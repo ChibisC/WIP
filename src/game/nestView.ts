@@ -103,7 +103,7 @@ export class NestView {
     const spots = owner?.player ? g.spots : [];
     this.stage.terrain.setHexes((q): HexVisual | null => {
       const ti = g.tunnelIndex(q);
-      if (ti >= 0) return { type: HEX_TYPE.entrance, level: 0, edges: 0, outline: shut.includes(g.entrances[ti]) ? 1 : 0, tint: black };
+      if (ti >= 0) return { type: HEX_TYPE.entrance, level: Math.max(0, (g.tunnels[ti] ?? [q]).indexOf(q)), edges: 0, outline: shut.includes(g.entrances[ti]) ? 1 : 0, tint: black };
       for (const sp of spots) if (sp.includes(q)) return { type: HEX_TYPE.spot, level: 0, edges: 0, outline: sp[0] === q ? 1 : 0, tint: black };
       const t = byQ.get(q);
       if (!t) return null;
