@@ -591,6 +591,35 @@ The user asked for an arena "like the EotU battle arena" for 2, 3 or 4 teams, al
 - **Determinism and multiplayer:** every action is a command with a wire format, so replays and snapshots carry the arena; the lobby does not offer it yet (single-player only).
 - Numbers: `ARENA` in `sim/balance.ts`. Tests: `tests/arena.ts`.
 
+### 3.14 Surface maps: survey for the new maps (2026-10-26, before any change)
+The brief (`docs/maps/brief.md`) replaces the four procedural surface styles (meadow, forest, sandy, riverbank; the formicarium stays for the arena) with five authored maps of 1,400–1,800 mm, a surface hex grid, authored water with flat crossings, floods and solid walls. What the code does today, and what each system needs:
+
+| System | Where | Sim / render | Today | At 1,400–1,800 mm with authored water and walls |
+|---|---|---|---|---|
+| Terrain recipe | `world/terrain.ts` `TerrainParams` :50, `generate` :106; `SimState.terrain` | sim (deterministic) | Rebuilt from `{seed, style, width, depth, sculpt[], water[], floodLevel}` on load, snapshot and worker start (`world.ts:61`); never serialized | Add a map id to the params; build heights and the hex layout from the map file + seed |
+| Heightfield arrays | `terrain.ts` `res = 2` :71 | sim | heights, overlay, water (f32), blocked, cover (u8), coverW ×4 | ~1.85 MB at 640 mm → 14.6 MB at 1,800 mm; consider `res = 4` for the big maps |
+| Walkability | `passable` :454 = `!isBlocked && !isWater`; `World.walkable` (`world.ts:352`) adds `inBounds(2)` | sim | Nearest 2 mm sample; **slope and walk height are ignored by movement** | Add hex-layout walls and walkways into `passable` (a walkway overrides water) |
+| Props | `placeProps` :175, `rebuildOverlay` :242; `render/props.ts` | sim placement, render meshes | Logs, rocks, twigs, leaves only raise the visual walk height (logs 56–80 mm); only mushroom stems block | Remove climbable props; walls become authored, blocking footprints; small decoration render-only |
+| Water | `addPuddle` :344, `rebuildWater` :307; `render/water.ts` | sim + render | 2 random puddles before nests, no exclusion (`mapGen.ts:111`); the riverbank "river" is a dry dip at the centre; `setFloodLevel`/`addWater` never called; water mesh 4 mm grid, rebuilt whole on any change; version key collides at 1,000 | Authored bodies from the map; floods as deterministic state; water mesh by chunk |
+| Colony placement | `mapGen.ts` `colonySpots` :266 | sim | Corners at 18 % (≤ 4) or a ring (5+); 30 random ±20 mm nudges test only the centre point and a wet point is accepted anyway | Replace with the map's 10 sites and its 2/3/4/10 site sets via `ColonySpec.at` |
+| Entrances | `colony.ts` `nestToSurface` :63 | sim | Hole = nest centre + offset × 0.6, clamped to the map, **no passability check** (40–90 mm from the centre; can be in water) | Entrances from the site definition (1–3 hexes), validated |
+| Caves, food, aphids, plants | `mapGen.ts` :129–211, `respawnSystem` :350; `dryPoint` :239 | sim | Random tries; `dryPoint` falls back to the unchecked centre | Zones from the map; respawn inside zones |
+| Creatures | `creatureAI.ts` `ecologySystem` :1309, `wildSpot` :1333 | sim | 30 random passable tries, 110 mm from entrances | Spawn and lair zones from the map |
+| Flow fields | `flow.ts` `SurfaceFlow` :412 | sim | 8 mm cells, one passable sample per cell, 8-connected with no corner-cut check, no eviction; fields seeded even in water | Walls and walkways at least 2 cells wide on the hex grid; corner-cut check; evict fields; ~51 k cells and ~204 KB per field at 1,800 mm; floods re-run every field |
+| Markers | `markers.ts` `placeMarker` :51 (player and AI) | sim | Snaps to an entrance within 12 mm; otherwise any in-bounds point | Snap a wet point to the nearest shore hex here (fixed ring scan, no rng) |
+| Hex grid | `world/nestGrid.ts` | sim | Flat-top, odd-q offset (odd columns down), q = r·cols + c, R circumradius, H = √3R, C = 1.5R, neighbours NE, SE, S, SW, NW, N; geometry lives in the nest class with its soil raster | Extract a shared `HexLayout` (index, centre, `hexAt`, neighbours, distance) and add ring/line helpers; GLSL copy in `render/nest/nestTerrain.ts:448` for the overlay |
+| Pheromones | `pheromones.ts` (4 mm) | sim | One trail field per colony, saved in snapshots | ~0.8 MB per array at 1,800 mm; 10 colonies ≈ 9 MB per snapshot before gzip (saves, resync, worker start) |
+| Missions | `missions.ts` (`style: 'meadow' \| 'forest'` :60) | sim | Spawns placed relative to the player's entrance (`spotFrom` :106); sized 640 by `main.ts` | Point at map ids and sites; text mentions the meadow and the old oak |
+| Menus and launch | `ui/menu.ts` :27–175, `main.ts` `launch` :83 (size 640/800/980 :117), `?style=` :224 | UI | Style chips; up to 6 AI (`MAX_AI`) → 7 colonies | Map cards; `MAX_AI = 9`; `?map=` |
+| Lobby | `net/messages.ts` `LobbySettings` :34, `net/match.ts` `matchSetup` :18, `net/lobby.ts` | net | Shares a whole `GameSetup` at start; 4 slots, 4 colours | Map id + seed + site set; AI fills up to 10 |
+| Area tabs | `areas.ts` `MAX_AREAS = 8` :23, `areaTabs.ts:25` | UI | 8 tabs, 8 colours | 10 nests + caves need more tabs or grouping |
+| Minimap | `ui/minimaps.ts` `bakeSurface` :251 | UI | Baked once from cover, relief and `!passable` (all drawn as water); never re-baked | Draw water, walls, sites and flood warnings; re-bake on water changes |
+| Saves and replays | `snapshot.ts`, `saves.ts` (no map field in `SaveHeader`), `replay.ts` (full `GameSetup`) | game | Terrain rebuilt from params; replays rebuild with `createWorld(setup)` | Map id in params and save header; old saves keep the procedural styles |
+| Terrain mesh, grass, look | `render/terrainMesh.ts`, `grass.ts`, `environment.ts`, `view.ts` | render | One mesh (373 k vertices at 1,800 mm), rebuilt whole; one grass InstancedMesh, never culled; one sky and fog for every style; fog ≈ 73 % at full zoom-out on 1,800 mm; shadows clamped to ±600 mm | Chunk and cull; per-map lighting, fog and weather presets |
+| Audio | `audio/ambience.ts` :57–95, `gameAudio.ts` :349 | render | Beds and one-shots per style | Map → biome mapping |
+
+Style switches to replace (`MapStyle`, `terrain.ts:5`): `terrain.ts` (relief, cover, props), `mapGen.ts:111`, `missions.ts`, `terrainMesh.ts:150/169`, `grass.ts:63/76`, `ambience.ts`, `gameAudio.ts`, `menu.ts`, `multiplayer.ts`, `net/match.ts`, `net/messages.ts`, `main.ts`, and dev scenes. **Tests and tools** build about 60 worlds with `style: 'meadow'` at 400–900 mm (and the formicarium for the arena); browser scripts rely on the default meadow layout for camera spots. The procedural styles stay available for them (and for old saves), so the authored maps are an addition to the terrain code, not a rewrite of it.
+
 ## 4. Rendering
 
 * Two scenes, both seen from above with the same top-down camera rig: **surface**
