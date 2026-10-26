@@ -287,11 +287,14 @@ export class Minimaps {
         const h0 = t.heightAt(wx, wz);
         const h1 = t.heightAt(Math.min(t.width, wx + 3), Math.min(t.depth, wz + 3));
         const sh = Math.max(0.6, Math.min(1.3, 1 + (h0 - h1) * 0.08));
-        const water = !t.passable(wx, wz);
+        const water = t.isWater(wx, wz);
+        // rocks, logs and other walls (authored maps) in grey; stepping stones over water in tan
+        const wall = !water && t.isBlocked(wx, wz);
+        const walk = !water && !wall && t.map !== null && t.waterAt(wx, wz) > -9999;
         const i = (y * S + x) * 4;
-        img.data[i] = water ? 40 : r * sh;
-        img.data[i + 1] = water ? 70 : gg * sh;
-        img.data[i + 2] = water ? 90 : b * sh;
+        img.data[i] = water ? 40 : wall ? 118 * sh : walk ? 168 : r * sh;
+        img.data[i + 1] = water ? 70 : wall ? 112 * sh : walk ? 146 : gg * sh;
+        img.data[i + 2] = water ? 90 : wall ? 104 * sh : walk ? 108 : b * sh;
         img.data[i + 3] = 255;
       }
     ctx.putImageData(img, 0, 0);

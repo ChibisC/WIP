@@ -11,8 +11,9 @@
 import { Command, decodeTickPacket, encodeTickPacket } from '../sim/commands';
 import type { GameSetup } from '../sim/mapGen';
 import type { SpeciesId } from '../sim/species';
+import type { MapId } from '../maps/types';
 
-export const BUILD_ID = 'ud-mp-3';
+export const BUILD_ID = 'ud-mp-4';
 
 /** A lobby slot (players 0–3; the slot number is the colony id). */
 export interface Slot {
@@ -33,6 +34,8 @@ export interface Slot {
 
 export interface LobbySettings {
   style: GameSetup['style'];
+  /** an authored map (docs/maps/design.md); replaces the style and size when set */
+  map?: MapId;
   seed: number;
   /** starting food multiplier on the map */
   food: number;

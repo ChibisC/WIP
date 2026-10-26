@@ -40,6 +40,7 @@ export function matchSetup(players: Slot[], s: LobbySettings): GameSetup {
     ],
     food: s.food,
     settings: { queenDeathLoses: true, statMul: 1, enemyStatMul: 1, creatures: 1 },
+    ...(s.map ? { map: s.map } : {}),
   };
 }
 

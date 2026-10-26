@@ -1,5 +1,6 @@
 import { SPECIES, SpeciesId, BORROWABLE, CASTES } from '../sim/species';
 import type { MapId } from '../maps/types';
+import { MAPS, PLAYABLE_MAPS } from '../maps';
 import { MapStyle } from '../world/terrain';
 import { Quality } from '../render/view';
 import { MISSIONS, MissionId } from '../sim/missions';
@@ -91,7 +92,11 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       .join('');
     const rivals = `${aiRows || `<p class="dim">${choice.mode === 'sandbox' ? 'No AI colonies: the meadow is yours.' : 'Add at least one AI colony.'}</p>`}<div class="opt-row">${choice.ais.length < MAX_AI ? '<button class="chip" data-aiadd="1">+ Add an AI colony</button>' : ''}<span class="dim">${choice.ais.length} of ${MAX_AI} · you are on Team 1; colonies on your team are allies</span></div>`;
     const styles: Array<[MapStyle, string]> = [['meadow', 'Meadow'], ['forest', 'Forest floor'], ['riverbank', 'Riverbank'], ['sandy', 'Sandy scrub']];
-    const map = styles.map(([id, n]) => `<button class="chip ${choice.style === id ? 'on' : ''}" data-style="${id}">${n}</button>`).join('');
+    const map =
+      PLAYABLE_MAPS.map((id) => `<button class="chip ${choice.map === id ? 'on' : ''}" data-map="${id}"><b>${MAPS[id]!.name}</b> · new</button>`).join('') +
+      '<span class="dim">or a random map:</span>' +
+      styles.map(([id, n]) => `<button class="chip ${!choice.map && choice.style === id ? 'on' : ''}" data-style="${id}">${n}</button>`).join('');
+    const mapNote = choice.map ? `<p class="dim">${MAPS[choice.map]!.blurb} 1.6 × 1.6 m, ten colony sites.</p>` : '';
     const q = (['auto', 'low', 'medium', 'high'] as Array<Quality | 'auto'>).map((id) => `<button class="chip ${choice.quality === id ? 'on' : ''}" data-q="${id}">${id[0].toUpperCase() + id.slice(1)}</button>`).join('');
     const modes: Array<[GameMode, string, string]> = [
       ['mission', 'Missions', 'Story missions with a narrator and a boss at the end'],
@@ -119,7 +124,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
            <h2>Colony</h2><div class="species-grid">${sp}</div>${borrow}`
         : `<h2>Colony</h2><div class="species-grid">${sp}</div>${borrow}
            <h2>AI colonies</h2>${rivals}
-           <h2>Map</h2><div class="opt-row">${map}</div>`;
+           <h2>Map</h2><div class="opt-row">${map}</div>${mapNote}`;
     const go = choice.mode === 'mission' ? `Start ${MISSIONS[choice.mission].title}` : choice.mode === 'sandbox' ? 'Open the sandbox' : choice.mode === 'arena' ? 'Open the arena' : 'Found the colony';
     root.innerHTML = `<div class="menu-card">
       <h1>UNDERGROUND DOMINION</h1>
@@ -170,7 +175,10 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       }
     } else if (d.teams) choice.teams = Number(d.teams);
     else if (d.afloor) arenaStyle = d.afloor as MapStyle;
-    else if (d.style) choice.style = d.style as MapStyle;
+    else if (d.style) {
+      choice.style = d.style as MapStyle;
+      delete choice.map;
+    } else if (d.map) choice.map = d.map as MapId;
     else if (d.q) choice.quality = d.q as Quality | 'auto';
     else if (t.classList.contains('go')) {
       if (t.disabled) return;

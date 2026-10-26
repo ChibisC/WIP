@@ -7,6 +7,8 @@ import { Lobby, LOBBY_SPECIES } from '../net/lobby';
 import type { MapStyle } from '../world/terrain';
 import { SaveRecord, SaveSlot, describeSave, listSaves, slotName } from '../game/saves';
 import { creditsHtml } from './credits';
+import { MAPS, PLAYABLE_MAPS } from '../maps';
+import type { MapId } from '../maps/types';
 
 const COLORS = ['#d9a441', '#d0554a', '#5b8ed6', '#4fb595'];
 const STYLES: Array<[MapStyle, string]> = [['meadow', 'Meadow'], ['forest', 'Forest floor'], ['riverbank', 'Riverbank'], ['sandy', 'Sandy scrub']];
@@ -305,12 +307,12 @@ export class LobbyView {
     const st = L.settings;
     const settings = host
       ? `<div class="lb-settings">
-          <label>Map <select data-f="style">${STYLES.map(([id, n]) => `<option value="${id}" ${id === st.style ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+          <label>Map <select data-f="style">${PLAYABLE_MAPS.map((id) => `<option value="map:${id}" ${id === st.map ? 'selected' : ''}>${MAPS[id]!.name} (new)</option>`).join('')}${STYLES.map(([id, n]) => `<option value="${id}" ${!st.map && id === st.style ? 'selected' : ''}>${n} (random)</option>`).join('')}</select></label>
           <label>Seed <input class="mp-input small" data-f="seed" value="${st.seed}"></label>
           <label>Food <select data-f="food">${[0.6, 1.2, 2].map((f) => `<option value="${f}" ${f === st.food ? 'selected' : ''}>${f === 0.6 ? 'Scarce' : f === 1.2 ? 'Normal' : 'Plenty'}</option>`).join('')}</select></label>
           <label>Population cap <select data-f="pop">${[150, 300, 500].map((p) => `<option value="${p}" ${p === st.popLimit ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
         </div>`
-      : `<p class="dim">Map ${STYLES.find((x) => x[0] === st.style)?.[1]} · seed ${st.seed} · food ${st.food === 0.6 ? 'scarce' : st.food === 1.2 ? 'normal' : 'plenty'} · population cap ${st.popLimit} · no pausing · speed 1×</p>`;
+      : `<p class="dim">Map ${st.map ? MAPS[st.map]?.name : STYLES.find((x) => x[0] === st.style)?.[1]} · seed ${st.seed} · food ${st.food === 0.6 ? 'scarce' : st.food === 1.2 ? 'normal' : 'plenty'} · population cap ${st.popLimit} · no pausing · speed 1×</p>`;
     const me = L.slots[L.you];
     const blocker = host ? L.startBlocker() : '';
     const chat = L.chat
@@ -383,7 +385,10 @@ export class LobbyView {
       if (slot === L.you) L.setMine({ species: t.value as never });
       else L.setSlot(slot, { species: t.value as never });
     } else if (f === 'kind') L.setSlot(slot, { kind: t.value as 'open' | 'closed' | 'ai' });
-    else if (f === 'style') L.setSettings({ style: t.value as MapStyle });
+    else if (f === 'style') {
+      if (t.value.startsWith('map:')) L.setSettings({ map: t.value.slice(4) as MapId, style: 'meadow' });
+      else L.setSettings({ style: t.value as MapStyle, map: undefined });
+    }
     else if (f === 'seed') L.setSettings({ seed: Math.max(1, Math.floor(Number(t.value) || 1)) });
     else if (f === 'food') L.setSettings({ food: Number(t.value) });
     else if (f === 'pop') L.setSettings({ popLimit: Number(t.value) });
