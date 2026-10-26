@@ -129,6 +129,32 @@ export class SurfaceLayout {
     for (let q = 0; q < this.flags.length; q++) if ((this.flags[q] & mask) === mask) out.push(q);
     return out;
   }
+
+  private zoneCache = new Map<number, number[]>();
+
+  /** Dry ground hexes of a zone flag (food, aphid…), cached; empty when the map has no such zone. */
+  zoneHexes(flag: number): number[] {
+    let z = this.zoneCache.get(flag);
+    if (!z) {
+      z = this.hexesWith(flag).filter((q) => this.type[q] === HEX_GROUND && !(this.flags[q] & (HF_SITE | HF_SITE_RING)));
+      this.zoneCache.set(flag, z);
+    }
+    return z;
+  }
+
+  /**
+   * The sites a match uses, in colony order: the map's balanced set for 2–4 colonies (set index
+   * `set`, or chosen by the seed), the 10-colony order otherwise (its first n), one site for 1.
+   */
+  siteOrder(n: number, set: number, seed: number): number[] {
+    const d = this.def;
+    if (n <= 0 || !d.sites.length) return [];
+    const pick = (sets: number[][]) => sets[(set >= 0 ? set : seed) % sets.length];
+    if (n === 1) return d.siteSets[2].length ? [pick(d.siteSets[2])[0]] : [0];
+    if (n <= 4 && d.siteSets[n as 2 | 3 | 4].length) return pick(d.siteSets[n as 2 | 3 | 4]).slice(0, n);
+    const all = d.siteSets[10].length ? pick(d.siteSets[10]) : d.sites.map((_, i) => i);
+    return all.slice(0, n);
+  }
 }
 
 /** FNV-1a over bytes, continuing from h. */

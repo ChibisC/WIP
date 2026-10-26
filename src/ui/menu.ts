@@ -1,4 +1,5 @@
 import { SPECIES, SpeciesId, BORROWABLE, CASTES } from '../sim/species';
+import type { MapId } from '../maps/types';
 import { MapStyle } from '../world/terrain';
 import { Quality } from '../render/view';
 import { MISSIONS, MissionId } from '../sim/missions';
@@ -25,6 +26,8 @@ export interface MenuChoice {
   /** AI colonies (up to 6) */
   ais: AiChoice[];
   style: MapStyle;
+  /** an authored map (docs/maps/design.md); when set it replaces the style and size */
+  map?: MapId;
   /** 'auto' follows the frame rate, starting from high */
   quality: Quality | 'auto';
   /** battle arena: 2–4 teams */

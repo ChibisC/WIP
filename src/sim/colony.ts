@@ -12,7 +12,8 @@ import { applyGroupOrders } from './markers';
 import { abilityActive, abilityTick } from './abilities';
 import { buildTick, forageTick } from './colonyAI';
 import { warTick } from './warAI';
-import { dcos, dsin, sq } from './dmath';
+import { dcos, dhypot, dsin, sq } from './dmath';
+import { SITE_RING } from '../world/surfaceLayout';
 
 /** Nest plane size in hexes (the same for every species; hex radius scales instead). */
 export const NEST_COLS = 34;
@@ -59,13 +60,39 @@ export function hexCoreCells(g: NestGrid, q: number, frac = 0.5): number[] {
   return out.length ? out : g.airCellsOfHex(q);
 }
 
-/** Map a nest-plane point to the colony's surface location (entrances keep their layout). */
+/**
+ * Map a nest-plane point to the colony's surface location (entrances keep their layout). On an
+ * authored map the point is kept inside the colony's site (its footprint and dry ring), which the
+ * map validator guarantees is dry, flat ground.
+ */
 export function nestToSurface(w: World, c: Colony, x: number, y: number): { x: number; y: number } {
   const g = w.nest(c.id)!;
   const k = 0.6;
-  const sx = c.nx + (x - g.widthMm / 2) * k;
-  const sy = c.ny + (y - g.depthMm / 2) * k;
+  let dx = (x - g.widthMm / 2) * k;
+  let dy = (y - g.depthMm / 2) * k;
+  const L = w.terrain.layout;
+  if (L && c.site !== undefined && L.sites[c.site]) {
+    const fp = L.def.sites[c.site].footprint ?? 1;
+    const lim = (fp + SITE_RING) * L.hex.H * 0.9;
+    const d = dhypot(dx, dy);
+    if (d > lim) {
+      dx *= lim / d;
+      dy *= lim / d;
+    }
+  }
+  const sx = c.nx + dx;
+  const sy = c.ny + dy;
   return { x: Math.min(w.terrain.width - 20, Math.max(20, sx)), y: Math.min(w.terrain.depth - 20, Math.max(20, sy)) };
+}
+
+/** Where a colony's n-th entrance opens on an authored map's site (its authored entrance hexes, in order), or null. */
+function siteEntrance(w: World, c: Colony, n: number): { x: number; y: number } | null {
+  const L = w.terrain.layout;
+  if (!L || c.site === undefined) return null;
+  const s = L.sites[c.site];
+  if (!s || n >= s.entrances.length) return null;
+  const q = s.entrances[n];
+  return { x: L.hex.centerX(q), y: L.hex.centerY(q) };
 }
 
 // ---------------------------------------------------------------------------
@@ -90,6 +117,8 @@ export interface ColonyOptions {
   developed?: number;
   /** team: colonies on the same team are allies (default: a team of its own) */
   team?: number;
+  /** the authored map's site index the colony stands on */
+  site?: number;
 }
 
 export function createColony(w: World, o: ColonyOptions): Colony {
@@ -131,6 +160,7 @@ export function createColony(w: World, o: ColonyOptions): Colony {
     abilityT: 0,
     nx: o.nx,
     ny: o.ny,
+    ...(o.site !== undefined ? { site: o.site } : {}),
     stats: { born: 0, died: 0, food: 0, kills: 0, lostQueen: false, peakPop: 0, stolen: 0 },
     recall: false,
     alarmT: 0,
@@ -191,7 +221,7 @@ export function createColony(w: World, o: ColonyOptions): Colony {
 
   // Entrance on the surface.
   const ep = g.hexCenter(entQ);
-  const es = nestToSurface(w, c, ep.x, ep.y);
+  const es = siteEntrance(w, c, 0) ?? nestToSurface(w, c, ep.x, ep.y);
   c.entrances.push({ q: entQ, sx: es.x, sy: es.y });
   c.spoil.push(0);
 
@@ -355,7 +385,7 @@ function checkNewEntrances(w: World, c: Colony): void {
     g.stateVersion++;
     g.version++;
     const p = g.hexCenter(q);
-    const s = nestToSurface(w, c, p.x, p.y);
+    const s = siteEntrance(w, c, c.entrances.length) ?? nestToSurface(w, c, p.x, p.y);
     c.entrances.push({ q, sx: s.x, sy: s.y });
     c.spoil.push(0);
     if (c.player) w.events.emit({ t: 'message', text: 'The diggers broke through: a new entrance to the surface.', kind: 'good', colony: c.id });
