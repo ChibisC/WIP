@@ -1,4 +1,5 @@
 import { World } from '../world';
+import { HF_CREATURE } from '../../world/surfaceLayout';
 import { Ant, AS, Creature, SURFACE } from '../types';
 import { casteOf } from '../species';
 import { ARENA, BALANCE, ECITON, TERMANT } from '../balance';
@@ -1332,10 +1333,21 @@ export function ecologySystem(w: World, dt: number): void {
 
 function wildSpot(w: World, clear: number): { x: number; y: number } | null {
   const t = w.terrain;
+  // on an authored map wild creatures come from its creature zones (when it has any)
+  const L = t.layout;
+  const zone = L ? L.zoneHexes(HF_CREATURE) : [];
   for (let i = 0; i < 30; i++) {
-    const x = w.rng.range(30, t.width - 30);
-    const y = w.rng.range(30, t.depth - 30);
-    if (!t.passable(x, y)) continue;
+    let x: number;
+    let y: number;
+    if (L && zone.length) {
+      const q = zone[w.rng.int(0, zone.length - 1)];
+      x = L.hex.centerX(q) + w.rng.range(-0.7, 0.7) * L.hex.R;
+      y = L.hex.centerY(q) + w.rng.range(-0.7, 0.7) * L.hex.R;
+    } else {
+      x = w.rng.range(30, t.width - 30);
+      y = w.rng.range(30, t.depth - 30);
+    }
+    if (!t.passable(x, y) || !t.inBounds(x, y, 30)) continue;
     let ok = true;
     for (const space of w.undergroundSpaces()) for (const e of w.entrancesOf(space)) if (dhypot(e.sx - x, e.sy - y) < clear) ok = false;
     if (ok) return { x, y };
