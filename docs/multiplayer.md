@@ -157,7 +157,7 @@ As built (`net/lockstep.ts`, `net/netGame.ts`, `net/transport.ts`):
 - **Transports.**
   - `LocalHub`: in-memory, with latency, for headless tests.
   - `BroadcastChannelTransport`: tabs on one machine (`?local=1`). It has no time-outs; a closing tab says goodbye on `pagehide`.
-  - `PeerTransport`: PeerJS WebRTC data channels. The room code maps to the host's peer id (`ud-<room>`). Public STUN, plus TURN from `VITE_TURN_*`; a failed connection says to configure TURN.
+  - `PeerTransport`: PeerJS WebRTC data channels. The room code maps to the host's peer id (`ud-<room>`). ICE servers from `net/relay.ts`: Google STUN plus a TURN relay, `VITE_TURN_*` when set at build time (the Pages workflow passes the repository variables `TURN_URL` / `TURN_USER` / `TURN_PASS`), else the Open Relay Project's public static-auth server (`staticauth.openrelay.metered.ca`, UDP 80, TCP 443, TLS 443) with TURN REST API credentials made in the browser from Metered's published shared secret (user `<expiry>:ud`, password base64 HMAC-SHA1, valid 24 h). PeerJS's own free TURN servers were shut down in 2023. A guest gives up after 30 s, or at once when ICE fails, with advice (VPN, Check connection, LAN). An ICE `disconnected` gets 8 s to recover before the player counts as gone.
   - `ManualRtcTransport` (`net/lanTransport.ts`): LAN play, WebRTC data channels set up by hand with connection codes and `iceServers: []` (section 6.1).
   - `NetSimTransport`: wraps any transport with latency, jitter and loss (`?netsim=lat,jit,loss`).
   - A WebSocket relay later only needs a new `Transport`.
@@ -206,7 +206,17 @@ For 2–4 devices on one Wi-Fi or network with no internet, no PeerJS, no STUN a
 
 **No outside servers:** `LAN_RTC_CONFIG` is a frozen `{ iceServers: [] }`; entering LAN mode also wraps `RTCPeerConnection` to log any connection made with ICE servers. The QR encoder and decoder are npm packages compiled into the build. The page must be loaded first (the artifact, or a local copy of `dist/` served on the network); then LAN play needs no internet. Google Fonts are cosmetic.
 
-**Browsers:** Chrome, Edge and Safari name local addresses with mDNS (`<uuid>.local`); most home networks resolve those. If a network does not, the connection fails with the advice above; granting camera access (after Scan QR code) makes Chrome and Safari offer plain IPs instead. Firefox also uses mDNS names. Tested here in Chromium (plain IP candidates; this container has no mDNS resolver): two and four players, wrong codes, a reconnect. Not yet tried on physical devices or across browsers.
+**Browsers:** Chrome, Edge and Firefox name local addresses with mDNS (`<uuid>.local`); most home networks resolve those. If a network does not, the connection fails with the advice above; granting microphone or camera access makes the browser offer plain IPs instead (Check connection → Allow on the LAN tab does that). WebKit (Safari, and every browser on iPhone and iPad) can hide the page's own addresses entirely until it may use the microphone or camera: Host LAN game's Add player and Join LAN game first probe for an address (`lanNeedsPermission`, a quick offer with no ICE servers), and when there is none on WebKit show "One more step on this device" with **Allow and continue**, which asks for the microphone (camera as a fallback), stops the tracks at once and carries on. A code is never made from a description with no address: that is refused with the reason (WebKit or network tips). Tested here in Chromium (plain IP candidates; this container has no mDNS resolver): two and four players, wrong codes, a reconnect. Not yet tried on physical devices or across browsers.
+
+### 6.2 When players cannot connect: Check connection (2026-10-26)
+
+**Multiplayer → Check connection** (Online and LAN tabs; `ui/netCheckView.ts`, `net/netCheck.ts`) gathers ICE candidates once and sorts them (`sortCandidates`): `host` (plain IP or mDNS `.local`), `srflx`/`prflx` (an internet address via STUN) and `relay` (the TURN relay answered). Online mode also fetches `https://0.peerjs.com/peerjs/id` to see that the matchmaking server answers. Each result is a plain sentence with ✓/✗, plus VPN advice when anything is blocked. LAN mode uses no ICE servers (`checkRoutes([])`), so it contacts nothing outside the network; when the address is hidden or only a `.local` name, it offers **Allow and check again**.
+
+The usual causes, in order: a VPN on either device (blocks local devices and, with "WebRTC leak protection", all non-proxied UDP); guest networks and client isolation (LAN); networks where only the relay gets through (phone data, school or work).
+
+![Hosting from an iPhone: allow first](multiplayer/check-iphone-host-gate.png)
+
+Tests: `tests/lan.ts` (relay credentials against a known HMAC, the default relay URLs, candidate sorting); `tests/browser/net_check.py` (LAN and online checks; an iPhone user agent with a page that hides its addresses until `getUserMedia`, as WebKit does: the check offers Allow, the host's Add player and the join screen ask first, and a normal browser joins the iPhone host). The relay itself cannot be reached from the test sandbox: check it on the live site.
 
 ## 7. Testing tools (Part F)
 

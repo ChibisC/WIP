@@ -35,7 +35,7 @@ How it works:
 - Every 100 ticks the players compare a hash of the whole game state. If they ever differ, the match stops with "Desync detected" and offers a report to download. It never carries on out of step.
 - **Local test without the internet:** the *Local tabs* tab of the Multiplayer menu. The players are then tabs of the same browser on one computer (`?room=ABCDEF&local=1`). For several devices without the internet, see LAN play below.
 - **Invite links need the deployed site.** A dev server on `localhost` cannot be reached by friends on other networks. Players connect through the free public PeerJS signalling server and then directly (WebRTC).
-  - Some strict firewalls and mobile networks block direct connections. For those, set a TURN relay at build time: `VITE_TURN_URL=turn:host:3478 VITE_TURN_USER=… VITE_TURN_PASS=…`.
+  - Where a direct connection is impossible (phone data, strict routers, VPNs, school or work networks), the game's messages go through a TURN relay: by default the free public [Open Relay Project](https://www.metered.ca/tools/openrelay/) server (UDP 80, TCP and TLS 443). To use your own relay (more reliable), set it at build time: `VITE_TURN_URL=turn:host:3478 VITE_TURN_USER=… VITE_TURN_PASS=…`. The GitHub Pages build reads these from the repository variables `TURN_URL`, `TURN_USER` and `TURN_PASS` (Settings → Secrets and variables → Actions → Variables). Anything in a build is visible to players, so use a relay account meant for browsers.
   - Your own PeerJS server: `VITE_PEER_HOST`, `VITE_PEER_PORT`, `VITE_PEER_PATH`, `VITE_PEER_SECURE`.
 
 ### How to play on LAN (no internet)
@@ -51,7 +51,14 @@ For 2–4 devices on the same Wi-Fi or network (laptops, tablets, phones in land
 
    ![A LAN lobby](docs/multiplayer/lan-lobby.png)
 
-If a player drops out during a match, the host taps **Players → Reconnect** and they exchange codes again; the player's colony is theirs again once the game has caught up. Codes last 5 minutes and work once. Where the page cannot use the camera, paste the text instead (a phone's camera app can read the QR code as text to copy). If devices cannot connect: guest networks and routers with "client isolation" stop devices seeing each other, and so can a VPN; a phone hotspot that every device joins usually works.
+If a player drops out during a match, the host taps **Players → Reconnect** and they exchange codes again; the player's colony is theirs again once the game has caught up. Codes last 5 minutes and work once. Where the page cannot use the camera, paste the text instead (a phone's camera app can read the QR code as text to copy). On an iPhone or iPad (any browser) and in Safari, the first Host or Join asks to allow the microphone once: WebKit only shows a page its own Wi-Fi address after that. Nothing is recorded.
+
+### When players cannot connect
+- **Turn off any VPN on every device** and reload the page. VPNs block devices on the same Wi-Fi from seeing each other, and many (apps and browser extensions with "WebRTC leak protection") block the connections online play uses.
+- **Multiplayer → Check connection** (on the Online or LAN tab) says what works from that device: the matchmaking server, a direct route, the relay, and the device's own address. On LAN it can also let the browser use the device's real address instead of a `.local` name (it asks for the microphone once).
+- LAN: guest networks and routers with "client isolation" stop devices seeing each other; a phone hotspot that every device joins usually works.
+
+  ![Check connection on the LAN tab](docs/multiplayer/check-lan.png)
 
 ## Deploying
 
