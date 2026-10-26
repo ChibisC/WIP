@@ -118,6 +118,13 @@ with sync_playwright() as p:
 
     ev = lambda pg, js: pg.evaluate(js)
 
+    def shot(pg, name):
+        # an in-game page renders slowly in software: do not let a screenshot hold the test up
+        try:
+            pg.screenshot(path=os.path.join(SHOTS, name), timeout=90000)
+        except Exception as e:
+            print('  (no screenshot', name, str(e)[:60], ')', flush=True)
+
     def same_hashes(pages, secs=150):
         def ready():
             hs = [ev(pg, '__net.status().lastHash') for pg in pages]
@@ -207,14 +214,14 @@ with sync_playwright() as p:
             ok, hs = same_hashes([h, g])
             check('state hashes match (2 players)', ok, hs)
             check('no desync', not any(ev(pg, '!!__net.status().desync') for pg in [h, g]))
-            g.screenshot(path=os.path.join(SHOTS, 'lan-match.png'))
+            shot(g, 'lan-match.png')
 
         # ------------------------------------------------------------------ 3. reconnect
         if lobby_ok and want('reconnect'):
             ev(g, '__net.transport.sever()')
             check('the joiner who lost the host is offered a rejoin', wait(lambda: g.locator('[data-a="rejoin"]').count() > 0, 30))
             check('the host waits for the player and offers a new code', wait(lambda: h.locator('[data-a="reconnect-waiting"]').is_visible(), 40))
-            g.screenshot(path=os.path.join(SHOTS, 'lan-lost-host.png'))
+            shot(g, 'lan-lost-host.png')
             g.locator('[data-a="rejoin"]').dispatch_event('click')
             check('the rejoin screen opens (the tab keeps its token)', wait(lambda: 'Rejoin the LAN match' in g.locator('.lan-card').inner_text(), 30))
             h.locator('[data-a="players"]').dispatch_event('click')

@@ -19,6 +19,7 @@ npx vite build      # production build in dist/
 The title screen has **Single-player** and **Multiplayer**.
 
 - **Single-player**, at your own pace, in four tabs: **Missions** (two story missions, *A Meadow Kingdom* and *The Forest Floor*, with a narrator, staged goals and a boss finale), **Skirmish** (you against 1–6 AI colonies, in teams; win when every rival queen falls), **Sandbox** (no rules: place any creature or boss, fill the stores, infinite food, wild creatures on or off) and **Battle Arena** (2–4 teams — Red, Blue, Green, Gold: drop any ants, termites or creatures in, 1–50 at a time and level I–III, round a team's corner or where you click; each team charges, holds or stands passive; the last team standing wins the round. Slow motion down to ¼×, climb rails and hitboxes make climbing easy to watch: put a passive stag beetle in the middle and send ants at it). You can pause (P) and change speed (− / =).
+- **Maps:** **Meadow Pond**, the first hand-made map (1.6 × 1.6 m: a lily pond, two streams with stepping stones, rocks, ten colony sites), or a random map in one of four styles. Four more hand-made maps are on the way.
 - **Multiplayer**: 2–4 players plus optional AI colonies on one map; last queen standing wins. A match always runs at 1× and **cannot be paused**. Opening a menu or photo mode does not stop it.
 
 ### Multiplayer and invite links
