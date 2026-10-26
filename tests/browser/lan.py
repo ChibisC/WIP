@@ -5,7 +5,7 @@ player with a host code, the player pastes it and gets a reply code, the host pa
   1. two players by copy and paste, a match, matching state hashes
   2. wrong and damaged codes give the right messages
   3. a dropped player comes back with a new code (host: Players → Reconnect) and catches up
-  4. four players (host + 3) on Meadow Pond (chosen in the lobby), matching hashes
+  4. four players (host + 3) on Forest Floor (chosen on its map card in the lobby), matching hashes
   every page: no request to PeerJS, STUN/TURN hosts or any other server once loaded, and every
   RTCPeerConnection made with an empty iceServers list
 
@@ -147,7 +147,8 @@ with sync_playwright() as p:
         wait(lambda: not h.locator('[data-a="start"]').is_disabled(), 30)
         h.click('[data-a="start"]')
         pages = [h] + guests
-        return wait(lambda: all(pg.evaluate('window.__ready===true') for pg in pages), 300)
+        # four software-rendered pages on two CPUs can take several minutes to build the match
+        return wait(lambda: all(pg.evaluate('window.__ready===true') for pg in pages), 600)
 
     def rtc_clean(pages):
         cfgs = [c for pg in pages for c in (ev(pg, 'window.__rtcConfigs || []') or [])]
@@ -286,14 +287,14 @@ with sync_playwright() as p:
             add_player(h, g, slot, name)
             check(f'{name} is seated in slot {slot + 1}', seated(h, name))
             guests.append(g)
-        # the authored map, chosen in the lobby
-        h.select_option('select[data-f="style"]', 'map:meadowPond')
-        check('every player sees Meadow Pond chosen', all(wait(lambda: 'Meadow Pond' in g.locator('.lobby').inner_text(), 15) for g in guests))
+        # the authored map, chosen on its card in the lobby
+        h.click('.lb-maps .map-card[data-map="forestFloor"]')
+        check('every player sees Forest Floor chosen', all(wait(lambda: g.locator('.lb-maps .map-card.on[data-map="forestFloor"]').count() == 1, 15) for g in guests))
         h.screenshot(path=os.path.join(SHOTS, 'lan-lobby-four.png'))
         ok = start_match(h, guests)
         check('the four-player LAN match starts everywhere', ok)
         if ok:
-            check('the match is on Meadow Pond, four colonies on its sites', all(ev(pg, '__session.world.terrain.map && __session.world.terrain.map.id') == 'meadowPond' and ev(pg, '__session.world.s.colonies.length') == 4 for pg in [h] + guests))
+            check('the match is on Forest Floor, four colonies on its sites', all(ev(pg, '__session.world.terrain.map && __session.world.terrain.map.id') == 'forestFloor' and ev(pg, '__session.world.s.colonies.length') == 4 for pg in [h] + guests))
             ok, hs = same_hashes([h] + guests, 300)
             check('state hashes match (4 players)', ok, hs)
             check('no desync', not any(ev(pg, '!!__net.status().desync') for pg in [h] + guests))
