@@ -3,6 +3,8 @@ import { TEST_POND } from './testPond';
 import { MEADOW_POND } from './meadowPond';
 import { FOREST_FLOOR } from './forestFloor';
 import { RIVERBANK } from './riverbank';
+import { RAINFOREST } from './rainforest';
+import { SAVANNA } from './savanna';
 
 export type { MapDef, MapId } from './types';
 
@@ -13,6 +15,8 @@ export const MAPS: Partial<Record<MapId, MapDef>> = {
   // drafts: validated, not yet offered in the menus (PLAYABLE_MAPS)
   forestFloor: FOREST_FLOOR,
   riverbank: RIVERBANK,
+  rainforest: RAINFOREST,
+  savanna: SAVANNA,
 };
 
 /** The maps offered in menus and the lobby, in order. */
