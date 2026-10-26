@@ -1,6 +1,6 @@
 # New surface maps — design (step 2)
 
-Status: draft for review, 2026-10-26. Brief: `docs/maps/brief.md`. Survey of today's code: `DESIGN.md` 3.14.
+Status: agreed with the user 2026-10-26 (decisions in §11). Brief: `docs/maps/brief.md`. Survey of today's code: `DESIGN.md` 3.14.
 
 The five maps are an **addition** to the terrain code, not a rewrite: the procedural styles stay for tests, tools and old saves (about 60 test worlds and every browser script depend on them), but the menus, the lobby and the missions offer only the five maps (plus the formicarium floor for the arena).
 
@@ -59,7 +59,7 @@ The seed varies only detail: grass and decoration scatter, food item positions i
 
 ## 5. Floods
 
-- Maps with flood zones schedule rain storms or rising water from the seed and the map's timing ranges (e.g. Meadow Pond: first storm at 9–13 min, then every 10–16 min). State lives in the simulation (`w.s.flood`: zone, phase, time), so it is deterministic, saved and replayed. A match setting turns floods off (default on).
+- Maps with flood zones schedule rain storms or rising water from the seed and the map's timing ranges (e.g. Meadow Pond: first storm at 9–13 min, then every 10–16 min). State lives in the simulation (`w.s.flood`: zone, phase, time), so it is deterministic, saved and replayed. A match setting turns floods on (**off by default**, the user's choice; missions may turn them on).
 - **Phases:** warning 25 s (the sky darkens, thunder rumbles, a timer icon on the minimap and the zone outlined on it) → rising 10 s (the zone's hexes turn to water lowest first, by a depth order stored in the file) → holding 40–90 s → draining 20 s.
 - **Effects:** ants and walking creatures on a flooded hex take drowning damage over time and head for the nearest dry hex (a shared "dry land" flow field rebuilt once per phase); food on flooded hexes floats off and is destroyed; markers inside the zone stay but groups wait at its edge. Sites and their rings are never in flood zones; underground nests are not affected.
 - **Rendering:** the water level of the zone's basin animates; the water mesh is per body (and per flood zone), so a flood rebuilds only its own patch.
@@ -74,7 +74,7 @@ The seed varies only detail: grass and decoration scatter, food item positions i
 
 ## 7. Menus, lobby, missions, saves
 
-- **Menus:** skirmish and sandbox show five map cards (name, blurb, size, number of sites, floods); a site set picker (Auto or a set); AI rivals up to 9. The arena keeps the formicarium floor.
+- **Menus:** skirmish and sandbox show five map cards (name, blurb, size, number of sites, floods); a site set picker (Auto or a set); a Floods switch (off by default); on Savanna a "Live termite mounds" switch; AI rivals up to 9. The arena keeps the formicarium floor.
 - **Lobby:** `LobbySettings` gets `map`, `siteSet`, `floods`, `ai`; the start message still carries the `GameSetup`, but terrain comes from the map id + seed, never from serialized terrain. `BUILD_ID` bumps.
 - **Missions:** *A Meadow Kingdom* plays on Meadow Pond (player on a fixed site, bosses spawned at a land-path distance), *Forest Floor* on Forest Floor (player and rival on fixed sites). Mission text is updated to the places.
 - **Saves and replays:** `TerrainParams.map` (absent = procedural); `SaveHeader.map` for the save list; `SimState.version` 3 with a migration (old saves load as their procedural style).
@@ -106,10 +106,13 @@ The seed varies only detail: grass and decoration scatter, food item positions i
 6. Floods, the editor's export, menus and lobby, missions, minimap, area tabs, saves.
 7. Verify (the brief's checklist), performance on the largest map with 10 colonies, docs (`docs/maps/` sketches and screenshots, DESIGN, README, PROGRESS).
 
-## 11. Decisions to confirm
+## 11. Decisions
 
+Settled with the user (2026-10-26):
 1. The procedural styles stay in the code (tests, tools, old saves) but leave the menus.
-2. Surface hex R = 8 mm (mound footprint 7 hexes ≈ 40 mm; site area ≈ 90 mm).
-3. Floods on by default, with a match setting to turn them off.
-4. Sizes as in §9 (1,500–1,800 mm), to be checked against the performance targets on the largest.
-5. Savanna's termite mounds: decorative walls by default, with an option to make some of them neutral termite colonies.
+2. Floods are **off by default**; a match setting turns them on.
+3. Savanna's termite mounds are decorative walls by default, with a match option that makes some of them neutral termite colonies.
+
+Working assumptions (change if the user prefers):
+4. Surface hex R = 8 mm (mound footprint 7 hexes ≈ 40 mm; site area ≈ 90 mm).
+5. Sizes as in §9 (1,500–1,800 mm), to be checked against the performance targets on the largest.
