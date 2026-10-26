@@ -576,7 +576,7 @@ function stumpMesh(m: Mass, ground: (x: number, y: number) => number, rng: Rng):
   }
   // the decayed top: growth rings in rotting wood, darker and dished toward a crumbling heart
   const topStart = pos.length / 3;
-  const RR = 5;
+  const RR = 12;
   pos.push(m.x, g0 + m.h * 0.8, m.y);
   col.push(0.16, 0.1, 0.06);
   for (let rr = 1; rr <= RR; rr++) {
@@ -591,7 +591,7 @@ function stumpMesh(m: Mass, ground: (x: number, y: number) => number, rng: Rng):
       const dish = (1 - f) * m.h * 0.12 * (0.6 + 0.4 * valueNoise2(i, rr, m.seed));
       pos.push(x, ey - 0.05 - dish, z);
       const ring = 0.5 + 0.5 * Math.sin(f * 22 + valueNoise2(i * 0.5, rr, m.seed) * 2);
-      tmpC.copy(rot).multiplyScalar((0.45 + 0.25 * ring) * (0.55 + 0.45 * f));
+      tmpC.copy(rot).multiplyScalar((0.38 + 0.3 * ring) * (0.6 + 0.4 * f));
       col.push(tmpC.r, tmpC.g, tmpC.b);
     }
   }
