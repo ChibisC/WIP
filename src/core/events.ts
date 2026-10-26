@@ -48,6 +48,8 @@ export type SimEvent =
   | { t: 'starving'; colony: number }
   | { t: 'chamberDone'; colony: number; chamber: number }
   | { t: 'queenHurt'; colony: number }
+  /** a flood zone's storm: warning, rising water or draining (sound, sky and minimap only) */
+  | { t: 'flood'; zone: number; phase: 'warn' | 'rise' | 'drain'; x: number; y: number }
   | { t: 'queenDead'; colony: number }
   | { t: 'colonyLost'; colony: number }
   | { t: 'food'; colony: number; amount: number }

@@ -15,6 +15,9 @@ import { nestToSurface } from '../src/sim/colony';
 import { SURFACE } from '../src/sim/types';
 import { runDeterminism } from '../src/dev/determinism';
 import { placeMarker } from '../src/sim/markers';
+import { CommandSchedule, stepWithCommands } from '../src/sim/commands';
+import { FP } from '../src/sim/floods';
+import { inShape } from '../src/world/mapShapes';
 
 let failed = 0;
 function check(name: string, ok: boolean, detail = ''): void {
@@ -149,6 +152,55 @@ check('aphids and plants stand on dry ground', w.s.aphids.every((a) => w.terrain
 // two runs and a snapshot restore stay identical (the map is rebuilt from its id + seed)
 const det = runDeterminism(2400, 200, 1200, setup, false);
 check('a map game is deterministic, also after a snapshot restore (2 min)', det.bDiff === -1 && det.cDiff === -1, `bDiff ${det.bDiff}, cDiff ${det.cDiff}, ${det.ants} ants`);
+
+// ---- floods (sim/floods.ts): off by default; on, a storm cycle floods the zone and drains it
+check('floods are off unless the match turns them on', w.s.flood === undefined);
+{
+  const fsetup: GameSetup = { ...setup, settings: { floods: true } };
+  const wf = createWorld(fsetup, new EventBus());
+  const fz = wf.terrain.map!.floods[0];
+  const f = wf.s.flood?.[0];
+  check('with floods on, the zone waits for its first storm (120–160 s)', !!f && f.phase === FP.Idle && f.next >= 120 && f.next <= 160, f ? `next ${f.next.toFixed(0)} s` : '');
+  const wetIn = () => {
+    let n = 0;
+    for (let y = 200; y < 520; y += 8) for (let x = 200; x < 540; x += 8) if (inShape(fz.shape, x, y) && wf.terrain.isWater(x, y)) n++;
+    return n;
+  };
+  const dryWet = wetIn();
+  const sched = new CommandSchedule();
+  const msgs: string[] = [];
+  wf.events.on('message', (e) => msgs.push(e.text));
+  const step = (until: () => boolean, max: number) => {
+    for (let i = 0; i < max && !until(); i++) {
+      stepWithCommands(wf, 0.05, sched);
+      wf.events.drain();
+    }
+    return until();
+  };
+  check('the storm warns the players first', step(() => f!.phase === FP.Warn, 4000) && msgs.some((m) => m.includes('storm')));
+  check('then the water rises and holds', step(() => f!.phase === FP.Hold, 1200) && f!.level === fz.level);
+  const flooded = wetIn();
+  check('the zone is under water (more of it than the pond alone)', flooded > dryWet + 20, `${dryWet} → ${flooded} wet samples`);
+  // an ant and a crumb in the water
+  let spot: { x: number; y: number } | null = null;
+  for (let y = 200; y < 520 && !spot; y += 8) for (let x = 200; x < 540 && !spot; x += 8) if (inShape(fz.shape, x, y) && wf.terrain.isWater(x, y) && wf.terrain.waterAt(x, y) - wf.terrain.heightAt(x, y) < 1.2) spot = { x, y };
+  const ant = wf.s.ants.find((a) => a.space !== SURFACE && wf.colony(a.colony)!.queen !== a.id)!;
+  if (spot && ant) {
+    ant.space = SURFACE;
+    ant.x = ant.px = spot.x;
+    ant.y = ant.py = spot.y;
+    const hp0 = ant.hp;
+    const food = wf.s.food.find((x) => x.space === SURFACE && !x.heldBy);
+    if (food) (food.x = spot.x + 2), (food.y = spot.y);
+    const fid = food?.id;
+    step(() => false, 20);
+    check('an ant in flood water loses health and paddles toward dry ground', ant.hp < hp0 && (ant.x !== spot.x || ant.y !== spot.y), `hp ${hp0.toFixed(1)} → ${ant.hp.toFixed(1)}`);
+    check('loose food in flood water floats off', fid === undefined || !wf.s.food.some((x) => x.id === fid));
+  } else check('found a shallow flooded spot to test with', false);
+  check('the flood drains away and the next storm is scheduled', step(() => f!.phase === FP.Idle, 3000) && f!.level === -9999 && wetIn() === dryWet && f!.next > wf.s.time, `next in ${(f!.next - wf.s.time).toFixed(0)} s`);
+  const fdet = runDeterminism(4400, 200, 3600, fsetup, false);
+  check('a game with floods is deterministic, also restored mid-storm', fdet.bDiff === -1 && fdet.cDiff === -1, `bDiff ${fdet.bDiff}, cDiff ${fdet.cDiff}`);
+}
 
 // ---- every playable map
 for (const id of PLAYABLE_MAPS) {

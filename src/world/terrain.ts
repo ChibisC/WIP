@@ -60,6 +60,8 @@ export interface TerrainParams {
   water: WaterOp[];
   /** Global flood level (absolute height); -Infinity encoded as -9999. */
   floodLevel: number;
+  /** authored maps: each flood zone's current water level (−9999 dry; sim/floods.ts) */
+  zoneFlood?: number[];
   /** an authored map (docs/maps/design.md); absent for the procedural styles */
   map?: MapId;
 }
@@ -162,6 +164,21 @@ export class Terrain {
           wm = 0.62 + ss(0.3, 0.6, moist) * 0.38;
           ws = ss(0.74, 0.86, sandN) * 0.3;
           wl = ss(0.64, 0.78, litN) * 0.3 * (1 - wm * 0.6);
+        } else if (map && (map.biome === 'forest' || map.biome === 'rainforest')) {
+          // woodland floor: leaf litter over most of it, moss in damp patches, bare soil between
+          wl = 0.5 + ss(0.35, 0.6, litN) * 0.45;
+          wm = ss(0.5, 0.66, moist) * (map.biome === 'rainforest' ? 0.75 : 0.55);
+          ws = ss(0.8, 0.9, sandN) * 0.15;
+        } else if (map && map.biome === 'riverbank') {
+          // grassy banks with sandy, gravelly strips (the shores get sand in shapeMap)
+          wm = 0.5 + ss(0.35, 0.62, moist) * 0.4;
+          ws = ss(0.66, 0.8, sandN) * 0.45;
+          wl = ss(0.66, 0.8, litN) * 0.2;
+        } else if (map && map.biome === 'savanna') {
+          // dry season: bare red-brown earth and sand, thin grass in patches
+          ws = 0.35 + ss(0.4, 0.62, sandN) * 0.4;
+          wm = ss(0.55, 0.72, moist) * 0.35;
+          wl = ss(0.7, 0.82, litN) * 0.2;
         } else {
           wm = ss(0.5, 0.66, moist) * 0.95;
           ws = ss(0.66, 0.78, sandN) * 0.6;
@@ -230,6 +247,13 @@ export class Terrain {
           const t = smooth01(d / BANK);
           const h = this.heights[k];
           if (h < bank) this.heights[k] = bank + (h - bank) * t * t;
+          // a riverbank's banks are sand and gravel a little further up
+          if (map.biome === 'riverbank' && d < 40) {
+            const sand = 1 - smooth01(Math.max(0, d - 8) / 32);
+            const k4 = k * 4;
+            this.coverW[k4 + 2] = Math.max(this.coverW[k4 + 2], 255 * sand * 0.9);
+            this.coverW[k4 + 1] *= 1 - sand * 0.7;
+          }
           // wet, bare mud along the shore
           const wet = 1 - smooth01(d / 14);
           if (wet > 0) {
@@ -428,6 +452,24 @@ export class Terrain {
             if (this.heights[k] < wb.level && shapeDist(wb.shape, i * res, j * res) < 0 && wb.level > this.water[k]) this.water[k] = wb.level;
           }
       }
+    // flood zones under water (storms on authored maps)
+    const zf = this.params.zoneFlood;
+    if (this.map && zf)
+      for (let z = 0; z < zf.length; z++) {
+        const level = zf[z];
+        const fz = this.map.floods[z];
+        if (!fz || level <= -9000) continue;
+        const box = shapeBox(fz.shape, 0);
+        const i0 = Math.max(0, Math.floor(box.x0 / res));
+        const i1 = Math.min(nx - 1, Math.ceil(box.x1 / res));
+        const j0 = Math.max(0, Math.floor(box.y0 / res));
+        const j1 = Math.min(ny - 1, Math.ceil(box.y1 / res));
+        for (let j = j0; j <= j1; j++)
+          for (let i = i0; i <= i1; i++) {
+            const k = j * nx + i;
+            if (this.heights[k] < level && level > this.water[k] && shapeDist(fz.shape, i * res, j * res) < 0) this.water[k] = level;
+          }
+      }
     const flood = this.params.floodLevel;
     for (let k = 0; k < nx * ny; k++) if (this.heights[k] < flood) this.water[k] = flood;
     for (const w of this.params.water) {
@@ -501,6 +543,14 @@ export class Terrain {
 
   setFloodLevel(level: number): void {
     this.params.floodLevel = level;
+    this.rebuildWater();
+  }
+
+  /** An authored map's flood zone `i` rises to (or drains from) `level` (−9999: dry). */
+  setZoneFlood(i: number, level: number): void {
+    const zf = (this.params.zoneFlood ??= []);
+    while (zf.length <= i) zf.push(-9999);
+    zf[i] = level;
     this.rebuildWater();
   }
 

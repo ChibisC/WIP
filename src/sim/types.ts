@@ -660,6 +660,8 @@ export interface CaveDef {
 export interface SimSettings {
   /** wild creature abundance multiplier (0 = none); undefined = 1 */
   creatures?: number;
+  /** authored maps: storms flood the map's flood zones (off unless the match turns it on) */
+  floods?: boolean;
   queenDeathLoses: boolean;
   fog: boolean;
   autoWaves: boolean;
@@ -698,4 +700,17 @@ export interface SimState {
   mode: Record<string, unknown>;
   /** multiplayer: the host's player id (may issue host commands such as AI takeover); default 0 */
   host?: number;
+  /** authored maps with floods on: each flood zone's storm cycle (sim/floods.ts) */
+  flood?: FloodState[];
+}
+
+/** One flood zone's storm cycle: phase 0 idle, 1 warning, 2 rising, 3 holding, 4 draining. */
+export interface FloodState {
+  phase: number;
+  /** seconds left in the phase */
+  t: number;
+  /** game time of the next storm (while idle) */
+  next: number;
+  /** the water level now (−9999: dry) */
+  level: number;
 }

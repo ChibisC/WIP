@@ -60,7 +60,7 @@ export class Grass {
 
   constructor(terrain: Terrain, density: number, margin = 320, extra: readonly DecorClump[] = []) {
     const rng = new Rng(terrain.params.seed + 555);
-    const blades: Array<{ x: number; z: number; h: number; w: number; rot: number; lean: number; c: number; reed?: boolean }> = [];
+    const blades: Array<{ x: number; z: number; h: number; w: number; rot: number; lean: number; c: number; reed?: boolean; dry?: boolean }> = [];
     const style = terrain.params.style;
     const pushClump = (cx: number, cz: number, s: number, tall: boolean) => {
       const n = Math.round((tall ? 26 : 12) * s * density);
@@ -76,6 +76,13 @@ export class Grass {
     for (const p of terrain.props) if (p.kind === 'grassClump') pushClump(p.x, p.y, p.scale, true);
     // an authored map's clumps (render/mapDecor.ts); reeds are tall, narrow and nearly upright
     for (const c of extra) {
+      if (c.kind === 'dry') {
+        // savanna: tall pale bunch grass
+        const from = blades.length;
+        pushClump(c.x, c.z, c.s, true);
+        for (let i = from; i < blades.length; i++) blades[i].dry = true;
+        continue;
+      }
       if (c.kind !== 'reed') {
         pushClump(c.x, c.z, c.s, c.kind === 'tall');
         continue;
@@ -172,6 +179,7 @@ export class Grass {
     const col = new THREE.Color();
     const greens = [new THREE.Color(0x4f7a2a), new THREE.Color(0x6b8f34), new THREE.Color(0x3d6626), new THREE.Color(0x8a9a44), new THREE.Color(0xa49a5a)];
     const reeds = [new THREE.Color(0x3f6a34), new THREE.Color(0x547a3a), new THREE.Color(0x35583a), new THREE.Color(0x6e7d48)];
+    const dry = [new THREE.Color(0xb59a5a), new THREE.Color(0xc8ad6a), new THREE.Color(0x9c8650), new THREE.Color(0xa59a62), new THREE.Color(0x8a8a50)];
     blades.forEach((b, i) => {
       const inside = b.x >= 0 && b.z >= 0 && b.x <= terrain.width && b.z <= terrain.depth;
       const y = inside ? terrain.heightAt(b.x, b.z) : terrain.heightAt(Math.min(Math.max(b.x, 0), terrain.width), Math.min(Math.max(b.z, 0), terrain.depth));
@@ -181,7 +189,7 @@ export class Grass {
       s.set(b.w, b.h, b.w);
       m.compose(p, q, s);
       mesh.setMatrixAt(i, m);
-      const pal = b.reed ? reeds : greens;
+      const pal = b.reed ? reeds : b.dry ? dry : greens;
       const gi = Math.floor(b.c * pal.length);
       col.copy(pal[gi]).lerp(pal[(gi + 1) % pal.length], rng.next() * 0.5);
       col.multiplyScalar(0.85 + rng.next() * 0.3);

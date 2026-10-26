@@ -6,6 +6,7 @@ import { shapeBox, shapeDist } from '../world/mapShapes';
 import { HF_ENTRANCE, HF_LITTER, HF_CREATURE, HF_SITE, HF_SITE_RING } from '../world/surfaceLayout';
 import { Terrain } from '../world/terrain';
 import { stoneGeometry } from './props';
+import { BIOME_DRESS, BiomeDress, buttressGeometry, leafRaft, litter, moundGeometry, mushroomCluster, nearWater, rootMatGeometry, trunkGeometry } from './mapBiomes';
 import { patchDapple } from './shaderPatch';
 import { textures } from './textures';
 
@@ -23,7 +24,7 @@ export interface DecorClump {
   x: number;
   z: number;
   s: number;
-  kind: 'tall' | 'short' | 'reed';
+  kind: 'tall' | 'short' | 'reed' | 'dry';
 }
 
 const hashStr = (s: string) => {
@@ -361,24 +362,63 @@ export class MapDecor {
     const tex = textures();
     const ground = (x: number, z: number) => terrain.heightAt(Math.min(Math.max(x, 0), terrain.width), Math.min(Math.max(z, 0), terrain.depth));
 
+    const dress = BIOME_DRESS[map.biome] ?? BIOME_DRESS.meadow;
     this.walls(map, ground, tex);
     this.walkways(map, terrain, tex);
-    this.stillWater(map, rng);
-    this.meadow(map, rng, ground, tex);
+    this.stillWater(map, rng, dress);
+    this.meadow(map, rng, ground, tex, dress);
   }
 
   private walls(map: MapDef, ground: (x: number, z: number) => number, tex: ReturnType<typeof textures>): void {
     const rockGeos: THREE.BufferGeometry[] = [];
     const logGeos: THREE.BufferGeometry[] = [];
+    const vcGeos: THREE.BufferGeometry[] = [];
+    const moundGeos: THREE.BufferGeometry[] = [];
     map.walls.forEach((w: Wall, i) => {
+      if (w.kind === 'buttress') {
+        const g = buttressGeometry(w.shape, w.height, ground);
+        if (g) logGeos.push(g);
+        return;
+      }
       if ('path' in w.shape) {
         logGeos.push(...pathLog(w.shape, ground, 900 + i));
+        return;
+      }
+      if (w.kind === 'trunk') {
+        const g = trunkGeometry(w.shape, w.height, ground, 1000 + i * 37);
+        if (g) logGeos.push(g);
+        return;
+      }
+      if (w.kind === 'mushrooms') {
+        const g = mushroomCluster(w.shape, w.height, ground, 1000 + i * 37);
+        if (g) vcGeos.push(g);
+        return;
+      }
+      if (w.kind === 'termiteMound') {
+        const g = moundGeometry(w.shape, w.height, ground, 1000 + i * 37);
+        if (g) moundGeos.push(g);
         return;
       }
       const look = ROCK_LOOK[w.kind] ?? ROCK_LOOK.rock!;
       const g = outlineRock(w.shape, w.height, 1000 + i * 37, look, ground);
       if (g) rockGeos.push(g);
     });
+    if (vcGeos.length) {
+      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55 });
+      patchDapple(mat);
+      const m = new THREE.Mesh(mergeGeometries(vcGeos), mat);
+      m.castShadow = m.receiveShadow = true;
+      m.name = 'mapMushrooms';
+      this.group.add(m);
+    }
+    if (moundGeos.length) {
+      const mat = new THREE.MeshStandardMaterial({ map: tex.soil.map, normalMap: tex.soil.normal, roughness: 0.95, vertexColors: true });
+      patchDapple(mat);
+      const m = new THREE.Mesh(mergeGeometries(moundGeos), mat);
+      m.castShadow = m.receiveShadow = true;
+      m.name = 'mapMounds';
+      this.group.add(m);
+    }
     if (rockGeos.length) {
       const mat = new THREE.MeshStandardMaterial({ map: tex.stone.map, normalMap: tex.stone.normal, normalScale: new THREE.Vector2(1.2, 1.2), roughness: 0.88, vertexColors: true });
       patchDapple(mat);
@@ -390,7 +430,7 @@ export class MapDecor {
     if (logGeos.length) {
       const mat = new THREE.MeshStandardMaterial({ map: tex.bark.map, normalMap: tex.bark.normal, roughness: 0.9, vertexColors: true, normalScale: new THREE.Vector2(1.5, 1.5) });
       patchDapple(mat);
-      const m = new THREE.Mesh(mergeGeometries(logGeos.map((g) => (g.index ? g.toNonIndexed() : g))), mat);
+      const m = new THREE.Mesh(mergeGeometries(logGeos.map(barkReady)), mat);
       m.castShadow = m.receiveShadow = true;
       m.name = 'mapLogs';
       this.group.add(m);
@@ -400,6 +440,8 @@ export class MapDecor {
   /** Walkways: overlapping flat stones (or a floating leaf) covering the whole path, tops at the walk height. */
   private walkways(map: MapDef, terrain: Terrain, tex: ReturnType<typeof textures>): void {
     const geos: THREE.BufferGeometry[] = [];
+    const roots: THREE.BufferGeometry[] = [];
+    const leaves: THREE.BufferGeometry[] = [];
     map.walkways.forEach((wk: Walkway, wi) => {
       if (!('path' in wk.shape)) return;
       const P = wk.shape.path;
@@ -407,6 +449,14 @@ export class MapDecor {
       let level = -9999;
       for (const wb of map.water) level = Math.max(level, wb.level);
       const top = level + 0.6;
+      if (wk.kind === 'rootMat') {
+        roots.push(...rootMatGeometry(P, w, top, 7000 + wi * 131));
+        return;
+      }
+      if (wk.kind === 'leaf') {
+        leaves.push(leafRaft(P, w, top, 7000 + wi * 131));
+        return;
+      }
       const rng = new Rng(7000 + wi * 131);
       for (let s = 0; s + 1 < P.length; s++) {
         const [x0, z0] = P[s];
@@ -450,6 +500,23 @@ export class MapDecor {
       m.name = 'mapWalkways';
       this.group.add(m);
     }
+    if (roots.length) {
+      const mat = new THREE.MeshStandardMaterial({ map: tex.bark.map, normalMap: tex.bark.normal, roughness: 0.85, vertexColors: true });
+      patchDapple(mat);
+      const m = new THREE.Mesh(mergeGeometries(roots.map(barkReady)), mat);
+      m.castShadow = m.receiveShadow = true;
+      m.name = 'mapRootMats';
+      this.group.add(m);
+    }
+    if (leaves.length) {
+      const mat = new THREE.MeshStandardMaterial({ map: tex.leaves.map, normalMap: tex.leaves.normal, roughness: 0.6, side: THREE.DoubleSide });
+      patchDapple(mat);
+      const m = new THREE.Mesh(mergeGeometries(leaves), mat);
+      m.castShadow = m.receiveShadow = true;
+      m.renderOrder = 3;
+      m.name = 'mapLeafRafts';
+      this.group.add(m);
+    }
   }
 
   private nearWalkway(map: MapDef, x: number, z: number, m: number): boolean {
@@ -458,7 +525,7 @@ export class MapDecor {
   }
 
   /** Lily pads and flowers on ponds and pools, reeds along every shore. */
-  private stillWater(map: MapDef, rng: Rng): void {
+  private stillWater(map: MapDef, rng: Rng, dress: BiomeDress): void {
     const pads: THREE.BufferGeometry[] = [];
     for (const wb of map.water) {
       const box = shapeBox(wb.shape, 0);
@@ -502,7 +569,7 @@ export class MapDecor {
         }
       }
       // reeds in patches along the shore (a few mm into the water to a little up the bank)
-      this.shoreReeds(map, wb.shape, wb.kind === 'stream' ? 0.45 : 0.7, rng);
+      this.shoreReeds(map, wb.shape, Math.min(1.6, (wb.kind === 'stream' ? 0.45 : 0.7) * dress.reeds), rng);
     }
     if (pads.length) {
       const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, side: THREE.DoubleSide });
@@ -564,8 +631,8 @@ export class MapDecor {
     }
   }
 
-  /** Grass clumps (long grass toward the edges and in the creature and litter zones), pebbles, wildflowers. */
-  private meadow(map: MapDef, rng: Rng, ground: (x: number, z: number) => number, tex: ReturnType<typeof textures>): void {
+  /** Grass clumps (long grass toward the edges and in the creature and litter zones), pebbles, wildflowers, litter. */
+  private meadow(map: MapDef, rng: Rng, ground: (x: number, z: number) => number, tex: ReturnType<typeof textures>, d: BiomeDress): void {
     const t = this.terrain;
     const W = t.width;
     const D = t.depth;
@@ -580,11 +647,11 @@ export class MapDecor {
     };
     const area = (W * D) / 1e4;
     // long grass
-    const clumps = Math.round(area * 3.4);
+    const clumps = Math.round(area * d.grass);
     for (let i = 0; i < clumps; i++) {
       let x = rng.range(0, W);
       let z = rng.range(0, D);
-      if (rng.chance(0.5)) {
+      if (rng.chance(d.edge)) {
         const side = rng.int(0, 3);
         const u = rng.range(0, 1);
         const inset = Math.abs(rng.gauss()) * 70;
@@ -596,7 +663,7 @@ export class MapDecor {
       if (!free(x, z, 8) || this.keepClear(x, z, 1)) continue;
       const zone = L ? L.flagsAt(x, z) : 0;
       const tall = zone & (HF_CREATURE | HF_LITTER) || fbm2(x / 160, z / 160, 3, 77) > 0.56;
-      this.clumps.push({ x, z, s: rng.range(0.6, 1.4) * (tall ? 1.15 : 0.8), kind: tall || rng.chance(0.45) ? 'tall' : 'short' });
+      this.clumps.push({ x, z, s: rng.range(0.6, 1.4) * (tall ? 1.15 : 0.8), kind: d.dry ? 'dry' : tall || rng.chance(0.45) ? 'tall' : 'short' });
     }
     // grass hugging the rocks' feet
     for (const wl of map.walls) {
@@ -608,17 +675,24 @@ export class MapDecor {
         const r = o.r(a) + rng.range(1, 9);
         const x = o.cx + Math.cos(a) * r;
         const z = o.cz + Math.sin(a) * r;
-        if (free(x, z) && !this.keepClear(x, z, 1)) this.clumps.push({ x, z, s: rng.range(0.4, 0.9), kind: rng.chance(0.5) ? 'tall' : 'short' });
+        if (free(x, z) && !this.keepClear(x, z, 1) && d.grass > 0.5) this.clumps.push({ x, z, s: rng.range(0.4, 0.9), kind: d.dry ? 'dry' : rng.chance(0.5) ? 'tall' : 'short' });
       }
     }
 
     // pebbles: a light scatter, scree round the rocks, gravel on the shores
     const peb: Array<[number, number, number]> = [];
-    for (let i = 0; i < area * 7; i++) {
+    for (let i = 0; i < area * d.pebbles; i++) {
       const x = rng.range(0, W);
       const z = rng.range(0, D);
       if (free(x, z, 3)) peb.push([x, z, 0.5 + Math.pow(rng.next(), 3) * 2.8]);
     }
+    // gravel banks along running water (riverbank)
+    if (d.reeds > 1)
+      for (let i = 0; i < area * 12; i++) {
+        const x = rng.range(0, W);
+        const z = rng.range(0, D);
+        if (nearWater(map, x, z, 45) && !nearWater(map, x, z, 9) && free(x, z, 3)) peb.push([x, z, 0.6 + Math.pow(rng.next(), 2) * 3.2]);
+      }
     for (const wl of map.walls) {
       const o = polar(wl.shape);
       if (!o) continue;
@@ -665,7 +739,7 @@ export class MapDecor {
 
     // wildflowers in drifts
     const fl: THREE.BufferGeometry[] = [];
-    const drifts = Math.round(area * 0.12);
+    const drifts = Math.round(area * d.flowers);
     for (let d = 0; d < drifts; d++) {
       const cx = rng.range(40, W - 40);
       const cz = rng.range(40, D - 40);
@@ -690,5 +764,18 @@ export class MapDecor {
       m.name = 'mapFlowers';
       this.group.add(m);
     }
+    // fallen leaves, twigs, fungi and ferns
+    litter({ map, terrain: t, rng, ground, free: (x, z, m2 = 6) => free(x, z, m2), keepClear: (x, z, r = 0) => this.keepClear(x, z, r) }, d, this.group);
   }
+}
+
+/** Bark meshes merged together need the same attributes: position, normal, uv, colour. */
+function barkReady(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  if (g.index) g = g.toNonIndexed();
+  const n = g.attributes.position.count;
+  if (!g.attributes.normal) g.computeVertexNormals();
+  if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+  if (!g.attributes.color) g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
+  for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'color'].includes(k)) g.deleteAttribute(k);
+  return g;
 }
