@@ -408,7 +408,8 @@ export class MapDecor {
       this.group.add(m);
     }
     if (moundGeos.length) {
-      const mat = new THREE.MeshStandardMaterial({ map: tex.soil.map, normalMap: tex.soil.normal, roughness: 0.95, vertexColors: true });
+      // vertex-coloured clay with the soil's normal map only (the dark soil colour map would muddy it)
+      const mat = new THREE.MeshStandardMaterial({ normalMap: tex.soil.normal, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 0.97, vertexColors: true });
       patchDapple(mat);
       const m = new THREE.Mesh(mergeGeometries(moundGeos), mat);
       m.castShadow = m.receiveShadow = true;
