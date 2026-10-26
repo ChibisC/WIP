@@ -172,17 +172,19 @@ As built (`net/lockstep.ts`, `net/netGame.ts`, `net/transport.ts`):
 - The main menu adds **Multiplayer**, with **Create Game** and **Join Game**.
 - **Create Game** makes a room code and shows `https://<site>/?room=ABC123` with **Copy Link**. Opening that link goes straight to the lobby.
 - **Lobby.**
-  - Four slots, each with name, species, colony colour, ping and ready status.
-  - Empty slots can be Open, Closed or AI.
-  - The host picks map, seed, starting food and population cap; game speed is fixed at 1×.
-  - Start is enabled when everyone is ready.
+  - Eight slots (2026-10-26; four before), each with name, species, colony colour, team, ping and ready status. Empty slots can be Open, Closed or AI (by default three open, the rest closed).
+  - **Teams** (2026-10-26): Red, Blue, Green, Gold (`net/match.ts` `LOBBY_TEAMS`) or no team. Players pick their own; the host picks AIs' and can move anyone. Lobby team t is simulation team `TEAM_BASE + t` (100 + t; colony ids stay below it); no team = a team of its own (the colony id). The simulation already treated teams as allies (combat, war AI, corpses, brood raids, areas). `matchSetup` sets `groupTeams`, and `createWorld` then places teammates on neighbouring sites of the map's balanced site set (`teamSiteOrder`: the sites in order around the map centre by `datan2`, teams taking runs of consecutive sites, bigger teams first). `matchWinner` returns the last team with a living queen; the results screen names the whole team ("Team Blue wins: …") and a knocked-out player is told their team plays on. Everyone on one team cannot start (`teamsBlocker`).
+  - **Gene Thief** (`plagiaria`, 2026-10-26): a Gene Thief slot shows the 21 borrowable castes (`BORROWABLE`) as chips: its player picks for themselves, the host for an AI (a new Gene Thief AI gets two or three at random, picked on the host so everyone gets the same). The host cleans every pick (`cleanBorrowed`: real borrowable castes, in a fixed order) and the colony starts with exactly those castes (before, every multiplayer Gene Thief got the same two). With none picked it falls back to `GENE_THIEF_DEFAULT` (mortar, fire major).
+  - **Map cards** (2026-10-26): the five authored maps as cards with a sketch (`ui/mapPreview.ts`), as in single-player; the host clicks one, guests see the choice. Floods on/off for maps that have them. Then seed, starting food and population cap; game speed is fixed at 1×.
+  - The host validates every slot change from a guest (species, team 0–4, castes, name length, colour). `BUILD_ID` is `ud-mp-5`.
+  - Start is enabled when everyone is ready and there are at least two sides.
 - **Match setup** is generated from the shared seed:
   - a surface with 2–4 fairly spaced spawns;
   - one home nest per colony, plus neutral lairs.
   - Each player sees their own nest as area 1 and the others as enemy areas (this already works: `areasFor(world, colony)`).
 - **In match.** A multiplayer match cannot be paused (user rule) and runs at 1×. Opening a menu or photo mode does not stop it.
 - **Surrender.** In the menu, two clicks. The colony is out on every client; that player can keep watching.
-- **End.** The last queen standing wins, followed by a results screen with per-colony stats. Text chat (Enter), with mute.
+- **End.** The last queen (or team) standing wins, followed by a results screen with per-colony stats. Text chat (Enter), with mute.
 - Sandbox options (revealing every area) are single-player only.
 
 ### 6.1 LAN play: connection codes, no servers (2026-10-26)

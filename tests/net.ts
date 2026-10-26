@@ -15,7 +15,10 @@ import { SURFACE } from '../src/sim/types';
 import { LocalHub, LocalEndpoint } from '../src/net/transport';
 import { NetGame, NetSim } from '../src/net/netGame';
 import { Slot, packControl, unpack } from '../src/net/messages';
-import { DEFAULT_LOBBY, matchPlayers, matchSetup, matchWinner } from '../src/net/match';
+import { DEFAULT_LOBBY, GENE_THIEF_DEFAULT, TEAM_BASE, matchPlayers, matchSetup, matchWinner, teamsBlocker } from '../src/net/match';
+import { Lobby } from '../src/net/lobby';
+import { BORROWABLE } from '../src/sim/species';
+import { dhypot } from '../src/sim/dmath';
 import { LocalCommands } from '../src/game/localCommands';
 
 let failed = 0;
@@ -56,14 +59,15 @@ interface Client {
   alive: boolean;
 }
 
-const slot = (kind: Slot['kind'], name: string, species: Slot['species'], peer = '', token = ''): Slot => ({ kind, name, species, color: 0, ready: true, peer, ping: 0, token });
+const slot = (kind: Slot['kind'], name: string, species: Slot['species'], peer = '', token = ''): Slot => ({ kind, name, species, color: 0, ready: true, peer, ping: 0, token, team: 0 });
 
-function makeMatch(hub: LocalHub, n: number, opts: { delay?: number; ai?: boolean } = {}) {
-  const slots: Slot[] = [slot('human', 'Host', 'lasius', 'p0', 't0')];
+function makeMatch(hub: LocalHub, n: number, opts: { delay?: number; ai?: boolean; slots?: Slot[]; map?: import('../src/maps/types').MapId } = {}) {
+  let slots: Slot[] = [slot('human', 'Host', 'lasius', 'p0', 't0')];
   for (let i = 1; i < n; i++) slots.push(slot('human', `Guest ${i}`, i % 2 ? 'formica' : 'solenopsis', `p${i}`, `t${i}`));
   if (opts.ai !== false) slots.push(slot('ai', 'AI', 'atta'));
+  if (opts.slots) slots = opts.slots;
   const players = matchPlayers(slots);
-  const setup = matchSetup(players, { ...DEFAULT_LOBBY, seed: 4242 });
+  const setup = matchSetup(players, { ...DEFAULT_LOBBY, seed: 4242, ...(opts.map ? { map: opts.map } : {}) });
   // everyone is connected (the lobby) before the match starts
   const eps = [hub.connect('p0', 'p0')];
   for (let i = 1; i < n; i++) eps.push(hub.connect(`p${i}`, 'p0'));
@@ -270,6 +274,75 @@ const t0 = Date.now();
   clients[1].cmds.issue({ type: 'recall' });
   await run(hub, clients, 1_000, false);
   check('surrender: a colony that is out can no longer give orders', clients[1].applied === before + 1 && !clients[1].sim.w.colony(1)!.alive);
+}
+
+// ---------------------------------------------------------------- teams and the Gene Thief
+{
+  // 2 v 2 on Meadow Pond: the host and a Gene Thief player (Red) against two AIs (Blue), one a Gene Thief
+  const team = (s: Slot, t: number, borrowed?: string[]) => ({ ...s, team: t, ...(borrowed ? { borrowed } : {}) });
+  const slots = [
+    team(slot('human', 'Host', 'lasius', 'p0', 't0'), 1),
+    team(slot('human', 'Thief', 'plagiaria', 'p1', 't1'), 1, ['atta_major', 'hell_soldier', 'bogus_caste']),
+    team(slot('ai', 'AI', 'formica'), 2),
+    team(slot('ai', 'AI', 'plagiaria'), 2),
+  ];
+  const hub = new LocalHub();
+  hub.latency = () => 40;
+  const { clients, setup } = makeMatch(hub, 2, { slots, map: 'meadowPond' });
+  check('teams: lobby teams become simulation teams (Red, Red, Blue, Blue) and teammates are grouped', JSON.stringify(setup.colonies.map((c) => c.team)) === JSON.stringify([TEAM_BASE + 1, TEAM_BASE + 1, TEAM_BASE + 2, TEAM_BASE + 2]) && setup.groupTeams === true);
+  check("Gene Thief: the player's picks are kept (unknown castes dropped), an AI with no picks gets the default pair", JSON.stringify(setup.colonies[1].borrowed) === JSON.stringify(['atta_major', 'hell_soldier']) && JSON.stringify(setup.colonies[3].borrowed) === JSON.stringify(GENE_THIEF_DEFAULT), JSON.stringify(setup.colonies.map((c) => c.borrowed)));
+  const w = clients[0].sim.w;
+  check('Gene Thief: the borrowed castes are raised by that colony on every client', clients.every((c) => ['atta_major', 'hell_soldier'].every((id) => c.sim.w.colony(1)!.castes.includes(id))) && !w.colony(0)!.castes.includes('atta_major'), w.colony(1)!.castes.join(','));
+  // teammates on neighbouring sites: each colony's nearest other colony is its teammate
+  const nests = w.s.colonies.map((c) => ({ id: c.id, team: c.team, x: c.entrances[0].sx, y: c.entrances[0].sy }));
+  const nearestIsMate = nests.every((a) => {
+    const others = nests.filter((b) => b.id !== a.id).sort((p, q) => dhypot(p.x - a.x, p.y - a.y) - dhypot(q.x - a.x, q.y - a.y));
+    return others[0].team === a.team;
+  });
+  check('teams: teammates start on neighbouring colony sites', nearestIsMate, nests.map((n) => `${n.id}@${Math.round(n.x)},${Math.round(n.y)}`).join(' '));
+  check('teams: allies are not enemies (teamOf)', w.teamOf(0) === w.teamOf(1) && w.teamOf(2) === w.teamOf(3) && w.teamOf(0) !== w.teamOf(2));
+  await run(hub, clients, 20_000);
+  const cmp = compareHashes(clients[0], clients[1]);
+  check('teams: a 2 v 2 match with Gene Thieves stays in sync', cmp.diff < 0 && cmp.common >= 3 && clients.every((c) => !c.game.status().desync), `${cmp.common} checkpoints`);
+  check('teams: no winner while both teams have a queen', matchWinner(w) === -1);
+  for (const c of clients) for (const id of [2, 3]) c.sim.w.colony(id)!.alive = false;
+  check('teams: when one team is out, the other team wins together', clients.every((c) => matchWinner(c.sim.w) === TEAM_BASE + 1));
+  for (const c of clients) c.sim.w.colony(0)!.alive = false;
+  check('teams: a team still wins with one of its queens left', matchWinner(w) === TEAM_BASE + 1);
+}
+
+// ---------------------------------------------------------------- the lobby: teams and Gene Thief picks are checked by the host
+{
+  const hub = new LocalHub();
+  const hostEp = hub.connect('h', 'h');
+  const host = new Lobby(hostEp, 'ROOMXX', 'Host', 'th');
+  const guestEp = hub.connect('g', 'h');
+  const guest = new Lobby(guestEp, 'ROOMXX', 'Guest', 'tg');
+  const settle = () => {
+    for (let k = 0; k < 10; k++) hub.deliver(hub.now + 10);
+  };
+  settle();
+  check('lobby: eight slots, the guest is seated', host.slots.length === 8 && guest.you === 1, `you ${guest.you}`);
+  guest.setMine({ species: 'plagiaria', team: 9, borrowed: ['bogus', 'fire_major'] } as never);
+  settle();
+  const g = host.slots[1];
+  check('lobby: a guest cannot set a team past 4 or a caste that does not exist', g.species === 'plagiaria' && g.team === 0 && JSON.stringify(g.borrowed) === JSON.stringify(['fire_major']), JSON.stringify(g));
+  guest.setMine({ team: 2 });
+  settle();
+  check("lobby: a guest picks their own team and everyone sees it", host.slots[1].team === 2 && guest.slots[1].team === 2);
+  host.setSlot(1, { species: 'atta' });
+  host.setSlot(1, { team: 3 });
+  settle();
+  check("lobby: the host can move a player to another team but not change their species", host.slots[1].team === 3 && host.slots[1].species === 'plagiaria');
+  host.setSlot(2, { kind: 'ai', species: 'plagiaria' });
+  const ai = host.slots[2];
+  check('lobby: a Gene Thief AI steals two or three castes, all borrowable', ai.kind === 'ai' && (ai.borrowed?.length ?? 0) >= 2 && (ai.borrowed?.length ?? 0) <= 3 && ai.borrowed!.every((id) => BORROWABLE.includes(id)), JSON.stringify(ai.borrowed));
+  host.setMine({ team: 3 });
+  host.setSlot(2, { team: 3 });
+  check('lobby: everyone on one team cannot start', host.startBlocker().startsWith('Everyone is on Team'), host.startBlocker());
+  host.setSlot(2, { team: 0 });
+  check('lobby: a colony with no team makes it a match', !teamsBlocker(matchPlayers(host.slots)), teamsBlocker(matchPlayers(host.slots)));
+  check('lobby: a guest who is not ready still blocks the start', host.startBlocker().startsWith('Waiting for'), host.startBlocker());
 }
 
 console.log(`\n${failed ? failed + ' FAILED' : 'all passed'} in ${((Date.now() - t0) / 1000).toFixed(1)}s`);

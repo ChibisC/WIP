@@ -2,8 +2,10 @@
  * Title screen (Single-player / Multiplayer), the multiplayer menu (create or
  * join a game) and the lobby screen (multiplayer brief, Part E).
  */
-import { SPECIES } from '../sim/species';
-import { Lobby, LOBBY_SPECIES } from '../net/lobby';
+import { BORROWABLE, CASTES, SPECIES } from '../sim/species';
+import { Lobby, LOBBY_SPECIES, SLOT_COUNT } from '../net/lobby';
+import { LOBBY_TEAMS, TEAM_COLORS, TEAM_NAMES, cleanTeam } from '../net/match';
+import { mapPreview } from './mapPreview';
 import type { MapStyle } from '../world/terrain';
 import { SaveRecord, SaveSlot, describeSave, listSaves, slotName } from '../game/saves';
 import { creditsHtml } from './credits';
@@ -11,8 +13,11 @@ import { MAPS, PLAYABLE_MAPS } from '../maps';
 import type { MapId } from '../maps/types';
 import { runNetCheck } from './netCheckView';
 
-const COLORS = ['#d9a441', '#d0554a', '#5b8ed6', '#4fb595'];
-const STYLES: Array<[MapStyle, string]> = [['meadow', 'Meadow'], ['forest', 'Forest floor'], ['riverbank', 'Riverbank'], ['sandy', 'Sandy scrub']];
+const COLORS = ['#d9a441', '#d0554a', '#5b8ed6', '#4fb595', '#b072d6', '#e07a3c', '#8fbf3f', '#e0e0d0'];
+/** "Red Wood Mortar": a borrowable caste's species and caste name */
+const casteName = (id: string) => `${SPECIES[CASTES[id].species].common.replace(' Ant', '')} ${CASTES[id].name}`;
+/** map card thumbnails, drawn once per map */
+const thumbs = new Map<MapId, HTMLCanvasElement>();
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -163,7 +168,7 @@ export function showMultiplayerMenu(
       : '';
   const body =
     mode === 'lan'
-      ? `<p class="dim">Play with up to 3 others on the same Wi-Fi or network, with no servers and no internet once the game has loaded. The host adds each player by showing a code (QR or text); the player's device answers with a reply code for the host.</p>
+      ? `<p class="dim">Play with others on the same Wi-Fi or network, with no servers and no internet once the game has loaded. The host adds each player by showing a code (QR or text); the player's device answers with a reply code for the host.</p>
          <div class="opt-row"><button class="go" data-a="lan-host">Host LAN game</button><button class="go" data-a="lan-join">Join LAN game</button></div>`
       : `<h2>Create</h2>
          <div class="opt-row"><button class="go" data-a="create">Create game</button></div>
@@ -178,7 +183,7 @@ export function showMultiplayerMenu(
   const root = screen(
     parent,
     `<h1>Multiplayer</h1>
-     <p class="tag">Up to 4 players and AI colonies on one map.</p>
+     <p class="tag">Up to 8 colonies on one map — players and AI, in teams if you like.</p>
      ${error ? `<p class="mp-error">${esc(error)}</p>` : ''}
      <h2>Your name</h2>
      <input class="mp-input" data-f="name" maxlength="24" placeholder="Queen of the meadow" value="${esc(savedName())}">
@@ -301,17 +306,26 @@ export class LobbyView {
       .map((s, i) => {
         const mine = i === L.you;
         const sp = SPECIES[s.species];
-        const color = `<span class="lb-col" style="background:${COLORS[s.color % 4]}"></span>`;
+        const filled = s.kind === 'human' || s.kind === 'ai';
+        const color = `<span class="lb-col" style="background:${COLORS[s.color % COLORS.length]}"></span>`;
         let who = '';
         if (s.kind === 'human') who = `<b>${esc(s.name)}</b>${i === 0 ? ' <span class="dim">(host)</span>' : ''}${mine ? ' <span class="dim">(you)</span>' : ''}`;
         else if (s.kind === 'ai') who = '<b>AI colony</b>';
         else who = `<span class="dim">${s.kind === 'open' ? 'Open — waiting for a player' : 'Closed'}</span>`;
-        const species =
-          s.kind === 'human' || s.kind === 'ai'
-            ? (mine && !L.started) || (host && s.kind === 'ai')
-              ? `<select data-slot="${i}" data-f="species">${LOBBY_SPECIES.map((id) => `<option value="${id}" ${id === s.species ? 'selected' : ''}>${SPECIES[id].common}</option>`).join('')}</select>`
-              : esc(sp.common)
-            : '';
+        const editSpecies = (mine && !L.started) || (host && s.kind === 'ai');
+        const species = filled
+          ? editSpecies
+            ? `<select data-slot="${i}" data-f="species">${LOBBY_SPECIES.map((id) => `<option value="${id}" ${id === s.species ? 'selected' : ''}>${SPECIES[id].common}</option>`).join('')}</select>`
+            : esc(sp.common)
+          : '';
+        // teams: you pick your own; the host can arrange everyone
+        const t = cleanTeam(s.team);
+        const teamBadge = t ? `<span class="lb-team" style="--tc:${TEAM_COLORS[t - 1]}">${TEAM_NAMES[t - 1]}</span>` : '<span class="dim">No team</span>';
+        const team = filled
+          ? mine || host
+            ? `<select class="lb-team-sel" data-slot="${i}" data-f="team" style="--tc:${t ? TEAM_COLORS[t - 1] : 'transparent'}"><option value="0" ${!t ? 'selected' : ''}>No team</option>${TEAM_NAMES.slice(0, LOBBY_TEAMS).map((n, k) => `<option value="${k + 1}" ${t === k + 1 ? 'selected' : ''}>Team ${n}</option>`).join('')}</select>`
+            : teamBadge
+          : '';
         const kindSel =
           host && i > 0 && s.kind !== 'human'
             ? `<select data-slot="${i}" data-f="kind">${(['open', 'closed', 'ai'] as const).map((k) => `<option value="${k}" ${k === s.kind ? 'selected' : ''}>${k === 'ai' ? 'AI' : k[0].toUpperCase() + k.slice(1)}</option>`).join('')}</select>`
@@ -320,19 +334,35 @@ export class LobbyView {
         const addBtn = host && this.addPlayer && (s.kind === 'open' || s.kind === 'closed') ? `<button class="chip lan-add" data-slot="${i}" data-a="add-player">Add player</button>` : '';
         const ping = s.kind === 'human' && i !== 0 ? `${s.ping || '—'} ms` : '';
         const ready = s.kind === 'human' ? (s.ready ? '<span class="lb-ready">Ready</span>' : '<span class="dim">Not ready</span>') : s.kind === 'ai' ? '<span class="lb-ready">Ready</span>' : '';
-        return `<tr class="${mine ? 'mine' : ''}"><td>${i + 1}</td><td>${color}</td><td>${who}</td><td>${species}</td><td>${addBtn}${kindSel}${colorBtn}</td><td data-ping="${i}">${ping}</td><td>${ready}</td></tr>`;
+        const row = `<tr class="${mine ? 'mine' : ''}"><td>${i + 1}</td><td>${color}</td><td>${who}</td><td>${species}</td><td>${team}</td><td>${addBtn}${kindSel}${colorBtn}</td><td data-ping="${i}">${ping}</td><td>${ready}</td></tr>`;
+        // a Gene Thief raises the castes picked here (its own player, or the host for an AI)
+        if (!filled || s.species !== 'plagiaria') return row;
+        const got = s.borrowed ?? [];
+        const thief = editSpecies
+          ? `<div class="lb-steal"><span class="dim">Steals (each needs its own room tile):</span>${BORROWABLE.map((id) => `<button class="chip small ${got.includes(id) ? 'on' : ''}" data-slot="${i}" data-a="borrow" data-caste="${id}">${casteName(id)}</button>`).join('')}</div>`
+          : `<div class="lb-steal"><span class="dim">Steals:</span> ${got.length ? got.map((id) => esc(casteName(id))).join(', ') : '<span class="dim">nothing yet</span>'}</div>`;
+        return `${row}<tr class="lb-sub ${mine ? 'mine' : ''}"><td></td><td colspan="7">${thief}</td></tr>`;
       })
       .join('');
     const st = L.settings;
+    const md = st.map ? MAPS[st.map] : undefined;
+    // map cards with a sketch of each map: the host picks, everyone sees the choice
+    const mapCards = `<div class="map-grid lb-maps">${PLAYABLE_MAPS.map((id) => {
+      const m = MAPS[id]!;
+      return `<button class="map-card ${st.map === id ? 'on' : ''}" data-map="${id}" ${host ? '' : 'disabled'}><span class="map-thumb" data-thumb="${id}"></span><b>${m.name}</b><i>${(m.width / 1000).toFixed(1)} × ${(m.depth / 1000).toFixed(1)} m${m.floods.length ? ' · floods' : ''}</i></button>`;
+    }).join('')}</div>${md ? `<p class="dim">${esc(md.blurb)}</p>` : ''}`;
+    const floods = md?.floods.length
+      ? host
+        ? `<div class="opt-row"><span class="dim">Floods:</span><button class="chip ${!st.floods ? 'on' : ''}" data-a="floods" data-v="0">Off</button><button class="chip ${st.floods ? 'on' : ''}" data-a="floods" data-v="1">On: storms flood the low ground now and then</button></div>`
+        : `<p class="dim">Floods ${st.floods ? 'on' : 'off'}.</p>`
+      : '';
     const settings = host
-      ? `<div class="lb-settings">
-          <label>Map <select data-f="style">${PLAYABLE_MAPS.map((id) => `<option value="map:${id}" ${id === st.map ? 'selected' : ''}>${MAPS[id]!.name}</option>`).join('')}${!st.map ? STYLES.filter(([id]) => id === st.style).map(([id, n]) => `<option value="${id}" selected>${n} (random)</option>`).join('') : ''}</select></label>
-          ${st.map && MAPS[st.map]?.floods.length ? `<label>Floods <select data-f="floods"><option value="0" ${!st.floods ? 'selected' : ''}>Off</option><option value="1" ${st.floods ? 'selected' : ''}>On</option></select></label>` : ''}
+      ? `${mapCards}${floods}<div class="lb-settings">
           <label>Seed <input class="mp-input small" data-f="seed" value="${st.seed}"></label>
           <label>Food <select data-f="food">${[0.6, 1.2, 2].map((f) => `<option value="${f}" ${f === st.food ? 'selected' : ''}>${f === 0.6 ? 'Scarce' : f === 1.2 ? 'Normal' : 'Plenty'}</option>`).join('')}</select></label>
           <label>Population cap <select data-f="pop">${[150, 300, 500].map((p) => `<option value="${p}" ${p === st.popLimit ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
         </div>`
-      : `<p class="dim">Map ${st.map ? MAPS[st.map]?.name : STYLES.find((x) => x[0] === st.style)?.[1]}${st.map && st.floods ? ' · floods on' : ''} · seed ${st.seed} · food ${st.food === 0.6 ? 'scarce' : st.food === 1.2 ? 'normal' : 'plenty'} · population cap ${st.popLimit} · no pausing · speed 1×</p>`;
+      : `${mapCards}${floods}<p class="dim">Seed ${st.seed} · food ${st.food === 0.6 ? 'scarce' : st.food === 1.2 ? 'normal' : 'plenty'} · population cap ${st.popLimit} · no pausing · speed 1×</p>`;
     const me = L.slots[L.you];
     const blocker = host ? L.startBlocker() : '';
     const chat = L.chat
@@ -355,7 +385,8 @@ export class LobbyView {
             : ''
       }
       <table class="lb-slots"><tbody>${rows}</tbody></table>
-      <h2>Settings</h2>${settings}
+      <p class="dim lb-note">Up to ${SLOT_COUNT} colonies. Colonies on the same team are allies: they never fight each other, and the last team with a living queen wins together. “No team” plays for itself.</p>
+      <h2>Map</h2>${settings}
       <h2>Chat</h2>
       <div class="lb-chat">${chat || '<span class="dim">Say hello.</span>'}</div>
       <input class="mp-input" data-f="chat" maxlength="200" placeholder="Type and press Enter" value="${esc(this.chatDraft)}">
@@ -365,6 +396,12 @@ export class LobbyView {
         <button class="chip" data-a="leave">Leave</button>
       </div>
     </div>`;
+    this.root.querySelectorAll<HTMLElement>('[data-thumb]').forEach((el) => {
+      const id = el.dataset.thumb as MapId;
+      let c = thumbs.get(id);
+      if (!c) thumbs.set(id, (c = mapPreview(MAPS[id]!, 110)));
+      el.appendChild(c);
+    });
     const log = this.root.querySelector('.lb-chat');
     if (log) log.scrollTop = log.scrollHeight;
     if (focus) (this.root.querySelector(`[data-f="${focus}"]`) as HTMLElement | null)?.focus();
@@ -392,11 +429,24 @@ export class LobbyView {
     else if (a === 'color') {
       const i = Number(b.dataset.slot);
       const used = new Set(L.slots.map((s) => s.color));
-      let c = (L.slots[i].color + 1) % 4;
-      for (let k = 0; k < 4 && used.has(c); k++) c = (c + 1) % 4;
+      const n = COLORS.length;
+      let c = (L.slots[i].color + 1) % n;
+      for (let k = 0; k < n && used.has(c); k++) c = (c + 1) % n;
       if (i === L.you) L.setMine({ color: c });
       else L.setSlot(i, { color: c });
-    }
+    } else if (a === 'borrow') {
+      const i = Number(b.dataset.slot);
+      const id = b.dataset.caste ?? '';
+      const got = [...(L.slots[i].borrowed ?? [])];
+      const k = got.indexOf(id);
+      if (k >= 0) got.splice(k, 1);
+      else got.push(id);
+      // keep at least one stolen caste (with none picked the default pair comes back)
+      if (!got.length) return;
+      if (i === L.you) L.setMine({ borrowed: got });
+      else L.setSlot(i, { borrowed: got });
+    } else if (a === 'floods') L.setSettings({ floods: b.dataset.v === '1' });
+    else if (b.dataset.map && L.isHost) L.setSettings({ map: b.dataset.map as MapId, style: 'meadow' });
   }
 
   private change(e: Event): void {
@@ -407,6 +457,9 @@ export class LobbyView {
     if (f === 'species') {
       if (slot === L.you) L.setMine({ species: t.value as never });
       else L.setSlot(slot, { species: t.value as never });
+    } else if (f === 'team') {
+      if (slot === L.you) L.setMine({ team: Number(t.value) });
+      else L.setSlot(slot, { team: Number(t.value) });
     } else if (f === 'kind') L.setSlot(slot, { kind: t.value as 'open' | 'closed' | 'ai' });
     else if (f === 'style') {
       if (t.value.startsWith('map:')) L.setSettings({ map: t.value.slice(4) as MapId, style: 'meadow' });

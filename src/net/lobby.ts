@@ -3,21 +3,22 @@
  *
  * The host creates a room: a six-letter code that becomes the invite link
  * `?room=CODE`. Guests open the link and join; the host gives each a free
- * slot. There are four slots, each open, closed, AI or a player (name,
- * species, colour, ping, ready). The host picks the map, seed, food and
- * population cap; everyone readies up and the host starts the match. Chat
- * works here and in the match.
+ * slot. There are eight slots, each open, closed, AI or a player (name,
+ * species, colour, team, a Gene Thief's borrowed castes, ping, ready). The
+ * host picks the map, seed, food and population cap and can arrange teams;
+ * everyone readies up and the host starts the match. Chat works here and in
+ * the match.
  *
  * At the start the lobby hands its transport (and any messages that arrived
  * since) to the match. A player who comes back to a match in progress is
  * answered with a `resync` instead of the lobby.
  */
 import { Control, BUILD_ID, LobbySettings, Slot, packControl, unpack } from './messages';
-import { DEFAULT_LOBBY, matchPlayers, matchSetup } from './match';
+import { DEFAULT_LOBBY, GENE_THIEF_DEFAULT, cleanBorrowed, cleanTeam, matchPlayers, matchSetup, pickBorrowed, teamsBlocker } from './match';
 import type { Transport } from './transport';
 import type { SpeciesId } from '../sim/species';
 
-export const SLOT_COUNT = 4;
+export const SLOT_COUNT = 8;
 export const LOBBY_SPECIES: SpeciesId[] = ['lasius', 'formica', 'solenopsis', 'atta', 'eciton', 'nasutitermes', 'rhynchotermes', 'hell', 'aurimyrmex', 'termant', 'plagiaria'];
 
 /** A six-letter room code without look-alike letters. */
@@ -32,7 +33,18 @@ export function newToken(): string {
   return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
 }
 
-const emptySlot = (i: number): Slot => ({ kind: i < 3 ? 'open' : 'closed', name: '', species: LOBBY_SPECIES[i % 4], color: i, ready: false, peer: '', ping: 0, token: '' });
+const emptySlot = (i: number): Slot => ({ kind: i < 3 ? 'open' : 'closed', name: '', species: LOBBY_SPECIES[i % 4], color: i, ready: false, peer: '', ping: 0, token: '', team: 0 });
+
+/** A slot change from a guest or the host's own UI, made safe: a known species, a team 0–4, real borrowable castes. */
+function cleanPatch<T extends Partial<Slot>>(patch: T): T {
+  const p = { ...patch };
+  if ('species' in p && !LOBBY_SPECIES.includes(p.species as SpeciesId)) delete p.species;
+  if ('team' in p) p.team = cleanTeam(p.team);
+  if ('borrowed' in p) p.borrowed = cleanBorrowed(p.borrowed);
+  if ('name' in p) p.name = String(p.name ?? '').slice(0, 24);
+  if ('color' in p) p.color = Math.max(0, Math.floor(Number(p.color) || 0)) % SLOT_COUNT;
+  return p;
+}
 
 export type StartInfo =
   | { kind: 'start'; msg: Extract<Control, { t: 'start' }> }
@@ -134,7 +146,9 @@ export class Lobby {
         if (!s || s.peer !== from) return;
         const { kind: _k, ...patch } = c.patch;
         void _k;
-        Object.assign(s, patch);
+        Object.assign(s, cleanPatch(patch));
+        // a Gene Thief always raises something: the default pair until its player picks
+        if (s.species === 'plagiaria' && !s.borrowed?.length) s.borrowed = [...GENE_THIEF_DEFAULT];
         this.publish();
         break;
       }
@@ -196,25 +210,42 @@ export class Lobby {
 
   // ------------------------------------------------------------------ actions
 
-  /** Change your own slot (name, species, colour, ready). */
-  setMine(patch: Partial<Pick<Slot, 'name' | 'species' | 'color' | 'ready'>>): void {
+  /** Change your own slot (name, species, colour, team, a Gene Thief's castes, ready). */
+  setMine(patch: Partial<Pick<Slot, 'name' | 'species' | 'color' | 'ready' | 'team' | 'borrowed'>>): void {
     if (this.you < 0) return;
     if (this.isHost) {
-      Object.assign(this.slots[this.you], patch);
+      const s = this.slots[this.you];
+      Object.assign(s, cleanPatch(patch));
+      if (s.species === 'plagiaria' && !s.borrowed?.length) s.borrowed = [...GENE_THIEF_DEFAULT];
       this.publish();
     } else this.send({ t: 'setSlot', slot: this.you, patch });
   }
 
-  /** Host: open, close or fill an empty slot with an AI colony; set an AI's species. */
-  setSlot(i: number, patch: Partial<Pick<Slot, 'kind' | 'species' | 'color'>>): void {
-    if (!this.isHost || i === 0) return;
+  /**
+   * Host: open, close or fill an empty slot with an AI colony; set an AI's species, colour and stolen
+   * castes; put any colony (players too) on a team.
+   */
+  setSlot(i: number, patch: Partial<Pick<Slot, 'kind' | 'species' | 'color' | 'team' | 'borrowed'>>): void {
+    if (!this.isHost) return;
     const s = this.slots[i];
-    if (s.kind === 'human' && patch.kind) return; // kick by closing? not here
-    Object.assign(s, patch);
+    if (!s) return;
+    // the host's own slot and players' slots: only their team here (players pick the rest themselves)
+    if (i === 0 || s.kind === 'human') {
+      if ('team' in patch) {
+        s.team = cleanTeam(patch.team);
+        this.publish();
+      }
+      return;
+    }
+    const p = cleanPatch(patch);
+    if (p.kind && p.kind !== 'open' && p.kind !== 'closed' && p.kind !== 'ai') delete p.kind; // only a player who joins fills a slot
+    Object.assign(s, p);
     if (s.kind === 'ai') {
       s.name = 'AI colony';
       s.ready = true;
-    } else if (s.kind !== 'human') {
+      // a Gene Thief AI steals two or three castes, picked here so every player gets the same ones
+      if (s.species === 'plagiaria' && !s.borrowed?.length) s.borrowed = pickBorrowed();
+    } else {
       s.name = '';
       s.ready = false;
     }
@@ -240,6 +271,8 @@ export class Lobby {
   startBlocker(): string {
     const players = matchPlayers(this.slots);
     if (players.length < 2) return 'Add a player or an AI colony.';
+    const teams = teamsBlocker(players);
+    if (teams) return teams;
     const waiting = this.slots.filter((s) => s.kind === 'human' && !s.ready);
     if (waiting.length) return `Waiting for ${waiting.map((s) => s.name).join(', ')} to be ready.`;
     return '';

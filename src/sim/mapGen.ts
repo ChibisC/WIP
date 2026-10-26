@@ -17,7 +17,7 @@ import { CaveOptions, createCave, lostRouteSystem } from './areas';
 import { SpeciesId, SPECIES } from './species';
 import { BALANCE, NASUTE, SICKLE } from './balance';
 import { edible } from './diet';
-import { dcos, dhypot, dsin } from './dmath';
+import { datan2, dcos, dhypot, dsin } from './dmath';
 import { creatureSystem, ecologySystem, registerCreatureHooks } from './creatures/creatureAI';
 import { MissionId, missionSystem, startMission } from './missions';
 import { ecitonSystem } from './eciton';
@@ -68,6 +68,32 @@ export interface GameSetup {
   map?: MapId;
   /** which of the map's balanced site sets for this colony count (default: chosen by the seed) */
   siteSet?: number;
+  /** multiplayer teams: colonies sharing a `team` start on neighbouring sites of the balanced set */
+  groupTeams?: boolean;
+}
+
+/**
+ * Teams on neighbouring sites: the chosen sites in order around the map's centre, each team taking a
+ * run of consecutive ones (bigger teams first), colonies without a team the rest. Pure arithmetic on
+ * the map file and the setup, so every client gets the same answer.
+ */
+export function teamSiteOrder(sites: number[], centres: Array<{ x: number; y: number }>, cx: number, cy: number, teams: Array<number | undefined>): number[] {
+  const around = sites.map((site, k) => ({ site, a: datan2(centres[k].y - cy, centres[k].x - cx) })).sort((p, q) => p.a - q.a || p.site - q.site);
+  const groups = new Map<number, number[]>();
+  teams.forEach((t, i) => {
+    if (t === undefined) return;
+    const g = groups.get(t);
+    if (g) g.push(i);
+    else groups.set(t, [i]);
+  });
+  const ordered = [...groups.entries()].sort((p, q) => q[1].length - p[1].length || p[1][0] - q[1][0]);
+  const out: number[] = new Array(teams.length).fill(-1);
+  let k = 0;
+  for (const [, members] of ordered) for (const i of members) out[i] = around[k++].site;
+  teams.forEach((t, i) => {
+    if (out[i] < 0) out[i] = around[k++].site;
+  });
+  return out;
 }
 
 /** Register all simulation systems in update order. */
@@ -127,7 +153,11 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
 
   // Place colonies: on an authored map on its sites (a balanced set), else far apart on dry ground.
   const L = w.terrain.layout;
-  const sites = L ? L.siteOrder(setup.colonies.length, setup.siteSet ?? -1, setup.seed) : null;
+  let sites = L ? L.siteOrder(setup.colonies.length, setup.siteSet ?? -1, setup.seed) : null;
+  if (sites && L && setup.groupTeams && sites.length === setup.colonies.length) {
+    const centres = sites.map((site) => ({ x: L.hex.centerX(L.sites[site].centre), y: L.hex.centerY(L.sites[site].centre) }));
+    sites = teamSiteOrder(sites, centres, w.terrain.width / 2, w.terrain.depth / 2, setup.colonies.map((c) => c.team));
+  }
   const spots = sites ? [] : colonySpots(w, setup.colonies.length, rng);
   let nextSite = 0;
   setup.colonies.forEach((spec, i) => {

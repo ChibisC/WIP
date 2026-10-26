@@ -13,7 +13,7 @@ import type { GameSetup } from '../sim/mapGen';
 import type { SpeciesId } from '../sim/species';
 import type { MapId } from '../maps/types';
 
-export const BUILD_ID = 'ud-mp-4';
+export const BUILD_ID = 'ud-mp-5';
 
 /** A lobby slot (players 0–3; the slot number is the colony id). */
 export interface Slot {
@@ -30,6 +30,10 @@ export interface Slot {
   ping: number;
   /** reconnect token (a rejoining player gets their slot back) */
   token: string;
+  /** team 1–4 (colonies on one team are allies and win together); 0 = no team (everyone for themselves) */
+  team: number;
+  /** Gene Thief (species plagiaria): the castes it raises besides its own workers (sim/species.ts BORROWABLE) */
+  borrowed?: string[];
 }
 
 export interface LobbySettings {
@@ -48,7 +52,7 @@ export type Control =
   // lobby
   | { t: 'join'; name: string; token: string; build: string }
   | { t: 'lobby'; slots: Slot[]; settings: LobbySettings; host: string }
-  | { t: 'setSlot'; slot: number; patch: Partial<Pick<Slot, 'kind' | 'name' | 'species' | 'color' | 'ready'>> }
+  | { t: 'setSlot'; slot: number; patch: Partial<Pick<Slot, 'kind' | 'name' | 'species' | 'color' | 'ready' | 'team' | 'borrowed'>> }
   | { t: 'settings'; patch: Partial<LobbySettings> }
   | { t: 'chat'; from: string; text: string }
   | { t: 'start'; setup: GameSetup; you: number; slots: Slot[]; delay: number }

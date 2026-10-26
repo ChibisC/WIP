@@ -4,6 +4,7 @@
  * the desync panel with its downloadable report, "host left", the chat
  * (Enter to type, with mute) and the results screen.
  */
+import { TEAM_BASE, TEAM_NAMES } from '../net/match';
 import type { GameSession } from '../game/session';
 import { BUILD_ID } from '../net/messages';
 import { WAIT_SHOW_S, DROP_AFTER_S } from '../net/netGame';
@@ -159,7 +160,8 @@ export class NetHud {
     else if (!this.s.player.alive && !this.outShown && !this.over) {
       // out of a match that goes on: watch the rest or leave
       this.outShown = true;
-      this.showPanel('out', () => `<h2>Your queen is gone</h2><p>Your colony is out of the match. The others play on; you can watch to the end.</p><div class="opt-row"><button class="go" data-a="close">Keep watching</button><button class="chip" data-a="leave">Back to the menu</button></div>`);
+      const allies = this.s.world.s.colonies.some((c) => c.alive && c.id !== this.s.player.id && c.team === this.s.player.team);
+      this.showPanel('out', () => `<h2>Your queen is gone</h2><p>Your colony is out of the match. ${allies ? 'Your team plays on: if it wins, you win with it.' : 'The others play on'}; you can watch to the end.</p><div class="opt-row"><button class="go" data-a="close">Keep watching</button><button class="chip" data-a="leave">Back to the menu</button></div>`);
     }
   }
 
@@ -247,9 +249,16 @@ export class NetHud {
       .join('');
     const me = this.s.player;
     const title = winner === -2 ? 'No queen survived' : me.team === winner ? 'Victory' : 'Defeat';
+    // a team wins together (lobby teams are TEAM_BASE + 1…4); a colony with no team is a team of its own
+    const winners = w.s.colonies.filter((c) => c.team === winner).map((c) => net?.slots[c.id]?.name || c.name);
+    const lobbyTeam = winner - TEAM_BASE;
+    const whoWon =
+      lobbyTeam >= 1 && lobbyTeam <= TEAM_NAMES.length
+        ? `Team ${TEAM_NAMES[lobbyTeam - 1]} wins: ${winners.map(esc).join(', ')}.`
+        : `${esc(winners[0] || 'A colony')} is the last queen standing.`;
     this.panelKey = '';
     this.showPanel('results', () => `<h2>${title}</h2>
-      <p>${winner === -2 ? 'Every colony lost its queen.' : `${esc(net?.slots[winner]?.name || w.colony(winner)?.name || 'A colony')} is the last queen standing.`} The match lasted ${Math.floor(w.s.time / 60)} min ${Math.floor(w.s.time % 60)} s.</p>
+      <p>${winner === -2 ? 'Every colony lost its queen.' : whoWon} The match lasted ${Math.floor(w.s.time / 60)} min ${Math.floor(w.s.time % 60)} s.</p>
       <table class="lb-slots results"><thead><tr><th></th><th>Colony</th><th></th><th>Peak</th><th>Raised</th><th>Lost</th><th>Food</th><th>Kills</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="opt-row"><button class="go" data-a="leave">Back to the menu</button><button class="chip" data-a="close">Keep watching</button></div>`);
   }

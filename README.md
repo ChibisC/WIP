@@ -24,8 +24,11 @@ The title screen has **Single-player** and **Multiplayer**.
 
 ### Multiplayer and invite links
 1. **Create game** gives you a six-letter room code and an invite link (`…/?room=ABCDEF`). Press **Copy link** and send it.
-2. Friends open the link and land in the lobby. Each player picks a name, species and colour, then clicks **Ready**.
-3. The host can set each empty slot to Open, Closed or AI, and choose the map, seed, food and population cap.
+2. Friends open the link and land in the lobby. Each player picks a name, species, colour and team, then clicks **Ready**. A **Gene Thief** player also picks the castes it steals (any of the 21 borrowable castes; each needs its own room tile).
+3. The host can set each of the eight slots to Open, Closed or AI (and pick an AI's species, team and, for a Gene Thief AI, its castes), move anyone to another team, pick the map from the map cards (everyone sees the choice), and set the seed, food, floods and population cap.
+   - **Teams:** Red, Blue, Green, Gold or no team. Teammates never fight each other, start on neighbouring colony sites, and win together when theirs is the last team with a living queen. Everyone on one team cannot start.
+
+   ![A lobby with teams, a Gene Thief and the map cards](docs/multiplayer/teams-lobby-host.png)
 4. The host starts the match once everyone is ready.
 
 How it works:
