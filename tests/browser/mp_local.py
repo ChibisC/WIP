@@ -83,11 +83,6 @@ with sync_playwright() as p:
       }).map((b) => (b.className + ' ' + (b.textContent || '').trim()).slice(0, 40))"""
     blocked = [ev(pg, REACH) for pg in pages]
     check('real clicks reach every in-game button on every tab (nothing covers them)', all(not x for x in blocked), [x[:4] for x in blocked])
-    dig = guests[0].locator('.tbtn', has_text='Dig').first.bounding_box()
-    if dig:
-        guests[0].mouse.click(dig['x'] + dig['width'] / 2, dig['y'] + dig['height'] / 2)
-    check('a real mouse click on Dig picks the Dig tool (guest)', wait(lambda: ev(guests[0], '__session.tool') != 'none', 15), ev(guests[0], '__session.tool'))
-    guests[0].keyboard.press('Escape')
     check('players are colonies 0, 1, 2 (+ AI 3)', [ev(pg, '__net.self') for pg in pages] == [0, 1, 2] and ev(host, '__session.world.s.colonies.length') == 4)
     check('guest 1 plays the species they picked', ev(guests[0], '__session.player.species') == 'formica')
     wait(lambda: min(ev(pg, '__session.world.s.tick') for pg in pages) >= 10, 120)
@@ -141,6 +136,15 @@ with sync_playwright() as p:
     time.sleep(12)
     t3 = [ev(pg, '__session.world.s.tick') for pg in rest]
     check('the two remaining players keep playing', min(t3) - max(t2) >= 5, f'{t2} -> {t3} in 12 s')
+    # Real mouse clicks (at the end: Dig opens the nest view, which takes this software renderer long
+    # enough that a guest would be dropped mid-test): a HUD button and a tool button both respond.
+    def real_click(pg, loc):
+        bb = loc.bounding_box()
+        if bb: pg.mouse.click(bb['x'] + bb['width'] / 2, bb['y'] + bb['height'] / 2)
+    real_click(guests[0], guests[0].locator('.net-mute'))
+    check('a real mouse click on Mute chat works (guest)', wait(lambda: 'Unmute' in guests[0].locator('.net-mute').inner_text(), 15))
+    real_click(guests[0], guests[0].locator('.tbtn', has_text='Dig').first)
+    check('a real mouse click on Dig picks the Dig tool (guest)', wait(lambda: ev(guests[0], '__session.tool') != 'none', 30), ev(guests[0], '__session.tool'))
     check('no errors in any tab', not errors, errors[:5])
     b.close()
 sys.exit(1 if fails else 0)
