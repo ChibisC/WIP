@@ -1,5 +1,8 @@
 import { Rng, fbm2, valueNoise2 } from '../core/rng';
 import { dcos, dhypot, dsin, sq } from '../sim/dmath';
+import { HexLayout } from './hexLayout';
+
+export { insideHex } from './hexLayout';
 
 export const NEST_CHUNK = 32;
 
@@ -66,21 +69,14 @@ export function hexRadiusFor(workerLength: number): number {
  * world z). Entrance hexes hold a ramp up to the surface; shaft sites are
  * hidden spots that become new entrances when dug into.
  */
-export class NestGrid {
-  readonly cols: number;
-  readonly rows: number;
+export class NestGrid extends HexLayout {
+  // the hex geometry (cols, rows, R, H, C, widthMm, depthMm, hexCenter, hexAt, neighbors…) is HexLayout's
   readonly seed: number;
-  /** hex circumradius, flat-to-flat height, column spacing, fine cell size (mm) */
-  readonly R: number;
-  readonly H: number;
-  readonly C: number;
+  /** fine raster cell size (mm) */
   readonly cell: number;
   /** fine raster size */
   readonly w: number;
   readonly h: number;
-  /** plane size in mm */
-  readonly widthMm: number;
-  readonly depthMm: number;
   /** fine raster: 0 air, 1..4 soil type, 255 stone */
   soil: Uint8Array;
   /** fine raster of designated hexes */
@@ -115,15 +111,9 @@ export class NestGrid {
   designatedCount = 0;
 
   constructor(p: NestGridParams) {
-    this.cols = p.cols;
-    this.rows = p.rows;
+    super(p);
     this.seed = p.seed;
-    this.R = p.R;
-    this.H = Math.sqrt(3) * p.R;
-    this.C = 1.5 * p.R;
     this.cell = p.R / CELLS_PER_R;
-    this.widthMm = this.C * (this.cols - 1) + 2 * this.R;
-    this.depthMm = this.H * (this.rows + 0.5);
     this.w = Math.ceil(this.widthMm / this.cell);
     this.h = Math.ceil(this.depthMm / this.cell);
     const n = this.w * this.h;
@@ -142,90 +132,6 @@ export class NestGrid {
 
   params(): NestGridParams {
     return { cols: this.cols, rows: this.rows, R: this.R, seed: this.seed };
-  }
-
-  // ---------------------------------------------------------------- geometry
-  hexIndex(c: number, r: number): number {
-    if (c < 0 || r < 0 || c >= this.cols || r >= this.rows) return -1;
-    return r * this.cols + c;
-  }
-
-  hexCol(q: number): number {
-    return q % this.cols;
-  }
-
-  hexRow(q: number): number {
-    return Math.floor(q / this.cols);
-  }
-
-  /** Hex centre in mm. */
-  hexCenter(q: number, out: { x: number; y: number } = { x: 0, y: 0 }): { x: number; y: number } {
-    const c = q % this.cols;
-    const r = Math.floor(q / this.cols);
-    out.x = this.R + c * this.C;
-    out.y = this.H * 0.5 + r * this.H + (c & 1 ? this.H * 0.5 : 0);
-    return out;
-  }
-
-  /** Hex containing a point (mm), or −1. */
-  hexAt(x: number, y: number): number {
-    const c0 = Math.round((x - this.R) / this.C);
-    let best = -1;
-    let bd = Infinity;
-    const p = { x: 0, y: 0 };
-    for (let c = c0 - 1; c <= c0 + 1; c++) {
-      if (c < 0 || c >= this.cols) continue;
-      const r0 = Math.round((y - this.H * 0.5 - (c & 1 ? this.H * 0.5 : 0)) / this.H);
-      for (let r = r0 - 1; r <= r0 + 1; r++) {
-        const q = this.hexIndex(c, r);
-        if (q < 0) continue;
-        this.hexCenter(q, p);
-        const d = sq(p.x - x) + sq(p.y - y);
-        if (d < bd) {
-          bd = d;
-          best = q;
-        }
-      }
-    }
-    if (best >= 0 && bd > this.R * this.R * 1.05) return -1;
-    return best;
-  }
-
-  /** Six neighbours (flat-top, odd columns shifted down); −1 when outside. Order: NE, SE, S, SW, NW, N. */
-  neighbors(q: number): number[] {
-    const c = q % this.cols;
-    const r = Math.floor(q / this.cols);
-    if (c & 1) return [this.hexIndex(c + 1, r), this.hexIndex(c + 1, r + 1), this.hexIndex(c, r + 1), this.hexIndex(c - 1, r + 1), this.hexIndex(c - 1, r), this.hexIndex(c, r - 1)];
-    return [this.hexIndex(c + 1, r - 1), this.hexIndex(c + 1, r), this.hexIndex(c, r + 1), this.hexIndex(c - 1, r), this.hexIndex(c - 1, r - 1), this.hexIndex(c, r - 1)];
-  }
-
-  /** Midpoint of the edge shared with neighbour direction d (mm). */
-  edgeMid(q: number, d: number, out: { x: number; y: number } = { x: 0, y: 0 }): { x: number; y: number } {
-    this.hexCenter(q, out);
-    const ang = [-Math.PI / 6, Math.PI / 6, Math.PI / 2, (5 * Math.PI) / 6, (7 * Math.PI) / 6, -Math.PI / 2][d];
-    const rr = this.H * 0.5;
-    out.x += dcos(ang) * rr;
-    out.y += dsin(ang) * rr;
-    return out;
-  }
-
-  /** Hex distance (steps) between two hexes (offset → cube coordinates). */
-  hexDistance(a: number, b: number): number {
-    const cube = (q: number) => {
-      const c = q % this.cols;
-      const r = Math.floor(q / this.cols);
-      const x = c;
-      const z = r - (c - (c & 1)) / 2;
-      return [x, -x - z, z];
-    };
-    const [ax, ay, az] = cube(a);
-    const [bx, by, bz] = cube(b);
-    return Math.max(Math.abs(ax - bx), Math.abs(ay - by), Math.abs(az - bz));
-  }
-
-  /** Is (dx, dy) inside this grid's hexagon centred at the origin. */
-  insideHex(dx: number, dy: number, scale = 1): boolean {
-    return insideHex(dx, dy, this.R * scale);
   }
 
   private buildRaster(): void {
@@ -537,15 +443,6 @@ export class NestGrid {
     g.dirtyAll();
     return g;
   }
-}
-
-/** Point inside a flat-top hexagon of circumradius R centred at origin. */
-export function insideHex(dx: number, dy: number, R: number): boolean {
-  const x = Math.abs(dx);
-  const y = Math.abs(dy);
-  const h = (Math.sqrt(3) / 2) * R;
-  if (y > h) return false;
-  return x <= R - y / Math.sqrt(3);
 }
 
 export function toB64(a: Uint8Array): string {
