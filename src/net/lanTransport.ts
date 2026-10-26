@@ -211,7 +211,7 @@ export class ManualRtcTransport implements Transport {
   }
 
   private newLink(peer: string): Link {
-    if (!PC) throw new LanError('This page has no WebRTC (some embedding pages block it), and LAN play needs it. Open the game on its website, https://chibisc.github.io/ant-game/, and play from there.');
+    if (!PC) throw new LanError('This page has no WebRTC (some embedding pages block it), and LAN play needs it. Open the game on its website, https://chibisc.github.io/WIP/, and play from there.');
     const pc = new PC(LAN_RTC_CONFIG);
     // a pre-agreed channel: both sides open it, nothing extra to signal
     const dc = pc.createDataChannel('ud', { negotiated: true, id: 0, ordered: true });

@@ -121,7 +121,7 @@ function saveName(n: string): void {
 }
 
 /** The game's own website (GitHub Pages), where multiplayer works. */
-export const GAME_SITE = 'https://chibisc.github.io/ant-game/';
+export const GAME_SITE = 'https://chibisc.github.io/WIP/';
 
 /** How players connect: the internet (PeerJS invite links), the local network (connection codes) or tabs of this browser. */
 export type MpMode = 'online' | 'lan' | 'local';

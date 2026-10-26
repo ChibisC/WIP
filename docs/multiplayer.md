@@ -200,7 +200,7 @@ For 2–4 devices on one Wi-Fi or network with no internet, no PeerJS, no STUN a
 
 **Mid-match drops:** the usual "Waiting for…" flow runs (AI after 30 s). The host taps **Players → Reconnect player N** (or **Reconnect with a new code** on the banner) for a new host code; the dropped player taps **Rejoin with a new code**, which reloads that tab into the rejoin screen with its token; after the exchange the host sends the snapshot and the packets since, as for an online rejoin. If the host leaves, everyone sees "The host ended the match".
 
-**Where it works:** the game's website (GitHub Pages, https://chibisc.github.io/ant-game/) or any ordinary page that serves `dist/`. Inside the Claude artifact viewer the page has no `RTCPeerConnection` at all (its frame blocks WebRTC), so neither LAN nor online play can work there; the Multiplayer menu says so and links to the website (Local tabs still work).
+**Where it works:** the game's website (GitHub Pages, https://chibisc.github.io/WIP/) or any ordinary page that serves `dist/`. Inside the Claude artifact viewer the page has no `RTCPeerConnection` at all (its frame blocks WebRTC), so neither LAN nor online play can work there; the Multiplayer menu says so and links to the website (Local tabs still work).
 
 **Camera:** some embedding pages (such as the published artifact's frame) do not let the game use the camera; Scan QR code then says so and the code is pasted instead. A phone's own camera app can also read the QR code as text to copy.
 
