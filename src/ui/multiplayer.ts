@@ -298,7 +298,7 @@ export class LobbyView {
             ? `<select data-slot="${i}" data-f="kind">${(['open', 'closed', 'ai'] as const).map((k) => `<option value="${k}" ${k === s.kind ? 'selected' : ''}>${k === 'ai' ? 'AI' : k[0].toUpperCase() + k.slice(1)}</option>`).join('')}</select>`
             : '';
         const colorBtn = mine || (host && s.kind === 'ai') ? `<button class="chip" data-slot="${i}" data-a="color">Colour</button>` : '';
-        const addBtn = host && this.addPlayer && s.kind === 'open' ? `<button class="chip lan-add" data-slot="${i}" data-a="add-player">Add player</button>` : '';
+        const addBtn = host && this.addPlayer && (s.kind === 'open' || s.kind === 'closed') ? `<button class="chip lan-add" data-slot="${i}" data-a="add-player">Add player</button>` : '';
         const ping = s.kind === 'human' && i !== 0 ? `${s.ping || '—'} ms` : '';
         const ready = s.kind === 'human' ? (s.ready ? '<span class="lb-ready">Ready</span>' : '<span class="dim">Not ready</span>') : s.kind === 'ai' ? '<span class="lb-ready">Ready</span>' : '';
         return `<tr class="${mine ? 'mine' : ''}"><td>${i + 1}</td><td>${color}</td><td>${who}</td><td>${species}</td><td>${addBtn}${kindSel}${colorBtn}</td><td data-ping="${i}">${ping}</td><td>${ready}</td></tr>`;
@@ -356,7 +356,10 @@ export class LobbyView {
     const L = this.lobby;
     const a = b.dataset.a;
     if (a === 'add-player') {
-      this.addPlayer?.(Number(b.dataset.slot));
+      const i = Number(b.dataset.slot);
+      // a closed slot opens for the player being added
+      if (L.slots[i]?.kind === 'closed') L.setSlot(i, { kind: 'open' });
+      this.addPlayer?.(i);
       return;
     }
     if (a === 'copy') {

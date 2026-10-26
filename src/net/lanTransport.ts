@@ -18,6 +18,8 @@ import type { Transport } from './transport';
 export const LAN_RTC_CONFIG: RTCConfiguration = Object.freeze({ iceServers: [] }) as RTCConfiguration;
 /** how long ICE gathering may take before the code is made from what was found */
 export const GATHER_TIMEOUT_MS = 3000;
+/** …but with no address found yet, keep waiting up to this long */
+export const GATHER_MAX_MS = 10000;
 /** how long the channel may take to open once the host has the reply */
 export const OPEN_TIMEOUT_MS = 15000;
 const CHUNK = 16 * 1024;
@@ -55,19 +57,38 @@ export function installLanGuard(log: (msg: string, cfg: RTCConfiguration | undef
   PC = Guarded;
 }
 
-/** Wait for ICE gathering to finish (or time out) and return the full local description. */
+/**
+ * Wait for ICE gathering to finish and return the full local description. After `ms` the code is
+ * made from what was found, but never from a description with no address in it while waiting longer
+ * (up to `GATHER_MAX_MS`) can still find one: a busy device can be slow to list its interfaces.
+ */
 function gathered(pc: RTCPeerConnection, ms = GATHER_TIMEOUT_MS): Promise<string> {
   return new Promise((resolve) => {
+    let finished = false;
     const done = () => {
+      if (finished) return;
+      finished = true;
       clearTimeout(t);
+      clearTimeout(t2);
       pc.removeEventListener('icegatheringstatechange', check);
+      pc.removeEventListener('icecandidate', onCandidate);
       resolve(pc.localDescription?.sdp ?? '');
     };
+    const hasAddress = () => /\na=candidate:/.test(pc.localDescription?.sdp ?? '');
+    let late = false;
     const check = () => {
       if (pc.iceGatheringState === 'complete') done();
     };
-    const t = setTimeout(done, ms);
+    const onCandidate = () => {
+      if (late && hasAddress()) done();
+    };
+    const t = setTimeout(() => {
+      if (hasAddress()) done();
+      else late = true;
+    }, ms);
+    const t2 = setTimeout(done, GATHER_MAX_MS);
     pc.addEventListener('icegatheringstatechange', check);
+    pc.addEventListener('icecandidate', onCandidate);
     check();
   });
 }

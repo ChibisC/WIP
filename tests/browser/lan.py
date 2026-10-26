@@ -160,6 +160,8 @@ with sync_playwright() as p:
         g = player('Ana')
         glog = []
         g.on('console', lambda m: glog.append(m.text[:160]))
+        hlog = []
+        h.on('console', lambda m: hlog.append(m.text[:160]))
         h.click('[data-a="add-player"][data-slot="1"]')
         hc = code_out(h, 'UD1H-')
         check('Add player shows host code #2 as a QR code and text', hc.startswith('UD1H-') and h.locator('.lan-dialog canvas.lan-qr').count() == 1 and 'host code #2' in h.locator('.lan-dialog').inner_text(), f'{len(hc)} characters')
@@ -233,6 +235,7 @@ with sync_playwright() as p:
             g.fill('[data-f="code-in"]', hc)
             g.click('[data-a="code-submit"]')
             rc = code_out(g, 'UD1R-')
+            print(f'    reconnect codes: host {len(hc)} characters, reply {len(rc)}', flush=True)
             h.fill('.lan-dialog [data-f="code-in"]', rc)
             h.locator('.lan-dialog [data-a="code-submit"]').dispatch_event('click')
 
@@ -244,6 +247,7 @@ with sync_playwright() as p:
                 return gs, hs
             back = False
             t0 = time.time()
+            next_print = t0
             while time.time() - t0 < 420:
                 try:
                     if g.evaluate('window.__ready===true') and g.evaluate('!!window.__net'):
@@ -251,7 +255,8 @@ with sync_playwright() as p:
                         break
                 except Exception:
                     pass
-                if int(time.time() - t0) % 30 < 1:
+                if time.time() >= next_print:
+                    next_print += 20
                     try:
                         print('   ', round(time.time() - t0), state(), flush=True)
                     except Exception as e:
@@ -259,6 +264,7 @@ with sync_playwright() as p:
                 time.sleep(1)
             if not back:
                 print('    console (joiner):', glog[-15:], flush=True)
+                print('    console (host):', hlog[-15:], flush=True)
             check('after the new code exchange the player is back in the match', back, f'{time.time() - t0:.0f} s')
             if back:
                 check('the rejoined player controls their own colony again', wait(lambda: ev(g, '__net.self') == 1 and 1 not in ev(h, '__net.status().dropped'), 60))
