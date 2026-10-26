@@ -22,9 +22,10 @@ import { dcos, dsin } from './dmath';
  * "reveal all underground areas" opens every tab.
  */
 
-export const MAX_AREAS = 8;
-/** Area colours by number 1..8 (home is 1; up to seven nests and a cave). */
-export const AREA_COLORS = ['#d9a441', '#d0554a', '#5b8ed6', '#a874d8', '#4fb595', '#e0873c', '#c4b85a', '#d470a8'];
+/** Ten colonies on the authored maps plus their caves and lairs. */
+export const MAX_AREAS = 14;
+/** Area colours by number 1..14 (home is 1). */
+export const AREA_COLORS = ['#d9a441', '#d0554a', '#5b8ed6', '#a874d8', '#4fb595', '#e0873c', '#c4b85a', '#d470a8', '#8fd06a', '#6ac4d8', '#b88a5a', '#e07a7a', '#9a9ae0', '#d8c8a0'];
 
 export type AreaKind = 'home' | 'enemy' | 'allied' | 'neutral';
 

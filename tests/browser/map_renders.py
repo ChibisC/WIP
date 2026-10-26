@@ -54,9 +54,21 @@ with sync_playwright() as p:
       const t = window.__session.world.terrain; const L = t.layout; const m = t.map;
       const c = (s) => s.circle ? s.circle : s.poly ? [s.poly.reduce((a, p) => a + p[0], 0) / s.poly.length, s.poly.reduce((a, p) => a + p[1], 0) / s.poly.length]
         : s.path ? s.path[Math.floor(s.path.length / 2)] : s.ellipse;
-      return { site0: [L.hex.centerX(L.sites[0].centre), L.hex.centerY(L.sites[0].centre)], walk0: m.walkways.length ? c(m.walkways[0].shape) : null, wall0: m.walls.length ? c(m.walls[0].shape) : null };
+      return { W: t.width, D: t.depth, site0: [L.hex.centerX(L.sites[0].centre), L.hex.centerY(L.sites[0].centre)], walk0: m.walkways.length ? c(m.walkways[0].shape) : null, wall0: m.walls.length ? c(m.walls[0].shape) : null };
     }""")
-    for name, (cx, cz, dist, yaw, pitch) in VIEWS.get(MAP, VIEWS["meadowPond"]).items():
+    views = VIEWS.get(MAP)
+    if views is None:
+        # generic views for any map: the whole map, a site, a crossing, a wall, and an ant's-eye view
+        W, D = spots["W"], spots["D"]
+        sx, sz = spots["site0"]
+        views = {
+            "overview": (W / 2, D / 2, max(W, D) * 0.95, 0.0, 0.9),
+            "site": ("site0", None, 240, 3.6, 0.3),
+            "crossing": ("walk0", None, 190, 2.2, 0.25),
+            "wall": ("wall0", None, 260, 0.8, 0.2),
+            "low": (sx + 70, sz + 70, 90, 0.75, -0.6),
+        }
+    for name, (cx, cz, dist, yaw, pitch) in views.items():
         if ONLY and not any(o in name for o in ONLY.split(",")):
             continue
         if isinstance(cx, str):

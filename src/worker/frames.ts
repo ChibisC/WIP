@@ -90,6 +90,7 @@ export class FrameBuilder {
         caves: s.caves,
         aphids: s.aphids,
         plants: s.plants,
+        ...(s.flood ? { flood: s.flood } : {}),
       },
       ants,
       food,

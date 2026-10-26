@@ -17,11 +17,11 @@ import { CombatFx } from '../render/game/combatFx';
 import { WorldMarkers } from '../render/game/worldMarkers';
 import { World } from '../sim/world';
 import { createWorld, GameSetup } from '../sim/mapGen';
-import { AS, Colony, SURFACE, TileType, colonyOfSpace, nestSpace } from '../sim/types';
+import { AS, Colony, FloodState, SURFACE, TileType, colonyOfSpace, nestSpace } from '../sim/types';
 import { AreaInfo, areaOpen, areasFor, teamPresence } from '../sim/areas';
 import { CASTES, SPECIES, canonCaste, isTermiteSpecies } from '../sim/species';
 import { canPlaceTile, canUpgrade, groupWouldJoin, hatchCost, neighbourPoints, tileAt, tileCost, TILE_INFO, upgradeNeed, upgradePoints } from '../sim/tiles';
-import { BALANCE, ENTRANCE } from '../sim/balance';
+import { BALANCE, ENTRANCE, FLOOD } from '../sim/balance';
 import { spotBlocked } from '../sim/entrances';
 import { entranceAt, markerRadius } from '../sim/markers';
 import { abilityOf } from '../sim/abilities';
@@ -950,7 +950,8 @@ export class GameSession {
     const c = this.player;
     const mode: SaveHeader['mode'] = m ? 'mission' : this.sandbox ? 'sandbox' : this.arena ? 'arena' : w.s.colonies.some((o) => o.team !== c.team) ? 'skirmish' : 'game';
     const title = m ? MISSIONS[m.id].title : mode === 'sandbox' ? 'Sandbox' : mode === 'arena' ? 'Battle Arena' : mode === 'skirmish' ? 'Skirmish' : 'Free play';
-    return { build, title, mode, mission: m?.id, local: c.id, species: c.species, colonyName: c.name, ants: c.living, time: w.s.time, tick: w.s.tick, date: new Date().toISOString() };
+    const map = w.terrain.map?.name;
+    return { build, title, mode, mission: m?.id, ...(map ? { map } : {}), local: c.id, species: c.species, colonyName: c.name, ants: c.living, time: w.s.time, tick: w.s.tick, date: new Date().toISOString() };
   }
 
   /** Single-player games can be saved (a match brings players back from the host instead). */
@@ -1396,6 +1397,7 @@ export class GameSession {
       const list = n === views.length ? views : views.slice(0, n);
       const t = w.terrain;
       this.mounds.update(w, this.terrainHeight);
+      this.view.storm = stormLevel(w.s.flood);
       this.surfMarkers.update(shown, SURFACE, this.surfHeight, v.observing ? v.observeRig.distance * 3 : v.surfaceRig.distance, (i) => markerRadius(w, this.player, i), sel, v.time);
       // creatures first: climbing ants are placed on their animated legs and backs
       this.surfCreatures.update(w.s.creatures, SURFACE, alpha, realDt, this.surfHeight, cam, vh);
@@ -1450,4 +1452,15 @@ export class GameSession {
     this.autoQuality.update(v, realDt);
     this.onFrame?.();
   }
+}
+
+/** How stormy the sky looks (0..1) from the floods' phases: building through the warning, full while the water is up, clearing as it drains. */
+function stormLevel(fl: readonly FloodState[] | undefined): number {
+  let k = 0;
+  for (const f of fl ?? []) {
+    if (f.phase === 1) k = Math.max(k, 0.25 + 0.75 * (1 - f.t / FLOOD.warnS));
+    else if (f.phase === 2 || f.phase === 3) k = 1;
+    else if (f.phase === 4) k = Math.max(k, Math.min(1, f.t / FLOOD.drainS));
+  }
+  return k;
 }

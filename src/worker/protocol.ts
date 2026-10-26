@@ -49,6 +49,8 @@ export interface SlowState {
   caves: CaveDef[];
   aphids: AphidCluster[];
   plants: LeafPlant[];
+  /** storms on authored maps (the replica raises its own water to match) */
+  flood?: SimState['flood'];
 }
 
 export interface FrameMsg {

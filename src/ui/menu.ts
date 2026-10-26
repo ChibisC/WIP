@@ -24,7 +24,7 @@ export interface MenuChoice {
   mission: MissionId;
   species: SpeciesId;
   borrowed: string[];
-  /** AI colonies (up to 6) */
+  /** AI colonies (up to MAX_AI) */
   ais: AiChoice[];
   style: MapStyle;
   /** an authored map (docs/maps/design.md); when set it replaces the style and size */
@@ -37,7 +37,8 @@ export interface MenuChoice {
   teams?: number;
 }
 
-export const MAX_AI = 6;
+/** AI colonies beside you: the authored maps have ten colony sites */
+export const MAX_AI = 9;
 
 /** Team number in the simulation for a menu choice (you are team 0; free-for-all colonies get their own). */
 export function teamOf(t: AiTeam): number | undefined {
@@ -93,11 +94,9 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       })
       .join('');
     const rivals = `${aiRows || `<p class="dim">${choice.mode === 'sandbox' ? 'No AI colonies: the meadow is yours.' : 'Add at least one AI colony.'}</p>`}<div class="opt-row">${choice.ais.length < MAX_AI ? '<button class="chip" data-aiadd="1">+ Add an AI colony</button>' : ''}<span class="dim">${choice.ais.length} of ${MAX_AI} · you are on Team 1; colonies on your team are allies</span></div>`;
-    const styles: Array<[MapStyle, string]> = [['meadow', 'Meadow'], ['forest', 'Forest floor'], ['riverbank', 'Riverbank'], ['sandy', 'Sandy scrub']];
-    const map =
-      PLAYABLE_MAPS.map((id) => `<button class="chip ${choice.map === id ? 'on' : ''}" data-map="${id}"><b>${MAPS[id]!.name}</b> · new</button>`).join('') +
-      '<span class="dim">or a random map:</span>' +
-      styles.map(([id, n]) => `<button class="chip ${!choice.map && choice.style === id ? 'on' : ''}" data-style="${id}">${n}</button>`).join('');
+    // the five authored maps (the old random styles stay in the code for missions, tests and old saves)
+    if (!choice.map) choice.map = PLAYABLE_MAPS[0];
+    const map = PLAYABLE_MAPS.map((id) => `<button class="chip ${choice.map === id ? 'on' : ''}" data-map="${id}"><b>${MAPS[id]!.name}</b></button>`).join('');
     const md = choice.map ? MAPS[choice.map] : undefined;
     const mapNote = md
       ? `<p class="dim">${md.blurb} ${(md.width / 1000).toFixed(1)} × ${(md.depth / 1000).toFixed(1)} m, ten colony sites.</p>` +
@@ -106,7 +105,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
     const q = (['auto', 'low', 'medium', 'high'] as Array<Quality | 'auto'>).map((id) => `<button class="chip ${choice.quality === id ? 'on' : ''}" data-q="${id}">${id[0].toUpperCase() + id.slice(1)}</button>`).join('');
     const modes: Array<[GameMode, string, string]> = [
       ['mission', 'Missions', 'Story missions with a narrator and a boss at the end'],
-      ['skirmish', 'Skirmish', 'You against 1 to 6 AI colonies, in teams if you like'],
+      ['skirmish', 'Skirmish', 'You against 1 to 9 AI colonies on one of five maps, in teams if you like'],
       ['sandbox', 'Sandbox', 'No rules: spawn creatures and bosses, infinite food'],
       ['arena', 'Battle Arena', 'Pit any ants and creatures against each other, in 2 to 4 teams'],
     ];

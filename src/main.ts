@@ -1,3 +1,4 @@
+import { PLAYABLE_MAPS } from './maps';
 import './ui/style.css';
 
 import { runAntLab } from './dev/antLab';
@@ -331,6 +332,8 @@ function startGame(): void {
   const openLobby = (raw: Transport, room: string, name: string, token: string, local: boolean) => {
     const transport = netsim(raw);
     const lobby = new Lobby(transport, room, name, token);
+    // the host starts on the first authored map (the old random styles left the menus with the five maps)
+    if (lobby.isHost && !lobby.settings.map) lobby.settings.map = PLAYABLE_MAPS[0];
     // LAN host: each open slot gets an Add player button (a connection-code exchange)
     const addPlayer = raw instanceof ManualRtcTransport && raw.isHost ? (slot: number) => void openHostDialog(ui, raw, slot, { title: `Add player ${slot + 1}` }) : undefined;
     const view = new LobbyView(

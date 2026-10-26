@@ -42,7 +42,7 @@ export const BIOME_DRESS: Record<Biome, BiomeDress> = {
   meadow: { grass: 3.4, edge: 0.5, dry: false, pebbles: 7, flowers: 0.12, leaves: 0.25, leafSize: [18, 40], twigs: 0.08, fungi: 0, ferns: 0, reeds: 1 },
   forest: { grass: 0.45, edge: 0.6, dry: false, pebbles: 4, flowers: 0, leaves: 8, leafSize: [20, 46], twigs: 1.1, fungi: 0.12, ferns: 0.07, reeds: 0.5 },
   riverbank: { grass: 2.4, edge: 0.4, dry: false, pebbles: 9, flowers: 0.05, leaves: 0.8, leafSize: [18, 40], twigs: 0.35, fungi: 0, ferns: 0, reeds: 1.6 },
-  rainforest: { grass: 0.15, edge: 0.6, dry: false, pebbles: 2, flowers: 0, leaves: 9, leafSize: [40, 110], twigs: 0.7, fungi: 0.08, ferns: 0.2, reeds: 0.6 },
+  rainforest: { grass: 0.15, edge: 0.6, dry: false, pebbles: 2, flowers: 0, leaves: 5, leafSize: [30, 80], twigs: 0.7, fungi: 0.08, ferns: 0.2, reeds: 0.6 },
   savanna: { grass: 2.2, edge: 0.3, dry: true, pebbles: 11, flowers: 0.02, leaves: 0.15, leafSize: [10, 22], twigs: 0.55, fungi: 0, ferns: 0, reeds: 0.4 },
 };
 
@@ -341,16 +341,25 @@ export function moundGeometry(shape: Shape, height: number, ground: (x: number, 
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
-  const clay = new THREE.Color(0xc08a5a);
-  const pale = new THREE.Color(0xe2c08e);
+  // sun-baked clay: ochre at the foot, paler and drier up the spire, in lumpy pellet patches
+  const clay = new THREE.Color(0x94603a);
+  const pale = new THREE.Color(0xb48a5c);
+  const damp = new THREE.Color(0x6e4428);
   const out = paint(g, (x, y, z) => {
     const h = Math.max(0, Math.min(1, (y - g0) / height));
-    return clay.clone().lerp(pale, h * 0.6).multiplyScalar(0.8 + 0.35 * valueNoise2(x * 0.2, y * 0.25 + z * 0.2, seed + 9));
+    const c = clay.clone().lerp(pale, Math.min(1, h * 0.9));
+    if (h < 0.12) c.lerp(damp, (0.12 - h) * 4);
+    const grain = valueNoise2(x * 0.35, y * 0.3 + z * 0.35, seed + 9);
+    const pell = valueNoise2(x * 1.6, y * 1.4 + z * 1.6, seed + 4);
+    return c.multiplyScalar(0.8 + 0.22 * grain + 0.12 * pell);
   });
-  // box-projected uvs (soil texture)
+  // cylindrical uvs round the spire (the soil normal map gives the worked-clay grain without stretching)
   const p = out.attributes.position as THREE.BufferAttribute;
   const uvs = new Float32Array(p.count * 2);
-  for (let i = 0; i < p.count; i++) uvs.set([(p.getX(i) + p.getZ(i)) / 40, p.getY(i) / 40], i * 2);
+  for (let i = 0; i < p.count; i++) {
+    const a = Math.atan2(p.getZ(i) - o.cz, p.getX(i) - o.cx);
+    uvs.set([((a / (Math.PI * 2)) * o.r(a) * 6.28) / 30, p.getY(i) / 30], i * 2);
+  }
   out.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   return out;
 }
@@ -420,8 +429,10 @@ export function litter(ctx: ScatterCtx, d: BiomeDress, group: THREE.Group): void
   for (let i = 0; i < area * d.leaves; i++) {
     const x = rng.range(0, t.width);
     const z = rng.range(0, t.depth);
-    if (!free(x, z, 4) || (!dense(x, z) && rng.chance(0.6))) continue;
-    const g = leafGeometry(rng.range(d.leafSize[0], d.leafSize[1]), rng.int(0, 7), tex.leaves.cols, tex.leaves.rows, rng);
+    const size = rng.range(d.leafSize[0], d.leafSize[1]);
+    // the whole leaf stays off water, walls and crossings (big rainforest leaves would hide them)
+    if (!free(x, z, Math.max(4, size * 0.45)) || (!dense(x, z) && rng.chance(0.6))) continue;
+    const g = leafGeometry(size, rng.int(0, 7), tex.leaves.cols, tex.leaves.rows, rng);
     g.rotateX(rng.range(-0.12, 0.12));
     g.rotateY(rng.range(0, 6.28));
     g.translate(x, ground(x, z) + 0.25 + rng.range(0, 0.4), z);

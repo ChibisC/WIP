@@ -30,6 +30,8 @@ export interface SaveHeader {
   title: string;
   mode: 'mission' | 'skirmish' | 'sandbox' | 'arena' | 'game';
   mission?: string;
+  /** the authored map's name ("Meadow Pond"); absent for the old random styles and older saves */
+  map?: string;
   /** the player's colony */
   local: number;
   species: string;
@@ -189,7 +191,7 @@ export async function listSaves(): Promise<SaveRecord[]> {
 export function describeSave(h: SaveHeader): string {
   const d = new Date(h.date);
   const when = isNaN(d.getTime()) ? '' : ` · ${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
-  return `${h.title} · ${Math.floor(h.time / 60)} min · ${h.ants} ants${when}`;
+  return `${h.title}${h.map ? ` on ${h.map}` : ''} · ${Math.floor(h.time / 60)} min · ${h.ants} ants${when}`;
 }
 
 /** Let the browser download bytes as a file. */

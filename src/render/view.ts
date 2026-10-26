@@ -99,6 +99,12 @@ export class GameView {
   /** Called every frame before rendering with real dt. */
   beforeRender: Array<(dt: number) => void> = [];
   night = false;
+  /** 0..1: a storm over the map (floods): darker, greyer, mistier light (set by the session each frame) */
+  storm = 0;
+  private stormShown = 0;
+  private dayFog = 0;
+  private daySun = 0;
+  private dayHemi = 0;
 
   constructor(private canvas: HTMLCanvasElement, private input: Input) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
@@ -196,6 +202,9 @@ export class GameView {
         this.water.material.color.setHex(look.water);
       }
     }
+    this.dayFog = fog && 'density' in fog ? fog.density : 0;
+    this.daySun = this.surfaceLights.sun.intensity;
+    this.dayHemi = this.surfaceLights.hemi.intensity;
     this.rebuildGrass();
     const r = this.surfaceRig;
     r.heightAt = (x, z) => terrain.walkHeight(Math.min(Math.max(x, 0), terrain.width), Math.min(Math.max(z, 0), terrain.depth));
@@ -622,17 +631,31 @@ export class GameView {
     this.post.focusDistance = focus;
     this.post.tilt = this.observing ? 0.15 : this.space === 'surface' ? 0.55 : 0.45;
     this.post.settings.dofStrength = this.observing ? 1.2 : 1;
+    this.applyStorm(dt);
     this.applyGrade();
     this.post.render(this.activeScene(), cam);
+  }
+
+  /** Ease the storm look in and out: dimmer sun, more fog (render only). */
+  private applyStorm(dt: number): void {
+    const k = Math.min(1, dt * 0.6);
+    this.stormShown += (this.storm - this.stormShown) * k;
+    if (this.night || this.daySun <= 0) return;
+    const s = this.stormShown;
+    this.surfaceLights.sun.intensity = this.daySun * (1 - 0.6 * s);
+    this.surfaceLights.hemi.intensity = this.dayHemi * (1 - 0.25 * s);
+    const fog = this.surfaceScene.fog as THREE.FogExp2 | null;
+    if (fog && 'density' in fog && this.dayFog > 0) fog.density = this.dayFog * (1 + 1.4 * s);
   }
 
   private applyGrade(): void {
     const g = this.post.settings.grade;
     if (this.space === 'surface') {
-      g.exposure = this.night ? 1.25 : 1.0;
-      g.saturation = this.night ? 0.7 : 1.08;
+      const s = this.stormShown;
+      g.exposure = this.night ? 1.25 : 1.0 - 0.12 * s;
+      g.saturation = this.night ? 0.7 : 1.08 - 0.35 * s;
       g.contrast = 1.06;
-      g.warmth = this.night ? -0.6 : 0.25;
+      g.warmth = this.night ? -0.6 : 0.25 - 0.55 * s;
       g.vignette = 0.32;
       g.lift.setRGB(0.008, 0.007, 0.004);
     } else {
