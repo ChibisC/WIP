@@ -1,6 +1,7 @@
 import { SPECIES, SpeciesId, BORROWABLE, CASTES } from '../sim/species';
 import type { MapId } from '../maps/types';
 import { MAPS, PLAYABLE_MAPS } from '../maps';
+import { mapPreview } from './mapPreview';
 import { MapStyle } from '../world/terrain';
 import { Quality } from '../render/view';
 import { MISSIONS, MissionId } from '../sim/missions';
@@ -57,6 +58,8 @@ export function randomBorrowed(): string[] {
 const PLAYABLE: SpeciesId[] = ['lasius', 'formica', 'atta', 'solenopsis', 'eciton', 'nasutitermes', 'rhynchotermes', 'hell', 'aurimyrmex', 'termant', 'plagiaria'];
 
 /** Prototype start screen: species, Gene Thief caste picks, AI colonies and their teams, map and quality. */
+const thumbs = new Map<MapId, HTMLCanvasElement>();
+
 export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): void {
   const choice: MenuChoice = { mode: 'mission', mission: 'meadow', species: 'lasius', borrowed: ['formica_mortar', 'fire_major'], ais: [{ species: 'formica', borrowed: [], team: 'own' }], style: 'meadow', quality: settings().quality, teams: 2 };
   // the arena has its own floor (the formicarium's flat plaster by default)
@@ -96,7 +99,10 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
     const rivals = `${aiRows || `<p class="dim">${choice.mode === 'sandbox' ? 'No AI colonies: the meadow is yours.' : 'Add at least one AI colony.'}</p>`}<div class="opt-row">${choice.ais.length < MAX_AI ? '<button class="chip" data-aiadd="1">+ Add an AI colony</button>' : ''}<span class="dim">${choice.ais.length} of ${MAX_AI} · you are on Team 1; colonies on your team are allies</span></div>`;
     // the five authored maps (the old random styles stay in the code for missions, tests and old saves)
     if (!choice.map) choice.map = PLAYABLE_MAPS[0];
-    const map = PLAYABLE_MAPS.map((id) => `<button class="chip ${choice.map === id ? 'on' : ''}" data-map="${id}"><b>${MAPS[id]!.name}</b></button>`).join('');
+    const map = `<div class="map-grid">${PLAYABLE_MAPS.map((id) => {
+      const m = MAPS[id]!;
+      return `<button class="map-card ${choice.map === id ? 'on' : ''}" data-map="${id}"><span class="map-thumb" data-thumb="${id}"></span><b>${m.name}</b><i>${(m.width / 1000).toFixed(1)} × ${(m.depth / 1000).toFixed(1)} m${m.floods.length ? ' · floods' : ''}</i></button>`;
+    }).join('')}</div>`;
     const md = choice.map ? MAPS[choice.map] : undefined;
     const mapNote = md
       ? `<p class="dim">${md.blurb} ${(md.width / 1000).toFixed(1)} × ${(md.depth / 1000).toFixed(1)} m, ten colony sites.</p>` +
@@ -129,7 +135,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
            <h2>Colony</h2><div class="species-grid">${sp}</div>${borrow}`
         : `<h2>Colony</h2><div class="species-grid">${sp}</div>${borrow}
            <h2>AI colonies</h2>${rivals}
-           <h2>Map</h2><div class="opt-row">${map}</div>${mapNote}`;
+           <h2>Map</h2>${map}${mapNote}`;
     const go = choice.mode === 'mission' ? `Start ${MISSIONS[choice.mission].title}` : choice.mode === 'sandbox' ? 'Open the sandbox' : choice.mode === 'arena' ? 'Open the arena' : 'Found the colony';
     root.innerHTML = `<div class="menu-card">
       <h1>UNDERGROUND DOMINION</h1>
@@ -139,6 +145,13 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       <h2>Graphics</h2><div class="opt-row">${q}</div>
       <button class="go" ${choice.mode === 'skirmish' && !choice.ais.length ? 'disabled title="Add at least one AI colony"' : ''}>${go}</button>
     </div>`;
+    // map thumbnails, drawn once from the map data
+    root.querySelectorAll<HTMLElement>('[data-thumb]').forEach((el) => {
+      const id = el.dataset.thumb as MapId;
+      let c = thumbs.get(id);
+      if (!c) thumbs.set(id, (c = mapPreview(MAPS[id]!, 124)));
+      el.appendChild(c);
+    });
   };
   render();
   root.addEventListener('click', (e) => {
