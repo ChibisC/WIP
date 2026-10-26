@@ -12,7 +12,7 @@ emulation (touch events, coarse pointer) at iPhone and iPad sizes:
     battle arena on each device.
 Fails on page errors, shader warnings or any check.
 
-Run: tests/browser/with_server.sh python3 tests/browser/mobile.py docs/mobile-renders   (ONLY=<device name part>)
+Run: tests/browser/with_server.sh python3 tests/browser/mobile.py docs/mobile-renders   (ONLY=<device name parts, comma-separated>)
 """
 import math, os, sys, time
 from playwright.sync_api import sync_playwright
@@ -104,7 +104,7 @@ with sync_playwright() as p:
         ctx.close()
 
     for name, W, H, ua, compact in DEVICES:
-        if ONLY and ONLY not in name:
+        if ONLY and not any(o and o in name for o in ONLY.split(",")):
             continue
         errs = []
         ctx = b.new_context(viewport={"width": W, "height": H}, device_scale_factor=1, is_mobile=True, has_touch=True, user_agent=ua)
@@ -164,8 +164,9 @@ with sync_playwright() as p:
             shot(pg, f"{name}_marker_orders")
             pg.locator(".mp-col.ord-open .mp-ord[data-order='noAttack']").tap()
             settle(pg, 4)
-            # a tap elsewhere (a harmless spot: another column's count) closes them
-            pg.locator(".mp-col[data-col='2'] .mp-count").tap()
+            # a tap elsewhere closes them: open ground near the top (not next to a button: Chromium's touch
+            # adjustment moves a tap onto a nearby button, e.g. another column's Orders button below its count)
+            pg.touchscreen.tap(cx, H * 0.25)
             settle(pg, 2)
             check(f"{name}: a tap outside closes the switches", not pg.evaluate("!!document.querySelector('.mp-col.ord-open')") and bool(pg.evaluate("window.__session.player.markers[0].noAttack")) == was)
         if folded:
