@@ -148,7 +148,8 @@ with sync_playwright() as p:
         small = pg.evaluate("() => Math.min(...[...document.querySelectorAll('.gui .bbtn, .gui .mp-head, .gui .at-tab')].filter(e => e.offsetParent).map(e => Math.min(e.getBoundingClientRect().width, e.getBoundingClientRect().height)))")
         mp, bp = pg.evaluate("() => ['.mp', '.bp'].map(q => { const r = document.querySelector(q).getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; })")
         check(f"{name}: marker panel open: controls big enough (smallest {small:.0f} px ≥ 24), beside the build panel", small >= 24 and mp[2] <= bp[0] + 1 and mp[1] >= 0, f"mp {mp}, bp {bp}")
-        if compact:
+        # every touch layout (phones, and tablets in either layout) shows a column's orders behind one button
+        if pg.evaluate("document.querySelector('.gui').classList.contains('touch')"):
             pg.locator(".mp-col[data-col='0'] .mp-ordbtn").tap()
             settle(pg, 2)
             sw = pg.evaluate("() => [...document.querySelectorAll('.mp-col.ord-open .mp-ord')].map(e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; })")
@@ -270,7 +271,7 @@ with sync_playwright() as p:
         check(f"{name}: a two-finger gesture with the dig tool marks no soil", n1 == n0, f"{n0} → {n1}")
         # find soil that can be dug near the middle of the screen
         spot = pg.evaluate("""([W, H]) => { const s = window.__session; const g = s.world.nest(s.player.id);
-            for (let r = 0; r < 260; r += 12) for (let a = 0; a < 6.28; a += 0.5) { const x = W / 2 + Math.cos(a) * r, y = H * 0.42 + Math.sin(a) * r * 0.6;
+            for (let r = 0; r < Math.max(260, Math.max(W, H) * 0.45); r += 12) for (let a = 0; a < 6.28; a += 0.5) { const x = W / 2 + Math.cos(a) * r, y = H * 0.42 + Math.sin(a) * r * (H > W ? 1 : 0.6);
               const np = s.view.pickNest(x, y); if (!np) continue; const q = g.hexAt(np.x, np.y); if (q >= 0 && !g.isHexDug(q) && g.isHexDiggable(q) && !g.hexDesig[q]) return [x, y]; } return null; }""", [W, H])
         if spot:
             touch(cdp, "touchStart", [spot])
@@ -278,10 +279,30 @@ with sync_playwright() as p:
             settle(pg, 4)
             n2 = pg.evaluate(desig)
             check(f"{name}: a tap with the dig tool marks one hex of soil", n2 == n1 + 1, f"{n1} → {n2}")
-            gesture(cdp, pg, [(spot[0], spot[1])], [(spot[0] + 70, spot[1] + 10)], steps=10, hold=0.2)
-            settle(pg, 4)
-            n3 = pg.evaluate(desig)
-            check(f"{name}: dragging with the dig tool paints soil instead of panning", n3 > n2 or n3 < n2, f"{n2} → {n3}")
+            # a drag across fresh soil (on a small screen a fixed direction can run over dug tunnels only, and a drag
+            # that starts on a marked hex unmarks): pick a start and a direction whose 70 px cross the most soil
+            drag = pg.evaluate("""([W, H]) => { const s = window.__session; const g = s.world.nest(s.player.id);
+                const fresh = (x, y) => { const np = s.view.pickNest(x, y); if (!np) return -1; const q = g.hexAt(np.x, np.y);
+                  return q >= 0 && !g.isHexDug(q) && g.isHexDiggable(q) && !g.hexDesig[q] ? q : -1; };
+                let best = null;
+                for (let r = 0; r < Math.max(220, Math.max(W, H) * 0.4); r += 16) for (let a = 0; a < 6.28; a += 0.6) {
+                  const x = W / 2 + Math.cos(a) * r, y = H * 0.42 + Math.sin(a) * r * (H > W ? 1 : 0.6);
+                  if (fresh(x, y) < 0) continue;
+                  for (let d = 0; d < 6.28; d += 0.785) { const seen = new Set();
+                    for (let k = 0; k <= 14; k++) { const q = fresh(x + Math.cos(d) * 5 * k, y + Math.sin(d) * 5 * k); if (q >= 0) seen.add(q); }
+                    const ex = x + Math.cos(d) * 70, ey = y + Math.sin(d) * 70;
+                    if (ex > 10 && ex < W - 10 && ey > 10 && ey < H - 10 && (!best || seen.size > best[4])) best = [x, y, ex, ey, seen.size]; } }
+                return best; }""", [W, H])
+            if drag and drag[4] >= 2:
+                c0 = rig(pg)
+                gesture(cdp, pg, [(drag[0], drag[1])], [(drag[2], drag[3])], steps=10, hold=0.2)
+                settle(pg, 4)
+                n3 = pg.evaluate(desig)
+                c1 = rig(pg)
+                still = abs(c1["x"] - c0["x"]) < 0.5 and abs(c1["z"] - c0["z"]) < 0.5
+                check(f"{name}: dragging with the dig tool paints soil instead of panning", n3 > n2 and still, f"{n2} → {n3} ({drag[4]} fresh hexes on the path); camera {'still' if still else 'moved'}")
+            else:
+                check(f"{name}: a drag path across fresh soil on screen", False, str(drag))
         else:
             check(f"{name}: soil to dig on screen", False)
         pg.evaluate("window.__session.setTool('none')")

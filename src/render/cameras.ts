@@ -59,10 +59,18 @@ export class SurfaceCameraRig {
       // Keyboard pan in camera-relative ground axes.
       this.goal.x += (fx * cy + fz * sy) * panSpeed * dt;
       this.goal.z += (-fx * sy + fz * cy) * panSpeed * dt;
-      // Mouse drag pan: drag the ground under the cursor.
-      const k = (this.distance / 700) * 1.25;
-      this.goal.x += (-d.panDX * cy - d.panDY * sy) * k;
-      this.goal.z += (d.panDX * sy - d.panDY * cy) * k;
+      // Mouse and finger drag pan: drag the ground under the cursor. One screen pixel covers
+      // 2·d·tan(fov/2)/height mm of ground at the target, on any screen size (the old fixed
+      // d/700·1.25 was right only on a ~390 px tall phone and ran 2–3× ahead elsewhere); a drag
+      // up or down the screen covers more ground on the tilted plane (1/sin pitch, capped).
+      if (d.panDX || d.panDY) {
+        const viewH = Math.max(1, typeof window !== 'undefined' ? window.innerHeight : 720);
+        const perPx = (2 * this.distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2)) / viewH;
+        const kx = perPx;
+        const kz = perPx / Math.max(0.4, Math.sin(this.pitch()));
+        this.goal.x += -d.panDX * cy * kx - d.panDY * sy * kz;
+        this.goal.z += d.panDX * sy * kx - d.panDY * cy * kz;
+      }
       this.goalYaw -= d.rotDX * 0.006;
       this.pitchBias = THREE.MathUtils.clamp(this.pitchBias + d.rotDY * 0.004, -0.4, 0.5);
       if (d.wheel) this.goalDistance *= Math.exp(d.wheel * 0.14);
