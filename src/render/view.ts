@@ -186,7 +186,7 @@ export class GameView {
     this.decor = terrain.map ? new MapDecor(terrain) : null;
     if (this.decor) this.worldGroup.add(this.decor.group);
     const fog = this.surfaceScene.fog as THREE.FogExp2 | null;
-    const baseFog = 0.00055 * Math.min(1, 1000 / Math.max(terrain.width, terrain.depth));
+    const baseFog = 0.00055 * Math.min(1, (terrain.map ? 800 : 1000) / Math.max(terrain.width, terrain.depth));
     if (fog && 'density' in fog && !this.night) fog.density = baseFog;
     // the map's biome sets its day light, air and water colour
     if (terrain.map && !this.night) {

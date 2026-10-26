@@ -5,7 +5,7 @@ import type { MapDef, Shape, Wall, WallKind, Walkway } from '../maps/types';
 import { shapeBox, shapeDist } from '../world/mapShapes';
 import { HF_ENTRANCE, HF_LITTER, HF_CREATURE, HF_SITE, HF_SITE_RING } from '../world/surfaceLayout';
 import { Terrain } from '../world/terrain';
-import { stoneGeometry } from './props';
+import { branchGeometry, stoneGeometry } from './props';
 import { BIOME_DRESS, BiomeDress, buttressGeometry, leafRaft, litter, moundGeometry, mushroomCluster, nearWater, rootMatGeometry, trunkGeometry } from './mapBiomes';
 import { patchDapple } from './shaderPatch';
 import { textures } from './textures';
@@ -191,7 +191,7 @@ export function outlineRock(shape: Shape, height: number, seed: number, look: Ro
   return f;
 }
 
-/** A log or trunk lying along a path: bark tube per segment, ends capped. */
+/** A log lying along a path: a tapered bark tube per segment with sawn, pale end caps, resting on the ground. */
 function pathLog(shape: Shape, ground: (x: number, z: number) => number, seed: number): THREE.BufferGeometry[] {
   if (!('path' in shape)) return [];
   const out: THREE.BufferGeometry[] = [];
@@ -202,18 +202,14 @@ function pathLog(shape: Shape, ground: (x: number, z: number) => number, seed: n
     const [x1, z1] = P[i + 1];
     const len = Math.hypot(x1 - x0, z1 - z0) + r * 0.6;
     const rng = new Rng(seed + i * 17);
-    const pts: THREE.Vector3[] = [];
-    for (let k = 0; k <= 4; k++) pts.push(new THREE.Vector3((k / 4 - 0.5) * len, 0, Math.sin((k / 4) * Math.PI) * rng.range(-0.04, 0.04) * len));
-    const curve = new THREE.CatmullRomCurve3(pts);
-    const g = new THREE.TubeGeometry(curve, Math.max(8, Math.round(len / 8)), r, 20, false);
-    const rot = Math.atan2(z1 - z0, x1 - x0);
+    // built along x, centred (props.branchGeometry: bark uvs that repeat along the length, end caps)
+    const g = branchGeometry(len, r, rng, 28, true);
+    const yaw = Math.atan2(z1 - z0, x1 - x0);
     const h0 = ground(x0, z0);
     const h1 = ground(x1, z1);
     g.rotateZ(Math.atan2(h1 - h0, len));
-    g.rotateY(-rot);
+    g.rotateY(-yaw);
     g.translate((x0 + x1) / 2, (h0 + h1) / 2 + r * 0.72, (z0 + z1) / 2);
-    const col = new Float32Array(g.attributes.position.count * 3).fill(1);
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     out.push(g);
   }
   return out;
@@ -487,7 +483,8 @@ export class MapDecor {
             const ez = Math.sin(a) * rz * wob;
             poly.push([cx + ex * Math.cos(rot) - ez * Math.sin(rot), cz + ex * Math.sin(rot) + ez * Math.cos(rot)]);
           }
-          const g = outlineRock({ poly }, top + 0.5 - lo, 3000 + wi * 50 + s * 7 + i, { tint: rng.chance(0.5) ? 0x857d72 : 0x7a756d, moss: 0.45, rough: 0.2, flat: 1.7 }, () => lo, lo);
+          // the top stands clear of the water (ants walk at the walk height, a hair lower)
+          const g = outlineRock({ poly }, top + 1.6 - lo, 3000 + wi * 50 + s * 7 + i, { tint: rng.chance(0.5) ? 0x857d72 : 0x7a756d, moss: 0.45, rough: 0.2, flat: 1.7 }, () => lo, lo);
           if (g) geos.push(g);
         }
       }

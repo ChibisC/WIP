@@ -40,9 +40,9 @@ export interface BiomeDress {
 
 export const BIOME_DRESS: Record<Biome, BiomeDress> = {
   meadow: { grass: 3.4, edge: 0.5, dry: false, pebbles: 7, flowers: 0.12, leaves: 0.25, leafSize: [18, 40], twigs: 0.08, fungi: 0, ferns: 0, reeds: 1 },
-  forest: { grass: 0.45, edge: 0.6, dry: false, pebbles: 4, flowers: 0, leaves: 8, leafSize: [20, 46], twigs: 1.1, fungi: 0.12, ferns: 0.18, reeds: 0.5 },
+  forest: { grass: 0.45, edge: 0.6, dry: false, pebbles: 4, flowers: 0, leaves: 8, leafSize: [20, 46], twigs: 1.1, fungi: 0.12, ferns: 0.07, reeds: 0.5 },
   riverbank: { grass: 2.4, edge: 0.4, dry: false, pebbles: 9, flowers: 0.05, leaves: 0.8, leafSize: [18, 40], twigs: 0.35, fungi: 0, ferns: 0, reeds: 1.6 },
-  rainforest: { grass: 0.15, edge: 0.6, dry: false, pebbles: 2, flowers: 0, leaves: 9, leafSize: [40, 110], twigs: 0.7, fungi: 0.08, ferns: 0.45, reeds: 0.6 },
+  rainforest: { grass: 0.15, edge: 0.6, dry: false, pebbles: 2, flowers: 0, leaves: 9, leafSize: [40, 110], twigs: 0.7, fungi: 0.08, ferns: 0.2, reeds: 0.6 },
   savanna: { grass: 2.2, edge: 0.3, dry: true, pebbles: 11, flowers: 0.02, leaves: 0.15, leafSize: [10, 22], twigs: 0.55, fungi: 0, ferns: 0, reeds: 0.4 },
 };
 
@@ -62,9 +62,9 @@ export interface BiomeLight {
 
 export const BIOME_LIGHT: Record<Biome, BiomeLight> = {
   meadow: { sun: 3.1, sunColor: 0xffdb9e, hemi: 0.95, hemiSky: 0xbfd4ff, hemiGround: 0x5a4a2a, fog: 1, fogColor: 0xd9d6c2, dapple: 0.7, water: 0x2a3a34 },
-  forest: { sun: 1.7, sunColor: 0xf2e2b0, hemi: 0.8, hemiSky: 0xa9c0a0, hemiGround: 0x3a3020, fog: 1.7, fogColor: 0x8f9a80, dapple: 1.0, water: 0x2c2a1e },
+  forest: { sun: 1.7, sunColor: 0xf2e2b0, hemi: 0.8, hemiSky: 0xa9c0a0, hemiGround: 0x3a3020, fog: 1.15, fogColor: 0x8f9a80, dapple: 1.0, water: 0x2c2a1e },
   riverbank: { sun: 3.0, sunColor: 0xfff0d8, hemi: 1.0, hemiSky: 0xc4d8ff, hemiGround: 0x5a5236, fog: 1.1, fogColor: 0xd2d8d0, dapple: 0.6, water: 0x2a3c3c },
-  rainforest: { sun: 1.4, sunColor: 0xe8efc8, hemi: 0.85, hemiSky: 0x9ebc98, hemiGround: 0x2e3218, fog: 2.4, fogColor: 0x9aa892, dapple: 1.0, water: 0x2e2c1c },
+  rainforest: { sun: 1.4, sunColor: 0xe8efc8, hemi: 0.85, hemiSky: 0x9ebc98, hemiGround: 0x2e3218, fog: 1.5, fogColor: 0x9aa892, dapple: 1.0, water: 0x2e2c1c },
   savanna: { sun: 3.6, sunColor: 0xffdca0, hemi: 0.9, hemiSky: 0xd6e0f0, hemiGround: 0x8a6a40, fog: 1.3, fogColor: 0xdccdac, dapple: 0.25, water: 0x4a4030 },
 };
 
@@ -268,29 +268,33 @@ export function mushroomCluster(shape: Shape, height: number, ground: (x: number
   return g;
 }
 
-/** A fern: fronds of paired leaflets arching out from a crown. */
+/** A fern: arching fronds of many narrow paired leaflets, darker at the base, paler at the tips. */
 export function fernGeometry(size: number, rng: Rng): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
-  const fronds = rng.int(5, 8);
-  const green = new THREE.Color().setHSL(rng.range(0.24, 0.3), rng.range(0.45, 0.6), rng.range(0.2, 0.28));
+  const fronds = rng.int(4, 7);
+  const base = new THREE.Color().setHSL(rng.range(0.22, 0.28), rng.range(0.4, 0.55), rng.range(0.12, 0.17));
+  const tip = base.clone().lerp(new THREE.Color(0x9aa860), 0.35);
   for (let f = 0; f < fronds; f++) {
-    const yaw = (f / fronds) * Math.PI * 2 + rng.range(-0.3, 0.3);
-    const L = size * rng.range(0.7, 1.1);
-    const lift = rng.range(0.7, 1.1);
+    const yaw = (f / fronds) * Math.PI * 2 + rng.range(-0.4, 0.4);
+    const L = size * rng.range(0.6, 1.05);
+    const arch = rng.range(0.35, 0.55);
+    const droop = rng.range(0.15, 0.35);
     const pos: number[] = [];
     const col: number[] = [];
-    const seg = 10;
-    const spine = (t: number) => [t * L, Math.sin(t * Math.PI * 0.85) * L * 0.45 * lift, 0];
-    for (let i = 1; i < seg; i++) {
+    const seg = 18;
+    // the spine rises, arches and droops at the tip
+    const spine = (t: number): [number, number] => [t * L, (Math.sin(t * Math.PI * 0.8) * arch - t * t * droop) * L];
+    for (let i = 2; i < seg; i++) {
       const t = i / seg;
       const [x, y] = spine(t);
-      const [x2, y2] = spine(t + 1 / seg);
-      const w = L * 0.22 * Math.sin(t * Math.PI) * (1 - t * 0.3);
+      const [x2, y2] = spine(t + 0.8 / seg);
+      const w = L * 0.16 * Math.sin(Math.pow(t, 0.8) * Math.PI) + 0.4;
+      const c = base.clone().lerp(tip, t);
       for (const side of [-1, 1]) {
-        // a leaflet: a thin triangle angled forward from the spine
-        pos.push(x, y, 0, x2, y2, 0, x + w * 0.35, y - w * 0.15, side * w);
-        const c = green.clone().multiplyScalar(0.85 + 0.3 * t);
-        for (let k = 0; k < 3; k++) col.push(c.r, c.g, c.b);
+        // a narrow leaflet angled forward and a little down from the spine
+        pos.push(x, y, 0, x2, y2, side * 0.25, x + w * 0.45, y - w * 0.22, side * w);
+        pos.push(x2, y2, side * 0.25, x2 + w * 0.3, y2 - w * 0.18, side * w * 0.85, x + w * 0.45, y - w * 0.22, side * w);
+        for (let k = 0; k < 6; k++) col.push(c.r, c.g, c.b);
       }
     }
     const g = new THREE.BufferGeometry();
@@ -359,10 +363,10 @@ export function rootMatGeometry(path: readonly (readonly [number, number])[], wi
   const L = Math.hypot(x1 - x0, z1 - z0);
   const dx = (x1 - x0) / L;
   const dz = (z1 - z0) / L;
-  const n = Math.max(4, Math.round(width / 6));
+  const n = Math.max(6, Math.round(width / 3.2));
   for (let k = 0; k < n; k++) {
-    const off = ((k + 0.5) / n - 0.5) * width * 1.05;
-    const r = rng.range(2.2, 3.6);
+    const off = ((k + 0.5) / n - 0.5) * width * 1.05 + rng.range(-1.5, 1.5);
+    const r = rng.range(1.3, 2.6);
     const pts: THREE.Vector3[] = [];
     const ext = rng.range(0.08, 0.2) * L;
     for (let i = 0; i <= 6; i++) {
@@ -373,7 +377,9 @@ export function rootMatGeometry(path: readonly (readonly [number, number])[], wi
       pts.push(new THREE.Vector3(x, top - r * 0.85 + Math.sin(t * Math.PI) * 0.6, z));
     }
     const g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, r, 8, false);
-    out.push(paint(g, new THREE.Color(0x6a5440).multiplyScalar(rng.range(0.85, 1.15))));
+    const bark = new THREE.Color(0x6a5440).multiplyScalar(rng.range(0.8, 1.15));
+    const moss = new THREE.Color(0x4d6a2a);
+    out.push(paint(g, (x, y, z) => bark.clone().lerp(moss, Math.max(0, fbm2(x * 0.08, z * 0.08, 2, seed + k) - 0.55) * 1.8)));
   }
   return out;
 }

@@ -248,8 +248,10 @@ export class Terrain {
           const h = this.heights[k];
           if (h < bank) this.heights[k] = bank + (h - bank) * t * t;
           // a riverbank's banks are sand and gravel a little further up
-          if (map.biome === 'riverbank' && d < 40) {
-            const sand = 1 - smooth01(Math.max(0, d - 8) / 32);
+          if (map.biome === 'riverbank' && d < 48) {
+            // a bank of uneven width: narrow in places, a broad sandy beach in others
+            const reach = 10 + 38 * fbm2(x / 90 + 3, y / 90 - 7, 3, 61);
+            const sand = 1 - smooth01(Math.max(0, d - 6) / Math.max(4, reach));
             const k4 = k * 4;
             this.coverW[k4 + 2] = Math.max(this.coverW[k4 + 2], 255 * sand * 0.9);
             this.coverW[k4 + 1] *= 1 - sand * 0.7;
