@@ -342,15 +342,16 @@ export function moundGeometry(shape: Shape, height: number, ground: (x: number, 
   g.setIndex(idx);
   g.computeVertexNormals();
   // sun-baked clay: ochre at the foot, paler and drier up the spire, in lumpy pellet patches
-  const clay = new THREE.Color(0xc4905e);
-  const pale = new THREE.Color(0xe6c898);
-  const damp = new THREE.Color(0x9a6a44);
+  const clay = new THREE.Color(0x94603a);
+  const pale = new THREE.Color(0xb48a5c);
+  const damp = new THREE.Color(0x6e4428);
   const out = paint(g, (x, y, z) => {
     const h = Math.max(0, Math.min(1, (y - g0) / height));
     const c = clay.clone().lerp(pale, Math.min(1, h * 0.9));
     if (h < 0.12) c.lerp(damp, (0.12 - h) * 4);
     const grain = valueNoise2(x * 0.35, y * 0.3 + z * 0.35, seed + 9);
-    return c.multiplyScalar(0.86 + 0.24 * grain);
+    const pell = valueNoise2(x * 1.6, y * 1.4 + z * 1.6, seed + 4);
+    return c.multiplyScalar(0.8 + 0.22 * grain + 0.12 * pell);
   });
   // cylindrical uvs round the spire (the soil normal map gives the worked-clay grain without stretching)
   const p = out.attributes.position as THREE.BufferAttribute;
