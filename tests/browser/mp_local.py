@@ -71,6 +71,23 @@ with sync_playwright() as p:
     check('the match starts on every tab', wait(lambda: all(pg.evaluate('window.__ready===true') for pg in pages), 300))
     ev = lambda pg, js: pg.evaluate(js)
     check('every tab runs the simulation in a worker, driven by lockstep', all(ev(pg, '__session.sim.kind') == 'worker' and ev(pg, '!!__net') for pg in pages))
+    # Real clicks must reach the in-game buttons: the multiplayer HUD layer once covered the whole screen
+    # and swallowed them (the clicks elsewhere in this test use dispatch_event, which skips hit-testing).
+    REACH = """() => [...document.querySelectorAll('#ui button, #ui .tbtn, #ui .at-tab')].filter((b) => {
+        const r = b.getBoundingClientRect(), st = getComputedStyle(b);
+        if (r.width < 2 || r.height < 2 || st.visibility === 'hidden' || st.display === 'none' || st.pointerEvents === 'none') return false;
+        const x = r.left + r.width / 2, y = r.top + r.height / 2;
+        if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
+        const top = document.elementFromPoint(x, y);
+        return !(top && (top === b || b.contains(top)));
+      }).map((b) => (b.className + ' ' + (b.textContent || '').trim()).slice(0, 40))"""
+    blocked = [ev(pg, REACH) for pg in pages]
+    check('real clicks reach every in-game button on every tab (nothing covers them)', all(not x for x in blocked), [x[:4] for x in blocked])
+    dig = guests[0].locator('.tbtn', has_text='Dig').first.bounding_box()
+    if dig:
+        guests[0].mouse.click(dig['x'] + dig['width'] / 2, dig['y'] + dig['height'] / 2)
+    check('a real mouse click on Dig picks the Dig tool (guest)', wait(lambda: ev(guests[0], '__session.tool') != 'none', 15), ev(guests[0], '__session.tool'))
+    guests[0].keyboard.press('Escape')
     check('players are colonies 0, 1, 2 (+ AI 3)', [ev(pg, '__net.self') for pg in pages] == [0, 1, 2] and ev(host, '__session.world.s.colonies.length') == 4)
     check('guest 1 plays the species they picked', ev(guests[0], '__session.player.species') == 'formica')
     wait(lambda: min(ev(pg, '__session.world.s.tick') for pg in pages) >= 10, 120)
