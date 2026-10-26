@@ -1,0 +1,5 @@
+# Netlify: cross-origin isolation, so the simulation worker can share its per-tick data
+# through SharedArrayBuffer (README, "Deploying"). Other hosts work without it.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless

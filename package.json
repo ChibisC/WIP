@@ -1,0 +1,30 @@
+{
+  "name": "underground-dominion",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A 3D ant colony strategy game rooted in real biology. Procedural art and audio, TypeScript + Three.js.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vite-node tools/check-determinism.ts && vite-node tests/run-all.ts && vite-node tests/species.ts && vite-node tests/combat.ts && vite-node tests/royals.ts && vite-node tests/sickle.ts && vite-node tests/eciton.ts && vite-node tests/termants.ts && vite-node tests/arena.ts && vite-node tests/fights.ts && vite-node tests/net.ts",
+    "test:determinism": "vite-node tools/determinism.ts --",
+    "stress": "vite-node tools/stress.ts --",
+    "audio:process": "tools/audio/process.sh",
+    "audio:manifest": "vite-node tools/audio/build-manifest.ts",
+    "audio:list": "vite-node tools/audio/sound-list.ts",
+    "audio:standins": "vite-node tools/audio/render-standins.ts"
+  },
+  "dependencies": {
+    "peerjs": "1.5.5",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vite-node": "^5.0.0"
+  }
+}

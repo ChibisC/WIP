@@ -1,0 +1,8 @@
+node_modules
+dist/
+shots/
+*.log
+underground-dominion-prototype.zip
+
+# rendered stand-in takes (npm run audio:standins)
+audio-src/standins/
