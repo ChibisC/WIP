@@ -36,6 +36,8 @@ export interface LobbySettings {
   style: GameSetup['style'];
   /** an authored map (docs/maps/design.md); replaces the style and size when set */
   map?: MapId;
+  /** storms flood the authored map's low ground (off by default) */
+  floods?: boolean;
   seed: number;
   /** starting food multiplier on the map */
   food: number;

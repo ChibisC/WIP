@@ -318,11 +318,12 @@ export class LobbyView {
     const settings = host
       ? `<div class="lb-settings">
           <label>Map <select data-f="style">${PLAYABLE_MAPS.map((id) => `<option value="map:${id}" ${id === st.map ? 'selected' : ''}>${MAPS[id]!.name} (new)</option>`).join('')}${STYLES.map(([id, n]) => `<option value="${id}" ${!st.map && id === st.style ? 'selected' : ''}>${n} (random)</option>`).join('')}</select></label>
+          ${st.map && MAPS[st.map]?.floods.length ? `<label>Floods <select data-f="floods"><option value="0" ${!st.floods ? 'selected' : ''}>Off</option><option value="1" ${st.floods ? 'selected' : ''}>On</option></select></label>` : ''}
           <label>Seed <input class="mp-input small" data-f="seed" value="${st.seed}"></label>
           <label>Food <select data-f="food">${[0.6, 1.2, 2].map((f) => `<option value="${f}" ${f === st.food ? 'selected' : ''}>${f === 0.6 ? 'Scarce' : f === 1.2 ? 'Normal' : 'Plenty'}</option>`).join('')}</select></label>
           <label>Population cap <select data-f="pop">${[150, 300, 500].map((p) => `<option value="${p}" ${p === st.popLimit ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
         </div>`
-      : `<p class="dim">Map ${st.map ? MAPS[st.map]?.name : STYLES.find((x) => x[0] === st.style)?.[1]} · seed ${st.seed} · food ${st.food === 0.6 ? 'scarce' : st.food === 1.2 ? 'normal' : 'plenty'} · population cap ${st.popLimit} · no pausing · speed 1×</p>`;
+      : `<p class="dim">Map ${st.map ? MAPS[st.map]?.name : STYLES.find((x) => x[0] === st.style)?.[1]}${st.map && st.floods ? ' · floods on' : ''} · seed ${st.seed} · food ${st.food === 0.6 ? 'scarce' : st.food === 1.2 ? 'normal' : 'plenty'} · population cap ${st.popLimit} · no pausing · speed 1×</p>`;
     const me = L.slots[L.you];
     const blocker = host ? L.startBlocker() : '';
     const chat = L.chat
@@ -402,6 +403,7 @@ export class LobbyView {
       if (t.value.startsWith('map:')) L.setSettings({ map: t.value.slice(4) as MapId, style: 'meadow' });
       else L.setSettings({ style: t.value as MapStyle, map: undefined });
     }
+    else if (f === 'floods') L.setSettings({ floods: t.value === '1' });
     else if (f === 'seed') L.setSettings({ seed: Math.max(1, Math.floor(Number(t.value) || 1)) });
     else if (f === 'food') L.setSettings({ food: Number(t.value) });
     else if (f === 'pop') L.setSettings({ popLimit: Number(t.value) });

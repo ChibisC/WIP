@@ -29,6 +29,8 @@ export interface MenuChoice {
   style: MapStyle;
   /** an authored map (docs/maps/design.md); when set it replaces the style and size */
   map?: MapId;
+  /** storms flood the authored map's low ground (off by default) */
+  floods?: boolean;
   /** 'auto' follows the frame rate, starting from high */
   quality: Quality | 'auto';
   /** battle arena: 2–4 teams */
@@ -96,7 +98,11 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       PLAYABLE_MAPS.map((id) => `<button class="chip ${choice.map === id ? 'on' : ''}" data-map="${id}"><b>${MAPS[id]!.name}</b> · new</button>`).join('') +
       '<span class="dim">or a random map:</span>' +
       styles.map(([id, n]) => `<button class="chip ${!choice.map && choice.style === id ? 'on' : ''}" data-style="${id}">${n}</button>`).join('');
-    const mapNote = choice.map ? `<p class="dim">${MAPS[choice.map]!.blurb} 1.6 × 1.6 m, ten colony sites.</p>` : '';
+    const md = choice.map ? MAPS[choice.map] : undefined;
+    const mapNote = md
+      ? `<p class="dim">${md.blurb} ${(md.width / 1000).toFixed(1)} × ${(md.depth / 1000).toFixed(1)} m, ten colony sites.</p>` +
+        (md.floods.length ? `<div class="opt-row"><span class="dim">Floods:</span><button class="chip ${!choice.floods ? 'on' : ''}" data-floods="0">Off</button><button class="chip ${choice.floods ? 'on' : ''}" data-floods="1">On: storms flood the low ground now and then</button></div>` : '')
+      : '';
     const q = (['auto', 'low', 'medium', 'high'] as Array<Quality | 'auto'>).map((id) => `<button class="chip ${choice.quality === id ? 'on' : ''}" data-q="${id}">${id[0].toUpperCase() + id.slice(1)}</button>`).join('');
     const modes: Array<[GameMode, string, string]> = [
       ['mission', 'Missions', 'Story missions with a narrator and a boss at the end'],
@@ -179,6 +185,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       choice.style = d.style as MapStyle;
       delete choice.map;
     } else if (d.map) choice.map = d.map as MapId;
+    else if (d.floods) choice.floods = d.floods === '1';
     else if (d.q) choice.quality = d.q as Quality | 'auto';
     else if (t.classList.contains('go')) {
       if (t.disabled) return;

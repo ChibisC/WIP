@@ -124,7 +124,8 @@ function startGame(): void {
         colonies,
         caves,
         food: 1.2,
-        settings: { creatures: q.get('creatures') ? Number(q.get('creatures')) : 1 },
+        // floods only on an authored map, and only when the player turned them on (off by default)
+        settings: { creatures: q.get('creatures') ? Number(q.get('creatures')) : 1, ...((c.floods || q.get('floods')) && c.map && !mission ? { floods: true } : {}) },
         mission: mission?.id,
         sandbox: c.mode === 'sandbox',
         ...(c.map && !mission ? { map: c.map, siteSet: q.get('sites') ? Number(q.get('sites')) : undefined } : {}),

@@ -39,7 +39,7 @@ export function matchSetup(players: Slot[], s: LobbySettings): GameSetup {
       { name: 'Beetle den', kind: 'lair', food: 40 },
     ],
     food: s.food,
-    settings: { queenDeathLoses: true, statMul: 1, enemyStatMul: 1, creatures: 1 },
+    settings: { queenDeathLoses: true, statMul: 1, enemyStatMul: 1, creatures: 1, ...(s.map && s.floods ? { floods: true } : {}) },
     ...(s.map ? { map: s.map } : {}),
   };
 }
