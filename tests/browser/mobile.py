@@ -154,10 +154,10 @@ with sync_playwright() as p:
             sw = pg.evaluate("() => [...document.querySelectorAll('.mp-col.ord-open .mp-ord')].map(e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; })")
             ok = len(sw) == 3 and all(min(r[2] - r[0], r[3] - r[1]) >= 24 and r[0] >= 0 and r[2] <= W and r[1] >= 0 and r[3] <= H for r in sw)
             check(f"{name}: a column's Orders button opens its three switches, finger-sized and on screen", ok, str([[round(v) for v in r] for r in sw]))
-            was = pg.evaluate("window.__session.player.markers[0].noAttack")
+            was = bool(pg.evaluate("window.__session.player.markers[0].noAttack"))  # unset (undefined) counts as off
             pg.locator(".mp-col.ord-open .mp-ord[data-order='noAttack']").tap()
             settle(pg, 4)
-            now = pg.evaluate("window.__session.player.markers[0].noAttack")
+            now = bool(pg.evaluate("window.__session.player.markers[0].noAttack"))
             still = pg.evaluate("!!document.querySelector('.mp-col.ord-open')")
             summary = pg.evaluate("document.querySelector(\".mp-col[data-col='0'] .mp-ordbtn .os\").classList.contains('on')")
             check(f"{name}: tapping a switch sets the order, the switches stay open and the button shows it", now != was and still and summary == now, f"noAttack {was} → {now}, open {still}, summary {summary}")
@@ -167,7 +167,7 @@ with sync_playwright() as p:
             # a tap elsewhere (a harmless spot: another column's count) closes them
             pg.locator(".mp-col[data-col='2'] .mp-count").tap()
             settle(pg, 2)
-            check(f"{name}: a tap outside closes the switches", not pg.evaluate("!!document.querySelector('.mp-col.ord-open')") and pg.evaluate("window.__session.player.markers[0].noAttack") == was)
+            check(f"{name}: a tap outside closes the switches", not pg.evaluate("!!document.querySelector('.mp-col.ord-open')") and bool(pg.evaluate("window.__session.player.markers[0].noAttack")) == was)
         if folded:
             pg.locator(".mp-side .bbtn").first.tap()
             settle(pg, 2)
