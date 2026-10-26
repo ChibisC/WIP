@@ -158,6 +158,7 @@ As built (`net/lockstep.ts`, `net/netGame.ts`, `net/transport.ts`):
   - `LocalHub`: in-memory, with latency, for headless tests.
   - `BroadcastChannelTransport`: tabs on one machine (`?local=1`). It has no time-outs; a closing tab says goodbye on `pagehide`.
   - `PeerTransport`: PeerJS WebRTC data channels. The room code maps to the host's peer id (`ud-<room>`). Public STUN, plus TURN from `VITE_TURN_*`; a failed connection says to configure TURN.
+  - `ManualRtcTransport` (`net/lanTransport.ts`): LAN play, WebRTC data channels set up by hand with connection codes and `iceServers: []` (section 6.1).
   - `NetSimTransport`: wraps any transport with latency, jitter and loss (`?netsim=lat,jit,loss`).
   - A WebSocket relay later only needs a new `Transport`.
 - **Desync detection.**
@@ -184,12 +185,34 @@ As built (`net/lockstep.ts`, `net/netGame.ts`, `net/transport.ts`):
 - **End.** The last queen standing wins, followed by a results screen with per-colony stats. Text chat (Enter), with mute.
 - Sandbox options (revealing every area) are single-player only.
 
+### 6.1 LAN play: connection codes, no servers (2026-10-26)
+
+For 2–4 devices on one Wi-Fi or network with no internet, no PeerJS, no STUN and no TURN. Multiplayer → **LAN**.
+
+**The exchange** (one per joining player; star topology as online):
+1. The host taps **Host LAN game**, then **Add player** on an open slot. The game makes an offer, waits for ICE gathering (at most 3 s, host candidates only) and shows **host code #N**: a QR code, the text with **Copy**, and **Show larger** for scanning across a desk.
+2. The player taps **Join LAN game** and scans the QR code (**Scan QR code**: `BarcodeDetector`, else the bundled jsQR; the camera is asked for only then) or pastes the text. Their device shows a **reply code**.
+3. The host scans or pastes the reply. The data channel opens (0.4 s in the tests) and the player appears in that slot with name, species, colour and ping. Everything else in the lobby is as online.
+
+**Codes** (`net/lanCode.ts`): `UD1H-` / `UD1R-` + URL-safe base64 of [mode][u32 session][u8 slot][u32 created][body][CRC-16]. The compact body keeps only the ICE username fragment and password, the DTLS fingerprint and role, the data-channel mid, SCTP port and maximum message size, and the UDP host candidates as raw address bytes; the other side rebuilds a minimal data-channel SDP. 128 characters with IPv4 candidates, about 170 with mDNS names. A description the compact form cannot represent is sent stripped of unneeded lines and deflated (or plain). Codes expire after 5 minutes (2 minutes of clock difference allowed) and work once. Decoding validates and limits everything (text 3,000 characters, payload 2,200 bytes, inflated SDP 8 KB, 16 candidates).
+
+**Messages:** "not a connection code", "damaged or incomplete" (CRC), "from a different version", "this is a host code: it goes to the joining player" / "this is a reply code: it goes to the host", "expired", "already used", and after 15 s without a connection the network advice: same Wi-Fi; guest networks and client (AP) isolation block devices from seeing each other; VPNs can too; try a phone hotspot.
+
+**Mid-match drops:** the usual "Waiting for…" flow runs (AI after 30 s). The host taps **Players → Reconnect player N** (or **Reconnect with a new code** on the banner) for a new host code; the dropped player taps **Rejoin with a new code**, which reloads that tab into the rejoin screen with its token; after the exchange the host sends the snapshot and the packets since, as for an online rejoin. If the host leaves, everyone sees "The host ended the match".
+
+**Camera:** some embedding pages (such as the published artifact's frame) do not let the game use the camera; Scan QR code then says so and the code is pasted instead. A phone's own camera app can also read the QR code as text to copy.
+
+**No outside servers:** `LAN_RTC_CONFIG` is a frozen `{ iceServers: [] }`; entering LAN mode also wraps `RTCPeerConnection` to log any connection made with ICE servers. The QR encoder and decoder are npm packages compiled into the build. The page must be loaded first (the artifact, or a local copy of `dist/` served on the network); then LAN play needs no internet. Google Fonts are cosmetic.
+
+**Browsers:** Chrome, Edge and Safari name local addresses with mDNS (`<uuid>.local`); most home networks resolve those. If a network does not, the connection fails with the advice above; granting camera access (after Scan QR code) makes Chrome and Safari offer plain IPs instead. Firefox also uses mDNS names. Tested here in Chromium (plain IP candidates; this container has no mDNS resolver): two and four players, wrong codes, a reconnect. Not yet tried on physical devices or across browsers.
+
 ## 7. Testing tools (Part F)
 
 | Tool | What it does |
 |---|---|
 | **F3 debug overlay** | FPS, frame time, simulation tick time, tick, ping per player, input delay, pending commands, last hash, desync status |
 | Local multiplayer | Up to 4 tabs with `BroadcastChannelTransport` (`?room=…&local=1`) |
+| LAN test | `tests/browser/lan.py`: real WebRTC between Chromium pages with no ICE servers, through the menus (two and four players, wrong codes, a reconnect, no requests to outside servers); `tests/lan.ts` checks codes and framing in Node |
 | Network simulator | Dev setting for latency, jitter and loss |
 | Determinism test | `tools/determinism.ts` runs a seed plus scripted commands twice in Node and once from a snapshot, comparing hashes every 100 ticks for 20 minutes of game time. `?scene=determinism` runs the same in a browser (tested in Chromium; open it in Firefox and Safari on the deployed site to compare engines). |
 | Stress test | `tools/stress.ts` (headless) and `?stress=1` (in browser, logs FPS and tick stats) |

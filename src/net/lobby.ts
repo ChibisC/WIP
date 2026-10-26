@@ -111,6 +111,9 @@ export class Lobby {
         if (!this.isHost) return;
         if (c.build !== BUILD_ID) return this.send({ t: 'refused', reason: 'Different game version: reload the page.' }, from);
         let i = this.slots.findIndex((s) => s.kind === 'human' && s.token === c.token);
+        // LAN: the slot the host made this player's code for, if it is still open
+        const want = this.transport.preferredSlot?.(from) ?? -1;
+        if (i < 0 && want > 0 && this.slots[want]?.kind === 'open') i = want;
         if (i < 0) i = this.slots.findIndex((s) => s.kind === 'open');
         if (i < 0) return this.send({ t: 'refused', reason: 'The lobby is full.' }, from);
         this.slots[i] = { ...this.slots[i], kind: 'human', name: c.name.slice(0, 24) || `Player ${i + 1}`, peer: from, token: c.token, ready: false };
@@ -171,7 +174,7 @@ export class Lobby {
     if (this.started) return;
     if (!this.isHost) {
       if (peer === this.transport.hostId) {
-        this.error = 'The host closed the game.';
+        this.error = this.transport.hostLostMessage ?? 'The host closed the game.';
         this.onChange?.();
       }
       return;

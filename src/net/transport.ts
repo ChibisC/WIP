@@ -10,6 +10,8 @@
  * - `BroadcastChannelTransport`: up to four tabs on one machine, no network
  *   (`?local=1` rooms): the quickest way to test multiplayer.
  * - `PeerTransport` (peerTransport.ts): WebRTC data channels through PeerJS.
+ * - `ManualRtcTransport` (lanTransport.ts): WebRTC data channels on a local network, set up
+ *   with connection codes the players exchange by hand (no servers of any kind).
  * - `NetSimTransport`: wraps any transport and adds latency, jitter and loss
  *   (loss on a reliable channel shows up as retransmission delay).
  */
@@ -31,6 +33,12 @@ export interface Transport {
   /** something went wrong at the connection level (shown to the player) */
   onError: ((message: string) => void) | null;
   close(): void;
+  /** LAN: the lobby slot a joining peer's connection code was made for (−1: any) */
+  preferredSlot?(peer: string): number;
+  /** what a client shows when its link to the host goes (default: the host closed the game) */
+  readonly hostLostMessage?: string;
+  /** a LAN transport (connection codes: a dropped player comes back with a new code) */
+  readonly lan?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -292,6 +300,15 @@ export class NetSimTransport implements Transport {
   }
   get isHost(): boolean {
     return this.inner.isHost;
+  }
+  get lan(): boolean | undefined {
+    return this.inner.lan;
+  }
+  get hostLostMessage(): string | undefined {
+    return this.inner.hostLostMessage;
+  }
+  preferredSlot(peer: string): number {
+    return this.inner.preferredSlot?.(peer) ?? -1;
   }
   peers(): string[] {
     return this.inner.peers();

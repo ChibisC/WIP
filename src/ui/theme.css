@@ -234,6 +234,8 @@
 .net-chat-input.show { display: block; }
 .net-mute { position: absolute; left: calc(12 * var(--u)); bottom: calc(222 * var(--u)); pointer-events: auto; font-size: calc(11 * var(--u)); color: var(--ink-dim, #b9a888); background: rgba(10,7,4,0.6); border: 1px solid rgba(168,132,79,0.4); border-radius: 3px; padding: 2px 6px; cursor: pointer; opacity: 0.6; }
 .net-chat-input.show + .net-mute { display: none; }
+.net-players { position: absolute; left: calc(12 * var(--u)); bottom: calc(244 * var(--u)); pointer-events: auto; font-size: calc(12 * var(--u)); color: var(--ink, #e8dcc4); background: rgba(10,7,4,0.7); border: 1px solid rgba(168,132,79,0.6); border-radius: 4px; padding: calc(4 * var(--u)) calc(10 * var(--u)); cursor: pointer; }
+.gui.touch .net-players { min-height: calc(35 * var(--u)); }
 .modal code { font-size: 12px; color: #e8c88a; }
 .results tr.won td { color: #f2d48a; }
 .debug-overlay { position: absolute; top: calc(90 * var(--u)); left: calc(10 * var(--u)); margin: 0; padding: 8px 10px; background: rgba(0,0,0,0.72); color: #cfe8c8; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; border-radius: 4px; pointer-events: none; display: none; white-space: pre; z-index: 50; }

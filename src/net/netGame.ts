@@ -38,6 +38,8 @@ export interface NetStatus {
   lastHash: { tick: number; hash: string } | null;
   /** the host left: the match cannot continue */
   hostLost: boolean;
+  /** the host said goodbye (left on purpose) rather than the connection dropping */
+  hostLeft: boolean;
   /** simulation clock factor (slightly below 1 while waiting for a slower player) */
   speed: number;
 }
@@ -87,6 +89,7 @@ export class NetGame {
       dropped: [],
       lastHash: null,
       hostLost: false,
+      hostLeft: false,
       speed: 1,
     };
     transport.onMessage = (from, data) => this.receive(from, data);
@@ -189,6 +192,13 @@ export class NetGame {
       case 'join':
         if (this.isHost) void this.readmit(from, c.token, c.name);
         break;
+      case 'bye':
+        if (!this.isHost && from === this.transport.hostId) {
+          this.st.hostLeft = true;
+          this.st.hostLost = true;
+          this.onLog?.('The host ended the match.');
+        }
+        break;
       default:
         break;
     }
@@ -196,8 +206,9 @@ export class NetGame {
 
   private peerLeft(peer: string): void {
     if (!this.isHost && peer === this.transport.hostId) {
+      if (this.st.hostLost) return;
       this.st.hostLost = true;
-      this.onLog?.('The host left the match.');
+      this.onLog?.(this.transport.lan ? 'Lost the connection to the host.' : 'The host left the match.');
       return;
     }
     const p = this.playerOfPeer(peer);

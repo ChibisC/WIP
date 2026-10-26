@@ -39,7 +39,7 @@ with sync_playwright() as p:
     host.goto(BASE + "?q=low")
     host.click("text=Multiplayer")
     host.fill('[data-f="name"]', 'Host')
-    host.check('[data-f="local"]')
+    host.click('[data-mode="local"]')
     host.click('[data-a="create"]')
     wait(lambda: host.locator('.lb-code').count() > 0, 20)
     room = host.locator('.lb-code').inner_text().strip()

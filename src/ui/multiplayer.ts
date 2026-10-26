@@ -118,34 +118,74 @@ function saveName(n: string): void {
   }
 }
 
-/** Create a game or join one by code. `local` uses browser tabs on this computer (no network). */
+/** How players connect: the internet (PeerJS invite links), the local network (connection codes) or tabs of this browser. */
+export type MpMode = 'online' | 'lan' | 'local';
+
+function savedMode(): MpMode {
+  try {
+    const m = localStorage.getItem('ud-mp-mode');
+    return m === 'lan' || m === 'local' ? m : 'online';
+  } catch {
+    return 'online';
+  }
+}
+
+/** Create a game or join one: online by room code, on the LAN with connection codes, or in local tabs. */
 export function showMultiplayerMenu(
   parent: HTMLElement,
-  cb: { create: (name: string, local: boolean) => void; join: (name: string, code: string, local: boolean) => void; back: () => void },
+  cb: {
+    create: (name: string, local: boolean) => void;
+    join: (name: string, code: string, local: boolean) => void;
+    lanHost: (name: string) => void;
+    lanJoin: (name: string) => void;
+    back: () => void;
+  },
   error = '',
+  mode: MpMode = savedMode(),
 ): void {
+  const tabs: Array<[MpMode, string, string]> = [
+    ['online', 'Online', 'Invite link over the internet'],
+    ['lan', 'LAN', 'Same Wi-Fi, connection codes, no internet needed'],
+    ['local', 'Local tabs', 'Testing: tabs of this browser'],
+  ];
+  const body =
+    mode === 'lan'
+      ? `<p class="dim">Play with up to 3 others on the same Wi-Fi or network, with no servers and no internet once the game has loaded. The host adds each player by showing a code (QR or text); the player's device answers with a reply code for the host.</p>
+         <div class="opt-row"><button class="go" data-a="lan-host">Host LAN game</button><button class="go" data-a="lan-join">Join LAN game</button></div>`
+      : `<h2>Create</h2>
+         <div class="opt-row"><button class="go" data-a="create">Create game</button></div>
+         <h2>Join</h2>
+         <div class="opt-row"><input class="mp-input code" data-f="code" maxlength="6" placeholder="ROOM CODE"><button class="go" data-a="join">Join game</button></div>
+         ${mode === 'local' ? '<p class="dim">Local test: the players are tabs of this browser on this computer (no network).</p>' : ''}`;
   const root = screen(
     parent,
     `<h1>Multiplayer</h1>
-     <p class="tag">Up to 4 players. The host creates a game and shares the invite link.</p>
+     <p class="tag">Up to 4 players and AI colonies on one map.</p>
      ${error ? `<p class="mp-error">${esc(error)}</p>` : ''}
      <h2>Your name</h2>
      <input class="mp-input" data-f="name" maxlength="24" placeholder="Queen of the meadow" value="${esc(savedName())}">
-     <h2>Create</h2>
-     <div class="opt-row"><button class="go" data-a="create">Create game</button></div>
-     <h2>Join</h2>
-     <div class="opt-row"><input class="mp-input code" data-f="code" maxlength="6" placeholder="ROOM CODE"><button class="go" data-a="join">Join game</button></div>
-     <h2>Testing</h2>
-     <label class="mp-check"><input type="checkbox" data-f="local"> Local test: players are browser tabs on this computer (no internet needed)</label>
+     <h2>Connect</h2>
+     <div class="mode-tabs mp-modes">${tabs.map(([id, n, d]) => `<button class="mode-tab ${id === mode ? 'on' : ''}" data-mode="${id}"><b>${n}</b><span>${d}</span></button>`).join('')}</div>
+     ${body}
      <div class="opt-row" style="margin-top:18px"><button class="chip" data-a="back">← Back</button></div>`,
   );
-  const val = (f: string) => (root.querySelector(`[data-f="${f}"]`) as HTMLInputElement);
+  const val = (f: string) => root.querySelector(`[data-f="${f}"]`) as HTMLInputElement;
   root.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
     if (!b) return;
     const name = val('name').value.trim() || 'Player';
     saveName(name);
-    const local = val('local').checked;
+    if (b.dataset.mode) {
+      try {
+        localStorage.setItem('ud-mp-mode', b.dataset.mode);
+      } catch {
+        // private mode
+      }
+      root.remove();
+      showMultiplayerMenu(parent, cb, '', b.dataset.mode as MpMode);
+      return;
+    }
+    const local = mode === 'local';
     if (b.dataset.a === 'create') {
       root.remove();
       cb.create(name, local);
@@ -157,6 +197,12 @@ export function showMultiplayerMenu(
       }
       root.remove();
       cb.join(name, code, local);
+    } else if (b.dataset.a === 'lan-host') {
+      root.remove();
+      cb.lanHost(name);
+    } else if (b.dataset.a === 'lan-join') {
+      root.remove();
+      cb.lanJoin(name);
     } else if (b.dataset.a === 'back') {
       root.remove();
       cb.back();
@@ -184,6 +230,8 @@ export class LobbyView {
     private lobby: Lobby,
     private local: boolean,
     private leave: () => void,
+    /** LAN host: open the code dialog for a slot */
+    private addPlayer?: (slot: number) => void,
   ) {
     this.root = document.createElement('div');
     this.root.className = 'menu';
@@ -225,7 +273,8 @@ export class LobbyView {
     }
     this.key = key;
     const focus = (document.activeElement as HTMLElement | null)?.dataset?.f;
-    const link = inviteLink(L.room, this.local);
+    const lan = !!this.lobby.transport.lan;
+    const link = lan ? '' : inviteLink(L.room, this.local);
     const host = L.isHost;
     const rows = L.slots
       .map((s, i) => {
@@ -247,9 +296,10 @@ export class LobbyView {
             ? `<select data-slot="${i}" data-f="kind">${(['open', 'closed', 'ai'] as const).map((k) => `<option value="${k}" ${k === s.kind ? 'selected' : ''}>${k === 'ai' ? 'AI' : k[0].toUpperCase() + k.slice(1)}</option>`).join('')}</select>`
             : '';
         const colorBtn = mine || (host && s.kind === 'ai') ? `<button class="chip" data-slot="${i}" data-a="color">Colour</button>` : '';
+        const addBtn = host && this.addPlayer && s.kind === 'open' ? `<button class="chip lan-add" data-slot="${i}" data-a="add-player">Add player</button>` : '';
         const ping = s.kind === 'human' && i !== 0 ? `${s.ping || '—'} ms` : '';
         const ready = s.kind === 'human' ? (s.ready ? '<span class="lb-ready">Ready</span>' : '<span class="dim">Not ready</span>') : s.kind === 'ai' ? '<span class="lb-ready">Ready</span>' : '';
-        return `<tr class="${mine ? 'mine' : ''}"><td>${i + 1}</td><td>${color}</td><td>${who}</td><td>${species}</td><td>${kindSel}${colorBtn}</td><td data-ping="${i}">${ping}</td><td>${ready}</td></tr>`;
+        return `<tr class="${mine ? 'mine' : ''}"><td>${i + 1}</td><td>${color}</td><td>${who}</td><td>${species}</td><td>${addBtn}${kindSel}${colorBtn}</td><td data-ping="${i}">${ping}</td><td>${ready}</td></tr>`;
       })
       .join('');
     const st = L.settings;
@@ -268,10 +318,14 @@ export class LobbyView {
       .map((c) => `<div><b>${esc(c.from)}:</b> ${esc(c.text)}</div>`)
       .join('');
     this.root.innerHTML = `<div class="menu-card lobby">
-      <h1>Lobby <span class="lb-code">${L.room}</span></h1>
+      <h1>${lan ? 'LAN game' : `Lobby <span class="lb-code">${L.room}</span>`}</h1>
       ${L.error ? `<p class="mp-error">${esc(L.error)}</p>` : ''}
       ${
-        host
+        lan
+          ? host
+            ? '<p class="dim">Players on the same Wi-Fi join with connection codes: tap <b>Add player</b> on an open slot and follow the steps. No internet is needed.</p>'
+            : ''
+          : host
           ? `<div class="lb-invite"><input class="mp-input" readonly value="${esc(link)}"><button class="go" data-a="copy">Copy link</button></div>
              <p class="dim">${this.local ? 'Local test: open the link in other tabs of this browser.' : 'Send this link to your friends. Invite links work on the deployed site, not on a local dev server.'}</p>`
           : L.you < 0
@@ -299,6 +353,10 @@ export class LobbyView {
     if (!b) return;
     const L = this.lobby;
     const a = b.dataset.a;
+    if (a === 'add-player') {
+      this.addPlayer?.(Number(b.dataset.slot));
+      return;
+    }
     if (a === 'copy') {
       void navigator.clipboard?.writeText(inviteLink(L.room, this.local)).catch(() => undefined);
       b.textContent = 'Copied!';

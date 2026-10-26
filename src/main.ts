@@ -31,7 +31,8 @@ import { NetHud } from './ui/netHud';
 import { Lobby, StartInfo, newToken, roomCode } from './net/lobby';
 import { NetGame } from './net/netGame';
 import { BroadcastChannelTransport, NetSimTransport, Transport } from './net/transport';
-import { PeerTransport } from './net/peerTransport';
+import { ManualRtcTransport, installLanGuard } from './net/lanTransport';
+import { openHostDialog, showLanJoin } from './ui/lanCodes';
 
 installTouchGuards();
 fitMenus();
@@ -301,7 +302,11 @@ function startGame(): void {
     }, 30);
   };
   const mpMenu = (error = '') =>
-    showMultiplayerMenu(ui, { create: (name, local) => void createGame(name, local), join: (name, code, local) => void joinGame(name, code, local), back: title }, error);
+    showMultiplayerMenu(
+      ui,
+      { create: (name, local) => void createGame(name, local), join: (name, code, local) => void joinGame(name, code, local), lanHost: (name) => lanHost(name), lanJoin: (name) => lanJoin(name), back: title },
+      error,
+    );
 
   // ------------------------------------------------------------------ multiplayer (brief Part E)
   const loading = (text: string) => {
@@ -324,12 +329,20 @@ function startGame(): void {
   const openLobby = (raw: Transport, room: string, name: string, token: string, local: boolean) => {
     const transport = netsim(raw);
     const lobby = new Lobby(transport, room, name, token);
-    const view = new LobbyView(ui, lobby, local, () => {
-      transport.close();
-      view.close();
-      history.replaceState(null, '', location.pathname);
-      mpMenu();
-    });
+    // LAN host: each open slot gets an Add player button (a connection-code exchange)
+    const addPlayer = raw instanceof ManualRtcTransport && raw.isHost ? (slot: number) => void openHostDialog(ui, raw, slot, { title: `Add player ${slot + 1}` }) : undefined;
+    const view = new LobbyView(
+      ui,
+      lobby,
+      local,
+      () => {
+        transport.close();
+        view.close();
+        history.replaceState(null, '', location.pathname);
+        mpMenu();
+      },
+      addPlayer,
+    );
     lobby.onStart = (info) => {
       view.close();
       // Build the match after this message handler returns: the lobby keeps whatever arrives meanwhile.
@@ -341,12 +354,21 @@ function startGame(): void {
     };
   };
 
+  // PeerJS is loaded only for online games: on import it probes WebRTC with an RTCPeerConnection
+  // configured with its default STUN and TURN servers (and installs a WebRTC shim), which LAN play
+  // must never do.
+  const onlineTransport = async (room: string, isHost: boolean): Promise<Transport> => {
+    const { PeerTransport } = await import('./net/peerTransport');
+    const t = new PeerTransport(room, isHost);
+    await t.ready;
+    return t;
+  };
+
   const createGame = async (name: string, local: boolean) => {
     const room = roomCode();
     const wait = loading('Creating the game…');
     try {
-      const transport = local ? new BroadcastChannelTransport(room, peerId(), true) : new PeerTransport(room, true);
-      if (transport instanceof PeerTransport) await transport.ready;
+      const transport = local ? new BroadcastChannelTransport(room, peerId(), true) : await onlineTransport(room, true);
       wait.remove();
       openLobby(transport, room, name, newToken(), local);
     } catch (e) {
@@ -368,8 +390,7 @@ function startGame(): void {
     history.replaceState(null, '', `${location.pathname}?room=${room}${local ? '&local=1' : ''}`);
     const wait = loading(`Joining game ${room}…`);
     try {
-      const transport = local ? new BroadcastChannelTransport(room, peerId(), false) : new PeerTransport(room, false);
-      if (transport instanceof PeerTransport) await transport.ready;
+      const transport = local ? new BroadcastChannelTransport(room, peerId(), false) : await onlineTransport(room, false);
       wait.remove();
       openLobby(transport, room, name, token, local);
     } catch (e) {
@@ -377,6 +398,46 @@ function startGame(): void {
       history.replaceState(null, '', location.pathname);
       mpMenu(e instanceof Error ? e.message : String(e));
     }
+  };
+
+  // ------------------------------------------------------------------ LAN play: connection codes, no servers
+  /** The token that gives a LAN player their colony back after a reconnect (kept for this tab). */
+  const lanToken = (): string => {
+    try {
+      let t = sessionStorage.getItem('ud-lan-token') || '';
+      if (!t) sessionStorage.setItem('ud-lan-token', (t = newToken()));
+      return t;
+    } catch {
+      return newToken();
+    }
+  };
+  const lanHost = (name: string) => {
+    installLanGuard();
+    openLobby(ManualRtcTransport.host(), 'LAN', name, newToken(), false);
+  };
+  const lanJoin = (name: string, rejoin = false, message = '') => {
+    installLanGuard();
+    try {
+      sessionStorage.setItem('ud-lan-name', name);
+    } catch {
+      // private mode
+    }
+    showLanJoin(ui, {
+      rejoin,
+      message,
+      connected: (t) => {
+        history.replaceState(null, '', location.pathname);
+        openLobby(t, 'LAN', name, lanToken(), false);
+      },
+      back: () => {
+        history.replaceState(null, '', location.pathname);
+        mpMenu();
+      },
+    });
+  };
+  /** A LAN player who lost the host comes back through the join screen (the tab keeps its token). */
+  const lanRejoinPage = (why = '') => {
+    location.href = `${location.pathname}?lanjoin=1${why ? `&why=${why}` : ''}`;
   };
 
   const mpQuality = (q.get('q') as 'low' | 'medium' | 'high' | null) || AUTO_START;
@@ -396,7 +457,8 @@ function startGame(): void {
     }
     for (const [from, data] of lobby.takeBuffered()) net.receive(from, data);
     // dropped while still connected (too slow): come back the way a reconnecting player does
-    net.onSelfDropped = () => setTimeout(() => location.reload(), 1500);
+    const lan = transport instanceof ManualRtcTransport ? transport : null;
+    net.onSelfDropped = () => setTimeout(() => (lan ? lanRejoinPage('dropped') : location.reload()), 1500);
     s.autoQuality.enabled = !q.get('q');
     s.attachNet(net);
     const w = window as unknown as { __session: GameSession; __net: NetGame; __ready: boolean };
@@ -404,10 +466,19 @@ function startGame(): void {
     w.__net = net;
     (window as unknown as { __ui: GameUI }).__ui = new GameUI(s, ui);
     new DebugOverlay(s, ui);
-    new NetHud(s, ui, () => {
-      net.close();
-      location.href = location.pathname;
-    });
+    new NetHud(
+      s,
+      ui,
+      () => {
+        net.close();
+        location.href = location.pathname;
+      },
+      lan
+        ? lan.isHost
+          ? { reconnect: (slot) => void openHostDialog(ui, lan, slot, { title: `Reconnect ${net.slots[slot]?.name || `player ${slot + 1}`}` }) }
+          : { rejoin: () => lanRejoinPage() }
+        : {},
+    );
     s.start();
     setTimeout(() => (w.__ready = true), 800);
   };
@@ -420,6 +491,15 @@ function startGame(): void {
     return;
   }
   const room = q.get('room');
-  if (room && /^[A-Za-z]{6}$/.test(room)) void joinGame(q.get('name') || savedName() || 'Player', room.toUpperCase(), !!q.get('local'));
+  if (q.get('lanjoin')) {
+    let name = savedName() || 'Player';
+    try {
+      name = sessionStorage.getItem('ud-lan-name') || name;
+    } catch {
+      // private mode
+    }
+    const why = q.get('why') === 'dropped' ? 'The host’s game stopped waiting for you (your connection stalled) and the AI is running your colony.' : '';
+    lanJoin(name, true, why);
+  } else if (room && /^[A-Za-z]{6}$/.test(room)) void joinGame(q.get('name') || savedName() || 'Player', room.toUpperCase(), !!q.get('local'));
   else title();
 }

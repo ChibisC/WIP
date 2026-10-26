@@ -120,3 +120,32 @@ html.touch .menu { -webkit-overflow-scrolling: touch; padding: max(10px, env(saf
 }
 @keyframes rot-hint { 0%, 30% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
 
+
+/* ---- LAN play: connection codes (ui/lanCodes.ts) */
+.lan-card { width: min(680px, 100%); }
+.lan-step { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 16px 0 8px; color: var(--ink); }
+.lan-step b { font-family: var(--serif); font-weight: 500; color: var(--accent); }
+.lan-dots { display: inline-flex; gap: 4px; margin-right: 4px; }
+.lan-dots i { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--panel-edge); background: transparent; }
+.lan-dots i.done { background: rgba(224,166,74,0.45); border-color: var(--accent); }
+.lan-dots i.now { background: var(--accent); }
+.lan-code { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.lan-qr { width: 196px; height: 196px; image-rendering: pixelated; border-radius: 6px; flex: none; background: #fff; }
+.lan-code-side { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.lan-text { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.35; resize: vertical; word-break: break-all; }
+.lan-entry { display: flex; flex-direction: column; gap: 8px; }
+.lan-entry .go, .lan-code .go { margin-top: 0; }
+.lan-cam video { width: 100%; max-width: 360px; border-radius: 8px; border: 1px solid var(--panel-edge); background: #000; }
+.lan-err { margin: 0; }
+.lan-foot { margin-top: 18px; }
+.lan-timer { font-variant-numeric: tabular-nums; }
+.lan-wait { margin-top: 6px; }
+.lan-tips { font-size: 13px; line-height: 1.45; }
+.lan-spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--panel-edge); border-top-color: var(--accent); border-radius: 50%; animation: lan-spin 0.9s linear infinite; vertical-align: -2px; margin-right: 6px; }
+@keyframes lan-spin { to { transform: rotate(360deg); } }
+.lan-dialog { position: absolute; inset: 0; display: flex; background: rgba(8,5,3,0.82); overflow: auto; padding: 16px; z-index: 60; pointer-events: auto; }
+.lan-big { position: fixed; inset: 0; z-index: 100; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: pointer; }
+.lan-big canvas { width: auto; height: auto; max-width: 92vw; max-height: 86vh; image-rendering: pixelated; }
+.lan-big p { color: #333; margin: 0; font-size: 14px; }
+.lb-slots .lan-add { border-color: var(--accent); }
+@media (max-width: 560px) { .lan-qr { width: 160px; height: 160px; } }

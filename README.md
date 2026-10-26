@@ -32,10 +32,25 @@ How it works:
 - If a player stops responding, everyone sees "Waiting for …". After 30 s the AI takes over that colony; the host can also do this at once with **Drop now**.
 - A player who reloads the page or loses the connection rejoins through the same link. The host sends the current state, the client catches up, and the colony is theirs again.
 - Every 100 ticks the players compare a hash of the whole game state. If they ever differ, the match stops with "Desync detected" and offers a report to download. It never carries on out of step.
-- **Local test without the internet:** tick *Local test* in the Multiplayer menu. The players are then tabs of the same browser on one computer (`?room=ABCDEF&local=1`).
+- **Local test without the internet:** the *Local tabs* tab of the Multiplayer menu. The players are then tabs of the same browser on one computer (`?room=ABCDEF&local=1`). For several devices without the internet, see LAN play below.
 - **Invite links need the deployed site.** A dev server on `localhost` cannot be reached by friends on other networks. Players connect through the free public PeerJS signalling server and then directly (WebRTC).
   - Some strict firewalls and mobile networks block direct connections. For those, set a TURN relay at build time: `VITE_TURN_URL=turn:host:3478 VITE_TURN_USER=… VITE_TURN_PASS=…`.
   - Your own PeerJS server: `VITE_PEER_HOST`, `VITE_PEER_PORT`, `VITE_PEER_PATH`, `VITE_PEER_SECURE`.
+
+### How to play on LAN (no internet)
+For 2–4 devices on the same Wi-Fi or network (laptops, tablets, phones in landscape), with no servers at all.
+1. Everyone opens the game page first (once it has loaded, no internet is needed).
+2. The host: **Multiplayer → LAN → Host LAN game**, then **Add player** on an open slot. A host code appears as a QR code and as text.
+
+   ![The host's code](docs/multiplayer/lan-host-code.png)
+3. The other player: **Multiplayer → LAN → Join LAN game**, then **Scan QR code** (camera) or paste the text. Their device shows a reply code.
+
+   ![The joining player's reply code](docs/multiplayer/lan-reply-code.png)
+4. The host scans or pastes the reply code. The player appears in the lobby. Repeat for each player, then ready up and start as online.
+
+   ![A LAN lobby](docs/multiplayer/lan-lobby.png)
+
+If a player drops out during a match, the host taps **Players → Reconnect** and they exchange codes again; the player's colony is theirs again once the game has caught up. Codes last 5 minutes and work once. Where the page cannot use the camera, paste the text instead (a phone's camera app can read the QR code as text to copy). If devices cannot connect: guest networks and routers with "client isolation" stop devices seeing each other, and so can a VPN; a phone hotspot that every device joins usually works.
 
 ## Deploying
 

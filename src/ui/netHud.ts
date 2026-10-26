@@ -39,10 +39,16 @@ export class NetHud {
   muted = false;
   private raf = 0;
 
+  /** LAN host: the Players button (reconnect a player with a new code) */
+  private playersBtn = document.createElement('button');
+  private reconnectBtn = document.createElement('button');
+
   constructor(
     private s: GameSession,
     parent: HTMLElement,
     private leave: () => void,
+    /** LAN play: the host makes a new code for a dropped player; a client goes to the rejoin screen */
+    private lan: { reconnect?: (slot: number) => void; rejoin?: () => void } = {},
   ) {
     this.root.className = 'net-hud';
     this.banner.className = 'net-banner pnl';
@@ -61,8 +67,20 @@ export class NetHud {
     this.dropBtn.dataset.drop = '1';
     this.dropBtn.textContent = 'Drop now';
     this.dropBtn.onclick = () => s.net?.status().waitingFor.forEach((p) => s.net!.dropPlayer(p));
-    this.banner.append(this.bannerText, this.dropBtn);
+    this.reconnectBtn.className = 'chip';
+    this.reconnectBtn.dataset.a = 'reconnect-waiting';
+    this.reconnectBtn.textContent = 'Reconnect with a new code';
+    this.reconnectBtn.onclick = () => {
+      const p = s.net?.status().waitingFor[0];
+      if (p !== undefined) this.lan.reconnect?.(p);
+    };
+    this.banner.append(this.bannerText, this.dropBtn, this.reconnectBtn);
+    this.playersBtn.className = 'net-players';
+    this.playersBtn.dataset.a = 'players';
+    this.playersBtn.textContent = 'Players';
+    this.playersBtn.onclick = () => this.playersPanel();
     this.root.append(this.banner, this.chatLog, this.chatInput, this.muteBtn);
+    if (s.net?.isHost && s.net.transport.lan && lan.reconnect) this.root.append(this.playersBtn);
     parent.appendChild(this.root);
     s.onChat = (from, text) => this.line(from, text);
     s.input.on('chat', () => this.openChat());
@@ -127,9 +145,16 @@ export class NetHud {
     if (this.bannerText.textContent !== banner) this.bannerText.textContent = banner;
     this.banner.classList.toggle('show', !!banner);
     this.dropBtn.style.display = drop ? '' : 'none';
+    this.reconnectBtn.style.display = drop && net.transport.lan && this.lan.reconnect ? '' : 'none';
     // blocking panels
     if (st.desync) this.showPanel('desync', () => this.desyncPanel(st.desync!.tick, st.desync!.hashes));
-    else if (st.hostLost) this.showPanel('host', () => `<h2>The host left</h2><p>The match cannot continue without the host.</p><div class="opt-row"><button class="go" data-a="leave">Back to the menu</button></div>`);
+    else if (st.hostLost && net.transport.lan && !st.hostLeft && this.lan.rejoin)
+      this.showPanel(
+        'host',
+        () =>
+          `<h2>Lost the connection to the host</h2><p>If the host is still playing, you can come back in: ask the host to tap <b>Players</b>, then <b>Reconnect</b> next to your name, and enter the new code they show. Your colony keeps going meanwhile (the AI runs it if you are away for long).</p><div class="opt-row"><button class="go" data-a="rejoin">Rejoin with a new code</button><button class="chip" data-a="leave">Back to the menu</button></div>`,
+      );
+    else if (st.hostLost) this.showPanel('host', () => `<h2>${st.hostLeft ? 'The host ended the match' : 'The host left'}</h2><p>The match cannot continue without the host.</p><div class="opt-row"><button class="go" data-a="leave">Back to the menu</button></div>`);
     else if (!this.s.player.alive && !this.outShown && !this.over) {
       // out of a match that goes on: watch the rest or leave
       this.outShown = true;
@@ -149,6 +174,13 @@ export class NetHud {
       if (!b) return;
       if (b.dataset.a === 'leave') this.leave();
       else if (b.dataset.a === 'report') void this.report();
+      else if (b.dataset.a === 'rejoin') this.lan.rejoin?.();
+      else if (b.dataset.a === 'reconnect') {
+        veil.remove();
+        this.panel = null;
+        this.panelKey = '';
+        this.lan.reconnect?.(Number(b.dataset.slot));
+      }
       else if (b.dataset.a === 'close') {
         veil.remove();
         this.panel = null;
@@ -156,6 +188,28 @@ export class NetHud {
     });
     this.root.parentElement?.appendChild(veil);
     this.panel = veil;
+  }
+
+  /** LAN host: every other player, connected or not, with Reconnect. */
+  private playersPanel(): void {
+    const net = this.s.net;
+    if (!net) return;
+    const peers = new Set(net.transport.peers());
+    const st = net.status();
+    const rows = net.slots
+      .map((sl, i) => {
+        if (sl.kind !== 'human' || i === net.self) return '';
+        const on = peers.has(sl.peer);
+        const state = st.dropped.includes(i) ? 'Dropped: the AI runs their colony' : on ? 'Connected' : 'Disconnected';
+        return `<tr><td><b>${esc(sl.name)}</b></td><td class="dim">${state}${on ? ` · ${sl.ping || '—'} ms` : ''}</td><td><button class="chip" data-a="reconnect" data-slot="${i}">Reconnect player ${i + 1}</button></td></tr>`;
+      })
+      .join('');
+    this.panelKey = '';
+    this.showPanel(
+      'players',
+      () =>
+        `<h2>Players</h2><p class="dim">A player whose connection dropped comes back with a new code: tap Reconnect next to their name, show them the code, then enter their reply.</p><table class="lb-slots"><tbody>${rows || '<tr><td class="dim">No other players.</td></tr>'}</tbody></table><div class="opt-row"><button class="chip" data-a="close">Close</button></div>`,
+    );
   }
 
   private desyncPanel(tick: number, hashes: Record<string, string>): string {
