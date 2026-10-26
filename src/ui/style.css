@@ -149,3 +149,4 @@ html.touch .menu { -webkit-overflow-scrolling: touch; padding: max(10px, env(saf
 .lan-big p { color: #333; margin: 0; font-size: 14px; }
 .lb-slots .lan-add { border-color: var(--accent); }
 @media (max-width: 560px) { .lan-qr { width: 160px; height: 160px; } }
+.mp-error a { color: #ffd59a; }

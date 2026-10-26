@@ -228,6 +228,8 @@ with sync_playwright() as p:
             shot(g, 'lan-lost-host.png')
             g.locator('[data-a="rejoin"]').dispatch_event('click')
             check('the rejoin screen opens (the tab keeps its token)', wait(lambda: 'Rejoin the LAN match' in g.locator('.lan-card').inner_text(), 30))
+            # software rendering here needs minutes to rebuild a match: give the rejoining page more time than a real device needs
+            ev(h, '__net.rejoinLoadS = 1500')
             h.locator('[data-a="players"]').dispatch_event('click')
             check('the host’s Players list shows the player as disconnected', wait(lambda: 'Disconnected' in h.locator('.modal').inner_text() or 'Dropped' in h.locator('.modal').inner_text(), 10))
             h.locator('[data-a="reconnect"][data-slot="1"]').dispatch_event('click')
@@ -248,7 +250,7 @@ with sync_playwright() as p:
             back = False
             t0 = time.time()
             next_print = t0
-            while time.time() - t0 < 420:
+            while time.time() - t0 < 1100:
                 try:
                     if g.evaluate('window.__ready===true') and g.evaluate('!!window.__net'):
                         back = True

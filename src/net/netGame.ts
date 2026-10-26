@@ -65,6 +65,8 @@ export class NetGame {
   private hashes = new Map<number, Map<number, string>>();
   /** host: players re-admitted who have not sent a packet since (still rebuilding the match) */
   private rejoining = new Set<number>();
+  /** how long a rejoining player still connected may take to load (s); tests on slow machines raise it */
+  rejoinLoadS = REJOIN_LOAD_S;
   private st: NetStatus;
   onDesync: ((tick: number) => void) | null = null;
   onChat: ((from: string, text: string) => void) | null = null;
@@ -275,7 +277,7 @@ export class NetGame {
         if (p === this.self) continue;
         // a rejoining player still connected is rebuilding the match: give a slow device time
         const loading = this.rejoining.has(p) && peers.includes(this.slots[p]?.peer ?? '');
-        const limit = (loading ? REJOIN_LOAD_S : this.lockstep.hasStarted(p) ? DROP_AFTER_S : 120) * 1000;
+        const limit = (loading ? this.rejoinLoadS : this.lockstep.hasStarted(p) ? DROP_AFTER_S : 120) * 1000;
         if (waited > limit) this.dropPlayer(p);
       }
     }

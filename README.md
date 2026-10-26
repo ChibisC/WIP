@@ -40,7 +40,7 @@ How it works:
 
 ### How to play on LAN (no internet)
 For 2–4 devices on the same Wi-Fi or network (laptops, tablets, phones in landscape), with no servers at all.
-1. Everyone opens the game page first (once it has loaded, no internet is needed).
+1. Everyone opens the game's website, https://chibisc.github.io/ant-game/ (once it has loaded, no internet is needed). The copy published as a Claude artifact cannot make network connections between players: its frame blocks WebRTC, so play multiplayer from the website.
 2. The host: **Multiplayer → LAN → Host LAN game**, then **Add player** on an open slot. A host code appears as a QR code and as text.
 
    ![The host's code](docs/multiplayer/lan-host-code.png)

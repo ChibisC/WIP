@@ -120,6 +120,9 @@ function saveName(n: string): void {
   }
 }
 
+/** The game's own website (GitHub Pages), where multiplayer works. */
+export const GAME_SITE = 'https://chibisc.github.io/ant-game/';
+
 /** How players connect: the internet (PeerJS invite links), the local network (connection codes) or tabs of this browser. */
 export type MpMode = 'online' | 'lan' | 'local';
 
@@ -150,6 +153,13 @@ export function showMultiplayerMenu(
     ['lan', 'LAN', 'Same Wi-Fi, connection codes, no internet needed'],
     ['local', 'Local tabs', 'Testing: tabs of this browser'],
   ];
+  // Online and LAN play use WebRTC. Some embedding pages (the published artifact's frame) give the game
+  // none: say so and point to the game's website instead of failing later.
+  const rtc = typeof RTCPeerConnection !== 'undefined';
+  const noRtc =
+    mode !== 'local' && !rtc
+      ? `<p class="mp-error">This page can't make network connections between players (it has no WebRTC here: the page that embeds the game blocks it). Play multiplayer on the game's website, <a href="${GAME_SITE}" target="_blank" rel="noopener">${GAME_SITE.replace('https://', '')}</a>, or use Local tabs to try it on this computer.</p>`
+      : '';
   const body =
     mode === 'lan'
       ? `<p class="dim">Play with up to 3 others on the same Wi-Fi or network, with no servers and no internet once the game has loaded. The host adds each player by showing a code (QR or text); the player's device answers with a reply code for the host.</p>
@@ -168,7 +178,7 @@ export function showMultiplayerMenu(
      <input class="mp-input" data-f="name" maxlength="24" placeholder="Queen of the meadow" value="${esc(savedName())}">
      <h2>Connect</h2>
      <div class="mode-tabs mp-modes">${tabs.map(([id, n, d]) => `<button class="mode-tab ${id === mode ? 'on' : ''}" data-mode="${id}"><b>${n}</b><span>${d}</span></button>`).join('')}</div>
-     ${body}
+     ${noRtc}${body}
      <div class="opt-row" style="margin-top:18px"><button class="chip" data-a="back">← Back</button></div>`,
   );
   const val = (f: string) => root.querySelector(`[data-f="${f}"]`) as HTMLInputElement;
