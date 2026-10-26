@@ -311,8 +311,8 @@ export function fernGeometry(size: number, rng: Rng): THREE.BufferGeometry {
 export function moundGeometry(shape: Shape, height: number, ground: (x: number, z: number) => number, seed: number): THREE.BufferGeometry | null {
   const o = polarOf(shape);
   if (!o) return null;
-  const N = 40;
-  const K = 16;
+  const N = 72;
+  const K = 28;
   const pos: number[] = [];
   const idx: number[] = [];
   const g0 = ground(o.cx, o.cz);
@@ -321,12 +321,13 @@ export function moundGeometry(shape: Shape, height: number, ground: (x: number, 
     const t = k / K;
     for (let i = 0; i <= N; i++) {
       const a = (i / N) * Math.PI * 2;
-      // fluted: buttress-like ribs, a lumpy surface, a few secondary spires near the top
-      const rib = 1 + 0.12 * Math.max(0, Math.sin(a * 5 + seed)) * (1 - t);
-      const lump = 1 + 0.08 * (valueNoise2(a * 3 + seed, t * 6, seed) - 0.5);
-      const side = Math.pow(1 - t, 0.85) * rib * lump;
-      const top = 1 + 0.25 * Math.max(0, Math.cos(a * spires + seed)) * t * t;
-      const r = o.r(a) * Math.max(0.04, side);
+      // fluted: deep vertical channels between buttress ribs, lumpy worked clay, secondary spires on top
+      const rib = 1 + 0.16 * Math.pow(Math.abs(Math.sin(a * 3.5 + seed)), 0.6) * (1 - t * 0.6);
+      const lump = 1 + 0.16 * (valueNoise2(a * 4 + seed, t * 9, seed) - 0.5) + 0.07 * (valueNoise2(a * 13 + seed, t * 23, seed + 5) - 0.5);
+      // a bulging lower dome that narrows into a spire
+      const side = (0.35 * Math.pow(1 - t, 0.5) + 0.65 * Math.pow(1 - t, 1.6)) * rib * lump;
+      const top = 1 + 0.22 * Math.max(0, Math.cos(a * spires + seed)) * t * t;
+      const r = o.r(a) * Math.max(0.03, side);
       pos.push(o.cx + Math.cos(a) * r, g0 - 2 + height * t * top, o.cz + Math.sin(a) * r);
     }
   }
@@ -340,8 +341,8 @@ export function moundGeometry(shape: Shape, height: number, ground: (x: number, 
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
-  const clay = new THREE.Color(0xa06a3a);
-  const pale = new THREE.Color(0xc89a66);
+  const clay = new THREE.Color(0xc08a5a);
+  const pale = new THREE.Color(0xe2c08e);
   const out = paint(g, (x, y, z) => {
     const h = Math.max(0, Math.min(1, (y - g0) / height));
     return clay.clone().lerp(pale, h * 0.6).multiplyScalar(0.8 + 0.35 * valueNoise2(x * 0.2, y * 0.25 + z * 0.2, seed + 9));

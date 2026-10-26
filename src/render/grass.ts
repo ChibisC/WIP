@@ -120,7 +120,10 @@ export class Grass {
           if (rng.chance(0.5)) x = x < W / 2 ? -rng.range(0, margin) : W + rng.range(0, margin);
           else z = z < D / 2 ? -rng.range(0, margin) : D + rng.range(0, margin);
         }
+        const from = blades.length;
         pushClump(x, z, rng.range(0.8, 1.6), true);
+        if (terrain.map?.biome === 'savanna') for (let k = from; k < blades.length; k++) blades[k].dry = true;
+        else if ((terrain.map?.biome === 'forest' || terrain.map?.biome === 'rainforest') && rng.chance(0.75)) blades.length = from;
       }
     }
     const geo = bladeGeometry();

@@ -166,7 +166,19 @@ export class TerrainMesh {
         const ci = Math.round(Math.min(Math.max(x, 0), t.width) / t.res);
         const cj = Math.round(Math.min(Math.max(z, 0), t.depth) / t.res);
         const k4 = (cj * t.nx + ci) * 4;
-        if (!inside && t.params.style !== 'formicarium' && t.params.style !== 'sandy') {
+        const biome = t.map?.biome;
+        if (!inside && biome === 'savanna') {
+          // beyond an authored savanna: more bare earth and sand
+          cover[k * 4] = 0.35;
+          cover[k * 4 + 1] = 0.1;
+          cover[k * 4 + 2] = 0.55;
+          cover[k * 4 + 3] = 0;
+        } else if (!inside && (biome === 'forest' || biome === 'rainforest')) {
+          cover[k * 4] = 0.2;
+          cover[k * 4 + 1] = 0.25;
+          cover[k * 4 + 2] = 0;
+          cover[k * 4 + 3] = 0.55;
+        } else if (!inside && t.params.style !== 'formicarium' && t.params.style !== 'sandy') {
           cover[k * 4] = 0.25;
           cover[k * 4 + 1] = 0.6;
           cover[k * 4 + 2] = 0;
