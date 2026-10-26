@@ -596,6 +596,21 @@ function digDisc(w: World, cid: number, qc: number, r: number): number[] {
   check('a crowd at one hole goes in a few a second, then all of it', firstSecond <= ENTRANCE.passPerS * 2 + ENTRANCE.burst && inside >= 20, `${firstSecond} in the first 2 s, ${inside}/24 after 20 s`);
 }
 {
+  // a big rival colony digs one extra entrance by the same rules (a marked spot, a passage to it)
+  const w = createWorld({ seed: 6, style: 'meadow', width: 600, depth: 600, colonies: [{ species: 'lasius', player: false, ai: true, startWorkers: 40, popLimit: 300 }], food: 3 }, new EventBus());
+  const c = w.colony(0)!;
+  const g = w.nest(0)!;
+  const at = ENTRANCE.aiExtraAt;
+  ENTRANCE.aiExtraAt = 30; // the colony starts with about 40 ants
+  let t = 0;
+  while (c.entrances.length < 2 && t < 400) {
+    run(w, 10);
+    t += 10;
+  }
+  ENTRANCE.aiExtraAt = at;
+  check('a big AI colony digs out one of its spots into an extra entrance (same rules as the player)', c.entrances.length === 2 && g.tunnels.length === 2 && g.spots.length === 1, `${c.living} ants, ${c.entrances.length} entrances after ${t} s`);
+}
+{
   // older saves: hidden shafts and one-hex entrances get tunnels and spots
   const w = createWorld({ seed: 5, style: 'meadow', width: 600, depth: 600, colonies: [{ species: 'lasius', player: true, ai: false }], food: 1 }, new EventBus());
   const st = w.serialize();

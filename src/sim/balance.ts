@@ -717,4 +717,6 @@ export const ENTRANCE = {
   collapseS: 60,
   /** tunnel hexes move ants like a level I highway */
   tunnelSpeed: 1.1,
+  /** rival AI colonies dig an extra entrance per this many living ants (at most maxExtra) */
+  aiExtraAt: 60,
 };

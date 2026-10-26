@@ -7,7 +7,7 @@ import { valueNoise2 } from '../../core/rng';
 const SUB = 2;
 
 /** Tile type ids written into the per-hex data texture. */
-export const HEX_TYPE: Record<string, number> = { none: 0, queen: 1, brood: 2, food: 3, fungus: 4, aphid: 5, thatch: 6, entrance: 7, highway: 8, mound: 9, carton: 10 };
+export const HEX_TYPE: Record<string, number> = { none: 0, queen: 1, brood: 2, food: 3, fungus: 4, aphid: 5, thatch: 6, entrance: 7, highway: 8, mound: 9, carton: 10, spot: 11 };
 
 export interface HexVisual {
   type: number;
@@ -47,6 +47,14 @@ export class NestTerrain {
   private tintData: Uint8Array;
   private builtVersion = -1;
   private skirt: THREE.Mesh;
+  /** top hexes of entrances that are plugged or have caved in (a soil cap instead of a ramp; set by the nest view) */
+  private shutTops: number[] = [];
+  private ramps: Ramp[] = [];
+  private rampKey = '';
+  private rampT: number[][] | null = null;
+  private rampTN = 0;
+  private rampE: number[] | null = null;
+  private rampEN = 0;
   readonly uniforms = {
     tSoil: { value: null as unknown as THREE.DataTexture },
     tLight: { value: null as unknown as THREE.DataTexture },
@@ -269,16 +277,80 @@ export class NestTerrain {
     const lump = t > 0.6 ? (Math.sin(px * 0.9 + Math.sin(py * 0.7) * 2) * Math.sin(py * 0.83 - px * 0.31) * 0.5 + 0.5) * this.wallH * 0.07 * (t - 0.6) * 2.5 : 0;
     const bump = (1 - t) * (Math.sin(px * 1.7 + py * 0.6) * Math.sin(py * 1.3 - px * 0.4)) * 0.12;
     let h = t * this.wallH + lump + bump;
-    // Entrance ramps: a mound of loose soil rising toward the opening above.
-    for (const q of g.entrances) {
-      const c = g.hexCenter(q);
-      const d = Math.hypot(px - c.x, py - c.y) / (g.R * 0.95);
-      if (d < 1) {
-        const k = 1 - d;
-        h = Math.max(h, this.wallH * 0.95 * k * k * (3 - 2 * k));
+    // Entrance tunnels: a ramp of loose soil rising along the tunnel to the opening above;
+    // a plugged or fallen-in entrance is capped with soil instead.
+    for (const r of this.rampList()) {
+      if (r.shut) {
+        const d = Math.hypot(px - r.xs[0], py - r.ys[0]) / (g.R * 1.05);
+        if (d < 1) {
+          const k = 1 - d;
+          h = Math.max(h, this.wallH * Math.min(1, k * 2.2) * (0.97 + 0.03 * Math.sin(px * 1.3 + py)));
+        }
+        continue;
       }
+      const m = rampAt(r, px, py);
+      if (m.d > g.R * 1.0) continue;
+      const lat = 1 - smooth01((m.d - g.R * 0.45) / (g.R * 0.55));
+      const u = Math.max(0, 1 - m.s / r.len);
+      const rise = this.wallH * 0.95 * Math.pow(u, 1.15);
+      h = Math.max(h, rise * lat);
     }
     return h;
+  }
+
+  /** Entrance tops the nest view reports as plugged or fallen in; re-meshes the tunnels that changed. */
+  setShut(tops: number[]): void {
+    const a = [...tops].sort((x, y) => x - y);
+    if (a.join() === this.shutTops.join()) return;
+    const changed = [...a.filter((q) => !this.shutTops.includes(q)), ...this.shutTops.filter((q) => !a.includes(q))];
+    this.shutTops = a;
+    const g = this.grid;
+    for (const top of changed) {
+      const ti = g.entrances.indexOf(top);
+      const hexes = ti >= 0 && g.tunnels[ti] ? g.tunnels[ti] : [top];
+      for (const q of hexes) for (const c of g.hexCells[q] ?? []) g.markDirty(c % g.w, Math.floor(c / g.w));
+    }
+    this.rampKey = '';
+  }
+
+  isShut(top: number): boolean {
+    return this.shutTops.includes(top);
+  }
+
+  /** Ramp polylines (hex centres from the top down, run on into the floor), rebuilt when the tunnels change. */
+  private rampList(): Ramp[] {
+    const g = this.grid;
+    // cheap check (heightAt runs per vertex and per ant): the replica swaps in new arrays, the sim pushes
+    if (this.rampKey === 'ok' && this.rampT === g.tunnels && this.rampTN === g.tunnels.length && this.rampE === g.entrances && this.rampEN === g.entrances.length) return this.ramps;
+    this.rampKey = 'ok';
+    this.rampT = g.tunnels;
+    this.rampTN = g.tunnels.length;
+    this.rampE = g.entrances;
+    this.rampEN = g.entrances.length;
+    this.ramps = g.entrances.map((top, i) => {
+      const hexes = g.tunnels[i]?.length ? g.tunnels[i] : [top];
+      const xs: number[] = [];
+      const ys: number[] = [];
+      for (const q of hexes) {
+        const c = g.hexCenter(q);
+        xs.push(c.x);
+        ys.push(c.y);
+      }
+      // run on past the bottom hex so the ramp meets the floor smoothly
+      const n = xs.length;
+      let dx = n > 1 ? xs[n - 1] - xs[n - 2] : 0;
+      let dy = n > 1 ? ys[n - 1] - ys[n - 2] : g.R;
+      const dl = Math.hypot(dx, dy) || 1;
+      dx /= dl;
+      dy /= dl;
+      const run = g.R * (n > 1 ? 0.7 : 1.2);
+      xs.push(xs[n - 1] + dx * run);
+      ys.push(ys[n - 1] + dy * run);
+      let len = 0;
+      for (let k = 1; k < xs.length; k++) len += Math.hypot(xs[k] - xs[k - 1], ys[k] - ys[k - 1]);
+      return { xs, ys, len, shut: this.shutTops.includes(top) };
+    });
+    return this.ramps;
   }
 
   normalAt(px: number, py: number, out: THREE.Vector3): THREE.Vector3 {
@@ -605,8 +677,8 @@ vec2 hl = gp - hctr;
 float hd = hexDist(hl);
 float apo = uHexR*0.8660254;
 float edgeProx = apo - hd;
-float tileK = floorM * step(0.5, htype);
-if (htype > 0.5) {
+float tileK = floorM * step(0.5, htype) * step(htype, 10.5);
+if (htype > 0.5 && htype < 10.5) {
   vec3 tc = col;
   vec3 tint = texture2D(tTint, huv).rgb;
   if (htype < 1.5) {
@@ -663,8 +735,20 @@ if (htype > 0.5) {
     tc = mix(vec3(0.24,0.15,0.08), vec3(0.52,0.36,0.18), clamp(n1 + n2, 0.0, 1.0));
     bumpH += (n1 + n2)*0.5;
   } else if (htype < 7.5) {
-    // entrance ramp: loose, paler soil lit from above
+    // entrance tunnel: loose, paler soil lit from above, worn smooth along the middle where ants walk;
+    // a plugged one (outline 1) is fresh dark crumbly soil
+    float wornK = smoothstep(apo*0.75, apo*0.2, hd);
     tc = mix(col, vec3(0.42,0.34,0.24)*(0.8+0.4*grain), 0.6);
+    tc = mix(tc, vec3(0.50,0.41,0.29)*(0.9+0.2*vnoise(gp*0.6)), wornK*0.35);
+    vec3 pw = worley(gp*1.8);
+    float pellet = step(0.9, pw.z) * smoothstep(0.3, 0.1, pw.x) * (1.0 - wornK);
+    tc = mix(tc, vec3(0.30,0.22,0.15), pellet*0.7);
+    bumpH += pellet*0.6 - wornK*0.1;
+    if (hout > 0.5) {
+      vec3 cw2 = worley(gp*1.4);
+      tc = vec3(0.16,0.11,0.07) * (0.75 + 0.5*smoothstep(0.5, 0.1, cw2.x));
+      bumpH += smoothstep(0.5, 0.1, cw2.x)*0.9;
+    }
   } else if (htype < 8.5) {
     // highway: smooth, packed, well-trodden earth with faint wear lines along it
     float wear = smoothstep(0.75, 1.0, abs(sin(dot(gp, vec2(0.5, 0.866))*1.6 + fbm(gp*0.2)*2.0)));
@@ -705,6 +789,21 @@ if (htype > 0.5) {
     float pul = 0.55 + 0.45*sin(uTime*4.0);
     vec3 pc = pendDel > 0.5 ? vec3(0.95,0.25,0.18) : vec3(1.0,0.82,0.3);
     col = mix(col, pc, smoothstep(0.7, 0.15, edgeProx) * pul * 0.85 * floorM);
+  }
+}
+// extra-entrance spot (undug soil the Dig tool opens into a new entrance): a dashed pale rim round
+// each of its hexes and a ring of daylight-coloured pebbles round the top hex (outline 1)
+if (htype > 10.5 && htype < 11.5) {
+  float soilK = 1.0 - floorM;
+  float ang3 = atan(hl.y, hl.x);
+  float dash3 = step(0.45, fract(ang3 * 1.9099 + 0.25));
+  col = mix(col, vec3(0.80,0.72,0.52), smoothstep(0.55, 0.12, edgeProx) * dash3 * 0.7 * soilK);
+  col = mix(col, col*1.25 + vec3(0.03,0.025,0.015), 0.35 * soilK);
+  if (hout > 0.5) {
+    float rr = hd / apo;
+    float ring = smoothstep(0.1, 0.0, abs(rr - 0.5));
+    col = mix(col, vec3(0.95,0.88,0.66), ring * 0.75 * soilK);
+    col = mix(col, vec3(0.035,0.025,0.02), smoothstep(0.32, 0.18, rr) * 0.7 * soilK);
   }
 }
 // group outline on edges that border a different group (coloured by marker)
@@ -770,3 +869,41 @@ const FRAG_EMISSIVE = /* glsl */ `
   }
 }
 `;
+
+interface Ramp {
+  xs: number[];
+  ys: number[];
+  len: number;
+  shut: boolean;
+}
+
+function smooth01(t: number): number {
+  const k = Math.max(0, Math.min(1, t));
+  return k * k * (3 - 2 * k);
+}
+
+const rampTmp = { d: 0, s: 0 };
+/** Distance from a point to a ramp's polyline, and how far along it (from the top) the nearest point lies. */
+function rampAt(r: Ramp, px: number, py: number): { d: number; s: number } {
+  let best = Infinity;
+  let bs = 0;
+  let acc = 0;
+  for (let k = 1; k < r.xs.length; k++) {
+    const ax = r.xs[k - 1];
+    const ay = r.ys[k - 1];
+    const bx = r.xs[k] - ax;
+    const by = r.ys[k] - ay;
+    const L2 = bx * bx + by * by || 1;
+    const t = Math.max(0, Math.min(1, ((px - ax) * bx + (py - ay) * by) / L2));
+    const d = Math.hypot(px - ax - bx * t, py - ay - by * t);
+    const L = Math.sqrt(L2);
+    if (d < best) {
+      best = d;
+      bs = acc + t * L;
+    }
+    acc += L;
+  }
+  rampTmp.d = best;
+  rampTmp.s = bs;
+  return rampTmp;
+}

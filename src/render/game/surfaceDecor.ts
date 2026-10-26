@@ -151,31 +151,7 @@ export class SurfaceDecor {
         this.m.compose(this.p, this.q.identity(), this.s);
         this.foodRings.add(this.m);
       }
-    // Entrances and spoil rings
-    for (const col of w.s.colonies) {
-      col.entrances.forEach((e, i) => {
-        const r = 2.6;
-        this.p.set(e.sx, h(e.sx, e.sy) + 0.15, e.sy);
-        this.s.set(r, 1, r);
-        this.m.compose(this.p, this.q.identity(), this.s);
-        this.holes.add(this.m);
-        const rng = new Rng(col.id * 1000 + i * 17 + 3);
-        const n = Math.min(90, 14 + Math.floor((col.spoil[i] ?? 0) * 1.5));
-        for (let k = 0; k < n; k++) {
-          const a = rng.range(0, Math.PI * 2);
-          const d = r + 0.6 + Math.abs(rng.gauss()) * (2 + Math.min(6, (col.spoil[i] ?? 0) * 0.05));
-          const x = e.sx + Math.cos(a) * d;
-          const y = e.sy + Math.sin(a) * d;
-          const sz = rng.range(0.5, 1.2);
-          this.p.set(x, h(x, y) + sz * 0.25, y);
-          this.e.set(rng.range(0, 6), rng.range(0, 6), rng.range(0, 6));
-          this.q.setFromEuler(this.e);
-          this.s.setScalar(sz);
-          this.m.compose(this.p, this.q, this.s);
-          this.spoil.add(this.m, this.c.setHSL(0.07, 0.38, rng.range(0.13, 0.27), THREE.SRGBColorSpace));
-        }
-      });
-    }
+    // (nest entrances: render/game/entranceModels.ts)
     // Caves and lairs: a wider hollow ringed with weathered stones and old leaf litter
     for (const cv of w.s.caves) {
       cv.entrances.forEach((e, i) => {

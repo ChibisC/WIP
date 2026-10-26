@@ -1,3 +1,4 @@
+import { designateSpot, extraCount, spotBlocked } from './entrances';
 import { World } from './world';
 import { AphidCluster, AS, Colony, SURFACE, TileType } from './types';
 import { CASTES, casteOf, isTermiteSpecies, tierOf } from './species';
@@ -7,7 +8,7 @@ import { buildableTiles, canPlaceTile, hatchCost, placeTile, raisesAnts, tileCos
 import { JOB, listJobs } from './jobs';
 import { assignGroup, markerRadius, placeMarker, removeMarker } from './markers';
 import { creatureHooks } from './combat';
-import { BALANCE, ECITON, NASUTE, SICKLE } from './balance';
+import { BALANCE, ECITON, ENTRANCE, NASUTE, SICKLE } from './balance';
 import { groupCounts } from './tiles';
 import { dhypot, dsin, sq } from './dmath';
 import { edible } from './diet';
@@ -161,9 +162,11 @@ export function buildTick(w: World, c: Colony, dt: number): void {
     if (planChamber(w, c, b, home, kind)) b.blocked = false;
   }
   if (g.designatedCount < wantDesig) {
-    const plan = planned(g, b).filter((q) => g.isHexDiggable(q) && !g.hexDesig[q]);
+    const plan = planned(g, b).filter((q) => g.isHexDiggable(q) && !g.hexDesig[q] && g.spotIndex(q) < 0);
     for (const q of plan.slice(0, wantDesig - g.designatedCount)) designateDig(w, c, q, true);
   }
+  // A bigger colony digs one extra entrance (the same rules as the player: a marked spot, at most ENTRANCE.maxExtra).
+  aiEntrance(w, c, g);
 
   // 2. Building (in the chambers; the tunnels stay clear).
   if (!roomFree.length) return;
@@ -265,7 +268,7 @@ function planChamber(w: World, c: Colony, b: BuildBrain, home: number, kind: 'br
   const rosette = (q: number) => [q, ...g.neighbors(q)];
   const ok = (q: number) => {
     const hs = rosette(q);
-    if (hs.length !== 7 || hs.some((h) => h < 0 || g.isEntrance(h) || !(g.isHexDiggable(h) || g.isHexDug(h)))) return false;
+    if (hs.length !== 7 || hs.some((h) => h < 0 || g.isEntrance(h) || g.spotIndex(h) >= 0 || !(g.isHexDiggable(h) || g.isHexDug(h)))) return false;
     // carved out of solid soil, with a wall of soil all round (the tunnel will cut through it)
     if (hs.some((h) => g.isHexDug(h))) return false;
     for (const h of hs) for (const n of g.neighbors(h)) if (n >= 0 && g.isHexDug(n)) return false;
@@ -307,7 +310,7 @@ function planChamber(w: World, c: Colony, b: BuildBrain, home: number, kind: 'br
           hit = n;
           break;
         }
-        if (!g.isHexDiggable(n) || g.isEntrance(n)) continue;
+        if (!g.isHexDiggable(n) || g.isEntrance(n) || g.spotIndex(n) >= 0) continue;
         prev[n] = q;
         queue.push(n);
       }
@@ -643,4 +646,44 @@ export function forageTick(w: World, c: Colony, dt: number): void {
       else if (!out && g.marker === FORAGE_MARKER) assignGroup(w, c, g.id, -1);
     }
   }
+}
+
+/**
+ * Rival colonies open an extra entrance once they are big enough (ENTRANCE.aiExtraAt ants per extra):
+ * the marked spot nearest the dug nest, reached by the shortest passage through soil (ordinary digs),
+ * then the spot itself (an entrance dig). Nothing happens while one is under way.
+ */
+function aiEntrance(w: World, c: Colony, g: NestGrid): void {
+  if (!g.spots.length || extraCount(c) >= ENTRANCE.maxExtra) return;
+  if (c.living < ENTRANCE.aiExtraAt * (extraCount(c) + 1)) return;
+  if (g.spots.some((sp) => sp.some((q) => g.hexDesig[q]))) return; // one at a time
+  const N = g.cols * g.rows;
+  const prev = new Int32Array(N).fill(-2);
+  const queue: number[] = [];
+  for (let q = 0; q < N; q++)
+    if (g.isHexDug(q) && !g.isEntrance(q)) {
+      prev[q] = -1;
+      queue.push(q);
+    }
+  // breadth-first from the dug floor through soil to the first spot hex reached
+  let hit = -1;
+  for (let i = 0; i < queue.length && hit < 0; i++) {
+    const q = queue[i];
+    for (const n of g.neighbors(q)) {
+      if (n < 0 || prev[n] !== -2) continue;
+      if (g.spotIndex(n) >= 0) {
+        prev[n] = q;
+        hit = n;
+        break;
+      }
+      if (!g.isHexDiggable(n) || g.isEntrance(n)) continue;
+      prev[n] = q;
+      queue.push(n);
+    }
+  }
+  if (hit < 0) return;
+  const si = g.spotIndex(hit);
+  if (spotBlocked(w, c, si)) return;
+  for (let q = prev[hit]; q >= 0 && !g.isHexDug(q); q = prev[q]) designateDig(w, c, q, true);
+  designateSpot(w, c, si, true);
 }

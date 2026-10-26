@@ -5,6 +5,7 @@ import { Rng } from '../../core/rng';
 import { patchDapple } from '../shaderPatch';
 import { InstancedPool } from './instancedPool';
 import { crumbGeometry } from './foodModels';
+import { SurfaceEntrances } from './entranceModels';
 
 /**
  * Fire ant mounds on the surface (Phase 12). Solenopsis heap the soil they
@@ -42,8 +43,11 @@ export class SurfaceMounds {
   private p = new THREE.Vector3();
   private s = new THREE.Vector3();
   private c = new THREE.Color();
+  /** species entrance rims, holes and nest structures (their heights add to the domes') */
+  readonly entrances = new SurfaceEntrances();
 
   constructor() {
+    this.group.add(this.entrances.group);
     this.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
     patchDapple(this.mat);
     const cm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
@@ -51,8 +55,13 @@ export class SurfaceMounds {
     this.clods = new InstancedPool(crumbGeometry(), cm, this.group, 512);
   }
 
-  /** The dome's height above the terrain at (x, y), mm (0 off any mound). */
+  /** The dome's (and the entrance rims') height above the terrain at (x, y), mm (0 off any mound). */
   height(x: number, y: number): number {
+    return (this.entrances.empty ? 0 : this.entrances.height(x, y)) + this.domeHeight(x, y);
+  }
+
+  /** The fire-ant domes alone. */
+  private domeHeight(x: number, y: number): number {
     let h = 0;
     for (const m of this.mounds) {
       const dx = x - m.x;
@@ -67,7 +76,7 @@ export class SurfaceMounds {
 
   /** Tilt a surface normal by the dome's slope at (x, y). */
   tilt(x: number, y: number, n: { x: number; y: number; z: number }): void {
-    if (!this.mounds.length) return;
+    if (!this.mounds.length && this.entrances.empty) return;
     const e = 0.6;
     const gx = (this.height(x + e, y) - this.height(x - e, y)) / (2 * e);
     const gz = (this.height(x, y + e) - this.height(x, y - e)) / (2 * e);
@@ -81,6 +90,7 @@ export class SurfaceMounds {
   }
 
   update(w: World, ground: (x: number, y: number) => number): void {
+    this.entrances.update(w, (x, y) => ground(x, y) + this.domeHeight(x, y));
     if (this.frame++ % 30 !== 0) return;
     const seen = new Set<number>();
     for (const c of w.s.colonies) {

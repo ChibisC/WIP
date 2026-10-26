@@ -85,13 +85,26 @@ export class NestView {
   /** Push the owner's tiles/groups into the floor shader when they change (caves: entrance ramps only). */
   updateHexes(w: World, owner: Colony | null): void {
     const g = w.nestOf(this.space)!;
-    const key = owner ? `${owner.tileVersion}|${owner.groups.map((gr) => gr.marker).join(',')}|${g.entrances.length}|${owner.tiles.map((t) => (t.built ? 1 : 0) + t.pend * 2).join('')}` : `cave|${g.entrances.length}`;
+    // plugged or fallen-in entrances: a soil cap on the ramp (and no daylight)
+    const ents = w.entrancesOf(this.space);
+    const shut: number[] = [];
+    ents.forEach((e) => {
+      if (e.shut || (e.fall ?? 0) > 0.5) shut.push(e.q);
+    });
+    this.stage.terrain.setShut(shut);
+    const spotKey = `${g.spots.map((sp) => sp.join('.')).join('/')}|${shut.join('.')}|${g.tunnels.length}`;
+    const key = owner ? `${owner.tileVersion}|${owner.groups.map((gr) => gr.marker).join(',')}|${g.entrances.length}|${spotKey}|${owner.tiles.map((t) => (t.built ? 1 : 0) + t.pend * 2).join('')}` : `cave|${g.entrances.length}|${spotKey}`;
     if (key === this.hexKey) return;
     this.hexKey = key;
     const byQ = new Map((owner?.tiles ?? []).map((t) => [t.q, t]));
     const tints = new Map<string, THREE.Color>();
+    const black = new THREE.Color(0, 0, 0);
+    // only the nest's owner sees where its extra entrances could go
+    const spots = owner?.player ? g.spots : [];
     this.stage.terrain.setHexes((q): HexVisual | null => {
-      if (g.isEntrance(q)) return { type: HEX_TYPE.entrance, level: 0, edges: 0, outline: 0, tint: new THREE.Color(0, 0, 0) };
+      const ti = g.tunnelIndex(q);
+      if (ti >= 0) return { type: HEX_TYPE.entrance, level: 0, edges: 0, outline: shut.includes(g.entrances[ti]) ? 1 : 0, tint: black };
+      for (const sp of spots) if (sp.includes(q)) return { type: HEX_TYPE.spot, level: 0, edges: 0, outline: sp[0] === q ? 1 : 0, tint: black };
       const t = byQ.get(q);
       if (!t) return null;
       let edges = 0;

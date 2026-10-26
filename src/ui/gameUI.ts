@@ -303,7 +303,7 @@ export class GameUI {
       if (l.textContent !== txt) l.textContent = txt;
     }
     // placement feedback at the cursor
-    const msg = s.hoverMsg || (s.tool === 'tile' ? s.ghostInfo : s.tool === 'arena' ? s.arenaPlaceInfo() : '');
+    const msg = s.hoverMsg || (s.tool === 'tile' ? s.ghostInfo : s.tool === 'arena' ? s.arenaPlaceInfo() : '') || s.entranceTip;
     if (msg) {
       if (this.cursorTip.textContent !== msg) this.cursorTip.textContent = msg;
       this.cursorTip.classList.add('show');

@@ -176,10 +176,25 @@ export class Minimaps {
         ctx.stroke();
       }
     }
-    // ramps up to the surface: arrows
-    for (const q of g.entrances) {
+    // ramps up to the surface: arrows (grey when plugged or fallen in); your extra-entrance spots as dashed rings
+    const ents = w.entrancesOf(space);
+    g.entrances.forEach((q, i) => {
       g.hexCenter(q, p);
-      this.arrow(ctx, p.x * k, p.y * k, Math.max(4, g.R * k * 0.9), true, '#e8f0ff');
+      const e = ents[i];
+      this.arrow(ctx, p.x * k, p.y * k, Math.max(4, g.R * k * 0.9), true, e && (e.shut || e.fall) ? '#8a8a8a' : '#e8f0ff');
+    });
+    if (c?.player && c.id === s.player.id) {
+      ctx.save();
+      ctx.setLineDash([2, 2]);
+      ctx.strokeStyle = 'rgba(232,220,180,0.8)';
+      ctx.lineWidth = 1;
+      for (const sp of g.spots) {
+        g.hexCenter(sp[0], p);
+        ctx.beginPath();
+        ctx.arc(p.x * k, p.y * k, Math.max(3, g.R * k * 0.8), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
     // food, then ants: yours pale, allies blue, enemies red; creatures as rings
     // (only food your colony can gather is shown in food colours; the rest is a dim grey)
@@ -343,8 +358,9 @@ export class Minimaps {
       for (const e of w.entrancesOf(tab.space)) {
         const x = e.sx * kx;
         const y = e.sy * kz;
-        if (nest) this.crown(ctx, x, y, r, col);
-        else this.arrow(ctx, x, y, r, false, col);
+        const ec = e.shut || e.fall ? '#777' : col;
+        if (nest) this.crown(ctx, x, y, r, ec);
+        else this.arrow(ctx, x, y, r, false, ec);
         ctx.lineWidth = 3;
         ctx.strokeStyle = '#000';
         ctx.strokeText(String(tab.number), x + r * 1.7, y - r * 0.9);

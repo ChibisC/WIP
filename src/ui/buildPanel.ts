@@ -183,7 +183,7 @@ export class BuildPanel {
       this.tileBtns.push({ b, type, caste });
     };
     const labour = '<br><i>Workers in the home column do all nest jobs — more workers build, upgrade and respawn faster.</i>';
-    add('dig', undefined, ICONS.dig, 'Dig', `<b>Dig</b>Mark soil for workers to excavate (6 points per hex; up to 2 workers each). Drag to paint; click a marked hex again to cancel. Hidden shaft sites become new entrances. <span class="k">G</span>${labour}`);
+    add('dig', undefined, ICONS.dig, 'Dig', `<b>Dig</b>Mark soil for workers to excavate (6 points per hex; up to 2 workers each). Drag to paint; click a marked hex again to cancel. Click a marked <b>entrance spot</b> (dashed rim, pale ring) to dig out a new entrance (up to 2); click a closed entrance to open it again. <span class="k">G</span>${labour}`);
     for (const bt of buildableTiles(c)) {
       if (bt.type === 'brood' && bt.caste) {
         const cd = CASTES[bt.caste];
@@ -205,7 +205,7 @@ export class BuildPanel {
       }
     }
     add('upgrade', undefined, ICONS.upgrade, 'Upgrade', `<b>Upgrade tool</b>Click tiles to mark upgrade jobs (cost = build cost; max level III). A tile needs <b>6</b> upgrade points for level II and <b>12</b> for level III, from its neighbours: each same-type tile gives its level, each soil wall 1, each highway its level. Big compact chambers upgrade best — a 19-tile hexagon can reach level III everywhere. Upgraded ants are healed and stronger. <span class="k">U</span>`);
-    add('remove', undefined, ICONS.trash, 'Delete', `<b>Delete tool</b>Click tiles to downgrade them one level at a time; at level I the tile is removed and its ant dies. Two-thirds of the build cost is dropped as seeds that workers carry back to storage. Also clears dig marks and cancels planned tiles. <span class="k">Del</span>`);
+    add('remove', undefined, ICONS.trash, 'Delete', `<b>Delete tool</b>Click tiles to downgrade them one level at a time; at level I the tile is removed and its ant dies. Two-thirds of the build cost is dropped as seeds that workers carry back to storage. Also clears dig marks, cancels planned tiles and plugs an extra entrance with soil (the main one stays open). <span class="k">Del</span>`);
   }
 
   update(): void {

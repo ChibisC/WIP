@@ -21,7 +21,8 @@ import { AS, Colony, SURFACE, TileType, colonyOfSpace, nestSpace } from '../sim/
 import { AreaInfo, areaOpen, areasFor, teamPresence } from '../sim/areas';
 import { CASTES, SPECIES, canonCaste, isTermiteSpecies } from '../sim/species';
 import { canPlaceTile, canUpgrade, groupWouldJoin, hatchCost, neighbourPoints, tileAt, tileCost, TILE_INFO, upgradeNeed, upgradePoints } from '../sim/tiles';
-import { BALANCE } from '../sim/balance';
+import { BALANCE, ENTRANCE } from '../sim/balance';
+import { spotBlocked } from '../sim/entrances';
 import { entranceAt, markerRadius } from '../sim/markers';
 import { abilityOf } from '../sim/abilities';
 import { Command, CommandBody } from '../sim/commands';
@@ -123,6 +124,10 @@ export class GameSession {
   hoverMsg = '';
   /** hover info for the ghost: cost and group it would join */
   ghostInfo = '';
+  /** the entrance under the cursor on the surface (cursor tip) */
+  entranceTip = '';
+  /** the current Dig stroke started on an extra-entrance spot (only then does it mark spots) */
+  private paintSpot = false;
   /** tile info overlay: levels, upgrade points, incubation rings */
   tileOverlay = false;
   /** with the Upgrade tool: points each neighbour of the hovered tile gives */
@@ -595,11 +600,36 @@ export class GameSession {
       this.painting = true;
       this.paintDone.clear();
       this.paintOn = this.tool === 'dig' ? !g.hexDesig[q] : true;
+      this.paintSpot = g.spotIndex(q) >= 0;
     }
     if (!this.painting || this.paintDone.has(q)) return;
     this.paintDone.add(q);
     // Every change is a command; the checks here only choose what to send and what to say.
+    const ti = g.tunnelIndex(q);
+    if (ti === 0 && phase === 'start' && this.tool === 'remove') {
+      this.onEvent?.({ t: 'message', text: 'The main entrance cannot be closed', kind: 'warn' });
+      return;
+    }
+    if (ti > 0 && phase === 'start' && (this.tool === 'dig' || this.tool === 'remove')) {
+      // an extra entrance: Remove plugs it with soil, Dig opens a plugged one again (the main one never closes)
+      const e = c.entrances[ti];
+      if (e && !e.fall) {
+        const close = this.tool === 'remove';
+        if (close === !!e.shut && !(e.work ?? 0)) this.onEvent?.({ t: 'message', text: close ? 'This entrance is already closed' : 'This entrance is open', kind: 'warn' });
+        else this.issue({ type: 'entrance', i: ti, close });
+      }
+      return;
+    }
     if (this.tool === 'dig') {
+      // a drag never sweeps up an extra-entrance spot by accident: start the stroke on the spot to dig it
+      if (g.spotIndex(q) >= 0 && !this.paintSpot) return;
+      if (g.spotIndex(q) >= 0 && phase === 'start' && this.paintOn) {
+        const why = spotBlocked(w, c, g.spotIndex(q));
+        if (why) {
+          this.onEvent?.({ t: 'message', text: why, kind: 'warn' });
+          return;
+        }
+      }
       if (!g.isHexDug(q) && g.isHexDiggable(q)) this.issue({ type: 'dig', q, on: this.paintOn }, phase !== 'start');
     } else if (this.tool === 'tile') {
       const ex = tileAt(c, q) ?? (this.pendingTileAt(q) ? { built: false } : undefined);
@@ -1194,7 +1224,31 @@ export class GameSession {
     return true;
   }
 
+  /** A few times a second: what the entrance under the cursor on the surface is (owner, area, state, crowd). */
+  private updateEntranceTip(): void {
+    if (this.frameNo % 6 !== 0) return;
+    this.entranceTip = '';
+    if (this.view.space !== 'surface' || this.view.observing || (this.tool !== 'none' && this.tool !== 'marker')) return;
+    const sp = this.view.pickSurface(this.input.mouseX, this.input.mouseY);
+    if (!sp) return;
+    const w = this.world;
+    for (const tab of this.areaTabs()) {
+      const ents = w.entrancesOf(tab.space);
+      for (let i = 0; i < ents.length; i++) {
+        const e = ents[i];
+        if (Math.hypot(e.sx - sp.x, e.sy - sp.z) > 5) continue;
+        const state = e.fall ? 'caving in' : e.work ? (e.shut ? 'being opened' : 'being plugged') : e.shut ? 'closed' : 'open';
+        let crowd = 0;
+        for (const a of w.s.ants) if (a.space === SURFACE && a.state !== AS.Dead && Math.abs(a.x - e.sx) < 6 && Math.abs(a.y - e.sy) < 6) crowd++;
+        const kind = tab.owner >= 0 ? (i === 0 ? 'main entrance' : 'extra entrance') : 'entrance';
+        this.entranceTip = `Area ${tab.number} · ${tab.name} · ${kind} · ${state}${crowd ? ` · ${crowd} ant${crowd > 1 ? 's' : ''} at the hole` : ''}`;
+        return;
+      }
+    }
+  }
+
   private updateHover(): void {
+    this.updateEntranceTip();
     const nt = this.view.nestTerrain;
     if (!nt) return;
     const u = nt.uniforms;
@@ -1222,7 +1276,17 @@ export class GameSession {
     let ok = true;
     if (this.tool === 'dig') {
       ok = g.isHexDiggable(q);
-      if (ok) this.ghostInfo = g.hexDesig[q] ? 'Marked for digging · click again to cancel' : g.shafts.includes(q) ? 'Dig here: breaks through to the surface (entrance dig, up to 7 workers)' : 'Mark for digging · workers excavate it (6 points)';
+      const sp = g.spotIndex(q);
+      const ti = g.tunnelIndex(q);
+      const e = ti > 0 ? c.entrances[ti] : undefined;
+      if (e) {
+        ok = !!e.shut && !e.fall;
+        this.ghostInfo = e.fall ? 'This entrance has caved in' : e.work ? 'Being worked on…' : e.shut ? 'Open this entrance again (workers dig the plug out)' : 'An open entrance';
+      } else if (ok && sp >= 0) {
+        const why = spotBlocked(this.world, c, sp);
+        ok = !why || !!g.hexDesig[q];
+        this.ghostInfo = g.hexDesig[q] ? 'Entrance dig marked · click again to cancel' : why ?? 'Extra entrance spot: dig it out to open a new entrance to the surface (entrance dig, up to 7 workers)';
+      } else if (ok) this.ghostInfo = g.hexDesig[q] ? 'Marked for digging · click again to cancel' : 'Mark for digging · workers excavate it (6 points)';
     } else if (this.tool === 'upgrade') {
       const t = tileAt(c, q);
       ok = !!t && t.built && !canUpgrade(this.world, c, t);
@@ -1235,7 +1299,11 @@ export class GameSession {
       } else this.hoverMsg = t ? 'Build this tile first' : `${CLICK} a tile to upgrade it`;
     } else if (this.tool === 'remove') {
       const t = tileAt(c, q);
-      ok = (!!t && t.type !== 'queen') || !!g.hexDesig[q];
+      const ti = g.tunnelIndex(q);
+      const e = ti > 0 ? c.entrances[ti] : undefined;
+      ok = (!!t && t.type !== 'queen') || !!g.hexDesig[q] || (!!e && !e.shut && !e.fall);
+      if (ti === 0) this.ghostInfo = 'The main entrance cannot be closed';
+      else if (e) this.ghostInfo = e.fall ? 'This entrance has caved in' : e.work ? 'Being worked on…' : e.shut ? 'Closed · use Dig to open it again' : `Close this entrance: workers plug it with soil (${ENTRANCE.closeS} s)`;
       if (t && t.type !== 'queen') {
         const refund = Math.round(tileCost(c, t.type, t.caste) * BALANCE.refund);
         this.ghostInfo = !t.built ? 'Cancel this planned tile' : t.pend === 2 ? 'Marked for deletion · click again to cancel' : t.level > 1 ? `Downgrade to level ${t.level - 1} · refund ${refund} food as seeds` : `Remove tile · refund ${refund} food as seeds${t.type === 'brood' ? ' · its ant dies' : ''}`;

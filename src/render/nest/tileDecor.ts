@@ -48,16 +48,16 @@ function beamMaterial(): THREE.ShaderMaterial {
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
-    uniforms: { uTime: globalUniforms.uTime },
+    uniforms: { uTime: globalUniforms.uTime, uCol: { value: new THREE.Color(0.92, 0.95, 1.0) } },
     vertexShader: `varying vec2 vUv; varying vec3 vP; void main(){ vUv = uv; vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-    fragmentShader: `uniform float uTime; varying vec2 vUv; varying vec3 vP;
+    fragmentShader: `uniform float uTime; uniform vec3 uCol; varying vec2 vUv; varying vec3 vP;
       float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
       void main(){
         float fall = pow(1.0 - vUv.y, 0.6);                 // brighter at the bottom
         float edge = sin(vUv.x * 3.14159);                  // soft sides
         float motes = step(0.985, h(floor(vec2(vUv.x*40.0, vUv.y*60.0 + uTime*1.5))));
         float a = fall * edge * edge * 0.16 + motes * 0.25 * edge;
-        gl_FragColor = vec4(vec3(1.0, 0.93, 0.78) * a, a);
+        gl_FragColor = vec4(uCol * a, a);
       }`,
   });
 }
@@ -174,10 +174,16 @@ export class TileDecor {
     g.entrances.forEach((q, i) => {
       const p = g.hexCenter(q);
       this.beams[i].position.set(p.x, 0, p.y);
+      // no daylight down a plugged or fallen-in hole
+      this.beams[i].visible = !this.terrain.isShut(q);
     });
+    for (let i = g.entrances.length; i < this.beams.length; i++) this.beams[i].visible = false;
+    // cool daylight by day, a faint blue moonlight at night
+    const night = Math.max(0, Math.min(1, w.s.night));
+    this.beamMat.uniforms.uCol.value.setRGB(0.92 - night * 0.6, 0.95 - night * 0.55, 1.0 - night * 0.35);
     // Tile contents change slowly: rebuild a few times a second or when tiles change.
     const day = w.s.night < 0.5;
-    const key = `${c.tileVersion}|${Math.round(c.food)}|${Math.round(c.fungus)}|${day}|${c.tiles.reduce((s, t) => s + (t.type === 'carton' ? Math.round(t.hp ?? 0) : 0), 0)}`;
+    const key = `${c.tileVersion}|${Math.round(c.food)}|${Math.round(c.fungus)}|${day}|${c.tiles.reduce((s, t) => s + (t.type === 'carton' ? Math.round(t.hp ?? 0) : 0), 0)}|${g.tunnels.length}`;
     if (key === this.lastKey && this.tick % 20 !== 0) return;
     this.lastKey = key;
     for (const pool of [this.crumbs, this.seeds, this.fungus, this.aphids, this.needles, this.clods, this.sunBrood]) pool.begin();
@@ -223,7 +229,46 @@ export class TileDecor {
       const n = Math.round(14 + 30 * Math.max(0.2, (t.hp ?? 1) / TERMANT.cartonWall.hp));
       for (let k = 0; k < n; k++) this.pile(g, t.q, rng, k, n, this.clods, rng.range(2.6, 4.6) * (g.R / 7), [0x6a4a2a, 0x9a7448, 0x4e3420, 0xb08a58][k % 4]);
     }
+    this.tunnelBits(g, c);
     for (const pool of [this.crumbs, this.seeds, this.fungus, this.aphids, this.needles, this.clods, this.sunBrood]) pool.end();
+  }
+
+  /**
+   * Loose bits along the sides of every entrance tunnel, matching the species' surface entrance: soil
+   * pellets everywhere, pine needles fallen in (wood ants), leaf scraps (leafcutters), carton flakes
+   * (nasute termites, Termants), pale frass (Gilded Ants), granular worked soil (fire ants).
+   */
+  private tunnelBits(g: NestGrid, c: Colony): void {
+    const sz = g.R / 7;
+    const extra: Partial<Record<string, { pool: InstancedPool; cols: number[]; n: number; s: [number, number] }>> = {
+      formica: { pool: this.needles, cols: [0x6a4a28, 0x8a6a38, 0x4a3018], n: 9, s: [3, 5.5] },
+      atta: { pool: this.crumbs, cols: [0x5a8a30, 0x6a9a3a, 0x7a9a40], n: 6, s: [1.2, 2] },
+      nasutitermes: { pool: this.clods, cols: [0x2e2016, 0x3b2a1e, 0x4a3626], n: 8, s: [1.4, 2.4] },
+      termant: { pool: this.clods, cols: [0x2e2016, 0x3b2a1e, 0x5a4434], n: 6, s: [1.4, 2.4] },
+      aurimyrmex: { pool: this.crumbs, cols: [0xd8c49a, 0xc8b086, 0xe6d6b0], n: 10, s: [0.7, 1.2] },
+      solenopsis: { pool: this.clods, cols: [0x8a6640, 0xa88458, 0x6e5034], n: 8, s: [1.0, 1.8] },
+    };
+    const sp = extra[c.species];
+    g.tunnels.forEach((t, ti) => {
+      t.forEach((q, k) => {
+        const rng = new Rng(q * 131 + ti * 17 + 7);
+        const ctr = g.hexCenter(q);
+        const put = (pool: InstancedPool, col: number, size: number) => {
+          const a = rng.range(0, Math.PI * 2);
+          const r = g.R * rng.range(0.45, 0.85); // the sides: the middle is worn smooth
+          const x = ctr.x + Math.cos(a) * r;
+          const z = ctr.y + Math.sin(a) * r;
+          this.p.set(x, this.terrain.heightAt(x, z) + size * 0.25, z);
+          this.e.set(rng.range(-0.5, 0.5), rng.range(0, 6.28), rng.range(-0.5, 0.5));
+          this.q.setFromEuler(this.e);
+          this.s.setScalar(size);
+          this.m.compose(this.p, this.q, this.s);
+          pool.add(this.m, this.c.setHex(col));
+        };
+        for (let i = 0; i < 7 - k; i++) put(this.crumbs, [0x3a2a1c, 0x5a4430, 0x4a3828][i % 3], rng.range(0.8, 1.5) * sz);
+        if (sp) for (let i = 0; i < sp.n - k * 2; i++) put(sp.pool, sp.cols[i % sp.cols.length], rng.range(sp.s[0], sp.s[1]) * sz);
+      });
+    });
   }
 
   /** Items heap toward the tile centre: early items low and central, later ones spread and stack. */
