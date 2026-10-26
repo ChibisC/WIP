@@ -2,10 +2,10 @@ import { World } from '../world';
 import { HF_CREATURE } from '../../world/surfaceLayout';
 import { Ant, AS, Creature, SURFACE } from '../types';
 import { casteOf } from '../species';
-import { ARENA, BALANCE, ECITON, TERMANT } from '../balance';
+import { ARENA, BALANCE, ECITON, STAG, TERMANT } from '../balance';
 import { riding } from '../climbing';
 import { riderUnits } from './climb';
-import { applyVenom, creatureHooks, damageAnt, damageCreature, flingAnt } from '../combat';
+import { applyVenom, creatureHooks, damageAnt, damageCreature, flingAnt, gripAnt } from '../combat';
 import { STANCE, arenaTeam, stanceOf } from '../arenaState';
 import { killAnt } from '../antAI';
 import { Body, bodyHook } from '../slots';
@@ -49,6 +49,8 @@ export const CS = {
   Flick: 16,
   Leap: 17,
   Strike: 18,
+  /** stag beetle: ants clamped in its antlers, lifted (render: head and forebody raised) */
+  Lift: 19,
 } as const;
 
 const TAU = Math.PI * 2;
@@ -703,17 +705,103 @@ function bossRoam(w: World, cr: Creature, k: CreatureKind, dt: number, speedMul 
   else wanderHome(w, cr, k, dt, 80, 0.5);
 }
 
+/** Let go of the ants clamped in the antlers (they drop: flungUpdate sees they are no longer held). */
+function stagRelease(cr: Creature): void {
+  cr.data.held1 = 0;
+  cr.data.held2 = 0;
+}
+
+/**
+ * Walking into a swarm, the beetle ploughs on: ants in front of it are shoved aside (no damage), so it
+ * pushes through instead of stopping at the first one (docs/creatures/stagBeetle.md).
+ */
+function stagPlough(w: World, cr: Creature, k: CreatureKind, dt: number): void {
+  if (cr.v <= 0) return;
+  const L = k.length;
+  const hx = dcos(cr.h);
+  const hy = dsin(cr.h);
+  for (const a of antsIn(w, cr, cr.x + hx * L * 0.2, cr.y + hy * L * 0.2, L * STAG.plough, { dir: cr.h, half: STAG.ploughHalf })) {
+    if (a.state === AS.Flung || a.state === AS.Climb || (a.state === AS.Grapple && a.gKind === 4 && a.gId === cr.id)) continue;
+    const c = w.colony(a.colony);
+    if (c && a.id === c.queen) continue;
+    // away from the beetle's line of travel, to whichever side the ant already is
+    const side = (a.x - cr.x) * -hy + (a.y - cr.y) * hx >= 0 ? 1 : -1;
+    const nx = a.x + -hy * side * STAG.shove * dt + hx * STAG.shove * 0.3 * dt;
+    const ny = a.y + hx * side * STAG.shove * dt + hy * STAG.shove * 0.3 * dt;
+    if (w.walkable(a.space, nx, ny)) {
+      a.x = nx;
+      a.y = ny;
+    }
+    a.stun = Math.max(a.stun, 0.12);
+  }
+}
+
 function stag(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   const p = bossPhase(w, cr, ['Advance', 'Grab and toss', 'Enraged: rear-up crush'], [0.75, 0.4]);
   const L = k.length;
+  if (cr.state !== CS.Lift && (cr.data.held1 || cr.data.held2)) stagRelease(cr);
+  const jx = cr.x + dcos(cr.h) * L * STAG.jaw;
+  const jy = cr.y + dsin(cr.h) * L * STAG.jaw;
   if (cr.state === CS.WindUp) {
     cr.v = 0;
-    if (cr.st >= 0.9) {
-      // the antlers clamp: everything in front is bitten and thrown
+    if (cr.st >= STAG.windUp) {
+      // the antlers clamp: the nearest ants between the tips are caught and lifted; the rest of the cone is
+      // bitten and knocked aside
       const ants = antsIn(w, cr, cr.x + dcos(cr.h) * L * 0.3, cr.y + dsin(cr.h) * L * 0.3, L * 0.32, { dir: cr.h, half: 0.9 });
-      for (const a of ants.slice(0, 5)) {
-        bite(w, cr, k, a, 0.6);
-        if (a.state !== AS.Dead) flingAnt(w, a, cr.x, cr.y, 2.4);
+      ants.sort((a, b) => sq(a.x - jx) + sq(a.y - jy) - (sq(b.x - jx) + sq(b.y - jy)) || a.id - b.id);
+      let held = 0;
+      for (const a of ants.slice(0, STAG.hold + 3)) {
+        if (held < STAG.hold && a.state !== AS.Climb) {
+          bite(w, cr, k, a, 0.6);
+          if (a.state !== AS.Dead && gripAnt(w, a, cr.id, L * STAG.liftH * 0.4)) {
+            if (held === 0) cr.data.held1 = a.id;
+            else cr.data.held2 = a.id;
+            held++;
+            continue;
+          }
+        }
+        bite(w, cr, k, a, STAG.sideBite);
+        if (a.state !== AS.Dead) flingAnt(w, a, cr.x, cr.y, STAG.sideFling);
+      }
+      if (held) {
+        setState(cr, CS.Lift);
+        w.events.emit({ t: 'bite', x: jx, y: jy, space: cr.space, strength: 1, by: cr.kind, on: 'ant' });
+      } else {
+        cr.cd2 = p >= 1 ? 6 : 9;
+        setState(cr, CS.Strike);
+      }
+    }
+    return;
+  }
+  if (cr.state === CS.Lift) {
+    // the clamped ants hang between the antler tips, rising with the head, squeezed
+    cr.v = 0;
+    const rise = Math.min(1, cr.st / (STAG.liftS * 0.6));
+    for (const [n, key] of [[0, 'held1'], [1, 'held2']] as const) {
+      const id = cr.data[key];
+      if (!id) continue;
+      const a = w.antById.get(id);
+      if (!a || a.state === AS.Dead || a.gripCr !== cr.id) {
+        cr.data[key] = 0;
+        continue;
+      }
+      const off = (n === 0 ? 1 : -1) * L * 0.025;
+      a.x = jx - dsin(cr.h) * off;
+      a.y = jy + dcos(cr.h) * off;
+      a.fz = L * STAG.liftH * (0.4 + 0.6 * rise);
+      a.h = cr.h + Math.PI / 2;
+      damageAnt(w, a, STAG.squeeze * dt, 'bite', cr);
+      if ((a.state as AS) === AS.Dead) cr.data[key] = 0;
+    }
+    if (cr.st >= STAG.liftS) {
+      // the toss: a flick of the head to one side throws them (the side the renderer turns the head to)
+      const sideK = cr.v2 > 0.5 ? 1 : -1;
+      const fx = jx + dsin(cr.h) * sideK * L * 0.3 - dcos(cr.h) * L * 0.1;
+      const fy = jy - dcos(cr.h) * sideK * L * 0.3 - dsin(cr.h) * L * 0.1;
+      for (const key of ['held1', 'held2'] as const) {
+        const a = cr.data[key] ? w.antById.get(cr.data[key]) : undefined;
+        cr.data[key] = 0;
+        if (a && a.state !== AS.Dead && a.gripCr === cr.id) flingAnt(w, a, fx, fy, STAG.toss);
       }
       cr.cd2 = p >= 1 ? 6 : 9;
       setState(cr, CS.Strike);
@@ -754,14 +842,16 @@ function stag(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   }
   const d = dhypot(a.x - cr.x, a.y - cr.y);
   setState(cr, CS.Chase);
-  if (d > L * 0.45) walkTo(w, cr, k, a.x, a.y, 1, dt, 2.5);
-  else {
+  if (d > L * 0.45) {
+    walkTo(w, cr, k, a.x, a.y, 1, dt, 2.5);
+    stagPlough(w, cr, k, dt);
+  } else {
     cr.v = 0;
     faceAnt(cr, a, dt, 2.25);
   }
   if (p >= 1 && cr.cd2 <= 0 && d < L * 0.6) {
     setState(cr, CS.WindUp);
-    telegraph(w, cr, cr.x + dcos(cr.h) * L * 0.3, cr.y + dsin(cr.h) * L * 0.3, L * 0.32, 0.9, { dir: cr.h, half: 0.9 });
+    telegraph(w, cr, cr.x + dcos(cr.h) * L * 0.3, cr.y + dsin(cr.h) * L * 0.3, L * 0.32, STAG.windUp, { dir: cr.h, half: 0.9 });
     return;
   }
   // a pinch of the antlers on the nearest ant in front

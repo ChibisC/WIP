@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildAnt } from '../render/ants/antGeometry';
+import { setBakeRenderer } from '../render/bake/detailBake';
 import { createAntGlueShell, createAntMaterials } from '../render/ants/antMaterial';
 import { ATTACK_CONTACT, AttackPose, applyAttackBody, attackPose, neutralPose } from '../render/ants/attackPoses';
 import { MORPHS } from '../render/ants/morphs';
@@ -22,6 +23,7 @@ import { GlueStreams } from '../render/termite/glue';
  */
 export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+  setBakeRenderer(renderer);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.shadowMap.enabled = true;
@@ -147,7 +149,7 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
   builtList.forEach((b, bi) => {
     const sc = scales[bi] ?? 1;
     const pz = per('poses', bi, pose);
-    const { material, depth } = createAntMaterials(b.rig, false);
+    const { material, depth } = createAntMaterials(b.rig, false, q.get('nodetail') === '1' ? undefined : keys[bi]);
     const im = new THREE.InstancedMesh(b.geometry, material, 1);
     const set = (name: string, v: number[]) => im.geometry.setAttribute(name, new THREE.InstancedBufferAttribute(new Float32Array(v), 4));
     set('aA', [phase, amp, Number(q.get('hyaw') || 0) + (atk?.headYaw ?? 0), per('hpitches', bi, Number(q.get('hpitch') || 0)) + (atk?.headPitch ?? 0)]);

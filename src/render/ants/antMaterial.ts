@@ -3,6 +3,9 @@ import { addPatch, patchDapple, NOISE_GLSL, ShaderPatch, globalUniforms } from '
 import { AntRig } from './antGeometry';
 import { GLUE_COLOR } from '../termite/castes';
 import { TERMANT } from '../../sim/balance';
+import { bakeDetail } from '../bake/detailBake';
+import { detailPatch } from '../bake/detailShading';
+import { antRecipe } from '../bake/recipes';
 
 /**
  * GPU skeletal animation for instanced ants.
@@ -392,7 +395,11 @@ export function rigUniforms(rig: AntRig): Record<string, THREE.IUniform> {
   };
 }
 
-export function createAntMaterials(rig: AntRig, dapple: boolean): { material: THREE.MeshPhysicalMaterial; depth: THREE.MeshDepthMaterial } {
+/**
+ * The ant's material (and its shadow depth material). With a morph key that has a baked-detail recipe
+ * (render/bake/recipes.ts) the material also gets the species' macro surface detail.
+ */
+export function createAntMaterials(rig: AntRig, dapple: boolean, morphKey?: string): { material: THREE.MeshPhysicalMaterial; depth: THREE.MeshDepthMaterial } {
   const material = new THREE.MeshPhysicalMaterial({
     vertexColors: true,
     roughness: 0.5,
@@ -407,6 +414,9 @@ export function createAntMaterials(rig: AntRig, dapple: boolean): { material: TH
   const uniforms = rigUniforms(rig);
   if (dapple) patchDapple(material);
   addPatch(material, { ...antPatch(), uniforms });
+  const recipe = morphKey ? antRecipe(morphKey) : null;
+  const maps = recipe ? bakeDetail(recipe) : null;
+  if (maps) addPatch(material, detailPatch(maps));
   const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   addPatch(depth, { ...antDepthPatch(), uniforms });
   return { material, depth };

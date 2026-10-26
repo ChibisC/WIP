@@ -161,8 +161,8 @@ class Bucket {
     const b0 = buildAnt(this.morph, 0, 3);
     const b1 = buildAnt(this.morph, 1, 3);
     this.rig = b1.rig;
-    const m0 = createAntMaterials(b0.rig, true);
-    const m1 = createAntMaterials(b1.rig, true);
+    const m0 = createAntMaterials(b0.rig, true, key);
+    const m1 = createAntMaterials(b1.rig, true, key);
     this.geos = [b0.geometry, b1.geometry, impostor.geo];
     this.mats = [m0.material, m1.material, impostor.mat];
     this.depths = [m0.depth, m1.depth, undefined];
@@ -355,7 +355,7 @@ export class AntRenderer {
     if (mat) return mat;
     const morph = MORPHS[key];
     const built = buildAnt(morph, 1, 3);
-    const { material } = createAntMaterials(built.rig, false);
+    const { material } = createAntMaterials(built.rig, false, key);
     const cols = 4;
     const rows = 2;
     const cell = 128;

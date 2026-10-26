@@ -100,6 +100,8 @@ export interface AntMorph {
     mandible: PartLook;
   };
   hair: number; // erect setae density 0..1
+  /** realism pass: erect setae on the head, mesosoma and gaster (counts at LOD0), their colour and length range (fractions of L) */
+  setae?: { color: number; head: number; meso: number; gaster?: number; len?: [number, number] };
   wingScars?: boolean;
   /** Walking body height above ground as a fraction of L. */
   stance: number;
@@ -353,6 +355,8 @@ const fireMinor: AntMorph = {
   legs: { hind: 0.88, thick: 0.0145 },
   look: fireLook,
   hair: 0.7,
+  // abundant long, pale golden erect hairs (docs/creatures/fire-ant.md)
+  setae: { color: 0xc89a58, head: 22, meso: 18, gaster: 46, len: [0.028, 0.06] },
   stance: 0.12,
 };
 

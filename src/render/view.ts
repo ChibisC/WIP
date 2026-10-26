@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { setBakeRenderer } from './bake/detailBake';
 import { Input } from '../core/input';
 import { Terrain } from '../world/terrain';
 import { NestGrid } from '../world/nestGrid';
@@ -113,6 +114,8 @@ export class GameView {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // macro surface detail is baked on this renderer when a species first appears (render/bake)
+    setBakeRenderer(this.renderer);
     const aspect = window.innerWidth / window.innerHeight;
     this.surfaceCam = new THREE.PerspectiveCamera(38, aspect, 1, 6000);
     this.nestCam = new THREE.PerspectiveCamera(34, aspect, 1, 4000);

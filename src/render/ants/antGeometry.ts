@@ -3,6 +3,7 @@ import { Rng } from '../../core/rng';
 import { AntMorph, PartLook } from './morphs';
 import { buildHellAnt } from './hellBuilder';
 import { buildHair6 } from './saiyHair';
+import { REGION } from '../bake/detailBake';
 
 /**
  * Procedural anatomical ant builder.
@@ -65,6 +66,25 @@ export interface BuiltAnt {
   rig: AntRig;
 }
 
+/**
+ * Where each vertex of a lofted or tubular piece sits on its surface (realism pass, baked detail):
+ * `th` angle around / 2π (−1 at the caps), `s` distance along (mm), `total` length (mm), `circ` mean girth (mm).
+ */
+export interface GeoMeta {
+  th: number[];
+  s: number[];
+  total: number;
+  circ: number;
+}
+
+/** `aDet` for a piece (render/bake/detailBake.ts): angle, mm along, 0..1 along, region + 32 × girth in µm. */
+export function detOf(meta: GeoMeta, region: number): number[] {
+  const out: number[] = [];
+  const w = region + 32 * Math.max(1, Math.round(meta.circ * 1000));
+  for (let i = 0; i < meta.th.length; i++) out.push(meta.th[i], meta.s[i], meta.total > 0 ? meta.s[i] / meta.total : 0, w);
+  return out;
+}
+
 export class Acc {
   pos: number[] = [];
   nrm: number[] = [];
@@ -72,13 +92,15 @@ export class Acc {
   surf: number[] = [];
   part: number[] = [];
   idx: number[] = [];
+  /** baked-detail coordinates (4 per vertex; zero where a piece has none) */
+  det: number[] = [];
 
   get count(): number {
     return this.pos.length / 3;
   }
 
   /** Append a piece and compute its smooth normals locally. */
-  piece(p: number[], ind: number[], part: number, colFn: (x: number, y: number, z: number) => THREE.Color, look: PartLook, flags = 0, normals?: number[]): void {
+  piece(p: number[], ind: number[], part: number, colFn: (x: number, y: number, z: number) => THREE.Color, look: PartLook, flags = 0, normals?: number[], det?: number[]): void {
     const base = this.count;
     const n = p.length / 3;
     let nr: number[];
@@ -121,6 +143,8 @@ export class Acc {
       this.col.push(c.r, c.g, c.b);
       this.surf.push(look.rough, look.coat, look.sheen, flags);
       this.part.push(part);
+      if (det && det.length >= (i + 1) * 4) this.det.push(det[i * 4], det[i * 4 + 1], det[i * 4 + 2], det[i * 4 + 3]);
+      else this.det.push(0, 0, 0, 0);
     }
     for (const i of ind) this.idx.push(base + i);
   }
@@ -132,13 +156,14 @@ export class Acc {
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
     g.setAttribute('aSurf', new THREE.Float32BufferAttribute(this.surf, 4));
     g.setAttribute('aPart', new THREE.Float32BufferAttribute(this.part, 1));
+    g.setAttribute('aDet', new THREE.Float32BufferAttribute(this.det, 4));
     g.setIndex(this.idx);
     g.computeBoundingSphere();
     return g;
   }
 }
 
-interface Ring {
+export interface Ring {
   x: number;
   y: number;
   z?: number;
@@ -148,10 +173,17 @@ interface Ring {
 }
 
 /** Loft rings along x into a closed body with pointed caps. */
-export function loft(rings: Ring[], radial: number, mod?: (x: number, y: number, z: number, t: number, a: number) => [number, number, number]): [number[], number[]] {
+export function loft(rings: Ring[], radial: number, mod?: (x: number, y: number, z: number, t: number, a: number) => [number, number, number]): [number[], number[], GeoMeta] {
   const p: number[] = [];
   const ind: number[] = [];
   const R = rings.length;
+  // where each ring sits along the piece (mm), and the mean girth (Ramanujan's ellipse perimeter)
+  const along: number[] = [0];
+  for (let r = 1; r < R; r++) along.push(along[r - 1] + Math.hypot(rings[r].x - rings[r - 1].x, rings[r].y - rings[r - 1].y, (rings[r].z ?? 0) - (rings[r - 1].z ?? 0)));
+  const total = along[R - 1];
+  let girth = 0;
+  for (const g of rings) girth += Math.PI * (3 * (g.rz + g.ry) - Math.sqrt((3 * g.rz + g.ry) * (g.rz + 3 * g.ry)));
+  const meta: GeoMeta = { th: [], s: [], total, circ: girth / R };
   for (let r = 0; r < R; r++) {
     const g = rings[r];
     const ex = 2 / (g.n ?? 2);
@@ -164,6 +196,8 @@ export function loft(rings: Ring[], radial: number, mod?: (x: number, y: number,
       let v: [number, number, number] = [g.x, y, z];
       if (mod) v = mod(v[0], v[1], v[2], r / (R - 1), a);
       p.push(v[0], v[1], v[2]);
+      meta.th.push(i / radial);
+      meta.s.push(along[r]);
     }
   }
   for (let r = 0; r < R - 1; r++)
@@ -181,6 +215,8 @@ export function loft(rings: Ring[], radial: number, mod?: (x: number, y: number,
   p.push(first.x - Math.min(first.rz, first.ry) * 0.25, first.y, first.z ?? 0);
   const c1 = p.length / 3;
   p.push(last.x + Math.min(last.rz, last.ry) * 0.25, last.y, last.z ?? 0);
+  meta.th.push(-1, -1);
+  meta.s.push(0, total);
   for (let i = 0; i < radial; i++) {
     const b = (i + 1) % radial;
     ind.push(c0, i, b);
@@ -197,14 +233,20 @@ export function loft(rings: Ring[], radial: number, mod?: (x: number, y: number,
     p[c0 * 3] = first.x + Math.min(first.rz, first.ry) * 0.25;
     p[c1 * 3] = last.x - Math.min(last.rz, last.ry) * 0.25;
   }
-  return [p, ind];
+  return [p, ind, meta];
 }
 
 /** Tube along a polyline with per-point radius, parallel-transport frames. */
-export function tube(pts: THREE.Vector3[], radii: number[], radial: number, capStart = true, capEnd = true, flatten = 1): [number[], number[]] {
+export function tube(pts: THREE.Vector3[], radii: number[], radial: number, capStart = true, capEnd = true, flatten = 1): [number[], number[], GeoMeta] {
   const p: number[] = [];
   const ind: number[] = [];
   const n = pts.length;
+  const along: number[] = [0];
+  for (let i = 1; i < n; i++) along.push(along[i - 1] + pts[i].distanceTo(pts[i - 1]));
+  const total = along[n - 1];
+  let girth = 0;
+  for (const r of radii) girth += Math.PI * r * (1 + flatten);
+  const meta: GeoMeta = { th: [], s: [], total, circ: girth / n };
   const T: THREE.Vector3[] = [];
   for (let i = 0; i < n; i++) {
     const a = pts[Math.max(0, i - 1)];
@@ -230,6 +272,8 @@ export function tube(pts: THREE.Vector3[], radii: number[], radial: number, capS
       const r = radii[i];
       const v = pts[i].clone().addScaledVector(N, Math.cos(a) * r * flatten).addScaledVector(B, Math.sin(a) * r);
       p.push(v.x, v.y, v.z);
+      meta.th.push(j / radial);
+      meta.s.push(along[i]);
     }
   }
   for (let i = 0; i < n - 1; i++)
@@ -244,23 +288,30 @@ export function tube(pts: THREE.Vector3[], radii: number[], radial: number, capS
     const c = p.length / 3;
     const v = pts[0].clone().addScaledVector(T[0], -radii[0] * 0.6);
     p.push(v.x, v.y, v.z);
+    meta.th.push(-1);
+    meta.s.push(0);
     for (let j = 0; j < radial; j++) ind.push(c, (j + 1) % radial, j);
   }
   if (capEnd) {
     const c = p.length / 3;
     const v = pts[n - 1].clone().addScaledVector(T[n - 1], radii[n - 1] * 0.6);
     p.push(v.x, v.y, v.z);
+    meta.th.push(-1);
+    meta.s.push(total);
     const o = (n - 1) * radial;
     for (let j = 0; j < radial; j++) ind.push(c, o + j, o + ((j + 1) % radial));
   }
-  return [p, ind];
+  return [p, ind, meta];
 }
 
-export function ellipsoid(c: THREE.Vector3, r: THREE.Vector3, seg: number, rot?: THREE.Quaternion): [number[], number[]] {
+export function ellipsoid(c: THREE.Vector3, r: THREE.Vector3, seg: number, rot?: THREE.Quaternion): [number[], number[], GeoMeta] {
   const p: number[] = [];
   const ind: number[] = [];
   const rings = Math.max(3, Math.round(seg / 2));
   const v = new THREE.Vector3();
+  // surface coordinates: around the x axis, and the meridian arc from the front pole (an even-spacing approximation)
+  const total = Math.PI * (r.x + (r.y + r.z) / 2) / 2;
+  const meta: GeoMeta = { th: [], s: [], total, circ: Math.PI * (r.y + r.z) };
   for (let i = 0; i <= rings; i++) {
     const th = (i / rings) * Math.PI;
     for (let j = 0; j < seg; j++) {
@@ -268,6 +319,8 @@ export function ellipsoid(c: THREE.Vector3, r: THREE.Vector3, seg: number, rot?:
       v.set(Math.cos(th) * r.x, Math.sin(th) * Math.cos(ph) * r.y, Math.sin(th) * Math.sin(ph) * r.z);
       if (rot) v.applyQuaternion(rot);
       p.push(c.x + v.x, c.y + v.y, c.z + v.z);
+      meta.th.push(j / seg);
+      meta.s.push((i / rings) * total);
     }
   }
   for (let i = 0; i < rings; i++)
@@ -278,7 +331,7 @@ export function ellipsoid(c: THREE.Vector3, r: THREE.Vector3, seg: number, rot?:
       const d = (i + 1) * seg + ((j + 1) % seg);
       ind.push(a, cc, b, b, cc, d);
     }
-  return [p, ind];
+  return [p, ind, meta];
 }
 
 /** Flat 2D outline (u forward, v sideways) extruded vertically with thickness profile. */
@@ -338,6 +391,31 @@ export const ss = (a: number, b: number, x: number) => {
 };
 
 export type Detail = 0 | 1;
+
+/**
+ * Erect setae on a lofted piece (LOD0, realism pass): fine tapering hairs standing out of the dorsal half
+ * of the surface, leaning back, each from a vertex of the loft (`pts`, `radial` vertices a ring).
+ */
+function setaeOn(acc: Acc, rng: Rng, pts: number[], radial: number, nRings: number, ringY: (r: number) => number, part: number, count: number, len: [number, number], color: number, Lm: number, xform?: THREE.Matrix4): void {
+  const col = new THREE.Color(color);
+  const look: PartLook = { color, rough: 0.55, coat: 0.15, sheen: 0.2 };
+  for (let k = 0; k < count; k++) {
+    const r = Math.floor(rng.range(1, nRings - 1));
+    // dorsal half and the upper flanks
+    const a = rng.range(-0.25, Math.PI + 0.25);
+    const j = Math.round((a / (Math.PI * 2)) * radial + radial) % radial;
+    const i = (r * radial + j) * 3;
+    const base = new THREE.Vector3(pts[i], pts[i + 1], pts[i + 2]);
+    const dir = new THREE.Vector3(0, base.y - ringY(r), base.z).normalize();
+    dir.x -= rng.range(0.15, 0.45);
+    dir.normalize();
+    const l = rng.range(len[0], len[1]) * Lm;
+    const mid = base.clone().addScaledVector(dir, l * 0.5).add(new THREE.Vector3(-l * 0.06, 0, 0));
+    const tip = base.clone().addScaledVector(dir, l).add(new THREE.Vector3(-l * 0.18, -l * 0.05, 0));
+    const [pp, ii] = tube([base, mid, tip], [0.0026 * Lm, 0.0016 * Lm, 0.0003 * Lm], 3, false, true);
+    acc.piece(xform ? transformPts(pp, xform) : pp, ii, part, () => col, look);
+  }
+}
 
 /**
  * Build an ant. detail 0 = full (observe camera), 1 = medium.
@@ -401,14 +479,18 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       const height = mH * top * Math.max(0.12, close);
       rings.push({ x: t * mL, y: mBottom + height * 0.5, rz: (mW / 2) * wid * Math.max(0.15, close), ry: height * 0.5, n: 2.4 });
     }
-    const [p, ind] = loft(rings, RAD);
+    const [p, ind, meta] = loft(rings, RAD);
     acc.piece(
       p,
       ind,
       PART.BODY,
       grad(look.meso, (x, y) => (m.key.startsWith('formica') ? ss(0.55, 0.95, (y - mBottom) / mH) * ss(0.45, 0.65, x / mL) * 0.85 : 0)),
       look.meso,
+      0,
+      undefined,
+      detOf(meta, REGION.MESO),
     );
+    if (hi && m.setae?.meso) setaeOn(acc, rng, p, RAD, rings.length, (r) => rings[r].y, PART.BODY, m.setae.meso, m.setae.len ?? [0.03, 0.05], m.setae.color, Lm);
     // spines
     const sp = m.meso.spines;
     if (sp) {
@@ -444,8 +526,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   {
     const a = new THREE.Vector3(mL - 0.04 * Lm, mBottom + mH * 0.55, 0);
     const b = neck.clone().add(new THREE.Vector3(0.05 * Lm, -0.005 * Lm, 0));
-    const [pp, ii] = tube([a, a.clone().lerp(b, 0.5), b], [mW * 0.22, mW * 0.17, mW * 0.2], hi ? 10 : 6);
-    acc.piece(pp, ii, PART.HEAD, () => tmpC.setHex(look.meso.color).multiplyScalar(0.8), look.meso);
+    const [pp, ii, meta] = tube([a, a.clone().lerp(b, 0.5), b], [mW * 0.22, mW * 0.17, mW * 0.2], hi ? 10 : 6);
+    acc.piece(pp, ii, PART.HEAD, () => tmpC.setHex(look.meso.color).multiplyScalar(0.8), look.meso, 0, undefined, detOf(meta, REGION.MESO));
   }
 
   // ---------- head ----------
@@ -478,7 +560,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       rings.push({ x: t * hL, y: headCY + (t > 0.8 ? (t - 0.8) * hH * 0.3 : 0), rz: (hW / 2) * w, ry: (hH / 2) * ht, n: 2.3 });
     }
     const notch = (m.head.notch ?? 0) * hL;
-    const [p, ind] = loft(rings, hi ? 22 : RAD, (x, y, z, t) => {
+    const [p, ind, meta] = loft(rings, hi ? 22 : RAD, (x, y, z, t) => {
       // heart-shaped posterior notch: midline pushed forward near the back
       let nx = x;
       if (notch > 0) {
@@ -502,7 +584,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       const lx = x - neck.x;
       const ly = y - neck.y;
       return headCol(lx, ly, z);
-    }, look.head);
+    }, look.head, 0, undefined, detOf(meta, REGION.HEAD));
+    if (hi && m.setae?.head) setaeOn(acc, rng, p, hi ? 22 : RAD, rings.length, (r) => rings[r].y, PART.HEAD, m.setae.head, m.setae.len ?? [0.03, 0.05], m.setae.color, Lm, headM);
 
     // clypeus plate
     {
@@ -709,8 +792,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const elbow = sock.clone().addScaledVector(scDir, scapeLen);
     elbows.push(elbow);
     const scMid = sock.clone().lerp(elbow, 0.5).add(new THREE.Vector3(0, scapeLen * 0.04, 0));
-    const [p1, i1] = tube([sock, scMid, elbow], [antThick * 0.8, antThick * 0.95, antThick * 1.15], hi ? 7 : 5, true, true);
-    acc.piece(p1, i1, s < 0 ? PART.SCAPE_L : PART.SCAPE_R, grad(look.antenna, () => 0), look.antenna);
+    const [p1, i1, m1] = tube([sock, scMid, elbow], [antThick * 0.8, antThick * 0.95, antThick * 1.15], hi ? 7 : 5, true, true);
+    acc.piece(p1, i1, s < 0 ? PART.SCAPE_L : PART.SCAPE_R, grad(look.antenna, () => 0), look.antenna, 0, undefined, detOf(m1, REGION.ANTENNA));
     // funiculus
     const fDir = new THREE.Vector3(0.86, -0.36, 0.3 * s).normalize();
     const nseg = m.antenna.segments - 1;
@@ -752,8 +835,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         pts.push(pts[pts.length - 1].clone().addScaledVector(d, funLen / 4));
         rad.push(antThick * (clubN > 0 && t > 0.6 ? 1.6 : 0.8 + 0.3 * t));
       }
-      const [pp, ii] = tube(pts, rad, 5, true, true);
-      acc.piece(pp, ii, funPart, funColor, look.antenna);
+      const [pp, ii, fm] = tube(pts, rad, 5, true, true);
+      acc.piece(pp, ii, funPart, funColor, look.antenna, 0, undefined, detOf(fm, REGION.ANTENNA));
     }
     void funColor;
   }
@@ -765,8 +848,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const wl = look.waist;
     // peduncle
     const wk = m.waist.thick ?? 1;
-    const [p0, i0] = tube([waistPivot.clone().add(new THREE.Vector3(0.01 * Lm, 0, 0)), new THREE.Vector3(-wL * 0.35, mBottom + mH * 0.28, 0)], [0.035 * Lm * wk, 0.03 * Lm * wk], hi ? 8 : 6);
-    acc.piece(p0, i0, PART.WAIST, solid(wl), wl);
+    const [p0, i0, m0] = tube([waistPivot.clone().add(new THREE.Vector3(0.01 * Lm, 0, 0)), new THREE.Vector3(-wL * 0.35, mBottom + mH * 0.28, 0)], [0.035 * Lm * wk, 0.03 * Lm * wk], hi ? 8 : 6);
+    acc.piece(p0, i0, PART.WAIST, solid(wl), wl, 0, undefined, detOf(m0, REGION.WAIST));
     const nodeH = m.waist.nodeH * Lm;
     if (m.waist.nodes === 1) {
       // formicine scale: thin upright plate, top slightly notched (Lasius)
@@ -784,14 +867,14 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       // myrmicine: petiole node + postpetiole node
       const W = m.waist;
       const c1 = new THREE.Vector3(-wL * 0.32, mBottom + mH * 0.3 + nodeH * 0.3, 0);
-      const [pp, ii] = ellipsoid(c1, new THREE.Vector3(wL * (W.crest ? 0.13 : 0.18), nodeH * 0.5, mW * (W.petW ?? 0.28)), hi ? 12 : 8);
+      const [pp, ii, pm] = ellipsoid(c1, new THREE.Vector3(wL * (W.crest ? 0.13 : 0.18), nodeH * 0.5, mW * (W.petW ?? 0.28)), hi ? 12 : 8);
       if (W.crest)
         // cuneate node: squeeze the top into a fairly sharp crest
         for (let i = 0; i < pp.length; i += 3) {
           const up = (pp[i + 1] - c1.y) / (nodeH * 0.5);
           if (up > 0) pp[i] = c1.x + (pp[i] - c1.x) * (1 - 0.55 * up * up);
         }
-      acc.piece(pp, ii, PART.WAIST, solid(wl), wl);
+      acc.piece(pp, ii, PART.WAIST, solid(wl), wl, 0, undefined, detOf(pm, REGION.WAIST));
       if (W.subTooth) {
         // small tooth under the front of the petiole, pointing down and forward
         const base = new THREE.Vector3(-wL * 0.24, mBottom + mH * 0.26, 0);
@@ -801,8 +884,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       }
       const postH = W.postH ?? 0.9;
       const c2 = new THREE.Vector3(-wL * 0.75, mBottom + mH * 0.3 + nodeH * 0.18 * postH, 0);
-      const [p2, i2] = ellipsoid(c2, new THREE.Vector3(wL * 0.2, nodeH * 0.5 * postH, mW * (W.postW ?? 0.36)), hi ? 12 : 8);
-      acc.piece(p2, i2, PART.WAIST, solid(wl), wl);
+      const [p2, i2, m2] = ellipsoid(c2, new THREE.Vector3(wL * 0.2, nodeH * 0.5 * postH, mW * (W.postW ?? 0.36)), hi ? 12 : 8);
+      acc.piece(p2, i2, PART.WAIST, solid(wl), wl, 0, undefined, detOf(m2, REGION.WAIST));
       const [p3, i3] = tube([new THREE.Vector3(-wL * 0.45, mBottom + mH * 0.26, 0), new THREE.Vector3(-wL * 0.6, mBottom + mH * 0.26, 0)], [0.028 * Lm, 0.028 * Lm], 6);
       acc.piece(p3, i3, PART.WAIST, solid(wl), wl);
     }
@@ -831,7 +914,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       const front = 0.32 + 0.68 * close;
       rings.push({ x: -wL - t * gL, y: cy + e * gH * 0.04 - t * t * gH * 0.12, rz: (gW / 2) * e * front * (1 - groove), ry: (gH / 2) * e * front * (1 - groove), n: 2.1 });
     }
-    const [p, ind] = loft(rings, RAD);
+    const [p, ind, gmeta] = loft(rings, RAD);
     const gasterCol = G.segs
       ? (x: number, y: number) => {
           // segment bands (`segs`) and hard plate/membrane stripes on the joints (`stripes`, `stripeW`)
@@ -861,7 +944,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
           return tmpC;
         }
       : grad(gl, (x) => ss(-wL - gL * 0.25, -wL, x) * 0.8);
-    acc.piece(p, ind, PART.GASTER, gasterCol, gl);
+    acc.piece(p, ind, PART.GASTER, gasterCol, gl, 0, undefined, detOf(gmeta, REGION.GASTER));
     gasterTip = new THREE.Vector3(-wL - gL, cy - gH * 0.1, 0);
     if (m.gaster.sting) {
       const a = gasterTip.clone().add(new THREE.Vector3(0.01 * Lm, 0, 0));
@@ -881,7 +964,9 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     }
     // Erect setae on the gaster and head (LOD0)
     if (hi && m.hair > 0) {
-      const n = Math.round(m.hair * 70);
+      const n = m.setae?.gaster ?? Math.round(m.hair * 70);
+      const hairCol = m.setae?.color ?? 0x6e5c44;
+      const hairLen = m.setae?.len ?? [0.022, 0.045];
       for (let k = 0; k < n; k++) {
         const t = rng.range(0.1, 0.92);
         const ang = rng.range(-0.2, Math.PI + 0.2); // dorsal-ish half
@@ -891,10 +976,10 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         const nrm = new THREE.Vector3(0, Math.sin(ang), Math.cos(ang)).normalize();
         nrm.x -= 0.35;
         nrm.normalize();
-        const len = rng.range(0.022, 0.045) * Lm;
+        const len = rng.range(hairLen[0], hairLen[1]) * Lm;
         const tip = base.clone().addScaledVector(nrm, len);
         const [pp, ii] = tube([base, tip], [0.0022 * Lm, 0.0004 * Lm], 3, false, true);
-        acc.piece(pp, ii, PART.GASTER, () => tmpC.setHex(0x6e5c44), { color: 0, rough: 0.7, coat: 0, sheen: 0.1 });
+        acc.piece(pp, ii, PART.GASTER, () => tmpC.setHex(hairCol), m.setae ? { color: 0, rough: 0.6, coat: 0.1, sheen: 0.15 } : { color: 0, rough: 0.7, coat: 0, sheen: 0.1 });
       }
     }
   }
@@ -977,8 +1062,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const pid = PART.LEG0 + li * 3;
     // coxa
     {
-      const [pp, ii] = tube([base, base.clone().lerp(coxaEnd, 0.5), coxaEnd], [th * 1.35, th * 1.45, th * 1.15], hi ? 8 : 5);
-      acc.piece(pp, ii, pid, lcol, ll);
+      const [pp, ii, cm] = tube([base, base.clone().lerp(coxaEnd, 0.5), coxaEnd], [th * 1.35, th * 1.45, th * 1.15], hi ? 8 : 5);
+      acc.piece(pp, ii, pid, lcol, ll, 0, undefined, detOf(cm, REGION.LEG));
     }
     // trochanter
     {
@@ -995,8 +1080,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         pts.push(trEnd.clone().lerp(knee, t));
         rad.push(th * (0.88 + 0.26 * Math.sin(Math.PI * Math.pow(t, 0.8)) - 0.1 * t));
       }
-      const [pp, ii] = tube(pts, rad, hi ? 8 : 5, true, true, 0.8);
-      acc.piece(pp, ii, pid, lcol, ll);
+      const [pp, ii, fm] = tube(pts, rad, hi ? 8 : 5, true, true, 0.8);
+      acc.piece(pp, ii, pid, lcol, ll, 0, undefined, detOf(fm, REGION.LEG));
     }
     // tibia
     {
@@ -1008,8 +1093,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         pts.push(knee.clone().lerp(ankle, t));
         rad.push(th * (0.78 - 0.12 * t + 0.1 * ss(0.85, 1, t)));
       }
-      const [pp, ii] = tube(pts, rad, hi ? 7 : 5);
-      acc.piece(pp, ii, pid + 1, lcol, ll);
+      const [pp, ii, tm] = tube(pts, rad, hi ? 7 : 5);
+      acc.piece(pp, ii, pid + 1, lcol, ll, 0, undefined, detOf(tm, REGION.LEG));
       if (hi) {
         // apical spur; the fore leg spur is the pectinate strigil (antenna cleaner)
         const sp0 = ankle.clone().lerp(knee, 0.04);
@@ -1037,8 +1122,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
           const dir = tarsDir.clone().add(new THREE.Vector3(0, 0.12 * k, 0)).normalize();
           const nxt = cur.clone().addScaledVector(dir, segL);
           const r0 = th * (0.55 - k * 0.05);
-          const [pp, ii] = tube([cur, cur.clone().lerp(nxt, 0.5), nxt], [r0 * 0.75, r0, r0 * 0.85], 6);
-          acc.piece(pp, ii, pid + 2, tcol, ll);
+          const [pp, ii, tsm] = tube([cur, cur.clone().lerp(nxt, 0.5), nxt], [r0 * 0.75, r0, r0 * 0.85], 6);
+          acc.piece(pp, ii, pid + 2, tcol, ll, 0, undefined, detOf(tsm, REGION.TARSUS));
           cur = nxt;
         }
         for (const cs of [-1, 1]) {
@@ -1051,8 +1136,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         }
       } else {
         const tip = ankle.clone().addScaledVector(tarsDir, taL);
-        const [pp, ii] = tube([ankle, ankle.clone().lerp(tip, 0.5), tip], [th * 0.5, th * 0.42, th * 0.3], 4);
-        acc.piece(pp, ii, pid + 2, tcol, ll);
+        const [pp, ii, tsm] = tube([ankle, ankle.clone().lerp(tip, 0.5), tip], [th * 0.5, th * 0.42, th * 0.3], 4);
+        acc.piece(pp, ii, pid + 2, tcol, ll, 0, undefined, detOf(tsm, REGION.TARSUS));
       }
     }
     // erect hairs on tibiae (Lasius diagnostic) and scapes

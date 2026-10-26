@@ -233,6 +233,8 @@ export interface Ant {
   holdKind?: number;
   holdT?: number;
   heldBy?: number;
+  /** clamped in a creature's jaws (the stag beetle's antlers): its id; the ant is lifted (Flung, held still) */
+  gripCr?: number;
   /** Saiy-Ants: seconds of gold surge left, and cooldown left */
   surgeT?: number;
   surgeCd?: number;

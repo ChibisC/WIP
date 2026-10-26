@@ -656,6 +656,30 @@ export const GUARD = {
 };
 
 /**
+ * European stag beetle boss (realism pass, docs/creatures/stagBeetle.md): like a male wrestling a rival, it
+ * opens its antlers (`windUp` s, the cone telegraph), clamps on up to `hold` ants between them, lifts them
+ * for `liftS` s while the jaws squeeze (`squeeze` damage a second), then tosses them to one side (`toss`
+ * fling power). Other ants in the cone take `sideBite` × a bite and are knocked aside. Walking at a swarm it
+ * ploughs on: ants in front closer than `plough` × its length are shoved aside at `shove` mm/s.
+ */
+export const STAG = {
+  windUp: 0.9,
+  hold: 2,
+  liftS: 0.85,
+  squeeze: 12,
+  toss: 2.6,
+  sideBite: 0.45,
+  sideFling: 1.2,
+  plough: 0.42,
+  ploughHalf: 0.9,
+  shove: 26,
+  /** height (fraction of its length) the clamped ants are lifted to, for the renderer */
+  liftH: 0.22,
+  /** how far in front of its centre the antler tips close (fraction of its length) */
+  jaw: 0.42,
+};
+
+/**
  * Battle arena (sim/arena.ts, DESIGN 3.13): 2–4 teams of any ants and creatures fight on an open surface. Units
  * appear in a spiral round their team's spawn point (`spacing` × body length apart); at most `maxUnits` live units
  * at once (ants and creatures) and `maxPerSpawn` per click. A charging team heads for the enemy unit nearest its own

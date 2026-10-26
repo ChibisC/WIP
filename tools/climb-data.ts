@@ -73,7 +73,8 @@ const KINDS: Record<string, { legs: (name: string) => boolean; patches: Patch[] 
       ...[-0.01, -0.09, -0.17].map((cx) => ({ frame: 'body', cx, cy: 0.08, rx: 0.04, ry: 0.038, rz: 0.06, n: 1, spread: 0 })),
     ],
   },
-  stagBeetle: { legs: () => true, patches: beetle(0.14, [[-0.18, 0, 0.28, 0.11, 0.17, 16], [0.1, 0.01, 0.1, 0.08, 0.15, 6], [0.22, -0.01, 0.06, 0.05, 0.13, 2]]) },
+  // the sculpted stag beetle (render/creatures/stagBeetle.ts SB): elytra, pronotum, the broad head
+  stagBeetle: { legs: () => true, patches: beetle(0.14, [[-0.275, 0, 0.19, 0.065, 0.142, 16], [-0.02, 0, 0.075, 0.05, 0.138, 6], [0.125, -0.022, 0.08, 0.036, 0.15, 2]]) },
   wolfSpider: { legs: () => true, patches: spider(1, 4, 6) },
   tarantula: { legs: () => true, patches: spider(1.08, 9, 15) },
   hogna: { legs: () => true, patches: spider(1.15, 8, 12) },

@@ -163,13 +163,44 @@ export function flingAnt(w: World, a: Ant, fromX: number, fromY: number, power: 
   a.fvx = dcos(ang) * sp;
   a.fvy = dsin(ang) * sp;
   a.fvz = sp * 0.9;
-  a.fz = 0.01;
+  // an ant tossed out of a creature's jaws starts from up there
+  a.fz = a.gripCr ? Math.max(0.01, a.fz) : 0.01;
+  a.gripCr = 0;
   a.state = AS.Flung;
   a.st = 0;
   w.events.emit({ t: 'fling', x: a.x, y: a.y, space: a.space });
 }
 
+/**
+ * Clamp an ant in a creature's jaws (the stag beetle's antlers): it lets go of everything and hangs there,
+ * helpless; the creature moves it each tick (`a.fz` its height) until it tosses it (flingAnt) or lets go.
+ */
+export function gripAnt(w: World, a: Ant, crId: number, height: number): boolean {
+  if (a.state === AS.Dead || riding(a)) return false;
+  const c = w.colony(a.colony);
+  if (c && a.id === c.queen) return false;
+  dropCarried(w, a);
+  releaseGrapple(w, a);
+  a.state = AS.Flung;
+  a.st = 0;
+  a.gripCr = crId;
+  a.fvx = a.fvy = a.fvz = 0;
+  a.fz = Math.max(0.01, height);
+  a.v = 0;
+  return true;
+}
+
 export function flungUpdate(w: World, a: Ant, dt: number): void {
+  if (a.gripCr) {
+    // held in the jaws: the holder places it; if the holder is gone or has let go, it drops
+    const cr = w.creatureById.get(a.gripCr);
+    if (cr && !cr.dead && (cr.data.held1 === a.id || cr.data.held2 === a.id)) {
+      a.v = 0;
+      return;
+    }
+    a.gripCr = 0;
+    a.softLand = true;
+  }
   a.fvz -= 400 * dt;
   a.fz += a.fvz * dt;
   const nx = a.x + a.fvx * dt;

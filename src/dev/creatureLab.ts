@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PostPipeline } from '../render/post';
+import { setBakeRenderer } from '../render/bake/detailBake';
 import { createSurfaceEnvironment } from '../render/environment';
 import { textures } from '../render/textures';
 import { globalUniforms } from '../render/shaderPatch';
@@ -17,6 +18,7 @@ import type { Creature } from '../sim/types';
  */
 export function runCreatureLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+  setBakeRenderer(renderer);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.shadowMap.enabled = true;

@@ -12,6 +12,10 @@ import { PrimitiveBatch, Prim, Surface } from './primitives';
 const _m = new THREE.Matrix4();
 const _l = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
+const _qt = new THREE.Quaternion();
+const _ls = new THREE.Matrix4();
+const _x = new THREE.Vector3();
+const _z = new THREE.Vector3();
 const _e = new THREE.Euler();
 const _s = new THREE.Vector3();
 const _p = new THREE.Vector3();
@@ -94,11 +98,90 @@ export class Rig {
   }
 
   private emit(prim: Prim, local: THREE.Matrix4, color: THREE.ColorRepresentation, surf: Surface): void {
+    if (this.sub) {
+      _ls.multiplyMatrices(this.sub, local);
+      local = _ls;
+    }
     _m.multiplyMatrices(this.base, local);
     if (this.flash > 0) {
       this.fc.set(color).lerp(FLASH, this.flash * 0.4);
       this.out.add(prim, _m, this.fc, surf);
     } else this.out.add(prim, _m, color as THREE.Color, surf);
+  }
+
+  /**
+   * A sub-frame inside the body frame (a head that pitches, with its mandibles and antennae): parts drawn
+   * while it is set are placed in it. `null` draws in the body frame again.
+   */
+  sub: THREE.Matrix4 | null = null;
+
+  /** Height of the ground below local (x, z), in the local frame (feet that follow the terrain). */
+  groundAt(x: number, z: number, ground: (x: number, z: number) => number): number {
+    _w.set(x, 0, z).applyMatrix4(this.base);
+    const gy = ground(_w.x, _w.z);
+    // the base's up axis: how far a step along local y moves in world y
+    const e = this.base.elements;
+    const upY = Math.max(0.3, e[5]);
+    return (gy - _w.y) / upY;
+  }
+
+  private emitPart(name: string, local: THREE.Matrix4, color: THREE.ColorRepresentation, surf: Surface): void {
+    if (this.sub) {
+      _ls.multiplyMatrices(this.sub, local);
+      local = _ls;
+    }
+    _m.multiplyMatrices(this.base, local);
+    if (this.flash > 0) {
+      this.fc.set(color).lerp(FLASH, this.flash * 0.4);
+      this.out.addPart(name, _m, this.fc, surf);
+    } else this.out.addPart(name, _m, color as THREE.Color, surf);
+  }
+
+  /** A sculpted part (primitives.ts registerPart) at (x, y, z), turned by yaw/pitch/roll, scaled by s (local). */
+  part(name: string, x: number, y: number, z: number, s: number, color: THREE.ColorRepresentation, surf: Surface, yaw = 0, pitch = 0, roll = 0, sy = s, sz = s): void {
+    _e.set(roll, yaw, pitch, 'YZX');
+    _q.setFromEuler(_e);
+    _l.compose(_p.set(x, y, z), _q, _s.set(s, sy, sz));
+    this.emitPart(name, _l, color, surf);
+  }
+
+  /** A part placed by a full local matrix. */
+  partM(name: string, local: THREE.Matrix4, color: THREE.ColorRepresentation, surf: Surface): void {
+    this.emitPart(name, local, color, surf);
+  }
+
+  /**
+   * A part modelled along +y from 0 to 1, stretched from a to b, with its local +x turned toward `side`
+   * (the outer face of a flattened tibia, the comb of an antenna club); rx, rz its thickness scales.
+   */
+  partFrame(name: string, a: V, b: V, side: V, rx: number, rz: number, color: THREE.ColorRepresentation, surf: Surface): void {
+    _d.set(b.x - a.x, b.y - a.y, b.z - a.z);
+    const len = _d.length();
+    if (len < 1e-4) return;
+    _d.multiplyScalar(1 / len);
+    _x.set(side.x, side.y, side.z);
+    _x.addScaledVector(_d, -_x.dot(_d));
+    if (_x.lengthSq() < 1e-10) _x.set(_d.y, -_d.x, 0);
+    _x.normalize();
+    _z.crossVectors(_x, _d);
+    _l.makeBasis(_x.multiplyScalar(rx), _d.multiplyScalar(len), _z.multiplyScalar(rz));
+    _l.setPosition(a.x, a.y, a.z);
+    this.emitPart(name, _l, color, surf);
+  }
+
+  /**
+   * A part modelled along +y from 0 to 1 (a leg segment, an antenna segment) stretched from a to b, `r` its
+   * thickness scale; `twist` turns it about its own axis (so a flattened tibia faces outward).
+   */
+  partSpan(name: string, a: V, b: V, r: number, color: THREE.ColorRepresentation, surf: Surface, twist = 0, rz = r): void {
+    _d.set(b.x - a.x, b.y - a.y, b.z - a.z);
+    const len = _d.length();
+    if (len < 1e-4) return;
+    _d.multiplyScalar(1 / len);
+    _q.setFromUnitVectors(UP, _d);
+    if (twist) _q.multiply(_qt.setFromAxisAngle(UP, twist));
+    _l.compose(_p.set(a.x, a.y, a.z), _q, _s.set(r, len, rz));
+    this.emitPart(name, _l, color, surf);
   }
 
   /** Ellipsoid centred at (x, y, z) with semi-axes (rx, ry, rz), rotated by yaw/pitch/roll (local). */

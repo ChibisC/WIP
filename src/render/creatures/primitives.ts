@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { addPatch, patchDapple } from '../shaderPatch';
+import { bakeDetail } from '../bake/detailBake';
+import { detailPatch } from '../bake/detailShading';
+import { creatureRecipe } from '../bake/recipes';
 
 /**
  * Instanced primitives for creatures (Phase 11). Every creature is built
@@ -18,6 +21,63 @@ import { addPatch, patchDapple } from '../shaderPatch';
  */
 
 export type Prim = 'ell' | 'tube' | 'cone';
+
+/**
+ * Sculpted part meshes (realism pass): a creature can use its own modelled parts — an elytron, an antler
+ * mandible, a toothed tibia — drawn instanced like the primitives, with a textured material whose macro
+ * detail is baked per family (render/bake). Parts are registered once by name with their geometry (built
+ * in mm at the family's reference length, with `aDet`) and family; the batch makes a pool per part.
+ */
+export interface PartDef {
+  family: string;
+  make: () => THREE.BufferGeometry;
+}
+const PART_DEFS = new Map<string, PartDef>();
+export function registerPart(name: string, def: PartDef): void {
+  PART_DEFS.set(name, def);
+}
+export function hasPart(name: string): boolean {
+  return PART_DEFS.has(name);
+}
+const partGeos = new Map<string, THREE.BufferGeometry>();
+/** A registered part's geometry (built once). */
+export function partGeometry(name: string): THREE.BufferGeometry {
+  let g = partGeos.get(name);
+  if (!g) {
+    const def = PART_DEFS.get(name);
+    if (!def) throw new Error(`unknown creature part ${name}`);
+    partGeos.set(name, (g = def.make()));
+  }
+  return g;
+}
+
+/** The textured material of a part family: per-instance roughness and gloss (aMat), dappled light, baked detail. */
+function partMaterial(family: string): THREE.MeshPhysicalMaterial {
+  // vertex colours carry painted gradients (an antler darkening to its points); instance colour the part's base
+  const m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.5, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.25, envMapIntensity: 0.6 });
+  addPatch(m, {
+    key: 'crpart',
+    vertexHeader: 'attribute vec4 aMat;\nvarying vec4 vMat;',
+    vertex: [['#include <begin_vertex>', '#include <begin_vertex>\nvMat = aMat;']],
+    fragmentHeader: 'varying vec4 vMat;',
+    fragment: [
+      ['#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = vMat.x;'],
+      [
+        '#include <lights_physical_fragment>',
+        `#include <lights_physical_fragment>
+        #ifdef USE_CLEARCOAT
+          material.clearcoat = clamp(vMat.y, 0.0, 1.0);
+          material.clearcoatRoughness = mix(0.4, 0.1, clamp(vMat.y, 0.0, 1.0));
+        #endif`,
+      ],
+    ],
+  });
+  patchDapple(m);
+  const recipe = creatureRecipe(family);
+  const maps = recipe ? bakeDetail(recipe) : null;
+  if (maps) addPatch(m, detailPatch(maps));
+  return m;
+}
 
 export interface Surface {
   rough: number;
@@ -182,6 +242,10 @@ const tmpC = new THREE.Color();
 export class PrimitiveBatch {
   readonly group = new THREE.Group();
   private pools: Record<Prim, Pool>;
+  /** sculpted part pools, made when a part is first drawn */
+  private parts = new Map<string, Pool>();
+  private partMats = new Map<string, THREE.Material>();
+  private depth: THREE.MeshDepthMaterial;
   /** instances written this frame (debug) */
   count = 0;
 
@@ -195,12 +259,39 @@ export class PrimitiveBatch {
     const cone = new THREE.ConeGeometry(1, 1, 8, 1);
     cone.translate(0, 0.5, 0);
     this.pools = { ell: new Pool(ell, mat, depth), tube: new Pool(tube, mat, depth), cone: new Pool(cone, mat, depth) };
+    this.depth = depth;
     for (const p of Object.values(this.pools)) this.group.add(p.mesh);
   }
 
   begin(): void {
     for (const p of Object.values(this.pools)) p.n = 0;
+    for (const p of this.parts.values()) p.n = 0;
     this.count = 0;
+  }
+
+  /** A sculpted part instance (see registerPart). */
+  addPart(name: string, m: THREE.Matrix4, color: THREE.ColorRepresentation | THREE.Color, surf: Surface): void {
+    let p = this.parts.get(name);
+    if (!p) {
+      const def = PART_DEFS.get(name);
+      if (!def) return;
+      let mat = this.partMats.get(def.family);
+      if (!mat) this.partMats.set(def.family, (mat = partMaterial(def.family)));
+      p = new Pool(partGeometry(name), mat, this.depth, 64);
+      p.mesh.castShadow = this.pools.ell.mesh.castShadow;
+      this.parts.set(name, p);
+      this.group.add(p.mesh);
+    }
+    if (p.n >= p.cap) p.ensure(p.n + 1, this.group);
+    const i = p.n++;
+    p.mesh.setMatrixAt(i, m);
+    p.mesh.setColorAt(i, color instanceof THREE.Color ? color : tmpC.set(color));
+    const a = p.mat.array as Float32Array;
+    a[i * 4] = surf.rough;
+    a[i * 4 + 1] = surf.gloss;
+    a[i * 4 + 2] = surf.pattern;
+    a[i * 4 + 3] = surf.scale;
+    this.count++;
   }
 
   add(prim: Prim, m: THREE.Matrix4, color: THREE.ColorRepresentation | THREE.Color, surf: Surface): void {
@@ -218,7 +309,7 @@ export class PrimitiveBatch {
   }
 
   end(): void {
-    for (const p of Object.values(this.pools)) {
+    for (const p of [...Object.values(this.pools), ...this.parts.values()]) {
       p.mesh.count = p.n;
       p.mesh.instanceMatrix.needsUpdate = true;
       if (p.mesh.instanceColor) p.mesh.instanceColor.needsUpdate = true;

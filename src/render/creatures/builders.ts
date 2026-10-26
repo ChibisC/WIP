@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Rig, V, ease, footAt, limb, limbEnd, tetrapod, tripod, wave } from './rig';
 import { Surface } from './primitives';
 import { chainPoint } from './chainTrail';
+import { stagBeetle2 } from './stagBeetle';
 
 /**
  * Procedural creature models and their animation (Phase 11), built from the
@@ -12,7 +13,7 @@ import { chainPoint } from './chainTrail';
  */
 
 /** Creature states (mirror of sim/creatures/creatureAI.ts CS; render must not import sim AI). */
-export const ST = { Wander: 0, Chase: 1, Attack: 2, Flee: 3, Rolled: 4, Curled: 5, Freeze: 6, Pounce: 7, WindUp: 8, Eat: 9, Display: 10, Lurk: 11, Hide: 12, Coil: 13, Whip: 14, Rear: 15, Flick: 16, Leap: 17, Strike: 18 } as const;
+export const ST = { Wander: 0, Chase: 1, Attack: 2, Flee: 3, Rolled: 4, Curled: 5, Freeze: 6, Pounce: 7, WindUp: 8, Eat: 9, Display: 10, Lurk: 11, Hide: 12, Coil: 13, Whip: 14, Rear: 15, Flick: 16, Leap: 17, Strike: 18, Lift: 19 } as const;
 
 export interface CrPose {
   /** body length (mm) */
@@ -785,7 +786,8 @@ export const BUILDERS: Record<string, (rig: Rig, p: CrPose) => void> = {
   mantis,
   antlion,
   spiderling,
-  stagBeetle,
+  // realism pass: the sculpted model (stagBeetle.ts); the old primitive build stays below for comparison renders
+  stagBeetle: stagBeetle2,
   tarantula,
   scolopendra,
   giantMantis,
@@ -804,7 +806,7 @@ export const STRIDE: Record<string, number> = {
   mantis: 0.4,
   antlion: 0.3,
   spiderling: 0.56,
-  stagBeetle: 0.4,
+  stagBeetle: 0.22,
   tarantula: 0.56,
   scolopendra: 0.091,
   giantMantis: 0.4,
