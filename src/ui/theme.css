@@ -364,13 +364,15 @@ input.vol::-moz-range-thumb { width: calc(14 * var(--u)); height: calc(14 * var(
 
 /* ---- compact: phones in landscape, tablets in portrait (GameUI.applyScale lays them out for ~1060 × 540) */
 .gui.compact .tb-left { flex-direction: row; align-items: center; gap: calc(8 * var(--u)); }
-.gui.compact .tb-toggles .bbtn { width: calc(38 * var(--u)); height: calc(38 * var(--u)); }
+/* finger-sized controls are 40 units: at the smallest compact scale (an iPhone SE in landscape, --ui 0.629) that is 25 px */
+.gui.compact .tb-toggles .bbtn { width: calc(40 * var(--u)); height: calc(40 * var(--u)); }
 .gui.compact .tb-toggles .bbtn .ic { width: calc(22 * var(--u)); height: calc(22 * var(--u)); }
-.gui.compact .tb-big .bbtn { height: calc(38 * var(--u)); }
+.gui.compact .tb-big .bbtn { height: calc(40 * var(--u)); }
+.gui.compact .tb-right .bbtn { height: calc(40 * var(--u)); }
 .gui.compact .mm { top: calc(56 * var(--u)); bottom: auto; flex-direction: column; }
 .gui.compact .mm .at { order: 0; align-items: stretch; }
-.gui.compact .mm .at-tab { height: calc(38 * var(--u)); border-bottom: 1px solid var(--bronze); border-radius: calc(4 * var(--u)); padding: 0 calc(10 * var(--u)); }
-.gui.compact .mm .mm-toggle { display: inline-flex !important; width: calc(46 * var(--u)); height: calc(38 * var(--u)); padding: 0; margin-left: calc(6 * var(--u)); }
+.gui.compact .mm .at-tab { height: calc(40 * var(--u)); border-bottom: 1px solid var(--bronze); border-radius: calc(4 * var(--u)); padding: 0 calc(10 * var(--u)); }
+.gui.compact .mm .mm-toggle { display: inline-flex !important; width: calc(46 * var(--u)); height: calc(40 * var(--u)); padding: 0; margin-left: calc(6 * var(--u)); }
 .gui.compact .mm .mm-toggle .ic { width: calc(22 * var(--u)); height: calc(22 * var(--u)); }
 .gui.compact .mm.open .mm-toggle { border-color: var(--bronze-hi); color: #fff2d6; background: linear-gradient(180deg, #5a4123, #2a1e12); }
 .gui.compact .mm .mm-row { display: none; margin-top: calc(6 * var(--u)); }
@@ -415,4 +417,17 @@ input.vol::-moz-range-thumb { width: calc(14 * var(--u)); height: calc(14 * var(
 .mp-ord .ic { width: calc(16 * var(--u)); height: calc(16 * var(--u)); }
 .mp-ord.on { color: #ffd2c0; border-color: #c8553a; background: linear-gradient(180deg, #4a1d12, #24100a); }
 .mp-ord.on::after { content: ''; position: absolute; left: 18%; right: 18%; top: 50%; height: 2px; background: #ff6a48; transform: rotate(-38deg); box-shadow: 0 0 calc(4 * var(--u)) #ff6a48; pointer-events: none; }
-.gui.compact .mp-ord.bbtn { width: calc(24 * var(--u)); height: calc(30 * var(--u)); }
+.mp.collapsed .mp-ordwrap { display: none; }
+.mp-ordbtn { display: none !important; }
+/* compact: one button per column shows the three orders small; it opens the switches at full size over the cards */
+.gui.compact .mp-ordwrap { position: relative; }
+.gui.compact .mp-ordbtn { display: flex !important; width: 100%; height: calc(40 * var(--u)); padding: 0; gap: calc(4 * var(--u)); border-radius: 0; border-left: 0; border-right: 0; }
+.gui.compact .mp-ordbtn .os { position: relative; display: inline-flex; color: var(--ink-dim); opacity: .5; }
+.gui.compact .mp-ordbtn .os .ic { width: calc(15 * var(--u)); height: calc(15 * var(--u)); }
+.gui.compact .mp-ordbtn .os.on { color: #ff8a68; opacity: 1; }
+.gui.compact .mp-ordbtn .os.on::after { content: ''; position: absolute; left: -10%; right: -10%; top: 50%; height: 2px; background: #ff6a48; transform: rotate(-38deg); pointer-events: none; }
+.gui.compact .mp-col.ord-open .mp-ordbtn { border-color: var(--bronze-hi); color: #fff2d6; background: linear-gradient(180deg, #5a4123, #2a1e12); }
+.gui.compact .mp-orders { display: none; }
+.gui.compact .mp-col.ord-open .mp-orders { display: flex; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 6; gap: calc(5 * var(--u)); padding: calc(5 * var(--u)); background: linear-gradient(180deg, #2a2016, #16110c); border: 1px solid var(--bronze-hi); border-radius: calc(4 * var(--u)); box-shadow: 0 calc(4 * var(--u)) calc(14 * var(--u)) rgba(0,0,0,.7); }
+.gui.compact .mp-ord.bbtn { width: calc(42 * var(--u)); height: calc(42 * var(--u)); }
+.gui.compact .mp-ord .ic { width: calc(24 * var(--u)); height: calc(24 * var(--u)); }

@@ -140,6 +140,38 @@ with sync_playwright() as p:
         shot(pg, f"{name}_surface")
         cx, cy = W / 2, H * 0.42
 
+        # the marker panel opened: its controls too; in the compact layout each column's orders sit behind one button
+        folded = pg.evaluate("document.querySelector('.mp').classList.contains('collapsed')")
+        if folded:
+            pg.locator(".mp-side .bbtn").first.tap()
+            settle(pg, 2)
+        small = pg.evaluate("() => Math.min(...[...document.querySelectorAll('.gui .bbtn, .gui .mp-head, .gui .at-tab')].filter(e => e.offsetParent).map(e => Math.min(e.getBoundingClientRect().width, e.getBoundingClientRect().height)))")
+        mp, bp = pg.evaluate("() => ['.mp', '.bp'].map(q => { const r = document.querySelector(q).getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; })")
+        check(f"{name}: marker panel open: controls big enough (smallest {small:.0f} px ≥ 24), beside the build panel", small >= 24 and mp[2] <= bp[0] + 1 and mp[1] >= 0, f"mp {mp}, bp {bp}")
+        if compact:
+            pg.locator(".mp-col[data-col='0'] .mp-ordbtn").tap()
+            settle(pg, 2)
+            sw = pg.evaluate("() => [...document.querySelectorAll('.mp-col.ord-open .mp-ord')].map(e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; })")
+            ok = len(sw) == 3 and all(min(r[2] - r[0], r[3] - r[1]) >= 24 and r[0] >= 0 and r[2] <= W and r[1] >= 0 and r[3] <= H for r in sw)
+            check(f"{name}: a column's Orders button opens its three switches, finger-sized and on screen", ok, str([[round(v) for v in r] for r in sw]))
+            was = pg.evaluate("window.__session.player.markers[0].noAttack")
+            pg.locator(".mp-col.ord-open .mp-ord[data-order='noAttack']").tap()
+            settle(pg, 4)
+            now = pg.evaluate("window.__session.player.markers[0].noAttack")
+            still = pg.evaluate("!!document.querySelector('.mp-col.ord-open')")
+            summary = pg.evaluate("document.querySelector(\".mp-col[data-col='0'] .mp-ordbtn .os\").classList.contains('on')")
+            check(f"{name}: tapping a switch sets the order, the switches stay open and the button shows it", now != was and still and summary == now, f"noAttack {was} → {now}, open {still}, summary {summary}")
+            shot(pg, f"{name}_marker_orders")
+            pg.locator(".mp-col.ord-open .mp-ord[data-order='noAttack']").tap()
+            settle(pg, 4)
+            # a tap elsewhere (a harmless spot: another column's count) closes them
+            pg.locator(".mp-col[data-col='2'] .mp-count").tap()
+            settle(pg, 2)
+            check(f"{name}: a tap outside closes the switches", not pg.evaluate("!!document.querySelector('.mp-col.ord-open')") and pg.evaluate("window.__session.player.markers[0].noAttack") == was)
+        if folded:
+            pg.locator(".mp-side .bbtn").first.tap()
+            settle(pg, 2)
+
         # one finger: a drag pans and is not a tap (no inspect, no click)
         r0 = rig(pg)
         g0 = ground(pg, cx - 80, cy)

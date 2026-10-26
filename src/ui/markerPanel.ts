@@ -49,7 +49,7 @@ const HOME_ORDER_TIP: Record<MarkerOrder, string> = {
 export class MarkerPanel {
   root = el('div', 'mp');
   private body = el('div', 'pnl mp-body');
-  private cols = new Map<number, { col: HTMLElement; head: HTMLElement; count: HTMLElement; cards: HTMLElement; orders: Map<MarkerOrder, HTMLElement> }>();
+  private cols = new Map<number, { col: HTMLElement; head: HTMLElement; count: HTMLElement; cards: HTMLElement; orders: Map<MarkerOrder, HTMLElement>; summary: Map<MarkerOrder, HTMLElement> }>();
   private cardEls = new Map<number, HTMLElement>();
   private structKey = '';
   private drag: DragState | null = null;
@@ -60,7 +60,10 @@ export class MarkerPanel {
 
   constructor(private s: GameSession) {
     const side = el('div', 'mp-side');
-    this.collapseBtn = button('sq', ICONS.chevDown, '<b>Collapse</b>Hide or show the group cards.', () => this.root.classList.toggle('collapsed'));
+    this.collapseBtn = button('sq', ICONS.chevDown, '<b>Collapse</b>Hide or show the group cards.', () => {
+      this.root.classList.toggle('collapsed');
+      this.closeOrders();
+    });
     side.append(this.collapseBtn, button('sq', ICONS.cancel, '<b>Cancel</b>Clear the selected marker (<span class="k">Esc</span>).', () => s.setTool('none')));
     const acts = el('div', 'mp-actions');
     const ab = abilityOf(s.player);
@@ -103,14 +106,43 @@ export class MarkerPanel {
         orders.set(o, b);
         row.appendChild(b);
       }
-      col.append(head, count, row, cards);
+      // compact layout (phones): the column is too narrow for three finger-sized toggles, so one button shows the
+      // three orders as small icons and opens the toggles at full size over the cards (CSS hides it elsewhere)
+      const summary = new Map<MarkerOrder, HTMLElement>();
+      const ordBtn = button('mp-ordbtn', '', `<b>Orders</b>No attacking, no gathering, no climbing for ${i < 0 ? 'the home groups' : `the groups at marker ${MARKER_NAMES[i]}`}. ${CLICK} to show the switches.`, () => {
+        const open = !col.classList.contains('ord-open');
+        this.closeOrders();
+        col.classList.toggle('ord-open', open);
+      });
+      for (const o of MARKER_ORDERS) {
+        const sp = el('span', 'os', ORDER_ICON[o]);
+        summary.set(o, sp);
+        ordBtn.appendChild(sp);
+      }
+      const wrap = el('div', 'mp-ordwrap');
+      wrap.append(ordBtn, row);
+      col.append(head, count, wrap, cards);
       this.body.appendChild(col);
-      this.cols.set(i, { col, head, count, cards, orders });
+      this.cols.set(i, { col, head, count, cards, orders, summary });
     }
     this.root.append(side, this.body, acts);
     shield(this.root);
     window.addEventListener('pointermove', (e) => this.onMove(e));
     window.addEventListener('pointerup', (e) => this.onUp(e));
+    // an open set of order switches closes on a press anywhere outside it (capture: before buttons stop the event)
+    window.addEventListener(
+      'pointerdown',
+      (e) => {
+        const t = e.target as HTMLElement | null;
+        if (!t?.closest?.('.mp-col.ord-open .mp-ordwrap')) this.closeOrders();
+      },
+      true,
+    );
+  }
+
+  /** Close the compact layout's order switches. */
+  private closeOrders(): void {
+    for (const o of this.cols.values()) o.col.classList.remove('ord-open');
   }
 
   private groupKey(): string {
@@ -142,8 +174,10 @@ export class MarkerPanel {
         const txt = `${n.current}/${n.max}${badge}`;
         if (o.count.innerHTML !== txt) o.count.innerHTML = txt;
         for (const [k, b] of o.orders) b.classList.toggle('on', !!m[k]);
+        for (const [k, b] of o.summary) b.classList.toggle('on', !!m[k]);
       } else {
         for (const [k, b] of o.orders) b.classList.toggle('on', orderOn(c, -1, k));
+        for (const [k, b] of o.summary) b.classList.toggle('on', orderOn(c, -1, k));
         const n = homeCounts(s.world, c);
         o.count.textContent = `${n.current}/${n.max}`;
       }
