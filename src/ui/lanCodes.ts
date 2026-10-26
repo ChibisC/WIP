@@ -9,7 +9,7 @@
  */
 import qrcode from 'qrcode-generator';
 import { CODE_TTL_S } from '../net/lanCode';
-import { LanError, ManualRtcTransport, NETWORK_TIPS } from '../net/lanTransport';
+import { LanError, ManualRtcTransport, NETWORK_TIPS, WEBKIT_TIP, lanNeedsPermission, unlockLanAddresses } from '../net/lanTransport';
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -281,6 +281,36 @@ function markUsed(s: number): void {
  * The joining player's screen: 1 scan or paste the host's code, 2 show the reply code to the
  * host, 3 wait for the host to enter it. Calls `connected` with the open transport.
  */
+/**
+ * Safari and every iPhone/iPad browser hide this device's Wi-Fi address from the page until it may
+ * use the microphone or camera. When that is so, show why and ask once (from a tap), then go on.
+ */
+async function addressGate(card: HTMLElement, title: string, go: () => void, cancel: () => void): Promise<void> {
+  card.innerHTML = `<h1>${esc(title)}</h1><p class="dim"><span class="lan-spin"></span> Checking this device’s network…</p>`;
+  if (!(await lanNeedsPermission())) return go();
+  card.innerHTML = `<h1>${esc(title)}</h1><p class="tag">One more step on this device</p><p>${esc(WEBKIT_TIP)}</p><p class="dim">Tap Allow below, then allow the microphone in the box your browser shows.</p>`;
+  const err = el('p', 'mp-error');
+  const row = el('div', 'opt-row lan-foot');
+  const back = el('button', 'chip', '← Cancel');
+  back.dataset.a = 'cancel';
+  back.onclick = cancel;
+  const allow = el('button', 'chip on', 'Allow and continue');
+  allow.dataset.a = 'allow-mic';
+  allow.onclick = async () => {
+    allow.disabled = true;
+    err.textContent = '';
+    try {
+      await unlockLanAddresses();
+      go();
+    } catch (e) {
+      err.textContent = e instanceof Error ? e.message : String(e);
+      allow.disabled = false;
+    }
+  };
+  row.append(back, allow);
+  card.append(err, row);
+}
+
 export function showLanJoin(parent: HTMLElement, opts: { rejoin?: boolean; message?: string; connected: (t: ManualRtcTransport) => void; back: () => void }): void {
   const root = el('div', 'menu');
   const card = el('div', 'menu-card lan-card');
@@ -370,7 +400,7 @@ export function showLanJoin(parent: HTMLElement, opts: { rejoin?: boolean; messa
       },
     );
   };
-  step1();
+  void addressGate(card, opts.rejoin ? 'Rejoin the LAN match' : 'Join a LAN game', step1, cancel);
 }
 
 // ---------------------------------------------------------------------------- host
@@ -455,6 +485,6 @@ export function openHostDialog(parent: HTMLElement, transport: ManualRtcTranspor
       if (status) status.innerHTML = '<span class="mp-error">This code expired. Tap New code for a fresh one.</span>';
     }
   };
-  void make();
+  void addressGate(card, opts.title, () => void make(), close);
   return { close };
 }

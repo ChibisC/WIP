@@ -2,29 +2,32 @@
  * WebRTC transport through PeerJS (multiplayer brief, Part D).
  *
  * - The host registers the peer id `ud-<room>` with the signalling server;
- *   guests connect to it. Data then flows directly between browsers over a
- *   reliable, ordered data channel (star topology: guests ↔ host).
- * - Signalling uses the free public PeerJS server by default. STUN servers
- *   find a direct route; when a firewall blocks that, a TURN relay is needed:
- *   set VITE_TURN_URL / VITE_TURN_USER / VITE_TURN_PASS at build time
- *   (README, "Multiplayer and invite links").
+ *   guests connect to it. Data then flows between browsers over a reliable,
+ *   ordered data channel (star topology: guests ↔ host).
+ * - Signalling uses the free public PeerJS server by default. A STUN server
+ *   finds a direct route; when a firewall, a phone network or a router blocks
+ *   that, a TURN relay carries the data instead (net/relay.ts: the relay set at
+ *   build time, else the free public Open Relay Project server).
  * - Everything above this class only sees the `Transport` interface.
  */
 import Peer, { DataConnection, PeerOptions } from 'peerjs';
+import { relayName } from './relay';
 import type { Transport } from './transport';
 
 const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 
-/** ICE servers: public STUN, plus TURN when configured. */
-export function iceServers(): RTCIceServer[] {
-  const servers: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:global.stun.twilio.com:3478'] }];
-  if (env.VITE_TURN_URL) servers.push({ urls: env.VITE_TURN_URL.split(','), username: env.VITE_TURN_USER, credential: env.VITE_TURN_PASS });
-  return servers;
-}
+/** how long a guest waits for the channel to the host to open */
+const CONNECT_MS = 30000;
+/** how long an interrupted connection may take to recover before the player counts as gone */
+const RECOVER_MS = 8000;
+
+/** What to try when two devices cannot connect. */
+const TRY =
+  'A VPN often blocks this: turn it off on both devices and reload. “Check connection” on the Multiplayer screen shows what is blocked; on the same Wi-Fi, LAN mode needs no internet at all.';
 
 /** Signalling server (the free public PeerJS cloud unless VITE_PEER_HOST is set). */
-function peerOptions(): PeerOptions {
-  const o: PeerOptions = { config: { iceServers: iceServers() }, debug: 1 };
+function peerOptions(iceServers: RTCIceServer[]): PeerOptions {
+  const o: PeerOptions = { config: { iceServers }, debug: 1 };
   if (env.VITE_PEER_HOST) {
     o.host = env.VITE_PEER_HOST;
     o.port = Number(env.VITE_PEER_PORT || 443);
@@ -76,12 +79,14 @@ export class PeerTransport implements Transport {
   id = '';
   hostId: string;
 
+  /** `iceServers`: from net/relay.ts `onlineIceServers()` (STUN and the relay). */
   constructor(
     readonly room: string,
     readonly isHost: boolean,
+    iceServers: RTCIceServer[],
   ) {
     this.hostId = hostPeerId(room);
-    this.peer = isHost ? new Peer(this.hostId, peerOptions()) : new Peer(peerOptions());
+    this.peer = isHost ? new Peer(this.hostId, peerOptions(iceServers)) : new Peer(peerOptions(iceServers));
     this.ready = new Promise((resolve, reject) => {
       this.peer.on('open', (id) => {
         this.id = id;
@@ -106,12 +111,23 @@ export class PeerTransport implements Transport {
 
   private connectToHost(resolve: () => void, reject: (e: Error) => void): void {
     const conn = this.peer.connect(this.hostId, { reliable: true, serialization: 'binary' });
-    const timer = setTimeout(() => {
-      const msg = 'Could not open a direct connection to the host (a firewall may block it; a TURN server fixes that).';
+    let done = false;
+    const fail = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      const msg = `Found the game, but could not connect to the host’s device, directly or through ${relayName()}. ${TRY}`;
       this.onError?.(msg);
       reject(new Error(msg));
-    }, 15000);
+      conn.close();
+    };
+    const timer = setTimeout(fail, CONNECT_MS);
+    conn.on('iceStateChanged', (s) => {
+      if (s === 'failed') fail();
+    });
     conn.on('open', () => {
+      if (done) return;
+      done = true;
       clearTimeout(timer);
       resolve();
     });
@@ -134,11 +150,15 @@ export class PeerTransport implements Transport {
     };
     conn.on('close', gone);
     conn.on('error', gone);
+    // 'disconnected' is often a blip (Wi-Fi roaming, a phone switching networks): give it a moment
+    let recover: ReturnType<typeof setTimeout> | undefined;
     conn.on('iceStateChanged', (s) => {
+      clearTimeout(recover);
       if (s === 'failed') {
-        this.onError?.('The direct connection failed (a firewall may block it; configure a TURN server).');
+        if (this.conns.get(conn.peer) === conn) this.onError?.(`The connection to the other player was lost. ${TRY}`);
         gone();
-      } else if (s === 'disconnected' || s === 'closed') gone();
+      } else if (s === 'closed') gone();
+      else if (s === 'disconnected') recover = setTimeout(gone, RECOVER_MS);
     });
   }
 

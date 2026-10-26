@@ -363,8 +363,8 @@ function startGame(): void {
   // configured with its default STUN and TURN servers (and installs a WebRTC shim), which LAN play
   // must never do.
   const onlineTransport = async (room: string, isHost: boolean): Promise<Transport> => {
-    const { PeerTransport } = await import('./net/peerTransport');
-    const t = new PeerTransport(room, isHost);
+    const [{ PeerTransport }, { onlineIceServers }] = await Promise.all([import('./net/peerTransport'), import('./net/relay')]);
+    const t = new PeerTransport(room, isHost, await onlineIceServers());
     await t.ready;
     return t;
   };

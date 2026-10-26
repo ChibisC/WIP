@@ -27,9 +27,94 @@ const MAX_MESSAGE = 64 * 1024 * 1024;
 const HIGH_WATER = 4 * 1024 * 1024;
 
 export const NETWORK_TIPS =
-  'Both devices must be on the same Wi-Fi or network. Guest networks and routers with "client isolation" (or "AP isolation") stop devices from seeing each other; so can a VPN. Try a phone hotspot that both devices join, or another network.';
+  'Both devices must be on the same Wi-Fi or network. Guest networks and routers with "client isolation" (or "AP isolation") stop devices from seeing each other, and so does a VPN: turn it off on both devices (or allow local network access in its settings) and reload. Otherwise try a phone hotspot that both devices join.';
+
+/** After a failed connection: the network tips, and where to look next. */
+const FAIL_TIPS = `${NETWORK_TIPS} “Check connection” on the LAN screen shows what each device offers (and can let the browser use its real address).`;
+
+/** Safari (and every browser on an iPhone or iPad) hides a page's own network addresses until it may use the microphone or camera. */
+export const WEBKIT_TIP =
+  'Safari (and every browser on an iPhone or iPad) only lets a web page see this device’s Wi-Fi address once the page may use the microphone or camera. Allow it once: nothing is recorded or sent, the game only needs the address to find the other devices.';
 
 export class LanError extends Error {}
+
+/** A WebKit browser: Safari, or any browser on an iPhone or iPad (they all use WebKit). */
+export function isWebKitBrowser(): boolean {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  return /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg\/|OPR\/|Android/.test(ua);
+}
+
+let addressesSeen = false;
+
+/**
+ * Does this browser show the page this device's own network addresses? A quick offer with no ICE
+ * servers: any candidate at all means yes. Remembered once seen.
+ */
+export async function lanAddressesVisible(ms = 2500): Promise<boolean> {
+  if (addressesSeen) return true;
+  if (!PC) return false;
+  const pc = new PC(LAN_RTC_CONFIG);
+  try {
+    pc.createDataChannel('probe');
+    await pc.setLocalDescription(await pc.createOffer());
+    const seen = await new Promise<boolean>((resolve) => {
+      let over = false;
+      const fin = (v: boolean) => {
+        if (over) return;
+        over = true;
+        clearTimeout(t);
+        resolve(v);
+      };
+      const any = () => /\na=candidate:/.test(pc.localDescription?.sdp ?? '');
+      pc.addEventListener('icecandidate', (e) => {
+        if (e.candidate && e.candidate.candidate) fin(true);
+        else if (!e.candidate) fin(any());
+      });
+      const t = setTimeout(() => fin(any()), ms);
+    });
+    if (seen) addressesSeen = true;
+    return seen;
+  } catch {
+    return false;
+  } finally {
+    try {
+      pc.close();
+    } catch {
+      // closed
+    }
+  }
+}
+
+/** On a WebKit browser that hides the addresses, LAN play needs the one-time microphone permission first. */
+export async function lanNeedsPermission(): Promise<boolean> {
+  return isWebKitBrowser() && !(await lanAddressesVisible());
+}
+
+/**
+ * Ask once for the microphone (stopped at once, nothing recorded) so WebKit shows this page the
+ * device's addresses for the rest of the visit. Call it from a tap.
+ */
+export async function unlockLanAddresses(): Promise<void> {
+  const md = typeof navigator !== 'undefined' ? navigator.mediaDevices : undefined;
+  if (!md?.getUserMedia) throw new LanError(`This browser cannot ask for the microphone here, so it will not show this device’s Wi-Fi address. ${WEBKIT_TIP}`);
+  let stream: MediaStream;
+  try {
+    stream = await md.getUserMedia({ audio: true });
+  } catch {
+    try {
+      stream = await md.getUserMedia({ video: true });
+    } catch {
+      throw new LanError('Microphone and camera access were refused, so the browser will not show this device’s Wi-Fi address. Allow one of them for this site (on iPhone and iPad: Settings → Safari → Microphone), reload the page and try again.');
+    }
+  }
+  for (const t of stream.getTracks()) t.stop();
+  addressesSeen = await lanAddressesVisible();
+}
+
+/** A code made from a description with no address cannot connect: say why instead. */
+function noAddress(): LanError {
+  return new LanError(`This device’s network address could not be found. ${isWebKitBrowser() ? WEBKIT_TIP : NETWORK_TIPS}`);
+}
 
 const nowS = () => Math.floor(Date.now() / 1000);
 const randU32 = () => (crypto.getRandomValues(new Uint32Array(1))[0] >>> 0) || 1;
@@ -292,6 +377,14 @@ export class ManualRtcTransport implements Transport {
     const offer = await link.pc.createOffer();
     await link.pc.setLocalDescription(offer);
     const sdp = await gathered(link.pc);
+    if (!/\na=candidate:/.test(sdp)) {
+      try {
+        link.pc.close();
+      } catch {
+        // closed
+      }
+      throw noAddress();
+    }
     const created = nowS();
     const code = await encodeCode({ kind: 'host', session, slot, created, sdp });
     const p: Pending = {
@@ -379,10 +472,10 @@ export class ManualRtcTransport implements Transport {
         this.onLink?.({ kind: 'open', peer: link.peer, slot });
         resolve();
       };
-      const t = setTimeout(() => fail(`Could not connect within ${OPEN_TIMEOUT_MS / 1000} seconds. ${NETWORK_TIPS}`), OPEN_TIMEOUT_MS);
+      const t = setTimeout(() => fail(`Could not connect within ${OPEN_TIMEOUT_MS / 1000} seconds. ${FAIL_TIPS}`), OPEN_TIMEOUT_MS);
       link.dc.addEventListener('open', ok);
       link.pc.addEventListener('connectionstatechange', () => {
-        if (link.pc.connectionState === 'failed') fail(`The connection failed. ${NETWORK_TIPS}`);
+        if (link.pc.connectionState === 'failed') fail(`The connection failed. ${FAIL_TIPS}`);
       });
     });
   }
@@ -416,6 +509,7 @@ export class ManualRtcTransport implements Transport {
       throw new LanError('The browser could not use this code. Ask the host for a new one.');
     }
     const sdp = await gathered(link.pc);
+    if (!/\na=candidate:/.test(sdp)) throw noAddress();
     const code = await encodeCode({ kind: 'reply', session: c.session, slot: c.slot, created: c.created, sdp });
     const opened = new Promise<void>((resolve, reject) => {
       const t = setTimeout(() => reject(new LanError('The host did not enter the reply code in time (codes last 5 minutes). Ask the host for a new code.')), Math.max(10000, (c.created + CODE_TTL_S + 60) * 1000 - Date.now()));
@@ -427,7 +521,7 @@ export class ManualRtcTransport implements Transport {
       link.pc.addEventListener('connectionstatechange', () => {
         if (link.pc.connectionState === 'failed') {
           clearTimeout(t);
-          reject(new LanError(`The connection failed. ${NETWORK_TIPS}`));
+          reject(new LanError(`The connection failed. ${FAIL_TIPS}`));
         }
       });
     });

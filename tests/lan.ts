@@ -9,6 +9,8 @@
 import { inflateSync, deflateSync } from 'three/examples/jsm/libs/fflate.module.js';
 import { CodeError, CODE_TTL_S, codeExpired, compactSdp, decodeCode, Deflater, encodeCode, extractCode, stripSdp, toSdp } from '../src/net/lanCode';
 import { frame, LAN_RTC_CONFIG, unframe } from '../src/net/lanTransport';
+import { onlineIceServers, OPEN_RELAY, relayServer, restCredentials, STUN } from '../src/net/relay';
+import { sortCandidates } from '../src/net/netCheck';
 
 let failed = 0;
 function check(name: string, ok: boolean, info = ''): void {
@@ -218,6 +220,23 @@ async function main(): Promise<void> {
     threw = true;
   }
   check('a frame announcing a huge message is refused', threw);
+
+  // ---- online relay credentials and the "Check connection" candidate sorting
+  const rc = await restCredentials(OPEN_RELAY.secret, 1000, 86400);
+  check('relay credentials follow the TURN REST API (expiry:name, base64 HMAC-SHA1)', rc.username === '87400:ud' && rc.credential === 'zEDeBPjEc6Y8Ccc0miMt1tisXP8=', `${rc.username} ${rc.credential}`);
+  const relay = await relayServer();
+  const urls = relay ? ([] as string[]).concat(relay.urls) : [];
+  check('the default relay is the Open Relay static-auth server over UDP, TCP and TLS', urls.length === 3 && urls.every((u) => u.includes(OPEN_RELAY.host)) && urls.some((u) => u.startsWith('turns:')) && /^\d+:ud$/.test(String(relay?.username)), urls.join(' '));
+  const ice = await onlineIceServers();
+  check('online play uses STUN and the relay (LAN uses neither)', ice.length === 2 && ice[0] === STUN && LAN_RTC_CONFIG.iceServers?.length === 0);
+  const sorted = sortCandidates([
+    'candidate:1 1 udp 2122260223 3f1e2a9c-1111-2222-3333-444455556666.local 54321 typ host generation 0',
+    'candidate:2 1 udp 1686052607 203.0.113.7 61000 typ srflx raddr 0.0.0.0 rport 0 generation 0',
+  ]);
+  check('Check connection: an mDNS host and a STUN address, no relay', sorted.local === 'mdns' && sorted.internet && !sorted.relay);
+  const sorted2 = sortCandidates(['a=candidate:3 1 udp 41885439 198.51.100.4 3478 typ relay raddr 203.0.113.7 rport 61000', 'candidate:4 1 tcp 1518280447 192.168.1.20 9 typ host tcptype active']);
+  check('Check connection: a plain host address and a relay', sorted2.local === 'ip' && !sorted2.internet && sorted2.relay);
+  check('Check connection: nothing gathered', sortCandidates([]).local === 'none');
 
   console.log(failed ? `\n${failed} LAN test(s) FAILED` : '\nall LAN tests passed');
   if (failed) (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;

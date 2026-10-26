@@ -9,6 +9,7 @@ import { SaveRecord, SaveSlot, describeSave, listSaves, slotName } from '../game
 import { creditsHtml } from './credits';
 import { MAPS, PLAYABLE_MAPS } from '../maps';
 import type { MapId } from '../maps/types';
+import { runNetCheck } from './netCheckView';
 
 const COLORS = ['#d9a441', '#d0554a', '#5b8ed6', '#4fb595'];
 const STYLES: Array<[MapStyle, string]> = [['meadow', 'Meadow'], ['forest', 'Forest floor'], ['riverbank', 'Riverbank'], ['sandy', 'Sandy scrub']];
@@ -169,6 +170,11 @@ export function showMultiplayerMenu(
          <h2>Join</h2>
          <div class="opt-row"><input class="mp-input code" data-f="code" maxlength="6" placeholder="ROOM CODE"><button class="go" data-a="join">Join game</button></div>
          ${mode === 'local' ? '<p class="dim">Local test: the players are tabs of this browser on this computer (no network).</p>' : ''}`;
+  // a route check for online and LAN play: what this device's network allows, in plain words
+  const check =
+    mode === 'local' || !rtc
+      ? ''
+      : `<div class="opt-row" style="margin-top:14px"><button class="chip" data-a="check">Check connection</button><span class="dim">${mode === 'lan' ? 'Can other devices on this Wi-Fi find this one?' : 'Can this device reach the other players?'}</span></div><div class="mp-netcheck" hidden></div>`;
   const root = screen(
     parent,
     `<h1>Multiplayer</h1>
@@ -178,7 +184,7 @@ export function showMultiplayerMenu(
      <input class="mp-input" data-f="name" maxlength="24" placeholder="Queen of the meadow" value="${esc(savedName())}">
      <h2>Connect</h2>
      <div class="mode-tabs mp-modes">${tabs.map(([id, n, d]) => `<button class="mode-tab ${id === mode ? 'on' : ''}" data-mode="${id}"><b>${n}</b><span>${d}</span></button>`).join('')}</div>
-     ${noRtc}${body}
+     ${noRtc}${body}${check}
      <div class="opt-row" style="margin-top:18px"><button class="chip" data-a="back">← Back</button></div>`,
   );
   const val = (f: string) => root.querySelector(`[data-f="${f}"]`) as HTMLInputElement;
@@ -215,6 +221,9 @@ export function showMultiplayerMenu(
     } else if (b.dataset.a === 'lan-join') {
       root.remove();
       cb.lanJoin(name);
+    } else if (b.dataset.a === 'check') {
+      const box = root.querySelector('.mp-netcheck') as HTMLElement | null;
+      if (box && mode !== 'local') runNetCheck(box, mode);
     } else if (b.dataset.a === 'back') {
       root.remove();
       cb.back();

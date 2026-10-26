@@ -22,6 +22,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # Optional: your own TURN relay for online play (repository Settings → Secrets and variables →
+          # Actions → Variables). Left unset, the game uses the free public Open Relay Project server.
+          VITE_TURN_URL: ${{ vars.TURN_URL }}
+          VITE_TURN_USER: ${{ vars.TURN_USER }}
+          VITE_TURN_PASS: ${{ vars.TURN_PASS }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

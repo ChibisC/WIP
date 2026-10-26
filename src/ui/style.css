@@ -157,3 +157,13 @@ html.touch .menu { -webkit-overflow-scrolling: touch; padding: max(10px, env(saf
 .lb-slots .lan-add { border-color: var(--accent); }
 @media (max-width: 560px) { .lan-qr { width: 160px; height: 160px; } }
 .mp-error a { color: #ffd59a; }
+/* multiplayer: "Check connection" results */
+.mp-netcheck { margin-top: 8px; background: rgba(0,0,0,0.25); border: 1px solid rgba(168,132,79,0.35); border-radius: 6px; padding: 8px 10px; max-width: 560px; }
+.mp-netcheck .nc-title { margin: 0 0 6px; font-weight: 600; }
+.mp-netcheck .nc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.mp-netcheck .nc-list li { display: grid; grid-template-columns: 1.2em 1fr; gap: 6px; line-height: 1.35; }
+.mp-netcheck .nc-ok { color: #9ccf6e; font-weight: 700; }
+.mp-netcheck .nc-no { color: #e2664c; font-weight: 700; }
+.mp-netcheck .nc-i { color: #bba98a; }
+.mp-netcheck .opt-row { margin-top: 8px; }
+.mp-error:empty { display: none; }
