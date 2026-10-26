@@ -158,6 +158,8 @@ with sync_playwright() as p:
         h = host_game()
         check('the host opens a LAN lobby (no room code, no invite link)', wait(lambda: h.locator('text=LAN game').count() > 0, 20) and h.locator('.lb-invite').count() == 0)
         g = player('Ana')
+        glog = []
+        g.on('console', lambda m: glog.append(m.text[:160]))
         h.click('[data-a="add-player"][data-slot="1"]')
         hc = code_out(h, 'UD1H-')
         check('Add player shows host code #2 as a QR code and text', hc.startswith('UD1H-') and h.locator('.lan-dialog canvas.lan-qr').count() == 1 and 'host code #2' in h.locator('.lan-dialog').inner_text(), f'{len(hc)} characters')
@@ -233,10 +235,35 @@ with sync_playwright() as p:
             rc = code_out(g, 'UD1R-')
             h.fill('.lan-dialog [data-f="code-in"]', rc)
             h.locator('.lan-dialog [data-a="code-submit"]').dispatch_event('click')
-            check('after the new code exchange the player is back in the match', wait(lambda: g.evaluate('window.__ready===true') and g.evaluate('!!window.__net'), 240))
-            check('the rejoined player controls their own colony again', wait(lambda: ev(g, '__net.self') == 1 and 1 not in ev(h, '__net.status().dropped'), 60))
-            ok, hs = same_hashes([h, g], 240)
-            check('state hashes match after the catch-up', ok, hs)
+
+            def state():
+                gs = g.evaluate("""() => ({ url: location.search, card: (document.querySelector('.lan-card')||{}).innerText?.slice(0, 160) || '', err: [...document.querySelectorAll('.mp-error')].map(e => e.innerText).join(' | '),
+                    lobby: !!document.querySelector('.lobby'), session: !!window.__session, ready: window.__ready === true, net: !!window.__net, loading: (document.querySelector('.loading')||{}).innerText || '' })""")
+                hs = h.evaluate("""() => ({ dialog: !!document.querySelector('.lan-dialog'), err: (document.querySelector('.lan-dialog .lan-err')||{}).innerText || '', status: (document.querySelector('.lan-dialog .lan-status')||{}).innerText || '',
+                    peers: __net.transport.peers(), dropped: __net.status().dropped, waiting: __net.status().waitingFor, tick: __net.status().tick })""")
+                return gs, hs
+            back = False
+            t0 = time.time()
+            while time.time() - t0 < 420:
+                try:
+                    if g.evaluate('window.__ready===true') and g.evaluate('!!window.__net'):
+                        back = True
+                        break
+                except Exception:
+                    pass
+                if int(time.time() - t0) % 30 < 1:
+                    try:
+                        print('   ', round(time.time() - t0), state(), flush=True)
+                    except Exception as e:
+                        print('    (state:', str(e)[:80], ')', flush=True)
+                time.sleep(1)
+            if not back:
+                print('    console (joiner):', glog[-15:], flush=True)
+            check('after the new code exchange the player is back in the match', back, f'{time.time() - t0:.0f} s')
+            if back:
+                check('the rejoined player controls their own colony again', wait(lambda: ev(g, '__net.self') == 1 and 1 not in ev(h, '__net.status().dropped'), 60))
+                ok, hs = same_hashes([h, g], 240)
+                check('state hashes match after the catch-up', ok, hs)
         clean, cfgs = rtc_clean([h, g])
         check('every RTCPeerConnection had an empty iceServers list', clean, cfgs[:3])
         h.context.close()

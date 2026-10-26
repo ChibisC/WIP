@@ -438,7 +438,8 @@ function startGame(): void {
   };
   /** A LAN player who lost the host comes back through the join screen (the tab keeps its token). */
   const lanRejoinPage = (why = '') => {
-    location.href = `${location.pathname}?lanjoin=1${why ? `&why=${why}` : ''}`;
+    const qual = q.get('q');
+    location.href = `${location.pathname}?lanjoin=1${why ? `&why=${why}` : ''}${qual ? `&q=${qual}` : ''}`;
   };
 
   const mpQuality = (q.get('q') as 'low' | 'medium' | 'high' | null) || AUTO_START;

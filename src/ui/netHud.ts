@@ -139,7 +139,8 @@ export class NetHud {
     let drop = false;
     if (st.waitingFor.length && st.waitingMs > WAIT_SHOW_S * 1000) {
       const left = Math.max(0, DROP_AFTER_S - st.waitingMs / 1000);
-      banner = `Waiting for ${st.waitingFor.map((p) => this.name(p)).join(', ')}… ${Math.floor(st.waitingMs / 1000)} s${net.isHost ? ` · the AI takes over in ${Math.ceil(left)} s` : ''}`;
+      const loading = st.waitingFor.every((p) => st.loading.includes(p));
+      banner = `Waiting for ${st.waitingFor.map((p) => this.name(p)).join(', ')}… ${Math.floor(st.waitingMs / 1000)} s${net.isHost ? (loading ? ' · rejoining: loading the match' : ` · the AI takes over in ${Math.ceil(left)} s`) : ''}`;
       drop = net.isHost;
     }
     if (this.bannerText.textContent !== banner) this.bannerText.textContent = banner;

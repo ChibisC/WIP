@@ -42,6 +42,8 @@ export interface NetStatus {
   hostLeft: boolean;
   /** simulation clock factor (slightly below 1 while waiting for a slower player) */
   speed: number;
+  /** host: rejoining players still rebuilding the match (waited for longer) */
+  loading: number[];
 }
 
 /** Ticks between hash comparisons. */
@@ -49,6 +51,8 @@ export const HASH_EVERY = 100;
 /** Seconds of waiting before the "Waiting for…" overlay, and before the host drops the player. */
 export const WAIT_SHOW_S = 3;
 export const DROP_AFTER_S = 30;
+/** A player rebuilding the match after a rejoin, still connected, is waited for this long (slow devices). */
+export const REJOIN_LOAD_S = 300;
 
 export class NetGame {
   readonly lockstep: Lockstep;
@@ -59,6 +63,8 @@ export class NetGame {
   /** host: RTT and jitter per peer */
   private rtt = new Map<string, { rtt: number; jitter: number }>();
   private hashes = new Map<number, Map<number, string>>();
+  /** host: players re-admitted who have not sent a packet since (still rebuilding the match) */
+  private rejoining = new Set<number>();
   private st: NetStatus;
   onDesync: ((tick: number) => void) | null = null;
   onChat: ((from: string, text: string) => void) | null = null;
@@ -91,6 +97,7 @@ export class NetGame {
       hostLost: false,
       hostLeft: false,
       speed: 1,
+      loading: [],
     };
     transport.onMessage = (from, data) => this.receive(from, data);
     transport.onPeerLeave = (id) => this.peerLeft(id);
@@ -143,6 +150,7 @@ export class NetGame {
         if (this.playerOfPeer(from) !== m.player) return;
         for (const p of this.transport.peers()) if (p !== from) this.transport.send(p, data);
       }
+      this.rejoining.delete(m.player);
       this.lockstep.addPacket(m.tick, m.player, m.cmds);
       return;
     }
@@ -261,9 +269,13 @@ export class NetGame {
     // run yet) gets 2 minutes: building the world takes a while on a slow computer.
     if (this.isHost && this.stallSince) {
       const waited = now - this.stallSince;
+      const peers = this.transport.peers();
+      this.st.loading = [...this.rejoining].filter((p) => peers.includes(this.slots[p]?.peer ?? ''));
       for (const p of this.lockstep.missing()) {
         if (p === this.self) continue;
-        const limit = (this.lockstep.hasStarted(p) ? DROP_AFTER_S : 120) * 1000;
+        // a rejoining player still connected is rebuilding the match: give a slow device time
+        const loading = this.rejoining.has(p) && peers.includes(this.slots[p]?.peer ?? '');
+        const limit = (loading ? REJOIN_LOAD_S : this.lockstep.hasStarted(p) ? DROP_AFTER_S : 120) * 1000;
         if (waited > limit) this.dropPlayer(p);
       }
     }
@@ -330,6 +342,9 @@ export class NetGame {
       this.control({ t: 'rejoin', player: p, fromTick });
       ls.queue({ type: 'setControl', colony: p, human: true, tick: 0, player: this.self, seq: 0xfff8 + p });
     }
+    this.rejoining.add(p);
+    // the wait for this player starts again from now (the old silence is not held against them)
+    if (this.stallSince) this.stallSince = this.now();
     const packets = ls.packetsAfter(tick).map(([t, pl, cmds]) => [t, pl, toB64(encodeTickPacket(t, pl, cmds))] as [number, number, string]);
     this.control({ t: 'resync', tick, you: p, slots: this.slots, delay: ls.delay, fromTick, packets, players: ls.playerStates() }, peer, snap);
     this.onLog?.(`${this.slots[p].name} rejoined.`);
