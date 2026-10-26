@@ -14,6 +14,7 @@ import { createWorld, GameSetup } from '../src/sim/mapGen';
 import { nestToSurface } from '../src/sim/colony';
 import { SURFACE } from '../src/sim/types';
 import { runDeterminism } from '../src/dev/determinism';
+import { placeMarker } from '../src/sim/markers';
 
 let failed = 0;
 function check(name: string, ok: boolean, detail = ''): void {
@@ -109,6 +110,41 @@ check('aphids and plants stand on dry ground', w.s.aphids.every((a) => w.terrain
     const d = Math.hypot(s.x - L2.hex.centerX(centre), s.y - L2.hex.centerY(centre));
     check('a shaft dug later surfaces inside the site’s dry area', d <= 3 * L2.hex.H && w.terrain.passable(s.x, s.y), `${d.toFixed(1)} mm from the centre`);
   }
+}
+// a marker dropped in the pond moves to the nearest dry ground (player and AI alike: placeMarker)
+{
+  const c = w.s.colonies[0];
+  placeMarker(w, c, 0, SURFACE, 380, 300);
+  const m = c.markers[0];
+  const shore = Math.hypot(m.x - 380, m.y - 300);
+  check('a marker dropped in the pond snaps to the nearest dry ground', m.placed && m.space === SURFACE && w.terrain.passable(m.x, m.y) && shore > 30 && shore < 110, `(${m.x.toFixed(0)}, ${m.y.toFixed(0)}), ${shore.toFixed(0)} mm from the drop`);
+  const first = [m.x, m.y];
+  placeMarker(w, c, 0, SURFACE, 380, 300);
+  check('the snap is deterministic', m.x === first[0] && m.y === first[1]);
+  placeMarker(w, c, 0, SURFACE, 535, 470);
+  check('a marker dropped on the log moves off it', w.terrain.passable(m.x, m.y) && !w.terrain.isBlocked(m.x, m.y));
+  placeMarker(w, c, 0, SURFACE, 150, 300);
+  check('a marker on dry ground stays where it was dropped', m.x === 150 && m.y === 300);
+}
+// flow fields on a map: routes round the pond and the log, never through them; a target in water still works
+{
+  const fl = w.surfFlow;
+  check('surface flow fields are strict on an authored map', fl.strict);
+  const d = fl.field('test:pond', 1, [{ x: 380, y: 300 }]);
+  check('a field to a point in the pond is seeded from the shore (finite on land)', Number.isFinite(fl.distAt(d, 150, 300)) && Number.isFinite(fl.distAt(d, 620, 620)));
+  const dst = { x: 620, y: 420 };
+  const f2 = fl.field('test:east', 1, [dst]);
+  let x = 120;
+  let y = 380;
+  let wet = 0;
+  const dir = { x: 0, y: 0 };
+  for (let s = 0; s < 400 && Math.hypot(x - dst.x, y - dst.y) > 10; s++) {
+    if (!fl.dir(f2, x, y, dir)) break;
+    x += dir.x * 3;
+    y += dir.y * 3;
+    if (!w.terrain.passable(x, y) && !(w.terrain.layout!.typeAt(x, y) === HEX_WALKWAY)) wet++;
+  }
+  check('following the field from west to east crosses by land or the walkway, never water or the log', Math.hypot(x - dst.x, y - dst.y) <= 12 && wet === 0, `ended ${Math.hypot(x - dst.x, y - dst.y).toFixed(0)} mm away, ${wet} steps off dry ground`);
 }
 // two runs and a snapshot restore stay identical (the map is rebuilt from its id + seed)
 const det = runDeterminism(2400, 200, 1200, setup, false);

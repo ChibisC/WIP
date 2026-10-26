@@ -48,6 +48,38 @@ export function entranceAt(w: World, c: Colony, x: number, y: number): { space: 
   return best;
 }
 
+/**
+ * The nearest walkable surface point to (x, y): the point itself when walkable, else the first
+ * walkable sample on square rings of the terrain grid round it (fixed order, no random numbers),
+ * up to 240 mm away; null when there is none.
+ */
+export function nearestWalkable(w: World, x: number, y: number): { x: number; y: number } | null {
+  const t = w.terrain;
+  if (w.walkable(SURFACE, x, y)) return { x, y };
+  const r = t.res;
+  const ci = Math.round(x / r);
+  const cj = Math.round(y / r);
+  const maxK = Math.ceil(240 / r);
+  for (let k = 1; k <= maxK; k++) {
+    let best: { x: number; y: number } | null = null;
+    let bd = Infinity;
+    for (let dj = -k; dj <= k; dj++)
+      for (let di = -k; di <= k; di++) {
+        if (Math.max(Math.abs(di), Math.abs(dj)) !== k) continue;
+        const px = (ci + di) * r;
+        const py = (cj + dj) * r;
+        if (!w.walkable(SURFACE, px, py)) continue;
+        const d = sq(px - x) + sq(py - y);
+        if (d < bd) {
+          bd = d;
+          best = { x: px, y: py };
+        }
+      }
+    if (best) return best;
+  }
+  return null;
+}
+
 export function placeMarker(w: World, c: Colony, i: number, space: number, x: number, y: number): void {
   if (i < 0 || i >= MARKER_COUNT) return;
   if (space === SURFACE) {
@@ -56,6 +88,13 @@ export function placeMarker(w: World, c: Colony, i: number, space: number, x: nu
       space = ent.space;
       x = ent.x;
       y = ent.y;
+    } else if (w.terrain.layout) {
+      // on an authored map a marker dropped in water or on a wall moves to the nearest dry ground
+      const p = nearestWalkable(w, x, y);
+      if (p) {
+        x = p.x;
+        y = p.y;
+      }
     }
   }
   const m = c.markers[i];

@@ -409,11 +409,19 @@ export class NestFlow {
   }
 }
 
+/** Most surface fields kept at once (least recently used dropped; a field rebuilt later is identical). */
+export const SURFACE_FIELD_CAP = 64;
+
 export class SurfaceFlow {
   readonly cell = 8;
   readonly w: number;
   readonly h: number;
   passable: Uint8Array;
+  /**
+   * Authored maps: no diagonal step between two blocked cells (walls and shores are real edges there),
+   * and a target in water starts from the nearest walkable cell. The procedural styles keep the old rule.
+   */
+  readonly strict: boolean;
   private builtFor = -1;
   private fields = new Map<string, { stamp: number; dist: Float32Array }>();
   private heap = new FlowHeap();
@@ -422,7 +430,22 @@ export class SurfaceFlow {
     this.w = Math.ceil(terrain.width / this.cell) + 1;
     this.h = Math.ceil(terrain.depth / this.cell) + 1;
     this.passable = new Uint8Array(this.w * this.h);
+    this.strict = !!terrain.layout;
     this.rebuildPassable();
+  }
+
+  /** Nearest walkable cell to cell (i, j) within r cells (fixed ring order), or −1. */
+  private nearestCell(i: number, j: number, r = 12): number {
+    for (let k = 0; k <= r; k++)
+      for (let dj = -k; dj <= k; dj++)
+        for (let di = -k; di <= k; di++) {
+          if (Math.max(Math.abs(di), Math.abs(dj)) !== k) continue;
+          const x = i + di;
+          const y = j + dj;
+          if (x < 0 || y < 0 || x >= this.w || y >= this.h) continue;
+          if (this.passable[y * this.w + x]) return y * this.w + x;
+        }
+    return -1;
   }
 
   rebuildPassable(): void {
@@ -443,20 +466,31 @@ export class SurfaceFlow {
   field(key: string, stamp: number, targets: Array<{ x: number; y: number }>): Float32Array {
     this.rebuildPassable();
     const f = this.fields.get(key);
-    if (f && f.stamp === stamp) return f.dist;
+    if (f) {
+      // most recently used last
+      this.fields.delete(key);
+      this.fields.set(key, f);
+      if (f.stamp === stamp) return f.dist;
+    }
     const dist = f ? f.dist : new Float32Array(this.w * this.h);
     dist.fill(Infinity);
     const heap = this.heap;
     heap.clear();
+    const strict = this.strict;
     for (const p of targets) {
       const i = Math.round(p.x / this.cell);
       const j = Math.round(p.y / this.cell);
       if (i < 0 || j < 0 || i >= this.w || j >= this.h) continue;
-      const k = j * this.w + i;
+      let k = j * this.w + i;
+      if (strict && !this.passable[k]) {
+        k = this.nearestCell(i, j);
+        if (k < 0) continue;
+      }
       dist[k] = 0;
       heap.push(k, 0);
     }
     const W = this.w;
+    const P = this.passable;
     while (heap.size) {
       const k = heap.pop();
       // stale entry. `dist` is Float32 and the heap's priorities Float64: compare at float32 precision, or a live entry
@@ -473,7 +507,9 @@ export class SurfaceFlow {
           const yy = y + dy;
           if (xx < 0 || yy < 0 || xx >= W || yy >= this.h) continue;
           const n = yy * W + xx;
-          if (!this.passable[n]) continue;
+          if (!P[n]) continue;
+          // no squeezing diagonally between two blocked cells
+          if (strict && dx && dy && (!P[y * W + xx] || !P[yy * W + x])) continue;
           const nd = d + (dx && dy ? 1.414 : 1);
           if (nd < dist[n]) {
             dist[n] = nd;
@@ -482,7 +518,10 @@ export class SurfaceFlow {
         }
     }
     if (f) f.stamp = stamp;
-    else this.fields.set(key, { stamp, dist });
+    else {
+      this.fields.set(key, { stamp, dist });
+      if (this.fields.size > SURFACE_FIELD_CAP) this.fields.delete(this.fields.keys().next().value!);
+    }
     return dist;
   }
 
@@ -511,6 +550,7 @@ export class SurfaceFlow {
         const xx = i + dx;
         const yy = j + dy;
         if (xx < 0 || yy < 0 || xx >= W || yy >= this.h) continue;
+        if (this.strict && dx && dy && (!this.passable[j * W + xx] || !this.passable[yy * W + i])) continue;
         const dd = dist[yy * W + xx];
         if (dd < best) {
           best = dd;
