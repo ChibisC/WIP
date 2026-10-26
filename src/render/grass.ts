@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Rng } from '../core/rng';
 import { Terrain } from '../world/terrain';
 import { addPatch, globalUniforms, patchDapple } from './shaderPatch';
+import type { DecorClump } from './mapDecor';
 
 /**
  * Instanced grass blades. Each blade is a tapered, slightly curved strip.
@@ -57,9 +58,9 @@ export class Grass {
   mesh: THREE.InstancedMesh;
   material: THREE.MeshStandardMaterial;
 
-  constructor(terrain: Terrain, density: number, margin = 320) {
+  constructor(terrain: Terrain, density: number, margin = 320, extra: readonly DecorClump[] = []) {
     const rng = new Rng(terrain.params.seed + 555);
-    const blades: Array<{ x: number; z: number; h: number; w: number; rot: number; lean: number; c: number }> = [];
+    const blades: Array<{ x: number; z: number; h: number; w: number; rot: number; lean: number; c: number; reed?: boolean }> = [];
     const style = terrain.params.style;
     const pushClump = (cx: number, cz: number, s: number, tall: boolean) => {
       const n = Math.round((tall ? 26 : 12) * s * density);
@@ -73,6 +74,19 @@ export class Grass {
       }
     };
     for (const p of terrain.props) if (p.kind === 'grassClump') pushClump(p.x, p.y, p.scale, true);
+    // an authored map's clumps (render/mapDecor.ts); reeds are tall, narrow and nearly upright
+    for (const c of extra) {
+      if (c.kind !== 'reed') {
+        pushClump(c.x, c.z, c.s, c.kind === 'tall');
+        continue;
+      }
+      const n = Math.round(14 * c.s * density);
+      for (let i = 0; i < n; i++) {
+        const r = Math.sqrt(rng.next()) * 6 * c.s;
+        const a = rng.range(0, Math.PI * 2);
+        blades.push({ x: c.x + Math.cos(a) * r, z: c.z + Math.sin(a) * r, h: rng.range(80, 200) * c.s, w: rng.range(1.3, 2.4), rot: a + rng.range(-0.5, 0.5), lean: rng.range(-0.12, 0.12), c: rng.next(), reed: true });
+      }
+    }
     if (style !== 'formicarium') {
       // Short sprouts on mossy ground inside the map.
       const sprouts = Math.round(((terrain.width * terrain.depth) / 1e4) * 14 * density);
@@ -83,6 +97,8 @@ export class Grass {
         const cj = Math.round(z / terrain.res);
         if (terrain.cover[cj * terrain.nx + ci] !== 1) continue;
         if (terrain.isWater(x, z)) continue;
+        // not through an authored map's rocks or stepping stones
+        if (terrain.map && (terrain.isBlocked(x, z) || terrain.walkHeight(x, z) - terrain.heightAt(x, z) > 0.3)) continue;
         pushClump(x, z, rng.range(0.4, 0.9), false);
       }
       // Dense meadow beyond the edges (skirt).
@@ -155,6 +171,7 @@ export class Grass {
     const p = new THREE.Vector3();
     const col = new THREE.Color();
     const greens = [new THREE.Color(0x4f7a2a), new THREE.Color(0x6b8f34), new THREE.Color(0x3d6626), new THREE.Color(0x8a9a44), new THREE.Color(0xa49a5a)];
+    const reeds = [new THREE.Color(0x3f6a34), new THREE.Color(0x547a3a), new THREE.Color(0x35583a), new THREE.Color(0x6e7d48)];
     blades.forEach((b, i) => {
       const inside = b.x >= 0 && b.z >= 0 && b.x <= terrain.width && b.z <= terrain.depth;
       const y = inside ? terrain.heightAt(b.x, b.z) : terrain.heightAt(Math.min(Math.max(b.x, 0), terrain.width), Math.min(Math.max(b.z, 0), terrain.depth));
@@ -164,8 +181,9 @@ export class Grass {
       s.set(b.w, b.h, b.w);
       m.compose(p, q, s);
       mesh.setMatrixAt(i, m);
-      const gi = Math.floor(b.c * greens.length);
-      col.copy(greens[gi]).lerp(greens[(gi + 1) % greens.length], rng.next() * 0.5);
+      const pal = b.reed ? reeds : greens;
+      const gi = Math.floor(b.c * pal.length);
+      col.copy(pal[gi]).lerp(pal[(gi + 1) % pal.length], rng.next() * 0.5);
       col.multiplyScalar(0.85 + rng.next() * 0.3);
       mesh.setColorAt(i, col);
     });

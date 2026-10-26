@@ -157,6 +157,11 @@ export class Terrain {
         } else if (p.style === 'formicarium') {
           ws = 0.35 + ss(0.45, 0.65, sandN) * 0.55;
           wl = ss(0.62, 0.78, litN) * 0.25;
+        } else if (map && map.biome === 'meadow') {
+          // an authored meadow: grass sward nearly everywhere, bare earth in small patches
+          wm = 0.62 + ss(0.3, 0.6, moist) * 0.38;
+          ws = ss(0.74, 0.86, sandN) * 0.3;
+          wl = ss(0.64, 0.78, litN) * 0.3 * (1 - wm * 0.6);
         } else {
           wm = ss(0.5, 0.66, moist) * 0.95;
           ws = ss(0.66, 0.78, sandN) * 0.6;
