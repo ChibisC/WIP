@@ -126,4 +126,4 @@ for (const [name, g] of [
 }
 
 console.log(failed ? `${failed} FAILED in ${((Date.now() - t0) / 1000).toFixed(1)}s` : `all hex grid tests passed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
-if (failed) process.exit(1);
+if (failed) (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;

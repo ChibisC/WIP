@@ -1,5 +1,9 @@
 import { Rng, fbm2 } from '../core/rng';
 import { dcos, dexp, dhypot, dhypot3, dpow, dsin, sq } from '../sim/dmath';
+import type { MapDef, MapId } from '../maps/types';
+import { mapDef } from '../maps';
+import { shapeBox, shapeDist, smooth01 } from './mapShapes';
+import { SurfaceLayout, surfaceLayout } from './surfaceLayout';
 
 /** Map styles drive generation of relief, ground cover and props. */
 export type MapStyle = 'meadow' | 'forest' | 'formicarium' | 'sandy' | 'riverbank';
@@ -56,6 +60,8 @@ export interface TerrainParams {
   water: WaterOp[];
   /** Global flood level (absolute height); -Infinity encoded as -9999. */
   floodLevel: number;
+  /** an authored map (docs/maps/design.md); absent for the procedural styles */
+  map?: MapId;
 }
 
 /**
@@ -67,8 +73,8 @@ export class Terrain {
   readonly params: TerrainParams;
   readonly width: number;
   readonly depth: number;
-  /** Height sample spacing in mm. */
-  readonly res = 2;
+  /** Height sample spacing in mm (4 on authored maps: movement never needed 2). */
+  readonly res: number;
   readonly nx: number;
   readonly ny: number;
   heights: Float32Array;
@@ -86,11 +92,18 @@ export class Terrain {
   /** Incremented whenever heights or water change (render rebuild trigger). */
   version = 0;
   waterVersion = 0;
+  /** the authored map and its hex layout (rules, zones, sites), when there is one */
+  readonly map: MapDef | null;
+  readonly layout: SurfaceLayout | null;
 
-  constructor(params: TerrainParams) {
+  /** `def` overrides the registered map file (the validator checks edited copies). */
+  constructor(params: TerrainParams, def?: MapDef) {
     this.params = params;
     this.width = params.width;
     this.depth = params.depth;
+    this.map = params.map ? (def ?? mapDef(params.map)) : null;
+    this.layout = this.map ? surfaceLayout(this.map) : null;
+    this.res = this.map ? 4 : 2;
     this.nx = Math.floor(this.width / this.res) + 1;
     this.ny = Math.floor(this.depth / this.res) + 1;
     const n = this.nx * this.ny;
@@ -108,14 +121,16 @@ export class Terrain {
     const rng = new Rng(p.seed * 7919 + 13);
     const { nx, ny, res } = this;
     const s = p.seed % 1000;
-    const amp = p.style === 'formicarium' ? 3 : p.style === 'sandy' ? 10 : p.style === 'riverbank' ? 16 : 14;
+    const map = this.map;
+    const amp = map ? map.relief.amp : p.style === 'formicarium' ? 3 : p.style === 'sandy' ? 10 : p.style === 'riverbank' ? 16 : 14;
+    const rs = map ? map.relief.scale : 160;
     for (let j = 0; j < ny; j++) {
       for (let i = 0; i < nx; i++) {
         const x = i * res;
         const y = j * res;
-        let h = (fbm2(x / 160, y / 160, 4, s) - 0.5) * amp * 2;
+        let h = (fbm2(x / rs, y / rs, 4, s) - 0.5) * amp * 2;
         h += (fbm2(x / 40, y / 40, 3, s + 5) - 0.5) * amp * 0.25;
-        if (p.style === 'riverbank') {
+        if (p.style === 'riverbank' && !map) {
           // A shallow channel crossing the map diagonally.
           const d = Math.abs((x - this.width * 0.5) * 0.7 + (y - this.depth * 0.5) * 0.7 - 120 * dsin(x / 240));
           h -= 18 * dexp(-(d * d) / (2 * 70 * 70));
@@ -165,10 +180,61 @@ export class Terrain {
     }
     // Flatten a rim so the playable edge reads cleanly.
     for (const op of p.sculpt) this.applySculpt(op, false);
-
-    this.placeProps(rng);
+    if (map) this.shapeMap(map);
+    // authored maps have no props in the simulation: their small decoration is render-only
+    else this.placeProps(rng);
     this.rebuildOverlay();
     this.rebuildWater();
+  }
+
+  /**
+   * An authored map's ground: height brushes, then each water body's basin (the bed sinks below
+   * the level inside the outline; the bank rises just above it outside), so the waterline is the
+   * outline itself; wet, bare ground along the shores.
+   */
+  private shapeMap(map: MapDef): void {
+    const { nx, ny, res } = this;
+    const each = (box: { x0: number; y0: number; x1: number; y1: number }, f: (k: number, x: number, y: number) => void) => {
+      const i0 = Math.max(0, Math.floor(box.x0 / res));
+      const i1 = Math.min(nx - 1, Math.ceil(box.x1 / res));
+      const j0 = Math.max(0, Math.floor(box.y0 / res));
+      const j1 = Math.min(ny - 1, Math.ceil(box.y1 / res));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) f(j * nx + i, i * res, j * res);
+    };
+    for (const b of map.brushes)
+      each(shapeBox(b.shape, b.falloff), (k, x, y) => {
+        const d = shapeDist(b.shape, x, y);
+        this.heights[k] += b.amount * (d <= 0 ? 1 : 1 - smooth01(d / b.falloff));
+      });
+    const BANK = 24;
+    for (const wb of map.water) {
+      const bed = wb.bed ?? 30;
+      each(shapeBox(wb.shape, BANK), (k, x, y) => {
+        const d = shapeDist(wb.shape, x, y);
+        if (d < 0) {
+          const floor = wb.level - 0.8 - wb.depth * smooth01(-d / bed);
+          if (this.heights[k] > floor) this.heights[k] = floor;
+        } else if (d < BANK) {
+          // the bank: just above the water at the edge, blending into the land
+          const bank = wb.level + 0.7 + d * 0.05;
+          const t = smooth01(d / BANK);
+          const h = this.heights[k];
+          if (h < bank) this.heights[k] = bank + (h - bank) * t * t;
+          // wet, bare mud along the shore
+          const wet = 1 - smooth01(d / 14);
+          if (wet > 0) {
+            const k4 = k * 4;
+            const keep = 1 - wet * 0.85;
+            const soil = this.coverW[k4] + (255 - this.coverW[k4]) * wet * 0.85;
+            this.coverW[k4] = soil;
+            this.coverW[k4 + 1] *= keep;
+            this.coverW[k4 + 2] *= keep;
+            this.coverW[k4 + 3] *= keep;
+            if (wet > 0.5) this.cover[k] = 0;
+          }
+        }
+      });
+    }
   }
 
   /** Natural-looking prop scatter, deterministic per seed. */
@@ -238,11 +304,16 @@ export class Terrain {
     }
   }
 
-  /** Bake props into the walk-height overlay and obstacle mask. */
+  /** Bake props into the walk-height overlay and obstacle mask (on an authored map: walkways and walls). */
   rebuildOverlay(): void {
     this.overlay.fill(0);
     this.blocked.fill(0);
     const { nx, ny, res } = this;
+    if (this.map) {
+      this.mapOverlay(this.map);
+      this.version++;
+      return;
+    }
     const stamp = (cx: number, cy: number, r: number, h: (d: number) => number) => {
       const i0 = Math.max(0, Math.floor((cx - r) / res));
       const i1 = Math.min(nx - 1, Math.ceil((cx + r) / res));
@@ -304,9 +375,49 @@ export class Terrain {
     this.version++;
   }
 
+  /** Walkways: a flat walk surface just above the water along each path. Walls: blocked. */
+  private mapOverlay(map: MapDef): void {
+    const { nx, ny, res } = this;
+    const each = (box: { x0: number; y0: number; x1: number; y1: number }, f: (k: number, x: number, y: number) => void) => {
+      const i0 = Math.max(0, Math.floor(box.x0 / res));
+      const i1 = Math.min(nx - 1, Math.ceil(box.x1 / res));
+      const j0 = Math.max(0, Math.floor(box.y0 / res));
+      const j1 = Math.min(ny - 1, Math.ceil(box.y1 / res));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) f(j * nx + i, i * res, j * res);
+    };
+    for (const wk of map.walkways) {
+      // the highest water the path crosses sets its surface
+      let level = -9999;
+      for (const wb of map.water) level = Math.max(level, wb.level);
+      const top = level + 0.6;
+      each(shapeBox(wk.shape, 0), (k, x, y) => {
+        if (shapeDist(wk.shape, x, y) >= 0) return;
+        const lift = top - this.heights[k];
+        if (lift > this.overlay[k]) this.overlay[k] = lift;
+      });
+    }
+    for (const wl of map.walls)
+      each(shapeBox(wl.shape, 0), (k, x, y) => {
+        if (shapeDist(wl.shape, x, y) < 0) this.blocked[k] = 1;
+      });
+  }
+
   rebuildWater(): void {
     const { nx, ny, res } = this;
     this.water.fill(-9999);
+    if (this.map)
+      for (const wb of this.map.water) {
+        const box = shapeBox(wb.shape, 0);
+        const i0 = Math.max(0, Math.floor(box.x0 / res));
+        const i1 = Math.min(nx - 1, Math.ceil(box.x1 / res));
+        const j0 = Math.max(0, Math.floor(box.y0 / res));
+        const j1 = Math.min(ny - 1, Math.ceil(box.y1 / res));
+        for (let j = j0; j <= j1; j++)
+          for (let i = i0; i <= i1; i++) {
+            const k = j * nx + i;
+            if (this.heights[k] < wb.level && shapeDist(wb.shape, i * res, j * res) < 0 && wb.level > this.water[k]) this.water[k] = wb.level;
+          }
+      }
     const flood = this.params.floodLevel;
     for (let k = 0; k < nx * ny; k++) if (this.heights[k] < flood) this.water[k] = flood;
     for (const w of this.params.water) {
@@ -462,4 +573,9 @@ export class Terrain {
 
 export function defaultTerrainParams(seed: number, style: MapStyle, width: number, depth: number): TerrainParams {
   return { seed, style, width, depth, sculpt: [], water: [], floodLevel: -9999 };
+}
+
+/** Terrain params for an authored map (its size and borrowed style come from the map file). */
+export function mapTerrainParams(seed: number, id: MapId, def: MapDef = mapDef(id)): TerrainParams {
+  return { seed, style: def.style, width: def.width, depth: def.depth, sculpt: [], water: [], floodLevel: -9999, map: id };
 }
