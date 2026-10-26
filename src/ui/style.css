@@ -37,6 +37,13 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .opt-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .chip { font: inherit; font-size: 12px; color: var(--ink); background: rgba(255,240,210,0.05); border: 1px solid var(--panel-edge); border-radius: 999px; padding: 5px 11px; cursor: pointer; }
 .chip.on { border-color: var(--accent); background: rgba(224,166,74,0.22); }
+.map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.map-card { display: flex; flex-direction: column; align-items: center; gap: 4px; font: inherit; color: var(--ink); background: rgba(255,240,210,0.05); border: 1px solid var(--panel-edge); border-radius: 8px; padding: 8px; cursor: pointer; }
+.map-card b { font-family: var(--serif); font-size: 15px; font-weight: 500; }
+.map-card i { color: var(--ink-faint); font-size: 11px; }
+.map-card.on { border-color: var(--accent); background: rgba(224,166,74,0.16); }
+.map-thumb { display: flex; align-items: center; justify-content: center; height: 124px; }
+.map-thumb canvas { border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
 .go { margin-top: 22px; font: inherit; font-size: 16px; font-family: var(--serif); color: #1a1008; background: var(--accent); border: 0; border-radius: 8px; padding: 11px 26px; cursor: pointer; }
 .go:hover { filter: brightness(1.08); }
 .loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-size: 18px; color: var(--ink-dim); background: #0b0705; }
