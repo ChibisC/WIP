@@ -207,6 +207,11 @@ export class Terrain {
         this.heights[k] += b.amount * (d <= 0 ? 1 : 1 - smooth01(d / b.falloff));
       });
     const BANK = 24;
+    // inside any water body (a stream's bank must not dam the pond it flows into)
+    const inWater = (x: number, y: number) => {
+      for (const o of map.water) if (shapeDist(o.shape, x, y) < 0) return true;
+      return false;
+    };
     for (const wb of map.water) {
       const bed = wb.bed ?? 30;
       each(shapeBox(wb.shape, BANK), (k, x, y) => {
@@ -214,7 +219,7 @@ export class Terrain {
         if (d < 0) {
           const floor = wb.level - 0.8 - wb.depth * smooth01(-d / bed);
           if (this.heights[k] > floor) this.heights[k] = floor;
-        } else if (d < BANK) {
+        } else if (d < BANK && !inWater(x, y)) {
           // the bank: just above the water at the edge, blending into the land
           const bank = wb.level + 0.7 + d * 0.05;
           const t = smooth01(d / BANK);
