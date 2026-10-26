@@ -317,7 +317,7 @@ export class LobbyView {
     const st = L.settings;
     const settings = host
       ? `<div class="lb-settings">
-          <label>Map <select data-f="style">${PLAYABLE_MAPS.map((id) => `<option value="map:${id}" ${id === st.map ? 'selected' : ''}>${MAPS[id]!.name} (new)</option>`).join('')}${STYLES.map(([id, n]) => `<option value="${id}" ${!st.map && id === st.style ? 'selected' : ''}>${n} (random)</option>`).join('')}</select></label>
+          <label>Map <select data-f="style">${PLAYABLE_MAPS.map((id) => `<option value="map:${id}" ${id === st.map ? 'selected' : ''}>${MAPS[id]!.name}</option>`).join('')}${!st.map ? STYLES.filter(([id]) => id === st.style).map(([id, n]) => `<option value="${id}" selected>${n} (random)</option>`).join('') : ''}</select></label>
           ${st.map && MAPS[st.map]?.floods.length ? `<label>Floods <select data-f="floods"><option value="0" ${!st.floods ? 'selected' : ''}>Off</option><option value="1" ${st.floods ? 'selected' : ''}>On</option></select></label>` : ''}
           <label>Seed <input class="mp-input small" data-f="seed" value="${st.seed}"></label>
           <label>Food <select data-f="food">${[0.6, 1.2, 2].map((f) => `<option value="${f}" ${f === st.food ? 'selected' : ''}>${f === 0.6 ? 'Scarce' : f === 1.2 ? 'Normal' : 'Plenty'}</option>`).join('')}</select></label>

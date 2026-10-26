@@ -48,6 +48,7 @@ export class AreaTabs {
   update(): void {
     const s = this.s;
     const tabs = s.areaTabs();
+    this.root.classList.toggle('many', tabs.length > 8);
     this.tabs.forEach((b, i) => {
       const t = tabs[i];
       b.style.display = t ? '' : 'none';

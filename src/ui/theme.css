@@ -54,7 +54,10 @@
 .tb-right .bbtn { pointer-events: auto; font-family: var(--head-font); font-size: calc(19 * var(--u)); padding: calc(5 * var(--u)) calc(18 * var(--u)); }
 
 /* ---- nest tabs (your nest + rival nests) */
-.at { display: flex; gap: calc(3 * var(--u)); padding-left: calc(4 * var(--u)); pointer-events: auto; }
+.at { display: flex; flex-wrap: wrap-reverse; gap: calc(3 * var(--u)); padding-left: calc(4 * var(--u)); pointer-events: auto; }
+/* many areas (ten colonies on a map): numbers only, so the row stays over the maps */
+.at.many .at-tab { padding: 0 calc(5 * var(--u)); }
+.at.many .at-tab .at-k { display: none; }
 .at-tab { position: relative; display: flex; align-items: center; gap: calc(3 * var(--u)); height: calc(30 * var(--u)); padding: 0 calc(8 * var(--u)) 0 calc(7 * var(--u)); background: linear-gradient(180deg, #2c2116, #15100b); border: 1px solid var(--bronze); border-bottom: none; border-top: calc(3 * var(--u)) solid var(--ac, var(--bronze)); border-radius: calc(4 * var(--u)) calc(4 * var(--u)) 0 0; color: var(--ink); cursor: pointer; transition: transform .15s, filter .2s; }
 .at-tab .at-n { font-family: var(--head-font); font-size: calc(17 * var(--u)); line-height: 1; }
 .at-tab .at-k { display: flex; width: calc(15 * var(--u)); height: calc(15 * var(--u)); color: var(--ac, var(--ink-dim)); }
