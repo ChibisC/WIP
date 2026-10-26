@@ -1,5 +1,3 @@
-# Draft, not yet registered in src/maps/index.ts: the two hollows (lairs, flood zones) sit on the
-# stream's ends; move them clear of the water before the art pass.
 """Forest Floor (docs/maps/design.md §9): 1,600 x 1,600 mm, point-symmetric about the centre.
 A small trickling stream in an S across the middle third, three root-mat crossings; fallen logs and
 rocks forming lanes and chokepoints; mushroom clusters; two leaf-litter hollows (spider and beetle
@@ -60,7 +58,7 @@ sites_at = outer + inner
 def ent(s):
     dx, dy = C - s[0], C - s[1]; l = math.hypot(dx, dy); return P(s[0] + dx / l * 22, s[1] + dy / l * 22)
 
-hollowA = polar(150, 560)
+hollowA = P(1000, 920)
 hollowB = rot(hollowA)
 d = dict(
     const='FOREST_FLOOR', id='forestFloor', name='Forest Floor',
