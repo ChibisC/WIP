@@ -80,6 +80,8 @@ export class Replica {
       if (d.designatedCount !== undefined) g.designatedCount = d.designatedCount;
       if (d.entrances) g.entrances = d.entrances;
       if (d.shafts) g.shafts = d.shafts;
+      if (d.tunnels) g.tunnels = d.tunnels;
+      if (d.spots) g.spots = d.spots;
       if (d.desigVersion !== undefined) g.desigVersion = d.desigVersion;
       g.version++;
       g.stateVersion++;

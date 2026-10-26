@@ -1,3 +1,4 @@
+import { migrateColonyEntrances, normalizeEntrance } from './entrances';
 import { Rng } from '../core/rng';
 import { EventBus } from '../core/events';
 import { Terrain } from '../world/terrain';
@@ -78,7 +79,12 @@ export class World {
     for (const c of state.colonies) {
       if (c.team === undefined) c.team = c.id;
       c.hexSpeed = null; // a cache (and JSON turns typed arrays into plain objects)
+      // entrance tunnels, spots and throughput fields (older saves: sim/entrances.ts)
+      const g = this.grids.get(nestSpace(c.id));
+      if (g) migrateColonyEntrances(this, c, g);
+      else for (const e of c.entrances) normalizeEntrance(e, state.time);
     }
+    for (const cv of state.caves) for (const e of cv.entrances) normalizeEntrance(e, state.time);
     this.surfFlow = new SurfaceFlow(this.terrain);
     this.phero = new Pheromones(this.terrain.width, this.terrain.depth, Math.max(1, state.colonies.length));
     this.antHashSurface = new SpatialHash(this.terrain.width, this.terrain.depth, 8, 4096);

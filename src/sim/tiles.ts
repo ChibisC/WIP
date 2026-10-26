@@ -1,6 +1,7 @@
 import { World } from './world';
 import { Ant, AS, Colony, NestGroup, Tile, TileType, nestSpace } from './types';
 import { CASTES, SPECIES, casteOf, naniticCaste, tierOf } from './species';
+import { tunnelSpeed } from './entrances';
 import { BALANCE, NASUTE, TERMANT } from './balance';
 import { makeFood } from './factory';
 import { dcos, dsin } from './dmath';
@@ -541,6 +542,7 @@ export function hexSpeedOf(w: World, c: Colony): Float32Array {
     if (!t.built) continue;
     sp[t.q] = t.type === 'highway' ? BALANCE.highwaySpeed[t.level - 1] : BALANCE.tileSpeed;
   }
+  tunnelSpeed(g, sp);
   c.hexSpeed = sp;
   return sp;
 }

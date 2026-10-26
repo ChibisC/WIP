@@ -40,6 +40,8 @@ export interface NestGridSnap extends NestGridParams {
   hexEntry: Int8Array;
   entrances: number[];
   shafts: number[];
+  tunnels: number[][];
+  spots: number[][];
 }
 
 export interface NestGridData extends NestGridParams {
@@ -52,6 +54,9 @@ export interface NestGridData extends NestGridParams {
   hexEntry: string;
   entrances: number[];
   shafts: number[];
+  /** older saves have none: rebuilt from the dug corridor behind each entrance */
+  tunnels?: number[][];
+  spots?: number[][];
 }
 
 /** Hex radius for a species: tiles are about three workers wide. */
@@ -66,8 +71,9 @@ export function hexRadiusFor(workerLength: number): number {
  * the dug state for rendering, navigation and progressive excavation.
  *
  * Coordinates are mm in the nest plane: x right, y "down the screen" (maps to
- * world z). Entrance hexes hold a ramp up to the surface; shaft sites are
- * hidden spots that become new entrances when dug into.
+ * world z). Each entrance is a short tunnel of hexes rising to a hole in the
+ * surface; extra-entrance spots are marked, undug tunnels the player may dig out
+ * to open one more entrance (sim/entrances.ts).
  */
 export class NestGrid extends HexLayout {
   // the hex geometry (cols, rows, R, H, C, widthMm, depthMm, hexCenter, hexAt, neighbors…) is HexLayout's
@@ -92,9 +98,14 @@ export class NestGrid extends HexLayout {
   hexCells: Int32Array[] = [];
   /** fine cell → hex index (−1 outside) */
   cellHex: Int32Array;
-  /** entrance ramp hexes (dug) and hidden shaft sites (undug) */
+  /** the top hex of each entrance tunnel (the ramp under the surface hole) */
   entrances: number[] = [];
+  /** entrance tunnels, aligned with `entrances`: hexes from the top down to the nest floor */
+  tunnels: number[][] = [];
+  /** the top hex of each extra-entrance spot (aligned with `spots`) */
   shafts: number[] = [];
+  /** extra-entrance spots: undug tunnels (top first) that open a new entrance once dug out */
+  spots: number[][] = [];
   version = 0;
   dirty = new Set<number>();
   /**
@@ -272,8 +283,45 @@ export class NestGrid extends HexLayout {
     return q >= 0 && this.hexSoil[q] !== SOIL_AIR && this.hexSoil[q] !== SOIL_STONE;
   }
 
+  /** Is q part of an entrance tunnel (its ramp hexes stay clear of tiles)? */
   isEntrance(q: number): boolean {
-    return this.entrances.includes(q);
+    return this.tunnelIndex(q) >= 0;
+  }
+
+  /** The entrance whose tunnel holds hex q, or −1. */
+  tunnelIndex(q: number): number {
+    for (let i = 0; i < this.tunnels.length; i++) if (this.tunnels[i].includes(q)) return i;
+    return this.entrances.indexOf(q);
+  }
+
+  /** The extra-entrance spot holding hex q, or −1. */
+  spotIndex(q: number): number {
+    for (let i = 0; i < this.spots.length; i++) if (this.spots[i].includes(q)) return i;
+    return -1;
+  }
+
+  /** Open an entrance whose tunnel (top first) is dug. */
+  addEntrance(tunnel: number[]): void {
+    this.entrances.push(tunnel[0]);
+    this.tunnels.push(tunnel.slice());
+    this.version++;
+    this.stateVersion++;
+    this.desigVersion++;
+  }
+
+  /** Mark an undug tunnel (top first) as an extra-entrance spot. */
+  addSpot(tunnel: number[]): void {
+    this.shafts.push(tunnel[0]);
+    this.spots.push(tunnel.slice());
+    this.stateVersion++;
+    this.desigVersion++;
+  }
+
+  removeSpot(i: number): void {
+    this.shafts.splice(i, 1);
+    this.spots.splice(i, 1);
+    this.stateVersion++;
+    this.desigVersion++;
   }
 
   /** Designated, undug and touching a dug hex. */
@@ -385,6 +433,8 @@ export class NestGrid extends HexLayout {
       hexTotal: toB64(new Uint8Array(this.hexTotal.buffer.slice(0))),
       entrances: [...this.entrances],
       shafts: [...this.shafts],
+      tunnels: this.tunnels.map((t) => [...t]),
+      spots: this.spots.map((t) => [...t]),
     };
   }
 
@@ -402,6 +452,8 @@ export class NestGrid extends HexLayout {
       hexEntry: this.hexEntry.slice(),
       entrances: [...this.entrances],
       shafts: [...this.shafts],
+      tunnels: this.tunnels.map((t) => [...t]),
+      spots: this.spots.map((t) => [...t]),
     };
   }
 
@@ -415,11 +467,28 @@ export class NestGrid extends HexLayout {
     g.hexTotal.set(d.hexTotal);
     g.hexDesig.set(d.hexDesig);
     g.hexEntry.set(d.hexEntry);
-    g.entrances = [...d.entrances];
-    g.shafts = [...d.shafts];
+    g.setEntranceLists(d);
     g.version++;
     g.dirtyAll();
     return g;
+  }
+
+  /**
+   * Entrance and spot lists from saved data. Older saves kept only each entrance's top hex and
+   * hidden one-hex shaft sites: the tunnel is rebuilt along the dug corridor behind the top, and
+   * each shaft grows into a spot reaching toward the nest's middle (sim/entrances.ts migrateNest
+   * then trims the spots to the colony's allowance).
+   */
+  setEntranceLists(d: { entrances: number[]; shafts: number[]; tunnels?: number[][]; spots?: number[][] }): void {
+    this.entrances = [...d.entrances];
+    this.shafts = [...d.shafts];
+    if (d.tunnels && d.tunnels.length === d.entrances.length) this.tunnels = d.tunnels.map((t) => [...t]);
+    else this.tunnels = this.entrances.map((top) => dugCorridor(this, top, TUNNEL_LEN));
+    if (d.spots && d.spots.length === d.shafts.length) this.spots = d.spots.map((t) => [...t]);
+    else {
+      const mid = this.hexIndex(Math.floor(this.cols / 2), Math.floor(this.rows / 2));
+      this.spots = this.shafts.map((top) => chainToward(this, top, mid, TUNNEL_LEN));
+    }
   }
 
   static deserialize(d: NestGridData): NestGrid {
@@ -430,8 +499,7 @@ export class NestGrid extends HexLayout {
     g.hexDesig = fromB64(d.hexDesig);
     g.hexEntry = new Int8Array(fromB64(d.hexEntry).buffer);
     if (d.hexTotal) g.hexTotal = new Float32Array(fromB64(d.hexTotal).buffer);
-    g.entrances = [...d.entrances];
-    g.shafts = [...d.shafts];
+    g.setEntranceLists(d);
     g.designatedCount = 0;
     g.designated.fill(0);
     for (let q = 0; q < g.hexSoil.length; q++)
@@ -443,6 +511,48 @@ export class NestGrid extends HexLayout {
     g.dirtyAll();
     return g;
   }
+}
+
+/** Hexes in a tunnel rebuilt for an older save (ENTRANCE.tunnelLen; kept here so the world layer needs no sim import). */
+const TUNNEL_LEN = 3;
+
+/**
+ * Up to n hexes from `from` toward `to`, one step at a time to the neighbour nearest `to` (ties: the
+ * lower direction), stopping where no neighbour passes `ok` (default: diggable soil) or none is
+ * nearer. Starts with `from` itself.
+ */
+export function chainToward(g: HexLayout & { isHexDiggable(q: number): boolean }, from: number, to: number, n: number, ok: (q: number) => boolean = (q) => g.isHexDiggable(q)): number[] {
+  const out = [from];
+  let cur = from;
+  while (out.length < n) {
+    let best = -1;
+    let bd = g.hexDistance(cur, to);
+    for (const nb of g.neighbors(cur)) {
+      if (nb < 0 || out.includes(nb) || !ok(nb)) continue;
+      const d = g.hexDistance(nb, to);
+      if (d < bd) {
+        bd = d;
+        best = nb;
+      }
+    }
+    if (best < 0) break;
+    out.push(best);
+    cur = best;
+  }
+  return out;
+}
+
+/** Up to n dug hexes from `top` along its corridor (the first dug neighbour not yet taken, by direction). */
+export function dugCorridor(g: NestGrid, top: number, n: number): number[] {
+  const out = [top];
+  let cur = top;
+  while (out.length < n) {
+    const nb = g.neighbors(cur).find((m) => m >= 0 && g.isHexDug(m) && !out.includes(m));
+    if (nb === undefined) break;
+    out.push(nb);
+    cur = nb;
+  }
+  return out;
 }
 
 export function toB64(a: Uint8Array): string {

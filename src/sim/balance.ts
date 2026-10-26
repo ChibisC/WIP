@@ -697,3 +697,24 @@ export const FLOOD = {
   /** paddling toward dry ground (mm/s) */
   swimMmS: 7,
 };
+
+/** Nest entrances (sim/entrances.ts; claude/maps/02-spec-nest-entrances, DESIGN.md "Entrances"). */
+export const ENTRANCE = {
+  /** extra entrances a colony may dig beside its main one (each site has this many surface spots) */
+  maxExtra: 2,
+  /** hexes in an entrance tunnel, from the ramp under the hole down to the nest floor */
+  tunnelLen: 3,
+  /** extra-entrance spots lie this many hexes from the queen's hex */
+  spotMin: 8,
+  spotMax: 13,
+  /** ants through one entrance per second, in and out together (a chokepoint: busy holes queue) */
+  passPerS: 10,
+  /** ants that may pass at once after a quiet spell */
+  burst: 4,
+  /** seconds to plug an extra entrance with soil, or to open it again */
+  closeS: 4,
+  /** seconds for a fallen colony's entrances to cave in */
+  collapseS: 60,
+  /** tunnel hexes move ants like a level I highway */
+  tunnelSpeed: 1.1,
+};

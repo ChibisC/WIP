@@ -1,3 +1,5 @@
+import { ENTRANCE } from './balance';
+import { makeEntrance } from './entrances';
 import { World } from './world';
 import { NestGrid, hexRadiusFor } from '../world/nestGrid';
 import { AS, CAVE_BASE, CaveDef, Colony, SURFACE, colonyOfSpace, isCaveSpace, nestSpace } from './types';
@@ -183,9 +185,9 @@ export function createCave(w: World, o: CaveOptions): number {
     g.softenHex(q);
     g.completeHex(q);
   }
-  g.entrances.push(entQ);
+  g.addEntrance(path.slice(-ENTRANCE.tunnelLen).reverse());
   w.addGrid(space, g);
-  const def: CaveDef = { space, name: o.name, kind: o.kind, entrances: [{ q: entQ, sx: o.at.x, sy: o.at.y }], nx: o.at.x, ny: o.at.y + 20 };
+  const def: CaveDef = { space, name: o.name, kind: o.kind, entrances: [makeEntrance(entQ, o.at.x, o.at.y, w.time)], nx: o.at.x, ny: o.at.y + 20 };
   w.s.caves.push(def);
   // Food on the cavern floor: a seed cache, and a dead insect or two.
   let left = o.food ?? (o.kind === 'cave' ? 60 : 40);

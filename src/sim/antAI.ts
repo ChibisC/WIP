@@ -1,5 +1,6 @@
 import { climbTick, climbUpdate } from './climbing';
 import { World } from './world';
+import { canLeave, usableMask } from './entrances';
 import { Ant, AS, Brood, Carry, Colony, Food, POSE, SURFACE, TileType, colonyOfSpace, nestSpace, snapping } from './types';
 import { casteOf, CASTES } from './species';
 import { NestGrid } from '../world/nestGrid';
@@ -166,7 +167,7 @@ function dumpField(w: World, c: Colony): Float32Array | null {
   const flow = w.flow(c.id);
   const g = w.nest(c.id);
   if (!flow || !g) return null;
-  return flow.field('dump', () => c.entrances.flatMap((e) => hexCoreCells(g, e.q, 0.45)), c.entrances.length);
+  return flow.field('dump', () => c.entrances.flatMap((e) => (canLeave(e) ? hexCoreCells(g, e.q, 0.45) : [])), c.entrances.length + 32 * usableMask(c.entrances, true));
 }
 
 /** Move along a direction without changing the facing (walking backwards with soil). */

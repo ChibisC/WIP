@@ -11,7 +11,6 @@ import { terrainHash, validateMap } from '../src/world/mapValidate';
 import { HF_FOOD } from '../src/world/surfaceLayout';
 import { EventBus } from '../src/core/events';
 import { createWorld, GameSetup } from '../src/sim/mapGen';
-import { nestToSurface } from '../src/sim/colony';
 import { SURFACE } from '../src/sim/types';
 import { runDeterminism } from '../src/dev/determinism';
 import { placeMarker } from '../src/sim/markers';
@@ -100,19 +99,22 @@ const surfFood = w.s.food.filter((f) => f.space === SURFACE);
 const inZone = surfFood.filter((f) => (w.terrain.layout!.flagsAt(f.x, f.y) & HF_FOOD) !== 0).length;
 check('most food lies in the food zones, none in water or walls', surfFood.length > 10 && inZone / surfFood.length > 0.5 && surfFood.every((f) => w.terrain.passable(f.x, f.y)), `${inZone} of ${surfFood.length} in zones`);
 check('aphids and plants stand on dry ground', w.s.aphids.every((a) => w.terrain.passable(a.x, a.y)) && w.s.plants.every((p) => w.terrain.passable(p.x, p.y)));
-// a dug shaft opens on the site (its next authored entrance, else inside the dry area)
+// extra entrances: every nest has two marked spots; a dug-out spot opens on one of its site's extra spots
 {
+  const L2 = w.terrain.layout!;
+  check('every colony has 2 extra-entrance spots in its nest and 2 matching dry spots on its site', w.s.colonies.every((c) => w.nest(c.id)!.spots.length === 2 && L2.sites[c.site!].extras.length === 2 && L2.sites[c.site!].extras.every((q) => w.terrain.passable(L2.hex.centerX(q), L2.hex.centerY(q)))));
   const c = w.s.colonies[0];
   const g = w.nest(c.id)!;
-  const L2 = w.terrain.layout!;
-  const sh = g.shafts[0];
-  if (sh !== undefined) {
-    const p = g.hexCenter(sh);
-    const s = nestToSurface(w, c, p.x, p.y);
-    const centre = L2.sites[c.site!].centre;
-    const d = Math.hypot(s.x - L2.hex.centerX(centre), s.y - L2.hex.centerY(centre));
-    check('a shaft dug later surfaces inside the site’s dry area', d <= 3 * L2.hex.H && w.terrain.passable(s.x, s.y), `${d.toFixed(1)} mm from the centre`);
+  const site = L2.sites[c.site!];
+  const onExtra = (e: { sx: number; sy: number }) => site.extras.findIndex((q) => Math.abs(L2.hex.centerX(q) - e.sx) < 0.01 && Math.abs(L2.hex.centerY(q) - e.sy) < 0.01);
+  const opened: number[] = [];
+  for (let k = 0; k < 2; k++) {
+    for (const q of g.spots[0]) g.completeHex(q);
+    for (let i = 0; i < 25; i++) w.step(0.05);
+    opened.push(onExtra(c.entrances[1 + k]));
   }
+  check('dug-out spots open on the site’s two extra spots (one each, never the raw projection)', c.entrances.length === 3 && opened.includes(0) && opened.includes(1), `extras used ${opened.join(',')}`);
+  check('… on dry, walkable ground away from water', c.entrances.every((e) => w.terrain.passable(e.sx, e.sy) && !w.terrain.isWater(e.sx, e.sy)));
 }
 // a marker dropped in the pond moves to the nearest dry ground (player and AI alike: placeMarker)
 {

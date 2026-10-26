@@ -351,11 +351,20 @@ export interface NestGroup {
 }
 
 export interface Entrance {
-  /** entrance ramp hex in the nest */
+  /** top hex of the entrance tunnel in the nest (the ramp under the hole; the whole tunnel is NestGrid.tunnels) */
   q: number;
   /** surface hole */
   sx: number;
   sy: number;
+  /** 1 while plugged with soil: nobody passes (extra entrances only; sim/entrances.ts) */
+  shut?: number;
+  /** seconds of plugging or unplugging left (the change applies when it reaches 0) */
+  work?: number;
+  /** throughput credit (ants that may pass now) and the sim time it was last topped up */
+  cr?: number;
+  crT?: number;
+  /** a fallen colony's entrance caving in: 0 → 1 over ENTRANCE.collapseS */
+  fall?: number;
 }
 
 /** One of the five pheromone markers (I–V). */

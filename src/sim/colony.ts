@@ -8,12 +8,13 @@ import { makeAnt, makeBrood } from './factory';
 import { applyLevel, hexSpeedOf, placeTile, popUsed, raisesAnts, recomputeGroups, recomputeTileCaps, tileAnts, tileAt, tileCapacity } from './tiles';
 import { BALANCE, NASUTE } from './balance';
 import { assignJobs, isJobWorker } from './jobs';
-import { applyGroupOrders } from './markers';
+import { applyGroupOrders, nearestWalkable } from './markers';
 import { abilityActive, abilityTick } from './abilities';
 import { buildTick, forageTick } from './colonyAI';
 import { warTick } from './warAI';
 import { dcos, dhypot, dsin, sq } from './dmath';
-import { SITE_RING } from '../world/surfaceLayout';
+import { ENTRANCE } from './balance';
+import { designateSpot, entranceTick, makeEntrance, markSpots, nestToSurface, openDugSpots } from './entrances';
 
 /** Nest plane size in hexes (the same for every species; hex radius scales instead). */
 export const NEST_COLS = 34;
@@ -60,38 +61,15 @@ export function hexCoreCells(g: NestGrid, q: number, frac = 0.5): number[] {
   return out.length ? out : g.airCellsOfHex(q);
 }
 
-/**
- * Map a nest-plane point to the colony's surface location (entrances keep their layout). On an
- * authored map the point is kept inside the colony's site (its footprint and dry ring), which the
- * map validator guarantees is dry, flat ground.
- */
-export function nestToSurface(w: World, c: Colony, x: number, y: number): { x: number; y: number } {
-  const g = w.nest(c.id)!;
-  const k = 0.6;
-  let dx = (x - g.widthMm / 2) * k;
-  let dy = (y - g.depthMm / 2) * k;
-  const L = w.terrain.layout;
-  if (L && c.site !== undefined && L.sites[c.site]) {
-    const fp = L.def.sites[c.site].footprint ?? 1;
-    const lim = (fp + SITE_RING) * L.hex.H * 0.9;
-    const d = dhypot(dx, dy);
-    if (d > lim) {
-      dx *= lim / d;
-      dy *= lim / d;
-    }
-  }
-  const sx = c.nx + dx;
-  const sy = c.ny + dy;
-  return { x: Math.min(w.terrain.width - 20, Math.max(20, sx)), y: Math.min(w.terrain.depth - 20, Math.max(20, sy)) };
-}
+export { nestToSurface } from './entrances';
 
-/** Where a colony's n-th entrance opens on an authored map's site (its authored entrance hexes, in order), or null. */
-function siteEntrance(w: World, c: Colony, n: number): { x: number; y: number } | null {
+/** Where a colony's main entrance opens on an authored map's site (its authored entrance hex), or null. */
+function siteEntrance(w: World, c: Colony): { x: number; y: number } | null {
   const L = w.terrain.layout;
   if (!L || c.site === undefined) return null;
   const s = L.sites[c.site];
-  if (!s || n >= s.entrances.length) return null;
-  const q = s.entrances[n];
+  if (!s || !s.entrances.length) return null;
+  const q = s.entrances[0];
   return { x: L.hex.centerX(q), y: L.hex.centerY(q) };
 }
 
@@ -204,26 +182,18 @@ export function createColony(w: World, o: ColonyOptions): Colony {
     g.softenHex(q);
     g.completeHex(q);
   }
-  g.entrances.push(entQ);
-  // Hidden shaft sites further out: digging into one opens a new surface entrance.
-  const cand: number[] = [];
-  for (let q = 0; q < g.cols * g.rows; q++) {
-    const d = g.hexDistance(q, q0);
-    if (d >= 8 && d <= 13 && g.isHexDiggable(q) && g.hexDistance(q, entQ) > 5 && g.hexRow(q) > 1 && g.hexRow(q) < g.rows - 2 && g.hexCol(q) > 1 && g.hexCol(q) < g.cols - 2) cand.push(q);
-  }
-  for (let i = 0; i < 3 && cand.length; i++) {
-    const k = w.rng.int(0, cand.length - 1);
-    const q = cand[k];
-    if (g.shafts.every((s) => g.hexDistance(s, q) > 6)) g.shafts.push(q);
-    cand.splice(k, 1);
-  }
+  // The main entrance: the last hexes of the passage form its tunnel, rising to the hole.
+  g.addEntrance(path.slice(-ENTRANCE.tunnelLen).reverse());
   w.addNest(id, g);
 
   // Entrance on the surface.
   const ep = g.hexCenter(entQ);
-  const es = siteEntrance(w, c, 0) ?? nestToSurface(w, c, ep.x, ep.y);
-  c.entrances.push({ q: entQ, sx: es.x, sy: es.y });
+  const proj = nestToSurface(w, c, ep.x, ep.y);
+  const es = siteEntrance(w, c) ?? nearestWalkable(w, proj.x, proj.y) ?? proj;
+  c.entrances.push(makeEntrance(entQ, es.x, es.y, w.time));
   c.spoil.push(0);
+  // Marked extra-entrance spots further out (the player digs one out to open another entrance).
+  markSpots(w, c, g, q0, [...start, ...path]);
 
   // ---- The queen's chamber: her hex and the six around it. Each queen tile stores 10 food
   // and raises one nanitic worker (the queen's small first brood). The colony starts with
@@ -366,6 +336,9 @@ function developNest(w: World, c: Colony, extra: number): void {
 export function designateDig(w: World, c: Colony, q: number, on: boolean): boolean {
   const g = w.nest(c.id);
   if (!g || q < 0 || !g.isHexDiggable(q)) return false;
+  // an extra-entrance spot is dug out whole (sim/entrances.ts)
+  const sp = g.spotIndex(q);
+  if (sp >= 0) return designateSpot(w, c, sp, on);
   g.designateHex(q, on);
   return true;
 }
@@ -373,24 +346,6 @@ export function designateDig(w: World, c: Colony, q: number, on: boolean): boole
 // ---------------------------------------------------------------------------
 // Entrances
 // ---------------------------------------------------------------------------
-
-/** A hidden shaft site that has been dug into becomes a new entrance to the surface. */
-function checkNewEntrances(w: World, c: Colony): void {
-  const g = w.nest(c.id);
-  if (!g) return;
-  for (const q of [...g.shafts]) {
-    if (!g.isHexDug(q)) continue;
-    g.shafts = g.shafts.filter((s) => s !== q);
-    g.entrances.push(q);
-    g.stateVersion++;
-    g.version++;
-    const p = g.hexCenter(q);
-    const s = siteEntrance(w, c, c.entrances.length) ?? nestToSurface(w, c, p.x, p.y);
-    c.entrances.push({ q, sx: s.x, sy: s.y });
-    c.spoil.push(0);
-    if (c.player) w.events.emit({ t: 'message', text: 'The diggers broke through: a new entrance to the surface.', kind: 'good', colony: c.id });
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Per-second colony bookkeeping
@@ -674,6 +629,8 @@ export function dropCarried(w: World, a: Ant): void {
 export function colonySystem(w: World, dt: number): void {
   // battle arena: the colonies are teams with no economy — no eggs, no nanitics, no jobs, never lost (sim/arena.ts)
   const arena = !!w.s.mode.arena;
+  // entrances: plugging work, and fallen colonies' entrances caving in (every colony, dead or alive)
+  if (!arena && w.s.tick % 20 === 0) entranceTick(w, 1);
   for (const c of w.s.colonies) {
     if (!c.alive) continue;
     if (c.infiniteFood) c.food = c.foodCap;
@@ -695,7 +652,7 @@ export function colonySystem(w: World, dt: number): void {
       auditTiles(w, c);
       countColony(w, c);
       recomputeTileCaps(c);
-      checkNewEntrances(w, c);
+      openDugSpots(w, c);
       fungusFarm(w, c, 1);
       aphidPastures(w, c, 1);
       allocateTasks(w, c);

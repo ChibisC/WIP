@@ -1,5 +1,6 @@
 import { World } from './world';
 import { Ant, AS, Carry, Colony, Entrance, SURFACE, nestSpace, colonyOfSpace } from './types';
+import { canEnter, canLeave, passEntrance, usableMask } from './entrances';
 import { casteOf } from './species';
 import { hexCoreCells } from './colony';
 import { hexSpeedOf } from './tiles';
@@ -164,14 +165,15 @@ export function exitFieldIn(w: World, space: number): Float32Array | null {
   const g = w.nestOf(space);
   if (!flow || !g) return null;
   const ents = w.entrancesOf(space);
-  return flow.field('exit', () => ents.flatMap((e) => hexCoreCells(g, e.q, 0.35)), ents.length);
+  // closed or fallen-in entrances lead nowhere
+  return flow.field('exit', () => ents.flatMap((e) => (canLeave(e) ? hexCoreCells(g, e.q, 0.35) : [])), ents.length + 32 * usableMask(ents, true));
 }
 
 /** Surface field toward an underground area's entrances. */
 export function areaField(w: World, space: number): Float32Array {
   const ents = w.entrancesOf(space);
-  const stamp = ents.reduce((s, e) => s + e.sx * 7 + e.sy * 13, 0);
-  return w.surfFlow.field('area:' + space, stamp, ents.map((e) => ({ x: e.sx, y: e.sy })));
+  const stamp = ents.reduce((s, e) => s + e.sx * 7 + e.sy * 13, 0) + usableMask(ents, false) * 0.001;
+  return w.surfFlow.field('area:' + space, stamp, ents.filter(canEnter).map((e) => ({ x: e.sx, y: e.sy })));
 }
 
 /** Nearest entrance (index) of a list to a surface point (−1 when empty). */
@@ -179,6 +181,7 @@ export function nearestOf(ents: Entrance[], x: number, y: number): number {
   let best = -1;
   let bd = Infinity;
   ents.forEach((e, i) => {
+    if (!canEnter(e)) return;
     const d = sq(e.sx - x) + sq(e.sy - y);
     if (d < bd) {
       bd = d;
@@ -195,8 +198,9 @@ export function chamberField(w: World, c: Colony, key: string, cells: () => numb
 }
 
 export function homeField(w: World, c: Colony): Float32Array {
-  const targets = c.entrances.map((e) => ({ x: e.sx, y: e.sy }));
-  const stamp = c.entrances.reduce((s, e) => s + e.sx * 7 + e.sy * 13, 0);
+  const open = c.entrances.filter(canEnter);
+  const targets = (open.length ? open : c.entrances.slice(0, 1)).map((e) => ({ x: e.sx, y: e.sy }));
+  const stamp = c.entrances.reduce((s, e) => s + e.sx * 7 + e.sy * 13, 0) + usableMask(c.entrances, false) * 0.001;
   return w.surfFlow.field('home:' + c.id, stamp, targets);
 }
 
@@ -205,6 +209,7 @@ export function nearestEntrance(c: Colony, x: number, y: number): number {
   let best = 0;
   let bd = Infinity;
   c.entrances.forEach((e, i) => {
+    if (i > 0 && !canEnter(e)) return; // closed extra entrances (the main one never closes)
     const d = sq(e.sx - x) + sq(e.sy - y);
     if (d < bd) {
       bd = d;
@@ -223,6 +228,7 @@ export function goHome(w: World, a: Ant, dt: number, speedMul = 1): boolean {
   if (!e) return false;
   const de = dhypot(e.sx - a.x, e.sy - a.y);
   if (de < 3) {
+    if (!passEntrance(w, e, false)) return waitAtHole(w, a, e, dt);
     enterNest(w, a, ei);
     return true;
   }
@@ -261,6 +267,13 @@ export function goToSurfacePoint(w: World, a: Ant, x: number, y: number, dt: num
     moveForward(w, a, antSpeed(w, a) * speedMul, dt);
   } else steerTo(w, a, x, y, dt, speedMul);
   return d;
+}
+
+/** Queue at a busy hole (ENTRANCE.passPerS): stand facing it, edging in. Returns false (not inside yet). */
+function waitAtHole(w: World, a: Ant, e: Entrance, dt: number): false {
+  turnToward(a, datan2(e.sy - a.y, e.sx - a.x), dt, 6);
+  a.v = 0;
+  return false;
 }
 
 /** Walk down one of the colony's own entrances: appear at the top of its ramp in the nest. */
@@ -311,8 +324,14 @@ export function tryExit(w: World, a: Ant): boolean {
   if (!g) return false;
   const ents = w.entrancesOf(a.space);
   for (let i = 0; i < ents.length; i++) {
+    if (!canLeave(ents[i])) continue;
     const p = g.hexCenter(ents[i].q);
     if (sq(p.x - a.x) + sq(p.y - a.y) < sq(g.R * 0.3)) {
+      // queue in the tunnel while the hole is busy
+      if (!passEntrance(w, ents[i], true)) {
+        a.v = 0;
+        return false;
+      }
       // Raiders and visitors leave through the host's entrance onto the surface beside it.
       exitAreaTo(w, a, a.space, i);
       return true;
@@ -336,6 +355,7 @@ export function goOut(w: World, a: Ant, dt: number): boolean {
     let best = ents[0];
     let bd = Infinity;
     for (const e of ents) {
+      if (!canLeave(e)) continue;
       const p = g.hexCenter(e.q);
       const d = sq(p.x - a.x) + sq(p.y - a.y);
       if (d < bd) {
@@ -367,6 +387,7 @@ export function goToArea(w: World, a: Ant, space: number, dt: number, speedMul =
   const e = ents[bi];
   const de = dhypot(e.sx - a.x, e.sy - a.y);
   if (de < 3) {
+    if (!passEntrance(w, e, false)) return waitAtHole(w, a, e, dt);
     enterArea(w, a, space, bi);
     return true;
   }

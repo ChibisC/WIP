@@ -31,6 +31,8 @@ export interface GridDelta {
   designatedCount?: number;
   entrances?: number[];
   shafts?: number[];
+  tunnels?: number[][];
+  spots?: number[][];
   desigVersion?: number;
 }
 

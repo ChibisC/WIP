@@ -39,6 +39,12 @@ export interface SiteHexes {
   footprint: number[];
   ring: number[];
   entrances: number[];
+  /**
+   * Surface spots for up to two extra entrances (docs/maps/design.md; claude/maps/02-spec-nest-entrances):
+   * the authored ones, else two dry hexes on the inner edge of the site's ring, about 120° either
+   * side of the main entrance.
+   */
+  extras: number[];
 }
 
 /**
@@ -107,7 +113,40 @@ export class SurfaceLayout {
         if (this.site[q] < 0) this.site[q] = i;
       }
       for (const q of entrances) this.flags[q] |= HF_ENTRANCE;
-      this.sites.push({ centre, footprint, ring, entrances });
+      // extra entrance spots: authored ones after the first, else picked on the ring
+      let extras = entrances.slice(1, 3);
+      const main = entrances.slice(0, 1);
+      if (extras.length < 2 && main.length) {
+        const cx = hex.centerX(centre);
+        const cy = hex.centerY(centre);
+        let ux = hex.centerX(main[0]) - cx;
+        let uy = hex.centerY(main[0]) - cy;
+        const ul = Math.sqrt(ux * ux + uy * uy) || 1;
+        ux /= ul;
+        uy /= ul;
+        const S = Math.sqrt(3) / 2;
+        const targets = [
+          [ux * -0.5 - uy * S, ux * S + uy * -0.5],
+          [ux * -0.5 + uy * S, -ux * S + uy * -0.5],
+        ];
+        const inner = ring.filter((q) => hex.hexDistance(q, centre) === fp + 1 && this.type[q] === HEX_GROUND && !this.flood[q] && !(this.flags[q] & (HF_ENTRANCE | HF_SHORE)));
+        extras = [];
+        for (const [tx, ty] of targets) {
+          let best = -1;
+          let bs = -2;
+          for (const q of inner) {
+            if (extras.includes(q)) continue;
+            const vx = hex.centerX(q) - cx;
+            const vy = hex.centerY(q) - cy;
+            const vl = Math.sqrt(vx * vx + vy * vy) || 1;
+            const sc = (vx * tx + vy * ty) / vl;
+            if (sc > bs) (bs = sc), (best = q);
+          }
+          if (best >= 0) extras.push(best);
+        }
+      }
+      for (const q of extras) this.flags[q] |= HF_ENTRANCE;
+      this.sites.push({ centre, footprint, ring, entrances: main, extras });
     }
     this.hash = fnv(this.type, fnv(new Uint8Array(this.flags.buffer), fnv(this.flood)));
   }

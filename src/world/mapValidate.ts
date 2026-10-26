@@ -139,10 +139,12 @@ export function validateMap(def: MapDef, seed = 1, expectSites = 10): MapReport 
       const d = hx.hexDistance(s.centre, L.sites[j].centre);
       if (d < SITE_RULES.between) problems.push(`sites ${i} and ${j}: ${d} hexes apart (min ${SITE_RULES.between})`);
     }
-    if (s.entrances.length < 1 || s.entrances.length > 3) problems.push(`site ${i}: ${s.entrances.length} entrances (1–3)`);
-    for (const e of s.entrances) {
+    if (s.entrances.length !== 1) problems.push(`site ${i}: ${s.entrances.length} main entrances (1)`);
+    if (s.extras.length !== 2) problems.push(`site ${i}: ${s.extras.length} extra entrance spots (2)`);
+    for (const e of [...s.entrances, ...s.extras]) {
       if (!area.includes(e)) problems.push(`site ${i}: entrance hex ${e} outside the site's footprint and ring`);
       if (L.type[e] !== HEX_GROUND || L.flags[e] & HF_SHORE) problems.push(`site ${i}: entrance hex ${e} in or next to water`);
+      if (L.flood[e]) problems.push(`site ${i}: entrance hex ${e} in a flood zone`);
     }
     info.push(`  site ${i}: hex ${s.centre} (${hx.centerX(s.centre).toFixed(0)}, ${hx.centerY(s.centre).toFixed(0)}), ${dw} hexes to water, ${dh} to a wall or lair, relief ${(hi - lo).toFixed(1)} mm`);
   });
@@ -163,6 +165,10 @@ export function validateMap(def: MapDef, seed = 1, expectSites = 10): MapReport 
         const c = nearestOk(g, hx.centerX(o.entrances[0]), hx.centerY(o.entrances[0]));
         if (c < 0 || !r[c]) problems.push(`site ${i} cannot reach site ${j} by land${when}`);
       });
+      for (const x of s.extras) {
+        const c = cellOf(g, hx.centerX(x), hx.centerY(x));
+        if (!r[c]) problems.push(`site ${i}: extra entrance spot ${x} is not reachable by land${when}`);
+      }
       foodPts.forEach(([x, y], k) => {
         const c = nearestOk(g, x, y);
         if (c < 0 || !r[c]) problems.push(`site ${i} cannot reach food zone ${k} by land${when}`);

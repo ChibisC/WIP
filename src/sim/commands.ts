@@ -17,6 +17,7 @@ import { World } from './world';
 import { Colony, SURFACE, TileType } from './types';
 import { assignGroup, placeMarker, recallAll, removeMarker, MARKER_ORDERS, MarkerOrder, setMarkerOrder } from './markers';
 import { designateDig } from './colony';
+import { setEntranceShut } from './entrances';
 import { markDelete, markUpgrade, placeTile, TILE_INFO } from './tiles';
 import { forgetCaste, setCorpsePriority } from './termants';
 import { useAbility } from './abilities';
@@ -60,7 +61,9 @@ export type CommandBody =
   /** a marker's order for the groups sent there (i = −1: the Home column): no attacking, gathering, climbing (on/off) */
   | { type: 'markerOrder'; i: number; order: MarkerOrder; on: boolean }
   /** host only: let the AI drive a player's colony (a dropped player) or hand it back */
-  | { type: 'setControl'; colony: number; human: boolean };
+  | { type: 'setControl'; colony: number; human: boolean }
+  /** plug extra entrance i with soil (close) or open it again; asking the opposite mid-way cancels (sim/entrances.ts) */
+  | { type: 'entrance'; i: number; close: boolean };
 
 export type CommandType = CommandBody['type'];
 
@@ -96,6 +99,7 @@ const TYPE_IDS: Record<CommandType, number> = {
   arenaStance: 20,
   arenaClear: 21,
   markerOrder: 22,
+  entrance: 23,
 };
 const TYPE_NAMES: CommandType[] = [];
 for (const [k, v] of Object.entries(TYPE_IDS)) TYPE_NAMES[v] = k as CommandType;
@@ -226,6 +230,9 @@ export function applyCommand(w: World, cmd: Command): string | null {
       else if (cmd.key === 'creatures') w.s.settings.creatures = cmd.on ? 1 : 0;
       else return 'bad setting';
       return null;
+    case 'entrance':
+      if (!Number.isInteger(cmd.i) || cmd.i < 0 || cmd.i >= c.entrances.length) return 'no such entrance';
+      return setEntranceShut(w, c, cmd.i, !!cmd.close);
     case 'surrender': {
       const q = w.antById.get(c.queen);
       if (q) killAnt(w, q);
@@ -439,6 +446,10 @@ function writeBody(b: Bytes, c: CommandBody): void {
       b.u8(MARKER_ORDERS.indexOf(c.order));
       b.u8(c.on ? 1 : 0);
       break;
+    case 'entrance':
+      b.u8(c.i);
+      b.u8(c.close ? 1 : 0);
+      break;
   }
 }
 
@@ -525,6 +536,8 @@ function readBody(r: Cursor): CommandBody {
       return { type, team: r.i16() };
     case 'markerOrder':
       return { type, i: r.u8() - 1, order: MARKER_ORDERS[r.u8()] ?? 'noAttack', on: r.u8() === 1 };
+    case 'entrance':
+      return { type, i: r.u8(), close: r.u8() === 1 };
   }
   throw new Error('commands: unknown command type');
 }

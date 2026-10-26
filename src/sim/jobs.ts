@@ -61,7 +61,7 @@ export function listJobs(w: World, c: Colony): JobSpot[] {
   for (let q = 0; q < N; q++) {
     if (!g.hexDesig[q] || !g.isHexDiggable(q)) continue;
     if (!g.neighbors(q).some((n) => n >= 0 && g.isHexDug(n))) continue; // unreachable: waits
-    const entrance = g.shafts.includes(q);
+    const entrance = g.spotIndex(q) >= 0;
     out.push({ kind: entrance ? JOB.Entrance : JOB.Dig, q, prio: entrance ? 1 : 0, max: entrance ? BALANCE.entranceDigWorkers : BALANCE.digWorkersPerHex });
   }
   for (const t of c.tiles) {
