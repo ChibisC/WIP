@@ -1241,7 +1241,9 @@ export class GameSession {
         let crowd = 0;
         for (const a of w.s.ants) if (a.space === SURFACE && a.state !== AS.Dead && Math.abs(a.x - e.sx) < 6 && Math.abs(a.y - e.sy) < 6) crowd++;
         const kind = tab.owner >= 0 ? (i === 0 ? 'main entrance' : 'extra entrance') : 'entrance';
-        this.entranceTip = `Area ${tab.number} · ${tab.name} · ${kind} · ${state}${crowd ? ` · ${crowd} ant${crowd > 1 ? 's' : ''} at the hole` : ''}`;
+        // hell ants are extinct: nothing survives of their nests, so their entrance is a reconstruction
+        const recon = tab.owner >= 0 && w.colony(tab.owner)?.species === 'hell' ? ' (reconstruction)' : '';
+        this.entranceTip = `Area ${tab.number} · ${tab.name} · ${kind}${recon} · ${state}${crowd ? ` · ${crowd} ant${crowd > 1 ? 's' : ''} at the hole` : ''}`;
         return;
       }
     }

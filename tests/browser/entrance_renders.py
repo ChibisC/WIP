@@ -2,7 +2,7 @@
 gameplay-zoom view of each colony's main entrance, an extra entrance dug out and one plugged, and the player's
 nest from above (entrance tunnels, extra-entrance spots, daylight). Fails on page errors or shader warnings.
 
-Run: tests/browser/with_server.sh python3 tests/browser/entrance_renders.py   (GROUPS=0,1,2  ONLY=<view name parts>)
+Run: tests/browser/with_server.sh python3 tests/browser/entrance_renders.py   (PAGES=0,1,2  ONLY=<view name parts>)
 Screenshots: docs/maps/entrances/<species>_<view>.jpg
 """
 import os
@@ -12,7 +12,7 @@ from playwright.sync_api import sync_playwright
 BASE = os.environ.get("BASE", "http://127.0.0.1:5173/")
 ONLY = os.environ.get("ONLY", "")
 MAP = os.environ.get("MAP", "testPond")
-GROUPS = [int(g) for g in os.environ.get("GROUPS", "0,1,2").split(",")]
+GROUPS = [int(g) for g in os.environ.get("PAGES", "0,1,2").split(",")]  # (bash keeps its own GROUPS variable)
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "maps", "entrances")
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"]
 os.makedirs(OUT, exist_ok=True)

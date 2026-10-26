@@ -677,7 +677,9 @@ vec2 hl = gp - hctr;
 float hd = hexDist(hl);
 float apo = uHexR*0.8660254;
 float edgeProx = apo - hd;
-float tileK = floorM * step(0.5, htype) * step(htype, 10.5);
+// entrance tunnels colour their ramp too (it rises like a wall toward the hole)
+float isEnt = step(6.5, htype) * step(htype, 7.5);
+float tileK = max(floorM, isEnt) * step(0.5, htype) * step(htype, 10.5);
 if (htype > 0.5 && htype < 10.5) {
   vec3 tc = col;
   vec3 tint = texture2D(tTint, huv).rgb;
@@ -738,7 +740,8 @@ if (htype > 0.5 && htype < 10.5) {
     // entrance tunnel: loose, paler soil lit from above, worn smooth along the middle where ants walk;
     // a plugged one (outline 1) is fresh dark crumbly soil
     float wornK = smoothstep(apo*0.75, apo*0.2, hd);
-    tc = mix(col, vec3(0.42,0.34,0.24)*(0.8+0.4*grain), 0.6);
+    // paler loose soil toward the middle, fading into the surrounding floor at the hex edge
+    tc = mix(col, vec3(0.42,0.34,0.24)*(0.8+0.4*grain), 0.6 * smoothstep(apo*1.05, apo*0.45, hd));
     tc = mix(tc, vec3(0.50,0.41,0.29)*(0.9+0.2*vnoise(gp*0.6)), wornK*0.35);
     vec3 pw = worley(gp*1.8);
     float pellet = step(0.9, pw.z) * smoothstep(0.3, 0.1, pw.x) * (1.0 - wornK);
@@ -773,7 +776,7 @@ if (htype > 0.5 && htype < 10.5) {
     bumpH += band*0.5;
   }
   // soft inner bevel so neighbouring tiles read as separate cells
-  tc *= mix(0.72, 1.0, smoothstep(0.0, 0.9, edgeProx));
+  tc *= mix(isEnt > 0.5 ? 1.0 : 0.72, 1.0, smoothstep(0.0, 0.9, edgeProx)); // (a tunnel has no cell edges)
   float hflags = floor(hexT.a*255.0 + 0.5);
   float planned = mod(floor(hflags / 2.0), 2.0);
   // planned tiles are ghosts: a faint wash of their material and a dashed rim
@@ -863,6 +866,13 @@ const FRAG_EMISSIVE = /* glsl */ `
   float lp = pow(pool, 2.2) * pow(wideL, 1.5) * spot * (floorM + wallM*0.12) * (1.0 - tileK*0.55);
   totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.74, 0.38) * lp * 1.25 * uPool;
   if (desig > 0.5) totalEmissiveRadiance += vec3(1.0,0.6,0.2) * smoothstep(0.9, 0.2, edgeProx) * 0.5;
+  // daylight down an open entrance tunnel: strongest at the top (level 0), cool white
+  if (isEnt > 0.5 && hout < 0.5) {
+    // soft-edged: a pool of light down the middle of the ramp, not a lit hexagon
+    float up = 1.0 - hlevel / 3.0;
+    float core = smoothstep(apo * 1.05, apo * 0.25, hd);
+    totalEmissiveRadiance += diffuseColor.rgb * vec3(0.78, 0.85, 1.0) * (0.12 + 0.75 * up * up) * core;
+  }
   if (uGhost.w > 0.5) {
     float gd = hexDist(gp - uGhost.xy);
     totalEmissiveRadiance += uGhostCol * smoothstep(0.6, 0.0, abs(gd - uHexR*0.8660254 + 0.3)) * 0.35;
