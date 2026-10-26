@@ -517,6 +517,8 @@ export interface Colony {
   /** surface location of the nest centre */
   nx: number;
   ny: number;
+  /** the authored map's anthill site the colony stands on (its entrances open inside it) */
+  site?: number;
   stats: ColonyStats;
   /** set by Recall: every group is in the home column */
   recall: boolean;

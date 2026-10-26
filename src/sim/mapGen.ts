@@ -1,7 +1,9 @@
 import { separationSystem } from './separation';
 import { EventBus } from '../core/events';
 import { Rng } from '../core/rng';
-import { MapStyle, Terrain, defaultTerrainParams } from '../world/terrain';
+import { MapStyle, Terrain, defaultTerrainParams, mapTerrainParams } from '../world/terrain';
+import type { MapId } from '../maps/types';
+import { HF_APHID, HF_FOOD, HF_LAIR, HF_LITTER, HF_PLANT } from '../world/surfaceLayout';
 import { World, emptyState } from './world';
 import { ColonyOptions, createColony, colonySystem } from './colony';
 import { broodSystem } from './brood';
@@ -61,6 +63,10 @@ export interface GameSetup {
   sandbox?: boolean;
   /** battle arena (sim/arena.ts): the colonies are the teams; no economy */
   arena?: boolean;
+  /** an authored map (docs/maps/design.md): its size, water, walls, sites and zones replace style, width and depth */
+  map?: MapId;
+  /** which of the map's balanced site sets for this colony count (default: chosen by the seed) */
+  siteSet?: number;
 }
 
 /** Register all simulation systems in update order. */
@@ -102,23 +108,35 @@ export function registerSystems(w: World): void {
 export const extraSystems: Array<{ name: string; fn: (w: World, dt: number) => void; every?: number }> = [];
 
 export function createWorld(setup: GameSetup, events: EventBus): World {
-  const params = defaultTerrainParams(setup.seed, setup.style, setup.width, setup.depth);
+  const params = setup.map ? mapTerrainParams(setup.seed, setup.map) : defaultTerrainParams(setup.seed, setup.style, setup.width, setup.depth);
+  // an authored map sets the size
+  setup = { ...setup, width: params.width, depth: params.depth, style: params.style };
   const state = emptyState(setup.seed, params);
   Object.assign(state.settings, setup.settings ?? {});
-  // Puddles are sculpted into the params before the world builds its terrain.
+  // Puddles are sculpted into the params before the world builds its terrain (authored maps have their own water).
   const pre = new Terrain(params);
   const rng = new Rng(setup.seed * 31 + 5);
-  const nPud = setup.puddles ?? (setup.style === 'sandy' || setup.style === 'formicarium' ? 0 : 2);
+  const nPud = setup.map ? 0 : (setup.puddles ?? (setup.style === 'sandy' || setup.style === 'formicarium' ? 0 : 2));
   for (let i = 0; i < nPud; i++) pre.addPuddle(rng.range(80, setup.width - 80), rng.range(80, setup.depth - 80), rng.range(18, 36));
   state.terrain = pre.params;
   const w = new World(state, events);
   registerSystems(w);
 
-  // Place colonies far apart on dry ground.
-  const spots = colonySpots(w, setup.colonies.length, rng);
+  // Place colonies: on an authored map on its sites (a balanced set), else far apart on dry ground.
+  const L = w.terrain.layout;
+  const sites = L ? L.siteOrder(setup.colonies.length, setup.siteSet ?? -1, setup.seed) : null;
+  const spots = sites ? [] : colonySpots(w, setup.colonies.length, rng);
+  let nextSite = 0;
   setup.colonies.forEach((spec, i) => {
-    const at = spec.at ?? spots[i];
-    const opts: ColonyOptions = { species: spec.species, player: spec.player, ai: spec.ai, borrowed: spec.borrowed, nx: at.x, ny: at.y, developed: spec.developed, startWorkers: spec.startWorkers, startFood: spec.startFood, popLimit: spec.popLimit, name: spec.name, team: spec.team };
+    let at = spec.at;
+    let site: number | undefined;
+    if (!at && sites && L) {
+      site = sites[nextSite++];
+      const q = L.sites[site].centre;
+      at = { x: L.hex.centerX(q), y: L.hex.centerY(q) };
+    }
+    at ??= spots[i];
+    const opts: ColonyOptions = { species: spec.species, player: spec.player, ai: spec.ai, borrowed: spec.borrowed, nx: at.x, ny: at.y, developed: spec.developed, startWorkers: spec.startWorkers, startFood: spec.startFood, popLimit: spec.popLimit, name: spec.name, team: spec.team, site };
     createColony(w, opts);
   });
   if (setup.mission) startMission(w, setup.mission, w.s.colonies.find((c) => c.player)?.id ?? 0);
@@ -126,7 +144,8 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
   if (setup.arena) setupArena(w);
 
   // Neutral caves and lairs, away from the nests.
-  for (const cv of setup.caves ?? []) createCave(w, { ...cv, at: cv.at ?? caveSpot(w, rng) });
+  const lairs = L ? L.def.zones.filter((z) => z.kind === 'lair') : [];
+  (setup.caves ?? []).forEach((cv, i) => createCave(w, { ...cv, at: cv.at ?? (i < lairs.length ? zonePoint(w, rng, HF_LAIR, 40) : caveSpot(w, rng)) }));
 
   // Food, aphids and leaf plants.
   const area = (setup.width * setup.depth) / 1e4;
@@ -134,7 +153,7 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
   for (let i = 0; i < nFood; i++) spawnRandomFood(w, rng);
   const nAph = setup.aphids ?? Math.round(area * 0.08);
   for (let i = 0; i < nAph; i++) {
-    const p = dryPoint(w, rng, 40);
+    const p = L ? zonePoint(w, rng, HF_APHID, 40) : dryPoint(w, rng, 40);
     w.s.aphids.push({ id: w.nextId(), x: p.x, y: p.y, n: rng.int(6, 16), dew: rng.range(1, 4), owner: -1, tendT: 0, green: rng.chance(0.5) });
   }
   // Every nest has an aphid-infested plant within reach (ants nest beside them).
@@ -170,7 +189,7 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
   }
   const nPl = setup.plants ?? Math.round(area * 0.14);
   for (let i = 0; i < nPl; i++) {
-    const p = dryPoint(w, rng, 30);
+    const p = L ? zonePoint(w, rng, HF_PLANT, 30) : dryPoint(w, rng, 30);
     const max = rng.range(18, 40);
     w.s.plants.push({ id: w.nextId(), x: p.x, y: p.y, leaf: max, max, v: rng.int(0, 1 << 20) });
   }
@@ -229,11 +248,29 @@ export function spawnLitter(w: World, rng: Rng = w.rng): void {
     const pl = w.s.plants[rng.int(0, w.s.plants.length - 1)];
     const a = rng.range(0, Math.PI * 2);
     p = { x: pl.x + dcos(a) * rng.range(10, 30), y: pl.y + dsin(a) * rng.range(10, 30) };
-  } else p = dryPoint(w, rng, 25);
+  } else p = w.terrain.layout ? zonePoint(w, rng, HF_LITTER, 25) : dryPoint(w, rng, 25);
   const t = w.terrain;
   if (p.x < 25 || p.y < 25 || p.x > t.width - 25 || p.y > t.depth - 25 || !t.passable(p.x, p.y)) return;
   for (const c of w.s.colonies) for (const e of c.entrances) if (dhypot(e.sx - p.x, e.sy - p.y) < 25) return;
   placeLitter(w, rng, p.x, p.y);
+}
+
+/**
+ * A walkable point in one of an authored map's zones (food, aphid, plant, lair, litter): a random
+ * hex of the zone, a random point in it. Falls back to any dry point when the map has no such zone.
+ */
+function zonePoint(w: World, rng: Rng, flag: number, margin: number): { x: number; y: number } {
+  const L = w.terrain.layout;
+  const hexes = L ? L.zoneHexes(flag) : [];
+  if (!L || !hexes.length) return dryPoint(w, rng, margin);
+  const t = w.terrain;
+  for (let i = 0; i < 20; i++) {
+    const q = hexes[rng.int(0, hexes.length - 1)];
+    const x = L.hex.centerX(q) + rng.range(-0.7, 0.7) * L.hex.R;
+    const y = L.hex.centerY(q) + rng.range(-0.7, 0.7) * L.hex.R;
+    if (t.inBounds(x, y, margin) && t.passable(x, y)) return { x, y };
+  }
+  return dryPoint(w, rng, margin);
 }
 
 function dryPoint(w: World, rng: Rng, margin: number): { x: number; y: number } {
@@ -290,7 +327,8 @@ function colonySpots(w: World, n: number, rng: Rng): Array<{ x: number; y: numbe
 }
 
 export function spawnRandomFood(w: World, rng: Rng = w.rng, insect = false): void {
-  const p = dryPoint(w, rng, 25);
+  // on an authored map most food falls in its food zones (a quarter anywhere on dry ground)
+  const p = w.terrain.layout && rng.chance(0.75) ? zonePoint(w, rng, HF_FOOD, 25) : dryPoint(w, rng, 25);
   // `insect`: an insect (what every ant eats, army ants included), when a colony's own food has run short
   const r = insect ? (rng.next() < 0.6 ? 0.1 : 0.9) : rng.next();
   // keep food away from nest entrances

@@ -127,6 +127,7 @@ function startGame(): void {
         settings: { creatures: q.get('creatures') ? Number(q.get('creatures')) : 1 },
         mission: mission?.id,
         sandbox: c.mode === 'sandbox',
+        ...(c.map && !mission ? { map: c.map, siteSet: q.get('sites') ? Number(q.get('sites')) : undefined } : {}),
       };
       if (!q.get('play')) updateSettings({ quality: c.quality });
       const s = new GameSession(canvas, setup, c.quality === 'auto' ? AUTO_START : c.quality);
@@ -222,7 +223,7 @@ function startGame(): void {
     setTimeout(() => ((window as unknown as { __ready: boolean }).__ready = true), 800);
   };
   if (q.get('play')) {
-    launch({ teams: Number(q.get('teams') || 2), mode: (q.get('mode') as MenuChoice['mode']) || (q.get('mission') ? 'mission' : 'skirmish'), mission: (q.get('mission') as MenuChoice['mission']) || 'meadow', species: (q.get('species') as MenuChoice['species']) || 'lasius', borrowed: (q.get('borrow') || 'formica_mortar,fire_major').split(','), ais: (q.get('rival') || '').split(',').filter(Boolean).map((sp) => ({ species: sp as MenuChoice['species'], borrowed: [], team: 'own' as const })), style: (q.get('style') as MenuChoice['style']) || (q.get('mode') === 'arena' ? 'formicarium' : 'meadow'), quality: (q.get('q') as MenuChoice['quality']) || 'high' });
+    launch({ teams: Number(q.get('teams') || 2), mode: (q.get('mode') as MenuChoice['mode']) || (q.get('mission') ? 'mission' : 'skirmish'), mission: (q.get('mission') as MenuChoice['mission']) || 'meadow', species: (q.get('species') as MenuChoice['species']) || 'lasius', borrowed: (q.get('borrow') || 'formica_mortar,fire_major').split(','), ais: (q.get('rival') || '').split(',').filter(Boolean).map((sp) => ({ species: sp as MenuChoice['species'], borrowed: [], team: 'own' as const })), style: (q.get('style') as MenuChoice['style']) || (q.get('mode') === 'arena' ? 'formicarium' : 'meadow'), map: (q.get('map') as MenuChoice['map']) || undefined, quality: (q.get('q') as MenuChoice['quality']) || 'high' });
     return;
   }
   const title = () => showTitle(ui, () => showMenu(ui, launch), () => mpMenu(), (bytes) => watchReplay(bytes), { slot: (sl) => void loadSlot(sl), file: (b) => void loadGame(b) });

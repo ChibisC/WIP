@@ -4,6 +4,7 @@ import { Terrain } from '../world/terrain';
 import { NestGrid } from '../world/nestGrid';
 import { TerrainMesh } from './terrainMesh';
 import { Grass } from './grass';
+import { MapDecor } from './mapDecor';
 import { Props } from './props';
 import { Water } from './water';
 import { NestTerrain } from './nest/nestTerrain';
@@ -83,6 +84,7 @@ export class GameView {
   terrain: Terrain | null = null;
   terrainMesh: TerrainMesh | null = null;
   grass: Grass | null = null;
+  decor: MapDecor | null = null;
   props: Props | null = null;
   water: Water | null = null;
   surfaceLights: SurfaceLights;
@@ -179,6 +181,11 @@ export class GameView {
     this.worldGroup.add(this.props.group);
     this.water = new Water(terrain);
     this.worldGroup.add(this.water.mesh);
+    // an authored map: rocks, walkways, lilies, flowers (render only); thinner fog on the big maps
+    this.decor = terrain.map ? new MapDecor(terrain) : null;
+    if (this.decor) this.worldGroup.add(this.decor.group);
+    const fog = this.surfaceScene.fog as THREE.FogExp2 | null;
+    if (fog && 'density' in fog && !this.night) fog.density = 0.00055 * Math.min(1, 1000 / Math.max(terrain.width, terrain.depth));
     this.rebuildGrass();
     const r = this.surfaceRig;
     r.heightAt = (x, z) => terrain.walkHeight(Math.min(Math.max(x, 0), terrain.width), Math.min(Math.max(z, 0), terrain.depth));
@@ -195,7 +202,7 @@ export class GameView {
       this.worldGroup.remove(this.grass.mesh);
       this.grass.mesh.geometry.dispose();
     }
-    this.grass = new Grass(this.terrain, this.preset.grassDensity);
+    this.grass = new Grass(this.terrain, this.preset.grassDensity, 320, this.decor?.clumps);
     this.worldGroup.add(this.grass.mesh);
   }
 
