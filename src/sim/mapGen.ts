@@ -23,6 +23,7 @@ import { MissionId, missionSystem, startMission } from './missions';
 import { ecitonSystem } from './eciton';
 import { termantSystem } from './termants';
 import { arenaSystem, setupArena } from './arena';
+import { floodSystem, initFloods } from './floods';
 
 export interface ColonySpec {
   species: SpeciesId;
@@ -100,6 +101,8 @@ export function registerSystems(w: World): void {
     { name: 'separation', fn: separationSystem, every: 2 },
     { name: 'ecology', fn: ecologySystem, every: 20 },
     { name: 'mission', fn: missionSystem, every: 20 },
+    // storms on authored maps (only when the match turns floods on)
+    { name: 'floods', fn: floodSystem },
     ...extraSystems,
   ];
 }
@@ -228,6 +231,8 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
       }
     }
   }
+  // storms on an authored map, when the match turns floods on (scheduled from the seed)
+  initFloods(w);
   w.reindex();
   return w;
 }

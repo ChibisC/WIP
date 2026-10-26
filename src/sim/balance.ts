@@ -681,3 +681,19 @@ export const ARENA = {
 } as const;
 
 export const B = BALANCE;
+
+/** Storms on authored maps (sim/floods.ts, docs/maps/design.md §5). */
+export const FLOOD = {
+  /** warning before the water rises (s) */
+  warnS: 25,
+  riseS: 10,
+  drainS: 20,
+  /** the level moves in this many steps (each rebuilds the water and the flow fields) */
+  steps: 5,
+  /** the rising water starts this far (mm) below the zone's full level */
+  startBelow: 3,
+  /** share of an ant's maximum health lost per second in flood water (creatures: half) */
+  drownFrac: 0.06,
+  /** paddling toward dry ground (mm/s) */
+  swimMmS: 7,
+};
