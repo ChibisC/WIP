@@ -23,6 +23,8 @@ export class Replica {
   overlay: { colony: number; data: Uint8Array; fresh: boolean } | null = null;
   /** simulation time per tick in the worker (ms) */
   tickMs = 0;
+  /** flood levels already applied to the replica's terrain, by zone */
+  private floodLevels: number[] = [];
 
   /** `ctrl` (shared memory): tells the worker which frame's buffers it may reuse */
   constructor(
@@ -51,6 +53,16 @@ export class Replica {
     s.caves = sl.caves;
     s.aphids = sl.aphids;
     s.plants = sl.plants;
+    // floods: the sim's water lives in the worker; raise (or drain) this copy of the terrain to match
+    if (sl.flood) {
+      s.flood = sl.flood;
+      sl.flood.forEach((f, i) => {
+        if (this.floodLevels[i] !== f.level) {
+          this.floodLevels[i] = f.level;
+          w.terrain.setZoneFlood(i, f.level);
+        }
+      });
+    }
     s.ants = this.ants.read(f.ants);
     s.food = this.food.read(f.food);
     s.brood = this.brood.read(f.brood);
