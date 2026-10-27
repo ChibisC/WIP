@@ -39,7 +39,7 @@ export class V {
   }
 }
 
-const FLASH = new THREE.Color(1, 0.42, 0.28);
+const FLASH = new THREE.Color(0.95, 0.3, 0.16);
 
 /**
  * What a builder recorded this frame for climbing ants (render only): each
@@ -104,7 +104,7 @@ export class Rig {
     }
     _m.multiplyMatrices(this.base, local);
     if (this.flash > 0) {
-      this.fc.set(color).lerp(FLASH, this.flash * 0.4);
+      this.fc.set(color).lerp(FLASH, this.flash * 0.3);
       this.out.add(prim, _m, this.fc, surf);
     } else this.out.add(prim, _m, color as THREE.Color, surf);
   }
@@ -132,7 +132,7 @@ export class Rig {
     }
     _m.multiplyMatrices(this.base, local);
     if (this.flash > 0) {
-      this.fc.set(color).lerp(FLASH, this.flash * 0.4);
+      this.fc.set(color).lerp(FLASH, this.flash * 0.3);
       this.out.addPart(name, _m, this.fc, surf);
     } else this.out.addPart(name, _m, color as THREE.Color, surf);
   }

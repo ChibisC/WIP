@@ -8,6 +8,7 @@ import { detailPatch } from '../bake/detailShading';
 import { antRecipe } from '../bake/recipes';
 import { creatureLightPatch, useCreatureEnv } from '../lightPresets';
 import { animV2 } from './antMotion';
+import { MORPHS } from './morphs';
 
 /**
  * GPU skeletal animation for instanced ants.
@@ -43,6 +44,7 @@ varying vec4 vGold;
 uniform float uMandVert; uniform float uMandSwing; uniform float uMandOpen; uniform vec3 uCrest;
 uniform vec3 uLegCoxa[6]; uniform vec3 uLegKnee[6]; uniform vec3 uLegAnkle[6]; uniform vec3 uLegAxis[6]; uniform vec3 uLegFoot[6]; uniform vec3 uLegHome[6];
 uniform float uPlant; // animation pass: feet planted by an analytic IK (pilot species)
+uniform float uRealV; // realism morphs (the sting rests retracted)
 varying float vHit;
 uniform vec3 uNeck; uniform vec3 uMandL; uniform vec3 uMandR; uniform vec3 uAntL; uniform vec3 uAntR;
 uniform vec3 uElbL; uniform vec3 uElbR; uniform vec3 uGasterPivot; uniform vec3 uWaistPivot;
@@ -226,8 +228,11 @@ vec3 animP = position;
     rotP(animP, N, uNeck, RIGHT, hPitch - death * 0.3);
     rotP(animP, N, uNeck, UP, hYaw);
   } else if (part == 8) {
-    // The sting slides out of the gaster tip while stinging.
-    if (abs(aSurf.w - 2.0) < 0.5 && pose == 4) animP.x -= 0.05 * uGait.w * poseW;
+    // The sting slides out of the gaster tip while stinging (realism: retracted into the tip otherwise).
+    if (abs(aSurf.w - 2.0) < 0.5) {
+      float sOut = pose == 4 ? poseW : 0.0;
+      animP.x += uRealV * 0.055 * uGait.w * (1.0 - sOut) - 0.05 * uGait.w * sOut;
+    }
     // A full crop stretches the gaster (honeydew, liquid food).
     vec3 gd = animP - uGasterPivot;
     animP = uGasterPivot + gd * vec3(1.0 + (0.16 + 0.55 * uPhyso) * swell, 1.0 + (0.3 + 0.5 * uPhyso) * swell, 1.0 + (0.3 + 0.45 * uPhyso) * swell);
@@ -469,6 +474,7 @@ export function rigUniforms(rig: AntRig): Record<string, THREE.IUniform> {
     uLegFoot: { value: rig.foot && rig.foot.length === 6 ? rig.foot : rig.ankle },
     uLegHome: { value: rig.home && rig.home.length === 6 ? rig.home : rig.foot && rig.foot.length === 6 ? rig.foot : rig.ankle },
     uPlant: { value: 0 },
+    uRealV: { value: 0 },
     uNeck: { value: rig.neck },
     uMandL: { value: rig.mandL },
     uMandR: { value: rig.mandR },
@@ -513,6 +519,7 @@ export function createAntMaterials(rig: AntRig, dapple: boolean, morphKey?: stri
   const uniforms = rigUniforms(rig);
   // animation pass: the pilot species' feet planted by the shader IK
   if (morphKey && animV2(morphKey) && rig.foot) uniforms.uPlant.value = 1;
+  if (morphKey && MORPHS[morphKey]?.real) uniforms.uRealV.value = 1;
   const recipe = morphKey ? antRecipe(morphKey) : null;
   if (dapple) patchDapple(material);
   addPatch(material, { ...antPatch(), uniforms });

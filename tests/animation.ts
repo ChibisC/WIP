@@ -176,7 +176,7 @@ function drift(segs: Seg[], dur: number, from = 0.6): { max: number; mean: numbe
     step();
     moved = Math.max(moved, Math.abs(out.fwd) + Math.abs(out.side) + Math.abs(out.yaw) * L);
   }
-  check('hit reaction: a flash, a moment of hit-stop and a visible flinch', flash0 > 0.9 && clock0 === 0 && moved > L * 0.03, `flash ${flash0.toFixed(2)}, flinch ${(moved / L * 100).toFixed(1)} % L`);
+  check('hit reaction: a flash, a moment of hit-stop and a visible flinch', flash0 > 0.8 && clock0 === 0 && moved > L * 0.03, `flash ${flash0.toFixed(2)}, flinch ${(moved / L * 100).toFixed(1)} % L`);
 }
 {
   // death: the legs curl within about half a second, the body rolls over

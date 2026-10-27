@@ -14,16 +14,16 @@ import type { MandibleSpec } from './mandible';
  */
 export const FIRE_WORKER: MandibleSpec = {
   len: 1,
-  // the outer margin a quarter ellipse (forward reach 0.2, inward 0.34 of the head width; length 0.43):
+  // the outer margin a quarter ellipse (forward reach 0.27, inward 0.34 of the head width; length 0.48):
   // heading from straight ahead at the hinge to across the head at the apex
   yaw: [
     [0, 0],
-    [0.1, 0.35],
-    [0.2, 0.64],
-    [0.3, 0.85],
-    [0.5, 1.14],
-    [0.7, 1.34],
-    [0.9, 1.5],
+    [0.1, 0.22],
+    [0.2, 0.43],
+    [0.3, 0.63],
+    [0.5, 0.95],
+    [0.7, 1.22],
+    [0.9, 1.46],
     [1, 1.57],
   ],
   pitch: [
@@ -35,16 +35,16 @@ export const FIRE_WORKER: MandibleSpec = {
     [0.5, 0.05],
     [1, 0.025],
   ],
-  // the basal margin to the basal angle (u ≈ 0.5), then the masticatory margin to the apex
+  // the basal margin to the basal angle (u ≈ 0.45), then the masticatory margin to the apex
   inner: [
-    [0, 0.16],
-    [0.1, 0.22],
-    [0.3, 0.27],
-    [0.5, 0.3],
-    [0.6, 0.285],
-    [0.7, 0.24],
-    [0.8, 0.18],
-    [0.9, 0.1],
+    [0, 0.15],
+    [0.1, 0.24],
+    [0.3, 0.315],
+    [0.45, 0.335],
+    [0.6, 0.31],
+    [0.7, 0.27],
+    [0.8, 0.21],
+    [0.9, 0.125],
     [1, 0.02],
   ],
   thick: [
@@ -130,25 +130,32 @@ export function stagMandible(size: number): MandibleSpec {
       [0.9, l(0.95, 0.85)],
       [1, l(1.2, 1.12)],
     ],
+    // rising gently: level where it leaves the head, lifting through the basal third
     pitch: [
-      [0, l(0.15, 0.28)],
+      [0, l(0.08, 0.1)],
+      [0.2, l(0.15, 0.26)],
       [0.5, l(0.1, 0.18)],
       [1, l(0.02, 0.06)],
     ],
+    // the base rounds off into the condyle seated in the head's front corner
+    baseRound: l(0.16, 0.16),
     // broad at the base (a third of the head's width), broad through the middle, then tapering
     outer: [
       [0, l(0.13, 0.12)],
-      [0.3, l(0.09, 0.07)],
-      [0.6, l(0.065, 0.05)],
-      [0.85, l(0.045, 0.035)],
-      [1, l(0.03, 0.02)],
+      [0.3, l(0.085, 0.062)],
+      [0.6, l(0.06, 0.042)],
+      [0.85, l(0.042, 0.03)],
+      [1, l(0.03, 0.018)],
     ],
+    // the base's inner side a rounded lobe beside the mouth, narrowing into the blade
     inner: [
-      [0, l(0.18, 0.22)],
-      [0.2, l(0.13, 0.13)],
-      [0.4, l(0.09, 0.075)],
-      [0.6, l(0.07, 0.055)],
-      [0.85, l(0.05, 0.04)],
+      [0, l(0.17, 0.2)],
+      [0.08, l(0.18, 0.22)],
+      [0.18, l(0.15, 0.17)],
+      [0.3, l(0.1, 0.095)],
+      [0.45, l(0.08, 0.062)],
+      [0.6, l(0.065, 0.045)],
+      [0.85, l(0.047, 0.034)],
       [1, l(0.025, 0.018)],
     ],
     thick: [
@@ -167,9 +174,8 @@ export function stagMandible(size: number): MandibleSpec {
             // leaning back toward the head
             { u: 0.5, size: 0.13, base: 0.055, lean: -0.35 },
             // small teeth on the broad base, a row of denticles from the big tooth to the fork
-            { u: 0.1, size: 0.02, base: 0.03, lean: 0.3 },
-            { u: 0.17, size: 0.016, base: 0.028, lean: 0.3 },
-            { u: 0.24, size: 0.012, base: 0.025, lean: 0.3 },
+            { u: 0.2, size: 0.016, base: 0.03, lean: 0.3, blunt: 0.6 },
+            { u: 0.27, size: 0.013, base: 0.026, lean: 0.3, blunt: 0.6 },
                         { u: 0.65, size: 0.022, base: 0.02, lean: 0.4 },
             { u: 0.7, size: 0.015, base: 0.018, lean: 0.4 },
             { u: 0.75, size: 0.02, base: 0.018, lean: 0.4 },

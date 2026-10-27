@@ -28,13 +28,21 @@ SHOTS = {
     "fire_front": f"{FIRE}&cam=front&dist=1.6&tx=1.45&ty=0.3",
     "fire_34": f"{FIRE}&cam=34&dist=1.9&tx=1.4&ty=0.3",
     "fire_whole_top": f"{FIRE}&cam=top&dist=7.6",
-    "major_top": f"{MAJOR}&cam=top&dist=5&tx=1.6",
-    "major_side": f"{MAJOR}&cam=side&dist=5&tx=1.6&ty=0.6",
+    "fire_head_top": f"{FIRE}&cam=top&dist=2.6&tx=1.15",
+    "major_head_side": f"{MAJOR}&cam=side&dist=5.2&tx=2.4&ty=0.7",
+    "stag_high": f"{STAG}&cam=game&dist=230&rot=2.4&tx=10",
+    "major_top": f"{MAJOR}&cam=top&dist=3.6&tx=3.0",
+    "major_side": f"{MAJOR}&cam=side&dist=3.6&tx=2.9&ty=0.6",
+    "major_34": f"{MAJOR}&cam=34&dist=4&tx=2.8&ty=0.6",
     # stag beetle: the head and mandibles from above and the side, and the whole animal from above
     "stag_top": f"{STAG}&cam=top&dist=120&tx=22",
     "stag_side": f"{STAG}&cam=side&dist=120&tx=22&ty=10",
     "stag_34": f"{STAG}&cam=34&dist=130&tx=18&ty=8",
     "stag_whole_top": f"{STAG}&cam=top&dist=210",
+    # one mandible from above, close (as photo stag_02)
+    "stag_mand": f"{STAG}&cam=top&dist=70&tx=32&tz=-16",
+    # allometry: majors to minors (photo stag_06)
+    **{f"stag_size{k}": f"{STAG}&cam=top&dist=210&msize={k / 4}" for k in range(5)},
 }
 
 

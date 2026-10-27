@@ -388,7 +388,8 @@ const fireMajor: AntMorph = {
   ...fireMinor,
   key: 'fire_major',
   L: 6,
-  head: { len: 0.34, width: 0.37, height: 0.215, shape: 'square', notch: 0.22, groove: 0.16, carinae: 0.014 },
+  // (jaws pass: the front of the head darkens toward the black jaws, photos fire_02 and fire_04)
+  head: { len: 0.34, width: 0.37, height: 0.215, shape: 'square', notch: 0.22, groove: 0.16, carinae: 0.014, frontMix: 0.8 },
   eyes: { size: 0.075, pos: 0.62, height: 0.15, ocelli: false },
   antenna: { segments: 10, scape: 0.55, funiculus: 1.0, club: 2, thick: 0.0105 },
   mandible: { type: 'massive', len: 0.32, teeth: 2, width: 0.75, spec: FIRE_MAJOR, open: 0.55 },
@@ -396,7 +397,7 @@ const fireMajor: AntMorph = {
   waist: { nodes: 2, len: 0.095, nodeH: 0.075, petW: 0.27, postW: 0.29, postH: 0.82, crest: true, subTooth: 0.02 },
   gaster: { len: 0.29, width: 0.19, height: 0.158, sting: true },
   legs: { hind: 0.78, thick: 0.019 },
-  look: { ...fireLook, head: L(0x7a3010, 0.24, 0.45, 0.04, 0x8a3a14), mandible: L(0x160a06, 0.28, 0.45, 0, 0x0a0503) },
+  look: { ...fireLook, head: L(0x7a3010, 0.24, 0.45, 0.04, 0x2e1208), mandible: L(0x160a06, 0.28, 0.45, 0, 0x0a0503) },
   hair: 0.6,
 };
 

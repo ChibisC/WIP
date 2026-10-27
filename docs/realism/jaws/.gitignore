@@ -1,0 +1,4 @@
+# sheets with the reference photos (study only) stay out of the repository
+compare-*.png
+blind/
+renders/

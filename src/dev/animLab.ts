@@ -146,8 +146,8 @@ function clips(): Record<string, Clip> {
     // a hundred workers idling side by side
     idle100: {
       dur: 9,
-      ants: Array.from({ length: 100 }, (_, i) => ({ script: standing(((i % 10) - 4.5) * 4.6, (Math.floor(i / 10) - 4.5) * 4.6, ((i * 2.399) % 6.283) * 0.15) })),
-      cam: { tx: 0, ty: 0, tz: 0, dir: [0.25, 1, 0.55], dist: 70, fov: 30 },
+      ants: Array.from({ length: 100 }, (_, i) => ({ script: standing(((i % 10) - 4.5) * 3.9, (Math.floor(i / 10) - 4.5) * 3.9, ((i * 2.399) % 6.283) * 0.15) })),
+      cam: { tx: 0, ty: 0, tz: 0, dir: [0.25, 1, 0.55], dist: 60, fov: 30 },
     },
     // three attackers round a worker: lunge bite, grip-and-sting, side clamp; the target flinches and flashes
     attack: {
@@ -182,7 +182,7 @@ function clips(): Record<string, Clip> {
           v.dead = t > 1 + k * 0.3;
         },
       })),
-      cam: { tx: 6, ty: 0.3, tz: 0, dir: [0.3, 0.7, 1], dist: 22, fov: 30 },
+      cam: { tx: 5, ty: 0.3, tz: 0, dir: [0.3, 0.75, 1], dist: 13, fov: 30 },
     },
     // a worker thrown through the air: it tumbles, lands with a bounce and rights itself, then walks on
     fling: {
@@ -201,7 +201,7 @@ function clips(): Record<string, Clip> {
           },
         },
       ],
-      cam: { tx: 0, ty: 3, tz: 0, dir: [0.1, 0.35, 1], dist: 38, fov: 30 },
+      cam: { tx: 0, ty: 2, tz: 0, dir: [0.1, 0.35, 1], dist: 20, follow: 0, fov: 30 },
     },
     // carrying (head up), digging, alarm (gaster raised, jaws open)
     poses: {
@@ -209,7 +209,7 @@ function clips(): Record<string, Clip> {
       ants: [
         {
           script: (t, v) => {
-            pathWalker(-6, -5, 0, [{ d: 6, v: 6, turn: 0.6 }])(t, v);
+            pathWalker(-2, -5, 0, [{ d: 6, v: 6, turn: 1.1 }])(t, v);
             v.carrying = true;
             v.mandible = 0.35;
           },
@@ -234,9 +234,30 @@ function clips(): Record<string, Clip> {
           },
         },
       ],
-      cam: { tx: 0, ty: 0.3, tz: 0, dir: [0.35, 0.8, 1], dist: 26, fov: 30 },
+      cam: { tx: 1, ty: 0.3, tz: 0, dir: [0.35, 0.8, 1], dist: 17, fov: 30 },
     },
   };
+  // one attacker at a time, side on (for naming the attacks): 0 lunge bite, 1 grip and sting, 2 side clamp and tug
+  for (const k of [0, 1, 2]) {
+    C[`atk${k}`] = {
+      dur: 3.2,
+      ants: [
+        {
+          script: (_t, v) => {
+            v.x = R * 0.55;
+            v.y = R * 0.15;
+            v.heading = Math.PI * 0.8;
+            v.hp = tgt.hp;
+            v.antennaActivity = 1;
+            v.antennaPitch = 0.6;
+            v.mandible = 0.6;
+          },
+        },
+        { script: attacker(-R * 0.62, 0, 0, k, 0.8, 0.2, bite) },
+      ],
+      cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.15, 0.35, 1], dist: 9, fov: 30 },
+    };
+  }
   // the same attack seen from the default gameplay zoom (readability)
   C.attack_game = { ...C.attack, cam: { tx: 0, ty: 0, tz: 0, dir: [0.25, 1, 0.55], dist: 230, fov: 45 } };
   const L = STAG_L;

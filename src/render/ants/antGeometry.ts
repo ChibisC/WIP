@@ -645,7 +645,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const headWidthAt = (t: number) => {
     const sh = m.head.shape;
     let w: number;
-    if (sh === 'rect' && m.real) w = 0.84 + 0.16 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.05)), 0.7) - 0.04 * ss(0.8, 1, t); // jaws pass: subrectangular, convex sides, broad front (photos)
+    if (sh === 'rect' && m.real) w = 0.84 + 0.16 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.05)), 0.7) - 0.14 * ss(0.55, 1, t); // jaws pass: oval-rectangular, widest behind the middle, narrowing to the jaws (photo fire_07)
     else if (sh === 'rect') w = 0.86 + 0.14 * Math.sin(Math.PI * Math.min(1, t * 1.2)) - 0.12 * ss(0.7, 1, t);
     else if (sh === 'square') w = 0.9 + 0.1 * Math.sin(Math.PI * Math.min(1, t * 1.15)) - 0.2 * ss(0.78, 1, t) - 0.12 * ss(0.3, 0, t); // parallel sides, rounded temples and front
     else if (sh === 'round') w = Math.sin(Math.PI * (0.12 + t * 0.8));
@@ -660,8 +660,11 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     for (let i = 0; i < N; i++) {
       const t = i / (N - 1);
       const w = headWidthAt(t);
-      const ht = (0.85 + 0.15 * Math.sin(Math.PI * t)) * Math.max(0.15, Math.pow(Math.min(1, t / 0.13), 0.32) * Math.pow(Math.min(1, (1 - t) / 0.07), 0.45));
-      rings.push({ x: t * hL, y: headCY + (t > 0.8 ? (t - 0.8) * hH * 0.3 : 0), rz: (hW / 2) * w, ry: (hH / 2) * ht, n: m.real ? 2.1 : 2.3 });
+      // jaws pass (realism morphs): a domed profile, highest behind the middle and sloping down to the clypeus
+      const prof = m.real ? 0.6 + 0.4 * Math.sin(Math.PI * Math.min(1, 0.1 + t * 0.92)) : 0.85 + 0.15 * Math.sin(Math.PI * t);
+      const ht = prof * Math.max(0.15, Math.pow(Math.min(1, t / 0.13), 0.32) * Math.pow(Math.min(1, (1 - t) / 0.07), 0.45));
+      const yc = m.real ? headCY - ss(0.55, 1, t) * hH * 0.1 : headCY + (t > 0.8 ? (t - 0.8) * hH * 0.3 : 0);
+      rings.push({ x: t * hL, y: yc, rz: (hW / 2) * w, ry: (hH / 2) * ht, n: m.real ? 2.1 : 2.3 });
     }
     const notch = (m.head.notch ?? 0) * hL;
     const [p, ind, meta] = loft(rings, hi ? 22 : RAD, (x, y, z, t) => {

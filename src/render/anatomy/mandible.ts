@@ -99,6 +99,8 @@ export interface MandibleSpec {
   tines?: TineSpec[];
   /** colours (sRGB hex): hinge → middle → apex; teeth and tines darken toward their points */
   color: { base: number; mid?: number; tip: number; teeth?: number; dark?: readonly [number, number] };
+  /** a rounded heel this long (fraction of len) behind the hinge, where the base sits in the head (0: cut flat) */
+  baseRound?: number;
   /** samples along the blade and across each half of the cross-section */
   nu?: number;
   nv?: number;
@@ -345,7 +347,17 @@ export function buildMandible(spec: MandibleSpec, side: 1 | -1): MandibleMesh {
   set.sort((a, b) => a - b);
   const us: number[] = [];
   for (const u of set) if (!us.length || u - us[us.length - 1] > 2e-4) us.push(u);
+  // a rounded heel behind the hinge (the condyle seated in the head) instead of a flat cut: the outline and
+  // thickness close over a quarter ellipse, the centreline carried straight back
+  const rb = spec.baseRound ?? 0;
+  if (rb > 0) {
+    const nh = 7;
+    for (let k = nh; k >= 1; k--) us.unshift(-rb * Math.sin(((Math.PI / 2) * k) / nh));
+  }
+  const heel = (u: number) => (u >= 0 ? 1 : Math.max(0.06, Math.sqrt(Math.max(0, 1 - (u / rb) ** 2))));
+  const f0 = frameAt(tab, 0, { p: new THREE.Vector3(), T: new THREE.Vector3(), In: new THREE.Vector3(), Up: new THREE.Vector3() });
   const frames: Frame[] = us.map((u) => {
+    if (u < 0) return { p: f0.p.clone().multiplyScalar(len).addScaledVector(f0.T, u * len), T: f0.T.clone(), In: f0.In.clone(), Up: f0.Up.clone() };
     const f = frameAt(tab, u, _f);
     return { p: f.p.clone().multiplyScalar(len), T: f.T.clone(), In: f.In.clone(), Up: f.Up.clone() };
   });
@@ -353,14 +365,15 @@ export function buildMandible(spec: MandibleSpec, side: 1 | -1): MandibleMesh {
     frames,
     us,
     len,
-    (u) => curveAt(spec.outer, u),
+    (u) => curveAt(spec.outer, Math.max(0, u)) * heel(u),
     (u) => {
+      if (u < 0) return [curveAt(spec.inner, 0) * heel(u), 0];
       const [add, k] = teethAt(spec.teeth, u);
       return [curveAt(spec.inner, u) + add, k];
     },
-    (u) => curveAt(spec.thick, u),
+    (u) => curveAt(spec.thick, Math.max(0, u)) * Math.pow(heel(u), 0.6),
     spec,
-    (u) => u,
+    (u) => Math.max(0, u),
     nv,
   );
   const pieces: MandiblePiece[] = [blade];

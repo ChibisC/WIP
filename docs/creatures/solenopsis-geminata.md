@@ -29,6 +29,31 @@ Queens are 7.5–8 mm.
 - Clypeus with two raised carinae ending in stout, protruding teeth on its front edge, the border concave between them; the median clypeal tooth is absent.
 - Small triangular mandibles with four teeth.
 
+## Mandibles (jaws pass, 2026-10-27)
+
+Built by the shared generator (`src/render/anatomy/mandible.ts`) from `FIRE_WORKER` and `FIRE_MAJOR` in
+`src/render/anatomy/mandibleSpecs.ts`. Measured on the reference photos fire_02, fire_04 and fire_07 (study
+only) and the descriptions above. Fractions are of the mandible's own length, hinge to apex along the outer
+margin.
+
+| | Worker and soldier (`FIRE_WORKER`, also the queen) | Major (`FIRE_MAJOR`) |
+|---|---|---|
+| Outline (top) | Subtriangular plate. The outer margin is a quarter ellipse: straight ahead at the hinge, turning to run across the head at the apex (forward reach 0.2, inward 0.34 of the head width). Basal margin to the basal angle at about half way, then the masticatory margin to the apex. Widest 0.3 at the basal angle. | Same plan, shorter and stouter: wider at the base, margins rounder. |
+| Thickness (side) | 0.16 at the hinge to 0.07 at the apex. The cutting edge is a wedge (bevelled to 16 % of the local thickness). The underside is flatter. Droops 0.1–0.3 rad below the head's plane. | 0.3 to 0.14, the edges rounded, droops more. |
+| Teeth | Four: the apical tooth (the apex itself, largest) and three on the masticatory margin at u 0.89, 0.77 and 0.66, getting smaller toward the base, leaning toward the apex. | Two low rounded crowns (worn flat milling seed). |
+| Tip | A single pointed apical tooth. | Blunt. |
+| Colour | Reddish brown (#7a3214) to #5a2410, near black (#1c0b05) at the apex and on the teeth. | Black-brown (#2a1209) to near black. |
+| Surface | Finely striate lengthwise with scattered hair pits (detail recipe `FIRE_MAND`), slightly glossy, the thin edge translucent. | As the worker's, duller. |
+| Hinge | At the head's anterolateral corners, just under the front margin, 0.84 of the half-width out. The length is fitted so the closed pair overlaps a little (6 %) on the midline in front of the clypeus. | Same. |
+| Closed / open | Closed, the masticatory margins meet across the front of the head. Open, each swings 0.7 rad (the pair about 80° apart). | Each swings 0.55 rad. |
+
+## Animation (animation pass, 2026-10-27)
+
+See docs/realism/animation.md. Tripod gait with planted feet. Five idles (antenna grooming, leg rubbing,
+looking round, antennating, small repositioning steps). Three attacks: the lunge bite, grip-and-sting (the
+jaws seize, the gaster swings under and the sting jabs while the ant pivots round its grip), and the side
+clamp and tug. Two hit reactions (recoil, side flinch). Two deaths (onto the back, onto the side).
+
 ## Major head (signature)
 - Huge, nearly square head with parallel sides, much wider than the mesosoma.
 - **Source correction:** the back edge has a *deep, angular* median notch between two rounded temples, and a *deep* lengthwise groove runs down the top of the head (the brief said "faint"). Modelled as `notch` 0.22 and `groove` 0.16.

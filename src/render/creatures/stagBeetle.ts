@@ -4,7 +4,7 @@ import type { PartLook } from '../ants/morphs';
 import { REGION } from '../bake/detailBake';
 import { bakeOcclusion } from '../bake/occlusion';
 import { registerPart } from './primitives';
-import { buildMandible } from '../anatomy/mandible';
+import { buildMandible, curveAt } from '../anatomy/mandible';
 import { stagMandible, stagMandibleShare } from '../anatomy/mandibleSpecs';
 import { Rig, V, ease, footAt, tripod } from './rig';
 import type { CrPose } from './builders';
@@ -40,10 +40,10 @@ export const SB = {
   // proportions from a major male specimen (top view): head 0.30 wide, pronotum 0.24, elytra 0.27
   elytra: { x0: -0.47, x1: -0.07, half: 0.135, top: 0.178 },
   pronotum: { x0: -0.085, x1: 0.045, half: 0.122, top: 0.158 },
-  head: { x0: 0.035, x1: 0.165, half: 0.152, cy: 0.11, ry: 0.036 },
+  head: { x0: 0.035, x1: 0.165, half: 0.142, cy: 0.11, ry: 0.036 },
   neck: { x: 0.04, y: 0.11 },
   // hinged at the head's front corners (jaws pass): the outer margin of each base continues the head's side
-  mand: { x: 0.17, y: 0.104, z: 0.112, len: 0.34 },
+  mand: { x: 0.176, y: 0.104, z: 0.112, len: 0.34 },
   eye: { x: 0.094, y: 0.112, z: 0.136 },
   ant: { x: 0.152, y: 0.106, z: 0.118 },
 };
@@ -169,9 +169,16 @@ function headWidth(t: number): number {
   const u = Math.max(0, Math.min(1, (t - a) / (b - a)));
   return wa + (wb - wa) * u * u * (3 - 2 * u);
 }
-function headGeo(): THREE.BufferGeometry {
+const hinges: number[] = [];
+/** The antler's hinge (fraction of L out from the midline) for a size bucket 0..4: on the head's front corner. */
+function hingeZ(q: number): number {
+  return (hinges[q] ??= stagHeadHalf(q / 4) * 0.97 - curveAt(stagMandible(q / 4).outer, 0) * stagMandibleShare(q / 4));
+}
+/** Head half-width (fraction of L) for a male of allometric size 0..1: minors' heads are narrower than the pronotum. */
+export const stagHeadHalf = (size: number): number => 0.118 + (SB.head.half - 0.118) * Math.max(0, Math.min(1, size));
+function headGeo(size = 1): THREE.BufferGeometry {
   return build((acc) => {
-    const H = SB.head;
+    const H = { ...SB.head, half: stagHeadHalf(size) };
     const rings: Ring[] = [];
     const N = 26;
     for (let i = 0; i < N; i++) {
@@ -388,7 +395,7 @@ export function registerStagParts(): void {
   const fam = 'stag';
   registerPart('stag_elytra', { family: fam, make: elytraGeo });
   registerPart('stag_pronotum', { family: fam, make: pronotumGeo });
-  registerPart('stag_head', { family: fam, make: headGeo });
+  for (let q = 0; q <= 4; q++) registerPart(`stag_head${q}`, { family: fam, make: () => headGeo(q / 4) });
   registerPart('stag_under', { family: fam, make: underGeo });
   // mandibles per male size (allometry: sizes in quarters, 4 = a major male)
   for (let q = 0; q <= 4; q++) {
@@ -403,7 +410,7 @@ export function registerStagParts(): void {
 const C = (hex: number) => new THREE.Color(hex);
 /** Colours (docs/creatures/stagBeetle.md): chestnut elytra, black head, pronotum, legs and underside. */
 // colours sampled from specimen and field photos (docs/realism/references.md): maroon elytra and mandibles
-export const SG2 = { gold: C(0x4a3a26), elytra: C(0x4e2420), black: C(0x2a2623), leg: C(0x1e1a18), under: C(0x1a1612), eye: C(0x080605), mand: C(0xffffff) };
+export const SG2 = { gold: C(0x4a3a26), elytra: C(0x4e2420), black: C(0x2a2623), leg: C(0x1e1a18), under: C(0x1a1612), eye: C(0x080605), mand: C(0xffffff), brush: C(0x8a5e2a) };
 const S = (rough: number, gloss: number) => ({ rough, gloss, pattern: 0, scale: 1 });
 // realism v2: satin, not lacquer (the clearcoat roughness per region is in render/bake/recipes.ts)
 const SURF = { elytra: S(0.38, 0.42), shield: S(0.58, 0.25), head: S(0.66, 0.18), mand: S(0.5, 0.35), leg: S(0.42, 0.42), under: S(0.6, 0.15), eye: S(0.1, 1.0) };
@@ -712,22 +719,30 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   mloc.makeTranslation(-SB.neck.x * L, -SB.neck.y * L, 0);
   head.multiply(mloc);
   rig.sub = head;
-  rig.part('stag_head', 0, 0, 0, k, SG2.black, SURF.head);
-  for (const sd of [-1, 1]) rig.ell(SB.eye.x * L, SB.eye.y * L, sd * (SB.eye.z - 0.008) * L, 0.015 * L, 0.013 * L, 0.009 * L, SG2.eye, SURF.eye);
+  // male size (allometry, quarters; the game's boss is a major male): the head narrows and the antlers shrink with it
+  const msz = Math.round(Math.max(0, Math.min(1, p.data.msize ?? 1)) * 4);
+  const hk = stagHeadHalf(msz / 4) / SB.head.half;
+  rig.part(`stag_head${msz}`, 0, 0, 0, k, SG2.black, SURF.head);
+  // the mouthparts between the antler bases: the labrum, the mentum below it and the pale golden maxillary
+  // brushes (the head front is not a bare cut)
+  rig.ell((SB.head.x1 + 0.006) * L, 0.1 * L, 0, 0.016 * L, 0.009 * L, 0.034 * hk * L, SG2.black, SURF.head);
+  rig.ell((SB.head.x1 - 0.004) * L, 0.084 * L, 0, 0.022 * L, 0.008 * L, 0.03 * hk * L, SG2.under, SURF.under);
+  for (const sd of [-1, 1]) rig.ell((SB.head.x1 + 0.014) * L, 0.09 * L, sd * 0.016 * L, 0.014 * L, 0.005 * L, 0.007 * L, SG2.brush, HAIR);
+  for (const sd of [-1, 1]) rig.ell(SB.eye.x * L, SB.eye.y * L, sd * (SB.eye.z * hk - 0.008) * L, 0.015 * L, 0.013 * L, 0.009 * L, SG2.eye, SURF.eye);
   // antler mandibles: open in the wind-up and when rearing, clamped while lifting, flung open in the toss
   const idle = 0.12 + 0.05 * Math.sin(p.t * 1.3 + p.v2 * 5);
-  // male size (allometry, quarters): the game's boss is a major male
-  const msz = Math.round(Math.max(0, Math.min(1, p.data.msize ?? 1)) * 4);
   let open = p.dead ? 0.25 : Math.max(idle, wind * (v2 ? 0.7 : 0.62) + tremble * 0.025, rear * 0.55, toss * 0.5, idle + 0.35 * jawIdle, 0.12 + 0.3 * pinch) * (1 - lift * 0.85) + lift * 0.02;
   if (v2 && p.state === ST.Lift) open = Math.max(0.02, open + Math.sin(st * 30) * 0.02); // squeezing the struggling ants
   for (const sd of [-1, 1] as const) {
     // a positive yaw turns +x toward −z: open the left (+z) antler with a negative one; the sway turns both alike
-    rig.part(`${sd > 0 ? 'stag_mandL' : 'stag_mandR'}${msz}`, SB.mand.x * L, SB.mand.y * L, sd * SB.mand.z * L, k, SG2.mand, SURF.mand, -sd * open + (v2 ? ra.sway : 0), 0);
+    // hinged at the front corners: the outer margin of each base continues the head's side
+    const mz = hingeZ(msz);
+    rig.part(`${sd > 0 ? 'stag_mandL' : 'stag_mandR'}${msz}`, SB.mand.x * L, SB.mand.y * L, sd * mz * L, k, SG2.mand, SURF.mand, -sd * open + (v2 ? ra.sway : 0), 0);
   }
   // antennae: elbowed — a long scape out to the side, the funicle forward, the comb club; waving a little
   for (const sd of [-1, 1]) {
     const wv = Math.sin(p.t * (2.2 + 6 * flick) + sd + p.v2 * 7) * (0.12 + 0.25 * flick) + (v2 ? ra.aSw * sd : 0);
-    tA.set(SB.ant.x * L, SB.ant.y * L, sd * SB.ant.z * L);
+    tA.set(SB.ant.x * L, SB.ant.y * L, sd * SB.ant.z * hk * L);
     // the long scape out and forward from in front of the eye (jaws pass: the socket beside the mandible base)
     tB.set(tA.x + 0.06 * L, tA.y + 0.014 * L, tA.z + sd * 0.1 * L);
     side.set(0, 1, 0);
