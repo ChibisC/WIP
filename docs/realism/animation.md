@@ -106,6 +106,25 @@ Results are logged in `PROGRESS.md`.
 - **Clips:** `docs/realism/animation/clips/` (WebM in real time and at 0.25×, GIFs) and
   `docs/realism/animation/strips/` (before and after frame strips).
 
+## Results (pilot, 2026-10-27)
+
+- **Foot sliding** (`tests/animation.ts`, the CPU mirror of the shader solve, every planted foot followed in
+  world space). Drift as a share of the body length:
+
+  | Motion | Max | Mean |
+  |---|---|---|
+  | Straight at sim speed (186 stances) | 0.00 % | 0.00 % |
+  | Slow (6 mm/s) | 0.01 % | 0.00 % |
+  | Curving | 2.2 % | 0.97 % |
+  | Turning in place | 5.7 % | 0.37 % |
+
+  At 0.25× the clips show no visible slide.
+- **Variety:** a hundred ants get 94 different gait phases, with strides within ±10 %. Forty standing ants
+  all idle, in 5 kinds, starting on 32 different frames. In the idle100 clip no two neighbours move in step.
+- **Hits and deaths:** a hit gives a flash (0.88), a short hit-stop and a flinch of 28 % of the body length.
+  The legs curl within 0.40 s and the body rolls (−2.55 rad).
+- **Stress and the blind review of the clips:** see `PROGRESS.md`.
+
 Lab: `?scene=animlab&clip=<name>` (`src/dev/animLab.ts`; `anim=1` shows the old motion). Recorder:
 `tests/browser/anim_clips.py`. Strips: `tools/anim-sheets.py`. Stress comparison:
 `tests/browser/anim_stress.py`.
