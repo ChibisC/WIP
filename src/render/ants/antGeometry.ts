@@ -5,6 +5,7 @@ import { buildHellAnt } from './hellBuilder';
 import { buildHair6 } from './saiyHair';
 import { REGION } from '../bake/detailBake';
 import { bakeOcclusion } from '../bake/occlusion';
+import { buildMandible, fitLen } from '../anatomy/mandible';
 
 /**
  * Procedural anatomical ant builder.
@@ -154,6 +155,18 @@ export class Acc {
       this.skipOcc.push(this.noOcc ? 1 : 0);
     }
     for (const i of ind) this.idx.push(base + i);
+  }
+
+  /** Append a piece with its own per-vertex colours (linear RGB, 3 per vertex). */
+  pieceCols(p: number[], ind: number[], part: number, cols: number[], look: PartLook, flags = 0, det?: number[]): void {
+    const base = this.count;
+    const c = new THREE.Color();
+    this.piece(p, ind, part, () => c, look, flags, undefined, det);
+    for (let i = 0; i < p.length / 3; i++) {
+      this.col[(base + i) * 3] = cols[i * 3];
+      this.col[(base + i) * 3 + 1] = cols[i * 3 + 1];
+      this.col[(base + i) * 3 + 2] = cols[i * 3 + 2];
+    }
   }
 
   /**
@@ -583,7 +596,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const headWidthAt = (t: number) => {
     const sh = m.head.shape;
     let w: number;
-    if (sh === 'rect') w = 0.86 + 0.14 * Math.sin(Math.PI * Math.min(1, t * 1.2)) - 0.12 * ss(0.7, 1, t);
+    if (sh === 'rect' && m.real) w = 0.84 + 0.16 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.05)), 0.7) - 0.04 * ss(0.8, 1, t); // jaws pass: subrectangular, convex sides, broad front (photos)
+    else if (sh === 'rect') w = 0.86 + 0.14 * Math.sin(Math.PI * Math.min(1, t * 1.2)) - 0.12 * ss(0.7, 1, t);
     else if (sh === 'square') w = 0.9 + 0.1 * Math.sin(Math.PI * Math.min(1, t * 1.15)) - 0.2 * ss(0.78, 1, t) - 0.12 * ss(0.3, 0, t); // parallel sides, rounded temples and front
     else if (sh === 'round') w = Math.sin(Math.PI * (0.12 + t * 0.8));
     else if (sh === 'tri') w = 1.0 - 0.38 * ss(0.3, 1.0, t) + 0.05 * Math.exp(-((t - 0.3) ** 2) / 0.02);
@@ -598,7 +612,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       const t = i / (N - 1);
       const w = headWidthAt(t);
       const ht = (0.85 + 0.15 * Math.sin(Math.PI * t)) * Math.max(0.15, Math.pow(Math.min(1, t / 0.13), 0.32) * Math.pow(Math.min(1, (1 - t) / 0.07), 0.45));
-      rings.push({ x: t * hL, y: headCY + (t > 0.8 ? (t - 0.8) * hH * 0.3 : 0), rz: (hW / 2) * w, ry: (hH / 2) * ht, n: 2.3 });
+      rings.push({ x: t * hL, y: headCY + (t > 0.8 ? (t - 0.8) * hH * 0.3 : 0), rz: (hW / 2) * w, ry: (hH / 2) * ht, n: m.real ? 2.1 : 2.3 });
     }
     const notch = (m.head.notch ?? 0) * hL;
     const [p, ind, meta] = loft(rings, hi ? 22 : RAD, (x, y, z, t) => {
@@ -684,6 +698,12 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     socketR = hp(hL * 0.74, headCY + hH * 0.32, hW * 0.17);
     mandPivL = hp(hL * 0.95, headCY - hH * 0.22, -hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
     mandPivR = hp(hL * 0.95, headCY - hH * 0.22, hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
+    if (m.mandible.spec) {
+      // jaws pass: hinged at the head's anterolateral corners, just under the front margin
+      const wz = (hW / 2) * headWidthAt(0.95) * 0.84;
+      mandPivL = hp(hL * 0.985, headCY - hH * 0.16, -wz);
+      mandPivR = hp(hL * 0.985, headCY - hH * 0.16, wz);
+    }
     // frontal carinae ridges between the sockets
     if (hi) {
       for (const s of [-1, 1]) {
@@ -739,6 +759,16 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     let pp: number[];
     let ii: number[];
     const mlook = look.mandible;
+    if (m.mandible.spec) {
+      // jaws pass: the shared parametric generator (render/anatomy/mandible.ts), its length fitted so the
+      // closed pair overlaps a little on the midline in front of the clypeus
+      const spec = fitLen(m.mandible.spec, inwardToMid * 1.06);
+      const mesh = buildMandible(hi ? spec : { ...spec, nu: 14, nv: 5, teeth: spec.teeth.slice(0, 2) }, s as 1 | -1);
+      const mm = new THREE.Matrix4().compose(piv, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), headRestPitch), new THREE.Vector3(1, 1, 1));
+      for (const pc of mesh.pieces) acc.pieceCols(transformPts(pc.pos, mm), pc.idx, part, pc.col, mlook, 0, detOf(pc.meta, REGION.MANDIBLE));
+      mandTips.push(mesh.apex.clone().applyMatrix4(mm));
+      continue;
+    }
     if (m.mandible.type === 'falcate') {
       // Eciton soldier: long sickle hooks curving inward, tips crossing.
       const pts: THREE.Vector3[] = [];
@@ -1074,6 +1104,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     gasterTip,
     mouth: hp(hL * 1.02, headCY - hH * 0.15, 0),
   };
+  // how far each mandible swings open at full gape (the generator's species set their own)
+  if (m.mandible.open !== undefined) (rig as AntRig & { mandOpen?: number }).mandOpen = m.mandible.open;
   // front of the hair (Saiy-Ants): pivot for the stretch / flutter in the shader
   const h6 = (m as { hair6?: { spikes: Array<{ at: number[] }> } }).hair6;
   (rig as AntRig & { crest?: THREE.Vector3 }).crest = hp(hL * ((h6?.spikes?.[0]?.at?.[0] ?? 0.1) + 0.5), headCY + (h6?.spikes?.[0]?.at?.[1] ?? 0.3) * hL, 0);

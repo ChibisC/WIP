@@ -3,6 +3,9 @@
  * notes in docs/creatures. Lengths are fractions of body length L unless
  * noted; colours are linear-ish sRGB hex.
  */
+import type { MandibleSpec } from '../anatomy/mandible';
+import { FIRE_MAJOR, FIRE_WORKER } from '../anatomy/mandibleSpecs';
+
 export type HeadShape = 'round' | 'heart' | 'rect' | 'tri' | 'square';
 export type MandibleType = 'triangular' | 'falcate' | 'massive' | 'small';
 
@@ -50,6 +53,13 @@ export interface AntMorph {
     hook?: number;
     /** falcate only: a small spur near the point (LOD0) */
     barb?: number;
+    /**
+     * jaws pass: built by the shared parametric generator from this spec (render/anatomy/mandibleSpecs.ts; the
+     * numbers in the species' docs/creatures/<id>.md), its length fitted so a closed pair meets in front of the head
+     */
+    spec?: MandibleSpec;
+    /** how far each mandible swings open at full gape (rad; default .95) */
+    open?: number;
   };
   /** `smooth`: one even arch, no metanotal groove (Saiy-Ants, Termants) */
   meso: { len: number; width: number; height: number; queen?: boolean; smooth?: boolean; spines?: { pro?: number; meso?: number; prop?: number } };
@@ -357,7 +367,8 @@ const fireMinor: AntMorph = {
   head: { len: 0.27, width: 0.27, height: 0.17, shape: 'rect', notch: 0.07, carinae: 0.022 },
   eyes: { size: 0.14, pos: 0.6, height: 0.15, ocelli: false },
   antenna: { segments: 10, scape: 0.95, funiculus: 1.15, club: 2, thick: 0.0144 },
-  mandible: { type: 'triangular', len: 0.3, teeth: 4, width: 0.55 },
+  // jaws pass: triangular plates with four teeth, closing in front of the clypeus; open 60–90° apart
+  mandible: { type: 'triangular', len: 0.3, teeth: 4, width: 0.55, spec: FIRE_WORKER, open: 0.7 },
   meso: { len: 0.3, width: 0.145, height: 0.13 },
   waist: { nodes: 2, len: 0.11, nodeH: 0.085, petW: 0.27, postW: 0.29, postH: 0.82, crest: true, subTooth: 0.026 },
   gaster: { len: 0.33, width: 0.26, height: 0.21, sting: true },
@@ -380,7 +391,7 @@ const fireMajor: AntMorph = {
   head: { len: 0.34, width: 0.37, height: 0.215, shape: 'square', notch: 0.22, groove: 0.16, carinae: 0.014 },
   eyes: { size: 0.075, pos: 0.62, height: 0.15, ocelli: false },
   antenna: { segments: 10, scape: 0.55, funiculus: 1.0, club: 2, thick: 0.0105 },
-  mandible: { type: 'massive', len: 0.32, teeth: 2, width: 0.75 },
+  mandible: { type: 'massive', len: 0.32, teeth: 2, width: 0.75, spec: FIRE_MAJOR, open: 0.55 },
   meso: { len: 0.26, width: 0.112, height: 0.122 },
   waist: { nodes: 2, len: 0.095, nodeH: 0.075, petW: 0.27, postW: 0.29, postH: 0.82, crest: true, subTooth: 0.02 },
   gaster: { len: 0.29, width: 0.19, height: 0.158, sting: true },
@@ -397,7 +408,7 @@ const fireQueen: AntMorph = {
   head: { len: 0.15, width: 0.172, height: 0.1, shape: 'rect', carinae: 0.012 },
   eyes: { size: 0.24, pos: 0.58, height: 0.2, ocelli: true },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.15, club: 2, thick: 0.0098 },
-  mandible: { type: 'triangular', len: 0.3, teeth: 4, width: 0.6 },
+  mandible: { type: 'triangular', len: 0.3, teeth: 4, width: 0.6, spec: FIRE_WORKER, open: 0.7 },
   meso: { len: 0.28, width: 0.16, height: 0.18, queen: true },
   waist: { nodes: 2, len: 0.07, nodeH: 0.07, petW: 0.24, postW: 0.27, postH: 0.85, crest: true, subTooth: 0.012 },
   gaster: { len: 0.5, width: 0.31, height: 0.25, sting: true },

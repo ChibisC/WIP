@@ -4,6 +4,8 @@ import type { PartLook } from '../ants/morphs';
 import { REGION } from '../bake/detailBake';
 import { bakeOcclusion } from '../bake/occlusion';
 import { registerPart } from './primitives';
+import { buildMandible } from '../anatomy/mandible';
+import { stagMandible, stagMandibleShare } from '../anatomy/mandibleSpecs';
 import { Rig, V, ease, footAt, tripod } from './rig';
 import type { CrPose } from './builders';
 
@@ -37,11 +39,12 @@ export const SB = {
   // proportions from a major male specimen (top view): head 0.30 wide, pronotum 0.24, elytra 0.27
   elytra: { x0: -0.47, x1: -0.07, half: 0.135, top: 0.178 },
   pronotum: { x0: -0.085, x1: 0.045, half: 0.122, top: 0.158 },
-  head: { x0: 0.035, x1: 0.17, half: 0.162, cy: 0.112, ry: 0.04 },
+  head: { x0: 0.035, x1: 0.165, half: 0.152, cy: 0.11, ry: 0.036 },
   neck: { x: 0.04, y: 0.11 },
-  mand: { x: 0.158, y: 0.108, z: 0.076, len: 0.34 },
-  eye: { x: 0.098, y: 0.112, z: 0.146 },
-  ant: { x: 0.14, y: 0.104, z: 0.115 },
+  // hinged at the head's front corners (jaws pass): the outer margin of each base continues the head's side
+  mand: { x: 0.17, y: 0.104, z: 0.112, len: 0.34 },
+  eye: { x: 0.094, y: 0.112, z: 0.136 },
+  ant: { x: 0.152, y: 0.106, z: 0.118 },
 };
 
 // --------------------------------------------------------------------------- part geometry
@@ -142,34 +145,53 @@ function pronotumGeo(): THREE.BufferGeometry {
 }
 
 /**
- * Head of a major male: broad and flat, narrow at the neck and flaring to sharp front angles (broader than
- * the pronotum), a transverse ridge across the front, the eyes far back at the sides under the canthus.
+ * Head of a major male (jaws pass): broad and flat, as wide as or wider than the pronotum; narrow at the neck,
+ * flaring to the cheeks, notched at the eyes, then widest at the sharp front corners where the mandibles are
+ * hinged; a raised transverse ridge across the front, a shallow hollow behind it.
  */
+const HEAD_W: Array<[number, number]> = [
+  // broad behind (nearly the pronotum's front), the sides diverging to the front corners, a notch at the eyes
+  [0, 0.7],
+  [0.1, 0.82],
+  [0.3, 0.86],
+  [0.42, 0.84],
+  [0.55, 0.9],
+  [0.78, 0.98],
+  [0.92, 1.0],
+  [1, 0.96],
+];
+function headWidth(t: number): number {
+  let i = 0;
+  while (i < HEAD_W.length - 2 && t > HEAD_W[i + 1][0]) i++;
+  const [a, wa] = HEAD_W[i];
+  const [b, wb] = HEAD_W[i + 1];
+  const u = Math.max(0, Math.min(1, (t - a) / (b - a)));
+  return wa + (wb - wa) * u * u * (3 - 2 * u);
+}
 function headGeo(): THREE.BufferGeometry {
   return build((acc) => {
     const H = SB.head;
     const rings: Ring[] = [];
-    const N = 20;
+    const N = 26;
     for (let i = 0; i < N; i++) {
       const t = i / (N - 1); // 0 neck … 1 front
       const x = F(H.x0 + (H.x1 - H.x0) * t);
-      const close = Math.pow(Math.min(1, t / 0.08), 0.45) * Math.pow(Math.min(1, (1 - t) / 0.05), 0.5);
-      // flares from the neck to the front angles (which jut forward), the sides curving out; the cheeks behind
-      // the eyes swell a little
-      const w = F(H.half) * (0.6 + 0.4 * ss(0.0, 0.85, t) + 0.05 * Math.exp(-(((t - 0.35) / 0.12) ** 2))) * Math.max(0.55, close);
-      const ry = F(H.ry) * 1.1 * (0.8 + 0.2 * Math.sin(Math.PI * t)) * Math.max(0.55, close);
-      rings.push({ x, y: F(H.cy), rz: w, ry, n: 2.05 });
+      const close = Math.pow(Math.min(1, t / 0.06), 0.45) * Math.pow(Math.min(1, (1 - t) / 0.025), 0.5);
+      const w = F(H.half) * headWidth(t) * Math.max(0.6, close);
+      const ry = F(H.ry) * (0.85 + 0.15 * Math.sin(Math.PI * t)) * Math.max(0.55, close);
+      rings.push({ x, y: F(H.cy), rz: w, ry, n: 2.7 });
     }
     put(
       acc,
-      loft(rings, 40, (x, y, z, t) => {
-        if (y > F(H.cy)) {
-          // the transverse ridge across the front, a shallow hollow in the middle behind it
-          y += F(0.006) * Math.exp(-(((t - 0.82) / 0.07) ** 2)) - F(0.004) * Math.exp(-(((t - 0.55) / 0.15) ** 2)) * Math.exp(-(z * z) / (F(0.07) ** 2));
-        } else y = F(H.cy) - (F(H.cy) - y) * 0.7;
-        // the front angles jut forward at the sides (the middle of the front margin stays back)
+      loft(rings, 48, (x, y, z, t) => {
         const lat = Math.abs(z) / F(H.half);
-        if (t > 0.85) x += F(0.018) * ss(0.55, 0.95, lat) * ss(0.85, 1, t);
+        if (y > F(H.cy)) {
+          // flat on top; the transverse ridge across the front, a shallow hollow in the middle behind it
+          y = F(H.cy) + (y - F(H.cy)) * 0.85;
+          y += F(0.007) * Math.exp(-(((t - 0.84) / 0.06) ** 2)) * (1 - 0.4 * ss(0.6, 0.95, lat)) - F(0.004) * Math.exp(-(((t - 0.6) / 0.14) ** 2)) * Math.exp(-(z * z) / (F(0.07) ** 2));
+        } else y = F(H.cy) - (F(H.cy) - y) * 0.7;
+        // the front corners jut forward at the sides, the middle of the front margin hollowed between the mandibles
+        if (t > 0.75) x += F(0.034) * ss(0.3, 0.9, lat) * ss(0.75, 1, t) - F(0.01) * (1 - ss(0.1, 0.4, lat)) * ss(0.85, 1, t);
         return [x, y, z];
       }),
       REGION.CR_HEAD,
@@ -270,101 +292,19 @@ function sweep(path: THREE.Vector3[], sec: (t: number) => Section, radial: numbe
 }
 
 /**
- * Antler mandible of a major male (mandible frame: pivot at the origin, pointing +x; +z outward, so the other
- * side is mirrored), realism v2: a robust, flattened blade — taller than wide only at the base, then
- * flattened, the inner edge sharp and the outer rounded — sweeping out and up, then inward like a caliper;
- * the broad inner tooth just past the middle, angled in and up; three small denticles toward the point; the
- * point forked, with an upper tine. Reddish chestnut, darker toward the points and on the teeth.
+ * Antler mandible of a male (jaws pass): built by the shared parametric generator from the species spec
+ * (render/anatomy/mandibleSpecs.ts `stagMandible`, numbers in docs/creatures/lucanus-cervus.md): broad
+ * flattened blades with a sharp inner edge, curving out and back in, the big inner tooth, denticles and the
+ * forked tip; reddish chestnut darkening to near black at the points. `size` 0 a minor male … 1 a major.
+ * Mandible frame: pivot at the origin, pointing +x, +z outward for side +1.
  */
-function mandibleGeo(side: 1 | -1): THREE.BufferGeometry {
-  const ml = F(SB.mand.len);
-  const base = new THREE.Color(0x42181c);
-  const mid = new THREE.Color(0x321318);
-  const tip = new THREE.Color(0x160a0c);
-  const col = new THREE.Color();
-  // the centre line: heading turns from 20° outward to 75° inward, rising at first
-  const n = 40;
-  const P: THREE.Vector3[] = [new THREE.Vector3()];
-  for (let i = 1; i <= n; i++) {
-    const t = (i - 0.5) / n;
-    // out at the base, fairly straight through the middle, hooking inward toward the point (antler-like)
-    const yaw = 0.42 - 0.35 * t - 1.45 * ss(0.5, 1.0, t);
-    const pitch = 0.2 * (1 - t) - 0.03;
-    const d = ml / n;
-    const q = P[i - 1];
-    P.push(new THREE.Vector3(q.x + Math.cos(yaw) * Math.cos(pitch) * d, q.y + Math.sin(pitch) * d, q.z + Math.sin(yaw) * Math.cos(pitch) * d));
-  }
-  const at = (t: number) => P[Math.min(n, Math.round(t * n))].clone();
-  const dirAt = (t: number) => at(Math.min(1, t + 0.03)).sub(at(Math.max(0, t - 0.03))).normalize();
-  const g = build(
-    (acc) => {
-      // the blade: half-width and half-height along it (mm at the 60 mm reference)
-      put(
-        acc,
-        sweep(
-          P,
-          (t) => ({
-            w: F(0.022) * (1 - 0.55 * Math.pow(t, 0.7)) * (1 - 0.35 * ss(0.85, 1, t)) + F(0.0024),
-            h: F(0.011) * (1 - 0.5 * Math.pow(t, 0.6)) * (1 - 0.3 * ss(0.85, 1, t)) + F(0.0011),
-            eIn: 1.35,
-            eOut: 2.3,
-            eUp: 2.6,
-            eDown: 2.0,
-          }),
-          22,
-        ),
-        REGION.CR_MAND,
-      );
-      // a tooth or tine: a flattened tapering blade from inside the main blade at `t`, along `dir`
-      const tooth = (t: number, dir: THREE.Vector3, len: number, w0: number, h0: number, curl = 0.08) => {
-        const a = at(t);
-        const d = dir.clone().normalize();
-        const pts: THREE.Vector3[] = [];
-        const m = 10;
-        for (let k = 0; k <= m; k++) {
-          const u = k / m;
-          pts.push(a.clone().addScaledVector(d, -w0 * 0.6 + len * u).add(new THREE.Vector3(0, len * curl * u * u, 0)));
-        }
-        // a flat blade, broad most of its length and pointed only at the end
-        put(acc, sweep(pts, (u) => ({ w: w0 * (1 - 0.55 * u - 0.4 * ss(0.7, 1, u)), h: h0 * (1 - 0.5 * u), eIn: 1.4, eOut: 1.4, eUp: 2.4, eDown: 2.4 }), 12), REGION.CR_MAND);
-      };
-      // the inward direction at t: the blade's tangent turned toward the midline (−z), tilted up
-      const inward = (t: number, up: number, fwd = 0.15) => {
-        const d = dirAt(t);
-        const inn = new THREE.Vector3(d.z, 0, -d.x).normalize(); // 90° toward −z for a +x blade
-        return inn.multiplyScalar(1).addScaledVector(d, fwd).add(new THREE.Vector3(0, up, 0)).normalize();
-      };
-      // the broad inner tooth, angled in and up
-      tooth(0.6, inward(0.6, 0.45, 0.55), F(0.085), F(0.019), F(0.009), 0.04);
-      // small denticles toward the point
-      for (const [t, l] of [[0.64, 0.016], [0.675, 0.024], [0.71, 0.014], [0.745, 0.027], [0.78, 0.018], [0.815, 0.022], [0.845, 0.012]] as const)
-        tooth(t, inward(t, 0.12, 0.35), F(l), F(0.006), F(0.0035), 0);
-      // the forked point: the upper tine
-      tooth(0.88, dirAt(0.88).add(new THREE.Vector3(0, 1.0, 0)).add(inward(0.88, 0, 0).multiplyScalar(0.45)).normalize(), F(0.055), F(0.011), F(0.008), -0.06);
-    },
-    (x, y, z) => {
-      // reddish chestnut, darker toward the points; the teeth (off the centre line, inward) darker still
-      const d = Math.hypot(x, z);
-      const k = ss(ml * 0.25, ml * 0.62, d);
-      col.copy(base).lerp(mid, k).lerp(tip, ss(ml * 0.62, ml * 0.98, d));
-      return col;
-    },
-  );
-  if (side < 0) {
-    // mirror across z and flip the winding
-    const pos = g.getAttribute('position') as THREE.BufferAttribute;
-    const nrm = g.getAttribute('normal') as THREE.BufferAttribute;
-    for (let i = 0; i < pos.count; i++) {
-      pos.setZ(i, -pos.getZ(i));
-      nrm.setZ(i, -nrm.getZ(i));
-    }
-    const idx = g.getIndex()!;
-    for (let i = 0; i < idx.count; i += 3) {
-      const a = idx.getX(i + 1);
-      idx.setX(i + 1, idx.getX(i + 2));
-      idx.setX(i + 2, a);
-    }
-  }
+function mandibleGeo(side: 1 | -1, size: number): THREE.BufferGeometry {
+  const spec = { ...stagMandible(size), len: F(stagMandibleShare(size)) };
+  const mesh = buildMandible(spec, side);
+  const acc = new Acc();
+  for (const pc of mesh.pieces) acc.pieceCols(pc.pos, pc.idx, 0, pc.col, LOOK, 0, detOf(pc.meta, REGION.CR_MAND));
+  const g = acc.build();
+  bakeOcclusion(g, { radius: F(0.02), skip: acc.skipOcc });
   return g;
 }
 
@@ -449,8 +389,11 @@ export function registerStagParts(): void {
   registerPart('stag_pronotum', { family: fam, make: pronotumGeo });
   registerPart('stag_head', { family: fam, make: headGeo });
   registerPart('stag_under', { family: fam, make: underGeo });
-  registerPart('stag_mandL', { family: fam, make: () => mandibleGeo(1) });
-  registerPart('stag_mandR', { family: fam, make: () => mandibleGeo(-1) });
+  // mandibles per male size (allometry: sizes in quarters, 4 = a major male)
+  for (let q = 0; q <= 4; q++) {
+    registerPart(`stag_mandL${q}`, { family: fam, make: () => mandibleGeo(1, q / 4) });
+    registerPart(`stag_mandR${q}`, { family: fam, make: () => mandibleGeo(-1, q / 4) });
+  }
   for (const k of ['coxa', 'femur', 'tibia1', 'tibia', 'tarsus', 'scape', 'funicle', 'club'] as const) registerPart(`stag_${k}`, { family: fam, make: () => segGeo(k) });
 }
 
@@ -593,21 +536,24 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   for (const sd of [-1, 1]) rig.ell(SB.eye.x * L, SB.eye.y * L, sd * (SB.eye.z - 0.008) * L, 0.015 * L, 0.013 * L, 0.009 * L, SG2.eye, SURF.eye);
   // antler mandibles: open in the wind-up and when rearing, clamped while lifting, flung open in the toss
   const idle = 0.12 + 0.05 * Math.sin(p.t * 1.3 + p.v2 * 5);
+  // male size (allometry, quarters): the game's boss is a major male
+  const msz = Math.round(Math.max(0, Math.min(1, p.data.msize ?? 1)) * 4);
   const open = p.dead ? 0.25 : Math.max(idle, wind * 0.62, rear * 0.55, toss * 0.5) * (1 - lift * 0.85) + lift * 0.02;
   for (const sd of [-1, 1] as const) {
     // a positive yaw turns +x toward −z: open the left (+z) antler with a negative one
-    rig.part(sd > 0 ? 'stag_mandL' : 'stag_mandR', SB.mand.x * L, SB.mand.y * L, sd * SB.mand.z * L, k, SG2.mand, SURF.mand, -sd * open, 0.05);
+    rig.part(`${sd > 0 ? 'stag_mandL' : 'stag_mandR'}${msz}`, SB.mand.x * L, SB.mand.y * L, sd * SB.mand.z * L, k, SG2.mand, SURF.mand, -sd * open, 0);
   }
   // antennae: elbowed — a long scape out to the side, the funicle forward, the comb club; waving a little
   for (const sd of [-1, 1]) {
     const wv = Math.sin(p.t * 2.2 + sd + p.v2 * 7) * 0.12;
     tA.set(SB.ant.x * L, SB.ant.y * L, sd * SB.ant.z * L);
-    tB.set(tA.x + 0.01 * L, tA.y + 0.014 * L, tA.z + sd * 0.12 * L);
+    // the long scape out and forward from in front of the eye (jaws pass: the socket beside the mandible base)
+    tB.set(tA.x + 0.06 * L, tA.y + 0.014 * L, tA.z + sd * 0.1 * L);
     side.set(0, 1, 0);
     rig.partFrame('stag_scape', tA, tB, side, 0.006 * L, 0.006 * L, SG2.black, SURF.leg);
     // the elbow: the funicle turns forward from the end of the long scape
-    const fx = Math.cos(0.2 + wv);
-    const fz = Math.sin(0.2 + wv);
+    const fx = Math.cos(0.45 + wv);
+    const fz = Math.sin(0.45 + wv);
     tA.copy(tB);
     tB.set(tA.x + fx * 0.095 * L, tA.y + 0.004 * L, tA.z + sd * fz * 0.095 * L);
     rig.partFrame('stag_funicle', tA, tB, side, 0.0052 * L, 0.0052 * L, SG2.black, SURF.leg);

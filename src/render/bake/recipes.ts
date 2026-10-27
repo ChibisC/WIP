@@ -39,6 +39,9 @@ const FIRE_LEG: Sculpt = { tile: [0.12, 0.3], noise: 0.0005, pits: { n: 380, r: 
 const FIRE_TARSUS: Sculpt = { tile: [0.06, 0.12], noise: 0.0005, pits: { n: 700, r: 0.0028, depth: 0.0015, pale: 0.5 }, rough: [0.12, 0.3], dirt: 0.55, mottle: 0.06, cavityDark: 0.35 };
 const FIRE_ANTENNA: Sculpt = { tile: [0.08, 0.2], noise: 0.0004, pits: { n: 900, r: 0.002, depth: 0.0008, pale: 0.15 }, rough: [0.1, 0.28], dirt: 0.25, mottle: 0.06, cavityDark: 0.35 };
 
+// jaws pass: the mandibles finely striate lengthwise with scattered hair pits, slightly glossy, thin enough to glow at the edge
+const FIRE_MAND: Sculpt = { tile: [0.1, 0.24], noise: 0.0003, striae: { per: 55, depth: 0.0011, angle: 0, wobble: 0.25 }, pits: { n: 120, r: 0.003, depth: 0.0012, pale: 0.2 }, wave: { cell: 0.06, amp: 0.002 }, rough: [-0.02, 0.24], roughVar: 0.05, dirt: 0.15, mottle: 0.1, cavityDark: 0.3 };
+
 export const FIRE_ANT: DetailRecipe = {
   key: 'fire',
   regions: {
@@ -51,6 +54,7 @@ export const FIRE_ANT: DetailRecipe = {
     [REGION.LEG]: { sculpt: FIRE_LEG, shade: shade(1.0, 0.5, 0, 0.6, 0.35, { coatRough: 0.22, wear: 0.3, dust: 0.35, mid: 0.3, tipThin: 0.6 }), px: [128, 320] },
     [REGION.TARSUS]: { sculpt: FIRE_TARSUS, shade: shade(0.9, 0.45, 0, 0.6, 0.35, { coatRough: 0.36, dust: 0.55, mid: 0.2, tipThin: 0.5 }), px: [64, 128] },
     [REGION.ANTENNA]: { sculpt: FIRE_ANTENNA, shade: shade(0.7, 0.05, 0, 0.6, 0.35, { coatRough: 0.3, dust: 0.15, mid: 0, tipThin: 0.4 }), px: [64, 160] },
+    [REGION.MANDIBLE]: { sculpt: FIRE_MAND, shade: shade(0.8, 0.1, 0, 0.45, 0.35, { coatRough: 0.18, wear: 0.5, dust: 0.05, tipThin: 0.7 }), px: [96, 192] },
   },
 };
 

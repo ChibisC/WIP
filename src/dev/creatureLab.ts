@@ -91,7 +91,7 @@ export function runCreatureLab(canvas: HTMLCanvasElement, q: URLSearchParams): v
       slowT: 0,
       stun: 0,
       faction: -1,
-      data: { riders: num('riders', kind === 'hogna' ? 14 : 0), exposed: num('exposed', 0), eaten: num('eaten', 0), pit: L * 1.3 },
+      data: { riders: num('riders', kind === 'hogna' ? 14 : 0), exposed: num('exposed', 0), eaten: num('eaten', 0), pit: L * 1.3, msize: num('msize', 1) },
     };
   });
   // walk each creature in to its place (backward along its path from the end pose)

@@ -38,7 +38,7 @@ attribute vec4 aSurf;
 attribute vec4 aA; attribute vec4 aB; attribute vec4 aC; attribute vec4 aD;
 attribute vec4 aE; // Saiy-Ants: gold 0..1, ripple dir ±1, exhausted 0..1, hair sway −1..1
 varying vec4 vGold;
-uniform float uMandVert; uniform float uMandSwing; uniform vec3 uCrest;
+uniform float uMandVert; uniform float uMandSwing; uniform float uMandOpen; uniform vec3 uCrest;
 uniform vec3 uLegCoxa[6]; uniform vec3 uLegKnee[6]; uniform vec3 uLegAnkle[6]; uniform vec3 uLegAxis[6];
 uniform vec3 uNeck; uniform vec3 uMandL; uniform vec3 uMandR; uniform vec3 uAntL; uniform vec3 uAntR;
 uniform vec3 uElbL; uniform vec3 uElbR; uniform vec3 uGasterPivot; uniform vec3 uWaistPivot;
@@ -168,8 +168,8 @@ vec3 animP = position;
       if (part == 2) rotP(animP, N, uMandL, RIGHT, -mOpen * uMandSwing);
       if (part == 3) rotP(animP, N, uMandR, RIGHT, -mOpen * uMandSwing);
     } else {
-      if (part == 2) rotP(animP, N, uMandL, UP, mOpen * 0.95);
-      if (part == 3) rotP(animP, N, uMandR, UP, -mOpen * 0.95);
+      if (part == 2) rotP(animP, N, uMandL, UP, mOpen * uMandOpen);
+      if (part == 3) rotP(animP, N, uMandR, UP, -mOpen * uMandOpen);
     }
     // Antennae: funiculus at the elbow, then scape at the socket.
     if (part >= 4) {
@@ -419,7 +419,7 @@ export function antDepthPatch(): ShaderPatch {
 }
 
 export function rigUniforms(rig: AntRig): Record<string, THREE.IUniform> {
-  const x = rig as AntRig & { mandVert?: number; mandSwing?: number; crest?: THREE.Vector3 };
+  const x = rig as AntRig & { mandVert?: number; mandSwing?: number; mandOpen?: number; crest?: THREE.Vector3 };
   return {
     uLegCoxa: { value: rig.coxa },
     uLegKnee: { value: rig.knee },
@@ -439,6 +439,7 @@ export function rigUniforms(rig: AntRig): Record<string, THREE.IUniform> {
     uSoft: { value: rig.soft ?? 0 },
     uMandVert: { value: x.mandVert ?? 0 },
     uMandSwing: { value: x.mandSwing ?? 0.95 },
+    uMandOpen: { value: x.mandOpen ?? 0.95 },
     uCrest: { value: x.crest ?? new THREE.Vector3() },
     uGoldTime: globalUniforms.uTime,
     uReal: { value: 0 },
