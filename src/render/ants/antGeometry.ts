@@ -57,6 +57,10 @@ export interface AntRig {
   /** mm travelled per full gait cycle at amplitude 1. */
   stride: number;
   stance: number;
+  /** the body's highest point above the ground and its greatest half-width (mm): a dead ant rolled onto its
+   * back or side is lifted so its body rests on the ground instead of sinking through it */
+  bodyTop?: number;
+  bodyHalfW?: number;
   /** Max protraction angle (rad). */
   q0: number;
   /** Front of head (mandible tips) x, and gaster tip x — for carry/attach points. */
@@ -1167,6 +1171,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     length: 0,
     stride: 0,
     stance: stanceY,
+    bodyTop: stanceY + Math.max(m.meso.height, m.gaster.height, m.head.height) * Lm,
+    bodyHalfW: (Math.max(m.gaster.width, m.head.width) * Lm) / 2,
     q0: 0.34,
     headTip: new THREE.Vector3(),
     gasterTip,

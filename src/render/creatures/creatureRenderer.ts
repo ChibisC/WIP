@@ -256,6 +256,20 @@ export class CreatureRenderer {
    * blob (or off-screen this frame). Returns false if the creature is unknown.
    */
   mountPose(cr: Creature, v: AntView, alpha: number, out: MountOut): boolean {
+    if (v.heldCr && !v.rideCr) {
+      // held in the jaws: at the recorded jaw point of the body drawn this frame, crosswise, struggling
+      const rec = this.recs.get(cr.id);
+      const jaw = rec && rec.full && this.frame - rec.frame <= 1 ? rec.frames.get('jaw') : undefined;
+      if (!jaw) return false;
+      out.p.setFromMatrixPosition(jaw);
+      _fx.setFromMatrixColumn(jaw, 0).normalize();
+      out.u.setFromMatrixColumn(jaw, 1).normalize();
+      out.f.setFromMatrixColumn(jaw, 2).normalize();
+      out.f.applyAxisAngle(out.u, Math.sin(this.time * 7 + v.id) * 0.25);
+      out.u.applyAxisAngle(out.f, Math.sin(this.time * 11 + v.id * 2) * 0.3);
+      out.speed = 0;
+      return true;
+    }
     const def = CLIMB_DATA[cr.kind];
     if (!def) return false;
     const L = cr.scale || CREATURES[cr.kind]?.length || 10;

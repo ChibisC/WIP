@@ -334,9 +334,24 @@ export class CombatFx {
     this.warnings.push({ g, fill, edge, t: 0, dur: Math.max(0.1, duration), ring: false });
   }
 
-  /** A slam's shock ring, expanding past the radius and fading. */
+  /**
+   * A slam's shock wave: a soft band of dust-coloured haze, transparent at both edges, expanding past the
+   * radius and fading (blind review: the old hard cream ring read as a selection circle).
+   */
   private ring(x: number, y: number, radius: number, heightAt: HeightFn): void {
-    const edge = new THREE.Mesh(new THREE.RingGeometry(radius * 0.9, radius, 48).rotateX(-Math.PI / 2), warnMat(0.6, 0xffd0a0));
+    const geo = new THREE.RingGeometry(radius * 0.55, radius, 48, 2).rotateX(-Math.PI / 2);
+    // three rings of vertices (inner, middle, outer): only the middle one is opaque
+    const n = geo.attributes.position.count;
+    const col = new Float32Array(n * 4);
+    const pos = geo.attributes.position;
+    const rm = radius * 0.8;
+    for (let i = 0; i < n; i++) {
+      const d = Math.hypot(pos.getX(i), pos.getZ(i));
+      col.set([0.66, 0.57, 0.44, Math.max(0, 1 - Math.abs(d - rm) / (radius * 0.24))], i * 4);
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
+    const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.32, depthWrite: false });
+    const edge = new THREE.Mesh(geo, mat);
     const g = new THREE.Group();
     g.add(edge);
     g.position.set(x, heightAt(x, y) + 0.5, y);
@@ -352,7 +367,7 @@ export class CombatFx {
       const k = Math.min(1, w.t / w.dur);
       if (w.ring) {
         w.g.scale.setScalar(0.6 + k * 0.6);
-        (w.edge.material as THREE.MeshBasicMaterial).opacity = 0.6 * (1 - k);
+        (w.edge.material as THREE.MeshBasicMaterial).opacity = 0.32 * (1 - k) * (1 - k);
       } else {
         w.fill!.scale.setScalar(Math.max(0.001, k));
         // the edge pulses faster as the strike comes

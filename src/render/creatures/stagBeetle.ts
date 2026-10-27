@@ -686,7 +686,15 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
     const hf = p.ground(p.x + c * L * 0.25, p.z + s * L * 0.25);
     const hb = p.ground(p.x - c * L * 0.3, p.z - s * L * 0.3);
     const pitch = Math.atan2(hf - hb, L * 0.55) + pitchUp;
-    const flip = p.dead ? L * SB.elytra.top * (1 - Math.cos(roll)) : 0;
+    // dead: it rolls over its edge and comes to rest on its back — lift it just enough that the lowest corner of
+    // the body touches the ground (blind review: the old lift of twice its height left it floating mid-air)
+    let flip = 0;
+    if (p.dead) {
+      const cr = Math.cos(roll);
+      const sr = Math.abs(Math.sin(roll));
+      const low = Math.min(SB.belly * cr, SB.elytra.top * cr) - SB.elytra.half * 0.85 * sr;
+      flip = Math.max(0, -low) * L;
+    }
     // rearing pivots on the hind legs: raise the centre so the elytra apex stays near the ground
     const raise = Math.sin(pitchUp) * L * 0.36 + heave + flip - wind * L * 0.012 - crouch * L * 0.01;
     // a flinch jolts the body back
@@ -740,6 +748,13 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
     const mz = hingeZ(msz);
     rig.part(`${sd > 0 ? 'stag_mandL' : 'stag_mandR'}${msz}`, SB.mand.x * L, SB.mand.y * L, sd * mz * L, k, SG2.mand, SURF.mand, -sd * open + (v2 ? ra.sway : 0), 0);
   }
+  // where the closed antlers hold a gripped ant (between their middles, raised with them): a gripped ant is
+  // drawn here on the animated head, so it rises, struggles and is flung with the jaws (blind review: in the
+  // toss it hung in the air ahead of them)
+  {
+    const ml = stagMandibleShare(msz / 4) * L;
+    rig.recLocal('jaw', SB.mand.x * L + ml * 0.5, SB.mand.y * L + ml * 0.16, 0);
+  }
   // antennae: elbowed — a long scape out to the side, the funicle forward, the comb club; waving a little
   for (const sd of [-1, 1]) {
     const wv = Math.sin(p.t * (2.2 + 6 * flick) + sd + p.v2 * 7) * (0.12 + 0.25 * flick) + (v2 ? ra.aSw * sd : 0);
@@ -775,7 +790,8 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
         const curl = v2 ? ease(p.deadT / 0.5) : 1;
         const tw = Math.sin(p.t * (v2 ? 23 : 7) + i * 2 + sd) * 0.08 * Math.max(0, 1 - p.deadT / (v2 ? 2.5 : 4)) * (v2 ? (Math.sin(p.t * 5 + i) > 0.3 ? 1 : 0.2) : 1);
         footAt(foot, fx * L, sd * reach * L, i * 0.5, 0, 0, 1, 0.6);
-        foot.set(foot.x + ((hx * 0.6 + tw) * L - foot.x) * curl, foot.y + (hip.y - 0.12 * L - foot.y) * curl, foot.z + (sd * (hz + 0.08) * L - foot.z) * curl);
+        // folded in over the belly (the feet near the midline, just off it), not stuck out straight
+        foot.set(foot.x + ((hx * 0.7 + tw) * L - foot.x) * curl, foot.y + (hip.y - 0.05 * L - foot.y) * curl, foot.z + (sd * (hz * 0.45 + 0.02) * L - foot.z) * curl);
       } else {
         if (v2 && ra.feet) {
           wv3.set(ra.feet[j * 3], ra.feet[j * 3 + 1], ra.feet[j * 3 + 2]).applyMatrix4(inv);

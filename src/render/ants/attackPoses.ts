@@ -57,8 +57,12 @@ const strikeEase = (x: number) => {
   return 1 - (1 - t) * (1 - t) * (1 - t);
 };
 
-/** Pose of attack `variant` (0..2) at phase `q` (0..1); `side` ±1 for the side clamp. */
-export function attackPose(variant: number, q: number, side: number, out: AttackPose): AttackPose {
+/**
+ * Pose of attack `variant` (0..2) at phase `q` (0..1); `side` ±1 for the side clamp. `bold` (the animation
+ * pass): bigger key poses that change the outline seen from above (blind review: lunge and clamp differed by a
+ * few pixels); the old motion keeps the small ones.
+ */
+export function attackPose(variant: number, q: number, side: number, out: AttackPose, bold = false): AttackPose {
   neutralPose(out);
   const C = ATTACK_CONTACT;
   // wind-up amount u (0 → 1), strike s (0 → 1), recovery r (1 → 0)
@@ -71,8 +75,9 @@ export function attackPose(variant: number, q: number, side: number, out: Attack
   const v = ((variant % 3) + 3) % 3;
   if (v === 0) {
     // lunge bite
-    const back = -0.06 * u;
-    const lunge = 0.12;
+    // (bold: it crouches back further first and lunges further)
+    const back = (bold ? -0.12 : -0.06) * u;
+    const lunge = bold ? 0.2 : 0.12;
     out.fwd = q < C ? back + (lunge - back) * s : lunge * r;
     out.headPitch = q < C ? 0.18 * u * (1 - s) - 0.3 * s : -0.3 * r;
     out.pitch = q < C ? 0.05 * u * (1 - s) - 0.06 * s : -0.06 * r;
@@ -83,13 +88,14 @@ export function attackPose(variant: number, q: number, side: number, out: Attack
     out.fwd = q < C ? -0.03 * u * (1 - s) + 0.08 * s : 0.08 * r;
   } else {
     // side clamp, then tug back
-    const tw = 0.32 * side;
-    out.yaw = q < C ? tw * u * (1 - s) - 0.12 * side * s : -0.12 * side * r;
-    out.headYaw = q < C ? 0.45 * side * u * (1 - s) - 0.15 * side * s : -0.15 * side * r;
+    const tw = (bold ? 0.5 : 0.32) * side;
+    const ys = bold ? 0.2 : 0.12;
+    out.yaw = q < C ? tw * u * (1 - s) - ys * side * s : -ys * side * r;
+    out.headYaw = q < C ? (bold ? 0.6 : 0.45) * side * u * (1 - s) - (bold ? 0.22 : 0.15) * side * s : -(bold ? 0.22 : 0.15) * side * r;
     out.roll = q < C ? 0.08 * side * u * (1 - s) : 0;
     // forward on the strike; the tug pulls back through the recovery (peak at 0.85), then settles
     const tug = q < C ? 0 : Math.sin(Math.PI * Math.min(1, (q - C) / (1 - C)));
-    out.fwd = q < C ? 0.06 * s : 0.06 * r - 0.08 * tug;
+    out.fwd = q < C ? 0.06 * s : 0.06 * r - (bold ? 0.16 : 0.08) * tug;
     out.headPitch = q < C ? -0.12 * s : -0.12 * r - 0.08 * tug;
   }
   return out;
@@ -109,13 +115,15 @@ function gripSting(q: number, side: number, out: AttackPose): AttackPose {
   const back = q < C ? 1 : 1 - sm((q - C) / (1 - C));
   // gape, then seize and hold, relaxing in the recovery
   out.mand = q < 0.12 ? 0.25 + 0.75 * sm(q / 0.12) : (1 - grip) * 0.95 + 0.05 + 0.2 * (1 - back);
-  // the gaster swings forward under the body, the sting jabs at contact
-  out.gaster = q < C ? -1.25 * curl - 0.55 * jab : -1.8 * back;
+  // the gaster swings down and on forward under the body (past vertical: blind review — curled only down it
+  // could not reach the victim), the sting jabs forward at contact
+  out.gaster = q < C ? -1.75 * curl - 0.75 * jab : -2.5 * back;
   out.sting = q < C ? 0.4 * curl + 0.6 * jab : back;
-  // pivoting round the grip: the body swings to one side and leans down at the jab
-  out.yaw = (0.22 * curl + 0.08 * jab) * side * (q < C ? 1 : back);
-  out.headYaw = -0.18 * side * curl * (q < C ? 1 : back);
-  out.pitch = q < C ? -0.04 * curl - 0.05 * jab : -0.09 * back;
+  // pivoting round the grip: the body swings well to one side (it reads from above) and tips forward onto
+  // the grip, lifting the hind end so the curled gaster clears the ground
+  out.yaw = (0.38 * curl + 0.1 * jab) * side * (q < C ? 1 : back);
+  out.headYaw = -0.3 * side * curl * (q < C ? 1 : back);
+  out.pitch = q < C ? -0.1 * curl - 0.06 * jab : -0.16 * back;
   out.headPitch = -0.22 * grip * (q < C ? 1 : back);
   out.fwd = 0.04 * grip * (q < C ? 1 : back);
   return out;

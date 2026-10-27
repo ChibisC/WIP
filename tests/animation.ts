@@ -195,5 +195,43 @@ function drift(segs: Seg[], dur: number, from = 0.6): { max: number; mean: numbe
   }
   check('death: legs curl in about half a second and the body rolls onto its side or back', at > 0.3 && at < 0.75 && Math.abs(out.deathRoll) > 1.3, `curled at ${at.toFixed(2)} s, roll ${out.deathRoll.toFixed(2)}`);
 }
+{
+  // flung: it tumbles in the air; landing on its back or side it lies kicking a moment, then rights itself
+  let upsideDown = 0;
+  let kicked = 0;
+  let righted = 0;
+  let worst = 0;
+  for (let id = 1; id <= 24; id++) {
+    const v = blankView();
+    v.id = id;
+    v.morph = 'fire_minor';
+    const m = newMotion(id);
+    const s = { phase: 0, amp: 0, pose: 0, poseW: 0, pph: 0, wave: 0, death: 0 };
+    const out = newMotionOut();
+    const step = () => stepMotion(s, m, v, rig, { x: 0, y: 0, h: 0, lastX: 0, lastY: 0, dt: 1 / 60, scale: 1, mounted: false, mountSpeed: 0, fighting: false }, out);
+    for (let k = 0; k < 5; k++) step();
+    // airborne for 0.6 s (a 9 mm hop), then down
+    v.flung = true;
+    for (let k = 0; k < 36; k++) {
+      v.lift = 9 * Math.sin((Math.PI * (k + 1)) / 37);
+      step();
+    }
+    v.flung = false;
+    v.lift = 0;
+    step();
+    const tilt = () => Math.abs(Math.sin((out.spinRoll + out.spinPitch) / 2)); // 0 upright … 1 on its back
+    const onBack = tilt() > 0.7;
+    if (onBack) upsideDown++;
+    let kick = 0;
+    for (let k = 0; k < 90; k++) {
+      step();
+      if (onBack && k < 20) kick = Math.max(kick, out.deathLeg);
+    }
+    if (onBack && kick > 0.3) kicked++;
+    worst = Math.max(worst, tilt());
+    if (tilt() < 0.05) righted++;
+  }
+  check('flung: tumbles, lies kicking a moment if it lands on its back, then rights itself within 1.5 s', upsideDown > 0 && kicked === upsideDown && righted === 24, `${upsideDown}/24 landed on their backs (all kicked: ${kicked}), ${righted}/24 upright after 1.5 s, worst tilt ${worst.toFixed(2)}`);
+}
 console.log(failed ? `\n${failed} animation test(s) FAILED` : '\nall animation tests passed');
 if (failed) (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;

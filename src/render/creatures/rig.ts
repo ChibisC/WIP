@@ -90,6 +90,21 @@ export class Rig {
     m.copy(this.base);
   }
 
+  /**
+   * Record a point in the current sub-frame (or the body frame) as a named frame: e.g. where the jaws hold a
+   * gripped ant, so it can be drawn there on the animated head (render-only).
+   */
+  recLocal(name: string, x: number, y: number, z: number): void {
+    const r = this.rec;
+    if (!r) return;
+    let m = r.frames.get(name);
+    if (!m) r.frames.set(name, (m = new THREE.Matrix4()));
+    _l.makeTranslation(x, y, z);
+    if (this.sub) _ls.multiplyMatrices(this.sub, _l);
+    else _ls.copy(_l);
+    m.multiplyMatrices(this.base, _ls);
+  }
+
   /** Place the local frame: ground point (wx, wy, wz) in world, heading h (sim radians), body pitch/roll. */
   setBase(wx: number, wy: number, wz: number, h: number, pitch = 0, roll = 0): void {
     _e.set(roll, -h, pitch, 'YZX');
@@ -104,7 +119,7 @@ export class Rig {
     }
     _m.multiplyMatrices(this.base, local);
     if (this.flash > 0) {
-      this.fc.set(color).lerp(FLASH, this.flash * 0.3);
+      this.fc.set(color).lerp(FLASH, this.flash * 0.16); // (blind review: at 0.3 a near-black beetle turned salmon)
       this.out.add(prim, _m, this.fc, surf);
     } else this.out.add(prim, _m, color as THREE.Color, surf);
   }
@@ -132,7 +147,7 @@ export class Rig {
     }
     _m.multiplyMatrices(this.base, local);
     if (this.flash > 0) {
-      this.fc.set(color).lerp(FLASH, this.flash * 0.3);
+      this.fc.set(color).lerp(FLASH, this.flash * 0.16); // (blind review: at 0.3 a near-black beetle turned salmon)
       this.out.addPart(name, _m, this.fc, surf);
     } else this.out.addPart(name, _m, color as THREE.Color, surf);
   }

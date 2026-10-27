@@ -146,7 +146,7 @@ export class NestView {
     // creatures first: climbing ants are placed on their animated legs and backs
     this.creatures.update(w.s.creatures, this.space, alpha, dt, this.floorHeight, cam, viewportH);
     this.ants.mount = (v, a, out) => {
-      const cr = w.creatureById.get(v.rideCr ?? 0);
+      const cr = w.creatureById.get(v.rideCr || v.heldCr || 0);
       return !!cr && this.creatures.mountPose(cr, v, a, out);
     };
     this.ants.update(list, alpha, dt, cam, this.adapter, viewportH);

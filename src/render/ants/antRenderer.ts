@@ -92,6 +92,8 @@ export interface AntView {
   atkVar?: number;
   atkSide?: number;
   atkGap?: number;
+  /** held in a creature's jaws (its id; 0 = not): drawn at the jaw frame of its animated body when it records one */
+  heldCr?: number;
   /** climbing a creature (sim/climbing.ts): its id (0 = on the ground), phase 1 up / 2 riding / 3 down, rail, slot, progress */
   rideCr?: number;
   ridePh?: number;
@@ -115,6 +117,14 @@ export type MountFn = (v: AntView, alpha: number, out: MountOut) => boolean;
 const mountOut: MountOut = { p: new THREE.Vector3(), f: new THREE.Vector3(), u: new THREE.Vector3(), speed: 0 };
 
 interface AnimState {
+  /** where it was last drawn mounted (held in jaws, riding) and the gap still being eased out after release */
+  mx?: number;
+  my?: number;
+  mz?: number;
+  wasMounted?: boolean;
+  gx?: number;
+  gy?: number;
+  gz?: number;
   phase: number;
   amp: number;
   wave: number;
@@ -285,6 +295,7 @@ const tmpQ = new THREE.Quaternion();
 const vF = new THREE.Vector3();
 const vU = new THREE.Vector3();
 const vR = new THREE.Vector3();
+const vN = new THREE.Vector3();
 const vP = new THREE.Vector3();
 const vS = new THREE.Vector3();
 const frustum = new THREE.Frustum();
@@ -502,7 +513,7 @@ export class AntRenderer {
       }
       const M = v2 ? motionOut : null;
       // on a creature: its animated leg or back decides where the ant is (and how fast it climbs)
-      const mounted = !!v.rideCr && !!this.mount && this.mount(v, alpha, mountOut);
+      const mounted = (!!v.rideCr || !!v.heldCr) && !!this.mount && this.mount(v, alpha, mountOut);
       // Gait: phase advances by distance travelled / stride length, so feet never slide.
       const scale = (1 + v.sizeVar * 0.12) * (v.scale ?? 1) * (s.m2 ? s.m2.sizeK : 1);
       const fighting = v.atk !== undefined;
@@ -569,7 +580,7 @@ export class AntRenderer {
       const aw = s.aw ?? 0;
       let stingW = 0;
       if (aw > 0.001) {
-        attackPose(s.av ?? 0, s.aq ?? 0, s.as ?? 1, atkP);
+        attackPose(s.av ?? 0, s.aq ?? 0, s.as ?? 1, atkP, !!M);
         hy += atkP.headYaw * aw;
         hp += atkP.headPitch * aw;
         mo += (atkP.mand - mo) * aw;
@@ -640,8 +651,50 @@ export class AntRenderer {
       tmpQ.setFromRotationMatrix(tmpM);
       if (M) {
         vP.addScaledVector(vF, M.fwd).addScaledVector(vR, M.side);
-        vP.addScaledVector(vU, v.lift + M.up + Math.min(1, M.deathLeg) * Math.min(1, Math.abs(M.deathRoll) / 1.4) * rig.stance * 0.3);
+        // (a dead ant rolled about its long axis through the ground point: lift it so its lowest point — the back
+        // or a flank — rests on the ground; blind review: the body sank and only a leg showed)
+        // (the same for a flung ant lying on its back after landing, rolled or pitched over)
+        const dr = M.deathRoll + M.spinRoll;
+        const dp = M.spinPitch;
+        let rest = 0;
+        if (Math.abs(dr) > 1e-3 || Math.abs(dp) > 1e-3) {
+          const top = rig.bodyTop ?? rig.stance * 2.5;
+          const mid = (rig.stance + top) / 2;
+          const hw = rig.bodyHalfW ?? rig.stance;
+          const c = Math.cos(dr);
+          const lowR = Math.min(rig.stance * c, top * c, mid * c - hw * Math.abs(Math.sin(dr)));
+          const cp = Math.cos(dp);
+          const lowP = Math.min(rig.stance * cp, top * cp, mid * cp - rig.length * 0.42 * Math.abs(Math.sin(dp)));
+          rest = Math.max(0, -lowR, -lowP);
+        }
+        vP.addScaledVector(vU, v.lift + M.up);
+        if (rest > 0) vP.addScaledVector(vN.set(s.nx, s.ny, s.nz).normalize(), rest);
       } else vP.addScaledVector(vU, v.lift + s.death * rig.stance * 0.3);
+      // released from jaws or a back: ease from where it was drawn to the sim's position instead of popping
+      if (mounted) {
+        s.mx = vP.x;
+        s.my = vP.y;
+        s.mz = vP.z;
+        s.wasMounted = true;
+        s.gx = s.gy = s.gz = 0;
+      } else {
+        if (s.wasMounted) {
+          s.wasMounted = false;
+          s.gx = (s.mx ?? vP.x) - vP.x;
+          s.gy = (s.my ?? vP.y) - vP.y;
+          s.gz = (s.mz ?? vP.z) - vP.z;
+        }
+        if (s.gx || s.gy || s.gz) {
+          const k = Math.exp(-dt * 9);
+          s.gx = (s.gx ?? 0) * k;
+          s.gy = (s.gy ?? 0) * k;
+          s.gz = (s.gz ?? 0) * k;
+          if (Math.abs(s.gx) + Math.abs(s.gy) + Math.abs(s.gz) < 1e-3) s.gx = s.gy = s.gz = 0;
+          vP.x += s.gx;
+          vP.y += s.gy;
+          vP.z += s.gz;
+        }
+      }
       vS.setScalar(scale);
       tmpM.compose(vP, tmpQ, vS);
 

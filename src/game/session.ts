@@ -1418,7 +1418,7 @@ export class GameSession {
       this.surfCreatures.update(w.s.creatures, SURFACE, alpha, realDt, this.surfHeight, cam, vh);
       this.surfHit.update(w, SURFACE, this.hitboxes, this.surfHeight, v.surfaceRig.goal.x, v.surfaceRig.goal.z, v.surfaceRig.distance * 2);
       this.surfAnts.mount = (av, a, out) => {
-        const cr = w.creatureById.get(av.rideCr ?? 0);
+        const cr = w.creatureById.get(av.rideCr || av.heldCr || 0);
         return !!cr && this.surfCreatures.mountPose(cr, av, a, out);
       };
       this.surfAnts.update(list, alpha, realDt, cam, this.surfAdapter, vh);

@@ -87,6 +87,9 @@ export interface Motion2 {
   spinAxis: number;
   air: boolean;
   bounceT: number;
+  /** after landing: the half turn it came down on, and how long it lies there kicking before rolling upright */
+  landK: number;
+  rightT: number;
   freeze: number;
 }
 
@@ -178,6 +181,8 @@ export function newMotion(id: number): Motion2 {
     spinAxis: r(11) < 0.6 ? 0 : 1,
     air: false,
     bounceT: 9,
+    landK: 0,
+    rightT: 0,
     freeze: 0,
   };
 }
@@ -396,10 +401,21 @@ export function stepMotion(
     if (m.air) {
       m.air = false;
       m.bounceT = 0;
+      // it comes down on whichever half turn is nearest: on its back or side it lies kicking a moment first
+      const half = Math.round(m.spin / Math.PI);
+      m.landK = half * Math.PI;
+      m.rightT = half % 2 !== 0 ? 0.45 + 0.35 * rnd(m) : 0;
     }
-    // settle to the nearest upright turn
-    const k = Math.round(m.spin / (Math.PI * 2)) * Math.PI * 2;
-    m.spin = damp(m.spin, k, 9, dt);
+    if (m.rightT > 0) {
+      // on its back: the legs flail, then it rolls over (blind review: it landed upright at once)
+      m.rightT -= dt;
+      m.spin = damp(m.spin, m.landK, 12, dt);
+      out.deathLeg = Math.max(out.deathLeg, 0.45 + 0.3 * Math.sin(m.bounceT * 26 + m.seed * 5));
+    } else {
+      // roll the rest of the way to the nearest upright turn
+      const k = Math.round(m.spin / (Math.PI * 2)) * Math.PI * 2;
+      m.spin = damp(m.spin, k, 7, dt);
+    }
     m.bounceT += dt;
   }
   if (m.spinAxis === 0) out.spinRoll = m.spin;

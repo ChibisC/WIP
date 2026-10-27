@@ -146,7 +146,7 @@ function clips(): Record<string, Clip> {
     // a hundred workers idling side by side
     idle100: {
       dur: 9,
-      ants: Array.from({ length: 100 }, (_, i) => ({ script: standing(((i % 10) - 4.5) * 3.9, (Math.floor(i / 10) - 4.5) * 3.9, ((i * 2.399) % 6.283) * 0.15) })),
+      ants: Array.from({ length: 100 }, (_, i) => ({ script: standing(((i % 10) - 4.5) * 3.9, (Math.floor(i / 10) - 4.5) * 3.9, (i * 2.399) % 6.283) })),
       cam: { tx: 0, ty: 0, tz: 0, dir: [0.25, 1, 0.55], dist: 60, fov: 30 },
     },
     // three attackers round a worker: lunge bite, grip-and-sting, side clamp; the target flinches and flashes
@@ -306,11 +306,13 @@ function clips(): Record<string, Clip> {
             v.heading = Math.PI / 2;
             v.lift = L * STAG.liftH * (0.4 + 0.6 * rise);
             v.pose = POSE.GRAPPLE;
+            v.heldCr = 900; // drawn in the animated antlers (as the game does for a gripped ant)
             v.roll = Math.sin(t * 20) * 0.35;
             v.mandible = 0.6;
             v.hp = 50 - (t - g0) * 12;
           } else {
-            const u = Math.min(1, (t - tossAt) / 1.1);
+            // a quick, high arc out of the jaws (it peaks while the flick is still on)
+            const u = Math.min(1, (t - tossAt) / 0.8);
             v.x = jx + L * 0.1 + u * L * 0.15;
             v.y = -u * L * 0.55;
             v.heading = Math.PI / 2;
@@ -464,6 +466,7 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
       a.cur.pose = 0;
       a.cur.lift = 0;
       a.cur.flung = false;
+      a.cur.heldCr = 0;
       a.cur.roll = 0;
       a.cur.dead = false;
       a.cur.hp = keepHp;
@@ -548,6 +551,7 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
     cam.updateMatrixWorld();
     sun.target.position.copy(target);
     sun.position.copy(target).addScaledVector(env.sunDir, C.dist * 4);
+    ants.mount = (av, a, out) => !!stag && (av.heldCr === stag.id || av.rideCr === stag.id) && crs.mountPose(stag, av, a, out);
     ants.update(views, alpha, dt, cam, adapter, window.innerHeight);
     fx.update(dt, flat, 1);
     if (draw) post.render(scene, cam);
