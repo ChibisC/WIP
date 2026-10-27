@@ -367,7 +367,8 @@ const fireMinor: AntMorph = {
   // (jaws pass: a little longer than wide, as in the photos)
   head: { len: 0.27, width: 0.25, height: 0.17, shape: 'rect', notch: 0.07, carinae: 0.022 },
   eyes: { size: 0.14, pos: 0.6, height: 0.15, ocelli: false },
-  antenna: { segments: 10, scape: 0.95, funiculus: 1.15, club: 2, thick: 0.0144 },
+  // (jaws review: slimmer scapes, as in the photos)
+  antenna: { segments: 10, scape: 0.95, funiculus: 1.15, club: 2, thick: 0.0118 },
   // jaws pass: triangular plates with four teeth, closing in front of the clypeus; open 60–90° apart
   mandible: { type: 'triangular', len: 0.3, teeth: 4, width: 0.55, spec: FIRE_WORKER, open: 0.7 },
   meso: { len: 0.3, width: 0.145, height: 0.13 },

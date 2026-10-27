@@ -177,10 +177,10 @@ export function stagMandible(size: number): MandibleSpec {
     ],
     // held raised: lifting from the head, levelling toward the points
     pitch: [
-      [0, l(0.14, 0.2)],
-      [0.25, l(0.22, 0.36)],
-      [0.55, l(0.14, 0.26)],
-      [1, l(0.04, 0.08)],
+      [0, l(0.16, 0.28)],
+      [0.25, l(0.24, 0.46)],
+      [0.55, l(0.16, 0.33)],
+      [1, l(0.05, 0.1)],
     ],
     // the base: a smooth swollen bulge seated in the head's front corner, no corner or flange
     baseRound: l(0.12, 0.2),
@@ -227,8 +227,8 @@ export function stagMandible(size: number): MandibleSpec {
     // prong at about 0.78 (longer, slightly upturned; the point itself a little longer still): both shrink with
     // the male, the big tooth to a nub, the fork to a small notch-like prong
     tines: [
-      { u: l(0.58, 0.565), len: l(0.035, 0.12), width: l(0.06, 0.085), thick: l(0.05, 0.055), yaw: 1.52, pitch: 0.05, curl: -0.18, across: 0.85, taper: 1.1, flare: 1.0 },
-      { u: l(0.82, 0.775), len: l(0.07, 0.17), width: l(0.06, 0.08), thick: l(0.045, 0.05), yaw: l(1.0, 1.36), pitch: 0.08, curl: -0.3, across: 0.85, taper: 1.15, flare: 1.0 },
+      { u: l(0.58, 0.565), len: l(0.035, 0.12), width: l(0.06, 0.085), thick: l(0.05, 0.055), yaw: 1.52, pitch: 0.05, curl: -0.18, across: 0.85, taper: 0.8, flare: 0.9 },
+      { u: l(0.82, 0.775), len: l(0.07, 0.17), width: l(0.06, 0.08), thick: l(0.045, 0.05), yaw: l(1.0, 1.36), pitch: 0.08, curl: -0.3, across: 0.85, taper: 0.8, flare: 0.9 },
     ].filter((t) => t.len > 0.02 && (t.u > 0.7 || arm > 0.02)),
     // dark maroon at the base, near black at the points and teeth (satin; finely pitted in the detail bake)
     color: { base: 0x46181c, mid: 0x34121a, tip: 0x0a0506, teeth: 0x080405, dark: [0.45, 0.96] },

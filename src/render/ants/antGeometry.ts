@@ -709,7 +709,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       acc.piece(transformPts(pp, headM), ii, PART.HEAD, m.real ? (x, y, z) => headCol(x - neck.x, y - neck.y, z) : solid(look.head), look.head);
     }
     // clypeal carinae: two ridges running forward over the clypeus, ending in teeth on its front edge
-    if (m.head.carinae && !clypLobe) {
+    // (realism morphs: none — at game scale their ends read as upright prongs; jaws review)
+    if (m.head.carinae && !m.real) {
       for (const s of [-1, 1]) {
         // realism (jaws pass): two low ridges along the clypeus ending in small teeth on its front margin
         // (on the clypeal lobe: low ridges lying on it, ending in small flat teeth on its front margin)

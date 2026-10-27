@@ -38,14 +38,20 @@ margin.
 
 | | Worker and soldier (`FIRE_WORKER`, also the queen) | Major (`FIRE_MAJOR`) |
 |---|---|---|
-| Outline (top) | Subtriangular plate. The outer margin is a quarter ellipse: straight ahead at the hinge, turning to run across the head at the apex (forward reach 0.2, inward 0.34 of the head width). Basal margin to the basal angle at about half way, then the masticatory margin to the apex. Widest 0.3 at the basal angle. | Same plan, shorter and stouter: wider at the base, margins rounder. |
-| Thickness (side) | 0.16 at the hinge to 0.07 at the apex. The cutting edge is a wedge (bevelled to 16 % of the local thickness). The underside is flatter. Droops 0.1–0.3 rad below the head's plane. | 0.3 to 0.14, the edges rounded, droops more. |
-| Teeth | Four: the apical tooth (the apex itself, largest) and three on the masticatory margin at u 0.89, 0.77 and 0.66, getting smaller toward the base, leaning toward the apex. | Two low rounded crowns (worn flat milling seed). |
+| Outline (top) | Triangular plate. The outer margin is a quarter ellipse: straight ahead at the hinge, curving in to an apex just past the midline, 0.47 of the hinge's distance from the midline in front of it. The basal margin (under the clypeus) runs to the basal angle at u 0.48. From there the straight masticatory margin runs about 30° off transverse to the apex. Widest (0.19) at the basal angle. The outline was derived from a target triangle (docs/realism/jaws.md). | A broader quarter ellipse (apex 0.55 ahead). Broad (0.37 at the base), the cutting edge a blunt rounded ridge. |
+| Thickness (side) | 0.11 at the hinge to 0.05 at the apex. The cutting edge is a wedge (bevelled to 16 % of the local thickness) and the underside flatter. Curves down 0.1–0.3 rad below the head's plane. | Deep: 0.42 to 0.2, the edges rounded. Curves down 0.24–0.74 rad round the front of the head. |
+| Teeth | Four: the apical tooth (the apex itself, largest) and three on the masticatory margin at u 0.885, 0.76 and 0.62. They get smaller toward the basal angle and lean toward the apex. | One low rounded crown (worn flat milling seed): nearly toothless. |
 | Tip | A single pointed apical tooth. | Blunt. |
-| Colour | Reddish brown (#7a3214) to #5a2410, near black (#1c0b05) at the apex and on the teeth. | Black-brown (#2a1209) to near black. |
-| Surface | Finely striate lengthwise with scattered hair pits (detail recipe `FIRE_MAND`), slightly glossy, the thin edge translucent. | As the worker's, duller. |
-| Hinge | At the head's anterolateral corners, just under the front margin, 0.84 of the half-width out. The length is fitted so the closed pair overlaps a little (6 %) on the midline in front of the clypeus. | Same. |
-| Closed / open | Closed, the masticatory margins meet across the front of the head. Open, each swings 0.7 rad (the pair about 80° apart). | Each swings 0.55 rad. |
+| Colour | Reddish brown (#8a3816) through #6a2a10 to near black (#1c0b05) at the apex and on the teeth. | Black-brown (#2a1209) to near black. |
+| Surface | Faintly striate lengthwise with scattered hair pits (detail recipe `FIRE_MAND`), slightly glossy, the thin edge translucent. | As the worker's, duller. |
+| Hinge | At the head's anterolateral corners, just under the front margin, 0.84 of the half-width out. The length is fitted so the closed apexes cross a little (10 %) past the midline. | Set higher into the face (0.93 of the head's length, 0.07 of its height below the centre), so the jaws continue the head's front as a blunt muzzle. They meet on the midline. |
+| Closed / open | Closed, a low arc in front of the head. The clypeal lobe covers the bases and the space between the cutting edges, so from above the jaws barely show past it. Open, each swings 0.7 rad (the pair about 80° apart). | Each swings 0.55 rad. |
+
+**Head (jaws review).** The worker's head is a rounded square: nearly parallel sides, the front still broad.
+The clypeus is a lobe projecting forward over the closed jaws. The antennae insert near the front, close to
+the midline. The surface is smooth and shining, with no reticulate cells. The clypeal carinae are left off
+(too small to show; at game scale their ends read as prongs). The major's face darkens gradually into its
+jaws, the lower front most, and its profile slopes down to them.
 
 ## Animation (animation pass, 2026-10-27)
 

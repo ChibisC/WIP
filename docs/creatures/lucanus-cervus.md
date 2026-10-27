@@ -15,20 +15,21 @@
 ## Mandibles (jaws pass, 2026-10-27)
 
 Built by the shared generator (`src/render/anatomy/mandible.ts`) from `stagMandible(size)` in
-`src/render/anatomy/mandibleSpecs.ts`. Measured on the reference photos stag_02, stag_05 and stag_06 (study
-only). `size` is the male's allometric size (0 = a small male, 1 = a large major; the game's boss is a
-major). Fractions are of the mandible's own length, hinge to apex.
+`src/render/anatomy/mandibleSpecs.ts`. The outline was traced on photo stag_03 (a major from above) with
+`tools/mandible-overlay.py`, and the allometry follows photo stag_06 (study only). `size` is the male's
+allometric size: 0 = a small male, 1 = a large major (the game's boss is a major). Fractions are of the
+mandible's own length, hinge to apex.
 
 | | Major male (size 1) | Small male (size 0) |
 |---|---|---|
-| Length | 0.34 of the body length (mandibles included), about the head and pronotum together | 0.17 |
-| Outline (top) | Leaves the head's front corner at about 45° outward, continuing the head's side. Turns to run straight forward through the middle (0.45–0.65), then hooks inward toward the point. Broad flat blade: 0.34 wide at the base (a third of the head's width), 0.12 at the middle, 0.04 near the point. | A gentle inward curve, broad at the base. |
-| Thickness (side) | Flattened top to bottom: 0.11 at the base to 0.03 at the point. Sharp inner edge (wedge), rounded outer edge, flatter underneath. Rises gently (0.28 rad at the base to 0.06 at the point). | Thicker, less flattened. |
-| Teeth | One large inner tooth at half way: a broad flat point 0.13 long, standing in from the inner edge and leaning back toward the head. Three small teeth on the broad base (0.10, 0.17, 0.24). A row of four denticles from 0.65 to 0.76. | One small tooth at 0.72. |
-| Tip | Forked. The point curves inward, and an inner prong branches at 0.77, angled further inward and rising above the point (the upper prong, a little longer). | Simple. |
-| Colour | Dark maroon to chestnut (#4a1c1b, a little darker and duller than the elytra), near black at the points and teeth (#120809). | Same. |
-| Surface | Finely granulate-punctate, satin (detail recipe `STAG_MAND`). | Same. |
-| Hinge | At the head's front corners: the outer margin of each base continues the head's side. | Same. |
+| Length | 0.34 of the body length (mandibles included), about the head and pronotum together | 0.12, about the head's length |
+| Outline (top) | Leaves the head's front corner at about 55° outward from a smooth swollen base. Turns through the basal third to run straight forward (0.45–0.65). Leans in over the distal third, the point hooking in a little more (0.58 rad). Width: 0.29 at the base, 0.15 through the middle, narrowing between the big tooth and the fork, tapering to a sharp point. | Calipers: out a little at the base, curving in all along (to 0.86 rad at the point). |
+| Thickness (side) | Flattened: 0.12 at the base to 0.02 at the point. Sharp inner edge (wedge), rounded outer edge, flatter underneath. Held raised: 0.2 rad at the base, 0.36 through the basal quarter, 0.08 at the point. | Thicker, less raised. |
+| Teeth | The big inner tooth is a thorn 0.12 long at 0.57, standing straight in and a little forward, its root filleted into the blade. A row of seven fine denticles runs from 0.41 to 0.53. | No big tooth. The denticles fade out below mid size. |
+| Tip | Forked. The inner prong at 0.78 is 0.17 long, nearly transverse and slightly upturned. The point above it is a little longer and hooks in. | A small inner prong near the point (0.07). |
+| Colour | Dark maroon (#46181c) at the base, darker through the middle (#34121a), near black at the points and teeth (#0a0506). | Same. |
+| Surface | Satin, finely granulate and pitted (detail recipe `STAG_MAND`, clearcoat roughness 0.3). | Same. |
+| Hinge | At the head's front corners, the base a rounded heel seated in the head. | Same. |
 | Closed / open | At rest the tips point at each other with a gap of about a third of the span. In the grab each swings 0.7 rad outward; clamped, they close past rest. | Same. |
 
 The head (`stagBeetle.ts` `headGeo`) was reshaped to carry them. It is broad and flat, nearly as wide behind
