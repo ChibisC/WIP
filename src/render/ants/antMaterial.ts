@@ -308,8 +308,8 @@ export function antPatch(): ShaderPatch {
            facet = smoothstep(0.42, 0.2, e);
            // realism v2: each facet a smooth dark dome, the seams only slightly duller
            facet = uReal > 0.5 ? smoothstep(0.5, 0.0, e) : facet;
-           diffuseColor.rgb *= uReal > 0.5 ? 0.75 : mix(0.78, 1.0, facet);
-           bumpH = facet * (uReal > 0.5 ? 0.1 : 0.6);
+           diffuseColor.rgb *= uReal > 0.5 ? 0.7 : mix(0.78, 1.0, facet);
+           bumpH = facet * (uReal > 0.5 ? 0.0 : 0.6);
          } else if (uReal < 0.5) {
            // Microsculpture/punctation breaks up highlights on rough chitin (realism v2: the baked detail does this).
            bumpH = (vnoise(vLocal.xz * 70.0 + vLocal.y * 20.0) * 0.6 + vnoise(vLocal.xy * 120.0) * 0.4) * vSurf.x;
@@ -350,7 +350,7 @@ export function antPatch(): ShaderPatch {
         `#include <lights_physical_fragment>
          #ifdef USE_CLEARCOAT
            material.clearcoat = mix(vSurf.y, 0.08, goldM);
-           material.clearcoatRoughness = uReal > 0.5 ? 0.3 : 0.18;
+           material.clearcoatRoughness = uReal > 0.5 ? 0.14 : 0.18;
          #endif
          #ifdef USE_SHEEN
            material.sheenColor = sheenColor * vSurf.z * (1.0 - goldM);

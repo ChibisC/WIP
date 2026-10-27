@@ -55,7 +55,7 @@ export function partGeometry(name: string): THREE.BufferGeometry {
 /** The textured material of a part family: per-instance roughness and gloss (aMat), dappled light, baked detail. */
 function partMaterial(family: string): THREE.MeshPhysicalMaterial {
   // vertex colours carry painted gradients (an antler darkening to its points); instance colour the part's base
-  const m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.5, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.25, envMapIntensity: 0.6 });
+  const m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.5, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.25, envMapIntensity: 0.6, side: THREE.DoubleSide });
   addPatch(m, {
     key: 'crpart',
     vertexHeader: 'attribute vec4 aMat;\nvarying vec4 vMat;',

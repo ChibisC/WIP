@@ -18,7 +18,7 @@ import type { ShaderPatch } from './shaderPatch';
  * ambient light now comes from somewhere: brighter from the sky, dark from the ground, broken by the canopy.
  */
 
-export type LightPreset = 'sunny' | 'overcast' | 'forest';
+export type LightPreset = 'sunny' | 'overcast' | 'forest' | 'studio';
 
 export interface PresetLight {
   /** directional sun: intensity and colour */
@@ -36,6 +36,8 @@ export const PRESETS: Record<LightPreset, PresetLight> = {
   sunny: { sun: 3.0, sunColor: 0xfff0dc, hemiK: 0.18, env: 1.0, sunGlow: 1.0 },
   overcast: { sun: 0.9, sunColor: 0xeef0f4, hemiK: 0.15, env: 1.35, sunGlow: 0.15 },
   forest: { sun: 1.8, sunColor: 0xf6eccd, hemiK: 0.2, env: 1.1, sunGlow: 0.5 },
+  // labs only: a specimen photo — white surroundings, two softboxes (window highlights), a soft key
+  studio: { sun: 1.3, sunColor: 0xffffff, hemiK: 0.08, env: 1.0, sunGlow: 0 },
 };
 
 /** Which preset a map biome uses (render/mapBiomes BIOME_LIGHT keys). */
@@ -80,6 +82,18 @@ void main(){
     // overcast: bright, nearly even, a little brighter overhead, soft cloud bands
     float b = fbm3(vec3(d.x, 0.0, d.z) / (max(y, 0.0) + 0.3) * 1.2);
     c = mix(vec3(0.55, 0.57, 0.60), vec3(0.95, 0.96, 0.99), pow(clamp(y, 0.0, 1.0), 0.5)) * (0.85 + 0.3 * b);
+  } else if (uPreset == 3) {
+    // studio: a diffuser dome, white paper below, and a ring of small lamps above (fibre-optic or ring light):
+    // many small, uneven highlights rather than one window
+    c = mix(vec3(0.36, 0.36, 0.37), vec3(0.58, 0.58, 0.59), clamp(y * 0.5 + 0.5, 0.0, 1.0));
+    for (int k = 0; k < 6; k++) {
+      float a0 = float(k) * 1.047 + 0.35 + 0.25 * h31(vec3(float(k), 1.0, 2.0));
+      float el = 0.55 + 0.25 * h31(vec3(float(k), 3.0, 1.0));
+      vec3 lp = normalize(vec3(cos(a0) * (1.0 - el), el, sin(a0) * (1.0 - el)));
+      float sz = 0.9975 - 0.0015 * h31(vec3(float(k), 5.0, 7.0));
+      c += vec3(9.0 + 5.0 * h31(vec3(float(k), 9.0, 4.0))) * smoothstep(sz, sz + 0.0015, dot(d, lp));
+    }
+    ground = vec3(0.55, 0.54, 0.52);
   } else {
     // forest: sky through a leaf canopy — dark leaves with bright gaps, more gaps overhead
     vec3 sky = mix(vec3(0.45, 0.52, 0.55), vec3(0.60, 0.70, 0.78), clamp(y, 0.0, 1.0));
@@ -97,8 +111,8 @@ void main(){
     }
     c = mix(c, vec3(0.035, 0.028, 0.020) * (0.7 + 0.6 * n3(d * 40.0)), tr);
   }
-  // grass blades and stems against the horizon (all presets), rising out of the ground
-  {
+  // grass blades and stems against the horizon (not in the studio), rising out of the ground
+  if (uPreset != 3) {
     float blade = n1(az * 70.0) * 0.6 + n1(az * 190.0) * 0.4;
     float top = -0.02 + 0.22 * pow(blade, 2.0);
     float g = smoothstep(top, top - 0.03, y) * step(-0.08, y);
@@ -128,7 +142,7 @@ export function presetEnvironment(renderer: THREE.WebGLRenderer, preset: LightPr
     vertexShader: ENV_VS,
     fragmentShader: ENV_FS,
     uniforms: {
-      uPreset: { value: preset === 'sunny' ? 0 : preset === 'overcast' ? 1 : 2 },
+      uPreset: { value: preset === 'sunny' ? 0 : preset === 'overcast' ? 1 : preset === 'studio' ? 3 : 2 },
       uSunDir: { value: sunDir.clone().normalize() },
       uSunCol: { value: new THREE.Color(p.sunColor) },
       uGlow: { value: p.sunGlow },

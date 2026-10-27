@@ -173,6 +173,10 @@ export function runCreatureLab(canvas: HTMLCanvasElement, q: URLSearchParams): v
   // realism v2: a little film grain and stronger contact occlusion for the macro renders
   post.settings.grade.grain = Number(q.get('grain') || 0);
   if (q.get('aostr')) post.settings.aoStrength = Number(q.get('aostr'));
+  // no bloom on a specimen photo (white paper would glow over everything) or when asked
+  if (q.get('bloom') === '0' || q.get('light') === 'studio') post.settings.bloom = false;
+  // soft shadow edges (a lamp or the sun through haze, not a point)
+  env.sun.shadow.radius = Number(q.get('shadowr') || 2.5);
   globalUniforms.uTime.value = 0;
   post.render(scene, cam);
   post.render(scene, cam);

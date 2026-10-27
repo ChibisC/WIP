@@ -340,31 +340,34 @@ const attaQueen: AntMorph = {
 // realism v2 (docs/realism/references.md): muted reddish-brown, not saturated orange; the gaster dark brown
 // behind its paler base; legs and antennae a lighter yellowish brown, the club darker
 const fireLook = {
-  head: L(0x844426, 0.36, 0.28, 0.03, 0x904c2c),
-  meso: L(0x8c4e2c, 0.36, 0.28, 0.03),
-  waist: L(0x86482a, 0.4, 0.24, 0.03),
-  gaster: L(0x382416, 0.32, 0.32, 0.04, 0x6e3e24),
-  legs: L(0x86562f, 0.34, 0.3, 0.04, 0x98663a),
-  antenna: L(0x90603a, 0.34, 0.3, 0.04, 0x5c3a22),
+  // sampled from the reference photos: saturated amber to reddish brown (hue ~20°), very shiny
+  head: L(0x8a3014, 0.2, 0.8, 0.02, 0x963a16),
+  meso: L(0x8e3a14, 0.2, 0.8, 0.02),
+  waist: L(0x8a3a14, 0.24, 0.7, 0.02),
+  gaster: L(0x4a2010, 0.18, 0.85, 0.03, 0x8a3c12),
+  // legs and antennae the body's amber (a little lighter toward the tips), not a separate pale tan
+  legs: L(0x8e3e18, 0.24, 0.65, 0.03, 0x9a4a1e),
+  antenna: L(0x8e4018, 0.28, 0.5, 0.03, 0x5c2a12),
   mandible: L(0x5a2c16, 0.32, 0.32, 0, 0x2a120a),
 };
 
 const fireMinor: AntMorph = {
   key: 'fire_minor',
   L: 2.8,
-  head: { len: 0.26, width: 0.24, height: 0.16, shape: 'rect', carinae: 0.022 },
+  head: { len: 0.27, width: 0.27, height: 0.17, shape: 'rect', notch: 0.07, carinae: 0.022 },
   eyes: { size: 0.14, pos: 0.6, height: 0.15, ocelli: false },
   antenna: { segments: 10, scape: 0.95, funiculus: 1.15, club: 2, thick: 0.0144 },
   mandible: { type: 'triangular', len: 0.3, teeth: 4, width: 0.55 },
-  meso: { len: 0.3, width: 0.12, height: 0.13 },
+  meso: { len: 0.3, width: 0.145, height: 0.13 },
   waist: { nodes: 2, len: 0.11, nodeH: 0.085, petW: 0.27, postW: 0.29, postH: 0.82, crest: true, subTooth: 0.026 },
-  gaster: { len: 0.34, width: 0.22, height: 0.18, sting: true },
-  legs: { hind: 0.88, thick: 0.0145 },
+  gaster: { len: 0.33, width: 0.26, height: 0.21, sting: true },
+  legs: { hind: 0.74, thick: 0.0125 },
   look: fireLook,
   hair: 0.7,
   // abundant long, pale golden erect hairs (docs/creatures/fire-ant.md)
   // erect, thin, yellowish (paler than the body, not gold), most short, some to ~0.3 mm
-  setae: { color: 0xa47a4a, head: 38, meso: 30, gaster: 70, len: [0.025, 0.095] },
+  // many pale erect setae of mixed length, densest on the gaster (they catch the light in the silhouette)
+  setae: { color: 0xc8aa80, head: 56, meso: 46, gaster: 150, len: [0.018, 0.09] },
   real: true,
   stance: 0.12,
 };

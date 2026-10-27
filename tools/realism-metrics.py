@@ -98,7 +98,7 @@ def main():
         species = v.split("_")[0]
         mimg = load(os.path.join(R, f"mask_{v}.png"))
         masks, subject = part_masks(mimg, species)
-        for light in ("overcast", "sunny", "backlit"):
+        for light in ("studio", "overcast", "sunny", "backlit"):
             p = os.path.join(R, f"after_{v}_{light}.png")
             if not os.path.exists(p):
                 continue

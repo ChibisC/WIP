@@ -15,8 +15,13 @@ import { textures } from '../render/textures';
  */
 export function applyLabLight(renderer: THREE.WebGLRenderer, scene: THREE.Scene, env: SurfaceLights, cam: THREE.Camera, target: THREE.Vector3, span: number, q: URLSearchParams, ground?: THREE.Mesh): void {
   const light = q.get('light') || 'sunny';
-  const preset: LightPreset = light === 'overcast' ? 'overcast' : light === 'forest' ? 'forest' : 'sunny';
+  const preset: LightPreset = light === 'overcast' ? 'overcast' : light === 'forest' ? 'forest' : light === 'studio' ? 'studio' : 'sunny';
   const sunDir = env.sunDir.clone();
+  if (light === 'studio') {
+    // the key from above, a little in front of the subject (toward the camera) and to the left
+    const toCam = cam.position.clone().sub(target).setY(0).normalize();
+    sunDir.set(toCam.x * 0.35 - toCam.z * 0.25, 0.9, toCam.z * 0.35 + toCam.x * 0.25).normalize();
+  }
   if (light === 'backlit') {
     // the sun low behind the subject, a little to the side, shining toward the camera
     const back = target.clone().sub(cam.position).setY(0).normalize();
@@ -45,13 +50,19 @@ export function applyLabLight(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
   else if (tm === 'neutral') renderer.toneMapping = THREE.NeutralToneMapping;
   else if (tm === 'aces') renderer.toneMapping = THREE.ACESFilmicToneMapping;
   if (q.get('exp')) renderer.toneMappingExposure = Number(q.get('exp'));
-  if (q.get('bg') === 'studio') {
-    // a museum specimen photo: plain pale backdrop, no ground, soft even light
+  if (q.get('bg') === 'studio' || light === 'studio') {
+    // a specimen photo: the animal on white paper, a plain pale backdrop, soft light
     env.sky.visible = false;
-    if (ground) ground.visible = false;
-    scene.background = new THREE.Color(q.get('bgcol') ? Number('0x' + q.get('bgcol')) : 0xd8d6d0);
+    const paper = q.get('bgcol') ? Number('0x' + q.get('bgcol')) : 0xe2dfd9;
+    if (ground) ground.material = new THREE.MeshStandardMaterial({ color: paper, roughness: 0.92, envMapIntensity: 0.5 });
+    scene.background = new THREE.Color(paper).multiplyScalar(1.15);
+    env.hemi.intensity = 0.55;
+    // the paper fades into the backdrop well before its edge (no horizon band)
+    const camDist = cam.position.distanceTo(target);
+    scene.fog = new THREE.Fog(scene.background.getHex(), camDist * 1.6 + span, camDist * 5 + span * 3);
+    if (ground) ground.scale.setScalar(20);
   }
-  const grains = q.get('mask') === '1' || q.get('bg') === 'studio' ? 0 : Number(q.get('grains') || 0);
+  const grains = q.get('mask') === '1' || q.get('bg') === 'studio' || light === 'studio' ? 0 : Number(q.get('grains') || 0);
   if (grains > 0) {
     scene.add(macroGround(target, span, grains, Number(q.get('grainmm') || span * 0.03), Number(q.get('litter') || 0)));
     // the ground at the subject's scale, three textures blended by low-frequency noise so nothing repeats
@@ -75,36 +86,51 @@ function rand(seed: number): () => number {
 function macroGround(target: THREE.Vector3, span: number, count: number, size: number, litter: number): THREE.Group {
   const rnd = rand(7);
   const g = new THREE.Group();
-  // an irregular grain: an icosphere pushed in and out by smooth noise
-  const geo = mergeVertices(new THREE.IcosahedronGeometry(1, 3));
-  const pos = geo.getAttribute('position') as THREE.BufferAttribute;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    const k = 1 + 0.18 * Math.sin(v.x * 3.1 + 1.3) * Math.cos(v.y * 2.7 + 0.4) + 0.12 * Math.sin(v.z * 4.3 + v.x * 1.7);
-    v.multiplyScalar(k);
-    pos.setXYZ(i, v.x, v.y * 0.75, v.z);
-  }
-  geo.computeVertexNormals();
-  const mat = new THREE.MeshStandardMaterial({ roughness: 0.82, metalness: 0, envMapIntensity: 0.8 });
-  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  // irregular grains: icospheres pushed in and out by smooth noise, three shapes so no two neighbours match
+  const shapes = [0, 1, 2].map((k) => {
+    const geo = mergeVertices(new THREE.IcosahedronGeometry(1, 3));
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+    const v = new THREE.Vector3();
+    const p1 = 1.3 + k * 0.9;
+    const p2 = 2.1 + k * 1.3;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      const kk = 1 + 0.2 * Math.sin(v.x * 3.1 * p1 / 2 + 1.3 + k) * Math.cos(v.y * 2.7 + 0.4 * k) + 0.14 * Math.sin(v.z * 4.3 * p2 / 2 + v.x * 1.7) + (k === 2 ? 0.25 * Math.max(0, v.x) : 0);
+      v.multiplyScalar(kk);
+      pos.setXYZ(i, v.x, v.y * (0.6 + 0.15 * k), v.z * (k === 1 ? 0.75 : 1));
+    }
+    geo.computeVertexNormals();
+    return geo;
+  });
+  const mat = new THREE.MeshStandardMaterial({ roughness: 0.78, metalness: 0, envMapIntensity: 0.8 });
+  const meshes = shapes.map((geo) => new THREE.InstancedMesh(geo, mat, Math.ceil(count / 3)));
+  const mesh = meshes[0];
   const m = new THREE.Matrix4();
   const qq = new THREE.Quaternion();
   const e = new THREE.Euler();
   const c = new THREE.Color();
   const R = span * 2.2;
-  const palette = [0x8c7e66, 0x766a56, 0x9e9078, 0x5a4c3c, 0x6e5a44, 0x3a322a, 0x86745c, 0xa8a090];
+  const palette = [0x7c6e56, 0x665a46, 0x8a7c64, 0x5a4c3c, 0x6e5a44, 0x3a322a, 0x76644c, 0x8a8270, 0x8c806a, 0x4e3e30];
   for (let i = 0; i < count; i++) {
+    const tgt = meshes[i % 3];
+    const j = Math.floor(i / 3);
     const r = R * Math.sqrt(rnd());
     const a = rnd() * Math.PI * 2;
-    const s = size * (0.35 + 1.3 * Math.pow(rnd(), 2));
+    // sizes spread widely: fine sand to small pebbles
+    const s = size * (0.25 + 1.6 * Math.pow(rnd(), 2.4));
     e.set(rnd() * 6.28, rnd() * 6.28, rnd() * 6.28);
     qq.setFromEuler(e);
     // bedded into the soil: only the top of each grain shows
-    m.compose(new THREE.Vector3(target.x + Math.cos(a) * r, s * (-0.15 + 0.2 * rnd()), target.z + Math.sin(a) * r), qq, new THREE.Vector3(s * (0.8 + 0.4 * rnd()), s * (0.55 + 0.25 * rnd()), s * (0.8 + 0.4 * rnd())));
-    mesh.setMatrixAt(i, m);
-    c.setHex(palette[Math.floor(rnd() * palette.length)]).multiplyScalar(0.6 + 0.35 * rnd());
-    mesh.setColorAt(i, c);
+    m.compose(new THREE.Vector3(target.x + Math.cos(a) * r, s * (-0.32 + 0.18 * rnd()), target.z + Math.sin(a) * r), qq, new THREE.Vector3(s * (0.7 + 0.6 * rnd()), s * (0.5 + 0.3 * rnd()), s * (0.7 + 0.6 * rnd())));
+    tgt.setMatrixAt(j, m);
+    c.setHex(palette[Math.floor(rnd() * palette.length)]).multiplyScalar(0.55 + 0.45 * rnd());
+    tgt.setColorAt(j, c);
+  }
+  meshes.forEach((mm, k) => (mm.count = Math.floor((count - k + 2) / 3)));
+  for (const mm of meshes.slice(1)) {
+    mm.castShadow = true;
+    mm.receiveShadow = true;
+    g.add(mm);
   }
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -189,8 +215,8 @@ export function renderLabMask(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
 function mixGround(ground: THREE.Mesh, span: number): void {
   const tex = textures();
   const size = (ground.geometry as THREE.PlaneGeometry).parameters?.width ?? 400;
-  const mat = new THREE.MeshStandardMaterial({ map: tex.sand.map, normalMap: tex.soil.normal, roughness: 0.95, envMapIntensity: 0.6 });
-  for (const t of [tex.sand.map, tex.soil.map, tex.litter.map, tex.noise, tex.soil.normal]) {
+  const mat = new THREE.MeshStandardMaterial({ map: tex.sand.map, normalMap: tex.sand.normal, roughness: 0.95, envMapIntensity: 0.6 });
+  for (const t of [tex.sand.map, tex.soil.map, tex.litter.map, tex.noise, tex.sand.normal]) {
     if (!t) continue;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
   }

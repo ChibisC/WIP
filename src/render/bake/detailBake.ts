@@ -328,7 +328,7 @@ void main() {
     float dark = 1.0 - uMix2[r].x * cav;
     vec3 alb = vec3(dark) * (1.0 + Mx.w * s.mot * 0.6) + vec3(0.10, 0.08, 0.05) * s.pale;
     // pit hairs: pale golden
-    alb = mix(alb, vec3(1.45, 1.3, 1.0), s.hair * 0.7);
+    alb = mix(alb, vec3(1.3, 1.18, 0.95), s.hair * 0.4);
     // dust settles in the hollows: a dull grey-brown that also roughens
     alb = mix(alb, vec3(1.25, 1.12, 0.95), Mx.z * cav * 0.55);
     float rough = mix(Mx.x, Mx.y, cav) + Mx.z * cav * 0.15 + uMix2[r].z * s.rv * 2.0 + 0.1 * s.hair;

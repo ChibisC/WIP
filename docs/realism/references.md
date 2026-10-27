@@ -49,6 +49,39 @@ and the Muséum de Toulouse specimen ([Wikimedia Commons](https://c.enwp.org/wik
 
 ## Sampled colours (photos)
 
-Pending: the workspace cannot download images, so the photos for colour sampling and the side-by-side
-comparison sheets come from the user (study only). `tools/realism-metrics.py docs/realism/pilot-v2/renders <refs>`
-fills this section from their `refs.json`.
+Thirteen reference photos supplied by the user (7 fire ant, 6 stag beetle; study only, kept out of the
+repository in `docs/realism/pilot-v2/refs/`, catalogued with crops, part rectangles and the matching render
+view in its `refs.json`). Median sRGB and HSV of the hand-marked part rectangles (`tools/realism-metrics.py`):
+
+| photo | part | hue° | sat | val | median sRGB |
+|---|---|---|---|---|---|
+| fire_07 (worker, top, white) | head | 17.7 | 0.72 | 0.57 | #873513 |
+| fire_07 | mesosoma | 18.2 | 0.88 | 0.56 | #8b3109 |
+| fire_07 | gaster | 22.6 | 0.86 | 0.61 | #9b410b |
+| fire_02 (major, on sand) | head | 19.3 | 0.94 | 0.53 | #923602 |
+| fire_02 | mesosoma | 26.5 | 0.79 | 0.73 | #ba5a0d |
+| fire_02 | gaster | 24.8 | 0.92 | 0.61 | #a54b02 |
+| fire_04 (major, profile, white) | head | 1.0 | 0.59 | 0.41 | #652a26 |
+| fire_04 | mesosoma | 3.3 | 0.53 | 0.30 | #4a2525 |
+| fire_04 | gaster | 272 | 0.43 | 0.28 | #2c2834 (dark, sky-blue sheen) |
+| fire_04 | legs | 14.6 | 0.59 | 0.51 | #794032 |
+| stag_03 (male specimen, top, white) | elytra | 3.1 | 0.57 | 0.47 | #75312e |
+| stag_03 | pronotum | 18.3 | 0.32 | 0.24 | #342c28 |
+| stag_03 | head | 14.0 | 0.15 | 0.48 | #786d6a (granular, catching the light) |
+| stag_03 | mandibles | 0 | 0.50 | 0.24 | #301a1a |
+| stag_01 (male on bark, daylight) | elytra | 320 | 0.30 | 0.34 | #4c3c49 (sky sheen) |
+| stag_01 | pronotum | 211 | 0.45 | 0.34 | #304150 (black with blue sky reflection) |
+| stag_01 | head | 209 | 0.41 | 0.45 | #455b70 |
+
+What the photos corrected:
+- **Fire ant colour:** not muted. Workers are a strongly saturated amber to reddish brown (hue 17–26°,
+  saturation 0.72–0.94, value 0.53–0.73); the gaster is amber in some workers and dark brown in others
+  (majors darker overall).
+- **Fire ant gloss:** polished, with crisp window-shaped highlights from the light source; sculpture is barely
+  visible except as scattered hair punctures; hairs pale, most visible around the gaster of majors.
+- **Stag colour:** elytra maroon (hue ~3°), not chestnut; mandibles dark maroon; head and pronotum black but
+  granular, so they read dark grey with a soft sheen; in daylight the black parts reflect the blue sky.
+- **Stag anatomy:** head broader than the pronotum (0.30 vs 0.24 of the length), elytra 0.27 wide with a
+  rounded apex and a fine dark suture; mandibles ~⅓ of the length, nearly flat, with the inner tooth, a row
+  of denticles and the forked tip; long, slender legs (fore legs reaching the mandible bases, hind tarsi past
+  the elytra) with spined tibiae; elbowed antennae with a long scape; golden hair at the pronotum's edges.

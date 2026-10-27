@@ -34,12 +34,13 @@ const LOOK: PartLook = { color: 0xffffff, rough: 0.5, coat: 0.5, sheen: 0 };
  */
 export const SB = {
   belly: 0.05,
-  elytra: { x0: -0.47, x1: -0.07, half: 0.145, top: 0.178 },
-  pronotum: { x0: -0.085, x1: 0.045, half: 0.14, top: 0.158 },
-  head: { x0: 0.035, x1: 0.17, half: 0.15, cy: 0.112, ry: 0.04 },
+  // proportions from a major male specimen (top view): head 0.30 wide, pronotum 0.24, elytra 0.27
+  elytra: { x0: -0.47, x1: -0.07, half: 0.135, top: 0.178 },
+  pronotum: { x0: -0.085, x1: 0.045, half: 0.122, top: 0.158 },
+  head: { x0: 0.035, x1: 0.17, half: 0.162, cy: 0.112, ry: 0.04 },
   neck: { x: 0.04, y: 0.11 },
-  mand: { x: 0.158, y: 0.108, z: 0.076, len: 0.3 },
-  eye: { x: 0.098, y: 0.112, z: 0.138 },
+  mand: { x: 0.158, y: 0.108, z: 0.076, len: 0.34 },
+  eye: { x: 0.098, y: 0.112, z: 0.146 },
   ant: { x: 0.14, y: 0.104, z: 0.115 },
 };
 
@@ -64,10 +65,10 @@ function elytraGeo(): THREE.BufferGeometry {
   const E0 = SB.elytra;
   const paint = (x: number, _y: number, z: number) => {
     const lat = Math.abs(z) / F(E0.half);
-    const sut = Math.exp(-(z * z) / (F(0.006) ** 2));
+    const sut = Math.exp(-(z * z) / (F(0.0045) ** 2));
     const apex = ss(F(E0.x0 + 0.12), F(E0.x0), x);
     const shoulder = ss(F(E0.x1 - 0.05), F(E0.x1), x);
-    const k = 1.08 - 0.3 * ss(0.62, 1.0, lat) - 0.45 * sut - 0.22 * apex - 0.1 * shoulder;
+    const k = 1.08 - 0.3 * ss(0.62, 1.0, lat) - 0.7 * sut - 0.22 * apex - 0.1 * shoulder;
     return col.setRGB(k * 1.02, k, k * 0.96);
   };
   return build((acc) => {
@@ -77,9 +78,9 @@ function elytraGeo(): THREE.BufferGeometry {
     for (let i = 0; i < N; i++) {
       const t = i / (N - 1); // 0 front (shoulders) … 1 apex
       const x = F(E.x1 + (E.x0 - E.x1) * t);
-      const shoulder = 0.88 + 0.12 * ss(0, 0.12, t);
-      // parallel sides, then a broad rounded apex
-      const apex = Math.sqrt(Math.max(0, 1 - Math.pow(ss(0.6, 1.0, t), 2.2)));
+      // square shoulders (the humeral angles), the sides converging a little toward a broadly rounded apex
+      const shoulder = (0.9 + 0.1 * ss(0, 0.05, t)) * (1 - 0.1 * ss(0.08, 0.7, t));
+      const apex = t < 0.68 ? 1 : Math.sqrt(Math.max(0, 1 - Math.pow((t - 0.68) / 0.32, 2)));
       const close = Math.pow(Math.min(1, t / 0.035), 0.5);
       const w = F(E.half) * shoulder * Math.max(0.08, apex) * Math.max(0.88, close);
       const dome = 0.82 + 0.18 * Math.sin(Math.PI * Math.min(1, 0.15 + t * 1.1));
@@ -89,17 +90,18 @@ function elytraGeo(): THREE.BufferGeometry {
     }
     put(
       acc,
-      loft(rings, 64, (x, y, z, t) => {
+      // (enough vertices around for the suture's fine line to show)
+      loft(rings, 128, (x, y, z, t) => {
         const r = rings[Math.round(t * (N - 1))];
         const lat = Math.abs(z) / Math.max(1e-3, r.rz);
         // a domed back and a flatter belly; the suture down the middle
         if (y < r.y) y = r.y - (r.y - y) * 0.55;
         else {
-          y -= F(0.0042) * Math.exp(-(z * z) / (F(0.003) ** 2));
+          y -= F(0.006) * Math.exp(-(z * z) / (F(0.0035) ** 2)) - F(0.0018) * Math.exp(-(((Math.abs(z) - F(0.008)) / F(0.004)) ** 2));
           // the humeral calli: a low swelling at each shoulder
           y += F(0.006) * Math.exp(-(((t - 0.08) / 0.07) ** 2)) * Math.exp(-(((lat - 0.72) / 0.16) ** 2));
           // the lateral margin turned up a little into a fine rim
-          y += F(0.0022) * ss(0.86, 0.97, lat) * (1 - ss(0.97, 1.0, lat));
+          y += F(0.0045) * ss(0.88, 0.96, lat) * (1 - ss(0.97, 1.0, lat)) - F(0.0025) * Math.exp(-(((lat - 0.84) / 0.03) ** 2));
         }
         return [x, y, z];
       }),
@@ -276,17 +278,18 @@ function sweep(path: THREE.Vector3[], sec: (t: number) => Section, radial: numbe
  */
 function mandibleGeo(side: 1 | -1): THREE.BufferGeometry {
   const ml = F(SB.mand.len);
-  const base = new THREE.Color(0x6a3418);
-  const mid = new THREE.Color(0x5a2a14);
-  const tip = new THREE.Color(0x24100a);
+  const base = new THREE.Color(0x42181c);
+  const mid = new THREE.Color(0x321318);
+  const tip = new THREE.Color(0x160a0c);
   const col = new THREE.Color();
   // the centre line: heading turns from 20° outward to 75° inward, rising at first
   const n = 40;
   const P: THREE.Vector3[] = [new THREE.Vector3()];
   for (let i = 1; i <= n; i++) {
     const t = (i - 0.5) / n;
-    const yaw = 0.36 - 1.65 * Math.pow(t, 1.35);
-    const pitch = 0.36 * (1 - t) - 0.04;
+    // out at the base, fairly straight through the middle, hooking inward toward the point (antler-like)
+    const yaw = 0.42 - 0.35 * t - 1.45 * ss(0.5, 1.0, t);
+    const pitch = 0.2 * (1 - t) - 0.03;
     const d = ml / n;
     const q = P[i - 1];
     P.push(new THREE.Vector3(q.x + Math.cos(yaw) * Math.cos(pitch) * d, q.y + Math.sin(pitch) * d, q.z + Math.sin(yaw) * Math.cos(pitch) * d));
@@ -301,8 +304,8 @@ function mandibleGeo(side: 1 | -1): THREE.BufferGeometry {
         sweep(
           P,
           (t) => ({
-            w: F(0.028) * (1 - 0.62 * Math.pow(t, 0.8)) * (1 - 0.35 * ss(0.85, 1, t)) + F(0.0028),
-            h: F(0.023) * (1 - 0.68 * Math.pow(t, 0.6)) * (1 - 0.3 * ss(0.85, 1, t)) + F(0.0016),
+            w: F(0.022) * (1 - 0.55 * Math.pow(t, 0.7)) * (1 - 0.35 * ss(0.85, 1, t)) + F(0.0024),
+            h: F(0.011) * (1 - 0.5 * Math.pow(t, 0.6)) * (1 - 0.3 * ss(0.85, 1, t)) + F(0.0011),
             eIn: 1.35,
             eOut: 2.3,
             eUp: 2.6,
@@ -322,7 +325,8 @@ function mandibleGeo(side: 1 | -1): THREE.BufferGeometry {
           const u = k / m;
           pts.push(a.clone().addScaledVector(d, -w0 * 0.6 + len * u).add(new THREE.Vector3(0, len * curl * u * u, 0)));
         }
-        put(acc, sweep(pts, (u) => ({ w: w0 * (1 - 0.92 * Math.pow(u, 0.9)), h: h0 * (1 - 0.85 * Math.pow(u, 0.9)), eIn: 1.6, eOut: 1.6, eUp: 2.2, eDown: 2.0 }), 12), REGION.CR_MAND);
+        // a flat blade, broad most of its length and pointed only at the end
+        put(acc, sweep(pts, (u) => ({ w: w0 * (1 - 0.55 * u - 0.4 * ss(0.7, 1, u)), h: h0 * (1 - 0.5 * u), eIn: 1.4, eOut: 1.4, eUp: 2.4, eDown: 2.4 }), 12), REGION.CR_MAND);
       };
       // the inward direction at t: the blade's tangent turned toward the midline (−z), tilted up
       const inward = (t: number, up: number, fwd = 0.15) => {
@@ -331,9 +335,10 @@ function mandibleGeo(side: 1 | -1): THREE.BufferGeometry {
         return inn.multiplyScalar(1).addScaledVector(d, fwd).add(new THREE.Vector3(0, up, 0)).normalize();
       };
       // the broad inner tooth, angled in and up
-      tooth(0.56, inward(0.56, 0.5, 0.3), F(0.095), F(0.024), F(0.012), 0.04);
+      tooth(0.6, inward(0.6, 0.45, 0.55), F(0.085), F(0.019), F(0.009), 0.04);
       // small denticles toward the point
-      for (const t of [0.68, 0.75, 0.82]) tooth(t, inward(t, 0.15, 0.3), F(0.03), F(0.009), F(0.006), 0);
+      for (const [t, l] of [[0.64, 0.016], [0.675, 0.024], [0.71, 0.014], [0.745, 0.027], [0.78, 0.018], [0.815, 0.022], [0.845, 0.012]] as const)
+        tooth(t, inward(t, 0.12, 0.35), F(l), F(0.006), F(0.0035), 0);
       // the forked point: the upper tine
       tooth(0.88, dirAt(0.88).add(new THREE.Vector3(0, 1.0, 0)).add(inward(0.88, 0, 0).multiplyScalar(0.45)).normalize(), F(0.055), F(0.011), F(0.008), -0.06);
     },
@@ -378,7 +383,7 @@ function segGeo(kind: 'coxa' | 'femur' | 'tibia1' | 'tibia' | 'tarsus' | 'scape'
         // a narrow neck at the trochanter, broad and flattened, the knee condyles at the end
         rad.push(0.7 + 0.5 * Math.sin(Math.PI * Math.pow(t, 0.8)) - 0.15 * t + 0.18 * ss(0.86, 1, t));
       }
-      put(acc, tube(pts, rad, 14, false, false, 0.62), reg);
+      put(acc, tube(pts, rad, 14, false, false, 0.85), reg);
     } else if (kind === 'tibia1' || kind === 'tibia') {
       const fore = kind === 'tibia1';
       const pts: THREE.Vector3[] = [];
@@ -388,7 +393,7 @@ function segGeo(kind: 'coxa' | 'femur' | 'tibia1' | 'tibia' | 'tarsus' | 'scape'
         pts.push(Y(t, fore ? 0.25 * t * t : 0));
         rad.push(fore ? 0.7 + 0.75 * t : 0.72 + 0.22 * t);
       }
-      put(acc, tube(pts, rad, 14, false, false, fore ? 0.68 : 0.8), reg);
+      put(acc, tube(pts, rad, 14, false, false, fore ? 0.82 : 0.92), reg);
       // teeth on the outer edge (the fore tibia digs; the others carry small spines), and the apical spurs
       const teeth = fore ? [0.42, 0.6, 0.76, 0.9] : [0.5, 0.72];
       // (y is in leg lengths, x and z in thicknesses: keep the teeth's y offsets tiny) — small, blunt teeth
@@ -399,6 +404,14 @@ function segGeo(kind: 'coxa' | 'femur' | 'tibia1' | 'tibia' | 'tarsus' | 'scape'
         put(acc, tube([a, b], [r0, 0.05], 6, false, true), reg);
       }
       for (const z of [-0.4, 0.4]) put(acc, tube([Y(0.97, 0, z * (fore ? 0.5 : 0.7)), Y(1.06, -0.3, z)], [0.26, 0.03], 6, false, true), reg);
+      // rows of fine spines along the tibia (the mid and hind tibiae of Lucanus are spinose)
+      if (!fore)
+        for (let k = 0; k < 7; k++) {
+          const t = 0.18 + k * 0.11;
+          const zz = (k % 2 ? -0.45 : 0.45) * 0.8;
+          const a0 = Y(t, 0.55, zz);
+          put(acc, tube([a0, a0.clone().add(new THREE.Vector3(0.75, 0.035, zz * 0.4))], [0.12, 0.02], 5, false, true), reg);
+        }
     } else if (kind === 'tarsus') {
       const shares = [0.18, 0.14, 0.13, 0.13, 0.42];
       let y = 0;
@@ -419,7 +432,7 @@ function segGeo(kind: 'coxa' | 'femur' | 'tibia1' | 'tibia' | 'tarsus' | 'scape'
       // the club: four lamellae combed out to one side (+x)
       for (let k = 0; k < 4; k++) {
         const y = (k + 0.5) / 4;
-        put(acc, ellipsoid(new THREE.Vector3(1.0, y, 0), new THREE.Vector3(1.35, 0.1, 0.55), 12), reg);
+        put(acc, ellipsoid(new THREE.Vector3(0.65, y, 0), new THREE.Vector3(1.05, 0.11, 0.5), 12), reg);
         put(acc, ellipsoid(new THREE.Vector3(0, y, 0), new THREE.Vector3(0.5, 0.13, 0.5), 8), reg);
       }
     }
@@ -445,10 +458,12 @@ export function registerStagParts(): void {
 
 const C = (hex: number) => new THREE.Color(hex);
 /** Colours (docs/creatures/stagBeetle.md): chestnut elytra, black head, pronotum, legs and underside. */
-export const SG2 = { elytra: C(0x4c2e1a), black: C(0x0d0b0a), leg: C(0x0e0c0b), under: C(0x14100d), eye: C(0x080605), mand: C(0xffffff) };
+// colours sampled from specimen and field photos (docs/realism/references.md): maroon elytra and mandibles
+export const SG2 = { gold: C(0x4a3a26), elytra: C(0x4e2420), black: C(0x2a2623), leg: C(0x1e1a18), under: C(0x1a1612), eye: C(0x080605), mand: C(0xffffff) };
 const S = (rough: number, gloss: number) => ({ rough, gloss, pattern: 0, scale: 1 });
 // realism v2: satin, not lacquer (the clearcoat roughness per region is in render/bake/recipes.ts)
-const SURF = { elytra: S(0.44, 0.42), shield: S(0.38, 0.45), head: S(0.42, 0.4), mand: S(0.52, 0.3), leg: S(0.4, 0.42), under: S(0.6, 0.15), eye: S(0.1, 1.0) };
+const SURF = { elytra: S(0.38, 0.42), shield: S(0.58, 0.25), head: S(0.66, 0.18), mand: S(0.5, 0.35), leg: S(0.42, 0.42), under: S(0.6, 0.15), eye: S(0.1, 1.0) };
+const HAIR = { rough: 0.9, gloss: 0, pattern: 2, scale: 3 };
 const jit = new THREE.Color();
 /** Each beetle a little different (hue and value), from its variation seed. */
 function jitter(c: THREE.Color, v: number, k = 1): THREE.Color {
@@ -474,9 +489,10 @@ const pv = new THREE.Vector3();
 
 /** Rest legs: [hip x, hip z, foot x, foot reach, femur, tibia, tarsus] (fractions of L). */
 const LEGS: Array<[number, number, number, number, number, number, number]> = [
-  [-0.02, 0.055, 0.17, 0.3, 0.125, 0.12, 0.1],
-  [-0.11, 0.07, -0.07, 0.36, 0.13, 0.13, 0.11],
-  [-0.17, 0.08, -0.32, 0.34, 0.14, 0.15, 0.12],
+  // long, slender legs (a specimen's fore legs reach past the mandible bases)
+  [-0.02, 0.055, 0.19, 0.31, 0.15, 0.15, 0.13],
+  [-0.11, 0.07, -0.15, 0.37, 0.16, 0.16, 0.14],
+  [-0.17, 0.08, -0.43, 0.33, 0.17, 0.18, 0.15],
 ];
 
 /** Knee for a two-bone leg from hip to foot (bending up and out), the foot clamped to its reach. */
@@ -558,6 +574,9 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   rig.part('stag_pronotum', 0, 0, 0, k, SG2.black, SURF.shield);
   // scutellum
   rig.ell(-0.08 * L, 0.174 * L, 0, 0.012 * L, 0.003 * L, 0.011 * L, SG2.black, SURF.shield);
+  // golden hair at the joints: behind the pronotum (around the scutellum) and in front of it
+  rig.ell(-0.077 * L, 0.16 * L, 0, 0.005 * L, 0.004 * L, 0.06 * L, SG2.gold, HAIR);
+  rig.ell(0.043 * L, 0.118 * L, 0, 0.004 * L, 0.004 * L, 0.06 * L, SG2.gold, HAIR);
 
   // head frame: pitches about the neck (down to grab, up to lift and toss), yaws a little in the toss
   const tossSide = p.v2 > 0.5 ? 1 : -1;
@@ -571,7 +590,7 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   head.multiply(mloc);
   rig.sub = head;
   rig.part('stag_head', 0, 0, 0, k, SG2.black, SURF.head);
-  for (const sd of [-1, 1]) rig.ell(SB.eye.x * L, SB.eye.y * L, sd * SB.eye.z * L, 0.018 * L, 0.016 * L, 0.011 * L, SG2.eye, SURF.eye);
+  for (const sd of [-1, 1]) rig.ell(SB.eye.x * L, SB.eye.y * L, sd * (SB.eye.z - 0.008) * L, 0.015 * L, 0.013 * L, 0.009 * L, SG2.eye, SURF.eye);
   // antler mandibles: open in the wind-up and when rearing, clamped while lifting, flung open in the toss
   const idle = 0.12 + 0.05 * Math.sin(p.t * 1.3 + p.v2 * 5);
   const open = p.dead ? 0.25 : Math.max(idle, wind * 0.62, rear * 0.55, toss * 0.5) * (1 - lift * 0.85) + lift * 0.02;
@@ -585,15 +604,15 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
     tA.set(SB.ant.x * L, SB.ant.y * L, sd * SB.ant.z * L);
     tB.set(tA.x + 0.01 * L, tA.y + 0.014 * L, tA.z + sd * 0.12 * L);
     side.set(0, 1, 0);
-    rig.partFrame('stag_scape', tA, tB, side, 0.008 * L, 0.008 * L, SG2.black, SURF.leg);
+    rig.partFrame('stag_scape', tA, tB, side, 0.006 * L, 0.006 * L, SG2.black, SURF.leg);
     // the elbow: the funicle turns forward from the end of the long scape
     const fx = Math.cos(0.2 + wv);
     const fz = Math.sin(0.2 + wv);
     tA.copy(tB);
-    tB.set(tA.x + fx * 0.06 * L, tA.y + 0.004 * L, tA.z + sd * fz * 0.06 * L);
+    tB.set(tA.x + fx * 0.095 * L, tA.y + 0.004 * L, tA.z + sd * fz * 0.095 * L);
     rig.partFrame('stag_funicle', tA, tB, side, 0.0052 * L, 0.0052 * L, SG2.black, SURF.leg);
     tA.copy(tB);
-    tB.set(tA.x + fx * 0.04 * L, tA.y + 0.003 * L, tA.z + sd * fz * 0.04 * L);
+    tB.set(tA.x + fx * 0.045 * L, tA.y + 0.003 * L, tA.z + sd * fz * 0.045 * L);
     side.set(-fz * sd * 0.3, 0.2, fx * sd);
     rig.partFrame('stag_club', tA, tB, side, 0.006 * L, 0.006 * L, SG2.black, SURF.leg);
   }
@@ -622,7 +641,7 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
       solveKnee(hip, ankle, l1 * L, l2 * L, sd, knee);
       side.set(dz / dl, 0, -dx / dl);
       // femora ~4 mm across on a 100 mm beetle, flattened; tibiae a little thinner, tarsi slender
-      const r = 0.023 * L;
+      const r = 0.02 * L;
       rig.partFrame('stag_coxa', hip, tA.set(hip.x, hip.y - 0.004 * L, hip.z + sd * 0.022 * L), side, r * 1.2, r * 1.2, SG2.leg, SURF.leg);
       rig.partFrame('stag_femur', tA, knee, side, r * 1.1, r * 0.9, SG2.leg, SURF.leg);
       side.set(0, 1, 0);

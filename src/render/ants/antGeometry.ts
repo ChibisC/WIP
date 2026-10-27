@@ -425,7 +425,7 @@ function seta(acc: Acc, rng: Rng, base: THREE.Vector3, out: THREE.Vector3, l: nu
   dir.z += rng.range(-0.22, 0.22);
   dir.normalize();
   const bend = lv.clone().add(new THREE.Vector3(0, -0.3, rng.range(-0.25, 0.25))).normalize().multiplyScalar(rng.range(0.1, 0.4));
-  const r0 = 0.00085 * Lm * rng.range(0.75, 1.2);
+  const r0 = 0.0007 * Lm * rng.range(0.75, 1.2);
   const pts: THREE.Vector3[] = [];
   const rad: number[] = [];
   const N = 5;
@@ -517,7 +517,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       }
       const close = Math.pow(Math.min(1, t / 0.06), 0.5) * Math.pow(Math.min(1, (1 - t) / 0.05), 0.5);
       const height = mH * top * Math.max(0.12, close);
-      rings.push({ x: t * mL, y: mBottom + height * 0.5, rz: (mW / 2) * wid * Math.max(0.15, close), ry: height * 0.5, n: 2.4 });
+      // (realism v2: a rounder section — the promesonotum a convex dome, not a box)
+      rings.push({ x: t * mL, y: mBottom + height * 0.5, rz: (mW / 2) * wid * Math.max(0.15, close), ry: height * 0.5, n: m.real ? 2.1 : 2.4 });
     }
     const [p, ind, meta] = loft(rings, RAD);
     acc.piece(
@@ -838,7 +839,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const [p1, i1, m1] = tube([sock, scMid, elbow], [antThick * 0.8, antThick * 0.95, antThick * 1.15], hi ? 7 : 5, true, true);
     acc.piece(p1, i1, s < 0 ? PART.SCAPE_L : PART.SCAPE_R, grad(look.antenna, () => 0), look.antenna, 0, undefined, detOf(m1, REGION.ANTENNA));
     // funiculus
-    const fDir = new THREE.Vector3(0.86, -0.36, 0.3 * s).normalize();
+    const fDir = m.real ? new THREE.Vector3(0.8, -0.45, -0.2 * s).normalize() : new THREE.Vector3(0.86, -0.36, 0.3 * s).normalize();
     const nseg = m.antenna.segments - 1;
     const clubN = m.antenna.club;
     const lens: number[] = [];
@@ -868,8 +869,9 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
           // realism v2: each segment a short cylinder widening toward its tip (obconical), close-set
           const nxt = cur.clone().addScaledVector(d, segL);
           const club = clubN > 0 && i >= nseg - clubN;
-          const rr = club ? [r * 0.72, r * 0.98, r, r * 0.86] : [r * 0.74, r * 0.86, r, r * 0.92];
-          const [pp, ii, fm] = tube([cur.clone(), cur.clone().lerp(nxt, 0.25), cur.clone().lerp(nxt, 0.8), nxt.clone().addScaledVector(d, -segL * 0.02)], rr, 9, i === 0, i === nseg - 1);
+          const rr = club ? [r * 0.8, r * 0.98, r, r * 0.9] : [r * 0.88, r * 0.95, r, r * 0.97];
+          // closed at both ends (an open end would show the background through the joint)
+          const [pp, ii, fm] = tube([cur.clone().addScaledVector(d, -segL * 0.06), cur.clone().lerp(nxt, 0.25), cur.clone().lerp(nxt, 0.8), nxt.clone().addScaledVector(d, -segL * 0.02)], rr, 9, true, true);
           acc.piece(pp, ii, funPart, () => col, look.antenna, 0, undefined, detOf(fm, REGION.ANTENNA));
         } else {
           const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), d);
@@ -965,7 +967,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       e *= 1 - 0.18 * ss(0.75, 1.0, t);
       let groove = 0;
       if (hi && m.real) {
-        for (const b of plates) if (t > b) groove += 0.045 * Math.exp(-(t - b) / 0.03);
+        for (const b of plates) if (t > b) groove += 0.028 * Math.exp(-(t - b) / 0.03);
       } else if (hi) for (const b of bands) groove += 0.035 * Math.exp(-((t - b) ** 2) / 0.0006);
       const close = Math.pow(Math.min(1, t / 0.07), 0.5);
       const front = 0.32 + 0.68 * close;
@@ -1027,7 +1029,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       const hc = new THREE.Color(hairCol);
       for (let k = 0; k < n; k++) {
         const t = rng.range(0.1, 0.92);
-        const ang = rng.range(-0.2, Math.PI + 0.2); // dorsal-ish half
+        const ang = m.real ? rng.range(-0.75, Math.PI + 0.75) : rng.range(-0.2, Math.PI + 0.2); // dorsal-ish half (realism v2: round to the sides)
         const ri = Math.round(t * (N - 1));
         const rg = rings[ri];
         const base = new THREE.Vector3(rg.x, rg.y + Math.sin(ang) * rg.ry * 0.97, Math.cos(ang) * rg.rz * 0.97);
@@ -1084,7 +1086,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const tL = legLen * 0.05;
     const fL = legLen * 0.32;
     const tiL = legLen * 0.28;
-    const taL = legLen * 0.21;
+    const taL = legLen * (m.real ? 0.17 : 0.21);
     const base = new THREE.Vector3(coxaX[pair], mBottom + mH * 0.12, side * mW * 0.28);
     const outward = [0.55, 0.15, -0.35][pair];
     const coxaDir = new THREE.Vector3(outward * 0.6, -0.62, side * 0.62).normalize();
@@ -1142,7 +1144,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         const t = i / n;
         pts.push(trEnd.clone().lerp(knee, t));
         // realism v2: a narrow neck at the trochanter, the club, and the knee condyles
-        rad.push(m.real && hi ? th * (0.7 + 0.42 * Math.sin(Math.PI * Math.pow(t, 0.75)) - 0.12 * t + 0.16 * ss(0.86, 1, t)) : th * (0.88 + 0.26 * Math.sin(Math.PI * Math.pow(t, 0.8)) - 0.1 * t));
+        rad.push(m.real && hi ? th * (0.72 + 0.68 * Math.sin(Math.PI * Math.pow(t, 0.8)) - 0.12 * t + 0.14 * ss(0.86, 1, t)) : th * (0.88 + 0.26 * Math.sin(Math.PI * Math.pow(t, 0.8)) - 0.1 * t));
       }
       const [pp, ii, fm] = tube(pts, rad, hi ? 8 : 5, true, true, m.real && hi ? 0.68 : 0.8);
       acc.piece(pp, ii, pid, lcol, ll, 0, undefined, detOf(fm, REGION.LEG));

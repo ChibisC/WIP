@@ -27,6 +27,36 @@ except Exception:
     FONT = SMALL = ImageFont.load_default()
 
 
+def contain(im, w, h):
+    """Scale to fit inside w×h, padded with the image's own border colour (no part of the animal cut off)."""
+    import numpy as np
+    a = np.asarray(im.convert("RGB"))
+    border = np.concatenate([a[0], a[-1], a[:, 0], a[:, -1]])
+    bg = tuple(int(v) for v in np.median(border, axis=0))
+    s = min(w / im.width, h / im.height)
+    im2 = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
+    out = Image.new("RGB", (w, h), bg)
+    out.paste(im2, ((w - im2.width) // 2, (h - im2.height) // 2))
+    return out
+
+
+def subject_crop(render_path, margin=0.12):
+    """A render cropped to the animal (its part mask), so it is framed like the photo."""
+    im = Image.open(render_path).convert("RGB")
+    view = os.path.basename(render_path)[len("after_"):].rsplit("_", 1)[0]
+    mp = os.path.join(R, f"mask_{view}.png")
+    if not os.path.exists(mp):
+        return im
+    import numpy as np
+    m = np.asarray(Image.open(mp).convert("RGB")).sum(axis=2) > 30
+    ys, xs = np.nonzero(m)
+    if len(xs) < 50:
+        return im
+    x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
+    dx, dy = (x1 - x0) * margin, (y1 - y0) * margin
+    return im.crop((max(0, int(x0 - dx)), max(0, int(y0 - dy)), min(im.width, int(x1 + dx)), min(im.height, int(y1 + dy))))
+
+
 def fit(im, w, h):
     """Scale to cover w×h and crop the middle (photos and renders have different aspects)."""
     s = max(w / im.width, h / im.height)
@@ -73,26 +103,45 @@ refs = []
 if REFS and os.path.exists(os.path.join(REFS, "refs.json")):
     refs = json.load(open(os.path.join(REFS, "refs.json")))
 
-VIEWS = ["side", "top", "front", "34", "macro"]
-NAMES = {"side": "side", "top": "top", "front": "front / head", "34": "three-quarter", "macro": "macro close-up"}
+VIEWS = ["profile", "side", "top", "front", "34", "macro"]
+NAMES = {"profile": "profile", "side": "side", "top": "top", "front": "front / head", "34": "three-quarter", "macro": "macro close-up"}
+LIGHTS = ["studio", "overcast", "sunny"]
+
+
+def ref_image(r):
+    """A reference photo, cropped to the animal when refs.json gives a crop (labels and scale bars removed)."""
+    im = Image.open(os.path.join(REFS, r["file"])).convert("RGB")
+    if r.get("crop"):
+        im = im.crop(tuple(r["crop"]))
+    return im
+
+
+def tile_img(im, label, sub="", w=520, h=330):
+    tmp = os.path.join(D, ".tile.png")
+    im.save(tmp)
+    t = tile(tmp, label, sub, w, h)
+    os.remove(tmp)
+    return t
+
+
 for sp, title in (("fire", "Tropical fire ant worker (Solenopsis geminata): photo vs render"), ("stag", "Stag beetle (Lucanus cervus) male: photo vs render")):
     rows = []
-    for v in VIEWS:
-        ref = next((r for r in refs if r["species"] == sp and r.get("render") == f"{sp}_{v}"), None)
-        rp = os.path.join(REFS, ref["file"]) if ref else None
-        credit = f"{ref.get('credit', '')} ({ref.get('license', '')})" if ref else ""
-        items = [
-            (rp, "reference photo (study only)", credit),
-            (os.path.join(R, f"after_{sp}_{v}_overcast.png"), "render: overcast", ""),
-            (os.path.join(R, f"after_{sp}_{v}_sunny.png"), "render: sunny", ""),
-        ]
-        rows.append((NAMES[v], items))
-    grid(f"compare-{sp}.png", title, [(n, [tile(*it) for it in items]) for n, items in rows])
+    for r in [r for r in refs if r["species"] == sp]:
+        v = r["render"]
+        light = r.get("light", "overcast")
+        credit = f"{r.get('credit', '')} ({r.get('license', '')})"
+        items = [tile_img(ref_image(r), f"photo {r['file']} (study only)", credit[:70])]
+        for l in [light] + [x for x in LIGHTS if x != light]:
+            items.append(tile(os.path.join(R, f"after_{v}_{l}.png"), f"render: {v.split('_', 1)[1]}, {l}"))
+        rows.append((r["file"].split(".")[0], items))
+    grid(f"compare-{sp}.png", title, rows)
 
 rows = []
 for sp in ("fire", "stag"):
     for v in VIEWS:
-        rows.append((f"{sp} {NAMES[v]}", [tile(os.path.join(R, f"before_{sp}_{v}.png"), "before"), tile(os.path.join(R, f"after_{sp}_{v}_overcast.png"), "after (overcast)"), tile(os.path.join(R, f"after_{sp}_{v}_sunny.png"), "after (sunny)")]))
+        if not os.path.exists(os.path.join(R, f"before_{sp}_{v}.png")):
+            continue
+        rows.append((f"{sp} {NAMES[v]}", [tile(os.path.join(R, f"before_{sp}_{v}.png"), "before"), tile(os.path.join(R, f"after_{sp}_{v}_overcast.png"), "after (overcast)"), tile(os.path.join(R, f"after_{sp}_{v}_sunny.png"), "after (sunny)"), tile(os.path.join(R, f"after_{sp}_{v}_studio.png"), "after (studio)")]))
 grid("before-after.png", "Realism v2: before and after (same cameras)", rows)
 
 grid("backlit.png", "Backlit test: the sun low behind the animal", [("fire ant", [tile(os.path.join(R, "after_fire_side_backlit.png"), "backlit", w=780, h=460), tile(os.path.join(R, "after_fire_side_sunny.png"), "front-lit (sunny)", w=780, h=460)]), ("stag beetle", [tile(os.path.join(R, "after_stag_side_backlit.png"), "backlit", w=780, h=460), tile(os.path.join(R, "after_stag_side_sunny.png"), "front-lit (sunny)", w=780, h=460)])], w=780, h=460)
@@ -113,8 +162,20 @@ if refs:
         if not os.path.exists(rp):
             continue
         n += 1
-        photo = fit(Image.open(os.path.join(REFS, r["file"])).convert("RGB"), 700, 470)
-        rend = fit(Image.open(rp).convert("RGB"), 700, 470)
+        src = ref_image(r)
+        # the same treatment for both: the render brought down to the photo's resolution, both through JPEG
+        rimg = subject_crop(rp)
+        sc = min(1.0, max(src.width / rimg.width, src.height / rimg.height))
+        rimg = rimg.resize((max(1, round(rimg.width * sc)), max(1, round(rimg.height * sc))), Image.LANCZOS)
+
+        def jpeg(im):
+            import io
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=88)
+            return Image.open(io.BytesIO(buf.getvalue())).convert("RGB")
+
+        photo = contain(jpeg(src), 700, 470)
+        rend = contain(jpeg(rimg), 700, 470)
         left_is_photo = rnd.random() < 0.5
         pair = Image.new("RGB", (1420, 490), (20, 20, 20))
         pair.paste(photo if left_is_photo else rend, (0, 10))

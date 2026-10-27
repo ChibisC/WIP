@@ -23,19 +23,21 @@ H = int(os.environ.get("H", "760"))
 os.makedirs(OUT, exist_ok=True)
 
 ANT = "scene=antlab&ant=fire_minor"
-STAG = "scene=crlab&kind=stagBeetle&walk=0"
+STAG = "scene=crlab&kind=stagBeetle&walk=0.35&speed=0.4"
 # name: (subject query, camera query, ground, depth of field)
 VIEWS = {
     "fire_side": (ANT, "cam=fside&dist=5.2&ty=0.3", "grains=500&grainmm=0.09", 0.5),
-    "fire_top": (ANT, "cam=top&dist=6.0", "grains=500&grainmm=0.09", 0.4),
+    "fire_top": (ANT, "cam=top&dist=7.6", "grains=500&grainmm=0.09", 0.4),
     "fire_front": (ANT, "cam=front&dist=2.4&tx=1.1&ty=0.35", "grains=400&grainmm=0.09", 0.7),
-    "fire_34": (ANT, "cam=34", "grains=500&grainmm=0.09", 0.6),
-    "fire_macro": (ANT, "cam=34&dist=2.2&tx=0.5&ty=0.4", "grains=300&grainmm=0.09", 0.9),
+    "fire_34": (ANT, "cam=34", "grains=500&grainmm=0.09", 1.2),
+    "fire_macro": (ANT, "cam=34&dist=2.2&tx=0.5&ty=0.4", "grains=300&grainmm=0.09", 1.4),
+    # specimen-photo style profiles (studio light: the animal on white paper)
+    "fire_profile": (ANT, "cam=side&dist=4.6&ty=0.35", "", 0.25),
     "stag_side": (STAG, "cam=fside&dist=190&ty=7", "grains=500&grainmm=1.4&litter=10", 0.5),
     "stag_top": (STAG, "cam=top&dist=210", "grains=500&grainmm=1.4&litter=10", 0.4),
     "stag_front": (STAG, "cam=front&dist=120&tx=18&ty=8", "grains=400&grainmm=1.4&litter=8", 0.7),
-    "stag_34": (STAG, "cam=34", "grains=500&grainmm=1.4&litter=10", 0.6),
-    "stag_macro": (STAG, "cam=34&dist=95&tx=14&ty=8", "grains=400&grainmm=1.2", 0.9),
+    "stag_34": (STAG, "cam=34", "grains=500&grainmm=1.4&litter=10", 1.1),
+    "stag_macro": (STAG, "cam=34&dist=95&tx=14&ty=8", "grains=400&grainmm=1.2", 1.3),
 }
 LIGHTS = [l for l in os.environ.get("LIGHTS", "overcast,sunny").split(",") if l]
 # a macro photo's character: a little grain, contact occlusion
@@ -68,7 +70,8 @@ with sync_playwright() as p:
             shot(pg, AFTER, f"{subj}&{cam}&{ground}&light=backlit&tm={TM}&dof={dof}&{LENS}", os.path.join(OUT, f"after_{name}_backlit.png"))
         if os.environ.get("MASKS", "1") == "1":
             shot(pg, AFTER, f"{subj}&{cam}&mask=1", os.path.join(OUT, f"mask_{name}.png"))
-        if BEFORE:
+        # (the old build has no elevated side camera: no before shot for those views)
+        if BEFORE and "fside" not in cam:
             shot(pg, BEFORE, f"{subj}&{cam}&dof={dof}", os.path.join(OUT, f"before_{name}.png"))
     b.close()
 print("errors:", errs[:8])
