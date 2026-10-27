@@ -43,7 +43,23 @@ makes the blind pairs.
 
 ## Pilot results
 
-Two review rounds by fresh reviewers drove the changes (scores and notes in `PROGRESS.md`).
+Four review rounds by fresh reviewers drove the changes (scores and notes in `PROGRESS.md`). The scores
+levelled off at 4–6 / 10 by round 3, and the reviewers began to contradict each other (gloss, how small males'
+jaws curve), so the pilot stops there for the user's judgement.
+
+**Fire ant, round 4.**
+- The worker's jaws are amber like the head, with only the cutting edge and teeth near black (`edgeDark`),
+  so the closed pair reads as two jaws rather than one dark rim.
+- The worker's head narrows a little toward the front, and the antennae insert further forward.
+- The major's jaws are a bigger, deeper wedge, glossy reddish black and broad at the end. They sit without
+  a separate clypeus knob above them.
+
+**Stag beetle, round 4.**
+- Small males' jaws are short (about the head's length), stout and nearly straight, keeping a small fork
+  prong and a nub of the big tooth.
+- The tines are flat, broad-based lobes rather than cones, and the blade's section is flatter.
+- The colour is a less saturated purple-chestnut with a little more gloss.
+- Small males' heads are narrower (half-width 0.085 of the body length against the major's 0.142).
 
 - **Fire ant worker.** The outer margin is a quarter ellipse: it leaves the head's front corner straight
   ahead and curves in to an apex just past the midline, about half the hinge's distance in front of it. The

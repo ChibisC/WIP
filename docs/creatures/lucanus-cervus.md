@@ -22,13 +22,13 @@ mandible's own length, hinge to apex.
 
 | | Major male (size 1) | Small male (size 0) |
 |---|---|---|
-| Length | 0.34 of the body length (mandibles included), about the head and pronotum together | 0.12, about the head's length |
-| Outline (top) | Leaves the head's front corner at about 55° outward from a smooth swollen base. Turns through the basal third to run straight forward (0.45–0.65). Leans in over the distal third, the point hooking in a little more (0.58 rad). Width: 0.29 at the base, 0.15 through the middle, narrowing between the big tooth and the fork, tapering to a sharp point. | Calipers: out a little at the base, curving in all along (to 0.86 rad at the point). |
+| Length | 0.34 of the body length (mandibles included), about the head and pronotum together | 0.075, about the head's length |
+| Outline (top) | Leaves the head's front corner at about 55° outward from a smooth swollen base. Turns through the basal third to run straight forward (0.45–0.65). Leans in over the distal third, the point hooking in a little more (0.58 rad). Width: 0.29 at the base, 0.15 through the middle, narrowing between the big tooth and the fork, tapering to a sharp point. | Short and stout (widths 1.45× the major's as fractions of length), nearly straight, the point turning in a little (0.56 rad). |
 | Thickness (side) | Flattened: 0.12 at the base to 0.02 at the point. Sharp inner edge (wedge), rounded outer edge, flatter underneath. Held raised: 0.2 rad at the base, 0.36 through the basal quarter, 0.08 at the point. | Thicker, less raised. |
-| Teeth | The big inner tooth is a thorn 0.12 long at 0.57, standing straight in and a little forward, its root filleted into the blade. A row of seven fine denticles runs from 0.41 to 0.53. | No big tooth. The denticles fade out below mid size. |
-| Tip | Forked. The inner prong at 0.78 is 0.17 long, nearly transverse and slightly upturned. The point above it is a little longer and hooks in. | A small inner prong near the point (0.07). |
-| Colour | Dark maroon (#46181c) at the base, darker through the middle (#34121a), near black at the points and teeth (#0a0506). | Same. |
-| Surface | Satin, finely granulate and pitted (detail recipe `STAG_MAND`, clearcoat roughness 0.3). | Same. |
+| Teeth | The big inner tooth is a flat, broad-based lobe 0.1 long at 0.57, standing straight in and a little forward, its root filleted into the blade. A row of seven fine denticles runs from 0.41 to 0.53. | A nub of the big tooth (0.04). The denticles fade out below mid size. |
+| Tip | Forked. The inner prong at 0.78 is 0.15 long, flat, nearly transverse and slightly upturned. The point above it is a little longer and hooks in. | A small inner prong near the point (0.08). |
+| Colour | Purple-chestnut (#3e1c22) at the base, darker through the middle (#2e161c), near black at the points and teeth (#0a0506). | Same. |
+| Surface | Satin to glossy, finely granulate and pitted (detail recipe `STAG_MAND`, clearcoat roughness 0.22). | Same. |
 | Hinge | At the head's front corners, the base a rounded heel seated in the head. | Same. |
 | Closed / open | At rest the tips point at each other with a gap of about a third of the span. In the grab each swings 0.7 rad outward; clamped, they close past rest. | Same. |
 

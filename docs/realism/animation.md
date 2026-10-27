@@ -35,14 +35,24 @@ The vertex shader's planted-feet solve is in `src/render/ants/antMaterial.ts` (`
 - **Crossfades.** Poses blend out and in within 0.1–0.25 s. Attacks ease in at 12/s and out at 9/s.
 - **Attacks** (`attackPoses.ts`). Each has a wind-up, a fast strike that lands on the damage tick, and a
   recovery. Fire ants cycle three:
-  - **lunge bite**: draw back with the jaws agape, thrust and snap;
-  - **grip and sting**: seize, swing the gaster under, pivot round the grip and jab;
-  - **side clamp and tug**.
+  - **lunge bite**: crouch back with the jaws agape, thrust a fifth of a body length and snap;
+  - **grip and sting**: seize, pivot well to one side round the grip, tip forward onto it (the hind end lifts)
+    and swing the gaster down and on forward under the body, past vertical, so the sting jabs toward the
+    victim;
+  - **side clamp and tug**: swing the head and body half a radian aside, clamp, then tug back.
+
+  The key poses are bold enough to change the outline seen from above; the old motion keeps its small ones.
 - **Hits.** A recoil or a side flinch with a small overshoot, a brief warm flash, and a 50 ms hit-stop of the
   ant's own animation clocks. The flinch and flash are rate-limited so steady biting does not flicker.
 - **Deaths.** The legs curl in about half a second with a fading twitch, and the body rolls onto its back
-  or its side.
-- **Flung ants** tumble in the air, land with a bounce and right themselves.
+  or its side. It is lifted just enough that its back or flank rests on the ground: it rolls about its long
+  axis through the ground point, so without that it sank and only a leg showed.
+- **Flung ants** tumble in the air and land with a bounce. One that comes down on its back or side lies there
+  kicking for half a second or so, then rolls upright; it rests on the ground the same way as a dead one.
+- **Held in jaws.** An ant gripped by a creature is drawn at the jaw point that the creature's animated body
+  records (`rig.recLocal('jaw', …)`, the stag beetle's antlers), crosswise and struggling, so it rises with
+  the heave and leaves with the toss. If none is recorded, the sim's position is used. On release, the gap
+  between the drawn and the sim position eases out over about a quarter second instead of popping.
 - **Secondary motion.** The antennae lag and overshoot on damped springs.
 - **Postures** (from the sim, as before): alarm (gaster raised, jaws open), carrying (head up), digging. The
   fire ant's sting now rests retracted and slides out to sting.
@@ -65,13 +75,16 @@ The vertex shader's planted-feet solve is in `src/render/ants/antMaterial.ts` (`
   - **Pinch:** in its first phase, a quick pinch of the antlers on each bite.
 - **Idles:** antenna flicks, a jaw opening, and a slight rear-up.
 - **Hits:** two flinches (a jolt back, a roll aside) with a softer flash.
-- **Death:** the legs curl in half a second, twitching, and it rolls onto its back.
+- **Death:** the legs curl in half a second, twitching, and fold over the belly. It rolls over its edge onto
+  its back and comes to rest there, lifted only as far as its lowest corner needs.
 - **Secondary motion:** the antlers and antennae sway on springs (lagging turns and steps). Riding ants follow
   the animated body as before.
 
 ## Impact emphasis
 
-The stag beetle's slam and its clamp shake the camera a little. The shake is scaled down when zoomed far out
+The stag beetle's slam throws out a ring of dust particles and a soft, dust-coloured shock wave, transparent
+at both edges (a hard cream ring read as a selection circle). A creature's hit flash tints it only a little
+toward warm. The slam and the clamp shake the camera a little. The shake is scaled down when zoomed far out
 and only applies if the hit is in view. Both also hold the sim for 50 ms or 33 ms, a hit-stop of a few
 frames in single player (the sim is only delayed, never changed). The hell ant's impale and the bosses'
 footfalls already did this. **Camera shake can be reduced or turned off** in Menu → Graphics → Camera shake
