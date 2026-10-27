@@ -69,7 +69,9 @@ export class CombatFx {
         void main(){
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           gl_Position = projectionMatrix * mv;
-          gl_PointSize = clamp(size * uPx / -mv.z, alpha > 0.0 ? 1.5 : 0.0, 40.0);
+          // a negative size: a marker that keeps at least 9 px on screen (a bite's pop, readable when zoomed out)
+          float mn = alpha > 0.0 ? (size < 0.0 ? 9.0 : 1.5) : 0.0;
+          gl_PointSize = clamp(abs(size) * uPx / -mv.z, mn, 40.0);
           vA = alpha; vC = color;
         }`,
       fragmentShader: `varying float vA; varying vec3 vC;
@@ -141,6 +143,9 @@ export class CombatFx {
           const grit = r() < 0.45;
           this.spawn(e.x, h, e.y, Math.cos(a) * sp, 8 + r() * 12, Math.sin(a) * sp, 0.35 + r() * 0.3, grit ? 0x6a5236 : 0xd8e0a0, grit ? 0.35 : 0.28 + e.strength * 0.25, 70);
         }
+        // the pop: a brief warm-white point at the bite that keeps a few pixels when zoomed out, so a fight reads
+        // as fight at the default camera distance (blind review: hits were 1–2 px specks there)
+        this.spawn(e.x, h + 0.2, e.y, 0, 0, 0, 0.16, 0xfff0c8, -0.45, 0, 0, 1.2);
         // a Saiy-Ant in its gold surge bites with a spray of golden sparks
         if (e.gold)
           for (let k = 0; k < 5; k++) {

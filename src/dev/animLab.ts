@@ -98,6 +98,8 @@ function standing(x: number, y: number, h: number): AntScript {
 }
 
 /** A biting attacker (as game/antViews.ts meleeAttack): the cycle's phase from the cooldown, the variant per cycle. */
+/** bites landed this tick (where the jaws are), for the combat effects — as the sim's 'bite' events in the game */
+const biteFx: Array<{ x: number; y: number }> = []; // det-ok: dev lab only
 function attacker(x: number, y: number, h: number, variant: number, gap: number, t0: number, onBite?: (t: number) => void): AntScript {
   let lastCycle = -1;
   return (t, v) => {
@@ -114,7 +116,10 @@ function attacker(x: number, y: number, h: number, variant: number, gap: number,
     const cyc = Math.floor((t - t0) / gap);
     if (cyc !== lastCycle) {
       lastCycle = cyc;
-      if (cyc > 0) onBite?.(t);
+      if (cyc > 0) {
+        onBite?.(t);
+        biteFx.push({ x: x + Math.cos(h) * 1.3, y: y + Math.sin(h) * 1.3 });
+      }
     }
     v.atk = (p + ATTACK_CONTACT) % 1;
     v.atkVar = variant;
@@ -481,6 +486,7 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
       stag.ph = stag.h;
       clip.stag!(T, stag);
     }
+    for (const b of biteFx.splice(0)) fx.emit({ t: 'bite', x: b.x, y: b.y, space: -1, strength: 0.6 } as unknown as SimEvent, flat);
     for (const ev of clip.events ?? []) if (ev.t > T - TICK && ev.t <= T) {
       fx.emit(ev.e, flat);
       if (ev.shake) shake = Math.max(shake, ev.shake);
@@ -553,7 +559,8 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
     sun.position.copy(target).addScaledVector(env.sunDir, C.dist * 4);
     ants.mount = (av, a, out) => !!stag && (av.heldCr === stag.id || av.rideCr === stag.id) && crs.mountPose(stag, av, a, out);
     ants.update(views, alpha, dt, cam, adapter, window.innerHeight);
-    fx.update(dt, flat, 1);
+    // (the game's pixel scale: particles the size they are on screen in play)
+    fx.update(dt, flat, window.innerHeight / (2 * Math.tan((cam.fov * Math.PI) / 360)));
     if (draw) post.render(scene, cam);
     t += dt;
   };
