@@ -1,2 +1,4 @@
 # frame folders (the clips, strips and sheets are kept)
 clips/*_frames/
+# GIFs are for sharing (several MB each); the WebM clips and the strips are kept
+clips/*.gif
