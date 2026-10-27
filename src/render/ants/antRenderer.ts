@@ -667,9 +667,10 @@ export class AntRenderer {
           const lowP = Math.min(rig.stance * cp, top * cp, mid * cp - rig.length * 0.42 * Math.abs(Math.sin(dp)));
           rest = Math.max(0, -lowR, -lowP);
         }
-        vP.addScaledVector(vU, v.lift + M.up);
+        // (mounted: the mount point already carries it — a held ant's sim height would lift it twice)
+        vP.addScaledVector(vU, (mounted ? 0 : v.lift) + M.up);
         if (rest > 0) vP.addScaledVector(vN.set(s.nx, s.ny, s.nz).normalize(), rest);
-      } else vP.addScaledVector(vU, v.lift + s.death * rig.stance * 0.3);
+      } else vP.addScaledVector(vU, (mounted ? 0 : v.lift) + s.death * rig.stance * 0.3);
       // released from jaws or a back: ease from where it was drawn to the sim's position instead of popping
       if (mounted) {
         s.mx = vP.x;
