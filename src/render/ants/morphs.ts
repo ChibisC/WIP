@@ -87,6 +87,11 @@ export interface AntMorph {
     /** soft abdomen: jiggles and sways with the stride (vertex shader `uSoft`) */
     soft?: number;
   };
+  /**
+   * realism pass v2 (docs/realism): curved tapered setae, jointed legs with the knee membrane and leg hairs,
+   * baked occlusion and edge convexity (LOD0)
+   */
+  real?: boolean;
   /** walk cycle: leg lift and duty factor (defaults .24 / .55; army ants step high and fast) */
   gait?: { lift: number; duty: number };
   legs: { hind: number; thick: number };
@@ -332,14 +337,16 @@ const attaQueen: AntMorph = {
 // pale hairs. Worker ≈ 2.8 mm; the soldier is the SAME model scaled to ≈ 4 mm
 // (CasteDef.scale); the major shares the body with an allometrically huge,
 // square head; the queen is a separate model.
+// realism v2 (docs/realism/references.md): muted reddish-brown, not saturated orange; the gaster dark brown
+// behind its paler base; legs and antennae a lighter yellowish brown, the club darker
 const fireLook = {
-  head: L(0x9a4418, 0.26, 0.42, 0.04, 0xae5622),
-  meso: L(0xa84e1e, 0.26, 0.42, 0.04),
-  waist: L(0x9a461a, 0.26, 0.42, 0.04),
-  gaster: L(0x2c1a10, 0.22, 0.5, 0.05, 0x6e3818),
-  legs: L(0x9a6430, 0.32, 0.3, 0.05, 0xb07a44),
-  antenna: L(0x9a6430, 0.32, 0.3, 0.05, 0x5a3418),
-  mandible: L(0x5a2410, 0.3, 0.35, 0, 0x2a0e06),
+  head: L(0x844426, 0.36, 0.28, 0.03, 0x904c2c),
+  meso: L(0x8c4e2c, 0.36, 0.28, 0.03),
+  waist: L(0x86482a, 0.4, 0.24, 0.03),
+  gaster: L(0x382416, 0.32, 0.32, 0.04, 0x6e3e24),
+  legs: L(0x86562f, 0.34, 0.3, 0.04, 0x98663a),
+  antenna: L(0x90603a, 0.34, 0.3, 0.04, 0x5c3a22),
+  mandible: L(0x5a2c16, 0.32, 0.32, 0, 0x2a120a),
 };
 
 const fireMinor: AntMorph = {
@@ -356,7 +363,9 @@ const fireMinor: AntMorph = {
   look: fireLook,
   hair: 0.7,
   // abundant long, pale golden erect hairs (docs/creatures/fire-ant.md)
-  setae: { color: 0xc89a58, head: 22, meso: 18, gaster: 46, len: [0.028, 0.06] },
+  // erect, thin, yellowish (paler than the body, not gold), most short, some to ~0.3 mm
+  setae: { color: 0xa47a4a, head: 38, meso: 30, gaster: 70, len: [0.025, 0.095] },
+  real: true,
   stance: 0.12,
 };
 

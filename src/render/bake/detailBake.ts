@@ -10,7 +10,7 @@ import * as THREE from 'three';
  * patch of real cuticle (mm across × mm along) baked seamless in both directions, so a part of any size
  * repeats it at the true scale of the sculpture. What is baked (`DetailMaps`):
  *   A  RGB albedo modulation (0.5 = × 1: pits darker, dust in the hollows, mottling), A roughness offset (0.5 = none)
- *   B  RG tangent-space normal (x around, y along), B cavity (1 open … 0 deep pit), A spare (setae sockets)
+ *   B  RG tangent-space normal (x around, y along), B cavity (1 open … 0 deep pit), A high points (wear)
  * Shading that depends on where a texel sits on the animal (dark joints, a paler underside, translucent thin
  * parts) is done live in the material from `aDet.z` and the region's settings, not baked.
  *
@@ -45,10 +45,17 @@ export interface Sculpt {
   tile: [number, number];
   /** fine irregularity of the surface (height, mm) */
   noise: number;
-  /** punctures: count per mm², radius (mm), depth (mm); `pale` lightens the rim (hair sockets) */
-  pits?: { n: number; r: number; depth: number; pale?: number };
-  /** parallel ridges: count per mm across, depth (mm), angle (rad, 0 = running along the part), waviness 0..1 */
-  striae?: { per: number; depth: number; angle: number; wobble: number };
+  /**
+   * punctures: count per mm², radius (mm), depth (mm); `pale` lightens the rim (hair sockets); `stub` a short
+   * appressed hair lying out of each pit (length in mm, direction along the part ±1, share of pits with one)
+   */
+  pits?: { n: number; r: number; depth: number; pale?: number; stub?: { len: number; dir: number; share: number } };
+  /**
+   * parallel ridges: count per mm across, depth (mm), angle (rad, 0 = running along the part), waviness 0..1;
+   * `sides` 0..1 keeps them to the lower flanks (the mesopleura; needs the tile to wrap the part once: tile
+   * around ≈ its girth)
+   */
+  striae?: { per: number; depth: number; angle: number; wobble: number; sides?: number };
   /** a net of fine ridges (reticulate/areolate): mesh size (mm), ridge height (mm) */
   reticulum?: { cell: number; depth: number };
   /** granules (shagreened, beaded): spacing (mm), height (mm) */
@@ -61,6 +68,10 @@ export interface Sculpt {
   mottle: number;
   /** darkening in pits and grooves 0..1 */
   cavityDark: number;
+  /** broad undulation of the surface ("orange peel"), so highlights are never perfect: cell (mm), height (mm) */
+  wave?: { cell: number; amp: number };
+  /** patchy roughness (greasier and duller patches) ± this much */
+  roughVar?: number;
 }
 
 /** How a region is shaded live (not baked). */
@@ -75,6 +86,25 @@ export interface RegionShade {
   thick: number;
   /** clearcoat kept in the hollows 0..1 */
   coatInPits: number;
+  /** clearcoat roughness (0 = the material's own) */
+  coatRough?: number;
+  /** worn high points and convex edges: lighter and smoother 0..1 */
+  wear?: number;
+  /** dust: on the underside, low parts and in the hollows 0..1 */
+  dust?: number;
+  /** lighter toward the middle of each segment, darker toward its ends (beyond `joint`) 0..1 */
+  mid?: number;
+  /** thinner (more translucent) toward the far end of the part 0..1 */
+  tipThin?: number;
+  /** how far the clearcoat follows the relief (1: fully) */
+  coatFollow?: number;
+  /**
+   * sutures and plate margins across the part, at up to four places 0..1 along it: a thin dark seam with a
+   * pale, thin (translucent) margin just before it — the overlapping gaster tergites, the promesonotal suture
+   */
+  bands?: number[];
+  /** band look: seam width (0..1 along), seam darkness 0..1, margin paleness 0..1, margin width (0..1 along) */
+  band?: [number, number, number, number];
 }
 
 export interface DetailRecipe {
@@ -90,8 +120,13 @@ export interface DetailMaps {
   rects: THREE.Vector4[];
   /** per region: shading (normal, joint, ventral, thick) */
   shade: THREE.Vector4[];
-  /** per region: coat in pits, spare */
+  /** per region: coat in pits, coat roughness, wear, dust */
   shade2: THREE.Vector4[];
+  /** per region: mid-segment lightening, tip thinning, coat follows relief, spare */
+  shade3: THREE.Vector4[];
+  /** per region: band positions along the part (0 = none), and the band look */
+  bands: THREE.Vector4[];
+  band: THREE.Vector4[];
   /** tile size per region (mm), to turn part sizes into tile counts */
   tiles: Array<[number, number]>;
 }
@@ -134,7 +169,9 @@ uniform vec4 uPits[${REGION_MAX}];     // n/mm², r, depth, pale
 uniform vec4 uStri[${REGION_MAX}];     // per mm, depth, angle, wobble
 uniform vec4 uRet[${REGION_MAX}];      // reticulum cell, depth, granule cell, granule height
 uniform vec4 uMix[${REGION_MAX}];      // rough flat, rough hollow, dirt, mottle
-uniform vec4 uMix2[${REGION_MAX}];     // cavity dark, spare…
+uniform vec4 uMix2[${REGION_MAX}];     // cavity dark, relief amplitude (mm), patchy roughness, spare
+uniform vec4 uWave[${REGION_MAX}];     // undulation cell (mm), height (mm), striae on the flanks only 0..1, spare
+uniform vec4 uStub[${REGION_MAX}];     // pit hairs: length (mm), direction ±1, share 0..1, spare
 uniform int uCount;
 
 float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -163,13 +200,29 @@ vec3 pworley(vec2 q, vec2 n, float seed) {
   return vec3(d1, d2, id);
 }
 
-struct S { float h; float cav; float pale; float mot; };
+// periodic Worley with the nearest feature's offset (cells) and hash: (d1, id, dx, dy)
+vec4 pworley2(vec2 q, vec2 n, float seed) {
+  vec2 i = floor(q); vec2 f = fract(q);
+  float d1 = 9.0, id = 0.0; vec2 off = vec2(0.0);
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+    vec2 g = vec2(float(x), float(y));
+    vec2 c = mod(i + g, n);
+    vec2 o = h22(c + seed);
+    vec2 r = g + o - f;
+    float d = length(r);
+    if (d < d1) { d1 = d; id = h21(c + seed + 3.7); off = -r; }
+  }
+  return vec4(d1, id, off);
+}
+
+struct S { float h; float cav; float pale; float mot; float rv; float hair; };
 
 // The relief (mm) at a point of region r, tile coordinates p (mm around, mm along).
 S surf(int r, vec2 p) {
   vec4 T = uTile[r]; vec4 P = uPits[r]; vec4 St = uStri[r]; vec4 R = uRet[r]; vec4 M = uMix[r];
   vec2 tile = T.xy; float seed = T.w;
-  S s; s.h = 0.0; s.cav = 0.0; s.pale = 0.0; s.mot = 0.0;
+  S s; s.h = 0.0; s.cav = 0.0; s.pale = 0.0; s.mot = 0.0; s.rv = 0.0; s.hair = 0.0;
+  vec4 Wv = uWave[r];
   // fine irregularity: two octaves, ~0.02 and ~0.008 mm
   vec2 n1 = max(vec2(1.0), floor(tile / 0.02 + 0.5));
   vec2 n2 = max(vec2(1.0), floor(tile / 0.008 + 0.5));
@@ -177,6 +230,15 @@ S surf(int r, vec2 p) {
   // soft mottling (~0.15 mm)
   vec2 nm = max(vec2(1.0), floor(tile / 0.15 + 0.5));
   s.mot = pnoise(p / tile * nm, nm, seed + 31.0) - 0.5;
+  // patchy roughness (~0.25 of the tile)
+  vec2 nrv = max(vec2(1.0), floor(tile / (tile * 0.22) + 0.5));
+  s.rv = pnoise(p / tile * nrv, nrv, seed + 41.0) - 0.5;
+  // broad undulation: two octaves, so the highlight wanders and breaks
+  if (Wv.x > 0.0) {
+    vec2 nw1 = max(vec2(1.0), floor(tile / Wv.x + 0.5));
+    vec2 nw2 = max(vec2(1.0), floor(tile / (Wv.x * 0.45) + 0.5));
+    s.h += Wv.y * ((pnoise(p / tile * nw1, nw1, seed + 51.0) - 0.5) + 0.45 * (pnoise(p / tile * nw2, nw2, seed + 57.0) - 0.5));
+  }
   // striae: ridges at an angle; the period is snapped so the tile stays seamless
   if (St.x > 0.0) {
     vec2 dir = vec2(sin(St.z), cos(St.z)); // 0 rad: lines run along the part (vary around it)
@@ -188,8 +250,13 @@ S surf(int r, vec2 p) {
     phase += St.w * (pnoise(p / tile * nw, nw, seed + 5.0) - 0.5) * 1.5;
     float ridge = 1.0 - abs(fract(phase) * 2.0 - 1.0);
     ridge = smoothstep(0.0, 1.0, ridge);
-    s.h += St.y * (ridge - 0.5);
-    s.cav = max(s.cav, smoothstep(0.35, 0.0, ridge) * 0.7);
+    // on the flanks only: the tile wraps the part once (u 0 and .5 are the sides, .25 the top, .75 below)
+    float u = fract(p.x / tile.x);
+    // the lower flanks: below each side (u 0 and .5), toward the underside (.75)
+    float side = smoothstep(0.1, 0.04, min(abs(u - 0.9), abs(u - 0.6)));
+    float bandK = mix(1.0, side, Wv.z);
+    s.h += St.y * (ridge - 0.5) * bandK;
+    s.cav = max(s.cav, smoothstep(0.35, 0.0, ridge) * 0.7 * bandK);
   }
   // reticulum: a net of fine ridges along the cell borders
   if (R.x > 0.0) {
@@ -211,12 +278,31 @@ S surf(int r, vec2 p) {
   if (P.x > 0.0) {
     float cell = inversesqrt(P.x);
     vec2 np = max(vec2(1.0), floor(tile / cell + 0.5));
-    vec3 w = pworley(p / tile * np, np, seed + 23.0);
-    float rr = P.y / (tile.x / np.x) * (0.75 + 0.5 * w.z); // radius in cells
-    float pit = smoothstep(rr, rr * 0.25, w.x);
+    vec4 w = pworley2(p / tile * np, np, seed + 23.0);
+    vec2 csz = tile / np;                                 // mm per cell
+    float rr = P.y / csz.x * (0.75 + 0.5 * w.y);           // radius in cells
+    // a rounded, shallow bowl (foveola) rather than a drilled hole
+    float pit = smoothstep(rr, rr * 0.1, w.x);
+    pit = pit * pit * (3.0 - 2.0 * pit);
     s.h -= P.z * pit;
-    s.cav = max(s.cav, pit);
-    s.pale = max(s.pale, P.w * smoothstep(rr * 1.6, rr * 1.05, w.x) * (1.0 - pit));
+    s.cav = max(s.cav, pit * 0.85);
+    s.pale = max(s.pale, P.w * smoothstep(rr * 1.7, rr * 1.05, w.x) * (1.0 - pit));
+    // the hair lying out of the pit: a tapering streak along the part from the pit's centre
+    vec4 Sb = uStub[r];
+    if (Sb.x > 0.0 && w.y < Sb.z) {
+      vec2 mm = w.zw * csz;                                // from the pit centre (mm)
+      float a = (fract(w.y * 7.31) - 0.5) * 0.7;           // a little off the axis
+      vec2 dir = vec2(sin(a), cos(a)) * Sb.y;
+      float along = dot(mm, dir);
+      float acrossD = abs(dot(mm, vec2(dir.y, -dir.x)));
+      float len = Sb.x * (0.6 + 0.6 * fract(w.y * 13.7));
+      float t01 = along / len;
+      float width = P.y * 0.28 * (1.0 - 0.8 * clamp(t01, 0.0, 1.0));
+      float hm = step(0.0, t01) * (1.0 - smoothstep(0.85, 1.0, t01)) * smoothstep(width, width * 0.35, acrossD);
+      s.hair = max(s.hair, hm);
+      s.h += P.z * 0.45 * hm;
+      s.cav *= 1.0 - hm;
+    }
   }
   return s;
 }
@@ -241,9 +327,11 @@ void main() {
     float cav = s.cav;
     float dark = 1.0 - uMix2[r].x * cav;
     vec3 alb = vec3(dark) * (1.0 + Mx.w * s.mot * 0.6) + vec3(0.10, 0.08, 0.05) * s.pale;
+    // pit hairs: pale golden
+    alb = mix(alb, vec3(1.45, 1.3, 1.0), s.hair * 0.7);
     // dust settles in the hollows: a dull grey-brown that also roughens
     alb = mix(alb, vec3(1.25, 1.12, 0.95), Mx.z * cav * 0.55);
-    float rough = mix(Mx.x, Mx.y, cav) + Mx.z * cav * 0.15;
+    float rough = mix(Mx.x, Mx.y, cav) + Mx.z * cav * 0.15 + uMix2[r].z * s.rv * 2.0 + 0.1 * s.hair;
     outColor = vec4(clamp(alb * 0.5, 0.0, 1.0), clamp(0.5 + rough, 0.0, 1.0));
   } else {
     // normal from the height's slope over one texel (mm per texel in each direction)
@@ -251,7 +339,10 @@ void main() {
     float hx = surf(r, p + vec2(e.x, 0.0)).h - surf(r, p - vec2(e.x, 0.0)).h;
     float hy = surf(r, p + vec2(0.0, e.y)).h - surf(r, p - vec2(0.0, e.y)).h;
     vec3 n = normalize(vec3(-hx / (2.0 * e.x), -hy / (2.0 * e.y), 1.0));
-    outColor = vec4(n.xy * 0.5 + 0.5, 1.0 - s.cav, clamp(s.pale, 0.0, 1.0));
+    // high points (worn lighter and smoother): the relief above its mean, against the region's amplitude
+    float hn = s.h / max(uMix2[r].y, 1e-6);
+    float wear = smoothstep(0.08, 0.4, hn) * (1.0 - s.cav);
+    outColor = vec4(n.xy * 0.5 + 0.5, 1.0 - s.cav, clamp(wear, 0.0, 1.0));
   }
 }`;
 
@@ -298,11 +389,16 @@ export function bakeDetail(recipe: DetailRecipe): DetailMaps | null {
     uRet: { value: u(REGION_MAX) },
     uMix: { value: u(REGION_MAX) },
     uMix2: { value: u(REGION_MAX) },
+    uWave: { value: u(REGION_MAX) },
+    uStub: { value: u(REGION_MAX) },
     uCount: { value: REGION_MAX },
   };
   const rects = u(REGION_MAX);
   const shade = u(REGION_MAX);
   const shade2 = u(REGION_MAX);
+  const shade3 = u(REGION_MAX);
+  const bands = u(REGION_MAX);
+  const band = u(REGION_MAX);
   const tiles: Array<[number, number]> = Array.from({ length: REGION_MAX }, () => [1, 1]);
   for (const [k, v] of Object.entries(recipe.regions)) {
     const i = Number(k);
@@ -314,11 +410,20 @@ export function bakeDetail(recipe: DetailRecipe): DetailMaps | null {
     if (s.striae) uniforms.uStri.value[i].set(s.striae.per, s.striae.depth, s.striae.angle, s.striae.wobble);
     uniforms.uRet.value[i].set(s.reticulum?.cell ?? 0, s.reticulum?.depth ?? 0, s.granules?.cell ?? 0, s.granules?.height ?? 0);
     uniforms.uMix.value[i].set(s.rough[0], s.rough[1], s.dirt, s.mottle);
-    uniforms.uMix2.value[i].set(s.cavityDark, 0, 0, 0);
+    const amp = s.noise * 0.75 + (s.pits?.depth ?? 0) + (s.striae?.depth ?? 0) * 0.5 + (s.reticulum?.depth ?? 0) * 0.7 + (s.granules?.height ?? 0) + (s.wave?.amp ?? 0) * 0.7;
+    uniforms.uMix2.value[i].set(s.cavityDark, Math.max(1e-6, amp), s.roughVar ?? 0, 0);
+    uniforms.uWave.value[i].set(s.wave?.cell ?? 0, s.wave?.amp ?? 0, s.striae?.sides ?? 0, 0);
+    const st = s.pits?.stub;
+    uniforms.uStub.value[i].set(st?.len ?? 0, st?.dir ?? 1, st?.share ?? 0, 0);
     // the tile's interior in atlas uv (y up: the render target's rows grow upward like vPx)
     rects[i].set((c[0] + GUTTER) / w, (c[1] + GUTTER) / h, (c[2] - 2 * GUTTER) / w, (c[3] - 2 * GUTTER) / h);
     shade[i].set(v!.shade.normal, v!.shade.joint, v!.shade.ventral, v!.shade.thick);
-    shade2[i].set(v!.shade.coatInPits, 0, 0, 0);
+    const sh = v!.shade;
+    shade2[i].set(sh.coatInPits, sh.coatRough ?? 0, sh.wear ?? 0, sh.dust ?? 0);
+    shade3[i].set(sh.mid ?? 0, sh.tipThin ?? 0, sh.coatFollow ?? 0.85, 0);
+    const bp = sh.bands ?? [];
+    bands[i].set(bp[0] ?? 0, bp[1] ?? 0, bp[2] ?? 0, bp[3] ?? 0);
+    band[i].set(...(sh.band ?? [0.012, 0.6, 0.5, 0.05]));
     tiles[i] = [s.tile[0], s.tile[1]];
   }
   const mat = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: BAKE_VS, fragmentShader: BAKE_FS, uniforms, depthTest: false, depthWrite: false });
@@ -360,7 +465,7 @@ export function bakeDetail(recipe: DetailRecipe): DetailMaps | null {
   mat.dispose();
   geo.dispose();
   ta.texture.anisotropy = tb.texture.anisotropy = Math.min(8, r.capabilities.getMaxAnisotropy());
-  const maps: DetailMaps = { key: recipe.key, a: ta.texture, b: tb.texture, rects, shade, shade2, tiles };
+  const maps: DetailMaps = { key: recipe.key, a: ta.texture, b: tb.texture, rects, shade, shade2, shade3, bands, band, tiles };
   cache.set(recipe.key, maps);
   return maps;
 }

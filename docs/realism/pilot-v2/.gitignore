@@ -1,0 +1,8 @@
+# reference photos are study material only: sheets and kits that contain them stay out of the repository
+refs/
+blind/
+compare-*.png
+# work-in-progress renders: regenerated each round; the final set is committed when the user approves
+renders/
+game/
+*.png

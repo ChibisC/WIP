@@ -6,6 +6,7 @@ import { TERMANT } from '../../sim/balance';
 import { bakeDetail } from '../bake/detailBake';
 import { detailPatch } from '../bake/detailShading';
 import { antRecipe } from '../bake/recipes';
+import { creatureLightPatch, useCreatureEnv } from '../lightPresets';
 
 /**
  * GPU skeletal animation for instanced ants.
@@ -45,6 +46,7 @@ uniform vec4 uGait; // q0, lift, duty, body length
 uniform float uPhyso; // physogastric gaster (army-ant queen): swell grows it far more than a full crop
 uniform float uSoft; // soft termite-like abdomen (Termants): jiggle and sway with the stride
 varying vec4 vSurf; varying vec3 vLocal; varying float vColorVar; varying float vTint;
+varying float vPartF;
 const float APIM = 3.14159265;
 vec3 rotA(vec3 v, vec3 a, float ang){ float c=cos(ang), s=sin(ang); return v*c + cross(a,v)*s + a*dot(a,v)*(1.0-c); }
 void rotP(inout vec3 p, inout vec3 n, vec3 piv, vec3 a, float ang){ p = piv + rotA(p - piv, a, ang); n = rotA(n, a, ang); }
@@ -64,6 +66,7 @@ vec3 animP = position;
   vec3 UP = vec3(0.0, 1.0, 0.0);
   vec3 RIGHT = vec3(0.0, 0.0, 1.0);
   vSurf = aSurf; vLocal = position / uGait.w; vTint = floor((aD.z + 2.0) / 4.0); vColorVar = aD.z - 4.0 * vTint;
+  vPartF = aPart;
 
   if (part == 30) {
     // Saiy-Ant hair locks: stretch ~30 % backward in gold (never rising), flutter with the stride,
@@ -189,7 +192,7 @@ vec3 animP = position;
     rotP(animP, N, uNeck, UP, hYaw);
   } else if (part == 8) {
     // The sting slides out of the gaster tip while stinging.
-    if (aSurf.w > 1.5 && pose == 4) animP.x -= 0.05 * uGait.w * poseW;
+    if (abs(aSurf.w - 2.0) < 0.5 && pose == 4) animP.x -= 0.05 * uGait.w * poseW;
     // A full crop stretches the gaster (honeydew, liquid food).
     vec3 gd = animP - uGasterPivot;
     animP = uGasterPivot + gd * vec3(1.0 + (0.16 + 0.55 * uPhyso) * swell, 1.0 + (0.3 + 0.5 * uPhyso) * swell, 1.0 + (0.3 + 0.45 * uPhyso) * swell);
@@ -218,7 +221,25 @@ vec3 animP = position;
 
 const FRAG_HEADER = /* glsl */ `
 varying vec4 vSurf; varying vec3 vLocal; varying float vColorVar; varying float vTint; varying vec4 vGold; uniform float uGoldTime;
+uniform float uReal;
+uniform float uMask;
+varying float vPartF;
+// lab part masks (realism metrics): flat colours per body part
+vec3 partMask(){
+  int p = int(vPartF + 0.5);
+  if (vSurf.w >= 7.5 && vSurf.w < 9.0) return vec3(0.0, 0.0, 0.0);      // setae
+  if (abs(vSurf.w - 1.0) < 0.5) return vec3(0.5, 0.5, 0.5);             // eyes
+  if (p == 1) return vec3(1.0, 0.0, 0.0);                                 // head
+  if (p == 0) return vec3(0.0, 1.0, 0.0);                                 // mesosoma
+  if (p == 8) return vec3(0.0, 0.0, 1.0);                                 // gaster
+  if (p == 9) return vec3(0.0, 1.0, 1.0);                                 // waist
+  if (p >= 10) return vec3(1.0, 1.0, 0.0);                                // legs
+  if (p >= 4 && p <= 7) return vec3(1.0, 0.0, 1.0);                       // antennae
+  return vec3(1.0, 0.5, 0.0);                                             // mandibles
+}
 float hairTip(){ float w = vSurf.w; return (w >= 3.5 && w < 7.5) ? fract(w) : 0.0; }
+// realism v2 setae (aSurf.w 8 + fraction along the hair), −1 elsewhere
+float setaT(){ float w = vSurf.w; return (w >= 7.5 && w < 9.0) ? fract(w) : -1.0; }
 // Saiy-Ant gold ripple: head first on, gaster first off; hair leads; never leaks at gold 0
 float goldMaskAt(){
   float lx = clamp(vLocal.x, -0.5, 0.5);
@@ -244,6 +265,19 @@ export function antPatch(): ShaderPatch {
         '#include <color_fragment>',
         `#include <color_fragment>
          diffuseColor.rgb *= 1.0 + vColorVar * 0.14;
+         if (uReal > 0.5) {
+           // each ant a little different: hue and saturation as well as value
+           float lum0 = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+           diffuseColor.rgb = mix(vec3(lum0), diffuseColor.rgb, 1.0 + vColorVar * 0.12);
+           diffuseColor.rgb *= vec3(1.0 + vColorVar * 0.035, 1.0, 1.0 - vColorVar * 0.05);
+         }
+         float sT = setaT();
+         if (sT >= 0.0) {
+           // setae: paler toward the tip and fading out (dithered: the tip is thinner than a pixel)
+           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.3 + vec3(0.025, 0.022, 0.018), smoothstep(0.3, 1.0, sT));
+           float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+           if (sT > 0.55 && ign < (sT - 0.55) / 0.45 * 0.8) discard;
+         }
          ${TINT_GLSL('vTint')}
          float goldM = goldMaskAt();
          {
@@ -272,17 +306,19 @@ export function antPatch(): ShaderPatch {
            vec2 hc = hexCell(vLocal.xy * 260.0);
            float e = length(hc);
            facet = smoothstep(0.42, 0.2, e);
-           diffuseColor.rgb *= mix(0.78, 1.0, facet);
-           bumpH = facet * 0.6;
-         } else {
-           // Microsculpture/punctation breaks up highlights on rough chitin.
+           // realism v2: each facet a smooth dark dome, the seams only slightly duller
+           facet = uReal > 0.5 ? smoothstep(0.5, 0.0, e) : facet;
+           diffuseColor.rgb *= uReal > 0.5 ? 0.75 : mix(0.78, 1.0, facet);
+           bumpH = facet * (uReal > 0.5 ? 0.1 : 0.6);
+         } else if (uReal < 0.5) {
+           // Microsculpture/punctation breaks up highlights on rough chitin (realism v2: the baked detail does this).
            bumpH = (vnoise(vLocal.xz * 70.0 + vLocal.y * 20.0) * 0.6 + vnoise(vLocal.xy * 120.0) * 0.4) * vSurf.x;
          }`,
       ],
       [
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>
-         roughnessFactor = abs(vSurf.w - 1.0) < 0.5 ? mix(0.4, 0.18, facet) : (abs(vSurf.w - 3.0) < 0.5 ? 0.12 : vSurf.x);
+         roughnessFactor = abs(vSurf.w - 1.0) < 0.5 ? (uReal > 0.5 ? 0.14 : mix(0.4, 0.18, facet)) : (abs(vSurf.w - 3.0) < 0.5 ? 0.12 : vSurf.x);
          roughnessFactor = mix(roughnessFactor, 0.22, goldM);
          roughnessFactor = mix(roughnessFactor, min(1.0, roughnessFactor + 0.4), vGold.z);`,
       ],
@@ -314,10 +350,23 @@ export function antPatch(): ShaderPatch {
         `#include <lights_physical_fragment>
          #ifdef USE_CLEARCOAT
            material.clearcoat = mix(vSurf.y, 0.08, goldM);
-           material.clearcoatRoughness = 0.18;
+           material.clearcoatRoughness = uReal > 0.5 ? 0.3 : 0.18;
          #endif
          #ifdef USE_SHEEN
            material.sheenColor = sheenColor * vSurf.z * (1.0 - goldM);
+         #endif`,
+      ],
+      ['#include <dithering_fragment>', '#include <dithering_fragment>\n if (uMask > 0.5) gl_FragColor = vec4(partMask(), 1.0);'],
+      [
+        '#include <lights_fragment_end>',
+        `#include <lights_fragment_end>
+         #if NUM_DIR_LIGHTS > 0
+         if (sT >= 0.0) {
+           // a seta glows when the sun is behind it
+           vec3 Ld = directionalLights[0].direction;
+           float back = pow(clamp(dot(-normalize(vViewPosition), Ld) * 0.5 + 0.5, 0.0, 1.0), 3.0);
+           reflectedLight.directDiffuse += directionalLights[0].color * diffuseColor.rgb * back * (0.35 + 0.6 * sT);
+         }
          #endif`,
       ],
     ],
@@ -392,8 +441,13 @@ export function rigUniforms(rig: AntRig): Record<string, THREE.IUniform> {
     uMandSwing: { value: x.mandSwing ?? 0.95 },
     uCrest: { value: x.crest ?? new THREE.Vector3() },
     uGoldTime: globalUniforms.uTime,
+    uReal: { value: 0 },
+    uMask: labMask,
   };
 }
+
+/** Lab part-mask mode (dev: realism metrics), shared by every ant material. */
+export const labMask = { value: 0 };
 
 /**
  * The ant's material (and its shadow depth material). With a morph key that has a baked-detail recipe
@@ -412,11 +466,17 @@ export function createAntMaterials(rig: AntRig, dapple: boolean, morphKey?: stri
     envMapIntensity: 0.55,
   });
   const uniforms = rigUniforms(rig);
+  const recipe = morphKey ? antRecipe(morphKey) : null;
   if (dapple) patchDapple(material);
   addPatch(material, { ...antPatch(), uniforms });
-  const recipe = morphKey ? antRecipe(morphKey) : null;
   const maps = recipe ? bakeDetail(recipe) : null;
-  if (maps) addPatch(material, detailPatch(maps));
+  if (maps) {
+    addPatch(material, detailPatch(maps));
+    // realism v2: the species' look with image-based light (render/lightPresets.ts)
+    uniforms.uReal.value = 1;
+    addPatch(material, creatureLightPatch());
+    useCreatureEnv(material);
+  }
   const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   addPatch(depth, { ...antDepthPatch(), uniforms });
   return { material, depth };

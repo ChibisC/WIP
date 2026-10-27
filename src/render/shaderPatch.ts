@@ -13,6 +13,8 @@ export interface ShaderPatch {
   /** [searchString, replacement] pairs; replacement may include the search string. */
   vertex?: Array<[string, string]>;
   fragment?: Array<[string, string]>;
+  /** fragment pairs applied only where their search string is present (no warning when it is not) */
+  fragmentOpt?: Array<[string, string]>;
   defines?: Record<string, string | number>;
 }
 
@@ -51,6 +53,7 @@ export function addPatch(mat: THREE.Material, patch: ShaderPatch): void {
           if (!shader.fragmentShader.includes(a)) console.warn(`[patch ${p.key}] fragment marker missing: ${a}`);
           shader.fragmentShader = shader.fragmentShader.replace(a, b);
         }
+        for (const [a, b] of p.fragmentOpt ?? []) shader.fragmentShader = shader.fragmentShader.replace(a, b);
       }
     };
   }

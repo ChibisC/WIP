@@ -3,6 +3,7 @@ import { addPatch, patchDapple } from '../shaderPatch';
 import { bakeDetail } from '../bake/detailBake';
 import { detailPatch } from '../bake/detailShading';
 import { creatureRecipe } from '../bake/recipes';
+import { creatureLightPatch, useCreatureEnv } from '../lightPresets';
 
 /**
  * Instanced primitives for creatures (Phase 11). Every creature is built
@@ -75,7 +76,12 @@ function partMaterial(family: string): THREE.MeshPhysicalMaterial {
   patchDapple(m);
   const recipe = creatureRecipe(family);
   const maps = recipe ? bakeDetail(recipe) : null;
-  if (maps) addPatch(m, detailPatch(maps));
+  if (maps) {
+    addPatch(m, detailPatch(maps));
+    // realism v2: image-based light (render/lightPresets.ts)
+    addPatch(m, creatureLightPatch());
+    useCreatureEnv(m);
+  }
   return m;
 }
 
@@ -95,6 +101,7 @@ class Pool {
   mat: THREE.InstancedBufferAttribute;
   n = 0;
   cap: number;
+  name = '';
 
   constructor(
     private geo: THREE.BufferGeometry,
@@ -133,6 +140,7 @@ class Pool {
     this.mesh.geometry.dispose();
     this.cap = cap;
     this.mesh = this.make(cap);
+    this.mesh.name = this.name;
     this.mat = this.mesh.geometry.getAttribute('aMat') as THREE.InstancedBufferAttribute;
     group.add(this.mesh);
   }
@@ -278,6 +286,8 @@ export class PrimitiveBatch {
       let mat = this.partMats.get(def.family);
       if (!mat) this.partMats.set(def.family, (mat = partMaterial(def.family)));
       p = new Pool(partGeometry(name), mat, this.depth, 64);
+      p.name = name;
+      p.mesh.name = name;
       p.mesh.castShadow = this.pools.ell.mesh.castShadow;
       this.parts.set(name, p);
       this.group.add(p.mesh);

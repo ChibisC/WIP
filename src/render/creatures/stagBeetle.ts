@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Acc, Ring, detOf, ellipsoid, loft, tube } from '../ants/antGeometry';
 import type { PartLook } from '../ants/morphs';
 import { REGION } from '../bake/detailBake';
+import { bakeOcclusion } from '../bake/occlusion';
 import { registerPart } from './primitives';
 import { Rig, V, ease, footAt, tripod } from './rig';
 import type { CrPose } from './builders';
@@ -38,17 +39,20 @@ export const SB = {
   head: { x0: 0.035, x1: 0.17, half: 0.15, cy: 0.112, ry: 0.04 },
   neck: { x: 0.04, y: 0.11 },
   mand: { x: 0.158, y: 0.108, z: 0.076, len: 0.3 },
-  eye: { x: 0.07, y: 0.115, z: 0.128 },
+  eye: { x: 0.098, y: 0.112, z: 0.138 },
   ant: { x: 0.14, y: 0.104, z: 0.115 },
 };
 
 // --------------------------------------------------------------------------- part geometry
 
-function build(fn: (acc: Acc) => void, color: (x: number, y: number, z: number) => THREE.Color = () => WHITE): THREE.BufferGeometry {
+function build(fn: (acc: Acc) => void, color: (x: number, y: number, z: number) => THREE.Color = () => WHITE, occRadius = F(0.03)): THREE.BufferGeometry {
   const acc = new Acc();
   colorFn = color;
   fn(acc);
-  return acc.build();
+  const g = acc.build();
+  // realism v2: occlusion between the teeth, at the margins and joints; worn convex edges
+  bakeOcclusion(g, { radius: occRadius, skip: acc.skipOcc });
+  return g;
 }
 let colorFn: (x: number, y: number, z: number) => THREE.Color = () => WHITE;
 const put = (acc: Acc, r: [number[], number[], ReturnType<typeof loft>[2]], region: number) => acc.piece(r[0], r[1], 0, colorFn, LOOK, 0, undefined, detOf(r[2], region));
@@ -60,10 +64,10 @@ function elytraGeo(): THREE.BufferGeometry {
   const E0 = SB.elytra;
   const paint = (x: number, _y: number, z: number) => {
     const lat = Math.abs(z) / F(E0.half);
-    const sut = Math.exp(-(z * z) / (F(0.012) ** 2));
+    const sut = Math.exp(-(z * z) / (F(0.006) ** 2));
     const apex = ss(F(E0.x0 + 0.12), F(E0.x0), x);
     const shoulder = ss(F(E0.x1 - 0.05), F(E0.x1), x);
-    const k = 1.08 - 0.3 * ss(0.62, 1.0, lat) - 0.22 * sut - 0.22 * apex - 0.1 * shoulder;
+    const k = 1.08 - 0.3 * ss(0.62, 1.0, lat) - 0.45 * sut - 0.22 * apex - 0.1 * shoulder;
     return col.setRGB(k * 1.02, k, k * 0.96);
   };
   return build((acc) => {
@@ -77,19 +81,26 @@ function elytraGeo(): THREE.BufferGeometry {
       // parallel sides, then a broad rounded apex
       const apex = Math.sqrt(Math.max(0, 1 - Math.pow(ss(0.6, 1.0, t), 2.2)));
       const close = Math.pow(Math.min(1, t / 0.035), 0.5);
-      const w = F(E.half) * shoulder * Math.max(0.08, apex) * Math.max(0.6, close);
+      const w = F(E.half) * shoulder * Math.max(0.08, apex) * Math.max(0.88, close);
       const dome = 0.82 + 0.18 * Math.sin(Math.PI * Math.min(1, 0.15 + t * 1.1));
       const top = F(SB.belly + 0.012) + (F(E.top) - F(SB.belly + 0.012)) * dome * Math.max(0.3, Math.pow(apex, 0.6)) * Math.max(0.75, close);
       const bot = F(SB.belly + 0.012);
-      rings.push({ x, y: (top + bot) / 2, rz: w, ry: (top - bot) / 2, n: 2.2 });
+      rings.push({ x, y: (top + bot) / 2, rz: w, ry: (top - bot) / 2, n: 2.7 });
     }
     put(
       acc,
-      loft(rings, 44, (x, y, z, t) => {
+      loft(rings, 64, (x, y, z, t) => {
         const r = rings[Math.round(t * (N - 1))];
+        const lat = Math.abs(z) / Math.max(1e-3, r.rz);
         // a domed back and a flatter belly; the suture down the middle
         if (y < r.y) y = r.y - (r.y - y) * 0.55;
-        else y -= F(0.0028) * Math.exp(-(z * z) / (F(0.004) ** 2));
+        else {
+          y -= F(0.0042) * Math.exp(-(z * z) / (F(0.003) ** 2));
+          // the humeral calli: a low swelling at each shoulder
+          y += F(0.006) * Math.exp(-(((t - 0.08) / 0.07) ** 2)) * Math.exp(-(((lat - 0.72) / 0.16) ** 2));
+          // the lateral margin turned up a little into a fine rim
+          y += F(0.0022) * ss(0.86, 0.97, lat) * (1 - ss(0.97, 1.0, lat));
+        }
         return [x, y, z];
       }),
       REGION.ELYTRA,
@@ -106,11 +117,12 @@ function pronotumGeo(): THREE.BufferGeometry {
     for (let i = 0; i < N; i++) {
       const t = i / (N - 1); // 0 rear … 1 front
       const x = F(P.x0 + (P.x1 - P.x0) * t);
-      const close = Math.pow(Math.min(1, t / 0.12), 0.5) * Math.pow(Math.min(1, (1 - t) / 0.14), 0.5);
-      const w = F(P.half) * (0.95 + 0.05 * Math.sin(Math.PI * Math.min(1, t * 1.3))) * (1 - 0.14 * ss(0.6, 1, t)) * Math.max(0.35, close);
+      const close = Math.pow(Math.min(1, t / 0.06), 0.5) * Math.pow(Math.min(1, (1 - t) / 0.08), 0.5);
+      // sides curved: narrower in front, widest a little behind the middle, the hind angles rounded
+      const w = F(P.half) * (0.8 + 0.2 * Math.sin(Math.PI * Math.min(1, 0.15 + t * 0.95))) * Math.max(0.72, close);
       const bot = F(SB.belly + 0.045);
-      const top = bot + (F(P.top) - bot) * (0.86 + 0.14 * Math.sin(Math.PI * t)) * Math.max(0.45, close);
-      rings.push({ x, y: (top + bot) / 2, rz: w, ry: (top - bot) / 2, n: 2.15 });
+      const top = bot + (F(P.top) - bot) * (0.86 + 0.14 * Math.sin(Math.PI * t)) * Math.max(0.7, close);
+      rings.push({ x, y: (top + bot) / 2, rz: w, ry: (top - bot) / 2, n: 2.05 });
     }
     put(
       acc,
@@ -139,11 +151,12 @@ function headGeo(): THREE.BufferGeometry {
     for (let i = 0; i < N; i++) {
       const t = i / (N - 1); // 0 neck … 1 front
       const x = F(H.x0 + (H.x1 - H.x0) * t);
-      const close = Math.pow(Math.min(1, t / 0.1), 0.45) * Math.pow(Math.min(1, (1 - t) / 0.05), 0.5);
-      // flares from the neck to the front angles, which jut forward; the front margin is straight
-      const w = F(H.half) * (0.7 + 0.3 * ss(0.05, 0.8, t)) * Math.max(0.3, close);
-      const ry = F(H.ry) * (0.8 + 0.2 * Math.sin(Math.PI * t)) * Math.max(0.45, close);
-      rings.push({ x, y: F(H.cy), rz: w, ry, n: 2.25 });
+      const close = Math.pow(Math.min(1, t / 0.08), 0.45) * Math.pow(Math.min(1, (1 - t) / 0.05), 0.5);
+      // flares from the neck to the front angles (which jut forward), the sides curving out; the cheeks behind
+      // the eyes swell a little
+      const w = F(H.half) * (0.6 + 0.4 * ss(0.0, 0.85, t) + 0.05 * Math.exp(-(((t - 0.35) / 0.12) ** 2))) * Math.max(0.55, close);
+      const ry = F(H.ry) * 1.1 * (0.8 + 0.2 * Math.sin(Math.PI * t)) * Math.max(0.55, close);
+      rings.push({ x, y: F(H.cy), rz: w, ry, n: 2.05 });
     }
     put(
       acc,
@@ -181,18 +194,94 @@ function underGeo(): THREE.BufferGeometry {
 }
 
 /**
- * Antler mandible (mandible frame: pivot at the origin, pointing +x; +z outward, so the other side is
- * mirrored): broad at the base, out and a little up, then sweeping inward like a caliper to a forked tip;
- * the big inner tooth just past the middle, angled up and in, small denticles between it and the tip.
- * Glossy red-chestnut, darker toward the points.
+ * A swept blade: a path with a cross-section that changes along it (realism v2). The section is a
+ * superellipse whose two halves can differ: `w` half-width (sideways, +B outward), `h` half-height (up),
+ * `eIn`/`eOut` the inner and outer edge exponents (low = sharp edge), `eUp`/`eDown` the top and bottom. The
+ * frame keeps "up" near world up, so a blade flattened by h < w stays flat like a real mandible.
+ * Returns positions, indices and the surface coordinates for the baked detail.
+ */
+interface Section {
+  w: number;
+  h: number;
+  eIn: number;
+  eOut: number;
+  eUp: number;
+  eDown: number;
+}
+function sweep(path: THREE.Vector3[], sec: (t: number) => Section, radial: number, capEnd = true): [number[], number[], ReturnType<typeof loft>[2]] {
+  const p: number[] = [];
+  const ind: number[] = [];
+  const n = path.length;
+  const along: number[] = [0];
+  for (let i = 1; i < n; i++) along.push(along[i - 1] + path[i].distanceTo(path[i - 1]));
+  const total = along[n - 1];
+  const meta = { th: [] as number[], s: [] as number[], total, circ: 0 };
+  const up = new THREE.Vector3(0, 1, 0);
+  const T = new THREE.Vector3();
+  const B = new THREE.Vector3();
+  const N = new THREE.Vector3();
+  let girth = 0;
+  for (let i = 0; i < n; i++) {
+    T.copy(path[Math.min(n - 1, i + 1)]).sub(path[Math.max(0, i - 1)]).normalize();
+    B.crossVectors(T, up).normalize();
+    N.crossVectors(B, T).normalize();
+    const c = sec(i / (n - 1));
+    girth += Math.PI * (c.w + c.h);
+    for (let j = 0; j < radial; j++) {
+      const a = (j / radial) * Math.PI * 2;
+      const ca = Math.cos(a);
+      const sa = Math.sin(a);
+      const ex = 2 / (ca >= 0 ? c.eOut : c.eIn);
+      const ey = 2 / (sa >= 0 ? c.eUp : c.eDown);
+      const x = Math.sign(ca) * Math.pow(Math.abs(ca), ex) * c.w;
+      const y = Math.sign(sa) * Math.pow(Math.abs(sa), ey) * c.h;
+      p.push(path[i].x + B.x * x + N.x * y, path[i].y + B.y * x + N.y * y, path[i].z + B.z * x + N.z * y);
+      meta.th.push(j / radial);
+      meta.s.push(along[i]);
+    }
+  }
+  meta.circ = girth / n;
+  for (let i = 0; i < n - 1; i++)
+    for (let j = 0; j < radial; j++) {
+      const a = i * radial + j;
+      const b = i * radial + ((j + 1) % radial);
+      const c = a + radial;
+      const d = b + radial;
+      ind.push(a, c, b, b, c, d);
+    }
+  // close the base (it sits in the head) and the point
+  const c0 = p.length / 3;
+  p.push(path[0].x, path[0].y, path[0].z);
+  meta.th.push(-1);
+  meta.s.push(0);
+  for (let j = 0; j < radial; j++) ind.push(c0, j, (j + 1) % radial);
+  if (capEnd) {
+    const c1 = p.length / 3;
+    const e = path[n - 1].clone().add(T.clone().multiplyScalar(sec(1).w * 0.3));
+    p.push(e.x, e.y, e.z);
+    meta.th.push(-1);
+    meta.s.push(total);
+    const o = (n - 1) * radial;
+    for (let j = 0; j < radial; j++) ind.push(c1, o + ((j + 1) % radial), o + j);
+  }
+  return [p, ind, meta];
+}
+
+/**
+ * Antler mandible of a major male (mandible frame: pivot at the origin, pointing +x; +z outward, so the other
+ * side is mirrored), realism v2: a robust, flattened blade — taller than wide only at the base, then
+ * flattened, the inner edge sharp and the outer rounded — sweeping out and up, then inward like a caliper;
+ * the broad inner tooth just past the middle, angled in and up; three small denticles toward the point; the
+ * point forked, with an upper tine. Reddish chestnut, darker toward the points and on the teeth.
  */
 function mandibleGeo(side: 1 | -1): THREE.BufferGeometry {
   const ml = F(SB.mand.len);
-  const base = new THREE.Color(0x56240c);
-  const tip = new THREE.Color(0x160a05);
+  const base = new THREE.Color(0x6a3418);
+  const mid = new THREE.Color(0x5a2a14);
+  const tip = new THREE.Color(0x24100a);
   const col = new THREE.Color();
   // the centre line: heading turns from 20° outward to 75° inward, rising at first
-  const n = 26;
+  const n = 40;
   const P: THREE.Vector3[] = [new THREE.Vector3()];
   for (let i = 1; i <= n; i++) {
     const t = (i - 0.5) / n;
@@ -203,29 +292,58 @@ function mandibleGeo(side: 1 | -1): THREE.BufferGeometry {
     P.push(new THREE.Vector3(q.x + Math.cos(yaw) * Math.cos(pitch) * d, q.y + Math.sin(pitch) * d, q.z + Math.sin(yaw) * Math.cos(pitch) * d));
   }
   const at = (t: number) => P[Math.min(n, Math.round(t * n))].clone();
+  const dirAt = (t: number) => at(Math.min(1, t + 0.03)).sub(at(Math.max(0, t - 0.03))).normalize();
   const g = build(
     (acc) => {
-      const rad: number[] = [];
-      for (let i = 0; i <= n; i++) {
-        const t = i / n;
-        rad.push(F(0.04) * (1 - 0.62 * Math.pow(t, 0.7)) * (1 - 0.3 * ss(0.88, 1, t)) + F(0.002));
-      }
-      put(acc, tube(P, rad, 18, true, true, 0.62), REGION.CR_MAND);
-      const branch = (t: number, dir: THREE.Vector3, len: number, r0: number, bend = 0.06) => {
+      // the blade: half-width and half-height along it (mm at the 60 mm reference)
+      put(
+        acc,
+        sweep(
+          P,
+          (t) => ({
+            w: F(0.028) * (1 - 0.62 * Math.pow(t, 0.8)) * (1 - 0.35 * ss(0.85, 1, t)) + F(0.0028),
+            h: F(0.023) * (1 - 0.68 * Math.pow(t, 0.6)) * (1 - 0.3 * ss(0.85, 1, t)) + F(0.0016),
+            eIn: 1.35,
+            eOut: 2.3,
+            eUp: 2.6,
+            eDown: 2.0,
+          }),
+          22,
+        ),
+        REGION.CR_MAND,
+      );
+      // a tooth or tine: a flattened tapering blade from inside the main blade at `t`, along `dir`
+      const tooth = (t: number, dir: THREE.Vector3, len: number, w0: number, h0: number, curl = 0.08) => {
         const a = at(t);
         const d = dir.clone().normalize();
-        const b = a.clone().addScaledVector(d, len * 0.55).add(new THREE.Vector3(0, len * bend, 0));
-        const c = a.clone().addScaledVector(d, len);
-        put(acc, tube([a.clone().addScaledVector(d, -r0 * 0.5), b, c], [r0, r0 * 0.62, r0 * 0.08], 10, false, true), REGION.CR_MAND);
+        const pts: THREE.Vector3[] = [];
+        const m = 10;
+        for (let k = 0; k <= m; k++) {
+          const u = k / m;
+          pts.push(a.clone().addScaledVector(d, -w0 * 0.6 + len * u).add(new THREE.Vector3(0, len * curl * u * u, 0)));
+        }
+        put(acc, sweep(pts, (u) => ({ w: w0 * (1 - 0.92 * Math.pow(u, 0.9)), h: h0 * (1 - 0.85 * Math.pow(u, 0.9)), eIn: 1.6, eOut: 1.6, eUp: 2.2, eDown: 2.0 }), 12), REGION.CR_MAND);
       };
-      // the big inner tooth, angled up and in
-      branch(0.55, new THREE.Vector3(0.15, 0.65, -0.75), F(0.07), F(0.02), 0.1);
-      // the forked tip: an upper prong
-      branch(0.9, new THREE.Vector3(0.25, 0.8, -0.55), F(0.036), F(0.0095));
-      // small denticles along the inner edge
-      for (const t of [0.66, 0.73, 0.8]) branch(t, new THREE.Vector3(-0.1, 0.25, -1), F(0.013), F(0.0055), 0);
+      // the inward direction at t: the blade's tangent turned toward the midline (−z), tilted up
+      const inward = (t: number, up: number, fwd = 0.15) => {
+        const d = dirAt(t);
+        const inn = new THREE.Vector3(d.z, 0, -d.x).normalize(); // 90° toward −z for a +x blade
+        return inn.multiplyScalar(1).addScaledVector(d, fwd).add(new THREE.Vector3(0, up, 0)).normalize();
+      };
+      // the broad inner tooth, angled in and up
+      tooth(0.56, inward(0.56, 0.5, 0.3), F(0.095), F(0.024), F(0.012), 0.04);
+      // small denticles toward the point
+      for (const t of [0.68, 0.75, 0.82]) tooth(t, inward(t, 0.15, 0.3), F(0.03), F(0.009), F(0.006), 0);
+      // the forked point: the upper tine
+      tooth(0.88, dirAt(0.88).add(new THREE.Vector3(0, 1.0, 0)).add(inward(0.88, 0, 0).multiplyScalar(0.45)).normalize(), F(0.055), F(0.011), F(0.008), -0.06);
     },
-    (x) => col.copy(base).lerp(tip, ss(ml * 0.35, ml * 0.95, x)),
+    (x, y, z) => {
+      // reddish chestnut, darker toward the points; the teeth (off the centre line, inward) darker still
+      const d = Math.hypot(x, z);
+      const k = ss(ml * 0.25, ml * 0.62, d);
+      col.copy(base).lerp(mid, k).lerp(tip, ss(ml * 0.62, ml * 0.98, d));
+      return col;
+    },
   );
   if (side < 0) {
     // mirror across z and flip the winding
@@ -254,12 +372,13 @@ function segGeo(kind: 'coxa' | 'femur' | 'tibia1' | 'tibia' | 'tarsus' | 'scape'
     else if (kind === 'femur') {
       const pts: THREE.Vector3[] = [];
       const rad: number[] = [];
-      for (let i = 0; i <= 8; i++) {
-        const t = i / 8;
+      for (let i = 0; i <= 12; i++) {
+        const t = i / 12;
         pts.push(Y(-0.03 + t * 1.06));
-        rad.push(0.8 + 0.38 * Math.sin(Math.PI * Math.pow(t, 0.8)) - 0.15 * t);
+        // a narrow neck at the trochanter, broad and flattened, the knee condyles at the end
+        rad.push(0.7 + 0.5 * Math.sin(Math.PI * Math.pow(t, 0.8)) - 0.15 * t + 0.18 * ss(0.86, 1, t));
       }
-      put(acc, tube(pts, rad, 12, false, false, 0.8), reg);
+      put(acc, tube(pts, rad, 14, false, false, 0.62), reg);
     } else if (kind === 'tibia1' || kind === 'tibia') {
       const fore = kind === 'tibia1';
       const pts: THREE.Vector3[] = [];
@@ -269,15 +388,15 @@ function segGeo(kind: 'coxa' | 'femur' | 'tibia1' | 'tibia' | 'tarsus' | 'scape'
         pts.push(Y(t, fore ? 0.25 * t * t : 0));
         rad.push(fore ? 0.7 + 0.75 * t : 0.72 + 0.22 * t);
       }
-      put(acc, tube(pts, rad, 12, false, false, fore ? 0.62 : 0.85), reg);
+      put(acc, tube(pts, rad, 14, false, false, fore ? 0.68 : 0.8), reg);
       // teeth on the outer edge (the fore tibia digs; the others carry small spines), and the apical spurs
-      const teeth = fore ? [0.35, 0.55, 0.72, 0.88] : [0.42, 0.68];
-      // (y is in leg lengths, x and z in thicknesses: keep the teeth's y offsets tiny)
+      const teeth = fore ? [0.42, 0.6, 0.76, 0.9] : [0.5, 0.72];
+      // (y is in leg lengths, x and z in thicknesses: keep the teeth's y offsets tiny) — small, blunt teeth
       for (const t of teeth) {
-        const r0 = fore ? 0.4 + 0.3 * t : 0.28;
-        const a = Y(t, (fore ? 0.25 * t * t : 0) + (fore ? 0.7 + 0.75 * t : 0.7) * 0.75);
-        const b = a.clone().add(new THREE.Vector3(fore ? 0.95 : 0.6, fore ? 0.025 : 0.03, 0));
-        put(acc, tube([a, b], [r0, 0.04], 6, false, true), reg);
+        const r0 = fore ? 0.22 + 0.16 * t : 0.16;
+        const a = Y(t, (fore ? 0.25 * t * t : 0) + (fore ? 0.7 + 0.75 * t : 0.7) * 0.6);
+        const b = a.clone().add(new THREE.Vector3(fore ? 0.5 : 0.32, fore ? 0.012 : 0.015, 0));
+        put(acc, tube([a, b], [r0, 0.05], 6, false, true), reg);
       }
       for (const z of [-0.4, 0.4]) put(acc, tube([Y(0.97, 0, z * (fore ? 0.5 : 0.7)), Y(1.06, -0.3, z)], [0.26, 0.03], 6, false, true), reg);
     } else if (kind === 'tarsus') {
@@ -285,8 +404,9 @@ function segGeo(kind: 'coxa' | 'femur' | 'tibia1' | 'tibia' | 'tarsus' | 'scape'
       let y = 0;
       for (let k = 0; k < 5; k++) {
         const l = shares[k];
-        const r = k === 4 ? 0.55 : 0.75 - k * 0.04;
-        put(acc, tube([Y(y), Y(y + l * 0.5), Y(y + l)], [r * 0.7, r, r * 0.85], 10, false, false), reg);
+        const r = k === 4 ? 0.6 : 0.8 - k * 0.04;
+        // each tarsomere widening toward its tip, flattened, the next set into it
+        put(acc, tube([Y(y), Y(y + l * 0.4), Y(y + l)], [r * 0.72, r * 0.88, r], 10, false, false, 0.7), reg);
         y += l;
       }
       // two curved claws
@@ -325,9 +445,15 @@ export function registerStagParts(): void {
 
 const C = (hex: number) => new THREE.Color(hex);
 /** Colours (docs/creatures/stagBeetle.md): chestnut elytra, black head, pronotum, legs and underside. */
-export const SG2 = { elytra: C(0x42200f), black: C(0x121010), leg: C(0x141110), under: C(0x181412), eye: C(0x0a0806), mand: C(0xffffff) };
+export const SG2 = { elytra: C(0x4c2e1a), black: C(0x0d0b0a), leg: C(0x0e0c0b), under: C(0x14100d), eye: C(0x080605), mand: C(0xffffff) };
 const S = (rough: number, gloss: number) => ({ rough, gloss, pattern: 0, scale: 1 });
-const SURF = { elytra: S(0.5, 0.32), shield: S(0.55, 0.25), head: S(0.6, 0.2), mand: S(0.38, 0.5), leg: S(0.48, 0.35), under: S(0.62, 0.12), eye: S(0.08, 1.2) };
+// realism v2: satin, not lacquer (the clearcoat roughness per region is in render/bake/recipes.ts)
+const SURF = { elytra: S(0.44, 0.42), shield: S(0.38, 0.45), head: S(0.42, 0.4), mand: S(0.52, 0.3), leg: S(0.4, 0.42), under: S(0.6, 0.15), eye: S(0.1, 1.0) };
+const jit = new THREE.Color();
+/** Each beetle a little different (hue and value), from its variation seed. */
+function jitter(c: THREE.Color, v: number, k = 1): THREE.Color {
+  return jit.copy(c).multiplyScalar(1 + (v - 0.5) * 0.16 * k).offsetHSL((v - 0.5) * 0.02 * k, (0.5 - v) * 0.06 * k, 0);
+}
 
 /** Creature states used here (render mirror of sim/creatures/creatureAI.ts CS). */
 const ST = { WindUp: 8, Rear: 15, Strike: 18, Lift: 19 } as const;
@@ -348,7 +474,7 @@ const pv = new THREE.Vector3();
 
 /** Rest legs: [hip x, hip z, foot x, foot reach, femur, tibia, tarsus] (fractions of L). */
 const LEGS: Array<[number, number, number, number, number, number, number]> = [
-  [0.012, 0.05, 0.19, 0.3, 0.12, 0.12, 0.1],
+  [-0.02, 0.055, 0.17, 0.3, 0.125, 0.12, 0.1],
   [-0.11, 0.07, -0.07, 0.36, 0.13, 0.13, 0.11],
   [-0.17, 0.08, -0.32, 0.34, 0.14, 0.15, 0.12],
 ];
@@ -428,10 +554,10 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   }
   // body shell
   rig.part('stag_under', 0, 0, 0, k, SG2.under, SURF.under);
-  rig.part('stag_elytra', 0, 0, 0, k, SG2.elytra, SURF.elytra);
+  rig.part('stag_elytra', 0, 0, 0, k, jitter(SG2.elytra, p.v2), SURF.elytra);
   rig.part('stag_pronotum', 0, 0, 0, k, SG2.black, SURF.shield);
   // scutellum
-  rig.ell(-0.088 * L, 0.188 * L, 0, 0.018 * L, 0.006 * L, 0.016 * L, SG2.black, SURF.shield);
+  rig.ell(-0.08 * L, 0.174 * L, 0, 0.012 * L, 0.003 * L, 0.011 * L, SG2.black, SURF.shield);
 
   // head frame: pitches about the neck (down to grab, up to lift and toss), yaws a little in the toss
   const tossSide = p.v2 > 0.5 ? 1 : -1;
@@ -457,11 +583,12 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   for (const sd of [-1, 1]) {
     const wv = Math.sin(p.t * 2.2 + sd + p.v2 * 7) * 0.12;
     tA.set(SB.ant.x * L, SB.ant.y * L, sd * SB.ant.z * L);
-    tB.set(tA.x + 0.035 * L, tA.y + 0.012 * L, tA.z + sd * 0.115 * L);
+    tB.set(tA.x + 0.01 * L, tA.y + 0.014 * L, tA.z + sd * 0.12 * L);
     side.set(0, 1, 0);
-    rig.partFrame('stag_scape', tA, tB, side, 0.0065 * L, 0.0065 * L, SG2.black, SURF.leg);
-    const fx = Math.cos(0.5 + wv);
-    const fz = Math.sin(0.5 + wv);
+    rig.partFrame('stag_scape', tA, tB, side, 0.008 * L, 0.008 * L, SG2.black, SURF.leg);
+    // the elbow: the funicle turns forward from the end of the long scape
+    const fx = Math.cos(0.2 + wv);
+    const fz = Math.sin(0.2 + wv);
     tA.copy(tB);
     tB.set(tA.x + fx * 0.06 * L, tA.y + 0.004 * L, tA.z + sd * fz * 0.06 * L);
     rig.partFrame('stag_funicle', tA, tB, side, 0.0052 * L, 0.0052 * L, SG2.black, SURF.leg);
@@ -495,7 +622,7 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
       solveKnee(hip, ankle, l1 * L, l2 * L, sd, knee);
       side.set(dz / dl, 0, -dx / dl);
       // femora ~4 mm across on a 100 mm beetle, flattened; tibiae a little thinner, tarsi slender
-      const r = 0.016 * L;
+      const r = 0.023 * L;
       rig.partFrame('stag_coxa', hip, tA.set(hip.x, hip.y - 0.004 * L, hip.z + sd * 0.022 * L), side, r * 1.2, r * 1.2, SG2.leg, SURF.leg);
       rig.partFrame('stag_femur', tA, knee, side, r * 1.1, r * 0.9, SG2.leg, SURF.leg);
       side.set(0, 1, 0);

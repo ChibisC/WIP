@@ -19,6 +19,8 @@ export interface GradeSettings {
   lift: THREE.Color;
   gain: THREE.Color;
   vignette: number;
+  /** film grain (labs: the look of a real macro photo), 0 = none */
+  grain?: number;
 }
 
 export interface PostSettings {
@@ -114,7 +116,7 @@ precision highp float;
 varying vec2 vUv;
 uniform sampler2D tColor; uniform sampler2D tDepth; uniform vec2 resolution;
 uniform float focusDist; uniform float dofStrength; uniform float dofOn; uniform float uTilt;
-uniform float exposure, saturation, contrast, warmth, vignette; uniform vec3 lift; uniform vec3 gain;
+uniform float exposure, saturation, contrast, warmth, vignette, grain; uniform vec3 lift; uniform vec3 gain;
 ${DEPTH_HELPERS}
 float coc(vec2 uv){
   float z = linDepth(texture2D(tDepth, uv).x);
@@ -154,6 +156,11 @@ void main(){
   col *= vec3(1.0 + warmth*0.06, 1.0, 1.0 - warmth*0.08);
   vec2 vv = vUv - 0.5; vv.x *= resolution.x / resolution.y;
   col *= mix(1.0, smoothstep(1.05, 0.25, length(vv)), vignette);
+  if (grain > 0.0) {
+    vec2 g = gl_FragCoord.xy;
+    float n = fract(sin(dot(g, vec2(12.9898, 78.233))) * 43758.5453) + fract(sin(dot(g + 17.3, vec2(39.346, 11.135))) * 24634.6345) - 1.0;
+    col *= 1.0 + n * grain;
+  }
   gl_FragColor = vec4(max(col, 0.0), 1.0);
 }`;
 
@@ -242,6 +249,7 @@ export class PostPipeline {
         contrast: { value: 1 },
         warmth: { value: 0 },
         vignette: { value: 0.3 },
+        grain: { value: 0 },
         lift: { value: new THREE.Color() },
         gain: { value: new THREE.Color(1, 1, 1) },
       },
@@ -318,6 +326,7 @@ export class PostPipeline {
     u.contrast.value = g.contrast;
     u.warmth.value = g.warmth;
     u.vignette.value = g.vignette;
+    u.grain.value = g.grain ?? 0;
     (u.lift.value as THREE.Color).copy(g.lift);
     (u.gain.value as THREE.Color).copy(g.gain);
     this.quad.material = this.dof;

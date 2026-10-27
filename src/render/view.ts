@@ -14,6 +14,7 @@ import { PostPipeline } from './post';
 import { createNestEnvironment, createSurfaceEnvironment, NestLights, SurfaceLights } from './environment';
 import { ObserveCameraRig, SurfaceCameraRig } from './cameras';
 import { globalUniforms } from './shaderPatch';
+import { presetForBiome, setCreatureEnvTexture, setCreatureLighting } from './lightPresets';
 
 export type ViewSpace = 'surface' | 'nest';
 export type Quality = 'low' | 'medium' | 'high';
@@ -106,6 +107,8 @@ export class GameView {
   private dayFog = 0;
   private daySun = 0;
   private dayHemi = 0;
+  /** which image-based light the creature materials have now (realism v2: render/lightPresets.ts) */
+  private crLight = '';
 
   constructor(private canvas: HTMLCanvasElement, private input: Input) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
@@ -636,7 +639,28 @@ export class GameView {
     this.post.settings.dofStrength = this.observing ? 1.2 : 1;
     this.applyStorm(dt);
     this.applyGrade();
+    this.applyCreatureLight();
     this.post.render(this.activeScene(), cam);
+  }
+
+  /**
+   * Creature and ant materials reflect a small procedural world (realism v2): on the surface the map's preset
+   * (sunny, forest shade; overcast in a storm), underground the nest's own warm, dim environment.
+   */
+  private applyCreatureLight(): void {
+    if (this.space === 'surface') {
+      const preset = this.stormShown > 0.5 ? 'overcast' : presetForBiome(this.terrain?.map?.biome);
+      const key = `surface:${preset}`;
+      if (key === this.crLight) return;
+      this.crLight = key;
+      setCreatureLighting(this.renderer, preset, this.surfaceLights.sunDir);
+    } else {
+      const scene = this.activeScene();
+      const key = `nest:${scene.uuid}`;
+      if (key === this.crLight) return;
+      this.crLight = key;
+      setCreatureEnvTexture(scene.environment, 0.55, 1);
+    }
   }
 
   /** Ease the storm look in and out: dimmer sun, more fog (render only). */

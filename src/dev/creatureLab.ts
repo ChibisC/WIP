@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { PostPipeline } from '../render/post';
 import { setBakeRenderer } from '../render/bake/detailBake';
 import { createSurfaceEnvironment } from '../render/environment';
+import { applyLabLight, renderLabMask } from './labLight';
 import { textures } from '../render/textures';
 import { globalUniforms } from '../render/shaderPatch';
 import { CreatureRenderer } from '../render/creatures/creatureRenderer';
@@ -136,6 +137,8 @@ export function runCreatureLab(canvas: HTMLCanvasElement, q: URLSearchParams): v
   const target = new THREE.Vector3(num('tx', 0), num('ty', Math.max(...Ls) * 0.1), num('tz', 0));
   const dirs: Record<string, THREE.Vector3> = {
     side: new THREE.Vector3(0, 0.12, 1),
+    // realism v2: a side view from a little above (field macro photos: ground behind, no horizon)
+    fside: new THREE.Vector3(0.08, 0.42, 1),
     top: new THREE.Vector3(0.0001, 1, 0.0001),
     front: new THREE.Vector3(1, 0.25, 0.0001),
     back: new THREE.Vector3(-1, 0.35, 0.0001),
@@ -146,6 +149,8 @@ export function runCreatureLab(canvas: HTMLCanvasElement, q: URLSearchParams): v
   cam.position.copy(target).addScaledVector(dirs[camKind].normalize(), dist);
   if (camKind === 'top') cam.up.set(1, 0, 0);
   cam.lookAt(target);
+  // realism v2: lighting preset, backlit test, tone mapping, macro ground (dev/labLight.ts)
+  applyLabLight(renderer, scene, env, cam, target, span, q, ground);
   const sun = env.sun;
   const sc = sun.shadow.camera as THREE.OrthographicCamera;
   sc.left = -span;
@@ -155,12 +160,19 @@ export function runCreatureLab(canvas: HTMLCanvasElement, q: URLSearchParams): v
   sc.updateProjectionMatrix();
   sun.target.position.copy(target);
   sun.position.copy(target).addScaledVector(env.sunDir, 400);
+  if (renderLabMask(renderer, scene, cam, q, [], cr.group)) {
+    (window as unknown as { __ready: boolean }).__ready = true;
+    return;
+  }
   const post = new PostPipeline(renderer);
   post.setSize(window.innerWidth, window.innerHeight, 1);
   post.focusDistance = dist;
   post.tilt = 0;
   post.settings.dofStrength = num('dof', 0.4);
   post.settings.ao = q.get('ao') !== '0';
+  // realism v2: a little film grain and stronger contact occlusion for the macro renders
+  post.settings.grade.grain = Number(q.get('grain') || 0);
+  if (q.get('aostr')) post.settings.aoStrength = Number(q.get('aostr'));
   globalUniforms.uTime.value = 0;
   post.render(scene, cam);
   post.render(scene, cam);

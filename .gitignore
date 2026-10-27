@@ -6,3 +6,4 @@ underground-dominion-prototype.zip
 
 # rendered stand-in takes (npm run audio:standins)
 audio-src/standins/
+__pycache__/
