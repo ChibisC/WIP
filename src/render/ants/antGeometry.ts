@@ -30,6 +30,16 @@ export const PART = {
 
 export interface AntRig {
   coxa: THREE.Vector3[];
+  /** rest foot points (tarsus tips, on the ground), for the planted-feet IK */
+  foot?: THREE.Vector3[];
+  /**
+   * planted-feet IK (animation pass): each foot's neutral place on the ground (mid-stance, pulled in from the
+   * nearly straight rest pose so the leg can reach forward and back), the largest stance half-sweep (mm) and
+   * half-turn per stance (rad) every leg can follow
+   */
+  home?: THREE.Vector3[];
+  sweepMax?: number;
+  turnMax?: number;
   knee: THREE.Vector3[];
   ankle: THREE.Vector3[];
   axis: THREE.Vector3[];
@@ -365,6 +375,45 @@ export function ellipsoid(c: THREE.Vector3, r: THREE.Vector3, seg: number, rot?:
       ind.push(a, cc, b, b, cc, d);
     }
   return [p, ind, meta];
+}
+
+/**
+ * Planted-feet IK (animation pass): for each leg, pull its foot's neutral place in toward the coxa until the
+ * foot can follow a stance sweep of ±`sweepMax` along the body (and a turn of ±`turnMax` round its centre)
+ * without the leg running out of reach; the shader steers each foot round its neutral place.
+ */
+function plantHomes(rig: AntRig): void {
+  const sweep = rig.length * 0.16;
+  rig.home = [];
+  let far = 0;
+  for (let li = 0; li < 6; li++) {
+    const C = rig.coxa[li];
+    const K = rig.knee[li];
+    const F = rig.foot![li];
+    const r0 = Math.hypot(F.x - C.x, F.z - C.z);
+    const ox = (F.x - C.x) / r0;
+    const oz = (F.z - C.z) / r0;
+    const kx = (K.x - C.x) * ox + (K.z - C.z) * oz;
+    const ky = K.y - C.y;
+    const fy = F.y - C.y;
+    const la = Math.hypot(kx, ky);
+    const lb = Math.hypot(r0 - kx, fy - ky);
+    const maxH = Math.sqrt(Math.max(0, (la + lb) * (la + lb) * 0.9 - fy * fy));
+    const minH = Math.sqrt(Math.max(0, (la - lb) * (la - lb) * 1.6 - fy * fy));
+    let k = 0.95;
+    for (; k > 0.5; k -= 0.01) {
+      const nx = C.x + (F.x - C.x) * k;
+      const nz = C.z + (F.z - C.z) * k;
+      const a = Math.hypot(nx + sweep - C.x, nz - C.z);
+      const b = Math.hypot(nx - sweep - C.x, nz - C.z);
+      if (Math.max(a, b) <= maxH && Math.min(a, b) >= minH) break;
+    }
+    const h = new THREE.Vector3(C.x + (F.x - C.x) * k, F.y, C.z + (F.z - C.z) * k);
+    rig.home.push(h);
+    far = Math.max(far, Math.hypot(h.x, h.z));
+  }
+  rig.sweepMax = sweep;
+  rig.turnMax = sweep / Math.max(far, 1e-3);
 }
 
 /** Flat 2D outline (u forward, v sideways) extruded vertically with thickness profile. */
@@ -1148,6 +1197,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const o = foot.clone().sub(base).setY(0).normalize();
     const axis = new THREE.Vector3().crossVectors(o, upv).normalize();
     rig.coxa.push(base.clone());
+    (rig.foot ??= []).push(foot.clone());
     rig.knee.push(knee.clone());
     rig.ankle.push(ankle.clone());
     rig.axis.push(axis);
@@ -1293,9 +1343,11 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   geometry.translate(-cx, 0, 0);
   const shift = (v: THREE.Vector3) => v.set(v.x - cx, v.y, v.z);
   rig.coxa.forEach(shift);
+  rig.foot?.forEach(shift);
   rig.knee.forEach(shift);
   rig.ankle.forEach(shift);
   [rig.neck, rig.mandL, rig.mandR, rig.antL, rig.antR, rig.elbL, rig.elbR, rig.gasterPivot, rig.waistPivot, rig.headTip, rig.gasterTip, rig.mouth, (rig as AntRig & { crest: THREE.Vector3 }).crest].forEach(shift);
+  if (rig.foot) plantHomes(rig);
   // army ants: high-stepping gait, the queen's physogastry, and where a porter's load hangs under the body
   if (m.gait) {
     rig.gaitLift = m.gait.lift;

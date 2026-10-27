@@ -3,8 +3,10 @@ import { AntRig, buildAnt } from './antGeometry';
 import { createAntMaterials, createAntGlueShell, POSE, TINT_GLSL } from './antMaterial';
 import { AttackPose, applyAttackBody, attackPose, neutralPose } from './attackPoses';
 import { AntMorph, MORPHS } from './morphs';
+import { animV2, attackVariant, Motion2, newMotion, newMotionOut, stepMotion } from './antMotion';
 import { addPatch, patchDapple } from '../shaderPatch';
 import { TermiteLayer } from '../termite/termiteLayer';
+import { BALANCE } from '../../sim/balance';
 
 /**
  * What the renderer needs to know about one ant this frame. Produced from the
@@ -36,6 +38,9 @@ export interface AntView {
   headYaw: number;
   dead: boolean;
   carrying: boolean;
+  /** hit points (render: a drop starts a hit reaction) and whether it is flying through the air after a fling */
+  hp?: number;
+  flung?: boolean;
   /** 0..1 crop fullness: a replete ant's gaster swells */
   crop: number;
   /** render scale multiplier (nanitics are smaller, upgraded ants a little larger) */
@@ -136,6 +141,8 @@ interface AnimState {
   swv?: number;
   /** termite glue on this ant, eased (render only) */
   gl?: number;
+  /** animation pass: the pilot species' motion controller (antMotion.ts) */
+  m2?: Motion2;
   /** melee attack: blend weight, last phase, attack, side */
   aw?: number;
   aq?: number;
@@ -213,7 +220,7 @@ class Bucket {
     const k = this.shellN[l];
     if (!mesh || k >= mesh.instanceMatrix.count) {
       const cap = mesh ? mesh.instanceMatrix.count * 2 : 16;
-      this.shellMat ??= createAntGlueShell(this.rig);
+      this.shellMat ??= createAntGlueShell(this.rig, this.key);
       const geo = this.geos[l].clone();
       const mk = (size = 4) => new THREE.InstancedBufferAttribute(new Float32Array(cap * size), size).setUsage(THREE.DynamicDrawUsage);
       const at = { a: mk(), b: mk(), c: mk(), d: mk(), e: mk(), g: mk(1) };
@@ -269,6 +276,8 @@ class Bucket {
 }
 
 const tmpShellM = new THREE.Matrix4();
+const motionOut = newMotionOut();
+const TICK_S = 1 / BALANCE.tickHz;
 const atkP = neutralPose({} as AttackPose);
 
 const tmpM = new THREE.Matrix4();
@@ -425,7 +434,7 @@ export class AntRenderer {
         ],
       ],
       vertex: [
-        ['#include <begin_vertex>', 'vGoldI = vec2(aE.x, aE.z); vTintI = floor((aD.z + 2.0) / 4.0);\n#include <begin_vertex>'],
+        ['#include <begin_vertex>', 'vGoldI = vec2(abs(aE.x), aE.z); vTintI = floor((aD.z + 2.0) / 4.0);\n#include <begin_vertex>'],
         [
           '#include <uv_vertex>',
           `#include <uv_vertex>
@@ -484,35 +493,45 @@ export class AntRenderer {
         s = { phase: Math.random(), amp: 0, wave: Math.random() * 10, hy: 0, hp: 0, mo: 0, ap: 0, gp: 0, cr: 0, pose: 0, poseW: 0, pph: Math.random() * 10, death: v.dead ? 1 : 0, nx: 0, ny: 1, nz: 0, lastX: x, lastY: y, lastH: h, seen: this.frame, roll: 0 };
         this.anim.set(v.id, s);
       }
+      // animation pass (render/ants/antMotion.ts): the pilot species' motion controller
+      const v2 = animV2(v.morph);
+      if (v2 && !s.m2) {
+        s.m2 = newMotion(v.id);
+        s.wave = s.m2.seed * 10;
+        s.pph = s.m2.seed * 7;
+      }
+      const M = v2 ? motionOut : null;
       // on a creature: its animated leg or back decides where the ant is (and how fast it climbs)
       const mounted = !!v.rideCr && !!this.mount && this.mount(v, alpha, mountOut);
       // Gait: phase advances by distance travelled / stride length, so feet never slide.
-      const scale = (1 + v.sizeVar * 0.12) * (v.scale ?? 1);
-      const stride = rig.stride * scale;
-      const moved = mounted ? mountOut.speed * dt : Math.hypot(x - s.lastX, y - s.lastY);
-      let dhs = h - s.lastH;
-      if (dhs > Math.PI) dhs -= Math.PI * 2;
-      else if (dhs < -Math.PI) dhs += Math.PI * 2;
-      const dh = Math.abs(dhs);
-      const travel = (moved < stride * 2 ? moved : 0) + dh * rig.length * 0.35 * scale;
-      s.lastX = x;
-      s.lastY = y;
-      s.lastH = h;
-      s.seen = this.frame;
-      const speed = dt > 0 ? travel / dt : 0;
-      const wantAmp = v.dead ? 0 : Math.min(1, speed / (stride * 1.2) + (speed > 0.05 ? 0.35 : 0));
-      s.amp = damp(s.amp, wantAmp, 12, dt);
-      if (s.amp > 0.02 || travel > 0) s.phase += travel / stride;
-      else s.phase += (Math.round(s.phase * 2) / 2 - s.phase) * Math.min(1, dt * 4); // settle feet
-      // Head, antennae, mandibles, gaster smoothing
-      s.hy = damp(s.hy, v.headYaw, 8, dt);
-      s.hp = damp(s.hp, v.headPitch + (v.carrying && !v.carryUnder ? 0.3 : 0), 6, dt);
-      const crest = (rig as { crest?: unknown }).crest;
-      if (crest) {
-        // Saiy-Ants: the low lock reaches the neck, so the head never pitches far enough to push it into the thorax
-        s.hp = Math.max(s.hp, -0.3);
-        // stiff but springy hair: a 2 Hz damped spring pushed by turning; the tips lag the head
-        if (dt > 0) {
+      const scale = (1 + v.sizeVar * 0.12) * (v.scale ?? 1) * (s.m2 ? s.m2.sizeK : 1);
+      const fighting = v.atk !== undefined;
+      if (M && s.m2) {
+        stepMotion(s, s.m2, v, rig, { x, y, h, lastX: s.lastX, lastY: s.lastY, dt, scale, mounted, mountSpeed: mounted ? mountOut.speed : 0, fighting }, M);
+        s.lastX = x;
+        s.lastY = y;
+        s.lastH = M.h;
+        s.seen = this.frame;
+      } else {
+        const stride = rig.stride * scale;
+        const moved = mounted ? mountOut.speed * dt : Math.hypot(x - s.lastX, y - s.lastY);
+        let dhs = h - s.lastH;
+        if (dhs > Math.PI) dhs -= Math.PI * 2;
+        else if (dhs < -Math.PI) dhs += Math.PI * 2;
+        const dh = Math.abs(dhs);
+        const travel = (moved < stride * 2 ? moved : 0) + dh * rig.length * 0.35 * scale;
+        s.lastX = x;
+        s.lastY = y;
+        s.lastH = h;
+        s.seen = this.frame;
+        const speed = dt > 0 ? travel / dt : 0;
+        const wantAmp = v.dead ? 0 : Math.min(1, speed / (stride * 1.2) + (speed > 0.05 ? 0.35 : 0));
+        s.amp = damp(s.amp, wantAmp, 12, dt);
+        if (s.amp > 0.02 || travel > 0) s.phase += travel / stride;
+        else s.phase += (Math.round(s.phase * 2) / 2 - s.phase) * Math.min(1, dt * 4); // settle feet
+        const crest0 = (rig as { crest?: unknown }).crest;
+        if (crest0 && dt > 0) {
+          // Saiy-Ants: stiff but springy hair: a 2 Hz damped spring pushed by turning; the tips lag the head
           const want = Math.max(-1, Math.min(1, -(dhs / dt) * 0.3));
           const k = 158; // (2π·2 Hz)²
           const ds = Math.min(dt, 1 / 40); // keep the explicit spring stable on slow frames
@@ -520,40 +539,61 @@ export class AntRenderer {
           s.sw = Math.max(-1.5, Math.min(1.5, (s.sw ?? 0) + s.swv * ds));
         }
       }
-      s.mo = damp(s.mo, v.mandible, v.snap ? 60 : v.mandible > s.mo ? 22 : 10, dt);
-      s.ap = damp(s.ap, v.antennaPitch, 5, dt);
+      const clock = M ? M.clock : 1;
+      // Head, antennae, mandibles, gaster smoothing
+      s.hy = damp(s.hy, v.headYaw + (M ? M.headYaw : 0), 8, dt);
+      s.hp = damp(s.hp, v.headPitch + (v.carrying && !v.carryUnder ? 0.3 : 0) + (M ? M.headPitch : 0), 6, dt);
+      // Saiy-Ants: the low lock reaches the neck, so the head never pitches far enough to push it into the thorax
+      if ((rig as { crest?: unknown }).crest) s.hp = Math.max(s.hp, -0.3);
+      const mandT = M && M.mand >= 0 ? Math.max(v.mandible, M.mand) : v.mandible;
+      s.mo = damp(s.mo, mandT, v.snap ? 60 : mandT > s.mo ? 22 : 10, dt);
+      s.ap = damp(s.ap, v.antennaPitch + (M ? M.antPitch : 0), 5, dt);
       s.gp = damp(s.gp, v.gaster, 6, dt);
       s.cr = damp(s.cr, v.crop, 1.5, dt);
-      s.wave += dt * (0.5 + v.antennaActivity * 2.5 + s.amp * 0.6) * (v.waveMul ?? 1);
-      s.death = damp(s.death, v.dead ? 1 : 0, 4, dt);
+      const act = M ? Math.max(v.antennaActivity, M.antAct) : v.antennaActivity;
+      s.wave += dt * clock * (0.5 + act * 2.5 + s.amp * 0.6) * (v.waveMul ?? 1) * (s.m2 ? s.m2.waveK : 1);
+      if (!M) s.death = damp(s.death, v.dead ? 1 : 0, 4, dt);
       s.roll = damp(s.roll, v.roll, 10, dt);
       // melee attack: this cycle's attack pose (attackPoses.ts), eased in and out of the fight
-      const fighting = v.atk !== undefined;
-      s.aw = damp(s.aw ?? 0, fighting ? 1 : 0, fighting ? 12 : 6, dt);
+      s.aw = damp(s.aw ?? 0, fighting ? 1 : 0, fighting ? 12 : M ? 9 : 6, dt);
       if (fighting) {
-        s.aq = v.atk;
-        s.av = v.atkVar ?? 0;
+        // (the animation pass runs the attack's phase on between ticks, so the strike is smooth at any frame rate)
+        s.aq = M ? ((v.atk ?? 0) + (alpha * TICK_S) / Math.max(0.15, v.atkGap ?? 0.8)) % 1 : v.atk;
+        s.av = M ? attackVariant(v.morph, v.atkVar ?? 0) : (v.atkVar ?? 0);
         s.as = v.atkSide ?? 1;
       }
       let hy = s.hy;
       let hp = s.hp;
       let mo = s.mo;
+      let gp = s.gp;
       const aw = s.aw ?? 0;
+      let stingW = 0;
       if (aw > 0.001) {
         attackPose(s.av ?? 0, s.aq ?? 0, s.as ?? 1, atkP);
         hy += atkP.headYaw * aw;
         hp += atkP.headPitch * aw;
         mo += (atkP.mand - mo) * aw;
+        gp += atkP.gaster * aw;
+        stingW = atkP.sting * aw;
         if ((rig as { crest?: unknown }).crest) hp = Math.max(hp, -0.3); // Saiy-Ants: the low lock stays clear of the thorax
       }
-      if (v.pose !== s.pose) {
-        s.poseW = damp(s.poseW, 0, 10, dt);
+      // poses crossfade: out, then the next one in (the animation pass blends faster: 0.1–0.25 s)
+      const wantPose = M ? M.pose : v.pose;
+      if (wantPose !== s.pose) {
+        s.poseW = damp(s.poseW, 0, M ? 18 : 10, dt);
         if (s.poseW < 0.05) {
-          s.pose = v.pose;
-          s.pph = 0;
+          s.pose = wantPose;
+          s.pph = M && s.m2 ? s.m2.seed * 3 : 0;
         }
-      } else s.poseW = damp(s.poseW, v.pose ? 1 : 0, 6, dt);
-      s.pph += dt * (s.pose === POSE.DIG ? 2.6 : s.pose === POSE.GROOM_ANT || s.pose === POSE.GROOM_LEGS ? 1.1 : 1.0);
+      } else s.poseW = damp(s.poseW, wantPose ? 1 : 0, M ? 10 : 6, dt);
+      s.pph += dt * clock * (s.pose === POSE.DIG ? 2.6 : s.pose === POSE.GROOM_ANT || s.pose === POSE.GROOM_LEGS ? 1.1 : 1.0);
+      let poseOut = s.pose;
+      let poseWOut = s.poseW;
+      if (stingW > 0.02) {
+        // grip and sting: the sting slides out as the gaster swings under
+        poseOut = POSE.STING;
+        poseWOut = stingW;
+      }
 
       // World transform
       if (mounted) {
@@ -570,13 +610,26 @@ export class AntRenderer {
         s.ny = damp(s.ny, vU.y, 10, dt);
         s.nz = damp(s.nz, vU.z, 10, dt);
         vU.set(s.nx, s.ny, s.nz).normalize();
-        adapter.forward(h, vF);
+        adapter.forward(M ? M.h : h, vF);
       }
       vF.addScaledVector(vU, -vF.dot(vU)).normalize();
-      if (v.pitch) vF.applyAxisAngle(vR.crossVectors(vF, vU).normalize(), v.pitch);
+      if (M && M.yaw) vF.applyAxisAngle(vU, M.yaw);
+      const pitch = v.pitch + (M ? M.pitch : 0);
+      if (pitch) vF.applyAxisAngle(vR.crossVectors(vF, vU).normalize(), pitch);
       vR.crossVectors(vF, vU).normalize();
       vU.crossVectors(vR, vF).normalize();
-      if (s.death > 0.01 || Math.abs(s.roll) > 0.001) {
+      if (M) {
+        // animation pass: the lean, a flung ant's tumble, the death roll
+        if (M.spinPitch) {
+          vF.applyAxisAngle(vR, M.spinPitch);
+          vU.applyAxisAngle(vR, M.spinPitch);
+        }
+        const r = M.deathRoll + s.roll + M.roll + M.spinRoll;
+        if (Math.abs(r) > 1e-4) {
+          vU.applyAxisAngle(vF, r);
+          vR.crossVectors(vF, vU).normalize();
+        }
+      } else if (s.death > 0.01 || Math.abs(s.roll) > 0.001) {
         // Dead ants tip onto their side/back; stagger rolls.
         const r = s.death * 2.4 + s.roll;
         vU.applyAxisAngle(vF, r);
@@ -585,7 +638,10 @@ export class AntRenderer {
       if (aw > 0.001) applyAttackBody(atkP, aw, rig.length * scale, vF, vU, vR, vP);
       tmpM.makeBasis(vF, vU, vR);
       tmpQ.setFromRotationMatrix(tmpM);
-      vP.addScaledVector(vU, v.lift + s.death * rig.stance * 0.3);
+      if (M) {
+        vP.addScaledVector(vF, M.fwd).addScaledVector(vR, M.side);
+        vP.addScaledVector(vU, v.lift + M.up + Math.min(1, M.deathLeg) * Math.min(1, Math.abs(M.deathRoll) / 1.4) * rig.stance * 0.3);
+      } else vP.addScaledVector(vU, v.lift + s.death * rig.stance * 0.3);
       vS.setScalar(scale);
       tmpM.compose(vP, tmpQ, vS);
 
@@ -612,11 +668,13 @@ export class AntRenderer {
       n = b.counts[lod]++;
       mesh.setMatrixAt(n, tmpM);
       at.a.setXYZW(n, s.phase, s.amp, hy, hp);
-      at.b.setXYZW(n, mo, v.antennaActivity * 0.3 + (v.antennaPitch > 0.5 ? 0.6 : 0), s.ap, s.wave);
-      at.c.setXYZW(n, s.gp, s.cr, s.pose, s.poseW);
-      // colour variation −1..1, plus 4 × the Termant tint code (decoded in the shader)
-      at.d.setXYZW(n, s.death, v.carrying ? 1 : 0, Math.max(-1, Math.min(1, v.colorVar)) + 4 * (v.tint ?? 0), s.pph);
-      at.e.setXYZW(n, v.gold ?? 0, v.goldDir ?? 1, v.exhausted ?? 0, s.sw ?? 0);
+      at.b.setXYZW(n, mo, act * 0.3 + (v.antennaPitch > 0.5 ? 0.6 : 0) + (M ? M.antSpread : 0), s.ap, s.wave);
+      // pose id + 0.99 × its weight; the hit flash
+      at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, M ? M.flash : 0);
+      // colour variation −1..1, plus 4 × the Termant tint code (decoded in the shader); the planted feet's stance sweep
+      at.d.setXYZW(n, M ? M.deathLeg : s.death, M ? M.Dh : 0, Math.max(-1, Math.min(1, v.colorVar)) + 4 * (v.tint ?? 0), s.pph);
+      // gold × ripple direction, the planted feet's turn per stance, exhausted, hair sway
+      at.e.setXYZW(n, (v.gold ?? 0) * ((v.goldDir ?? 1) < 0 ? -1 : 1), M ? M.Ps : 0, v.exhausted ?? 0, s.sw ?? 0);
       // termite glue clinging to the ant (render only): eases in, wears off slowly; a sickle-jaw's acid uses the
       // same wet shell (the kit's acid and glue colours are nearly the same pale amber)
       const gw = Math.max(v.glue ?? 0, v.acid ?? 0);

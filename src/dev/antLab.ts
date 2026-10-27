@@ -155,9 +155,10 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     const set = (name: string, v: number[]) => im.geometry.setAttribute(name, new THREE.InstancedBufferAttribute(new Float32Array(v), 4));
     set('aA', [phase, amp, Number(q.get('hyaw') || 0) + (atk?.headYaw ?? 0), per('hpitches', bi, Number(q.get('hpitch') || 0)) + (atk?.headPitch ?? 0)]);
     set('aB', [atk ? atk.mand : per('mopens', bi, Number(q.get('mopen') || 0)), Number(q.get('aspread') || 0), Number(q.get('apitch') || 0), Number(q.get('awave') || 0.1)]);
-    set('aC', [Number(q.get('gpitch') || 0), Number(q.get('swell') || 0), pz, pz ? 1 : 0]);
+    // (aC.z packs the pose id and its weight; aE.x the gold and its ripple direction)
+    set('aC', [Number(q.get('gpitch') || 0), Number(q.get('swell') || 0), pz + (pz ? 0.99 : 0), Number(q.get('hit') || 0)]);
     set('aD', [Number(q.get('death') || 0), 0, 4 * per('tints', bi, 0), Number(q.get('pph') || 0.1)]);
-    set('aE', [Number(q.get('gold') || 0), Number(q.get('golddir') || 1), Number(q.get('exh') || 0), 0]);
+    set('aE', [Number(q.get('gold') || 0) * (Number(q.get('golddir') || 1) < 0 ? -1 : 1), 0, Number(q.get('exh') || 0), 0]);
     const mx = new THREE.Matrix4();
     const cx = x + (b.rig.length * sc) / 2;
     placements.push(cx);

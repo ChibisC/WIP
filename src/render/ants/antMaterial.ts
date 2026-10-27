@@ -7,6 +7,7 @@ import { bakeDetail } from '../bake/detailBake';
 import { detailPatch } from '../bake/detailShading';
 import { antRecipe } from '../bake/recipes';
 import { creatureLightPatch, useCreatureEnv } from '../lightPresets';
+import { animV2 } from './antMotion';
 
 /**
  * GPU skeletal animation for instanced ants.
@@ -14,8 +15,9 @@ import { creatureLightPatch, useCreatureEnv } from '../lightPresets';
  * Per-instance attributes (all vec4):
  *   aA: gait phase (cycles), stride amplitude 0..1, head yaw, head pitch
  *   aB: mandible open 0..1, antenna spread -1..1, antenna pitch -1..1, antenna wave phase
- *   aC: gaster pitch (+ raise / − curl under), gaster yaw, pose id, pose weight
- *   aD: death curl 0..1, carry 0..1, colour variation -1..1 (+ 4 × Termant tint code: 1 stolen caste), pose phase
+ *   aC: gaster pitch (+ raise / − curl under), crop swell, pose id + 0.99 × pose weight, hit flash 0..1
+ *   aD: death curl 0..1, stance sweep (mm, planted feet), colour variation -1..1 (+ 4 × Termant tint code: 1 stolen caste), pose phase
+ *   aE: Saiy-Ants gold 0..1 × ripple direction ±1, turn per stance (rad, planted feet), exhausted 0..1, hair sway
  * Pose ids: 0 none, 1 groom antennae, 2 groom legs, 3 trophallaxis, 4 sting,
  *           5 acid spray, 6 dig, 7 grapple/brace, 8 alarm, 9 carry,
  *           army ants (render-only, chosen in game/antViews.ts from sim state): 10 porter (load under the body),
@@ -39,7 +41,9 @@ attribute vec4 aA; attribute vec4 aB; attribute vec4 aC; attribute vec4 aD;
 attribute vec4 aE; // Saiy-Ants: gold 0..1, ripple dir ±1, exhausted 0..1, hair sway −1..1
 varying vec4 vGold;
 uniform float uMandVert; uniform float uMandSwing; uniform float uMandOpen; uniform vec3 uCrest;
-uniform vec3 uLegCoxa[6]; uniform vec3 uLegKnee[6]; uniform vec3 uLegAnkle[6]; uniform vec3 uLegAxis[6];
+uniform vec3 uLegCoxa[6]; uniform vec3 uLegKnee[6]; uniform vec3 uLegAnkle[6]; uniform vec3 uLegAxis[6]; uniform vec3 uLegFoot[6]; uniform vec3 uLegHome[6];
+uniform float uPlant; // animation pass: feet planted by an analytic IK (pilot species)
+varying float vHit;
 uniform vec3 uNeck; uniform vec3 uMandL; uniform vec3 uMandR; uniform vec3 uAntL; uniform vec3 uAntR;
 uniform vec3 uElbL; uniform vec3 uElbR; uniform vec3 uGasterPivot; uniform vec3 uWaistPivot;
 uniform vec4 uGait; // q0, lift, duty, body length
@@ -50,6 +54,7 @@ varying float vPartF;
 const float APIM = 3.14159265;
 vec3 rotA(vec3 v, vec3 a, float ang){ float c=cos(ang), s=sin(ang); return v*c + cross(a,v)*s + a*dot(a,v)*(1.0-c); }
 void rotP(inout vec3 p, inout vec3 n, vec3 piv, vec3 a, float ang){ p = piv + rotA(p - piv, a, ang); n = rotA(n, a, ang); }
+float wrapA(float x){ return x - 6.2831853 * floor((x + 3.14159265) / 6.2831853); }
 `;
 
 const ANIM_BODY = /* glsl */ `
@@ -59,10 +64,15 @@ vec3 animP = position;
   int part = int(aPart + 0.5);
   float phase = aA.x, amp = aA.y, hYaw = aA.z, hPitch = aA.w;
   float mOpen = aB.x, aSpread = aB.y, aPitchI = aB.z, aWave = aB.w;
-  float gPitch = aC.x, swell = aC.y; int pose = int(aC.z + 0.5); float poseW = aC.w;
+  // aC.z packs the pose id and its weight (id + 0.99 × weight); aC.w is the hit flash
+  float gPitch = aC.x, swell = aC.y; float pzI = floor(aC.z + 0.0005); int pose = int(pzI); float poseW = clamp((aC.z - pzI) / 0.99, 0.0, 1.0);
   float death = aD.x, pph = aD.w;
-  float goldA = aE.x, exh = aE.z;
-  vGold = aE;
+  // aE.x packs the gold amount and the ripple direction in its sign; aE.y is the turn per stance (planted feet)
+  float goldA = abs(aE.x), exh = aE.z;
+  vGold = vec4(goldA, aE.x < 0.0 ? -1.0 : 1.0, aE.z, aE.w);
+  vHit = aC.w;
+  // body bob at twice the stride frequency (the planted feet allow for it)
+  float bob = amp * uGait.w * 0.006 * cos(phase * 12.566);
   vec3 UP = vec3(0.0, 1.0, 0.0);
   vec3 RIGHT = vec3(0.0, 0.0, 1.0);
   vSurf = aSurf; vLocal = position / uGait.w; vTint = floor((aD.z + 2.0) / 4.0); vColorVar = aD.z - 4.0 * vTint;
@@ -96,6 +106,31 @@ vec3 animP = position;
     float lft = lift * uGait.y * amp;
     float knee = -lift * 0.42 * amp;
     float ankleF = lift * 0.3 * amp;
+    if (uPlant > 0.5) {
+      // animation pass: the foot stays where it touched down. Its target on the ground moves back under the body
+      // by the stance sweep (aD.y, mm) and round the body's centre by the turn (aE.y, rad) while planted, and
+      // swings forward lifted; the leg reaches it by yaw at the coxa and a two-bone solve in its own plane.
+      vec3 C = uLegCoxa[li]; vec3 K = uLegKnee[li]; vec3 F0 = uLegFoot[li]; vec3 NH = uLegHome[li];
+      vec3 tg = rotA(vec3(NH.x, 0.0, NH.z), UP, -pro * aE.y) + vec3(pro * aD.y, 0.0, 0.0);
+      vec2 r0 = F0.xz - C.xz;
+      vec2 r1 = tg.xz - C.xz;
+      yaw = wrapA(atan(r0.y, r0.x) - atan(r1.y, r1.x));
+      vec2 o = normalize(r0);
+      vec2 kk = vec2(dot(K.xz - C.xz, o), K.y - C.y);
+      vec2 ff = vec2(length(r0), F0.y - C.y);
+      float la = length(kk);
+      float lb = length(ff - kk);
+      vec2 tt = vec2(length(r1), ff.y + lift * uGait.y * amp * length(r0) * 0.75 - bob);
+      float Dd = clamp(length(tt), abs(la - lb) + 1e-4, (la + lb) * 0.999);
+      float al = acos(clamp((la * la + Dd * Dd - lb * lb) / (2.0 * la * Dd), -1.0, 1.0));
+      float sK = (ff.x * kk.y - ff.y * kk.x) >= 0.0 ? 1.0 : -1.0;
+      float pA1 = atan(tt.y, tt.x) + sK * al;
+      vec2 K1 = la * vec2(cos(pA1), sin(pA1));
+      float pB1 = atan(tt.y - K1.y, tt.x - K1.x);
+      lft = wrapA(pA1 - atan(kk.y, kk.x));
+      knee = wrapA(pB1 - atan(ff.y - kk.y, ff.x - kk.x) - lft);
+      ankleF = lift * 0.3 * amp;
+    }
 
     if (pose == 1 && pair == 0) {
       // Antenna grooming: the fore leg on the grooming side rises to the head
@@ -212,7 +247,7 @@ vec3 animP = position;
   if (pose == 11) { vec3 piv = (uLegCoxa[4] + uLegCoxa[5]) * 0.5; piv.y = 0.0; rotP(animP, N, piv, RIGHT, 0.26 * poseW); }
   if (pose == 13) animP.y -= poseW * uGait.w * 0.1;
   // Body bob at twice the stride frequency.
-  animP.y += amp * uGait.w * 0.006 * cos(phase * 12.566);
+  animP.y += bob;
   // Gold form: body lowered slightly (a rushing look).
   if (part < 10) animP.y -= goldA * uGait.w * 0.012;
   objectNormal = N;
@@ -221,6 +256,7 @@ vec3 animP = position;
 
 const FRAG_HEADER = /* glsl */ `
 varying vec4 vSurf; varying vec3 vLocal; varying float vColorVar; varying float vTint; varying vec4 vGold; uniform float uGoldTime;
+varying float vHit;
 uniform float uReal;
 uniform float uMask;
 varying float vPartF;
@@ -279,6 +315,8 @@ export function antPatch(): ShaderPatch {
            if (sT > 0.55 && ign < (sT - 0.55) / 0.45 * 0.8) discard;
          }
          ${TINT_GLSL('vTint')}
+         // hit flash (animation pass): a quick pale-red flush that reads at a distance
+         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95, 0.32, 0.18), vHit * 0.38);
          float goldM = goldMaskAt();
          {
            // black -> bronze -> metallic gold (darker in linear space than the brief's hexes: the tone mapping lifts gold to cream otherwise)
@@ -331,6 +369,7 @@ export function antPatch(): ShaderPatch {
            totalEmissiveRadiance += goldM * vec3(1.0, 0.62, 0.18) * (0.025 + 0.14 * rim);
            float ht = hairTip();
            totalEmissiveRadiance += goldM * ht * ht * vec3(1.0, 0.9, 0.6) * 0.1;
+           totalEmissiveRadiance += vHit * vec3(0.55, 0.14, 0.06) * 0.22;
          }`,
       ],
       [
@@ -381,9 +420,11 @@ export function antPatch(): ShaderPatch {
  * a full coat when fully glued. (The kit's shell patch is tuned for the
  * termite meshes; on ants its strand noise read as a blocky print.)
  */
-export function createAntGlueShell(rig: AntRig): THREE.MeshPhysicalMaterial {
+export function createAntGlueShell(rig: AntRig, morphKey?: string): THREE.MeshPhysicalMaterial {
   const mat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(GLUE_COLOR), roughness: 0.08, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, transparent: true, depthWrite: false });
-  addPatch(mat, { key: 'antAnim', vertexHeader: ANIM_HEADER, vertex: antPatch().vertex, uniforms: rigUniforms(rig) });
+  const u = rigUniforms(rig);
+  if (morphKey && animV2(morphKey) && rig.foot) u.uPlant.value = 1;
+  addPatch(mat, { key: 'antAnim', vertexHeader: ANIM_HEADER, vertex: antPatch().vertex, uniforms: u });
   addPatch(mat, {
     key: 'antGlue',
     uniforms: { uGlueThick: { value: 0.045 } },
@@ -425,6 +466,9 @@ export function rigUniforms(rig: AntRig): Record<string, THREE.IUniform> {
     uLegKnee: { value: rig.knee },
     uLegAnkle: { value: rig.ankle },
     uLegAxis: { value: rig.axis },
+    uLegFoot: { value: rig.foot && rig.foot.length === 6 ? rig.foot : rig.ankle },
+    uLegHome: { value: rig.home && rig.home.length === 6 ? rig.home : rig.foot && rig.foot.length === 6 ? rig.foot : rig.ankle },
+    uPlant: { value: 0 },
     uNeck: { value: rig.neck },
     uMandL: { value: rig.mandL },
     uMandR: { value: rig.mandR },
@@ -467,6 +511,8 @@ export function createAntMaterials(rig: AntRig, dapple: boolean, morphKey?: stri
     envMapIntensity: 0.55,
   });
   const uniforms = rigUniforms(rig);
+  // animation pass: the pilot species' feet planted by the shader IK
+  if (morphKey && animV2(morphKey) && rig.foot) uniforms.uPlant.value = 1;
   const recipe = morphKey ? antRecipe(morphKey) : null;
   if (dapple) patchDapple(material);
   addPatch(material, { ...antPatch(), uniforms });

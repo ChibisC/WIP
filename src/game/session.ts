@@ -246,15 +246,28 @@ export class GameSession {
       if (e.t === 'command') this.commands.acknowledge(e.player, e.seq);
       this.routeFx(e);
       this.noteAlert(e);
+      // camera shake (the player's setting: off, reduced, full)
+      const shakeK = settings().shake ?? 1;
       // a boss's heavy footfalls shake the surface camera
-      if (e.t === 'bossFootstep' && this.view.space === 'surface') this.view.surfaceRig.shake = Math.max(this.view.surfaceRig.shake, Math.min(1, e.power * 0.6));
+      if (e.t === 'bossFootstep' && this.view.space === 'surface') this.view.surfaceRig.shake = Math.max(this.view.surfaceRig.shake, Math.min(1, e.power * 0.6) * shakeK);
       // a hell ant impaling prey right in front of a close camera: a jolt and a brief hit-stop
       if (e.t === 'snap' && e.impale && e.space === SURFACE && this.view.space === 'surface') {
         const rig = this.view.surfaceRig;
         const S = BALANCE.snap;
         if (rig.distance < S.shakeAt && Math.hypot(rig.target.x - e.x, rig.target.z - e.y) < rig.distance) {
-          rig.shake = Math.max(rig.shake, S.shake);
+          rig.shake = Math.max(rig.shake, S.shake * shakeK);
           if (!this.net) this.loop.hitStop(S.hitStop);
+        }
+      }
+      // animation pass: a boss's big hits (the stag beetle's slam, its antlers clamping) land with a small shake,
+      // less when zoomed far out, and a hit-stop of a few frames (single player: the sim is only delayed)
+      if (this.view.space === 'surface' && (e.t === 'slam' || (e.t === 'bite' && e.by === 'stagBeetle' && e.strength >= 1)) && e.space === SURFACE) {
+        const rig = this.view.surfaceRig;
+        if (Math.hypot(rig.target.x - e.x, rig.target.z - e.y) < rig.distance * 1.3) {
+          const zoomK = Math.min(1, 420 / Math.max(1, rig.distance));
+          const big = e.t === 'slam';
+          rig.shake = Math.max(rig.shake, (big ? 0.55 * e.power : 0.22) * zoomK * shakeK);
+          if (!this.net) this.loop.hitStop(big ? 0.05 : 0.033);
         }
       }
       if (e.t === 'message' && e.colony !== undefined && e.colony !== this.player.id) return; // another player's message

@@ -15,6 +15,7 @@ import * as THREE from 'three';
  *     then crash down onto the target and chomp.
  *  2. **Side clamp and tug** — twist and clamp from one side, then pull back
  *     (the tug of war of ants holding a leg); the side alternates.
+ *  3. **Grip and sting** (fire ants; see gripSting).
  *
  * Phase q: 0 → `WINDUP` wind-up, → `ATTACK_CONTACT` strike, → 1 recovery; the
  * pose is neutral at q = 0 and q = 1, so cycles chain without a pop.
@@ -35,10 +36,13 @@ export interface AttackPose {
   headYaw: number;
   /** mandible opening 0..1 (absolute) */
   mand: number;
+  /** added gaster pitch (rad, − curls it under) and the sting's extension 0..1 (grip-and-sting) */
+  gaster: number;
+  sting: number;
 }
 
 export function neutralPose(out: AttackPose): AttackPose {
-  out.fwd = out.pitch = out.yaw = out.roll = out.headPitch = out.headYaw = 0;
+  out.fwd = out.pitch = out.yaw = out.roll = out.headPitch = out.headYaw = out.gaster = out.sting = 0;
   out.mand = 0.25;
   return out;
 }
@@ -63,6 +67,7 @@ export function attackPose(variant: number, q: number, side: number, out: Attack
   const r = q < C ? 1 : 1 - sm((q - C) / (1 - C));
   // jaws gape through the wind-up, are shut at contact in every variant, then relax back to the rest opening
   out.mand = q < C ? (0.25 + 0.75 * u) * (1 - s) : 0.25 * (1 - r);
+  if (variant === 3) return gripSting(q, side, out);
   const v = ((variant % 3) + 3) % 3;
   if (v === 0) {
     // lunge bite
@@ -87,6 +92,32 @@ export function attackPose(variant: number, q: number, side: number, out: Attack
     out.fwd = q < C ? 0.06 * s : 0.06 * r - 0.08 * tug;
     out.headPitch = q < C ? -0.12 * s : -0.12 * r - 0.08 * tug;
   }
+  return out;
+}
+
+/**
+ * 3. **Grip and sting** (fire ants, animation pass): the jaws seize the victim early in the wind-up and hold;
+ * the gaster swings forward under the body while the ant pivots round its grip; the sting jabs at contact,
+ * then the gaster draws back and the grip relaxes. (Solenopsis workers hold on with the mandibles and sting
+ * repeatedly, pivoting round the bite.)
+ */
+function gripSting(q: number, side: number, out: AttackPose): AttackPose {
+  const C = ATTACK_CONTACT;
+  const grip = sm(q / 0.22);
+  const curl = sm((q - 0.15) / (WINDUP - 0.15));
+  const jab = q < WINDUP ? 0 : strikeEase((q - WINDUP) / (C - WINDUP));
+  const back = q < C ? 1 : 1 - sm((q - C) / (1 - C));
+  // gape, then seize and hold, relaxing in the recovery
+  out.mand = q < 0.12 ? 0.25 + 0.75 * sm(q / 0.12) : (1 - grip) * 0.95 + 0.05 + 0.2 * (1 - back);
+  // the gaster swings forward under the body, the sting jabs at contact
+  out.gaster = q < C ? -1.25 * curl - 0.55 * jab : -1.8 * back;
+  out.sting = q < C ? 0.4 * curl + 0.6 * jab : back;
+  // pivoting round the grip: the body swings to one side and leans down at the jab
+  out.yaw = (0.22 * curl + 0.08 * jab) * side * (q < C ? 1 : back);
+  out.headYaw = -0.18 * side * curl * (q < C ? 1 : back);
+  out.pitch = q < C ? -0.04 * curl - 0.05 * jab : -0.09 * back;
+  out.headPitch = -0.22 * grip * (q < C ? 1 : back);
+  out.fwd = 0.04 * grip * (q < C ? 1 : back);
   return out;
 }
 

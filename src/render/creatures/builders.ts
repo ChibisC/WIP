@@ -41,6 +41,12 @@ export interface CrPose {
   hurt: number;
   /** extra numbers from the simulation (riders, pit, exposed…) */
   data: Record<string, number>;
+  /** animation pass: this frame's time step (s), the creature's id and its attack cooldown (a bite resets it) */
+  dt?: number;
+  id?: number;
+  cd?: number;
+  /** animation pass: render-only state the builder keeps per creature (planted feet, idles, springs) */
+  ra?: Record<string, unknown>;
   /** chains: earlier head positions, newest first, `trailStep` mm apart (world x, z pairs) */
   trail: Float32Array;
   trailN: number;

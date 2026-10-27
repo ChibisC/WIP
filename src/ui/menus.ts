@@ -282,6 +282,22 @@ export class Menus {
     });
     r5.append(edge);
     m.appendChild(r5);
+    // animation pass: camera shake on big hits can be reduced or turned off
+    m.appendChild(el('h3', '', 'Camera shake'));
+    const r6 = el('div', 'row');
+    for (const [k, label] of [
+      [0, 'Off'],
+      [0.5, 'Reduced'],
+      [1, 'Full'],
+    ] as Array<[number, string]>) {
+      const b = button(Math.abs((settings().shake ?? 1) - k) < 0.01 ? 'on' : '', label, 'How much the camera shakes when a boss slams the ground or a big hit lands', () => {
+        updateSettings({ shake: k });
+        for (const x of Array.from(r6.children)) x.classList.remove('on');
+        b.classList.add('on');
+      });
+      r6.appendChild(b);
+    }
+    m.appendChild(r6);
   }
 
   private soundTab(m: HTMLElement): void {

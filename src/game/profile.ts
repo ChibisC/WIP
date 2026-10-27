@@ -33,6 +33,8 @@ export interface Settings {
   volume: Volumes;
   /** actions bound to a key other than the default */
   bindings: Partial<Record<Action, string>>;
+  /** camera shake on big hits and boss footfalls: 0 off, 0.5 reduced, 1 full (animation pass) */
+  shake?: number;
 }
 
 export type Medal = 'gold' | 'silver' | 'bronze';

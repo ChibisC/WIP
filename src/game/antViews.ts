@@ -137,6 +137,9 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
   }
   out.colorVar = a.colorVar;
   out.lift = a.state === AS.Flung ? a.fz : 0;
+  // animation pass: a drop in hit points starts a hit reaction; a thrown ant tumbles (not one held in antlers)
+  out.hp = a.hp;
+  out.flung = a.state === AS.Flung && !a.gripCr;
   // Scurry fade at entrances: on the surface an ant shrinks and sinks as it
   // reaches a hole (and grows out of it when it emerges); underground it
   // grows in from the top of the ramp just after coming down.
@@ -593,6 +596,8 @@ export function corpseToView(f: Food, out: AntView, space: number, morph: string
   out.pheading = f.h;
   out.dead = true;
   out.carrying = false;
+  out.hp = undefined;
+  out.flung = false;
   out.sizeVar = 0;
   out.scale = 1;
   out.colorVar = -0.3;

@@ -30,6 +30,8 @@ interface CrAnim {
   hitT: number;
   flash: number;
   flashCd: number;
+  /** animation pass: the builder's own render-only state */
+  ra: Record<string, unknown>;
 }
 
 
@@ -215,6 +217,10 @@ export class CreatureRenderer {
       a.flashCd -= dt;
       p.hurt = a.flash;
       p.data = cr.data;
+      p.dt = dt;
+      p.id = cr.id;
+      p.cd = cr.cd;
+      p.ra = a.ra;
       p.trail = a.trail;
       p.trailN = a.trailN;
       p.trailStep = L * TRAIL_STEP;
@@ -404,7 +410,7 @@ export class CreatureRenderer {
   private animOf(cr: Creature, x: number, z: number, L: number): CrAnim {
     let a = this.anim.get(cr.id);
     if (!a || Math.hypot(a.lastX - x, a.lastZ - z) > L * 3) {
-      a = { phase: cr.v2 * 4, spd: 0, lastX: x, lastZ: z, trail: a?.trail ?? new Float32Array(TRAIL_CAP * 2), trailN: 0, seen: this.frame, hitT: cr.data.hitT ?? 0, flash: 0, flashCd: 0 };
+      a = { phase: cr.v2 * 4, spd: 0, lastX: x, lastZ: z, trail: a?.trail ?? new Float32Array(TRAIL_CAP * 2), trailN: 0, seen: this.frame, hitT: cr.data.hitT ?? 0, flash: 0, flashCd: 0, ra: {} };
       this.anim.set(cr.id, a);
     }
     return a;

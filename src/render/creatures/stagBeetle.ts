@@ -8,6 +8,7 @@ import { buildMandible } from '../anatomy/mandible';
 import { stagMandible, stagMandibleShare } from '../anatomy/mandibleSpecs';
 import { Rig, V, ease, footAt, tripod } from './rig';
 import type { CrPose } from './builders';
+import { animSettings } from '../ants/antMotion';
 
 /**
  * European stag beetle, Lucanus cervus, major male (realism pass, pilot): a sculpted model from the
@@ -471,22 +472,179 @@ function solveKnee(h: V, f: V, l1: number, l2: number, outZ: number, out: V): vo
   out.set(h.x + ux * along + (bx / bl) * hh, h.y + uy * along + (by / bl) * hh, h.z + uz * along + (bz / bl) * hh);
 }
 
+/** Render-only state per beetle (animation pass): planted feet, the stepping order, idles, hit flinches, springs. */
+interface StagRA {
+  feet?: Float32Array;
+  start?: Float32Array;
+  sw?: Float32Array;
+  next: number;
+  vx: number;
+  vz: number;
+  om: number;
+  lastX: number;
+  lastZ: number;
+  lastH: number;
+  rs: number;
+  idle: number;
+  it: number;
+  idur: number;
+  iwait: number;
+  stillT: number;
+  hitT: number;
+  hitV: number;
+  hitSide: number;
+  lastHurt: number;
+  sway: number;
+  swayV: number;
+  aSw: number;
+  aSwV: number;
+  pinchT: number;
+  lastCd: number;
+}
+
+function stagRA(p: CrPose): StagRA {
+  const ra = (p.ra ?? (p.ra = {})) as unknown as StagRA;
+  if (ra.rs === undefined) {
+    Object.assign(ra, { next: 0, vx: 0, vz: 0, om: 0, lastX: p.x, lastZ: p.z, lastH: p.h, rs: (Math.floor(p.v2 * 1e6) | 0) + 7, idle: -1, it: 0, idur: 0, iwait: 1 + p.v2 * 2, stillT: 0, hitT: 9, hitV: 0, hitSide: 1, lastHurt: 0, sway: 0, swayV: 0, aSw: 0, aSwV: 0, pinchT: 9, lastCd: p.cd ?? 0 });
+  }
+  return ra;
+}
+function raRnd(ra: StagRA): number {
+  let x = ra.rs | 0 || 1;
+  x ^= x << 13;
+  x ^= x >>> 17;
+  x ^= x << 5;
+  ra.rs = x | 0;
+  return ((x >>> 0) % 100000) / 100000;
+}
+const wrapA = (a: number) => a - Math.PI * 2 * Math.floor((a + Math.PI) / (Math.PI * 2));
+const sm01 = (x: number) => ease(x);
+/** fast out, gentle in */
+const strikeE = (x: number) => {
+  const t = Math.max(0, Math.min(1, x));
+  return 1 - (1 - t) * (1 - t) * (1 - t);
+};
+/** Hit flinch envelope: a jolt, an ease back with a small overshoot, settled by 0.5 s. */
+const flinchE = (t: number) => (t < 0.06 ? t / 0.06 : t < 0.3 ? 1 - 1.15 * ease((t - 0.06) / 0.24) : t < 0.5 ? -0.15 * (1 - ease((t - 0.3) / 0.2)) : 0);
+function springStep(x: number, v: number, target: number, hz: number, zeta: number, dt: number): [number, number] {
+  const w = Math.PI * 2 * hz;
+  const n = Math.max(1, Math.ceil(dt * 240));
+  const h = dt / n;
+  for (let i = 0; i < n; i++) {
+    v += (w * w * (target - x) - 2 * zeta * w * v) * h;
+    x += v * h;
+  }
+  return [x, v];
+}
+const inv = new THREE.Matrix4();
+const wv3 = new THREE.Vector3();
+
 /**
  * Pose and draw one stag beetle. States: walking (a slow, heavy tripod gait, the body rocking with each
  * step), WindUp (antlers wide, head down: about to grab), Lift (an ant clamped in the antlers, the head and
  * forebody raised), Strike (the toss: the head flicks up and to the side, antlers opening), Rear (enraged:
  * reared up on the middle and hind legs, forelegs raised, antlers spread, then the slam), dead (on its back).
+ *
+ * Animation pass (render only, docs/realism/animation.md): the feet stay planted where they touch down and
+ * step in alternating tripods when the body has moved or turned far enough from them (turning in place steps
+ * round); the body rocks toward the planted tripod; the attacks have an anticipation, a fast strike and an
+ * overshoot (a crouch before rearing, the slam's dip, the clamp's snap and the toss's flick); three idles when
+ * standing (antenna flicks, a jaw opening, a slight rear-up); two hit flinches; death curls the legs in half a
+ * second with a twitch; the antlers and antennae sway on springs.
  */
 export function stagBeetle2(rig: Rig, p: CrPose): void {
   registerStagParts();
+  const v2 = animSettings.v2;
+  const ra = stagRA(p);
+  const dt = p.dt ?? 0;
   const L = p.L * (p.dead ? 1 - 0.4 * p.eaten : 1);
   const k = L / STAG_REF;
   const st = p.st;
-  const rear = p.state === ST.Rear ? ease(st * 1.8) * (1 - ease((st - 1.15) * 6)) : 0;
-  const slam = p.state === ST.Rear ? ease((st - 1.15) * 6) * (1 - ease((st - 1.5) * 3)) : 0;
-  const wind = p.state === ST.WindUp ? ease(st * 2.5) : 0;
-  const lift = p.state === ST.Lift ? ease(st * 3) : 0;
-  const toss = p.state === ST.Strike ? Math.sin(Math.min(1, st * 2.2) * Math.PI) : 0;
+  // ---- motion estimate (render only): smoothed velocity and turn rate, for the planted feet and the springs
+  if (Math.hypot(p.x - ra.lastX, p.z - ra.lastZ) > L) {
+    ra.feet = undefined;
+    ra.lastX = p.x;
+    ra.lastZ = p.z;
+  }
+  if (dt > 0) {
+    const kd = 1 - Math.exp(-8 * dt);
+    ra.vx += ((p.x - ra.lastX) / dt - ra.vx) * kd;
+    ra.vz += ((p.z - ra.lastZ) / dt - ra.vz) * kd;
+    ra.om += (wrapA(p.h - ra.lastH) / dt - ra.om) * kd;
+  }
+  ra.lastX = p.x;
+  ra.lastZ = p.z;
+  ra.lastH = p.h;
+  const speed = Math.hypot(ra.vx, ra.vz);
+  // ---- attack timings: anticipation, a fast strike, an overshoot and settle
+  let rear: number;
+  let slam: number;
+  let crouch = 0;
+  let wind: number;
+  let lift: number;
+  let toss: number;
+  let tremble = 0;
+  if (v2) {
+    // rear-and-slam: a crouch, the rear with an overshoot, the slam lands at 1.2 s (the sim's slam tick), a dip
+    crouch = p.state === ST.Rear ? Math.sin(Math.PI * Math.min(1, st / 0.2)) * (st < 0.2 ? 1 : 0) : 0;
+    const up = sm01((st - 0.12) / 0.5) + 0.12 * Math.sin(Math.PI * Math.max(0, Math.min(1, (st - 0.45) / 0.35)));
+    rear = p.state === ST.Rear ? (st < 1.1 ? up : 1 - strikeE((st - 1.1) / 0.1)) : 0;
+    slam = p.state === ST.Rear ? sm01((st - 1.12) / 0.08) * (1 - sm01((st - 1.3) / 0.45)) : 0;
+    // grab: antlers wide and quivering, head low, the body sinking forward
+    wind = p.state === ST.WindUp ? sm01(st / 0.35) : 0;
+    tremble = p.state === ST.WindUp ? Math.sin(st * 40) * wind : 0;
+    // lift: the clamp snaps shut, the head heaves up with an overshoot
+    lift = p.state === ST.Lift ? sm01(st / 0.3) + 0.15 * Math.sin(Math.PI * Math.max(0, Math.min(1, (st - 0.2) / 0.3))) : 0;
+    // toss: a fast flick, then easing back
+    toss = p.state === ST.Strike ? (st < 0.12 ? strikeE(st / 0.12) : 1 - sm01((st - 0.12) / 0.38)) * (st < 0.5 ? 1 : 0) : 0;
+  } else {
+    rear = p.state === ST.Rear ? ease(st * 1.8) * (1 - ease((st - 1.15) * 6)) : 0;
+    slam = p.state === ST.Rear ? ease((st - 1.15) * 6) * (1 - ease((st - 1.5) * 3)) : 0;
+    wind = p.state === ST.WindUp ? ease(st * 2.5) : 0;
+    lift = p.state === ST.Lift ? ease(st * 3) : 0;
+    toss = p.state === ST.Strike ? Math.sin(Math.min(1, st * 2.2) * Math.PI) : 0;
+  }
+  // a pinch of the antlers (phase 1 bites): the cooldown jumps when it bites
+  if (v2) {
+    if ((p.cd ?? 0) > ra.lastCd + 0.05 && !p.dead) ra.pinchT = 0;
+    ra.lastCd = p.cd ?? 0;
+    ra.pinchT += dt;
+  }
+  const pinch = v2 && ra.pinchT < 0.3 ? (ra.pinchT < 0.1 ? sm01(ra.pinchT / 0.1) : 1 - sm01((ra.pinchT - 0.1) / 0.2)) : 0;
+  // ---- hits: two flinches
+  if (v2) {
+    if (p.hurt > ra.lastHurt + 0.5 && !p.dead) {
+      ra.hitT = 0;
+      ra.hitV = raRnd(ra) < 0.5 ? 0 : 1;
+      ra.hitSide = raRnd(ra) < 0.5 ? -1 : 1;
+    }
+    ra.lastHurt = p.hurt;
+    ra.hitT += dt;
+  }
+  const fl = v2 && ra.hitT < 0.5 ? flinchE(ra.hitT) : 0;
+  // ---- idles when standing: antenna flicks, a jaw opening, a slight rear-up
+  const busy = p.dead || p.state === ST.Rear || p.state === ST.WindUp || p.state === ST.Lift || (p.state === ST.Strike && st < 0.6) || pinch > 0;
+  const still = speed < L * 0.03 && Math.abs(ra.om) < 0.05;
+  ra.stillT = still && !busy ? ra.stillT + dt : 0;
+  if (!v2 || ra.stillT < 0.6) {
+    if (ra.idle >= 0) ra.iwait = 0.8 + 1.5 * raRnd(ra);
+    ra.idle = -1;
+  } else if (ra.idle < 0) {
+    ra.iwait -= dt;
+    if (ra.iwait <= 0) {
+      ra.idle = Math.min(2, Math.floor(raRnd(ra) * 3));
+      ra.it = 0;
+      ra.idur = [1.2, 1.8, 1.5][ra.idle] + 0.4 * raRnd(ra);
+    }
+  } else if ((ra.it += dt) >= ra.idur) {
+    ra.idle = -1;
+    ra.iwait = 1 + 2.5 * raRnd(ra);
+  }
+  const iu = ra.idle >= 0 ? Math.sin(Math.PI * Math.min(1, ra.it / ra.idur)) : 0;
+  const flick = ra.idle === 0 ? iu : 0;
+  const jawIdle = ra.idle === 1 ? iu : 0;
+  const rearIdle = ra.idle === 2 ? iu : 0;
+
   // heavy gait: the body rolls toward the planted tripod and heaves a little each step
   const ph = p.phase * Math.PI * 2;
   const amp = p.dead ? 0 : p.amp;
@@ -495,9 +653,24 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   const moving = Math.min(1, amp * 4);
   // (when it stops, the feet settle back to their rest places)
   const sweep = 0.22 * Math.max(0.35, amp) * 0.6 * Math.min(1, amp * 6);
-  const roll = Math.sin(ph) * 0.045 * moving + (p.dead ? Math.PI * ease(p.deadT * 2) : 0);
-  const heave = Math.abs(Math.sin(ph)) * L * 0.006 * moving;
-  const pitchUp = rear * 0.52 + lift * 0.16 + wind * -0.05 - slam * 0.04;
+  let rock = 0;
+  let heaveK = 0;
+  if (v2 && ra.sw) {
+    LEGS.forEach((_, i) => {
+      for (const sd of [-1, 1]) {
+        const j = i * 2 + (sd > 0 ? 1 : 0);
+        const w = ra.sw![j] >= 0 ? Math.sin(Math.PI * ra.sw![j]) : 0;
+        rock -= sd * w;
+        heaveK += w;
+      }
+    });
+    rock /= 3;
+    heaveK /= 3;
+  }
+  const deadRoll = p.dead ? Math.PI * ease(p.deadT * 2) + (p.deadT > 0.5 && p.deadT < 0.8 ? 0.06 * Math.sin(Math.PI * ((p.deadT - 0.5) / 0.3)) : 0) : 0;
+  const roll = (v2 ? rock * 0.035 + 0.05 * ra.hitSide * (ra.hitV === 1 ? fl : 0) : Math.sin(ph) * 0.045 * moving) + deadRoll;
+  const heave = v2 ? heaveK * L * 0.005 : Math.abs(Math.sin(ph)) * L * 0.006 * moving;
+  const pitchUp = rear * 0.52 + lift * 0.16 + wind * -0.05 - slam * 0.07 - crouch * 0.05 + rearIdle * 0.09 + (ra.hitV === 0 ? fl * 0.04 : 0);
   // place the body: tilted to the ground under its front and back, then reared
   {
     const c = Math.cos(p.h);
@@ -507,8 +680,10 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
     const pitch = Math.atan2(hf - hb, L * 0.55) + pitchUp;
     const flip = p.dead ? L * SB.elytra.top * (1 - Math.cos(roll)) : 0;
     // rearing pivots on the hind legs: raise the centre so the elytra apex stays near the ground
-    const raise = Math.sin(pitchUp) * L * 0.36 + heave + flip;
-    rig.setBase(p.x, (hf + hb) / 2 + raise, p.z, p.h, pitch, roll);
+    const raise = Math.sin(pitchUp) * L * 0.36 + heave + flip - wind * L * 0.012 - crouch * L * 0.01;
+    // a flinch jolts the body back
+    const jolt = ra.hitV === 0 ? -fl * L * 0.012 : 0;
+    rig.setBase(p.x + c * jolt, (hf + hb) / 2 + raise, p.z + s * jolt, p.h, pitch, roll);
     rig.recFrame('body');
   }
   // body shell
@@ -521,10 +696,15 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   rig.ell(-0.077 * L, 0.16 * L, 0, 0.005 * L, 0.004 * L, 0.06 * L, SG2.gold, HAIR);
   rig.ell(0.043 * L, 0.118 * L, 0, 0.004 * L, 0.004 * L, 0.06 * L, SG2.gold, HAIR);
 
+  // the antlers and antennae sway on springs: they lag the turns and the steps
+  if (v2 && dt > 0) {
+    [ra.sway, ra.swayV] = springStep(ra.sway, ra.swayV, Math.max(-0.08, Math.min(0.08, -ra.om * 0.06)) + rock * 0.012, 2.6, 0.22, dt);
+    [ra.aSw, ra.aSwV] = springStep(ra.aSw, ra.aSwV, Math.max(-0.2, Math.min(0.2, -ra.om * 0.12)), 3.5, 0.25, dt);
+  }
   // head frame: pitches about the neck (down to grab, up to lift and toss), yaws a little in the toss
   const tossSide = p.v2 > 0.5 ? 1 : -1;
-  const hPitch = -0.12 * wind + 0.32 * lift + 0.42 * toss + 0.12 * rear - 0.08 * slam;
-  const hYaw = 0.35 * toss * tossSide + Math.sin(p.t * 0.7 + p.v2 * 6) * 0.03 * (1 - amp);
+  const hPitch = -0.12 * wind + 0.32 * lift + 0.42 * toss + 0.12 * rear - (v2 ? 0.16 : 0.08) * slam - 0.08 * pinch + (ra.hitV === 0 ? 0.1 * fl : 0) + 0.05 * rearIdle;
+  const hYaw = (v2 ? 0.45 : 0.35) * toss * tossSide + Math.sin(p.t * 0.7 + p.v2 * 6) * 0.03 * (1 - amp) - (ra.hitV === 1 ? 0.1 * ra.hitSide * fl : 0);
   e.set(0, hYaw, hPitch, 'YZX');
   q.setFromEuler(e);
   pv.set(SB.neck.x * L, SB.neck.y * L, 0);
@@ -538,14 +718,15 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   const idle = 0.12 + 0.05 * Math.sin(p.t * 1.3 + p.v2 * 5);
   // male size (allometry, quarters): the game's boss is a major male
   const msz = Math.round(Math.max(0, Math.min(1, p.data.msize ?? 1)) * 4);
-  const open = p.dead ? 0.25 : Math.max(idle, wind * 0.62, rear * 0.55, toss * 0.5) * (1 - lift * 0.85) + lift * 0.02;
+  let open = p.dead ? 0.25 : Math.max(idle, wind * (v2 ? 0.7 : 0.62) + tremble * 0.025, rear * 0.55, toss * 0.5, idle + 0.35 * jawIdle, 0.12 + 0.3 * pinch) * (1 - lift * 0.85) + lift * 0.02;
+  if (v2 && p.state === ST.Lift) open = Math.max(0.02, open + Math.sin(st * 30) * 0.02); // squeezing the struggling ants
   for (const sd of [-1, 1] as const) {
-    // a positive yaw turns +x toward −z: open the left (+z) antler with a negative one
-    rig.part(`${sd > 0 ? 'stag_mandL' : 'stag_mandR'}${msz}`, SB.mand.x * L, SB.mand.y * L, sd * SB.mand.z * L, k, SG2.mand, SURF.mand, -sd * open, 0);
+    // a positive yaw turns +x toward −z: open the left (+z) antler with a negative one; the sway turns both alike
+    rig.part(`${sd > 0 ? 'stag_mandL' : 'stag_mandR'}${msz}`, SB.mand.x * L, SB.mand.y * L, sd * SB.mand.z * L, k, SG2.mand, SURF.mand, -sd * open + (v2 ? ra.sway : 0), 0);
   }
   // antennae: elbowed — a long scape out to the side, the funicle forward, the comb club; waving a little
   for (const sd of [-1, 1]) {
-    const wv = Math.sin(p.t * 2.2 + sd + p.v2 * 7) * 0.12;
+    const wv = Math.sin(p.t * (2.2 + 6 * flick) + sd + p.v2 * 7) * (0.12 + 0.25 * flick) + (v2 ? ra.aSw * sd : 0);
     tA.set(SB.ant.x * L, SB.ant.y * L, sd * SB.ant.z * L);
     // the long scape out and forward from in front of the eye (jaws pass: the socket beside the mandible base)
     tB.set(tA.x + 0.06 * L, tA.y + 0.014 * L, tA.z + sd * 0.1 * L);
@@ -555,7 +736,7 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
     const fx = Math.cos(0.45 + wv);
     const fz = Math.sin(0.45 + wv);
     tA.copy(tB);
-    tB.set(tA.x + fx * 0.095 * L, tA.y + 0.004 * L, tA.z + sd * fz * 0.095 * L);
+    tB.set(tA.x + fx * 0.095 * L, tA.y + 0.004 * L + flick * 0.02 * L * Math.sin(p.t * 9 + sd), tA.z + sd * fz * 0.095 * L);
     rig.partFrame('stag_funicle', tA, tB, side, 0.0052 * L, 0.0052 * L, SG2.black, SURF.leg);
     tA.copy(tB);
     tB.set(tA.x + fx * 0.045 * L, tA.y + 0.003 * L, tA.z + sd * fz * 0.045 * L);
@@ -564,19 +745,31 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   }
   rig.sub = null;
 
+  // planted feet (animation pass): world positions that stay put until their tripod steps
+  if (v2 && !p.dead) plantFeet(rig, p, ra, L, speed, dt);
+  if (v2) inv.copy(rig.base).invert();
+
   // legs: tripod gait, slow and deliberate; feet planted on the ground below them
   LEGS.forEach(([hx, hz, fx, reach, l1, l2, l3], i) => {
     for (const sd of [-1, 1]) {
+      const j = i * 2 + (sd > 0 ? 1 : 0);
       hip.set(hx * L, (SB.belly + 0.025) * L, sd * hz * L);
       if (p.dead) {
-        const tw = Math.sin(p.t * 7 + i * 2 + sd) * 0.08 * Math.max(0, 1 - p.deadT / 4);
-        foot.set((hx * 0.6 + tw) * L, hip.y - 0.12 * L, sd * (hz + 0.08) * L);
+        // the legs fold in over half a second, twitching for a while
+        const curl = v2 ? ease(p.deadT / 0.5) : 1;
+        const tw = Math.sin(p.t * (v2 ? 23 : 7) + i * 2 + sd) * 0.08 * Math.max(0, 1 - p.deadT / (v2 ? 2.5 : 4)) * (v2 ? (Math.sin(p.t * 5 + i) > 0.3 ? 1 : 0.2) : 1);
+        footAt(foot, fx * L, sd * reach * L, i * 0.5, 0, 0, 1, 0.6);
+        foot.set(foot.x + ((hx * 0.6 + tw) * L - foot.x) * curl, foot.y + (hip.y - 0.12 * L - foot.y) * curl, foot.z + (sd * (hz + 0.08) * L - foot.z) * curl);
       } else {
-        footAt(foot, fx * L, sd * reach * L, p.phase + tripod(i, sd), sweep * L, 0.05 * L * moving, 1, 0.6);
-        // a rearing beetle lifts its fore legs and waves them; the others brace wider
+        if (v2 && ra.feet) {
+          wv3.set(ra.feet[j * 3], ra.feet[j * 3 + 1], ra.feet[j * 3 + 2]).applyMatrix4(inv);
+          foot.set(wv3.x, wv3.y, wv3.z);
+        } else footAt(foot, fx * L, sd * reach * L, p.phase + tripod(i, sd), sweep * L, 0.05 * L * moving, 1, 0.6);
+        // a rearing beetle lifts its fore legs and waves them; the others brace wider; the slam drives them down
         if (i === 0 && rear > 0) foot.set(foot.x + 0.12 * L * rear, foot.y + 0.18 * L * rear + Math.sin(p.t * 9 + sd) * 0.02 * L * rear, foot.z + sd * 0.04 * L * rear);
-        else if (rear > 0) foot.set(foot.x - 0.05 * L * rear, foot.y, foot.z + sd * 0.04 * L * rear);
-        if (!(i === 0 && rear > 0.3)) foot.y += rig.groundAt(foot.x, foot.z, p.ground);
+        else if (rear > 0 && !v2) foot.set(foot.x - 0.05 * L * rear, foot.y, foot.z + sd * 0.04 * L * rear);
+        if (i === 0 && rearIdle > 0) foot.y += 0.035 * L * rearIdle;
+        if (!v2 && !(i === 0 && rear > 0.3)) foot.y += rig.groundAt(foot.x, foot.z, p.ground);
       }
       // tarsus lies along the ground from the ankle to the claws
       const dx = foot.x - hip.x;
@@ -596,4 +789,90 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
       rig.recLeg((sd > 0 ? 'L' : 'R') + (i + 1), hip, knee, ankle, foot);
     }
   });
+}
+
+const home = new THREE.Vector3();
+const pred = new THREE.Vector3();
+/**
+ * Planted feet (animation pass, render only): each foot keeps its world position while it stands; when the
+ * body has moved or turned far enough from a tripod's resting places, that tripod lifts and steps to where
+ * those places will be a moment later (velocity and turn rate ahead); the two tripods alternate. Standing
+ * still, a last small step settles the feet.
+ */
+function plantFeet(rig: Rig, p: CrPose, ra: StagRA, L: number, speed: number, dt: number): void {
+  if (!ra.feet || !ra.start || !ra.sw) {
+    ra.feet = new Float32Array(18);
+    ra.start = new Float32Array(18);
+    ra.sw = new Float32Array(6).fill(-1);
+    LEGS.forEach(([, , fx, reach], i) => {
+      for (const sd of [-1, 1]) {
+        const j = i * 2 + (sd > 0 ? 1 : 0);
+        home.set(fx * L, 0, sd * reach * L).applyMatrix4(rig.base);
+        ra.feet![j * 3] = home.x;
+        ra.feet![j * 3 + 1] = p.ground(home.x, home.z);
+        ra.feet![j * 3 + 2] = home.z;
+      }
+    });
+  }
+  const feet = ra.feet;
+  const sw = ra.sw;
+  const moving = speed > L * 0.02 || Math.abs(ra.om) > 0.04;
+  // a heavy, deliberate step: quicker when it hurries
+  const swingDur = Math.max(0.17, Math.min(0.3, 0.3 - (speed / L) * 0.25));
+  const lead = 0.22;
+  const err = new Float32Array(6);
+  const tgt = new Float32Array(18);
+  LEGS.forEach(([, , fx, reach], i) => {
+    for (const sd of [-1, 1]) {
+      const j = i * 2 + (sd > 0 ? 1 : 0);
+      home.set(fx * L, 0, sd * reach * L).applyMatrix4(rig.base);
+      // where it will be a moment later: ahead along the velocity, turned with the body
+      const a = ra.om * lead;
+      const rx = home.x - p.x;
+      const rz = home.z - p.z;
+      pred.set(p.x + rx * Math.cos(a) - rz * Math.sin(a) + ra.vx * lead, 0, p.z + rx * Math.sin(a) + rz * Math.cos(a) + ra.vz * lead);
+      pred.y = p.ground(pred.x, pred.z);
+      tgt[j * 3] = pred.x;
+      tgt[j * 3 + 1] = pred.y;
+      tgt[j * 3 + 2] = pred.z;
+      err[j] = Math.hypot(feet[j * 3] - home.x, feet[j * 3 + 2] - home.z);
+    }
+  });
+  const group = (j: number) => (tripod(j >> 1, j & 1 ? 1 : -1) > 0.25 ? 1 : 0);
+  let swinging = false;
+  for (let j = 0; j < 6; j++) if (sw[j] >= 0) swinging = true;
+  if (!swinging) {
+    const thr = moving ? 0.035 * L : 0.012 * L;
+    let eg = 0;
+    let eo = 0;
+    for (let j = 0; j < 6; j++) {
+      if (group(j) === ra.next) eg = Math.max(eg, err[j]);
+      else eo = Math.max(eo, err[j]);
+    }
+    if (eg > thr || eo > thr * 1.6) {
+      const pick = eg >= eo * 0.6 ? ra.next : 1 - ra.next;
+      for (let j = 0; j < 6; j++)
+        if (group(j) === pick && err[j] > 0.006 * L) {
+          sw[j] = 0;
+          ra.start![j * 3] = feet[j * 3];
+          ra.start![j * 3 + 1] = feet[j * 3 + 1];
+          ra.start![j * 3 + 2] = feet[j * 3 + 2];
+        }
+      ra.next = 1 - pick;
+    }
+  }
+  for (let j = 0; j < 6; j++) {
+    if (sw[j] < 0) {
+      // planted: keep it on the ground (the terrain may differ under a slid foot)
+      feet[j * 3 + 1] = p.ground(feet[j * 3], feet[j * 3 + 2]);
+      continue;
+    }
+    sw[j] = Math.min(1, sw[j] + dt / swingDur);
+    const u = ease(sw[j]);
+    const s0 = ra.start!;
+    feet[j * 3] = s0[j * 3] + (tgt[j * 3] - s0[j * 3]) * u;
+    feet[j * 3 + 2] = s0[j * 3 + 2] + (tgt[j * 3 + 2] - s0[j * 3 + 2]) * u;
+    feet[j * 3 + 1] = p.ground(feet[j * 3], feet[j * 3 + 2]) + 0.05 * L * Math.sin(Math.PI * sw[j]);
+    if (sw[j] >= 1) sw[j] = -1;
+  }
 }
