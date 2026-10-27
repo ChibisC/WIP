@@ -3,7 +3,7 @@ WebM and GIF clips (real time and 0.25x) and frame strips.
 
   BASE=http://127.0.0.1:5174/ CLIPS=walk,attack ANIM=2 python3 tests/browser/anim_clips.py docs/realism/animation/clips
 
-Env: CLIPS (comma list), ANIM (2 = the animation pass, 1 = the old motion), FPS (render rate, default 30),
+Env: EXTRA (more query parameters), NAME (output-name suffix), CLIPS (comma list), ANIM (2 = the animation pass, 1 = the old motion), FPS (render rate, default 30),
 EVERY (keep every n-th frame, default 1), W, H, LIGHT (default overcast), SECS (override the clip length).
 """
 import os, sys, time, subprocess, shutil
@@ -21,6 +21,9 @@ W = int(os.environ.get("W", "800"))
 H = int(os.environ.get("H", "500"))
 LIGHT = os.environ.get("LIGHT", "overcast")
 SECS = float(os.environ.get("SECS", "0"))
+# EXTRA: more query parameters (e.g. "&cdist=80"); NAME: a suffix for the output names (e.g. "_d80")
+EXTRA = os.environ.get("EXTRA", "")
+NAME = os.environ.get("NAME", "")
 os.makedirs(OUT, exist_ok=True)
 tag = "after" if ANIM == "2" else "before"
 
@@ -46,11 +49,11 @@ with sync_playwright() as p:
     pg.on("console", lambda m: errs.append(m.text) if ("THREE.WebGLProgram" in m.text or (m.type == "error" and "ERR_" not in m.text)) else None)
     for clip in CLIPS:
         t0 = time.time()
-        pg.goto(f"{BASE}?scene=animlab&clip={clip}&anim={ANIM}&light={LIGHT}&fps={FPS}&tm=neutral", wait_until="load", timeout=600000)
+        pg.goto(f"{BASE}?scene=animlab&clip={clip}&anim={ANIM}&light={LIGHT}&fps={FPS}&tm=neutral{EXTRA}", wait_until="load", timeout=600000)
         while time.time() - t0 < 600 and not pg.evaluate("window.__ready===true"):
             time.sleep(0.25)
         dur = SECS or pg.evaluate("window.__anim.dur")
-        fdir = os.path.join(OUT, f"{clip}_{tag}_frames")
+        fdir = os.path.join(OUT, f"{clip}{NAME}_{tag}_frames")
         shutil.rmtree(fdir, ignore_errors=True)
         os.makedirs(fdir)
         frames = []
@@ -61,11 +64,11 @@ with sync_playwright() as p:
             pg.screenshot(path=f, timeout=300000)
             frames.append(f)
         rate = FPS / EVERY
-        base = os.path.join(OUT, f"{clip}_{tag}")
+        base = os.path.join(OUT, f"{clip}{NAME}_{tag}")
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(rate), "-i", os.path.join(fdir, "f%04d.png"), "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "34", "-deadline", "realtime", "-cpu-used", "8", "-pix_fmt", "yuv420p", base + ".webm"], check=False)
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(rate / 4), "-i", os.path.join(fdir, "f%04d.png"), "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "34", "-deadline", "realtime", "-cpu-used", "8", "-pix_fmt", "yuv420p", base + "_quarter.webm"], check=False)
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(rate), "-i", os.path.join(fdir, "f%04d.png"), "-vf", f"fps={min(15, rate)},scale={W // 2}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96[p];[b][p]paletteuse=dither=bayer", base + ".gif"], check=False)
-        strip(frames, base + "_strip.png", 8, f"{clip} ({tag}): {dur:.1f} s, 8 frames evenly spaced")
+        strip(frames, base + "_strip.png", 8, f"{clip}{NAME} ({tag}): {dur:.1f} s, 8 frames evenly spaced")
         print(f"{time.time() - t0:6.1f}s  {clip}: {n} frames", flush=True)
     b.close()
 print("errors:", errs[:8])
