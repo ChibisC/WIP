@@ -117,13 +117,13 @@ function gripSting(q: number, side: number, out: AttackPose): AttackPose {
   out.mand = q < 0.12 ? 0.25 + 0.75 * sm(q / 0.12) : (1 - grip) * 0.95 + 0.05 + 0.2 * (1 - back);
   // the gaster swings down and on forward under the body (past vertical: blind review — curled only down it
   // could not reach the victim), the sting jabs forward at contact
-  out.gaster = q < C ? -1.75 * curl - 0.75 * jab : -2.5 * back;
+  out.gaster = q < C ? -1.55 * curl - 0.55 * jab : -2.1 * back;
   out.sting = q < C ? 0.4 * curl + 0.6 * jab : back;
   // pivoting round the grip: the body swings well to one side (it reads from above) and tips forward onto
   // the grip, lifting the hind end so the curled gaster clears the ground
   out.yaw = (0.38 * curl + 0.1 * jab) * side * (q < C ? 1 : back);
   out.headYaw = -0.3 * side * curl * (q < C ? 1 : back);
-  out.pitch = q < C ? -0.1 * curl - 0.06 * jab : -0.16 * back;
+  out.pitch = q < C ? -0.07 * curl - 0.05 * jab : -0.12 * back;
   out.headPitch = -0.22 * grip * (q < C ? 1 : back);
   out.fwd = 0.04 * grip * (q < C ? 1 : back);
   return out;

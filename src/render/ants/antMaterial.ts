@@ -186,12 +186,21 @@ vec3 animP = position;
       float fw = pair == 0 ? 0.65 : (pair == 1 ? 0.05 : -0.6);
       yaw = mix(yaw, side * fw, poseW); lft = mix(lft, 0.8, poseW); knee = mix(knee, 0.05, poseW); ankleF = mix(ankleF, 0.5, poseW);
     }
-    // Death: legs fold up against the body.
+    // Death: legs fold up against the body. (Animation pass, pilot species: curled in under the belly, as a dead
+    // ant's are — femora down and in, tibiae folded back under — so on its back they curl over it instead of
+    // standing up like comb teeth; blind review.)
     float fp = float(pair) - 1.0;
-    yaw = mix(yaw, side * (-0.45 * fp), death);
-    lft = mix(lft, 1.25, death);
-    knee = mix(knee, -2.0, death);
-    ankleF = mix(ankleF, 0.9, death);
+    if (uPlant > 0.5) {
+      yaw = mix(yaw, side * (-0.3 * fp), death);
+      lft = mix(lft, -0.6, death);
+      knee = mix(knee, -2.35, death);
+      ankleF = mix(ankleF, 1.2, death);
+    } else {
+      yaw = mix(yaw, side * (-0.45 * fp), death);
+      lft = mix(lft, 1.25, death);
+      knee = mix(knee, -2.0, death);
+      ankleF = mix(ankleF, 0.9, death);
+    }
 
     vec3 ax = uLegAxis[li];
     if (seg >= 2) rotP(animP, N, uLegAnkle[li], ax, ankleF);

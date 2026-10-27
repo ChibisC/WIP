@@ -753,3 +753,24 @@ User spec: project doc `claude/realism/02-spec-realism-fix-plastic-look.md`. Det
   - Round 2 (reshuffled): renders 2–3 / 10 (mean 2.8), identified 96–98 %. After: colour varied by part, small broken highlights from a ring of lamps, shorter legs with swollen femora, no ringed waist or antennae, many more pale setae; stag mahogany elytra with shoulders, rounder legs, flatter mandibles with a denticle row, sunken eyes. New problems found: open segment ends showing the background (white rings and dots), gaster seams reading as wireframe lines, a printed dot pattern, the studio horizon band, dimpled soil.
   - Round 3 (reshuffled): renders 3 / 10 each (mean 3.0), identified 96–98 %; photos 8–9. Credited as convincing: body plan and stance, the elytral suture, contact shadows, the stag pronotum's granular surface, the ant gaster's highlights and edge hairs. Still failing: even-width tube legs and antennae, one flat red without translucency, rounded-box head with a bead eye, lathe-turned waist, visible sting, slab elytra and plank legs on the beetle, the procedural floor.
 - **Acceptance checks (spec §4):** visible difference ✓ (before → after ΔE 21–28 on the animals, mean 24); colour ✓ (fire ant head and mesosoma hue 15–20°, saturation 0.69–0.79 against photos 17–26°, 0.72–0.94; stag elytra 7°, 0.47 against 3°, 0.57); highlights ✓ (no round, smooth, even highlight blob in 35 renders, `tools/realism-metrics.py`); microsculpture ✓ at macro (hair punctures with their hairs, mesopleural striae, beetle granulation and reticulation); translucency ✓ partly (backlit setae and legs glow; the stag elytra show a grazing glare); hairs ✓ partly (curved, tapered, varied, fading tips, but still read as sparse to the reviewer); **independent review ✗: 3 / 10, not the 7 / 10 target**; gameplay zoom ✓ (arena shots read clearly). Pilot stopped here for the user's decision.
+
+## 2026-10-27 — Jaws and animation pass, pilot: fire ant and stag beetle (awaiting approval)
+User spec: project doc `claude/realism/03-spec-jaws-and-animation.md`. Details in `docs/realism/jaws.md` and `docs/realism/animation.md`; branch `feature/realism`; nothing rolled out beyond the pilot.
+- **Jaws** (shared generator `src/render/anatomy/mandible.ts`, specs `mandibleSpecs.ts`, numbers in `docs/creatures/`):
+  - Stag antlers are traced on a specimen photo: tapered hooked points, filleted big tooth and fork prong, denticles, a smooth base, held raised.
+  - Allometry runs from small males' short stout jaws to the major's antlers, with heads narrowing below the pronotum's width.
+  - The fire ant worker has amber four-toothed triangles closing under a forward clypeal lobe on a smooth rounded-square head; the major has a massive glossy wedge in a darkening face.
+  - Fresh-reviewer scores (5 pairs + size series): round 1: 2, 4, 4, 3, 4 / size 5; round 2: 3, 4, 6, 5, 6 / 5; round 3: 3, 4, 6, 5, 5 / 4; round 4: 4, 3, 6, 5, 4 / 5. They plateaued, and reviewers contradicted each other (gloss, small males' jaw curve), so the pilot stops for the user's judgement.
+- **Animation** (render-only): planted feet, turning, variety, five idles, three attacks, hits, deaths and flings.
+  - Tests: foot drift 0.00 % straight, 2.2 % on curves, 5.7 % turning in place; 94/100 distinct gait phases.
+  - Blind review fixes:
+    - Dead and flung ants rest on the ground.
+    - Flung ants lie kicking before they right themselves.
+    - Gripped ants are drawn in the stag's animated antlers, with a smooth release.
+    - The attack key poses are bigger, and the sting curls forward.
+    - The slam has a soft dust shock wave and the hit flash is lighter.
+    - The dead stag rests on its back with folded legs.
+  - Second blind review: lunge identified at 75 %, grip-and-sting at 70 %; clamp-and-tug confused with rear-up. Fights are unreadable at the default zoom, where ants are about 10 px.
+  - After the clips were recorded: each bite gets a warm pop that keeps 9 px on screen, dead pilot ants' legs curl under the belly, and the sting curl is softer. These are not in the clips.
+  - Not done: the stress comparison (1000+ ants, 4 bosses). The run failed (a dev-server reload, and too few frames in 40 s on software rendering); re-run with `SECS=200`.
+- Clips and strips: `docs/realism/animation/clips/`, `strips/`; jaw sheets: `docs/realism/jaws/` (photo sheets git-ignored).
