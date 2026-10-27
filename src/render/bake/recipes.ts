@@ -89,7 +89,7 @@ export const STAG: DetailRecipe = {
     [REGION.ELYTRA]: { sculpt: STAG_ELYTRA, shade: shade(1.15, 0.35, 0.3, 0.04, 0.5, { coatRough: 0.32, wear: 0.4, dust: 0.15, mid: 0.08 }), px: [512, 512] },
     [REGION.PRONOTUM]: { sculpt: STAG_PRONOTUM, shade: shade(1.2, 0.4, 0.3, 0, 0.35, { coatRough: 0.38, wear: 0.45, dust: 0.2 }), px: [512, 512] },
     [REGION.CR_HEAD]: { sculpt: STAG_HEAD, shade: shade(1.2, 0.4, 0.3, 0, 0.3, { coatRough: 0.4, wear: 0.45, dust: 0.22 }), px: [512, 512] },
-    [REGION.CR_MAND]: { sculpt: STAG_MAND, shade: shade(1.0, 0.3, 0.15, 0.1, 0.4, { coatRough: 0.3, wear: 0.4, dust: 0.04, tipThin: 1.0 }), px: [256, 512] },
+    [REGION.CR_MAND]: { sculpt: STAG_MAND, shade: shade(1.0, 0.3, 0.15, 0.1, 0.4, { coatRough: 0.22, wear: 0.4, dust: 0.04, tipThin: 1.0 }), px: [256, 512] },
     [REGION.CR_LEG]: { sculpt: STAG_LEG, shade: shade(1.1, 0.45, 0, 0.08, 0.35, { coatRough: 0.34, wear: 0.45, dust: 0.35, mid: 0.15, tipThin: 0.8 }), px: [256, 512] },
     [REGION.CR_UNDER]: { sculpt: STAG_UNDER, shade: shade(0.9, 0.4, 0, 0, 0.3, { coatRough: 0.45, dust: 0.3 }), px: [256, 256] },
     [REGION.CR_ANT]: { sculpt: STAG_ANT, shade: shade(0.8, 0.35, 0, 0.15, 0.3, { coatRough: 0.35, tipThin: 0.6 }), px: [128, 256] },

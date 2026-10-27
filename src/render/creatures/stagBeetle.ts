@@ -176,7 +176,7 @@ function hingeZ(q: number): number {
   return (hinges[q] ??= stagHeadHalf(q / 4) * 0.97 - curveAt(stagMandible(q / 4).outer, 0) * stagMandibleShare(q / 4));
 }
 /** Head half-width (fraction of L) for a male of allometric size 0..1: minors' heads are narrower than the pronotum. */
-export const stagHeadHalf = (size: number): number => 0.095 + (SB.head.half - 0.095) * Math.max(0, Math.min(1, size));
+export const stagHeadHalf = (size: number): number => 0.085 + (SB.head.half - 0.085) * Math.max(0, Math.min(1, size));
 function headGeo(size = 1): THREE.BufferGeometry {
   return build((acc) => {
     const H = { ...SB.head, half: stagHeadHalf(size) };
@@ -414,7 +414,7 @@ const C = (hex: number) => new THREE.Color(hex);
 export const SG2 = { gold: C(0x4a3a26), elytra: C(0x4e2420), black: C(0x2a2623), leg: C(0x1e1a18), under: C(0x1a1612), eye: C(0x080605), mand: C(0xffffff), brush: C(0x8a5e2a) };
 const S = (rough: number, gloss: number) => ({ rough, gloss, pattern: 0, scale: 1 });
 // realism v2: satin, not lacquer (the clearcoat roughness per region is in render/bake/recipes.ts)
-const SURF = { elytra: S(0.38, 0.42), shield: S(0.58, 0.25), head: S(0.62, 0.2), mand: S(0.4, 0.42), leg: S(0.42, 0.42), under: S(0.6, 0.15), eye: S(0.1, 1.0) };
+const SURF = { elytra: S(0.38, 0.42), shield: S(0.58, 0.25), head: S(0.62, 0.2), mand: S(0.34, 0.52), leg: S(0.42, 0.42), under: S(0.6, 0.15), eye: S(0.1, 1.0) };
 const HAIR = { rough: 0.9, gloss: 0, pattern: 2, scale: 3 };
 const jit = new THREE.Color();
 /** Each beetle a little different (hue and value), from its variation seed. */
