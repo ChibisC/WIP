@@ -645,7 +645,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const headWidthAt = (t: number) => {
     const sh = m.head.shape;
     let w: number;
-    if (sh === 'rect' && m.real) w = 0.84 + 0.16 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.05)), 0.7) - 0.14 * ss(0.55, 1, t); // jaws pass: oval-rectangular, widest behind the middle, narrowing to the jaws (photo fire_07)
+    if (sh === 'rect' && m.real) w = 0.9 + 0.1 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.1)), 0.6) - 0.06 * ss(0.7, 1, t); // jaws pass: a rounded square, the sides nearly parallel and the front still broad (photo fire_07; review: not an oval narrowing to the jaws)
     else if (sh === 'rect') w = 0.86 + 0.14 * Math.sin(Math.PI * Math.min(1, t * 1.2)) - 0.12 * ss(0.7, 1, t);
     else if (sh === 'square') w = 0.9 + 0.1 * Math.sin(Math.PI * Math.min(1, t * 1.15)) - 0.2 * ss(0.78, 1, t) - 0.12 * ss(0.3, 0, t); // parallel sides, rounded temples and front
     else if (sh === 'round') w = Math.sin(Math.PI * (0.12 + t * 0.8));
@@ -661,7 +661,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       const t = i / (N - 1);
       const w = headWidthAt(t);
       // jaws pass (realism morphs): a domed profile, highest behind the middle and sloping down to the clypeus
-      const prof = m.real ? 0.6 + 0.4 * Math.sin(Math.PI * Math.min(1, 0.1 + t * 0.92)) : 0.85 + 0.15 * Math.sin(Math.PI * t);
+      const prof = m.real ? (0.6 + 0.4 * Math.sin(Math.PI * Math.min(1, 0.1 + t * 0.92))) * (m.mandible.type === 'massive' ? 1 - 0.22 * ss(0.62, 1, t) : 1) : 0.85 + 0.15 * Math.sin(Math.PI * t);
       const ht = prof * Math.max(0.15, Math.pow(Math.min(1, t / 0.13), 0.32) * Math.pow(Math.min(1, (1 - t) / 0.07), 0.45));
       const yc = m.real ? headCY - ss(0.55, 1, t) * hH * 0.1 : headCY + (t > 0.8 ? (t - 0.8) * hH * 0.3 : 0);
       rings.push({ x: t * hL, y: yc, rz: (hW / 2) * w, ry: (hH / 2) * ht, n: m.real ? 2.1 : 2.3 });
@@ -683,7 +683,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     });
     const headCol = grad(look.head, (x, y) => {
       if (m.key.startsWith('formica')) return ss(0.15, 0.95, x / hL) * 0.6 + ss(0.05, -0.4, (y - headCY) / hH) * 0.7;
-      if (m.head.frontMix !== undefined) return (m.real ? ss(0.42, 0.92, x / hL) : ss(0.55, 1.0, x / hL)) * m.head.frontMix;
+      if (m.head.frontMix !== undefined) return (m.real ? Math.min(1, ss(0.3, 0.86, x / hL) + 0.35 * ss(0.5, 0.95, x / hL) * ss(0.05, -0.35, (y - headCY) / hH)) : ss(0.55, 1.0, x / hL)) * m.head.frontMix; // (realism: the face darkens gradually into the jaws, the lower front most)
       return ss(0.5, 1.0, x / hL) * 0.5;
     });
     acc.piece(transformPts(p, headM), ind, PART.HEAD, (x, y, z) => {
@@ -696,21 +696,27 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
 
     // clypeus plate (jaws pass, realism morphs: a low plate set into the front of the head, its front margin
     // reaching over the closed jaws' bases, not a raised disc)
+    // (spec jaws: a lobe projecting over the closed jaws' bases to just behind their cutting edges, filling the
+    // space between them, as in Solenopsis; its size from the jaws' hinge distance `wzSpec`)
+    const wzSpec = (hW / 2) * headWidthAt(0.95) * 0.84;
+    const clypLobe = m.real && !!m.mandible.spec && m.mandible.type !== 'massive';
+    const clypFront = clypLobe ? hL * 0.965 + wzSpec * 0.38 : 0;
     {
-      const c = m.real ? new THREE.Vector3(hL * 0.9, headCY + hH * 0.12, 0) : new THREE.Vector3(hL * 0.93, headCY + hH * 0.18, 0);
-      const r = m.real ? new THREE.Vector3(hL * 0.085, hH * 0.11, hW * 0.27) : new THREE.Vector3(hL * 0.1, hH * 0.18, hW * 0.24);
+      const c = clypLobe ? new THREE.Vector3(hL * 0.965 - wzSpec * 0.07, headCY - hH * 0.1, 0) : m.real ? new THREE.Vector3(hL * 0.9, headCY + hH * 0.12, 0) : new THREE.Vector3(hL * 0.93, headCY + hH * 0.18, 0);
+      const r = clypLobe ? new THREE.Vector3(wzSpec * 0.45, hH * 0.13, wzSpec * 0.86) : m.real ? new THREE.Vector3(hL * 0.085, hH * 0.11, hW * 0.27) : new THREE.Vector3(hL * 0.1, hH * 0.18, hW * 0.24);
       const [pp, ii] = ellipsoid(c, r, hi ? 16 : 6);
       // (realism: the head's own colour gradient, so a major's face darkens toward the jaws under it too)
       acc.piece(transformPts(pp, headM), ii, PART.HEAD, m.real ? (x, y, z) => headCol(x - neck.x, y - neck.y, z) : solid(look.head), look.head);
     }
     // clypeal carinae: two ridges running forward over the clypeus, ending in teeth on its front edge
-    if (m.head.carinae) {
+    if (m.head.carinae && !clypLobe) {
       for (const s of [-1, 1]) {
         // realism (jaws pass): two low ridges along the clypeus ending in small teeth on its front margin
-        const a = m.real ? new THREE.Vector3(hL * 0.88, headCY + hH * 0.2, s * hW * 0.07) : new THREE.Vector3(hL * 0.8, headCY + hH * 0.3, s * hW * 0.07);
-        const b = m.real ? new THREE.Vector3(hL * 1.02, headCY + hH * 0.13, s * hW * 0.08) : new THREE.Vector3(hL * 1.0, headCY + hH * 0.2, s * hW * 0.085);
-        const tip = new THREE.Vector3((m.real ? hL * 1.02 : hL * 1.0) + m.head.carinae * Lm * (m.real ? 0.15 : 1), headCY + hH * (m.real ? 0.06 : 0.06), s * hW * 0.085);
-        const cr = m.real ? 0.35 : 1;
+        // (on the clypeal lobe: low ridges lying on it, ending in small flat teeth on its front margin)
+        const a = clypLobe ? new THREE.Vector3(hL * 0.86, headCY + hH * 0.12, s * hW * 0.065) : m.real ? new THREE.Vector3(hL * 0.88, headCY + hH * 0.2, s * hW * 0.07) : new THREE.Vector3(hL * 0.8, headCY + hH * 0.3, s * hW * 0.07);
+        const b = clypLobe ? new THREE.Vector3(clypFront - wzSpec * 0.08, headCY - hH * 0.02, s * hW * 0.075) : m.real ? new THREE.Vector3(hL * 1.02, headCY + hH * 0.13, s * hW * 0.08) : new THREE.Vector3(hL * 1.0, headCY + hH * 0.2, s * hW * 0.085);
+        const tip = clypLobe ? new THREE.Vector3(clypFront + m.head.carinae * Lm * 0.25, headCY - hH * 0.07, s * hW * 0.08) : new THREE.Vector3((m.real ? hL * 1.02 : hL * 1.0) + m.head.carinae * Lm * (m.real ? 0.15 : 1), headCY + hH * (m.real ? 0.06 : 0.06), s * hW * 0.085);
+        const cr = clypLobe ? 0.3 : m.real ? 0.35 : 1;
         const [pp, ii] = tube([a, b, tip], [0.012 * Lm * cr, 0.011 * Lm * cr, 0.002 * Lm], hi ? 6 : 4, true, true);
         acc.piece(transformPts(pp, headM), ii, PART.HEAD, solid(look.head), look.head);
       }
@@ -749,15 +755,19 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(0x120c08), { color: 0, rough: 0.1, coat: 1, sheen: 0 });
       }
     }
-    socketL = hp(hL * 0.74, headCY + hH * 0.32, -hW * 0.17);
-    socketR = hp(hL * 0.74, headCY + hH * 0.32, hW * 0.17);
+    // (realism: near the front, close to the midline just behind the clypeus, as in Solenopsis — photo fire_07)
+    socketL = m.real ? hp(hL * 0.83, headCY + hH * 0.3, -hW * 0.15) : hp(hL * 0.74, headCY + hH * 0.32, -hW * 0.17);
+    socketR = m.real ? hp(hL * 0.83, headCY + hH * 0.3, hW * 0.15) : hp(hL * 0.74, headCY + hH * 0.32, hW * 0.17);
     mandPivL = hp(hL * 0.95, headCY - hH * 0.22, -hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
     mandPivR = hp(hL * 0.95, headCY - hH * 0.22, hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
     if (m.mandible.spec) {
       // jaws pass: hinged at the head's anterolateral corners, just under the front margin
       const wz = (hW / 2) * headWidthAt(0.95) * 0.84;
-      mandPivL = hp(hL * 0.965, headCY - hH * 0.16, -wz);
-      mandPivR = hp(hL * 0.965, headCY - hH * 0.16, wz);
+      // (massive jaws, a fire ant major's: set higher into the face, so their upper side continues the head's
+      // front and the closed pair makes its blunt dark muzzle — jaws review)
+      const big = m.mandible.type === 'massive';
+      mandPivL = hp(hL * (big ? 0.93 : 0.965), headCY - hH * (big ? 0.07 : 0.16), -wz * (big ? 0.92 : 1));
+      mandPivR = hp(hL * (big ? 0.93 : 0.965), headCY - hH * (big ? 0.07 : 0.16), wz * (big ? 0.92 : 1));
     }
     // frontal carinae ridges between the sockets (realism morphs: too low to show at this scale)
     if (hi && !m.real) {

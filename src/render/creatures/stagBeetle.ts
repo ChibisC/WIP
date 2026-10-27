@@ -414,7 +414,7 @@ const C = (hex: number) => new THREE.Color(hex);
 export const SG2 = { gold: C(0x4a3a26), elytra: C(0x4e2420), black: C(0x2a2623), leg: C(0x1e1a18), under: C(0x1a1612), eye: C(0x080605), mand: C(0xffffff), brush: C(0x8a5e2a) };
 const S = (rough: number, gloss: number) => ({ rough, gloss, pattern: 0, scale: 1 });
 // realism v2: satin, not lacquer (the clearcoat roughness per region is in render/bake/recipes.ts)
-const SURF = { elytra: S(0.38, 0.42), shield: S(0.58, 0.25), head: S(0.62, 0.2), mand: S(0.3, 0.62), leg: S(0.42, 0.42), under: S(0.6, 0.15), eye: S(0.1, 1.0) };
+const SURF = { elytra: S(0.38, 0.42), shield: S(0.58, 0.25), head: S(0.62, 0.2), mand: S(0.4, 0.42), leg: S(0.42, 0.42), under: S(0.6, 0.15), eye: S(0.1, 1.0) };
 const HAIR = { rough: 0.9, gloss: 0, pattern: 2, scale: 3 };
 const jit = new THREE.Color();
 /** Each beetle a little different (hue and value), from its variation seed. */

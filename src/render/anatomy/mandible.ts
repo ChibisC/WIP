@@ -74,6 +74,8 @@ export interface TineSpec {
   across?: number;
   /** how fast it narrows (1 = linear) */
   taper?: number;
+  /** a fillet where it grows out of the blade: the root this much wider, easing off over the first third */
+  flare?: number;
 }
 
 export interface MandibleSpec {
@@ -219,7 +221,7 @@ function sweepBlade(
   us: number[],
   len: number,
   outer: (u: number) => number,
-  inner: (u: number) => [number, number],
+  inner: (u: number) => [number, number] | [number, number, number],
   thick: (u: number) => number,
   spec: MandibleSpec,
   colourU: (u: number) => number,
@@ -252,8 +254,11 @@ function sweepBlade(
     if (r > 0) along += f.p.distanceTo(prev);
     prev.copy(f.p);
     const o = outer(u) * len;
-    const [iv, k] = inner(u);
-    const i = iv * len;
+    // (a tooth bulges the very edge only — `ad` of the inner width — so a row of small teeth reads as
+    // teeth on the margin, not ribs across the blade)
+    const [iv, k, ad = 0] = inner(u);
+    const i = (iv - ad) * len;
+    const a = ad * len;
     const h = thick(u) * len;
     girth += 2 * (o + i) + Math.PI * h * 0.5;
     const cu = colourU(u);
@@ -262,7 +267,7 @@ function sweepBlade(
       for (let jj = 0; jj < nv; jj++) {
         const j = half === 0 ? jj : nv - 1 - jj;
         const s = ss[j];
-        const v = s < 0 ? s * o : s * i;
+        const v = s < 0 ? s * o : s * i + Math.pow(s, 5) * a;
         const y = (half === 0 ? 0.5 : -0.5 * below) * h * prof(s);
         pos.push(f.p.x + f.In.x * v + f.Up.x * y, f.p.y + f.In.y * v + f.Up.y * y, f.p.z + f.In.z * v + f.Up.z * y);
         // teeth (beyond the plain margin) and the cutting edge darker
@@ -295,7 +300,9 @@ function sweepBlade(
   const f0 = frames[0];
   const fN = frames[R - 1];
   const c0 = pos.length / 3;
-  pos.push(f0.p.x - f0.T.x * 0.02 * len, f0.p.y - f0.T.y * 0.02 * len, f0.p.z - f0.T.z * 0.02 * len);
+  // (a rounded heel already closes to a point: no extra nub behind it)
+  const back = (spec.baseRound ?? 0) > 0 ? 0 : 0.02 * len;
+  pos.push(f0.p.x - f0.T.x * back, f0.p.y - f0.T.y * back, f0.p.z - f0.T.z * back);
   colourAt(spec, colourU(us[0]), 0, _c);
   col.push(_c.r, _c.g, _c.b);
   meta.th.push(-1);
@@ -354,7 +361,10 @@ export function buildMandible(spec: MandibleSpec, side: 1 | -1): MandibleMesh {
   const rb = spec.baseRound ?? 0;
   if (rb > 0) {
     const nh = 7;
-    for (let k = nh; k >= 1; k--) us.unshift(-rb * Math.sin(((Math.PI / 2) * k) / nh));
+    // from the back of the heel (u = −rb) forward to the hinge, in order
+    const heelUs: number[] = [];
+    for (let k = nh; k >= 1; k--) heelUs.push(-rb * Math.sin(((Math.PI / 2) * k) / nh));
+    us.unshift(...heelUs);
   }
   const heel = (u: number) => (u >= 0 ? 1 : Math.max(0.06, Math.sqrt(Math.max(0, 1 - (u / rb) ** 2))));
   const f0 = frameAt(tab, 0, { p: new THREE.Vector3(), T: new THREE.Vector3(), In: new THREE.Vector3(), Up: new THREE.Vector3() });
@@ -371,7 +381,7 @@ export function buildMandible(spec: MandibleSpec, side: 1 | -1): MandibleMesh {
     (u) => {
       if (u < 0) return [curveAt(spec.inner, 0) * heel(u), 0];
       const [add, k] = teethAt(spec.teeth, u);
-      return [curveAt(spec.inner, u) + add, k];
+      return [curveAt(spec.inner, u) + add, k, add];
     },
     (u) => curveAt(spec.thick, Math.max(0, u)) * Math.pow(heel(u), 0.6),
     spec,
@@ -416,14 +426,15 @@ export function buildMandible(spec: MandibleSpec, side: 1 | -1): MandibleMesh {
       p.addScaledVector(d, step);
     }
     const tp = tn.taper ?? 1;
-    const w = (t: number) => (tn.width * 0.5) * Math.max(0.06, Math.pow(1 - t, tp) * (1 - 0.25 * t)) / 1;
+    const fl = tn.flare ?? 0;
+    const w = (t: number) => tn.width * 0.5 * Math.max(0.035, Math.pow(1 - t, tp) * (1 - 0.25 * t) * (1 + fl * Math.pow(1 - Math.min(1, t / 0.35), 2)));
     const piece = sweepBlade(
       tf,
       tus,
       len,
       w,
       (t) => [w(t), 0],
-      (t) => tn.thick * Math.max(0.12, 1 - 0.75 * t),
+      (t) => tn.thick * Math.max(0.1, 1 - 0.8 * t) * (1 + 0.5 * fl * Math.pow(1 - Math.min(1, t / 0.35), 2)),
       { ...spec, edgeIn: Math.max(1.3, spec.edgeIn), edgeOut: Math.max(1.3, spec.edgeIn) },
       (t) => tn.u + (1 - tn.u) * t,
       Math.max(6, Math.round(nv * 0.7)),
