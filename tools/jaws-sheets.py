@@ -74,7 +74,7 @@ try:
     w = 240
     strip = Image.new("RGB", (w * 5 + 20, 600), (18, 16, 14))
     d = ImageDraw.Draw(strip)
-    d.text((10, 6), "Allometry: male size 1 → 0 (render, top) | photo stag_06 (study only), five males from large to small", fill=(235, 220, 190))
+    d.text((10, 6), "Allometry: male size 1 to 0 (render, top) | photo stag_06 (study only), five males from large to small", fill=(235, 220, 190))
     for i, im in enumerate(sizes):
         im.thumbnail((w, 300))
         strip.paste(im, (10 + i * w, 24))
