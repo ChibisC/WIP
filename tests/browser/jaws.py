@@ -28,7 +28,7 @@ SHOTS = {
     "fire_front": f"{FIRE}&cam=front&dist=1.6&tx=1.45&ty=0.3",
     "fire_34": f"{FIRE}&cam=34&dist=1.9&tx=1.4&ty=0.3",
     "fire_whole_top": f"{FIRE}&cam=top&dist=7.6",
-    "fire_head_top": f"{FIRE}&cam=top&dist=2.6&tx=1.15",
+    "fire_head_top": f"{FIRE}&cam=top&dist=2.7&tx=1.3",
     "major_head_side": f"{MAJOR}&cam=side&dist=5.2&tx=2.4&ty=0.7",
     "stag_high": f"{STAG}&cam=game&dist=230&rot=2.4&tx=10",
     "major_top": f"{MAJOR}&cam=top&dist=3.6&tx=3.0",

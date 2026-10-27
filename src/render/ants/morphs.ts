@@ -364,7 +364,8 @@ const fireLook = {
 const fireMinor: AntMorph = {
   key: 'fire_minor',
   L: 2.8,
-  head: { len: 0.27, width: 0.27, height: 0.17, shape: 'rect', notch: 0.07, carinae: 0.022 },
+  // (jaws pass: a little longer than wide, as in the photos)
+  head: { len: 0.27, width: 0.25, height: 0.17, shape: 'rect', notch: 0.07, carinae: 0.022 },
   eyes: { size: 0.14, pos: 0.6, height: 0.15, ocelli: false },
   antenna: { segments: 10, scape: 0.95, funiculus: 1.15, club: 2, thick: 0.0144 },
   // jaws pass: triangular plates with four teeth, closing in front of the clypeus; open 60–90° apart
@@ -389,7 +390,7 @@ const fireMajor: AntMorph = {
   key: 'fire_major',
   L: 6,
   // (jaws pass: the front of the head darkens toward the black jaws, photos fire_02 and fire_04)
-  head: { len: 0.34, width: 0.37, height: 0.215, shape: 'square', notch: 0.22, groove: 0.16, carinae: 0.014, frontMix: 0.8 },
+  head: { len: 0.34, width: 0.37, height: 0.215, shape: 'square', notch: 0.22, groove: 0.16, carinae: 0.014, frontMix: 0.95 },
   eyes: { size: 0.075, pos: 0.62, height: 0.15, ocelli: false },
   antenna: { segments: 10, scape: 0.55, funiculus: 1.0, club: 2, thick: 0.0105 },
   mandible: { type: 'massive', len: 0.32, teeth: 2, width: 0.75, spec: FIRE_MAJOR, open: 0.55 },

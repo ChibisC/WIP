@@ -321,7 +321,7 @@ export function antPatch(): ShaderPatch {
          }
          ${TINT_GLSL('vTint')}
          // hit flash (animation pass): a quick pale-red flush that reads at a distance
-         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95, 0.32, 0.18), vHit * 0.38);
+         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.95, 0.3, 0.16), vHit * 0.28);
          float goldM = goldMaskAt();
          {
            // black -> bronze -> metallic gold (darker in linear space than the brief's hexes: the tone mapping lifts gold to cream otherwise)
@@ -374,7 +374,7 @@ export function antPatch(): ShaderPatch {
            totalEmissiveRadiance += goldM * vec3(1.0, 0.62, 0.18) * (0.025 + 0.14 * rim);
            float ht = hairTip();
            totalEmissiveRadiance += goldM * ht * ht * vec3(1.0, 0.9, 0.6) * 0.1;
-           totalEmissiveRadiance += vHit * vec3(0.55, 0.14, 0.06) * 0.22;
+           totalEmissiveRadiance += vHit * vec3(0.55, 0.14, 0.06) * 0.12;
          }`,
       ],
       [

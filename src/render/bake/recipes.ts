@@ -18,7 +18,8 @@ const shade = (normal: number, joint: number, ventral: number, thick: number, co
 // pit hairs point back along the part: the head and mesosoma are built front-last (−1), the gaster and legs front-first (+1)
 // a faint microreticulation everywhere (cells ~14 µm) turns the gloss into a sheen without hiding the shine
 // polished (the photos: crisp window highlights): faint relief, the highlights bent rather than scattered
-const FIRE_HEAD: Sculpt = { tile: [0.42, 0.42], noise: 0.0003, reticulum: { cell: 0.014, depth: 0.0002 }, pits: { n: 22, r: 0.004, depth: 0.0008, pale: 0.05, stub: { len: 0.02, dir: -1, share: 0.9 } }, wave: { cell: 0.1, amp: 0.0028 }, rough: [-0.06, 0.2], roughVar: 0.05, dirt: 0.2, mottle: 0.25, cavityDark: 0.22 };
+// (jaws pass: the review read the faint reticulation as reptile skin and the undulation as shiny blotches: both fainter)
+const FIRE_HEAD: Sculpt = { tile: [0.42, 0.42], noise: 0.0002, reticulum: { cell: 0.014, depth: 0.00006 }, pits: { n: 22, r: 0.004, depth: 0.0008, pale: 0.05, stub: { len: 0.02, dir: -1, share: 0.9 } }, wave: { cell: 0.14, amp: 0.0015 }, rough: [-0.06, 0.2], roughVar: 0.04, dirt: 0.15, mottle: 0.12, cavityDark: 0.22 };
 const FIRE_MESO: Sculpt = {
   tile: [1.1, 0.42],
   noise: 0.0003,
@@ -40,7 +41,7 @@ const FIRE_TARSUS: Sculpt = { tile: [0.06, 0.12], noise: 0.0005, pits: { n: 700,
 const FIRE_ANTENNA: Sculpt = { tile: [0.08, 0.2], noise: 0.0004, pits: { n: 900, r: 0.002, depth: 0.0008, pale: 0.15 }, rough: [0.1, 0.28], dirt: 0.25, mottle: 0.06, cavityDark: 0.35 };
 
 // jaws pass: the mandibles finely striate lengthwise with scattered hair pits, slightly glossy, thin enough to glow at the edge
-const FIRE_MAND: Sculpt = { tile: [0.1, 0.24], noise: 0.0003, striae: { per: 55, depth: 0.0011, angle: 0, wobble: 0.25 }, pits: { n: 120, r: 0.003, depth: 0.0012, pale: 0.2 }, wave: { cell: 0.06, amp: 0.002 }, rough: [-0.02, 0.24], roughVar: 0.05, dirt: 0.15, mottle: 0.1, cavityDark: 0.3 };
+const FIRE_MAND: Sculpt = { tile: [0.1, 0.24], noise: 0.0003, striae: { per: 55, depth: 0.0003, angle: 0, wobble: 0.35 }, pits: { n: 120, r: 0.003, depth: 0.0008, pale: 0.1 }, wave: { cell: 0.06, amp: 0.002 }, rough: [-0.02, 0.24], roughVar: 0.05, dirt: 0.15, mottle: 0.1, cavityDark: 0.3 };
 
 export const FIRE_ANT: DetailRecipe = {
   key: 'fire',
@@ -73,8 +74,9 @@ export function antRecipe(morphKey: string): DetailRecipe | null {
  */
 const STAG_ELYTRA: Sculpt = { tile: [6, 6], noise: 0.004, granules: { cell: 0.06, height: 0.004 }, pits: { n: 10, r: 0.06, depth: 0.014, pale: 0.12 }, wave: { cell: 1.4, amp: 0.06 }, rough: [0.0, 0.25], roughVar: 0.08, dirt: 0.12, mottle: 0.25, cavityDark: 0.35 };
 const STAG_PRONOTUM: Sculpt = { tile: [5, 5], noise: 0.005, granules: { cell: 0.22, height: 0.028 }, pits: { n: 16, r: 0.07, depth: 0.022, pale: 0.05 }, wave: { cell: 1.2, amp: 0.06 }, rough: [0.06, 0.3], roughVar: 0.08, dirt: 0.22, mottle: 0.14, cavityDark: 0.45 };
-const STAG_HEAD: Sculpt = { tile: [5, 5], noise: 0.006, reticulum: { cell: 0.45, depth: 0.04 }, granules: { cell: 0.2, height: 0.035 }, wave: { cell: 1.0, amp: 0.06 }, rough: [0.1, 0.32], roughVar: 0.08, dirt: 0.26, mottle: 0.12, cavityDark: 0.5 };
-const STAG_MAND: Sculpt = { tile: [3, 6], noise: 0.004, granules: { cell: 0.09, height: 0.009 }, pits: { n: 26, r: 0.06, depth: 0.02, pale: 0.12 }, wave: { cell: 0.8, amp: 0.05 }, rough: [-0.04, 0.24], roughVar: 0.08, dirt: 0.1, mottle: 0.3, cavityDark: 0.4 };
+const STAG_HEAD: Sculpt = { tile: [5, 5], noise: 0.004, reticulum: { cell: 0.45, depth: 0.025 }, granules: { cell: 0.16, height: 0.018 }, wave: { cell: 1.0, amp: 0.05 }, rough: [0.06, 0.3], roughVar: 0.08, dirt: 0.2, mottle: 0.1, cavityDark: 0.45 };
+// (jaws pass: the photos show smooth, glossy antlers with fine punctures, not a speckled matte surface)
+const STAG_MAND: Sculpt = { tile: [3, 6], noise: 0.002, granules: { cell: 0.09, height: 0.003 }, pits: { n: 14, r: 0.05, depth: 0.01, pale: 0.03 }, wave: { cell: 1.2, amp: 0.035 }, rough: [-0.12, 0.12], roughVar: 0.05, dirt: 0.06, mottle: 0.14, cavityDark: 0.25 };
 const STAG_LEG: Sculpt = { tile: [2, 4], noise: 0.004, pits: { n: 30, r: 0.05, depth: 0.016, pale: 0.25 }, granules: { cell: 0.07, height: 0.005 }, wave: { cell: 0.7, amp: 0.04 }, rough: [0.05, 0.3], roughVar: 0.06, dirt: 0.35, mottle: 0.1, cavityDark: 0.4 };
 const STAG_UNDER: Sculpt = { tile: [5, 5], noise: 0.004, pits: { n: 60, r: 0.03, depth: 0.01, pale: 0.6 }, rough: [0.15, 0.3], dirt: 0.3, mottle: 0.12, cavityDark: 0.35 };
 const STAG_ANT: Sculpt = { tile: [1, 2], noise: 0.003, pits: { n: 120, r: 0.015, depth: 0.004, pale: 0.4 }, rough: [0.1, 0.25], dirt: 0.15, mottle: 0.05, cavityDark: 0.3 };
@@ -85,7 +87,7 @@ export const STAG: DetailRecipe = {
     [REGION.ELYTRA]: { sculpt: STAG_ELYTRA, shade: shade(1.15, 0.35, 0.3, 0.04, 0.5, { coatRough: 0.32, wear: 0.4, dust: 0.15, mid: 0.08 }), px: [512, 512] },
     [REGION.PRONOTUM]: { sculpt: STAG_PRONOTUM, shade: shade(1.2, 0.4, 0.3, 0, 0.35, { coatRough: 0.38, wear: 0.45, dust: 0.2 }), px: [512, 512] },
     [REGION.CR_HEAD]: { sculpt: STAG_HEAD, shade: shade(1.2, 0.4, 0.3, 0, 0.3, { coatRough: 0.4, wear: 0.45, dust: 0.22 }), px: [512, 512] },
-    [REGION.CR_MAND]: { sculpt: STAG_MAND, shade: shade(1.2, 0.3, 0.15, 0.1, 0.4, { coatRough: 0.4, wear: 0.5, dust: 0.08, tipThin: 1.0 }), px: [256, 512] },
+    [REGION.CR_MAND]: { sculpt: STAG_MAND, shade: shade(1.0, 0.3, 0.15, 0.1, 0.4, { coatRough: 0.16, wear: 0.4, dust: 0.04, tipThin: 1.0 }), px: [256, 512] },
     [REGION.CR_LEG]: { sculpt: STAG_LEG, shade: shade(1.1, 0.45, 0, 0.08, 0.35, { coatRough: 0.34, wear: 0.45, dust: 0.35, mid: 0.15, tipThin: 0.8 }), px: [256, 512] },
     [REGION.CR_UNDER]: { sculpt: STAG_UNDER, shade: shade(0.9, 0.4, 0, 0, 0.3, { coatRough: 0.45, dust: 0.3 }), px: [256, 256] },
     [REGION.CR_ANT]: { sculpt: STAG_ANT, shade: shade(0.8, 0.35, 0, 0.15, 0.3, { coatRough: 0.35, tipThin: 0.6 }), px: [128, 256] },

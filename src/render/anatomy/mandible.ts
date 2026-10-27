@@ -99,6 +99,8 @@ export interface MandibleSpec {
   tines?: TineSpec[];
   /** colours (sRGB hex): hinge → middle → apex; teeth and tines darken toward their points */
   color: { base: number; mid?: number; tip: number; teeth?: number; dark?: readonly [number, number] };
+  /** for a pair fitted to the head: how far the closed apex reaches toward the midline (1 = to it; default 1.06, a little overlap) */
+  reach?: number;
   /** a rounded heel this long (fraction of len) behind the hinge, where the base sits in the head (0: cut flat) */
   baseRound?: number;
   /** samples along the blade and across each half of the cross-section */

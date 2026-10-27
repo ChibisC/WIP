@@ -182,7 +182,7 @@ function clips(): Record<string, Clip> {
           v.dead = t > 1 + k * 0.3;
         },
       })),
-      cam: { tx: 5, ty: 0.3, tz: 0, dir: [0.3, 0.75, 1], dist: 13, fov: 30 },
+      cam: { tx: 5, ty: 0.3, tz: 0, dir: [0.2, 1, 0.75], dist: 17, fov: 30 },
     },
     // a worker thrown through the air: it tumbles, lands with a bounce and rights itself, then walks on
     fling: {
@@ -259,7 +259,8 @@ function clips(): Record<string, Clip> {
     };
   }
   // the same attack seen from the default gameplay zoom (readability)
-  C.attack_game = { ...C.attack, cam: { tx: 0, ty: 0, tz: 0, dir: [0.25, 1, 0.55], dist: 230, fov: 45 } };
+  // (the game's surface camera: 38° field of view, 230 mm away at the default zoom, looking down at about 50°)
+  C.attack_game = { ...C.attack, cam: { tx: 0, ty: 0, tz: 0, dir: [0.35, 1, 0.55], dist: 230, fov: 38 } };
   const L = STAG_L;
   const stagBase = (c: Creature, x: number, y: number, h: number) => {
     c.x = x;

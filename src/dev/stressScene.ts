@@ -39,7 +39,7 @@ export function stressSetup(species: readonly string[] = STRESS_SPECIES): GameSe
  * Creature systems must be registered by the caller (they are a separate
  * phase of the game).
  */
-export function populateStress(w: World, perColony: number, creatures: number): void {
+export function populateStress(w: World, perColony: number, creatures: number, bosses = 0): void {
   const cx = w.terrain.width / 2;
   const cy = w.terrain.depth / 2;
   for (const c of w.s.colonies) {
@@ -72,6 +72,15 @@ export function populateStress(w: World, perColony: number, creatures: number): 
     const y = w.rng.range(40, w.terrain.depth - 40);
     if (!w.terrain.passable(x, y)) continue;
     spawnCreature(w, kinds[i % kinds.length], SURFACE, x, y);
+    i++;
+  }
+  // animation pass stress test: stag beetle bosses near the middle, where the camera looks
+  for (let i = 0, tries = 0; i < bosses && tries < 200; tries++) {
+    const a = (i / Math.max(1, bosses)) * Math.PI * 2 + 0.4;
+    const x = cx + Math.cos(a) * (60 + tries);
+    const y = cy + Math.sin(a) * (60 + tries);
+    if (!w.terrain.passable(x, y)) continue;
+    spawnCreature(w, 'stagBeetle', SURFACE, x, y);
     i++;
   }
 }

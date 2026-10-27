@@ -683,7 +683,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     });
     const headCol = grad(look.head, (x, y) => {
       if (m.key.startsWith('formica')) return ss(0.15, 0.95, x / hL) * 0.6 + ss(0.05, -0.4, (y - headCY) / hH) * 0.7;
-      if (m.head.frontMix !== undefined) return ss(0.55, 1.0, x / hL) * m.head.frontMix;
+      if (m.head.frontMix !== undefined) return (m.real ? ss(0.42, 0.92, x / hL) : ss(0.55, 1.0, x / hL)) * m.head.frontMix;
       return ss(0.5, 1.0, x / hL) * 0.5;
     });
     acc.piece(transformPts(p, headM), ind, PART.HEAD, (x, y, z) => {
@@ -694,20 +694,23 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     }, look.head, 0, undefined, detOf(meta, REGION.HEAD));
     if (hi && m.setae?.head) setaeOn(acc, rng, p, hi ? 22 : RAD, rings.length, (r) => rings[r].y, PART.HEAD, m.setae.head, m.setae.len ?? [0.03, 0.05], m.setae.color, Lm, headM);
 
-    // clypeus plate
+    // clypeus plate (jaws pass, realism morphs: a low plate set into the front of the head, its front margin
+    // reaching over the closed jaws' bases, not a raised disc)
     {
-      const c = new THREE.Vector3(hL * 0.93, headCY + hH * 0.18, 0);
-      const [pp, ii] = ellipsoid(c, new THREE.Vector3(hL * 0.1, hH * 0.18, hW * 0.24), hi ? 16 : 6);
-      acc.piece(transformPts(pp, headM), ii, PART.HEAD, solid(look.head), look.head);
+      const c = m.real ? new THREE.Vector3(hL * 0.9, headCY + hH * 0.12, 0) : new THREE.Vector3(hL * 0.93, headCY + hH * 0.18, 0);
+      const r = m.real ? new THREE.Vector3(hL * 0.085, hH * 0.11, hW * 0.27) : new THREE.Vector3(hL * 0.1, hH * 0.18, hW * 0.24);
+      const [pp, ii] = ellipsoid(c, r, hi ? 16 : 6);
+      // (realism: the head's own colour gradient, so a major's face darkens toward the jaws under it too)
+      acc.piece(transformPts(pp, headM), ii, PART.HEAD, m.real ? (x, y, z) => headCol(x - neck.x, y - neck.y, z) : solid(look.head), look.head);
     }
     // clypeal carinae: two ridges running forward over the clypeus, ending in teeth on its front edge
     if (m.head.carinae) {
       for (const s of [-1, 1]) {
-        const a = new THREE.Vector3(hL * 0.8, headCY + hH * 0.3, s * hW * 0.07);
-        const b = new THREE.Vector3(hL * 1.0, headCY + hH * 0.2, s * hW * 0.085);
-        // realism v2: low ridges ending in small teeth (not tusks)
-        const tip = new THREE.Vector3(hL * 1.0 + m.head.carinae * Lm * (m.real ? 0.55 : 1), headCY + hH * 0.06, s * hW * 0.09);
-        const cr = m.real ? 0.6 : 1;
+        // realism (jaws pass): two low ridges along the clypeus ending in small teeth on its front margin
+        const a = m.real ? new THREE.Vector3(hL * 0.88, headCY + hH * 0.2, s * hW * 0.07) : new THREE.Vector3(hL * 0.8, headCY + hH * 0.3, s * hW * 0.07);
+        const b = m.real ? new THREE.Vector3(hL * 1.02, headCY + hH * 0.13, s * hW * 0.08) : new THREE.Vector3(hL * 1.0, headCY + hH * 0.2, s * hW * 0.085);
+        const tip = new THREE.Vector3((m.real ? hL * 1.02 : hL * 1.0) + m.head.carinae * Lm * (m.real ? 0.15 : 1), headCY + hH * (m.real ? 0.06 : 0.06), s * hW * 0.085);
+        const cr = m.real ? 0.35 : 1;
         const [pp, ii] = tube([a, b, tip], [0.012 * Lm * cr, 0.011 * Lm * cr, 0.002 * Lm], hi ? 6 : 4, true, true);
         acc.piece(transformPts(pp, headM), ii, PART.HEAD, solid(look.head), look.head);
       }
@@ -753,15 +756,16 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     if (m.mandible.spec) {
       // jaws pass: hinged at the head's anterolateral corners, just under the front margin
       const wz = (hW / 2) * headWidthAt(0.95) * 0.84;
-      mandPivL = hp(hL * 0.985, headCY - hH * 0.16, -wz);
-      mandPivR = hp(hL * 0.985, headCY - hH * 0.16, wz);
+      mandPivL = hp(hL * 0.965, headCY - hH * 0.16, -wz);
+      mandPivR = hp(hL * 0.965, headCY - hH * 0.16, wz);
     }
-    // frontal carinae ridges between the sockets
-    if (hi) {
+    // frontal carinae ridges between the sockets (realism morphs: too low to show at this scale)
+    if (hi && !m.real) {
       for (const s of [-1, 1]) {
-        const a = new THREE.Vector3(hL * 0.55, headCY + hH * 0.42, s * hW * 0.12);
-        const b = new THREE.Vector3(hL * 0.85, headCY + hH * 0.33, s * hW * 0.15);
-        const [pp, ii] = tube([a, a.clone().lerp(b, 0.5), b], [0.008 * Lm, 0.012 * Lm, 0.008 * Lm], 5);
+        const a = new THREE.Vector3(hL * (m.real ? 0.66 : 0.55), headCY + hH * (m.real ? 0.36 : 0.42), s * hW * 0.12);
+        const b = new THREE.Vector3(hL * 0.85, headCY + hH * (m.real ? 0.3 : 0.33), s * hW * 0.15);
+        const fr = m.real ? 0.5 : 1;
+        const [pp, ii] = tube([a, a.clone().lerp(b, 0.5), b], [0.008 * Lm * fr, 0.012 * Lm * fr, 0.008 * Lm * fr], 5);
         acc.piece(transformPts(pp, headM), ii, PART.HEAD, solid(look.head), look.head);
       }
     }
@@ -814,7 +818,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     if (m.mandible.spec) {
       // jaws pass: the shared parametric generator (render/anatomy/mandible.ts), its length fitted so the
       // closed pair overlaps a little on the midline in front of the clypeus
-      const spec = fitLen(m.mandible.spec, inwardToMid * 1.06);
+      const spec = fitLen(m.mandible.spec, inwardToMid * (m.mandible.spec.reach ?? 1.06));
       const mesh = buildMandible(hi ? spec : { ...spec, nu: 14, nv: 5, teeth: spec.teeth.slice(0, 2) }, s as 1 | -1);
       const mm = new THREE.Matrix4().compose(piv, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), headRestPitch), new THREE.Vector3(1, 1, 1));
       for (const pc of mesh.pieces) acc.pieceCols(transformPts(pc.pos, mm), pc.idx, part, pc.col, mlook, 0, detOf(pc.meta, REGION.MANDIBLE));

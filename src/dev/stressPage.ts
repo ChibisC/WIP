@@ -11,14 +11,17 @@ import { GameUI } from '../ui/gameUI';
 import { DebugOverlay } from '../ui/debugOverlay';
 import { populateStress, stressSetup } from './stressScene';
 import type { Quality } from '../render/view';
+import { animSettings } from '../render/ants/antMotion';
 
 export function runStressPage(canvas: HTMLCanvasElement, ui: HTMLElement, q: URLSearchParams): void {
   const per = Number(q.get('ants') || 400);
   const nCr = Number(q.get('creatures') || 100);
   const secs = Number(q.get('secs') || 60);
   const sp = q.get('species')?.split(',');
+  // animation pass: `anim=1` runs the old motion (before/after timing)
+  animSettings.v2 = q.get('anim') !== '1';
   const s = new GameSession(canvas, stressSetup(sp && sp.length === 4 ? sp : undefined), (q.get('q') as Quality) || 'medium');
-  populateStress(s.world, per, nCr);
+  populateStress(s.world, per, nCr, Number(q.get('bosses') || 0));
   if (q.get('worker') !== '0') s.useWorker();
   new GameUI(s, ui);
   const dbg = new DebugOverlay(s, ui);
