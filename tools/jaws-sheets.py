@@ -85,6 +85,15 @@ try:
 except FileNotFoundError:
     pass
 
+# pairs for the reviewer of the likeness: render left, photo right, one file each
+rv = os.path.join(D, "review")
+os.makedirs(rv, exist_ok=True)
+for i, (name, r, ph) in enumerate(rows):
+    out = Image.new("RGB", (SIZE * 2 + 12, SIZE), (30, 30, 30))
+    out.paste(r, (0, 0))
+    out.paste(ph, (SIZE + 12, 0))
+    out.save(os.path.join(rv, f"pair_{i + 1:02d}.jpg"), quality=90)
+
 # blind pairs for a fresh reviewer: same framing, sides shuffled
 random.seed(int(os.environ.get("SEED", "7")))
 bd = os.path.join(D, "blind")
