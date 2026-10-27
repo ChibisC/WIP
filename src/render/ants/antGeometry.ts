@@ -645,7 +645,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const headWidthAt = (t: number) => {
     const sh = m.head.shape;
     let w: number;
-    if (sh === 'rect' && m.real) w = 0.9 + 0.1 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.1)), 0.6) - 0.06 * ss(0.7, 1, t); // jaws pass: a rounded square, the sides nearly parallel and the front still broad (photo fire_07; review: not an oval narrowing to the jaws)
+    if (sh === 'rect' && m.real) w = 0.9 + 0.1 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.1)), 0.6) - 0.11 * ss(0.6, 1, t); // jaws pass: a rounded square, the sides nearly parallel and the front still broad (photo fire_07; review: not an oval narrowing to the jaws)
     else if (sh === 'rect') w = 0.86 + 0.14 * Math.sin(Math.PI * Math.min(1, t * 1.2)) - 0.12 * ss(0.7, 1, t);
     else if (sh === 'square') w = 0.9 + 0.1 * Math.sin(Math.PI * Math.min(1, t * 1.15)) - 0.2 * ss(0.78, 1, t) - 0.12 * ss(0.3, 0, t); // parallel sides, rounded temples and front
     else if (sh === 'round') w = Math.sin(Math.PI * (0.12 + t * 0.8));
@@ -701,7 +701,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const wzSpec = (hW / 2) * headWidthAt(0.95) * 0.84;
     const clypLobe = m.real && !!m.mandible.spec && m.mandible.type !== 'massive';
     const clypFront = clypLobe ? hL * 0.965 + wzSpec * 0.38 : 0;
-    {
+    // (a major's massive jaws fill the front: no separate clypeus knob above them — jaws review)
+    if (!(m.real && m.mandible.type === 'massive')) {
       const c = clypLobe ? new THREE.Vector3(hL * 0.965 - wzSpec * 0.07, headCY - hH * 0.1, 0) : m.real ? new THREE.Vector3(hL * 0.9, headCY + hH * 0.12, 0) : new THREE.Vector3(hL * 0.93, headCY + hH * 0.18, 0);
       const r = clypLobe ? new THREE.Vector3(wzSpec * 0.45, hH * 0.13, wzSpec * 0.86) : m.real ? new THREE.Vector3(hL * 0.085, hH * 0.11, hW * 0.27) : new THREE.Vector3(hL * 0.1, hH * 0.18, hW * 0.24);
       const [pp, ii] = ellipsoid(c, r, hi ? 16 : 6);
@@ -757,8 +758,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       }
     }
     // (realism: near the front, close to the midline just behind the clypeus, as in Solenopsis — photo fire_07)
-    socketL = m.real ? hp(hL * 0.83, headCY + hH * 0.3, -hW * 0.15) : hp(hL * 0.74, headCY + hH * 0.32, -hW * 0.17);
-    socketR = m.real ? hp(hL * 0.83, headCY + hH * 0.3, hW * 0.15) : hp(hL * 0.74, headCY + hH * 0.32, hW * 0.17);
+    socketL = m.real ? hp(hL * 0.88, headCY + hH * 0.27, -hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, -hW * 0.17);
+    socketR = m.real ? hp(hL * 0.88, headCY + hH * 0.27, hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, hW * 0.17);
     mandPivL = hp(hL * 0.95, headCY - hH * 0.22, -hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
     mandPivR = hp(hL * 0.95, headCY - hH * 0.22, hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
     if (m.mandible.spec) {

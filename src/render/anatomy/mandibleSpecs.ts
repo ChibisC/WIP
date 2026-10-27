@@ -76,8 +76,9 @@ export const FIRE_WORKER: MandibleSpec = {
     { u: 0.76, size: 0.036, base: 0.05, lean: 0.3 },
     { u: 0.622, size: 0.028, base: 0.05, lean: 0.25 },
   ],
-  // the head's own reddish brown at the base, darkening to near black at the teeth
-  color: { base: 0x8a3816, mid: 0x6a2a10, tip: 0x1c0b05, teeth: 0x120704, dark: [0.55, 0.97] },
+  // amber like the head, the cutting edge and teeth near black (review: two jaws, not one dark rim)
+  color: { base: 0x9a461a, mid: 0x8a3c16, tip: 0x4a1a0a, teeth: 0x140704, dark: [0.75, 1.0] },
+  edgeDark: 0.85,
   reach: 1.1,
   nu: 44,
   nv: 9,
@@ -105,37 +106,39 @@ export const FIRE_MAJOR: MandibleSpec = {
     [1, 1.6],
   ],
   reach: 1.0,
+  // a heavy wedge, the end broad and rounded (not hooked back)
   pitch: [
-    [0, -0.24],
-    [0.5, -0.48],
-    [1, -0.74],
+    [0, -0.26],
+    [0.5, -0.42],
+    [1, -0.55],
   ],
   outer: [
-    [0, 0.13],
-    [0.6, 0.12],
-    [1, 0.07],
+    [0, 0.16],
+    [0.6, 0.15],
+    [1, 0.09],
   ],
   // broad, the cutting edge a blunt rounded ridge
   inner: [
-    [0, 0.2],
-    [0.3, 0.24],
-    [0.5, 0.21],
-    [0.7, 0.16],
-    [0.85, 0.11],
-    [1, 0.045],
+    [0, 0.24],
+    [0.3, 0.3],
+    [0.5, 0.27],
+    [0.7, 0.2],
+    [0.85, 0.13],
+    [1, 0.05],
   ],
   // deep: the muzzle fills the lower front of the face
   thick: [
-    [0, 0.42],
-    [0.6, 0.34],
-    [1, 0.2],
+    [0, 0.5],
+    [0.6, 0.42],
+    [1, 0.26],
   ],
   edgeIn: 2.0,
   edgeOut: 2.4,
   edgeMin: 0.4,
   baseRound: 0.14,
   teeth: [{ u: 0.8, size: 0.014, base: 0.1, blunt: 1 }],
-  color: { base: 0x2a1209, mid: 0x1a0b06, tip: 0x0c0503, teeth: 0x080302, dark: [0.3, 0.9] },
+  color: { base: 0x3a150a, mid: 0x261008, tip: 0x120604, teeth: 0x0a0403, dark: [0.3, 0.9] },
+  edgeDark: 0,
 };
 
 /**
@@ -152,8 +155,10 @@ export function stagMandible(size: number): MandibleSpec {
   const s = Math.max(0, Math.min(1, size));
   const l = (a: number, b: number) => a + (b - a) * s;
   // how much of the major's armature a male carries: the big tooth and the denticles fade first, the fork last
-  const arm = s * s * (3 - 2 * s);
   const den = Math.max(0, (s - 0.35) / 0.65);
+  // small males' jaws are short and stout: their widths are larger fractions of their length
+  const st = 1 + 0.45 * (1 - s);
+  const W = (c: [number, number][]): [number, number][] => c.map(([u, v]) => [u, v * st]);
   const teeth = [];
   // a row of fine denticles on the inner edge below the big tooth (photo stag_03), fading in smaller males
   if (den > 0) for (let k = 0; k < 7; k++) teeth.push({ u: 0.405 + k * 0.021, size: 0.011 * den * (k % 2 ? 0.8 : 1), base: 0.0095, lean: 0.35, blunt: 0.35 });
@@ -164,16 +169,16 @@ export function stagMandible(size: number): MandibleSpec {
     // point hooking in a little more — an antler, not a sickle. Smaller males: shorter calipers, out less at
     // the base and curving in more (photo stag_06)
     yaw: [
-      [0, l(-0.45, -1.0)],
-      [0.14, l(-0.32, -0.78)],
-      [0.3, l(-0.15, -0.5)],
-      [0.42, l(0.02, -0.17)],
-      [0.52, l(0.14, -0.05)],
-      [0.64, l(0.28, -0.02)],
-      [0.74, l(0.42, 0.18)],
-      [0.84, l(0.58, 0.32)],
-      [0.93, l(0.74, 0.45)],
-      [1, l(0.86, 0.58)],
+      [0, l(-0.22, -1.0)],
+      [0.14, l(-0.16, -0.78)],
+      [0.3, l(-0.08, -0.5)],
+      [0.42, l(0.0, -0.17)],
+      [0.52, l(0.06, -0.05)],
+      [0.64, l(0.14, -0.02)],
+      [0.74, l(0.24, 0.18)],
+      [0.84, l(0.34, 0.32)],
+      [0.93, l(0.46, 0.45)],
+      [1, l(0.56, 0.58)],
     ],
     // held raised: lifting from the head, levelling toward the points
     pitch: [
@@ -184,9 +189,9 @@ export function stagMandible(size: number): MandibleSpec {
     ],
     // the base: a smooth swollen bulge seated in the head's front corner, no corner or flange
     baseRound: l(0.12, 0.2),
-    outer: [
+    outer: W([
       [0, l(0.1, 0.1)],
-      [0.14, l(0.085, 0.1)],
+      [0.14, l(0.085, 0.092)],
       [0.3, l(0.072, 0.086)],
       [0.42, l(0.064, 0.082)],
       [0.55, l(0.056, 0.076)],
@@ -196,10 +201,10 @@ export function stagMandible(size: number): MandibleSpec {
       [0.88, l(0.032, 0.034)],
       [0.95, l(0.02, 0.02)],
       [1, l(0.004, 0.004)],
-    ],
+    ]),
     // the inner margin: broad at the base, concave, the denticle row, then narrowing between the big tooth
     // and the fork; the point tapers to a sharp hook
-    inner: [
+    inner: W([
       [0, l(0.11, 0.15)],
       [0.14, l(0.085, 0.12)],
       [0.3, l(0.068, 0.075)],
@@ -211,15 +216,15 @@ export function stagMandible(size: number): MandibleSpec {
       [0.86, l(0.03, 0.034)],
       [0.94, l(0.018, 0.02)],
       [1, l(0.004, 0.004)],
-    ],
-    thick: [
-      [0, l(0.13, 0.12)],
+    ]),
+    thick: W([
+      [0, l(0.11, 0.09)],
       [0.4, l(0.095, 0.075)],
       [0.8, l(0.06, 0.05)],
       [1, l(0.02, 0.016)],
-    ],
+    ]),
     edgeIn: 1.35,
-    edgeOut: 2.0,
+    edgeOut: 1.7,
     edgeMin: 0.16,
     flatBelow: 0.3,
     teeth,
@@ -227,15 +232,15 @@ export function stagMandible(size: number): MandibleSpec {
     // prong at about 0.78 (longer, slightly upturned; the point itself a little longer still): both shrink with
     // the male, the big tooth to a nub, the fork to a small notch-like prong
     tines: [
-      { u: l(0.58, 0.565), len: l(0.035, 0.12), width: l(0.06, 0.085), thick: l(0.05, 0.055), yaw: 1.52, pitch: 0.05, curl: -0.18, across: 0.85, taper: 0.8, flare: 0.9 },
-      { u: l(0.82, 0.775), len: l(0.07, 0.17), width: l(0.06, 0.08), thick: l(0.045, 0.05), yaw: l(1.0, 1.36), pitch: 0.08, curl: -0.3, across: 0.85, taper: 0.8, flare: 0.9 },
-    ].filter((t) => t.len > 0.02 && (t.u > 0.7 || arm > 0.02)),
+      { u: l(0.6, 0.565), len: l(0.04, 0.1), width: l(0.07, 0.09), thick: l(0.03, 0.03), yaw: 1.52, pitch: 0.05, curl: -0.18, across: 0.85, taper: 0.9, flare: 1.3 },
+      { u: l(0.8, 0.775), len: l(0.08, 0.15), width: l(0.08, 0.085), thick: l(0.03, 0.03), yaw: l(1.0, 1.36), pitch: 0.08, curl: -0.35, across: 0.85, taper: 0.9, flare: 1.3 },
+    ].filter((t) => t.len > 0.02),
     // dark maroon at the base, near black at the points and teeth (satin; finely pitted in the detail bake)
-    color: { base: 0x46181c, mid: 0x34121a, tip: 0x0a0506, teeth: 0x080405, dark: [0.45, 0.96] },
+    color: { base: 0x3e1c22, mid: 0x2e161c, tip: 0x0a0506, teeth: 0x080405, dark: [0.45, 0.96] },
     nu: 64,
     nv: 11,
   };
 }
 
 /** A stag male's mandible length against its body length (mandibles included): ~⅓ in majors, about the head's length in minors. */
-export const stagMandibleShare = (size: number): number => 0.12 + 0.22 * Math.max(0, Math.min(1, size));
+export const stagMandibleShare = (size: number): number => 0.075 + 0.265 * Math.max(0, Math.min(1, size));

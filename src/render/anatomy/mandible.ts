@@ -105,6 +105,8 @@ export interface MandibleSpec {
   reach?: number;
   /** a rounded heel this long (fraction of len) behind the hinge, where the base sits in the head (0: cut flat) */
   baseRound?: number;
+  /** the cutting edge darkens this much toward the inner margin (0..1), teeth or not */
+  edgeDark?: number;
   /** samples along the blade and across each half of the cross-section */
   nu?: number;
   nv?: number;
@@ -271,7 +273,7 @@ function sweepBlade(
         const y = (half === 0 ? 0.5 : -0.5 * below) * h * prof(s);
         pos.push(f.p.x + f.In.x * v + f.Up.x * y, f.p.y + f.In.y * v + f.Up.y * y, f.p.z + f.In.z * v + f.Up.z * y);
         // teeth (beyond the plain margin) and the cutting edge darker
-        const tk = s > 0 ? k * Math.max(0, (s - 0.4) / 0.6) : 0;
+        const tk = s > 0 ? Math.max(k * Math.max(0, (s - 0.4) / 0.6), (spec.edgeDark ?? 0) * Math.max(0, (s - 0.55) / 0.45)) : 0;
         colourAt(spec, cu, tk, _c);
         col.push(_c.r, _c.g, _c.b);
         meta.th.push((half * nv + jj) / M);

@@ -399,7 +399,7 @@ const fireMajor: AntMorph = {
   waist: { nodes: 2, len: 0.095, nodeH: 0.075, petW: 0.27, postW: 0.29, postH: 0.82, crest: true, subTooth: 0.02 },
   gaster: { len: 0.29, width: 0.19, height: 0.158, sting: true },
   legs: { hind: 0.78, thick: 0.019 },
-  look: { ...fireLook, head: L(0x7a3010, 0.24, 0.45, 0.04, 0x2e1208), mandible: L(0x160a06, 0.28, 0.45, 0, 0x0a0503) },
+  look: { ...fireLook, head: L(0x7a3010, 0.24, 0.45, 0.04, 0x2e1208), mandible: L(0x2a0e06, 0.2, 0.6, 0, 0x0a0503) },
   hair: 0.6,
 };
 

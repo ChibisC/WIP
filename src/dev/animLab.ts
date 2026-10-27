@@ -484,8 +484,8 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
       if (ev.hitStop) hold = ev.hitStop;
     }
   };
-  // camera
-  const C = clip.cam;
+  // camera (`cdist=` overrides the clip's distance: the same scene at another zoom)
+  const C = q.get('cdist') ? { ...clip.cam, dist: Number(q.get('cdist')) } : clip.cam;
   const cam = new THREE.PerspectiveCamera(C.fov ?? 30, window.innerWidth / window.innerHeight, C.dist * 0.02, C.dist * 60);
   const dir = new THREE.Vector3(...C.dir).normalize();
   const target = new THREE.Vector3(C.tx, C.ty, C.tz);
