@@ -7,6 +7,8 @@ import { CREATURES } from '../sim/creatures/kinds';
 import { rampFraction } from '../sim/termites';
 import { isSickle, sickleRampFraction } from '../sim/sickleJaws';
 import { SickleJawAudio } from '../render/termite/audio';
+import { animHooks } from '../render/ants/antRenderer';
+import { ANIM_SFX } from '../render/ants/antMotion';
 import type { MapStyle } from '../world/terrain';
 import { audio } from './engine';
 import { GrainBed, LoopBed } from './beds';
@@ -104,6 +106,20 @@ export class GameAudio {
 
   constructor(private s: GameSession) {
     s.events.onAny((e) => this.event(e));
+    // the ant animation's own moments (spec 04; the sim's bites, stings and deaths have their sounds already)
+    animHooks.emit = (k, x, y, space, cause) => this.anim(k, x, y, space, cause);
+  }
+
+  /** Render-side sound hooks (render/ants/antMotion.ts ANIM_SFX): a grip, a crunch, a landing on the back, righting, a death's own sound. */
+  private anim(k: number, x: number, y: number, space: number, cause: number): void {
+    if (!audio.ctx) return;
+    if (k === ANIM_SFX.GRIP) return this.want('combat.grapple_scuffle', x, y, space, { pool: 'combat', gain: 0.45, rate: 1.4 });
+    if (k === ANIM_SFX.CRUNCH) return this.want('combat.chitin_crack', x, y, space, { pool: 'combat', gain: 0.55, rate: 0.85 });
+    if (k === ANIM_SFX.FLIP || k === ANIM_SFX.RIGHT) return this.want('ant.pellet_drop', x, y, space, { pool: 'work', gain: k === ANIM_SFX.FLIP ? 0.6 : 0.4, rate: 1.3 });
+    if (k === ANIM_SFX.DEATH) {
+      if (cause === 3) return this.want('combat.acid_splat', x, y, space, { pool: 'combat', gain: 0.4, rate: 1.2 });
+      if (cause === 4 || cause === 8) return this.want('combat.chitin_crack', x, y, space, { pool: 'combat', gain: 0.8, rate: 0.75 });
+    }
   }
 
   // ---------------------------------------------------------------- placement

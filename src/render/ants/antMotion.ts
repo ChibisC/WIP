@@ -107,6 +107,9 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
   return out;
 }
 
+/** Render-side sound hooks (spec 04): moments the sim has no event for (its bites, stings and deaths sound already). */
+export const ANIM_SFX = { GRIP: 1, CRUNCH: 2, FLIP: 3, RIGHT: 4, DEATH: 5 } as const;
+
 export const IDLE = { GROOM_ANT: 0, GROOM_LEGS: 1, LOOK: 2, ANTENNATE: 3, SHUFFLE: 4 } as const;
 const IDLE_W = [0.26, 0.2, 0.2, 0.18, 0.16];
 const IDLE_DUR: Array<[number, number]> = [
@@ -169,6 +172,11 @@ export interface Motion2 {
   landK: number;
   rightT: number;
   freeze: number;
+  /** the most hit points seen (a heavy hit is a large share of it), and a heavy hit's knockback: time since, and the
+   *  ground frame's push back (mm, read by the renderer) */
+  hpMax: number;
+  kbT: number;
+  kbOff: number;
 }
 
 /** What the controller decides this frame (the renderer turns it into the instance transform and attributes). */
@@ -210,10 +218,12 @@ export interface MotionOut {
   antAct: number;
   /** animation clock scale (0 during a hit-stop) */
   clock: number;
+  /** a sound hook this frame (ANIM_SFX.*, 0 none) */
+  sfx: number;
 }
 
 export function newMotionOut(): MotionOut {
-  return { h: 0, fwd: 0, side: 0, up: 0, yaw: 0, pitch: 0, roll: 0, spinRoll: 0, spinPitch: 0, tumbleC: 0, Dh: 0, Dz: 0, Ps: 0, flash: 0, deathLeg: 0, deathRoll: 0, decap: 0, squash: 0, gaster: 0, pose: 0, headYaw: 0, headPitch: 0, mand: 0, antPitch: 0, antSpread: 0, antAct: 0, clock: 1 };
+  return { h: 0, fwd: 0, side: 0, up: 0, yaw: 0, pitch: 0, roll: 0, spinRoll: 0, spinPitch: 0, tumbleC: 0, Dh: 0, Dz: 0, Ps: 0, flash: 0, deathLeg: 0, deathRoll: 0, decap: 0, squash: 0, gaster: 0, pose: 0, headYaw: 0, headPitch: 0, mand: 0, antPitch: 0, antSpread: 0, antAct: 0, clock: 1, sfx: 0 };
 }
 
 const hash01 = (n: number, k: number): number => {
@@ -273,6 +283,9 @@ export function newMotion(id: number): Motion2 {
     landK: 0,
     rightT: 0,
     freeze: 0,
+    hpMax: 0,
+    kbT: 9,
+    kbOff: 0,
   };
 }
 
@@ -346,8 +359,18 @@ export function stepMotion(
   // ---- hits: a recoil or a side flinch, a flash, a 50 ms hit-stop of the ant's own clocks
   m.hitCd -= dt;
   m.flashCd -= dt;
+  out.sfx = 0;
   if (v.hp !== undefined) {
+    m.hpMax = Math.max(m.hpMax, v.hp);
     if (m.hp >= 0 && v.hp < m.hp - 1e-6 && !v.dead) {
+      // a heavy hit (a fifth of its life at once): knocked back a step, the legs scrabbling to keep their footing
+      if (m.hp - v.hp > m.hpMax * 0.2 && m.kbT > 0.6) {
+        m.kbT = 0;
+        m.hitT = 0;
+        m.hitV = 2;
+        m.hitCd = 0.55;
+        m.freeze = 0.06;
+      }
       if (m.flashCd <= 0) {
         m.flash = 1;
         m.flashCd = 0.45;
@@ -434,11 +457,10 @@ export function stepMotion(
   const DzT = cad > 0 ? ((duty * (m.vs / cad)) / 2) / inp.scale : 0;
   // (standing, the last stance is held: the planted feet stay where they are rather than sliding home)
   if (moving) {
-    // (eased, not snapped: a sudden change of sweep slid the planted feet — user rating A2, a roughness in the legs
-    // when switching from walking to turning or stopping)
-    m.Dh = damp(m.Dh, DhT, 14, dt);
-    m.Ps = damp(m.Ps, PsT, 14, dt);
-    m.Dz = damp(m.Dz, DzT, 14, dt);
+    // (fast: easing it slower lets the planted feet drift — tests/animation.ts turning in place)
+    m.Dh = damp(m.Dh, DhT, 30, dt);
+    m.Ps = damp(m.Ps, PsT, 30, dt);
+    m.Dz = damp(m.Dz, DzT, 30, dt);
   }
   s.phase += cad * adt;
   const ampT = v.dead ? 0 : Math.min(1, cad / 4 + (moving ? 0.45 : 0));
@@ -458,9 +480,19 @@ export function stepMotion(
   m.hitT += dt;
   m.flash = Math.max(0, m.flash - dt * 7);
   out.flash = m.flash;
+  // the knockback: shoved back a quarter of a body length in a tenth of a second, then stepping back to its place
+  m.kbT += dt;
+  const kb = m.kbT < 0.1 ? sm(m.kbT / 0.1) : m.kbT < 0.3 ? 1 : 1 - sm((m.kbT - 0.3) / 0.7);
+  m.kbOff = v.dead ? 0 : 0.25 * L * kb;
   if (m.hitT < 0.5 && !v.dead) {
     const e = flinch(m.hitT);
-    if (m.hitV === 0) {
+    if (m.hitV === 2) {
+      // reeling from the heavy hit: thrown up and back at the front, jaws agape
+      out.fwd -= 0.06 * L * e;
+      out.pitch += 0.22 * e;
+      out.headPitch += 0.35 * e;
+      out.mand = Math.max(out.mand, 0.8 * Math.max(0, e));
+    } else if (m.hitV === 0) {
       out.fwd -= 0.07 * L * e;
       out.pitch += 0.12 * e;
       out.headPitch += 0.25 * e;
@@ -484,6 +516,7 @@ export function stepMotion(
         m.freeze = 0.08;
         m.flash = 1;
       }
+      if (m.deadT === 0) out.sfx = ANIM_SFX.DEATH;
     }
     m.deadT += dt;
   } else m.deadT = -1;
@@ -508,7 +541,9 @@ export function stepMotion(
       const half = Math.round(m.spin / Math.PI);
       m.landK = half * Math.PI;
       m.rightT = half % 2 !== 0 ? 0.45 + 0.35 * rnd(m) : 0;
+      out.sfx = ANIM_SFX.FLIP;
     }
+    if (m.rightT > 0 && m.rightT - dt <= 0) out.sfx = ANIM_SFX.RIGHT;
     if (m.rightT > 0) {
       // on its back: the legs flail, then it rolls over (blind review: it landed upright at once)
       m.rightT -= dt;

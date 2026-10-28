@@ -208,6 +208,7 @@ export class GameSession {
     this.view.setActiveNest(this.viewedArea);
     this.surfAnts = new AntRenderer(this.view.renderer, 'surfaceAnts');
     this.surfAnts.lodScale = this.view.preset.lodScale;
+    this.surfAnts.space = SURFACE;
     this.view.surfaceScene.add(this.teamRings.group, this.surfHit.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfFx.group);
     // Pheromone overlay texture.
     const ph = w.phero;

@@ -3,7 +3,7 @@ import { AntRig, buildAnt } from './antGeometry';
 import { BODY_TEX, createAntMaterials, createAntGlueShell, POSE, TINT_GLSL } from './antMaterial';
 import { AttackPose, applyAttackBody, attackPose, attackPoseV2, neutralPose } from './attackPoses';
 import { AntMorph, MORPHS } from './morphs';
-import { animV2, AtkPlan, attackPlan, Motion2, newMotion, newMotionOut, stepMotion } from './antMotion';
+import { ANIM_SFX, animV2, AtkPlan, attackPlan, Motion2, newMotion, newMotionOut, stepMotion } from './antMotion';
 import { addPatch, patchDapple } from '../shaderPatch';
 import { TermiteLayer } from '../termite/termiteLayer';
 import { BALANCE } from '../../sim/balance';
@@ -165,7 +165,8 @@ interface AnimState {
   aq?: number;
   av?: number;
   as?: number;
-  /** spec 04: the grip held from the last sting / into the next, and the pivot round the grip (rad, eased) */
+  /** spec 04: the grip held from the last sting / into the next, and the pivot round the grip (rad, eased); last phase */
+  aqPrev?: number;
   ahi?: boolean;
   aho?: boolean;
   piv?: number;
@@ -375,6 +376,9 @@ const lerpAngle = (a: number, b: number, t: number) => {
 };
 const damp = (a: number, b: number, k: number, dt: number) => a + (b - a) * (1 - Math.exp(-k * dt));
 
+/** Render-side sound hooks (spec 04): set by the game's audio; (ANIM_SFX.*, plane x, y, space, cause of death, morph). */
+export const animHooks: { emit: ((sfx: number, x: number, y: number, space: number, cause: number, morph: string) => void) | null } = { emit: null };
+
 export interface AntSpaceAdapter {
   /** world position for plane coords */
   toWorld(x: number, y: number, out: THREE.Vector3): void;
@@ -407,6 +411,8 @@ export class AntRenderer {
   termites: TermiteLayer | null = null;
   /** climbing ants: placed on the creature's animated leg or body (set by the session) */
   mount: MountFn | null = null;
+  /** the space these ants are in (for the sound hooks; set by the session) */
+  space = 0;
 
   constructor(renderer: THREE.WebGLRenderer, public name = 'ants') {
     this.renderer = renderer;
@@ -602,12 +608,17 @@ export class AntRenderer {
       let gx = x;
       let gy = y;
       let gh = h;
+      if (M && s.m2 && s.m2.kbOff > 1e-4) {
+        // a heavy hit's knockback (antMotion.ts): the ground frame shoved back, the legs step to catch up
+        gx -= Math.cos(h) * s.m2.kbOff;
+        gy -= Math.sin(h) * s.m2.kbOff;
+      }
       if (M) {
         s.piv = damp(s.piv ?? 0, fighting ? plan.piv : 0, 10, dt);
         if (Math.abs(s.piv) > 1e-4) {
           const d = rig.mouth.x * scale;
-          gx = x + d * (Math.cos(h) - Math.cos(h + s.piv));
-          gy = y + d * (Math.sin(h) - Math.sin(h + s.piv));
+          gx += d * (Math.cos(h) - Math.cos(h + s.piv));
+          gy += d * (Math.sin(h) - Math.sin(h + s.piv));
           gh = h + s.piv;
         }
       }
@@ -615,6 +626,17 @@ export class AntRenderer {
         stepMotion(s, s.m2, v, rig, { x: gx, y: gy, h: gh, lastX: s.lastX, lastY: s.lastY, dt, scale, mounted, mountSpeed: mounted ? mountOut.speed : 0, fighting }, M);
         s.lastX = gx;
         s.lastY = gy;
+        // sound hooks (spec 04): the grip of a sting series, the major's crunch, a landing on the back, righting, a death
+        const q0 = s.aqPrev ?? 0;
+        const q1 = s.aq ?? 0;
+        s.aqPrev = q1;
+        let sfx = M.sfx;
+        if (fighting && q1 > q0) {
+          if (s.av === 3 && !s.ahi && q0 < 0.2 && q1 >= 0.2) sfx = ANIM_SFX.GRIP;
+          else if (s.av === 4 && q0 < 0.3 && q1 >= 0.3) sfx = ANIM_SFX.GRIP;
+          else if (s.av === 5 && q0 < 0.7 && q1 >= 0.7) sfx = ANIM_SFX.CRUNCH;
+        }
+        if (sfx && animHooks.emit) animHooks.emit(sfx, x, y, this.space, v.cause ?? 0, v.morph);
         s.lastH = M.h;
         s.seen = this.frame;
       } else {
@@ -682,13 +704,15 @@ export class AntRenderer {
       // (planted-feet pass: in a fight the attack itself curls the gaster and shows the sting; the sim's stinging pose
       // would hold the legs in a fixed stance)
       const wantPose = M ? (fighting && M.pose === POSE.STING ? POSE.NONE : M.pose) : v.pose;
+      // (user rating A2: a roughness in the legs between animations — the planted-feet pass now fades a pose's leg
+      // angles out and in over about a quarter of a second, not a tenth)
       if (wantPose !== s.pose) {
-        s.poseW = damp(s.poseW, 0, M ? 18 : 10, dt);
+        s.poseW = damp(s.poseW, 0, M ? 11 : 10, dt);
         if (s.poseW < 0.05) {
           s.pose = wantPose;
           s.pph = M && s.m2 ? s.m2.seed * 3 : 0;
         }
-      } else s.poseW = damp(s.poseW, wantPose ? 1 : 0, M ? 10 : 6, dt);
+      } else s.poseW = damp(s.poseW, wantPose ? 1 : 0, M ? 7 : 6, dt);
       s.pph += dt * clock * (s.pose === POSE.DIG ? 2.6 : s.pose === POSE.GROOM_ANT || s.pose === POSE.GROOM_LEGS ? 1.1 : 1.0);
       let poseOut = s.pose;
       let poseWOut = s.poseW;

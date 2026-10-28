@@ -63,6 +63,7 @@ export class NestView {
     nt.uniforms.uMarkerCols.value.forEach((col, i) => col.set(i === 0 ? '#000000' : i <= 5 ? MARKER_COLORS[i - 1] : '#b89a64'));
     this.ants = new AntRenderer(view.renderer, 'areaAnts' + space);
     this.ants.lodScale = view.preset.lodScale;
+    this.ants.space = space;
     this.decor = new TileDecor(nt);
     this.creatures = new CreatureRenderer('areaCreatures' + space);
     this.hit = new HitboxOverlay('areaHitboxes' + space);
