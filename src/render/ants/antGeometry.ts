@@ -704,14 +704,22 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // space between them, as in Solenopsis; its size from the jaws' hinge distance `wzSpec`)
     const wzSpec = (hW / 2) * headWidthAt(0.95) * 0.84;
     const clypLobe = m.real && !!m.mandible.spec && m.mandible.type !== 'massive';
-    const clypFront = clypLobe ? hL * 0.965 + wzSpec * 0.38 : 0;
+    // (pilot finish, back to the user's spec: the jaws are "clearly visible at the front of the head", so the lobe
+    // only covers their bases; the dark labrum fills the space between the closed jaws behind their cutting edges)
+    const clypFront = clypLobe ? hL * 0.965 + wzSpec * 0.2 : 0;
     // (a major's massive jaws fill the front: no separate clypeus knob above them — jaws review)
     if (!(m.real && m.mandible.type === 'massive')) {
-      const c = clypLobe ? new THREE.Vector3(hL * 0.965 - wzSpec * 0.07, headCY - hH * 0.1, 0) : m.real ? new THREE.Vector3(hL * 0.9, headCY + hH * 0.12, 0) : new THREE.Vector3(hL * 0.93, headCY + hH * 0.18, 0);
-      const r = clypLobe ? new THREE.Vector3(wzSpec * 0.45, hH * 0.13, wzSpec * 0.86) : m.real ? new THREE.Vector3(hL * 0.085, hH * 0.11, hW * 0.27) : new THREE.Vector3(hL * 0.1, hH * 0.18, hW * 0.24);
+      const c = clypLobe ? new THREE.Vector3(hL * 0.955 - wzSpec * 0.12, headCY - hH * 0.04, 0) : m.real ? new THREE.Vector3(hL * 0.9, headCY + hH * 0.12, 0) : new THREE.Vector3(hL * 0.93, headCY + hH * 0.18, 0);
+      // (flat: a plate continuing the face, not a disc standing on it)
+      const r = clypLobe ? new THREE.Vector3(wzSpec * 0.34, hH * 0.07, wzSpec * 0.72) : m.real ? new THREE.Vector3(hL * 0.085, hH * 0.11, hW * 0.27) : new THREE.Vector3(hL * 0.1, hH * 0.18, hW * 0.24);
       const [pp, ii] = ellipsoid(c, r, hi ? 16 : 6);
       // (realism: the head's own colour gradient, so a major's face darkens toward the jaws under it too)
       acc.piece(transformPts(pp, headM), ii, PART.HEAD, m.real ? (x, y, z) => headCol(x - neck.x, y - neck.y, z) : solid(look.head), look.head);
+    }
+    if (clypLobe) {
+      // the labrum: a dark lip under the clypeus, between the closed jaws' bases
+      const [pp, ii] = ellipsoid(new THREE.Vector3(hL * 0.965 + wzSpec * 0.16, headCY - hH * 0.2, 0), new THREE.Vector3(wzSpec * 0.26, hH * 0.06, wzSpec * 0.42), hi ? 12 : 6);
+      acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(0x3a1a0c), { color: 0x3a1a0c, rough: 0.4, coat: 0.3, sheen: 0 });
     }
     // clypeal carinae: two ridges running forward over the clypeus, ending in teeth on its front edge
     // (realism morphs: none — at game scale their ends read as upright prongs; jaws review)
@@ -762,8 +770,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       }
     }
     // (realism: near the front, close to the midline just behind the clypeus, as in Solenopsis — photo fire_07)
-    socketL = m.real ? hp(hL * 0.88, headCY + hH * 0.27, -hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, -hW * 0.17);
-    socketR = m.real ? hp(hL * 0.88, headCY + hH * 0.27, hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, hW * 0.17);
+    socketL = m.real ? hp(hL * 0.84, headCY + hH * 0.24, -hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, -hW * 0.17);
+    socketR = m.real ? hp(hL * 0.84, headCY + hH * 0.24, hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, hW * 0.17);
     mandPivL = hp(hL * 0.95, headCY - hH * 0.22, -hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
     mandPivR = hp(hL * 0.95, headCY - hH * 0.22, hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
     if (m.mandible.spec) {

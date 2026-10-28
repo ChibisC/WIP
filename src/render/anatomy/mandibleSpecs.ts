@@ -15,26 +15,26 @@ import type { MandibleSpec } from './mandible';
 export const FIRE_WORKER: MandibleSpec = {
   len: 1,
   // the outer margin a quarter ellipse: from straight ahead at the hinge to across the head at the apex, the
-  // apex 0.47 of the hinge's distance from the midline in front of it. Closed, the pair is a low arc in
+  // apex 0.58 of the hinge's distance from the midline in front of it (pilot finish: clearly visible, as the spec asks). Closed, the pair is a low arc in
   // front of the clypeus, the cutting edges nearly transverse behind it (review: not a dome, no gap between
   // them); derived with a target outline (docs/realism/jaws.md)
   yaw: [
     [0, 0],
-    [0.1, 0.48],
-    [0.2, 0.8],
-    [0.3, 1.0],
-    [0.4, 1.145],
-    [0.5, 1.253],
-    [0.6, 1.341],
-    [0.7, 1.417],
-    [0.8, 1.486],
-    [0.9, 1.553],
-    [1, 1.618],
+    [0.1, 0.347],
+    [0.2, 0.633],
+    [0.3, 0.851],
+    [0.4, 1.019],
+    [0.5, 1.153],
+    [0.6, 1.266],
+    [0.7, 1.365],
+    [0.8, 1.456],
+    [0.9, 1.543],
+    [1, 1.629],
   ],
-  // curving down: from above only the arc in front of the clypeus shows
+  // nearly level, curving down a little: from above the toothed triangles show in front of the head
   pitch: [
-    [0, -0.1],
-    [1, -0.3],
+    [0, -0.04],
+    [1, -0.16],
   ],
   outer: [
     [0, 0.05],
@@ -45,17 +45,17 @@ export const FIRE_WORKER: MandibleSpec = {
   // margin, 30° off transverse, to the apex: a proper triangle; closed, the clypeal lobe covers the space
   // between the two cutting edges
   inner: [
-    [0, 0.15],
-    [0.1, 0.155],
-    [0.2, 0.177],
-    [0.3, 0.189],
-    [0.4, 0.19],
-    [0.5, 0.181],
-    [0.6, 0.162],
-    [0.7, 0.135],
-    [0.8, 0.099],
-    [0.9, 0.054],
-    [0.95, 0.028],
+    [0, 0.16],
+    [0.1, 0.168],
+    [0.2, 0.19],
+    [0.3, 0.199],
+    [0.4, 0.197],
+    [0.5, 0.186],
+    [0.6, 0.171],
+    [0.7, 0.145],
+    [0.8, 0.109],
+    [0.9, 0.061],
+    [0.95, 0.033],
     [1, 0.004],
   ],
   // thin plates
@@ -72,14 +72,15 @@ export const FIRE_WORKER: MandibleSpec = {
   // four teeth: the apex is the apical (largest) one; three more along the masticatory margin, smaller
   // toward the basal angle, each leaning toward the apex
   teeth: [
-    { u: 0.885, size: 0.042, base: 0.05, lean: 0.35 },
-    { u: 0.76, size: 0.036, base: 0.05, lean: 0.3 },
-    { u: 0.622, size: 0.028, base: 0.05, lean: 0.25 },
+    { u: 0.89, size: 0.042, base: 0.05, lean: 0.35 },
+    { u: 0.768, size: 0.036, base: 0.05, lean: 0.3 },
+    { u: 0.63, size: 0.028, base: 0.05, lean: 0.25 },
   ],
   // amber like the head, the cutting edge and teeth near black (review: two jaws, not one dark rim)
   color: { base: 0x9a461a, mid: 0x8a3c16, tip: 0x4a1a0a, teeth: 0x140704, dark: [0.75, 1.0] },
   edgeDark: 0.85,
-  reach: 1.1,
+  // closed, the apexes cross a little past each other
+  reach: 1.18,
   nu: 44,
   nv: 9,
 };
