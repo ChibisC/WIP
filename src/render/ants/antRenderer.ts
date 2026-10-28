@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { AntRig, buildAnt } from './antGeometry';
-import { createAntMaterials, createAntGlueShell, POSE, TINT_GLSL } from './antMaterial';
-import { AttackPose, applyAttackBody, attackPose, neutralPose } from './attackPoses';
+import { BODY_TEX, createAntMaterials, createAntGlueShell, POSE, TINT_GLSL } from './antMaterial';
+import { AttackPose, applyAttackBody, attackPose, attackPoseV2, neutralPose } from './attackPoses';
 import { AntMorph, MORPHS } from './morphs';
 import { animV2, attackVariant, Motion2, newMotion, newMotionOut, stepMotion } from './antMotion';
 import { addPatch, patchDapple } from '../shaderPatch';
@@ -172,6 +172,9 @@ class Bucket {
   geos: THREE.BufferGeometry[] = [];
   mats: THREE.Material[] = [];
   depths: (THREE.Material | undefined)[] = [];
+  /** spec 04: each animated LOD's material uniforms and its per-instance body-offset texture */
+  unis: Array<Record<string, THREE.IUniform> | undefined> = [];
+  bodyTex: Array<THREE.DataTexture | undefined> = [];
 
   constructor(public key: string, private group: THREE.Group, impostor: { geo: THREE.BufferGeometry; mat: THREE.Material }, shadows: boolean) {
     this.morph = MORPHS[key];
@@ -183,6 +186,7 @@ class Bucket {
     this.geos = [b0.geometry, b1.geometry, impostor.geo];
     this.mats = [m0.material, m1.material, impostor.mat];
     this.depths = [m0.depth, m1.depth, undefined];
+    this.unis = [m0.uniforms, m1.uniforms, undefined];
     for (let l = 0; l < 3; l++) this.alloc(l, l === 0 ? 64 : 256, shadows);
   }
 
@@ -208,6 +212,13 @@ class Bucket {
     mesh.receiveShadow = l < 2;
     if (this.depths[l]) mesh.customDepthMaterial = this.depths[l];
     mesh.name = `ants:${this.key}:${LOD_NAMES[l]}`;
+    const u = this.unis[l];
+    if (u) {
+      this.bodyTex[l]?.dispose();
+      const tex = bodyTexture(cap);
+      this.bodyTex[l] = tex;
+      u.uBodyTex.value = tex;
+    }
     this.meshes[l] = mesh;
     this.attrs[l] = at;
     this.capacity[l] = cap;
@@ -222,7 +233,8 @@ class Bucket {
   shell: Array<THREE.InstancedMesh | null> = [null, null];
   shellAt: Array<{ a: THREE.InstancedBufferAttribute; b: THREE.InstancedBufferAttribute; c: THREE.InstancedBufferAttribute; d: THREE.InstancedBufferAttribute; e: THREE.InstancedBufferAttribute; g: THREE.InstancedBufferAttribute } | null> = [null, null];
   shellN = [0, 0];
-  private shellMat: THREE.MeshStandardMaterial | null = null;
+  private shellMats: Array<THREE.MeshPhysicalMaterial | null> = [null, null];
+  private shellTex: Array<THREE.DataTexture | null> = [null, null];
 
   /** Copy instance `n` of LOD `l` into the glue shell with glue amount `g`. */
   addShell(l: number, n: number, g: number): void {
@@ -230,7 +242,14 @@ class Bucket {
     const k = this.shellN[l];
     if (!mesh || k >= mesh.instanceMatrix.count) {
       const cap = mesh ? mesh.instanceMatrix.count * 2 : 16;
-      this.shellMat ??= createAntGlueShell(this.rig, this.key);
+      const shellMat = (this.shellMats[l] ??= createAntGlueShell(this.rig, this.key));
+      const oldTex = this.shellTex[l];
+      const tex = bodyTexture(cap);
+      if (oldTex) (tex.image.data as Float32Array).set((oldTex.image.data as Float32Array).subarray(0, k * BODY_F));
+      oldTex?.dispose();
+      this.shellTex[l] = tex;
+      const su = shellMat.userData.antUniforms as Record<string, THREE.IUniform>;
+      su.uBodyTex.value = tex;
       const geo = this.geos[l].clone();
       const mk = (size = 4) => new THREE.InstancedBufferAttribute(new Float32Array(cap * size), size).setUsage(THREE.DynamicDrawUsage);
       const at = { a: mk(), b: mk(), c: mk(), d: mk(), e: mk(), g: mk(1) };
@@ -240,7 +259,7 @@ class Bucket {
       geo.setAttribute('aD', at.d);
       geo.setAttribute('aE', at.e);
       geo.setAttribute('aGlue', at.g);
-      const next = new THREE.InstancedMesh(geo, this.shellMat, cap);
+      const next = new THREE.InstancedMesh(geo, shellMat, cap);
       next.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       next.frustumCulled = false;
       next.renderOrder = 2;
@@ -269,6 +288,8 @@ class Bucket {
     mesh.setMatrixAt(k, m4);
     for (const key of ['a', 'b', 'c', 'd', 'e'] as const) dst[key].setXYZW(k, src[key].getX(n), src[key].getY(n), src[key].getZ(n), src[key].getW(n));
     dst.g.setX(k, g);
+    const bt = this.bodyTex[l];
+    if (bt) (this.shellTex[l]!.image.data as Float32Array).set((bt.image.data as Float32Array).subarray(n * BODY_F, n * BODY_F + BODY_F), k * BODY_F);
     this.shellN[l] = k + 1;
   }
 
@@ -281,9 +302,40 @@ class Bucket {
       const at = this.shellAt[l]!;
       mesh.instanceMatrix.needsUpdate = true;
       for (const attr of [at.a, at.b, at.c, at.d, at.e, at.g]) attr.needsUpdate = true;
+      const su = this.shellMats[l]?.userData.antUniforms as Record<string, THREE.IUniform> | undefined;
+      if (su) su.uBodyOn.value = this.bodyOn;
+      if (this.shellTex[l]) this.shellTex[l]!.needsUpdate = true;
     }
   }
+
+  /** spec 04: whether this species' feet are planted under a moving body (set each frame) */
+  bodyOn = 0;
+
+  /** Write instance n's body offset (LOD l): translation (object units), lateral sweep, rotation vector, spread, gaster yaw, sting out, fore legs raised, decapitation. */
+  writeBody(l: number, n: number, b: Float32Array): void {
+    const t = this.bodyTex[l];
+    if (t) (t.image.data as Float32Array).set(b, n * BODY_F);
+  }
 }
+
+/** floats per instance in the body-offset texture */
+const BODY_F = BODY_TEX.texels * 4;
+function bodyTexture(cap: number): THREE.DataTexture {
+  const rows = Math.max(1, Math.ceil(cap / BODY_TEX.perRow));
+  const w = BODY_TEX.perRow * BODY_TEX.texels;
+  const tex = new THREE.DataTexture(new Float32Array(w * rows * 4), w, rows, THREE.RGBAFormat, THREE.FloatType);
+  tex.needsUpdate = true;
+  return tex;
+}
+const bodyBuf = new Float32Array(BODY_F);
+const zeroBody = new Float32Array(BODY_F);
+const qB = new THREE.Quaternion();
+const qT = new THREE.Quaternion();
+const vT = new THREE.Vector3();
+const vPiv = new THREE.Vector3();
+const AX_X = new THREE.Vector3(1, 0, 0);
+const AX_Y = new THREE.Vector3(0, 1, 0);
+const AX_Z = new THREE.Vector3(0, 0, 1);
 
 const tmpShellM = new THREE.Matrix4();
 const motionOut = newMotionOut();
@@ -471,6 +523,9 @@ export class AntRenderer {
     for (const b of this.buckets.values()) {
       b.counts.fill(0);
       b.shellN.fill(0);
+      // spec 04: the body-offset texture is read only by the planted-feet species (the lab can switch them back)
+      b.bodyOn = animV2(b.key) && b.rig.foot ? 1 : 0;
+      for (const u of b.unis) if (u) u.uBodyOn.value = b.bodyOn;
     }
     projScreen.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(projScreen);
@@ -580,16 +635,20 @@ export class AntRenderer {
       const aw = s.aw ?? 0;
       let stingW = 0;
       if (aw > 0.001) {
-        attackPose(s.av ?? 0, s.aq ?? 0, s.as ?? 1, atkP, !!M);
+        if (M) attackPoseV2(s.av ?? 0, s.aq ?? 0, s.as ?? 1, atkP);
+        else attackPose(s.av ?? 0, s.aq ?? 0, s.as ?? 1, atkP);
         hy += atkP.headYaw * aw;
         hp += atkP.headPitch * aw;
         mo += (atkP.mand - mo) * aw;
-        gp += atkP.gaster * aw;
+        // (planted-feet pass: the attack sets the gaster outright — added to the sim's stinging curl it went too far)
+        gp = M ? gp + (atkP.gaster - gp) * aw : gp + atkP.gaster * aw;
         stingW = atkP.sting * aw;
         if ((rig as { crest?: unknown }).crest) hp = Math.max(hp, -0.3); // Saiy-Ants: the low lock stays clear of the thorax
       }
       // poses crossfade: out, then the next one in (the animation pass blends faster: 0.1–0.25 s)
-      const wantPose = M ? M.pose : v.pose;
+      // (planted-feet pass: in a fight the attack itself curls the gaster and shows the sting; the sim's stinging pose
+      // would hold the legs in a fixed stance)
+      const wantPose = M ? (fighting && M.pose === POSE.STING ? POSE.NONE : M.pose) : v.pose;
       if (wantPose !== s.pose) {
         s.poseW = damp(s.poseW, 0, M ? 18 : 10, dt);
         if (s.poseW < 0.05) {
@@ -600,7 +659,7 @@ export class AntRenderer {
       s.pph += dt * clock * (s.pose === POSE.DIG ? 2.6 : s.pose === POSE.GROOM_ANT || s.pose === POSE.GROOM_LEGS ? 1.1 : 1.0);
       let poseOut = s.pose;
       let poseWOut = s.poseW;
-      if (stingW > 0.02) {
+      if (stingW > 0.02 && !M) {
         // grip and sting: the sting slides out as the gaster swings under
         poseOut = POSE.STING;
         poseWOut = stingW;
@@ -624,8 +683,9 @@ export class AntRenderer {
         adapter.forward(M ? M.h : h, vF);
       }
       vF.addScaledVector(vU, -vF.dot(vU)).normalize();
-      if (M && M.yaw) vF.applyAxisAngle(vU, M.yaw);
-      const pitch = v.pitch + (M ? M.pitch : 0);
+      // (planted-feet pass: the yaw, pitch and roll of lean, flinch and attack are the body's offset over its feet,
+      // below; the ground frame only carries the heading, the ground's slope and a tumble or death roll)
+      const pitch = M ? 0 : v.pitch;
       if (pitch) vF.applyAxisAngle(vR.crossVectors(vF, vU).normalize(), pitch);
       vR.crossVectors(vF, vU).normalize();
       vU.crossVectors(vR, vF).normalize();
@@ -635,7 +695,7 @@ export class AntRenderer {
           vF.applyAxisAngle(vR, M.spinPitch);
           vU.applyAxisAngle(vR, M.spinPitch);
         }
-        const r = M.deathRoll + s.roll + M.roll + M.spinRoll;
+        const r = M.deathRoll + M.spinRoll;
         if (Math.abs(r) > 1e-4) {
           vU.applyAxisAngle(vF, r);
           vR.crossVectors(vF, vU).normalize();
@@ -646,11 +706,38 @@ export class AntRenderer {
         vU.applyAxisAngle(vF, r);
         vR.crossVectors(vF, vU).normalize();
       }
-      if (aw > 0.001) applyAttackBody(atkP, aw, rig.length * scale, vF, vU, vR, vP);
+      if (aw > 0.001 && !M) applyAttackBody(atkP, aw, rig.length * scale, vF, vU, vR, vP);
       tmpM.makeBasis(vF, vU, vR);
       tmpQ.setFromRotationMatrix(tmpM);
       if (M) {
-        vP.addScaledVector(vF, M.fwd).addScaledVector(vR, M.side);
+        // ---- spec 04: the body's offset over its planted feet (object units; the shader solves the legs for it)
+        const Lr = rig.length;
+        const w = aw > 0.001 ? aw : 0;
+        qB.setFromAxisAngle(AX_Y, atkP.yaw * w + M.yaw);
+        qB.multiply(qT.setFromAxisAngle(AX_Z, atkP.pitch * w + M.pitch + v.pitch));
+        qB.multiply(qT.setFromAxisAngle(AX_X, atkP.roll * w + M.roll + s.roll));
+        vT.set(atkP.fwd * w * Lr + M.fwd / scale, atkP.up * w * Lr, atkP.side * w * Lr + M.side / scale);
+        // turned about a pivot at the body's height (along the body by the pose's px), not about the ground point
+        vPiv.set(atkP.px * w * Lr, rig.stance, 0);
+        vT.add(vPiv).sub(vPiv.applyQuaternion(qB));
+        if (qB.w < 0) qB.set(-qB.x, -qB.y, -qB.z, -qB.w);
+        const ang = 2 * Math.acos(Math.min(1, qB.w));
+        const sh = Math.sin(ang / 2);
+        const k = sh > 1e-6 ? ang / sh : 0;
+        bodyBuf[0] = vT.x;
+        bodyBuf[1] = vT.y;
+        bodyBuf[2] = vT.z;
+        bodyBuf[3] = 0;
+        bodyBuf[4] = qB.x * k;
+        bodyBuf[5] = qB.y * k;
+        bodyBuf[6] = qB.z * k;
+        bodyBuf[7] = atkP.spread * w;
+        bodyBuf[8] = atkP.gYaw * w;
+        bodyBuf[9] = stingW;
+        bodyBuf[10] = atkP.front * w;
+        bodyBuf[11] = 0;
+        vP.addScaledVector(vF, vT.x * scale).addScaledVector(vU, vT.y * scale).addScaledVector(vR, vT.z * scale);
+        tmpQ.multiply(qB);
         // (a dead ant rolled about its long axis through the ground point: lift it so its lowest point — the back
         // or a flank — rests on the ground; blind review: the body sank and only a leg showed)
         // (the same for a flung ant lying on its back after landing, rolled or pitched over)
@@ -721,6 +808,10 @@ export class AntRenderer {
       const at = b.attrs[lod];
       n = b.counts[lod]++;
       mesh.setMatrixAt(n, tmpM);
+      if (lod < 2 && b.bodyTex[lod]) {
+        if (M) b.writeBody(lod, n, bodyBuf);
+        else b.writeBody(lod, n, zeroBody);
+      }
       at.a.setXYZW(n, s.phase, s.amp, hy, hp);
       at.b.setXYZW(n, mo, act * 0.3 + (v.antennaPitch > 0.5 ? 0.6 : 0) + (M ? M.antSpread : 0), s.ap, s.wave);
       // pose id + 0.99 × its weight; the hit flash
@@ -745,6 +836,8 @@ export class AntRenderer {
           mesh.instanceMatrix.needsUpdate = true;
           const at = b.attrs[l];
           at.a.needsUpdate = at.b.needsUpdate = at.c.needsUpdate = at.d.needsUpdate = at.e.needsUpdate = true;
+          const bt = b.bodyTex[l];
+          if (bt) bt.needsUpdate = true;
           // Only upload the used range.
           for (const attr of [mesh.instanceMatrix, at.a, at.b, at.c, at.d, at.e]) {
             attr.clearUpdateRanges();

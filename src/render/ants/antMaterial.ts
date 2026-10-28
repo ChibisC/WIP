@@ -44,6 +44,12 @@ varying vec4 vGold;
 uniform float uMandVert; uniform float uMandSwing; uniform float uMandOpen; uniform vec3 uCrest;
 uniform vec3 uLegCoxa[6]; uniform vec3 uLegKnee[6]; uniform vec3 uLegAnkle[6]; uniform vec3 uLegAxis[6]; uniform vec3 uLegFoot[6]; uniform vec3 uLegHome[6];
 uniform float uPlant; // animation pass: feet planted by an analytic IK (pilot species)
+// spec 04: the body's offset from its ground frame, per instance (3 texels at (id % 128) × 3, id / 128):
+//   0: translation (object units), lateral stance sweep · 1: rotation vector, stance spread
+//   2: gaster yaw, sting out, fore legs raised, decapitation
+// The planted feet are solved in the body frame against targets fixed in the ground frame, so the body lunges,
+// rises, leans and twists over feet that stay where they are.
+uniform sampler2D uBodyTex; uniform float uBodyOn;
 uniform float uRealV; // realism morphs (the sting rests retracted)
 varying float vHit;
 uniform vec3 uNeck; uniform vec3 uMandL; uniform vec3 uMandR; uniform vec3 uAntL; uniform vec3 uAntR;
@@ -69,6 +75,15 @@ vec3 animP = position;
   // aC.z packs the pose id and its weight (id + 0.99 × weight); aC.w is the hit flash
   float gPitch = aC.x, swell = aC.y; float pzI = floor(aC.z + 0.0005); int pose = int(pzI); float poseW = clamp((aC.z - pzI) / 0.99, 0.0, 1.0);
   float death = aD.x, pph = aD.w;
+  vec4 bT0 = vec4(0.0), bT1 = vec4(0.0), bT2 = vec4(0.0);
+  if (uBodyOn > 0.5) {
+    ivec2 bc = ivec2((gl_InstanceID % 128) * 3, gl_InstanceID / 128);
+    bT0 = texelFetch(uBodyTex, bc, 0);
+    bT1 = texelFetch(uBodyTex, bc + ivec2(1, 0), 0);
+    bT2 = texelFetch(uBodyTex, bc + ivec2(2, 0), 0);
+  }
+  float bAng = length(bT1.xyz);
+  vec3 bAx = bAng > 1e-5 ? bT1.xyz / bAng : vec3(0.0, 1.0, 0.0);
   // aE.x packs the gold amount and the ripple direction in its sign; aE.y is the turn per stance (planted feet)
   float goldA = abs(aE.x), exh = aE.z;
   vGold = vec4(goldA, aE.x < 0.0 ? -1.0 : 1.0, aE.z, aE.w);
@@ -77,8 +92,8 @@ vec3 animP = position;
   float bob = amp * uGait.w * 0.006 * cos(phase * 12.566);
   // spec 04 (planted-feet species): the threat display (alarm: gaster flagged, user rating A11) and the sting
   // (A4) plant the feet wider and lift the body on straightened legs; the feet stay on the ground
-  float stanceW = uPlant > 0.5 && (pose == 8 || pose == 4) ? poseW : 0.0;
-  float bodyUp = stanceW * uGait.w * (pose == 8 ? 0.06 : 0.045);
+  float stanceW = uPlant > 0.5 && pose == 8 ? poseW : 0.0;
+  float bodyUp = stanceW * uGait.w * 0.06;
   vec3 UP = vec3(0.0, 1.0, 0.0);
   vec3 RIGHT = vec3(0.0, 0.0, 1.0);
   vSurf = aSurf; vLocal = position / uGait.w; vTint = floor((aD.z + 2.0) / 4.0); vColorVar = aD.z - 4.0 * vTint;
@@ -118,7 +133,10 @@ vec3 animP = position;
       // swings forward lifted; the leg reaches it by yaw at the coxa and a two-bone solve in its own plane.
       // (spec 04: in the threat display and the sting the feet plant wider and the body rises on them)
       vec3 C = uLegCoxa[li]; vec3 K = uLegKnee[li]; vec3 F0 = uLegFoot[li]; vec3 NH = uLegHome[li];
-      vec3 tg = rotA(vec3(NH.x * (1.0 + 0.12 * stanceW), 0.0, NH.z * (1.0 + 0.3 * stanceW)), UP, -pro * aE.y) + vec3(pro * aD.y, 0.0, 0.0);
+      float spr = stanceW + bT1.w;
+      vec3 tg = rotA(vec3(NH.x * (1.0 + 0.12 * spr), 0.0, NH.z * (1.0 + 0.3 * spr)), UP, -pro * aE.y) + vec3(pro * aD.y, 0.0, pro * bT0.w);
+      // the ground point at the foot's rest height, into the body frame (the body moved by bT0/bT1 over it)
+      tg = rotA(vec3(tg.x, F0.y, tg.z) - bT0.xyz, bAx, -bAng);
       vec2 r0 = F0.xz - C.xz;
       vec2 r1 = tg.xz - C.xz;
       yaw = wrapA(atan(r0.y, r0.x) - atan(r1.y, r1.x));
@@ -127,7 +145,7 @@ vec3 animP = position;
       vec2 ff = vec2(length(r0), F0.y - C.y);
       float la = length(kk);
       float lb = length(ff - kk);
-      vec2 tt = vec2(length(r1), ff.y + lift * uGait.y * amp * length(r0) * 0.75 - bob - bodyUp);
+      vec2 tt = vec2(length(r1), tg.y - C.y + lift * uGait.y * amp * length(r0) * 0.75 - bob - bodyUp);
       float Dd = clamp(length(tt), abs(la - lb) + 1e-4, (la + lb) * 0.999);
       float al = acos(clamp((la * la + Dd * Dd - lb * lb) / (2.0 * la * Dd), -1.0, 1.0));
       float sK = (ff.x * kk.y - ff.y * kk.x) >= 0.0 ? 1.0 : -1.0;
@@ -137,6 +155,13 @@ vec3 animP = position;
       lft = wrapA(pA1 - atan(kk.y, kk.x));
       knee = wrapA(pB1 - atan(ff.y - kk.y, ff.x - kk.x) - lft);
       ankleF = lift * 0.3 * amp;
+      // fore legs raised off the ground (rearing, a high sting): up and out, the tibiae angled down and forward
+      if (pair == 0 && bT2.z > 0.0) {
+        yaw = mix(yaw, side * 0.62, bT2.z);
+        lft = mix(lft, 0.78, bT2.z);
+        knee = mix(knee, -1.15, bT2.z);
+        ankleF = mix(ankleF, 0.45, bT2.z);
+      }
     }
 
     if (pose == 1 && pair == 0) {
@@ -166,7 +191,8 @@ vec3 animP = position;
         lft = mix(lft, 0.85, poseW);
         knee = mix(knee, -1.2, poseW);
       }
-    } else if (pose == 4 || pose == 5 || pose == 7) {
+    } else if ((pose == 4 || pose == 5 || pose == 7) && uPlant < 0.5) {
+      // (planted-feet species: their feet stay planted; the attack moves the body over them)
       float spread = pair == 0 ? 0.3 : (pair == 2 ? -0.3 : 0.0);
       yaw = mix(yaw, side * spread, poseW);
       lft = mix(lft, pose == 5 ? 0.15 : 0.0, poseW);
@@ -248,7 +274,7 @@ vec3 animP = position;
     // The sting slides out of the gaster tip while stinging (realism: retracted into the tip otherwise).
     if (abs(aSurf.w - 2.0) < 0.5) {
       // (planted-feet species: the sting shows in the threat display too, as in the reference footage)
-      float sOut = pose == 4 ? poseW : (pose == 8 && uPlant > 0.5 ? poseW * 0.75 : 0.0);
+      float sOut = max(bT2.y, pose == 4 ? poseW : (pose == 8 && uPlant > 0.5 ? poseW * 0.75 : 0.0));
       animP.x += uRealV * 0.055 * uGait.w * (1.0 - sOut) - 0.05 * uGait.w * sOut;
     }
     // A full crop stretches the gaster (honeydew, liquid food).
@@ -265,8 +291,11 @@ vec3 animP = position;
     // the flagged gaster waves slowly in the threat display (planted-feet species)
     float wave = uPlant > 0.5 && pose == 8 ? poseW * 0.12 * sin(pph * 4.2) : 0.0;
     rotP(animP, N, uGasterPivot, RIGHT, -gPitch - wave);
+    // aimed to one side (a sting while pivoting round a grip)
+    if (bT2.x != 0.0) rotP(animP, N, uGasterPivot, UP, bT2.x);
   } else if (part == 9) {
     rotP(animP, N, uWaistPivot, RIGHT, -gPitch * 0.3);
+    if (bT2.x != 0.0) rotP(animP, N, uWaistPivot, UP, bT2.x * 0.35);
   }
   // Soldier on guard: the whole body pitched up about the hind feet; pothole plug: body lowered onto the ground.
   if (pose == 11) { vec3 piv = (uLegCoxa[4] + uLegCoxa[5]) * 0.5; piv.y = 0.0; rotP(animP, N, piv, RIGHT, 0.26 * poseW); }
@@ -449,6 +478,7 @@ export function createAntGlueShell(rig: AntRig, morphKey?: string): THREE.MeshPh
   const mat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(GLUE_COLOR), roughness: 0.08, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, transparent: true, depthWrite: false });
   const u = rigUniforms(rig);
   if (morphKey && animV2(morphKey) && rig.foot) u.uPlant.value = 1;
+  mat.userData.antUniforms = u;
   addPatch(mat, { key: 'antAnim', vertexHeader: ANIM_HEADER, vertex: antPatch().vertex, uniforms: u });
   addPatch(mat, {
     key: 'antGlue',
@@ -494,6 +524,8 @@ export function rigUniforms(rig: AntRig): Record<string, THREE.IUniform> {
     uLegFoot: { value: rig.foot && rig.foot.length === 6 ? rig.foot : rig.ankle },
     uLegHome: { value: rig.home && rig.home.length === 6 ? rig.home : rig.foot && rig.foot.length === 6 ? rig.foot : rig.ankle },
     uPlant: { value: 0 },
+    uBodyTex: { value: blankBodyTex },
+    uBodyOn: { value: 0 },
     uRealV: { value: 0 },
     uNeck: { value: rig.neck },
     uMandL: { value: rig.mandL },
@@ -517,6 +549,11 @@ export function rigUniforms(rig: AntRig): Record<string, THREE.IUniform> {
   };
 }
 
+/** The body-offset texture's layout (spec 04): instances per row and texels per instance. */
+export const BODY_TEX = { perRow: 128, texels: 3 } as const;
+const blankBodyTex = new THREE.DataTexture(new Float32Array(4), 1, 1, THREE.RGBAFormat, THREE.FloatType);
+blankBodyTex.needsUpdate = true;
+
 /** Lab part-mask mode (dev: realism metrics), shared by every ant material. */
 export const labMask = { value: 0 };
 
@@ -524,7 +561,7 @@ export const labMask = { value: 0 };
  * The ant's material (and its shadow depth material). With a morph key that has a baked-detail recipe
  * (render/bake/recipes.ts) the material also gets the species' macro surface detail.
  */
-export function createAntMaterials(rig: AntRig, dapple: boolean, morphKey?: string): { material: THREE.MeshPhysicalMaterial; depth: THREE.MeshDepthMaterial } {
+export function createAntMaterials(rig: AntRig, dapple: boolean, morphKey?: string): { material: THREE.MeshPhysicalMaterial; depth: THREE.MeshDepthMaterial; uniforms: Record<string, THREE.IUniform> } {
   const material = new THREE.MeshPhysicalMaterial({
     vertexColors: true,
     roughness: 0.5,
@@ -553,5 +590,5 @@ export function createAntMaterials(rig: AntRig, dapple: boolean, morphKey?: stri
   }
   const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   addPatch(depth, { ...antDepthPatch(), uniforms });
-  return { material, depth };
+  return { material, depth, uniforms };
 }

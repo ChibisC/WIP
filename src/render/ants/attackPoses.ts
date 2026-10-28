@@ -39,10 +39,20 @@ export interface AttackPose {
   /** added gaster pitch (rad, − curls it under) and the sting's extension 0..1 (grip-and-sting) */
   gaster: number;
   sting: number;
+  // ---- spec 04 (planted feet): offsets of the body over feet that stay where they are
+  /** up and to the right (body lengths), the body's pitch pivot along it (body lengths, + forward) */
+  up: number;
+  side: number;
+  px: number;
+  /** stance spread 0..1 (feet set wider: bracing), fore legs raised 0..1, gaster yaw (rad) */
+  spread: number;
+  front: number;
+  gYaw: number;
 }
 
 export function neutralPose(out: AttackPose): AttackPose {
   out.fwd = out.pitch = out.yaw = out.roll = out.headPitch = out.headYaw = out.gaster = out.sting = 0;
+  out.up = out.side = out.px = out.spread = out.front = out.gYaw = 0;
   out.mand = 0.25;
   return out;
 }
@@ -158,4 +168,153 @@ export function applyAttackBody(p: AttackPose, w: number, L: number, vF: THREE.V
   vP.addScaledVector(vF, p.fwd * w * L);
   // keep the hind end planted while rearing (and the jaws above ground when crashing down)
   vP.addScaledVector(vU, Math.abs(Math.sin(pitch)) * L * 0.42);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Spec 04 (docs/realism/combat.md): attacks over planted feet, for the species whose feet the shader plants.
+// Every attack has three beats — a readable wind-up, a strike of 2–4 frames that lands on ATTACK_CONTACT (the
+// damage tick), and a recovery — and moves the body over feet that stay put: the legs bend and straighten under
+// it, brace wider, and only lift to step (never to strike). Jaws, sting and gaster do the attacking.
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Attack variants of the planted-feet pass (attackVariant in antMotion.ts picks them per species and cycle). */
+export const ATK = { LUNGE: 0, REAR: 1, CLAMP: 2, PIVOT_STING: 3, QUICK_STING: 4, CRUSH: 5, HEAD_SWING: 6 } as const;
+
+type Key = Partial<Omit<AttackPose, never>>;
+const FIELDS = ['fwd', 'pitch', 'yaw', 'roll', 'headPitch', 'headYaw', 'mand', 'gaster', 'sting', 'up', 'side', 'px', 'spread', 'front', 'gYaw'] as const;
+const NEUTRAL: AttackPose = neutralPose({} as AttackPose);
+const tmpA = {} as AttackPose;
+const tmpB = {} as AttackPose;
+function keyPose(k: Key, side: number, out: AttackPose): AttackPose {
+  for (const f of FIELDS) out[f] = k[f] ?? NEUTRAL[f];
+  // keys are written for side +1: yaw, roll, head yaw, sideways shift and gaster yaw mirror
+  out.yaw *= side;
+  out.roll *= side;
+  out.headYaw *= side;
+  out.side *= side;
+  out.gYaw *= side;
+  return out;
+}
+function mixPose(a: AttackPose, b: AttackPose, t: number, out: AttackPose): AttackPose {
+  for (const f of FIELDS) out[f] = a[f] + (b[f] - a[f]) * t;
+  return out;
+}
+/** blend key a → key b by t into out */
+function blend(a: Key, b: Key, t: number, side: number, out: AttackPose): AttackPose {
+  keyPose(a, side, tmpA);
+  keyPose(b, side, tmpB);
+  return mixPose(tmpA, tmpB, t, out);
+}
+
+// beats (fractions of the attack cycle): the wind-up builds to WIND, holds (a tremble of tension) to STRIKE,
+// strikes to the contact, and recovers
+const WIND = 0.5;
+const STRIKE = 0.62;
+
+// ---- key poses (side +1; body lengths and radians)
+const LUNGE_W: Key = { fwd: -0.09, up: -0.03, pitch: 0.13, headPitch: 0.3, mand: 1, gaster: 0.35, spread: 0.25 };
+const LUNGE_S: Key = { fwd: 0.13, up: -0.02, pitch: -0.11, px: 0.25, headPitch: -0.34, mand: 0, gaster: 0.1, spread: 0.25 };
+const CLAMP_W: Key = { yaw: 0.34, side: 0.035, roll: 0.07, headYaw: 0.5, headPitch: 0.12, mand: 1, fwd: -0.03, spread: 0.25 };
+const CLAMP_S: Key = { yaw: -0.14, headYaw: -0.22, fwd: 0.08, headPitch: -0.16, mand: 0, spread: 0.25 };
+const CLAMP_T: Key = { yaw: -0.08, fwd: -0.13, pitch: 0.07, headPitch: -0.06, mand: 0.04, spread: 0.4 };
+/** gripping and stinging (fire ants): the hold between stings and the jab */
+const GRIP: Key = { fwd: 0.06, up: 0.055, pitch: -0.1, px: 0.3, headPitch: -0.26, mand: 0.04, gaster: -1.25, sting: 0.6, spread: 0.32 };
+const JAB: Key = { fwd: 0.07, up: 0.075, pitch: -0.17, px: 0.3, headPitch: -0.3, mand: 0.02, gaster: -2.35, sting: 1, spread: 0.32, gYaw: -0.12 };
+const GRAB: Key = { fwd: 0.09, up: 0.0, pitch: -0.05, headPitch: -0.3, mand: 0.05, spread: 0.2 };
+const CRUSH_W: Key = { fwd: -0.05, up: -0.06, headPitch: -0.22, mand: 1, gaster: 0.15, spread: 0.4 };
+const CRUSH_S: Key = { fwd: 0.1, up: -0.07, pitch: -0.08, px: 0.3, headPitch: -0.42, mand: 0, spread: 0.4 };
+const SWING_W: Key = { yaw: 0.26, headYaw: 0.55, headPitch: -0.12, roll: 0.05, mand: 0.85, up: -0.03, spread: 0.32 };
+const SWING_S: Key = { yaw: -0.22, headYaw: -0.45, roll: -0.08, fwd: 0.05, headPitch: -0.2, mand: 0.15, up: -0.03, spread: 0.32 };
+
+/**
+ * Pose of a planted-feet attack at phase q. `holdIn` / `holdOut`: this sting continues a grip held from the
+ * last cycle / into the next one (the pivoting sting series), so it starts / ends on the grip, not neutral.
+ */
+export function attackPoseV2(variant: number, q: number, side: number, out: AttackPose, holdIn = false, holdOut = false): AttackPose {
+  const C = ATTACK_CONTACT;
+  const u = sm(q / WIND);
+  const s = strikeEase((q - STRIKE) / (C - STRIKE));
+  const tremble = q > WIND && q < STRIKE ? Math.sin(q * 160) * 0.5 : 0;
+  switch (variant) {
+    case ATK.LUNGE: {
+      // crouch back on bent legs, head up, jaws agape → surge forward and down onto the target, snap → worry
+      // it with a short tug and a shake of the head → settle
+      if (q < STRIKE) blend({}, LUNGE_W, u, side, out);
+      else if (q < C) blend(LUNGE_W, LUNGE_S, s, side, out);
+      else {
+        const k = (q - C) / (1 - C);
+        blend(LUNGE_S, {}, sm((k - 0.35) / 0.65), side, out);
+        const tug = Math.sin(Math.PI * Math.min(1, k / 0.45));
+        out.fwd -= 0.05 * tug;
+        out.headYaw += 0.14 * Math.sin(k * 22) * tug;
+      }
+      out.headYaw += 0.04 * tremble;
+      return out;
+    }
+    case ATK.CLAMP: {
+      // twist over the planted feet to one side, head turned further → swing across and clamp → brace wide and
+      // haul back (a tug of war), the legs straining → settle
+      if (q < STRIKE) blend({}, CLAMP_W, u, side, out);
+      else if (q < C) blend(CLAMP_W, CLAMP_S, s, side, out);
+      else {
+        const k = (q - C) / (1 - C);
+        if (k < 0.5) blend(CLAMP_S, CLAMP_T, sm(k / 0.5), side, out);
+        else blend(CLAMP_T, {}, sm((k - 0.5) / 0.5), side, out);
+        out.headYaw += 0.05 * Math.sin(k * 30) * (1 - k);
+      }
+      out.headPitch += 0.03 * tremble;
+      return out;
+    }
+    case ATK.PIVOT_STING: {
+      // grab (or keep the grip) → plant wide, rise on the legs, arch and curl the gaster under, the sting out →
+      // jab forward under the body → hold, the gaster pumping → back to the grip (or let go at the end)
+      const start: Key = holdIn ? GRIP : {};
+      if (!holdIn && q < 0.2) blend({}, GRAB, sm(q / 0.2), side, out);
+      else if (q < STRIKE) blend(holdIn ? GRIP : GRAB, GRIP, holdIn ? 1 : sm((q - 0.2) / (WIND - 0.2)), side, out);
+      else if (q < C) blend(GRIP, JAB, s, side, out);
+      else {
+        const k = (q - C) / (1 - C);
+        blend(JAB, holdOut ? GRIP : {}, sm((k - 0.25) / 0.75), side, out);
+        out.gaster -= 0.12 * Math.sin(k * 25) * Math.max(0, 1 - k * 2.5);
+      }
+      if (q < STRIKE) out.gaster += 0.06 * tremble;
+      void start;
+      return out;
+    }
+    case ATK.QUICK_STING: {
+      // a fast grab, a quick tuck and one jab, release
+      if (q < 0.3) blend({}, GRAB, sm(q / 0.3), side, out);
+      else if (q < STRIKE) blend(GRAB, { ...GRIP, up: 0.03, gaster: -1.5 }, sm((q - 0.45) / (STRIKE - 0.45)), side, out);
+      else if (q < C) blend({ ...GRIP, up: 0.03, gaster: -1.5 }, { ...JAB, up: 0.04, gaster: -2.2 }, s, side, out);
+      else blend({ ...JAB, up: 0.04, gaster: -2.2 }, {}, sm((q - C) / (1 - C)), side, out);
+      return out;
+    }
+    case ATK.CRUSH: {
+      // the major's crushing bite: sink into a low, wide brace, head lowered, the jaws opening slowly → surge and
+      // crunch, feet planted → a shudder as the jaws bear down → settle
+      if (q < STRIKE) blend({}, CRUSH_W, sm(q / STRIKE), side, out);
+      else if (q < C) blend(CRUSH_W, CRUSH_S, s, side, out);
+      else {
+        const k = (q - C) / (1 - C);
+        blend(CRUSH_S, {}, sm((k - 0.4) / 0.6), side, out);
+        out.headPitch += 0.05 * Math.sin(k * 40) * Math.max(0, 1 - k * 2);
+        out.up -= 0.008 * Math.sin(k * 40) * Math.max(0, 1 - k * 2);
+      }
+      out.mand = q < STRIKE ? sm(q / STRIKE) : out.mand;
+      return out;
+    }
+    case ATK.HEAD_SWING: {
+      // the major swings its great head sideways into the target, body twisting over braced legs
+      if (q < STRIKE) blend({}, SWING_W, u, side, out);
+      else if (q < C) blend(SWING_W, SWING_S, s, side, out);
+      else blend(SWING_S, {}, sm((q - C) / (1 - C)), side, out);
+      return out;
+    }
+    default:
+      // the old rear-up chomp (not used by the planted-feet species), with the fore legs lifted
+      attackPose(variant, q, side, out, true);
+      out.front = Math.max(0, out.pitch) / 0.38;
+      out.px = -0.3;
+      return out;
+  }
 }
