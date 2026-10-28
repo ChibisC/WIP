@@ -189,9 +189,13 @@ export interface MotionOut {
   Dz: number;
   Ps: number;
   flash: number;
-  /** death: leg curl (0..~1.1, the shader's `death`) and the roll onto the back or side */
+  /** death: leg curl (0..~1.1, the shader's `death`) and the roll onto the back or side; the head coming off and the
+   *  body crushed flat (0..1); an added gaster pitch (convulsions) */
   deathLeg: number;
   deathRoll: number;
+  decap: number;
+  squash: number;
+  gaster: number;
   /** pose to blend to (POSE.*) and antenna offsets */
   pose: number;
   headYaw: number;
@@ -205,7 +209,7 @@ export interface MotionOut {
 }
 
 export function newMotionOut(): MotionOut {
-  return { h: 0, fwd: 0, side: 0, up: 0, yaw: 0, pitch: 0, roll: 0, spinRoll: 0, spinPitch: 0, Dh: 0, Dz: 0, Ps: 0, flash: 0, deathLeg: 0, deathRoll: 0, pose: 0, headYaw: 0, headPitch: 0, mand: 0, antPitch: 0, antSpread: 0, antAct: 0, clock: 1 };
+  return { h: 0, fwd: 0, side: 0, up: 0, yaw: 0, pitch: 0, roll: 0, spinRoll: 0, spinPitch: 0, Dh: 0, Dz: 0, Ps: 0, flash: 0, deathLeg: 0, deathRoll: 0, decap: 0, squash: 0, gaster: 0, pose: 0, headYaw: 0, headPitch: 0, mand: 0, antPitch: 0, antSpread: 0, antAct: 0, clock: 1 };
 }
 
 const hash01 = (n: number, k: number): number => {
@@ -462,19 +466,22 @@ export function stepMotion(
     out.antAct = Math.max(out.antAct, 0.8);
   }
 
-  // ---- death: legs curl over half a second with a twitch, the body tips onto its back or its side
+  // ---- death (spec 04: by what killed it — sim HIT.*), ending on the back or side, the legs curled
+  out.decap = out.squash = out.gaster = 0;
   if (v.dead) {
-    if (m.deadT < 0) m.deadT = s.death > 0.9 ? 5 : 0;
+    if (m.deadT < 0) {
+      m.deadT = s.death > 0.9 ? 5 : 0;
+      // a big kill: a beat of hit-stop and a flash
+      if (m.deadT === 0 && (v.cause === 4 || v.cause === 8)) {
+        m.freeze = 0.08;
+        m.flash = 1;
+      }
+    }
     m.deadT += dt;
   } else m.deadT = -1;
-  if (m.deadT >= 0) {
-    const t = m.deadT;
-    const tw = t < 2.2 ? 0.14 * Math.sin(t * 31 + m.seed * 6) * Math.exp(-t * 1.6) * (Math.sin(t * 7 + m.seed * 3) > 0.2 ? 1 : 0.25) : 0;
-    out.deathLeg = clamp(sm(t / 0.5) + tw, 0, 1.12);
-    const R = (m.deadV === 0 ? 2.55 : 1.45) * m.deadS;
-    out.deathRoll = R * (sm(t / 0.45) + (t > 0.45 && t < 0.7 ? 0.08 * Math.sin(Math.PI * ((t - 0.45) / 0.25)) : 0));
-    s.death = out.deathLeg;
-  } else {
+  if (m.deadT >= 0) deathPose(m, v.cause ?? 0, m.deadT, out);
+  if (m.deadT >= 0) s.death = out.deathLeg;
+  else {
     out.deathLeg = 0;
     out.deathRoll = 0;
     s.death = damp(s.death, 0, 6, dt);
@@ -572,6 +579,74 @@ export function stepMotion(
   [m.apo, m.apov] = spring(m.apo, m.apov, clamp((-m.acc / Math.max(L, 1e-3)) * 0.01, -0.4, 0.4), 4, 0.3, dt);
   out.antSpread += m.asp;
   out.antPitch += m.apo;
+}
+
+/**
+ * The death by cause (spec 04), `t` seconds in (render only):
+ *  - bite (and unknown): the legs curl over half a second with a twitch; it tips onto its back or side
+ *  - venom: convulsions — the body trembles, the legs flex out of time, the gaster pumps — then curls tight on its side
+ *  - acid: writhing, rolling side to side with the legs flailing, then still on its back
+ *  - crush (a creature's jaws or feet): flattened at once, the legs splayed flat
+ *  - fall (a fling's landing): on its back, the legs kicking a moment
+ *  - drowning: slow paddling that weakens, rolling onto its side
+ *  - starvation / exhaustion: a slow collapse, antennae drooping, settling half onto its side
+ *  - decapitation (a killing bite of nearly half its life): the head comes away; the body collapses, legs twitching on
+ */
+export function deathPose(m: Motion2, cause: number, t: number, out: MotionOut): void {
+  const R = (m.deadV === 0 ? 2.55 : 1.45) * m.deadS;
+  const sd = m.seed * 6;
+  switch (cause) {
+    case 2: {
+      const e = Math.exp(-t * 1.3);
+      out.deathLeg = clamp(sm(t / 1.4) * 1.05 + 0.32 * Math.abs(Math.sin(t * 19 + sd)) * e, 0, 1.12);
+      out.deathRoll = 1.45 * m.deadS * sm((t - 0.35) / 1.0) + 0.1 * Math.sin(t * 27 + sd) * e;
+      out.pitch += 0.05 * Math.sin(t * 23 + sd) * e;
+      out.gaster = -0.5 * Math.abs(Math.sin(t * 11 + sd)) * e;
+      out.antPitch -= 0.6 * sm(t / 1.2);
+      return;
+    }
+    case 3: {
+      const e = Math.exp(-t * 2.0);
+      out.deathLeg = clamp(t < 1 ? 0.35 + 0.5 * Math.abs(Math.sin(t * 17 + sd)) : 0.85 + 0.25 * sm(t - 1), 0, 1.12);
+      out.deathRoll = 2.55 * m.deadS * sm(t / 0.9) + 0.7 * Math.sin(t * 13 + sd) * e;
+      out.gaster = -0.6 * Math.abs(Math.sin(t * 9)) * e;
+      return;
+    }
+    case 4:
+      out.squash = sm(t / 0.1);
+      out.deathLeg = 0.3 * sm(t / 0.2);
+      out.deathRoll = 0.12 * m.deadS * sm(t / 0.2);
+      return;
+    case 5: {
+      out.deathLeg = clamp(sm(t / 0.7) + 0.3 * Math.sin(t * 24 + sd) * Math.exp(-t * 2.5), 0, 1.12);
+      out.deathRoll = 2.55 * m.deadS * sm(t / 0.3);
+      return;
+    }
+    case 6: {
+      const e = Math.exp(-t * 0.9);
+      out.deathLeg = clamp(sm(t / 1.9) * 0.95 + 0.3 * Math.sin(t * 9 + sd) * e, 0, 1.12);
+      out.deathRoll = 1.45 * m.deadS * sm((t - 0.6) / 1.4);
+      out.antPitch -= 0.5 * sm(t / 1.5);
+      return;
+    }
+    case 7:
+      out.deathLeg = 0.85 * sm(t / 2.0);
+      out.deathRoll = 0.55 * m.deadS * sm((t - 1.0) / 1.2);
+      out.antPitch -= 0.8 * sm(t / 1.6);
+      out.headPitch -= 0.3 * sm(t / 1.6);
+      return;
+    case 8: {
+      out.decap = sm(t / 0.35);
+      out.deathLeg = clamp(0.55 * sm(t / 0.4) + 0.3 * Math.sin(t * 29 + sd) * Math.exp(-t * 0.6), 0, 1.12);
+      out.deathRoll = 0.3 * m.deadS * sm(t / 0.6);
+      return;
+    }
+    default: {
+      const tw = t < 2.2 ? 0.14 * Math.sin(t * 31 + sd) * Math.exp(-t * 1.6) * (Math.sin(t * 7 + m.seed * 3) > 0.2 ? 1 : 0.25) : 0;
+      out.deathLeg = clamp(sm(t / 0.5) + tw, 0, 1.12);
+      out.deathRoll = R * (sm(t / 0.45) + (t > 0.45 && t < 0.7 ? 0.08 * Math.sin(Math.PI * ((t - 0.45) / 0.25)) : 0));
+    }
+  }
 }
 
 /**

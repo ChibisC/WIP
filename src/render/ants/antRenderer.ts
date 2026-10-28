@@ -96,6 +96,9 @@ export interface AntView {
    *  the render picks the attacks itself (the game) or plays `atkVar`'s (the lab's single-attack clips) */
   atkN?: number;
   atkSeq?: boolean;
+  /** dead: what killed it (sim HIT.*: the render picks the death), and a corpse's drying 0..1 (its gloss fades) */
+  cause?: number;
+  dry?: number;
   /** held in a creature's jaws (its id; 0 = not): drawn at the jaw frame of its animated body when it records one */
   heldCr?: number;
   /** climbing a creature (sim/climbing.ts): its id (0 = on the ground), phase 1 up / 2 riding / 3 down, rail, slot, progress */
@@ -659,7 +662,7 @@ export class AntRenderer {
       let hy = s.hy;
       let hp = s.hp;
       let mo = s.mo;
-      let gp = s.gp;
+      let gp = s.gp + (M ? M.gaster : 0);
       const aw = s.aw ?? 0;
       let stingW = 0;
       if (aw > 0.001) {
@@ -763,7 +766,9 @@ export class AntRenderer {
         bodyBuf[8] = atkP.gYaw * w;
         bodyBuf[9] = stingW;
         bodyBuf[10] = atkP.front * w;
-        bodyBuf[11] = 0;
+        bodyBuf[11] = M.decap;
+        bodyBuf[12] = v.dry ?? 0;
+        bodyBuf[13] = M.squash;
         vP.addScaledVector(vF, vT.x * scale).addScaledVector(vU, vT.y * scale).addScaledVector(vR, vT.z * scale);
         tmpQ.multiply(qB);
         // (a dead ant rolled about its long axis through the ground point: lift it so its lowest point — the back
@@ -783,8 +788,8 @@ export class AntRenderer {
           rest = Math.max(0, -lowR, -lowP);
         }
         // (mounted: the mount point already carries it — a held ant's sim height would lift it twice)
-        vP.addScaledVector(vU, (mounted ? 0 : v.lift) + M.up);
-        if (rest > 0) vP.addScaledVector(vN.set(s.nx, s.ny, s.nz).normalize(), rest);
+        // (along the ground's normal, not the body's up: a corpse on its back sinking was lifted instead — user rating A9)
+        vP.addScaledVector(vN.set(s.nx, s.ny, s.nz).normalize(), (mounted ? 0 : v.lift) + M.up + rest);
       } else vP.addScaledVector(vU, (mounted ? 0 : v.lift) + s.death * rig.stance * 0.3);
       // released from jaws or a back: ease from where it was drawn to the sim's position instead of popping
       if (mounted) {

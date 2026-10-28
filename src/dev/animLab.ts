@@ -190,6 +190,26 @@ function clips(): Record<string, Clip> {
       })),
       cam: { tx: 5, ty: 0.3, tz: 0, dir: [0.2, 1, 0.75], dist: 17, fov: 30 },
     },
+    // spec 04: a death for each cause (sim HIT.*: bite, venom, acid, crush, fall, drown, starve, decapitation), each
+    // corpse drying and then sinking into the ground as in the game (BALANCE.corpse: 0.5 s + 2 s, then 0.6 s down)
+    deaths: {
+      dur: 5,
+      ants: [0, 1, 2, 3, 4, 5, 6, 7].map((k) => ({
+        script: (t: number, v: AntView) => {
+          const td = 0.8 + (k % 4) * 0.12 + (k >> 2) * 0.06;
+          const tt = Math.min(t, td);
+          v.x = -10 + (k % 4) * 6 + 3 * tt;
+          v.y = (k >> 2) * 6 - 3;
+          v.heading = 0;
+          v.dead = t > td;
+          v.cause = k + 1;
+          const age = t - td - 0.5;
+          v.dry = v.dead ? Math.max(0, Math.min(1, age / 2)) : 0;
+          v.lift = age > 2 ? -Math.min(1, (age - 2) / 0.6) * 3.5 : 0;
+        },
+      })),
+      cam: { tx: 0.3, ty: 0.3, tz: 0, dir: [0.15, 1, 0.75], dist: 28, fov: 30 },
+    },
     // a worker thrown through the air: it tumbles, lands with a bounce and rights itself, then walks on
     fling: {
       dur: 4,
@@ -503,7 +523,8 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
     }
   };
   // camera (`cdist=` overrides the clip's distance: the same scene at another zoom)
-  const C = q.get('cdist') ? { ...clip.cam, dist: Number(q.get('cdist')) } : clip.cam;
+  // (`ctx` / `ctz` move the camera's target: a close look at one actor)
+  const C = { ...clip.cam, dist: Number(q.get('cdist') || clip.cam.dist), tx: Number(q.get('ctx') ?? clip.cam.tx), tz: Number(q.get('ctz') ?? clip.cam.tz) };
   const cam = new THREE.PerspectiveCamera(C.fov ?? 30, window.innerWidth / window.innerHeight, C.dist * 0.02, C.dist * 60);
   const dir = new THREE.Vector3(...C.dir).normalize();
   const target = new THREE.Vector3(C.tx, C.ty, C.tz);

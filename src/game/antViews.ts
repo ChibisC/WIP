@@ -141,6 +141,8 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
   out.lift = a.state === AS.Flung ? a.fz : 0;
   // animation pass: a drop in hit points starts a hit reaction; a thrown ant tumbles (not one held in antlers)
   out.hp = a.hp;
+  out.cause = a.state === AS.Dead ? (a.lastHit ?? 0) : 0;
+  out.dry = 0;
   out.flung = a.state === AS.Flung && !a.gripCr;
   // held in antlers: drawn in the animated jaws (render-only; the sim's position is the fallback)
   out.heldCr = a.state === AS.Flung && a.gripCr ? a.gripCr : 0;
@@ -591,7 +593,11 @@ function hellPosture(a: Ant, out: AntView, L: number): void {
 
 /** Ant corpses lying on the ground (food items made from dead ants). */
 export function corpseToView(f: Food, out: AntView, space: number, morph: string): AntView {
-  out.id = -f.id;
+  // (the dead ant's own id: its death animation carries on through the hand-over to a corpse — spec 04)
+  out.id = f.v > 0 ? f.v : -f.id;
+  out.cause = f.cause ?? 0;
+  // its gloss fades as it dries, over the time it lies there
+  out.dry = Math.min(1, f.age / Math.max(2, f.sinkAt ?? 2));
   out.morph = morph;
   out.space = space;
   out.x = f.x;
@@ -612,7 +618,8 @@ export function corpseToView(f: Food, out: AntView, space: number, morph: string
   // its time is up: sinking into the ground (then the food item is deleted)
   if (f.sinkAt !== undefined && f.age > f.sinkAt && !f.heldBy) {
     const k = Math.min(1, (f.age - f.sinkAt) / BALANCE.corpse.sink);
-    out.lift = -k * Math.max(1.5, f.size * 0.45);
+    // (deep enough that a corpse on its back, its legs splayed, is gone: user rating A9)
+    out.lift = -k * Math.max(2, f.size);
     out.colorVar = -0.3 - k * 0.5;
   }
   out.roll = 0;

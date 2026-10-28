@@ -46,10 +46,11 @@ uniform vec3 uLegCoxa[6]; uniform vec3 uLegKnee[6]; uniform vec3 uLegAnkle[6]; u
 uniform float uPlant; // animation pass: feet planted by an analytic IK (pilot species)
 // spec 04: the body's offset from its ground frame, per instance (3 texels at (id % 128) × 3, id / 128):
 //   0: translation (object units), lateral stance sweep · 1: rotation vector, stance spread
-//   2: gaster yaw, sting out, fore legs raised, decapitation
+//   2: gaster yaw, sting out, fore legs raised, decapitation · 3: corpse drying (gloss fades), crushed flat
 // The planted feet are solved in the body frame against targets fixed in the ground frame, so the body lunges,
 // rises, leans and twists over feet that stay where they are.
 uniform sampler2D uBodyTex; uniform float uBodyOn;
+varying float vDry;
 uniform float uRealV; // realism morphs (the sting rests retracted)
 varying float vHit;
 uniform vec3 uNeck; uniform vec3 uMandL; uniform vec3 uMandR; uniform vec3 uAntL; uniform vec3 uAntR;
@@ -75,13 +76,15 @@ vec3 animP = position;
   // aC.z packs the pose id and its weight (id + 0.99 × weight); aC.w is the hit flash
   float gPitch = aC.x, swell = aC.y; float pzI = floor(aC.z + 0.0005); int pose = int(pzI); float poseW = clamp((aC.z - pzI) / 0.99, 0.0, 1.0);
   float death = aD.x, pph = aD.w;
-  vec4 bT0 = vec4(0.0), bT1 = vec4(0.0), bT2 = vec4(0.0);
+  vec4 bT0 = vec4(0.0), bT1 = vec4(0.0), bT2 = vec4(0.0), bT3 = vec4(0.0);
   if (uBodyOn > 0.5) {
-    ivec2 bc = ivec2((gl_InstanceID % 128) * 3, gl_InstanceID / 128);
+    ivec2 bc = ivec2((gl_InstanceID % 128) * 4, gl_InstanceID / 128);
     bT0 = texelFetch(uBodyTex, bc, 0);
     bT1 = texelFetch(uBodyTex, bc + ivec2(1, 0), 0);
     bT2 = texelFetch(uBodyTex, bc + ivec2(2, 0), 0);
+    bT3 = texelFetch(uBodyTex, bc + ivec2(3, 0), 0);
   }
+  vDry = bT3.x;
   float bAng = length(bT1.xyz);
   vec3 bAx = bAng > 1e-5 ? bT1.xyz / bAng : vec3(0.0, 1.0, 0.0);
   // aE.x packs the gold amount and the ripple direction in its sign; aE.y is the turn per stance (planted feet)
@@ -224,7 +227,14 @@ vec3 animP = position;
     // ant's are — femora down and in, tibiae folded back under — so on its back they curl over it instead of
     // standing up like comb teeth; blind review.)
     float fp = float(pair) - 1.0;
-    if (uPlant > 0.5) {
+    if (uPlant > 0.5 && bT3.y > 0.0) {
+      // crushed: the legs splayed flat round the body
+      float fw = pair == 0 ? 0.6 : (pair == 1 ? 0.05 : -0.55);
+      yaw = mix(yaw, side * fw, bT3.y);
+      lft = mix(lft, 0.85, bT3.y);
+      knee = mix(knee, 0.12, bT3.y);
+      ankleF = mix(ankleF, 0.3, bT3.y);
+    } else if (uPlant > 0.5) {
       yaw = mix(yaw, side * (-0.3 * fp), death);
       lft = mix(lft, -0.6, death);
       knee = mix(knee, -2.35, death);
@@ -270,6 +280,13 @@ vec3 animP = position;
     // Head yaw/pitch carries mandibles and antennae.
     rotP(animP, N, uNeck, RIGHT, hPitch - death * 0.3);
     rotP(animP, N, uNeck, UP, hYaw);
+    if (bT2.w > 0.0) {
+      // decapitated (spec 04, a big kill): the head comes away, falls in front of the body and rolls onto its side
+      float dk = bT2.w;
+      rotP(animP, N, uNeck, vec3(1.0, 0.0, 0.0), 1.3 * dk);
+      rotP(animP, N, uNeck, RIGHT, -0.7 * dk);
+      animP += vec3(0.22 * uGait.w, -uNeck.y * 0.7, 0.1 * uGait.w) * dk;
+    }
   } else if (part == 8) {
     // The sting slides out of the gaster tip while stinging (realism: retracted into the tip otherwise).
     if (abs(aSurf.w - 2.0) < 0.5) {
@@ -302,6 +319,8 @@ vec3 animP = position;
   if (pose == 13) animP.y -= poseW * uGait.w * 0.1;
   // Body bob at twice the stride frequency; the lift of the threat display and the sting (feet planted).
   animP.y += bob + bodyUp;
+  // crushed flat (spec 04: killed under a big creature's jaws or feet)
+  if (bT3.y > 0.0) animP.y *= 1.0 - 0.3 * bT3.y;
   // Gold form: body lowered slightly (a rushing look).
   if (part < 10) animP.y -= goldA * uGait.w * 0.012;
   objectNormal = N;
@@ -311,6 +330,7 @@ vec3 animP = position;
 const FRAG_HEADER = /* glsl */ `
 varying vec4 vSurf; varying vec3 vLocal; varying float vColorVar; varying float vTint; varying vec4 vGold; uniform float uGoldTime;
 varying float vHit;
+varying float vDry;
 uniform float uReal;
 uniform float uMask;
 varying float vPartF;
@@ -412,7 +432,9 @@ export function antPatch(): ShaderPatch {
         `#include <roughnessmap_fragment>
          roughnessFactor = abs(vSurf.w - 1.0) < 0.5 ? (uReal > 0.5 ? 0.14 : mix(0.4, 0.18, facet)) : (abs(vSurf.w - 3.0) < 0.5 ? 0.12 : vSurf.x);
          roughnessFactor = mix(roughnessFactor, 0.22, goldM);
-         roughnessFactor = mix(roughnessFactor, min(1.0, roughnessFactor + 0.4), vGold.z);`,
+         roughnessFactor = mix(roughnessFactor, min(1.0, roughnessFactor + 0.4), vGold.z);
+         // a corpse dries: the gloss fades (spec 04)
+         roughnessFactor = mix(roughnessFactor, min(1.0, roughnessFactor + 0.35), vDry);`,
       ],
       ['#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = mix(metalnessFactor, 0.8, goldM);'],
       [
@@ -442,7 +464,7 @@ export function antPatch(): ShaderPatch {
         '#include <lights_physical_fragment>',
         `#include <lights_physical_fragment>
          #ifdef USE_CLEARCOAT
-           material.clearcoat = mix(vSurf.y, 0.08, goldM);
+           material.clearcoat = mix(vSurf.y, 0.08, goldM) * (1.0 - 0.85 * vDry);
            material.clearcoatRoughness = uReal > 0.5 ? 0.14 : 0.18;
          #endif
          #ifdef USE_SHEEN
@@ -550,7 +572,7 @@ export function rigUniforms(rig: AntRig): Record<string, THREE.IUniform> {
 }
 
 /** The body-offset texture's layout (spec 04): instances per row and texels per instance. */
-export const BODY_TEX = { perRow: 128, texels: 3 } as const;
+export const BODY_TEX = { perRow: 128, texels: 4 } as const;
 const blankBodyTex = new THREE.DataTexture(new Float32Array(4), 1, 1, THREE.RGBAFormat, THREE.FloatType);
 blankBodyTex.needsUpdate = true;
 
