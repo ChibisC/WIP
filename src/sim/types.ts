@@ -170,6 +170,8 @@ export interface Ant {
   fvy: number;
   /** time since death */
   deadT: number;
+  /** what last hurt it (HIT.*; render: how it dies — spec 04) */
+  lastHit?: number;
   /** hint for renderer: pose id */
   pose: number;
   /** body-relative head yaw toward target */
@@ -277,8 +279,13 @@ export interface Brood {
 /** `wood`: deadwood (twig, branch, bamboo, palm frond, log, stump — in `from`) and chewed fragments ('chip'); termites only */
 export type FoodKind = 'insect' | 'seed' | 'berry' | 'honeydew' | 'crumb' | 'corpse' | 'leaf' | 'fungus' | 'wood';
 
+/** What last hurt an ant (`Ant.lastHit`, the death event's and the corpse's `cause`): the render picks the death. */
+export const HIT = { BITE: 1, VENOM: 2, ACID: 3, CRUSH: 4, FALL: 5, DROWN: 6, STARVE: 7, DECAP: 8 } as const;
+
 export interface Food {
   id: number;
+  /** an ant's corpse: what killed it (HIT.*; render only) */
+  cause?: number;
   kind: FoodKind;
   space: number;
   x: number;

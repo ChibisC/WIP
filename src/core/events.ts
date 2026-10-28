@@ -14,7 +14,7 @@ export type SimEvent =
   | { t: 'sting'; x: number; y: number; space: number; by?: string }
   | { t: 'hit'; x: number; y: number; space: number; big: boolean }
   /** `what`: the caste id or creature kind */
-  | { t: 'death'; x: number; y: number; space: number; kind: 'ant' | 'creature'; id: number; colony: number; what?: string }
+  | { t: 'death'; x: number; y: number; space: number; kind: 'ant' | 'creature'; id: number; colony: number; what?: string; cause?: number }
   | { t: 'alarm'; x: number; y: number; space: number; colony: number }
   | { t: 'fling'; x: number; y: number; space: number }
   | { t: 'slam'; x: number; y: number; space: number; radius: number; power: number }

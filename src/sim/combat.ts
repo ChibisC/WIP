@@ -1,5 +1,5 @@
 import { World } from './world';
-import { Ant, AS, Carry, Colony, Creature, POSE, SURFACE, nestSpace } from './types';
+import { Ant, AS, Carry, Colony, Creature, HIT, POSE, SURFACE, nestSpace } from './types';
 import type { Projectile } from './types';
 import { casteOf, DamageType, isKing } from './species';
 import { angleDiff, antSpeed, faceToward, moveForward, steerTo, turnToward, goHome, goOut } from './movement';
@@ -78,6 +78,10 @@ export function damageAnt(w: World, t: Ant, amount: number, type: DamageType, sr
   if ((t.holdId ?? 0) !== 0 && cd.termite !== 'sickle' && !(src && 'caste' in src && src.id === t.holdId && t.holdKind === 3)) release(w, t, false);
   if (cd.termite === 'major') majorAlarm(w, t);
   if (cd.termite && cd.species === 'rhynchotermes') sickleAlarm(w, t);
+  // what hurt it (render: how it dies) — a creature's jaws or feet crush; a killing bite of nearly half its life
+  // takes the head off; an untargeted bite is a hard landing (the fling's, marked before the call)
+  if (src || type !== 'bite') t.lastHit = type === 'acid' ? HIT.ACID : src && !('caste' in src) ? HIT.CRUSH : HIT.BITE;
+  if (src && type === 'bite' && t.hp - dmg <= 0 && dmg >= t.maxHp * 0.45) t.lastHit = HIT.DECAP;
   t.hp -= dmg;
   t.alarm = 1;
   raiseAlarm(w, t);
@@ -224,6 +228,7 @@ export function flungUpdate(w: World, a: Ant, dt: number): void {
       a.stun = 0.4;
     } else {
       a.stun = 0.9;
+      a.lastHit = HIT.FALL;
       damageAnt(w, a, 1.5, 'bite', null);
     }
   }
@@ -340,6 +345,7 @@ export function venomTick(w: World, a: Ant, dt: number): boolean {
     a.venomDps = 0;
   }
   if (a.hp <= 0) {
+    a.lastHit = HIT.VENOM;
     killAnt(w, a);
     return true;
   }

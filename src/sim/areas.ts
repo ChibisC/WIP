@@ -2,7 +2,7 @@ import { ENTRANCE } from './balance';
 import { makeEntrance } from './entrances';
 import { World } from './world';
 import { NestGrid, hexRadiusFor } from '../world/nestGrid';
-import { AS, CAVE_BASE, CaveDef, Colony, SURFACE, colonyOfSpace, isCaveSpace, nestSpace } from './types';
+import { AS, CAVE_BASE, CaveDef, Colony, HIT, SURFACE, colonyOfSpace, isCaveSpace, nestSpace } from './types';
 import { BALANCE } from './balance';
 import { killAnt } from './antAI';
 import { exitFieldIn } from './movement';
@@ -121,7 +121,10 @@ export function lostRouteSystem(w: World, dt: number): void {
     }
     a.lostT = (a.lostT ?? 0) + dt;
     a.hp -= (a.maxHp * dt) / BALANCE.lostDeathTime;
-    if (a.hp <= 0 || a.lostT >= BALANCE.lostDeathTime) killAnt(w, a);
+    if (a.hp <= 0 || a.lostT >= BALANCE.lostDeathTime) {
+      a.lastHit = HIT.STARVE;
+      killAnt(w, a);
+    }
   }
 }
 

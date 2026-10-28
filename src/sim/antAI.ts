@@ -224,7 +224,7 @@ export function killAnt(w: World, a: Ant): void {
   const c = w.colony(a.colony);
   if (c) c.stats.died++;
   onAntDied(w, a);
-  w.events.emit({ t: 'death', x: a.x, y: a.y, space: a.space, kind: 'ant', id: a.id, colony: a.colony, what: a.caste });
+  w.events.emit({ t: 'death', x: a.x, y: a.y, space: a.space, kind: 'ant', id: a.id, colony: a.colony, what: a.caste, cause: a.lastHit ?? 0 });
   if (c && a.id === c.queen) w.events.emit({ t: 'queenDead', colony: c.id });
   if (c && casteOf(a.caste).termite) onTermiteDied(w, c, a);
   // the king (termites, Termants) dies as soon as his queen does (user note 2026-10-25)
@@ -250,6 +250,7 @@ function corpseFromAnt(w: World, a: Ant): void {
   f.colony = a.colony;
   f.h = a.h;
   f.v = a.id;
+  f.cause = a.lastHit ?? 0;
   // timed: food for enemies for a moment (termites: any ant), then it sinks into the ground and is gone
   f.sinkAt = cd.termite ? BALANCE.corpse.termiteFood : BALANCE.corpse.antFood;
   // games with Termants: the dead lie long enough to be carried home for their genes (termants.ts)

@@ -1,7 +1,7 @@
 import { FLOOD } from './balance';
 import { casteOf } from './species';
 import { killAnt } from './antAI';
-import { AS, SURFACE, FloodState } from './types';
+import { AS, HIT, SURFACE, FloodState } from './types';
 import { World } from './world';
 import { inShape, shapeBox } from '../world/mapShapes';
 import { dhypot } from './dmath';
@@ -109,6 +109,7 @@ function floodEffects(w: World, i: number, dt: number): void {
     if (cd.role === 'king') continue;
     a.hp -= cd.hp * FLOOD.drownFrac * dt;
     if (a.hp <= 0) {
+      a.lastHit = HIT.DROWN;
       killAnt(w, a);
       continue;
     }
