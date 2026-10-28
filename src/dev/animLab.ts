@@ -221,7 +221,7 @@ function clips(): Record<string, Clip> {
         },
         {
           script: (t, v) => {
-            standing(0, 3, 0.3)(t, v);
+            standing(-2, 0.6, 0.3)(t, v); // inside the walker's circle, clear of it
             v.pose = POSE.DIG;
             v.mandible = 0.4 + Math.max(0, Math.sin(t * 16)) * 0.55;
             v.headPitch = -0.4;
@@ -230,7 +230,7 @@ function clips(): Record<string, Clip> {
         },
         {
           script: (t, v) => {
-            standing(6, 0, 2.6)(t, v);
+            standing(6.5, 2.5, 2.6)(t, v); // outside it, still in frame
             v.pose = POSE.ALARM;
             v.mandible = 0.8;
             v.antennaPitch = 0.7;

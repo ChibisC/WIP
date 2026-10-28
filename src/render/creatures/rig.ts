@@ -119,7 +119,7 @@ export class Rig {
     }
     _m.multiplyMatrices(this.base, local);
     if (this.flash > 0) {
-      this.fc.set(color).lerp(FLASH, this.flash * 0.16); // (blind review: at 0.3 a near-black beetle turned salmon)
+      this.fc.set(color).lerp(FLASH, this.flash * 0.1); // (blind reviews: at 0.3, then 0.16, a near-black beetle washed out salmon)
       this.out.add(prim, _m, this.fc, surf);
     } else this.out.add(prim, _m, color as THREE.Color, surf);
   }
@@ -147,7 +147,7 @@ export class Rig {
     }
     _m.multiplyMatrices(this.base, local);
     if (this.flash > 0) {
-      this.fc.set(color).lerp(FLASH, this.flash * 0.16); // (blind review: at 0.3 a near-black beetle turned salmon)
+      this.fc.set(color).lerp(FLASH, this.flash * 0.1); // (blind reviews: at 0.3, then 0.16, a near-black beetle washed out salmon)
       this.out.addPart(name, _m, this.fc, surf);
     } else this.out.addPart(name, _m, color as THREE.Color, surf);
   }
