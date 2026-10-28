@@ -125,6 +125,7 @@ function attacker(x: number, y: number, h: number, variant: number, gap: number,
     v.atkVar = variant;
     v.atkSide = cyc & 1 ? 1 : -1;
     v.atkGap = gap;
+    v.atkN = Math.max(0, cyc);
   };
 }
 

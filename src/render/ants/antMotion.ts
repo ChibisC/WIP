@@ -1,6 +1,7 @@
 import type { AntRig } from './antGeometry';
 import type { AntView } from './antRenderer';
 import { POSE } from './antMaterial';
+import { ATK } from './attackPoses';
 
 /**
  * Ant animation pass (docs/realism/animation.md), render only: the per-ant motion controller for the
@@ -34,6 +35,78 @@ export function attackVariant(morph: string, v: number): number {
   return v;
 }
 
+/** This attack cycle's plan (spec 04): which attack, whether a grip is held into / out of it, the pivot round the grip. */
+export interface AtkPlan {
+  variant: number;
+  holdIn: boolean;
+  holdOut: boolean;
+  /** turn round the grip point (rad) at this phase */
+  piv: number;
+}
+/** each sting of a series turns the ant this far round its grip (Solenopsis stings in a ring round the bite) */
+const PIV_STEP = 0.3;
+
+/**
+ * Pick the attack for cycle `v.atkN` at phase q (render only; seeded by the ant, so the same fight replays the same).
+ *  - Fire ant worker: a bout of six cycles — a series of 3–5 stings, pivoting round the grip after each (the ring of
+ *    stings Solenopsis leaves), then the jaws alone: a lunge bite, a clamp and tug or a quick single sting.
+ *  - Fire ant major: crushing bites, now and then a sideways swing of the head (never twice running).
+ * With `v.atkSeq` unset (the lab's one-attack clips) `v.atkVar` names the attack: worker 0 lunge, 1 the sting series
+ * (four and a quick sting), 2 clamp; major 0 crush, 1 head swing, 2 lunge.
+ */
+export function attackPlan(morph: string, v: AntView, q: number, seed: number, out: AtkPlan): AtkPlan {
+  out.holdIn = out.holdOut = false;
+  out.piv = 0;
+  const n = Math.max(0, v.atkN ?? 0);
+  const av = (((v.atkVar ?? 0) % 3) + 3) % 3;
+  const hs = (k: number, j: number) => hash01(seed * 1000 + k, j);
+  if (morph.startsWith('fire_major')) {
+    if (!v.atkSeq) out.variant = [ATK.CRUSH, ATK.HEAD_SWING, ATK.LUNGE][av];
+    else {
+      const swing = (k: number) => k > 0 && hs(k, 3) < 0.35;
+      out.variant = swing(n) && !swing(n - 1) ? ATK.HEAD_SWING : ATK.CRUSH;
+    }
+    return out;
+  }
+  if (!morph.startsWith('fire_')) {
+    out.variant = attackVariant(morph, av);
+    return out;
+  }
+  // the worker's bout: a sting series of `len`, then jaws-only attacks
+  let len: number;
+  let pos: number;
+  let bout: number;
+  let other: number;
+  if (v.atkSeq) {
+    bout = Math.floor(n / 6);
+    pos = n % 6;
+    len = 3 + Math.floor(hs(bout, 4) * 3);
+    other = [ATK.LUNGE, ATK.CLAMP, ATK.QUICK_STING][Math.floor(hs(bout * 7 + pos, 5) * 3) % 3];
+  } else if (av === 1) {
+    bout = Math.floor(n / 5);
+    pos = n % 5;
+    len = 4;
+    other = ATK.QUICK_STING;
+  } else {
+    out.variant = av === 0 ? ATK.LUNGE : ATK.CLAMP;
+    return out;
+  }
+  const dir = hs(bout, 6) < 0.5 ? -1 : 1;
+  const sm01 = (x: number) => sm(x);
+  if (pos < len) {
+    out.variant = ATK.PIVOT_STING;
+    out.holdIn = pos > 0;
+    out.holdOut = pos < len - 1;
+    // after each jab but the last, a step round the grip while the gaster draws back
+    out.piv = dir * PIV_STEP * (pos + (out.holdOut ? sm01((q - 0.76) / 0.24) : 0));
+  } else {
+    out.variant = other;
+    // the first attack after the series: back round to face the target as it lets go
+    if (pos === len) out.piv = dir * PIV_STEP * (len - 1) * (1 - sm01(q / 0.5));
+  }
+  return out;
+}
+
 export const IDLE = { GROOM_ANT: 0, GROOM_LEGS: 1, LOOK: 2, ANTENNATE: 3, SHUFFLE: 4 } as const;
 const IDLE_W = [0.26, 0.2, 0.2, 0.18, 0.16];
 const IDLE_DUR: Array<[number, number]> = [
@@ -57,6 +130,9 @@ export interface Motion2 {
   vf: number;
   om: number;
   acc: number;
+  /** sideways speed (mm/s, + to the ant's right) and the sideways stance sweep */
+  vs: number;
+  Dz: number;
   Dh: number;
   Ps: number;
   roll: number;
@@ -108,8 +184,9 @@ export interface MotionOut {
   /** tumbling while flung: about the body's long axis or its side axis */
   spinRoll: number;
   spinPitch: number;
-  /** planted feet: stance half-sweep (object mm) and half the turn per stance (rad) */
+  /** planted feet: stance half-sweep (object mm) forward and sideways, and half the turn per stance (rad) */
   Dh: number;
+  Dz: number;
   Ps: number;
   flash: number;
   /** death: leg curl (0..~1.1, the shader's `death`) and the roll onto the back or side */
@@ -128,7 +205,7 @@ export interface MotionOut {
 }
 
 export function newMotionOut(): MotionOut {
-  return { h: 0, fwd: 0, side: 0, up: 0, yaw: 0, pitch: 0, roll: 0, spinRoll: 0, spinPitch: 0, Dh: 0, Ps: 0, flash: 0, deathLeg: 0, deathRoll: 0, pose: 0, headYaw: 0, headPitch: 0, mand: 0, antPitch: 0, antSpread: 0, antAct: 0, clock: 1 };
+  return { h: 0, fwd: 0, side: 0, up: 0, yaw: 0, pitch: 0, roll: 0, spinRoll: 0, spinPitch: 0, Dh: 0, Dz: 0, Ps: 0, flash: 0, deathLeg: 0, deathRoll: 0, pose: 0, headYaw: 0, headPitch: 0, mand: 0, antPitch: 0, antSpread: 0, antAct: 0, clock: 1 };
 }
 
 const hash01 = (n: number, k: number): number => {
@@ -151,6 +228,8 @@ export function newMotion(id: number): Motion2 {
     vf: 0,
     om: 0,
     acc: 0,
+    vs: 0,
+    Dz: 0,
     Dh: 0,
     Ps: 0,
     roll: 0,
@@ -310,14 +389,20 @@ export function stepMotion(
 
   // ---- speed along the body and turn rate (smoothed), from what the body actually did this frame
   let fwd = 0;
+  let sd = 0;
   const dx = inp.x - inp.lastX;
   const dy = inp.y - inp.lastY;
-  if (Math.hypot(dx, dy) < L * 2) fwd = dx * Math.cos(m.hb) + dy * Math.sin(m.hb);
+  if (Math.hypot(dx, dy) < L * 2) {
+    fwd = dx * Math.cos(m.hb) + dy * Math.sin(m.hb);
+    // (the ant's right in plane coords is (−sin h, cos h): the object's +z)
+    sd = -dx * Math.sin(m.hb) + dy * Math.cos(m.hb);
+  }
   const vfT = inp.mounted ? inp.mountSpeed : dt > 0 ? fwd / dt : 0;
   const omT = inp.mounted || dt <= 0 ? 0 : wrap(m.hb - m.lastHb) / dt;
   m.lastHb = m.hb;
   const prevVf = m.vf;
   m.vf = damp(m.vf, vfT, 14, dt);
+  m.vs = damp(m.vs, inp.mounted || dt <= 0 ? 0 : sd / dt, 14, dt);
   m.om = damp(m.om, clamp(omT, -14, 14), 14, dt);
   m.acc = damp(m.acc, dt > 0 ? (m.vf - prevVf) / dt : 0, 8, dt);
 
@@ -327,7 +412,7 @@ export function stepMotion(
   const duty = rig.gaitDuty ?? 0.55;
   const ellMax = ((2 * (rig.sweepMax ?? rig.length * 0.16)) / duty) * inp.scale * 0.97;
   const turnCyc = ((2 * (rig.turnMax ?? 0.2)) / duty) * 0.97;
-  const vAbs = Math.abs(m.vf);
+  const vAbs = Math.hypot(m.vf, m.vs);
   const ell = ellMax * m.strideK * 0.92 * clamp(0.55 + 0.45 * (vAbs / (ellMax * 4)), 0.55, 1);
   const lever = rig.length * 0.3 * inp.scale;
   const travel = vAbs + Math.abs(m.om) * lever;
@@ -336,16 +421,19 @@ export function stepMotion(
   const cad = moving ? vAbs / ell + Math.abs(m.om) / turnCyc : 0;
   const DhT = cad > 0 ? ((duty * (m.vf / cad)) / 2) / inp.scale : 0;
   const PsT = cad > 0 ? (duty * (m.om / cad)) / 2 : 0;
+  const DzT = cad > 0 ? ((duty * (m.vs / cad)) / 2) / inp.scale : 0;
   // (standing, the last stance is held: the planted feet stay where they are rather than sliding home)
   if (moving) {
     m.Dh = damp(m.Dh, DhT, 30, dt);
     m.Ps = damp(m.Ps, PsT, 30, dt);
+    m.Dz = damp(m.Dz, DzT, 30, dt);
   }
   s.phase += cad * adt;
   const ampT = v.dead ? 0 : Math.min(1, cad / 4 + (moving ? 0.45 : 0));
   s.amp = damp(s.amp, ampT, 10, dt);
   out.Dh = m.Dh;
   out.Ps = m.Ps;
+  out.Dz = m.Dz;
 
   // ---- body: lean into turns, pitch with speeding up / slowing down
   m.roll = damp(m.roll, clamp((m.vf / Math.max(L, 1e-3)) * m.om * 0.01, -0.06, 0.06), 8, dt);

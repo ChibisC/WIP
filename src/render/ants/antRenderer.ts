@@ -3,7 +3,7 @@ import { AntRig, buildAnt } from './antGeometry';
 import { BODY_TEX, createAntMaterials, createAntGlueShell, POSE, TINT_GLSL } from './antMaterial';
 import { AttackPose, applyAttackBody, attackPose, attackPoseV2, neutralPose } from './attackPoses';
 import { AntMorph, MORPHS } from './morphs';
-import { animV2, attackVariant, Motion2, newMotion, newMotionOut, stepMotion } from './antMotion';
+import { animV2, AtkPlan, attackPlan, Motion2, newMotion, newMotionOut, stepMotion } from './antMotion';
 import { addPatch, patchDapple } from '../shaderPatch';
 import { TermiteLayer } from '../termite/termiteLayer';
 import { BALANCE } from '../../sim/balance';
@@ -92,6 +92,10 @@ export interface AntView {
   atkVar?: number;
   atkSide?: number;
   atkGap?: number;
+  /** the attack cycle's count (render: sequences of attacks, e.g. a fire ant's series of pivoting stings) and whether
+   *  the render picks the attacks itself (the game) or plays `atkVar`'s (the lab's single-attack clips) */
+  atkN?: number;
+  atkSeq?: boolean;
   /** held in a creature's jaws (its id; 0 = not): drawn at the jaw frame of its animated body when it records one */
   heldCr?: number;
   /** climbing a creature (sim/climbing.ts): its id (0 = on the ground), phase 1 up / 2 riding / 3 down, rail, slot, progress */
@@ -158,6 +162,10 @@ interface AnimState {
   aq?: number;
   av?: number;
   as?: number;
+  /** spec 04: the grip held from the last sting / into the next, and the pivot round the grip (rad, eased) */
+  ahi?: boolean;
+  aho?: boolean;
+  piv?: number;
 }
 
 const LOD_NAMES = ['lod0', 'lod1', 'imp'] as const;
@@ -341,6 +349,7 @@ const tmpShellM = new THREE.Matrix4();
 const motionOut = newMotionOut();
 const TICK_S = 1 / BALANCE.tickHz;
 const atkP = neutralPose({} as AttackPose);
+const plan: AtkPlan = { variant: 0, holdIn: false, holdOut: false, piv: 0 };
 
 const tmpM = new THREE.Matrix4();
 const tmpQ = new THREE.Quaternion();
@@ -572,10 +581,35 @@ export class AntRenderer {
       // Gait: phase advances by distance travelled / stride length, so feet never slide.
       const scale = (1 + v.sizeVar * 0.12) * (v.scale ?? 1) * (s.m2 ? s.m2.sizeK : 1);
       const fighting = v.atk !== undefined;
+      if (fighting) {
+        // (the animation pass runs the attack's phase on between ticks, so the strike is smooth at any frame rate)
+        s.aq = M ? ((v.atk ?? 0) + (alpha * TICK_S) / Math.max(0.15, v.atkGap ?? 0.8)) % 1 : v.atk;
+        s.as = v.atkSide ?? 1;
+        if (M && s.m2) {
+          attackPlan(v.morph, v, s.aq ?? 0, s.m2.seed, plan);
+          s.av = plan.variant;
+          s.ahi = plan.holdIn;
+          s.aho = plan.holdOut;
+        } else s.av = v.atkVar ?? 0;
+      }
+      // spec 04: a fire ant stinging its way round its grip — the ground frame turns about the grip point (the jaw
+      // tips) and the legs step round (the gait's turn and sideways sweep follow it)
+      let gx = x;
+      let gy = y;
+      let gh = h;
+      if (M) {
+        s.piv = damp(s.piv ?? 0, fighting ? plan.piv : 0, 10, dt);
+        if (Math.abs(s.piv) > 1e-4) {
+          const d = rig.mouth.x * scale;
+          gx = x + d * (Math.cos(h) - Math.cos(h + s.piv));
+          gy = y + d * (Math.sin(h) - Math.sin(h + s.piv));
+          gh = h + s.piv;
+        }
+      }
       if (M && s.m2) {
-        stepMotion(s, s.m2, v, rig, { x, y, h, lastX: s.lastX, lastY: s.lastY, dt, scale, mounted, mountSpeed: mounted ? mountOut.speed : 0, fighting }, M);
-        s.lastX = x;
-        s.lastY = y;
+        stepMotion(s, s.m2, v, rig, { x: gx, y: gy, h: gh, lastX: s.lastX, lastY: s.lastY, dt, scale, mounted, mountSpeed: mounted ? mountOut.speed : 0, fighting }, M);
+        s.lastX = gx;
+        s.lastY = gy;
         s.lastH = M.h;
         s.seen = this.frame;
       } else {
@@ -622,12 +656,6 @@ export class AntRenderer {
       s.roll = damp(s.roll, v.roll, 10, dt);
       // melee attack: this cycle's attack pose (attackPoses.ts), eased in and out of the fight
       s.aw = damp(s.aw ?? 0, fighting ? 1 : 0, fighting ? 12 : M ? 9 : 6, dt);
-      if (fighting) {
-        // (the animation pass runs the attack's phase on between ticks, so the strike is smooth at any frame rate)
-        s.aq = M ? ((v.atk ?? 0) + (alpha * TICK_S) / Math.max(0.15, v.atkGap ?? 0.8)) % 1 : v.atk;
-        s.av = M ? attackVariant(v.morph, v.atkVar ?? 0) : (v.atkVar ?? 0);
-        s.as = v.atkSide ?? 1;
-      }
       let hy = s.hy;
       let hp = s.hp;
       let mo = s.mo;
@@ -635,7 +663,7 @@ export class AntRenderer {
       const aw = s.aw ?? 0;
       let stingW = 0;
       if (aw > 0.001) {
-        if (M) attackPoseV2(s.av ?? 0, s.aq ?? 0, s.as ?? 1, atkP);
+        if (M) attackPoseV2(s.av ?? 0, s.aq ?? 0, s.as ?? 1, atkP, !!s.ahi, !!s.aho);
         else attackPose(s.av ?? 0, s.aq ?? 0, s.as ?? 1, atkP);
         hy += atkP.headYaw * aw;
         hp += atkP.headPitch * aw;
@@ -674,8 +702,8 @@ export class AntRenderer {
         s.nz = vU.z;
         vF.copy(mountOut.f);
       } else {
-        adapter.toWorld(x, y, vP);
-        adapter.normal(x, y, vU);
+        adapter.toWorld(gx, gy, vP);
+        adapter.normal(gx, gy, vU);
         s.nx = damp(s.nx, vU.x, 10, dt);
         s.ny = damp(s.ny, vU.y, 10, dt);
         s.nz = damp(s.nz, vU.z, 10, dt);
@@ -727,7 +755,7 @@ export class AntRenderer {
         bodyBuf[0] = vT.x;
         bodyBuf[1] = vT.y;
         bodyBuf[2] = vT.z;
-        bodyBuf[3] = 0;
+        bodyBuf[3] = M.Dz;
         bodyBuf[4] = qB.x * k;
         bodyBuf[5] = qB.y * k;
         bodyBuf[6] = qB.z * k;

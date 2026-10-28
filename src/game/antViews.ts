@@ -103,6 +103,8 @@ function meleeAttack(w: World, a: Ant, out: AntView): void {
   out.atkVar = r.v;
   out.atkSide = r.n & 1 ? 1 : -1;
   out.atkGap = r.gap;
+  out.atkN = r.n;
+  out.atkSeq = true;
   if (++atkPrune > 4000) {
     atkPrune = 0;
     for (const [id, x] of atkRecs) if (w.s.tick - x.seen > 200) atkRecs.delete(id);

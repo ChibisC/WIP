@@ -218,8 +218,8 @@ const CLAMP_W: Key = { yaw: 0.34, side: 0.035, roll: 0.07, headYaw: 0.5, headPit
 const CLAMP_S: Key = { yaw: -0.14, headYaw: -0.22, fwd: 0.08, headPitch: -0.16, mand: 0, spread: 0.25 };
 const CLAMP_T: Key = { yaw: -0.08, fwd: -0.13, pitch: 0.07, headPitch: -0.06, mand: 0.04, spread: 0.4 };
 /** gripping and stinging (fire ants): the hold between stings and the jab */
-const GRIP: Key = { fwd: 0.06, up: 0.055, pitch: -0.1, px: 0.3, headPitch: -0.26, mand: 0.04, gaster: -1.25, sting: 0.6, spread: 0.32 };
-const JAB: Key = { fwd: 0.07, up: 0.075, pitch: -0.17, px: 0.3, headPitch: -0.3, mand: 0.02, gaster: -2.35, sting: 1, spread: 0.32, gYaw: -0.12 };
+const GRIP: Key = { fwd: 0.06, up: 0.1, pitch: -0.16, px: 0.35, headPitch: -0.2, mand: 0.04, gaster: -1.6, sting: 0.6, spread: 0.32 };
+const JAB: Key = { fwd: 0.07, up: 0.13, pitch: -0.25, px: 0.35, headPitch: -0.24, mand: 0.02, gaster: -2.8, sting: 1, spread: 0.32, gYaw: -0.12 };
 const GRAB: Key = { fwd: 0.09, up: 0.0, pitch: -0.05, headPitch: -0.3, mand: 0.05, spread: 0.2 };
 const CRUSH_W: Key = { fwd: -0.05, up: -0.06, headPitch: -0.22, mand: 1, gaster: 0.15, spread: 0.4 };
 const CRUSH_S: Key = { fwd: 0.1, up: -0.07, pitch: -0.08, px: 0.3, headPitch: -0.42, mand: 0, spread: 0.4 };
