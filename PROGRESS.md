@@ -771,6 +771,12 @@ User spec: project doc `claude/realism/03-spec-jaws-and-animation.md`. Details i
     - The slam has a soft dust shock wave and the hit flash is lighter.
     - The dead stag rests on its back with folded legs.
   - Second blind review: lunge identified at 75 %, grip-and-sting at 70 %; clamp-and-tug confused with rear-up. Fights are unreadable at the default zoom, where ants are about 10 px.
-  - After the clips were recorded: each bite gets a warm pop that keeps 9 px on screen, dead pilot ants' legs curl under the belly, and the sting curl is softer. These are not in the clips.
-  - Not done: the stress comparison (1000+ ants, 4 bosses). The run failed (a dev-server reload, and too few frames in 40 s on software rendering); re-run with `SECS=200`.
+  - Later fixes, all in the final clips: each bite gets a warm pop that keeps 9 px on screen; dead pilot ants' legs curl under the belly; the sting curl is softer; the posed ants in the lab stand clear of the walker; a lighter creature hit flash.
+  - Stress: the frame rate can't be measured with 1000+ ants on this sandbox, where the software GPU takes several seconds a frame and two 200 s runs never got past warm-up. The CPU side of the pass costs 1.25 ms a frame for 1,040 ants (2.2 ms p95), about 7.5 % of a 60 fps budget, and 3.3 ms for 4,160 (`tools/anim-cost.ts`, `docs/realism/animation/cost.json`). The frame rate needs checking on a real device.
+- **Pilot finish (2026-10-27/28, at the user's request).**
+  - The fire ant worker's jaws went back to the spec's "clearly visible": a longer, flatter toothed triangle in front of the head, apexes crossing a little, a small flat clypeal lobe and a dark labrum.
+  - The antenna sockets sit back on the head surface.
+  - Everything was re-rendered and all clips re-recorded both ways.
+  - The review page for the user's own rating is https://claude.ai/artifact/DvWJzEKXqPdcp396FprwZC: jaws J1–J6, clips A1–A17, the spec's acceptance checklist and the rollout decision. Scores are stored in its `ratings` collection. The photo comparison sheet was sent in the chat; the photos are study-only and stay out of the page.
+  - Waiting for the user's ratings and decision.
 - Clips and strips: `docs/realism/animation/clips/`, `strips/`; jaw sheets: `docs/realism/jaws/` (photo sheets git-ignored).

@@ -136,7 +136,11 @@ Results are logged in `PROGRESS.md`.
   all idle, in 5 kinds, starting on 32 different frames. In the idle100 clip no two neighbours move in step.
 - **Hits and deaths:** a hit gives a flash (0.88), a short hit-stop and a flinch of 28 % of the body length.
   The legs curl within 0.40 s and the body rolls (−2.55 rad).
-- **Stress and the blind review of the clips:** see `PROGRESS.md`.
+- **Cost:** the motion controller takes 1.25 ms a frame for 1,040 ants (2.2 ms p95), about 7.5 % of a 60 fps
+  budget on the 2-CPU test machine, and 3.3 ms for 4,160 (`tools/anim-cost.ts`). The frame rate with 1,000+
+  ants and four bosses can't be measured without a GPU (`tests/browser/anim_stress.py` on software rendering
+  never gets past warm-up) and needs a real device.
+- **Blind reviews of the clips:** see `PROGRESS.md`.
 
 Lab: `?scene=animlab&clip=<name>` (`src/dev/animLab.ts`; `anim=1` shows the old motion). Recorder:
 `tests/browser/anim_clips.py`. Strips: `tools/anim-sheets.py`. Stress comparison:
