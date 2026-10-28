@@ -780,3 +780,18 @@ User spec: project doc `claude/realism/03-spec-jaws-and-animation.md`. Details i
   - The review page for the user's own rating is https://claude.ai/artifact/DvWJzEKXqPdcp396FprwZC: jaws J1–J6, clips A1–A17, the spec's acceptance checklist and the rollout decision. Scores are stored in its `ratings` collection. The photo comparison sheet was sent in the chat; the photos are study-only and stay out of the page.
   - Waiting for the user's ratings and decision.
 - Clips and strips: `docs/realism/animation/clips/`, `strips/`; jaw sheets: `docs/realism/jaws/` (photo sheets git-ignored).
+
+## 2026-10-28 — Combat and death animation (spec 04), pilot: fire ant worker and major (awaiting approval)
+User spec: project doc `claude/realism/04-spec-ant-attack-and-death-animations.md`, the user's ratings of round 1 (review page DvWJzEKXqPdcp396FprwZC: jaws all 10/10; the animation not yet approved) and a reference screen recording (study only). Details in `docs/realism/combat.md`; research in `docs/creatures/solenopsis-geminata.md`.
+- **Planted feet under a moving body.** A per-instance body-offset texture (4 texels: translation, rotation, stance spread, sideways sweep, gaster yaw, sting, fore legs, decapitation, drying, crush). The shader solves each leg against its ground target in the body frame, so attacks, flinches and leans move the body over feet that stay put.
+- **Attacks in three beats** (wind-up, a 4-frame strike on the damage tick, recovery):
+  - Worker: a series of 3–5 stings on one grip, rising, arching, curling the gaster under and stepping round the grip between stings; also a lunge bite, a clamp and tug, and a quick sting.
+  - Major: crushing bites and head swings.
+  - Alarm: the gaster-flagging threat display.
+  - Hits: two light reactions and a heavy knockback.
+  - Render-side sound hooks.
+- **Deaths by cause.** Sim: a deterministic `Ant.lastHit` (bite, venom, acid, crush, fall, drown, starve, decapitation) passed on the death event and the corpse. Each cause has its own death. Corpses keep the animation through the hand-over, lose their gloss, and sink out of sight.
+- **Round-1 rating fixes:** A1, A2, A3, A4, A5, A9, A10, A11, A13, A14, A16, A17 (list in combat.md).
+- **Checks:** check-determinism clean; tests/animation.ts and tests/combat.ts pass.
+- **Clips:** `docs/realism/combat/fire-ant/`, `docs/realism/combat/stag-beetle/`.
+- Waiting for the user's ratings on the round-2 review page before rollout.

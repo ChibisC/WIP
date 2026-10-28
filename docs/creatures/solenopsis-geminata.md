@@ -95,6 +95,14 @@ clamp and tug. Two hit reactions (recoil, side flinch). Two deaths (onto the bac
 - In real colonies, workers harvest about eight times more seed than *S. invicta* does and store it in granaries, and the majors mill it.
 - *S. geminata* foragers are slower and less aggressive than *S. invicta*'s, but defend food once found.
 
+## Combat and death behavior (spec 04, animation)
+What the attack and death animations are built on (render only; `render/ants/attackPoses.ts`, `antMotion.ts`; notes in docs/realism/combat.md):
+- **Grip and pivot sting.** A worker seizes the skin with its mandibles and lifts it, curls the gaster under its body and drives the sting in. It then pulls the sting out, pivots round the grip on its head and stings again several times, leaving a ring of stings. The game plays a series of 3–5 stings on one grip: the ant rises on its legs, arches, tucks the gaster under and jabs, then steps round the grip between stings. A quick single sting is the short variant. (extension.org "Ouch! I've been stung by a fire ant"; the ring of pustules is the clinical sign.)
+- **Gaster flagging.** Workers raise the gaster and vibrate it with the sting extruded, dispersing venom into the air. Foragers use it to repel other ants they meet (up to ~500 ng of venom); brood tenders use about 1 ng on the brood. The game's threat display (alarm): legs planted wide, body lifted, gaster near vertical with the sting out and waving, head lowered and turning a little. The reference footage the user supplied shows the same posture; it is study-only and nothing from it is copied. (Obin & Vander Meer 1985.)
+- **Majors.** These are heavy-jawed seed millers. In a fight they bite with a slow, braced crush (low wide stance, head lowered, jaws opening slowly, then a surge and crunch) and now and then swing the head sideways.
+- **Jaws and sting, never legs.** Ants attack only with the mandibles, the sting and (other species) acid. The legs plant, brace, lift the body, pivot and scrabble.
+- **Death.** A dying ant curls its legs under it and tips onto its side or back. Venom brings convulsions first; a crushing blow leaves it flat. Fire ants carry their dead to refuse piles (necrophoresis, triggered by fatty-acid decomposition products; Howard & Tschinkel 1976). The game sinks corpses after a short while instead (a user decision), and their gloss fades as they lie.
+
 ## Facts for info cards
 - Majors have huge square heads and blunt mandibles built for milling seeds.
 - Native to the Americas, *S. geminata* has spread across the tropics on ships for centuries.
@@ -103,3 +111,6 @@ clamp and tug. Two hit reactions (recoil, side flinch). Two deaths (onto the bac
 ## Sources
 - AntWiki, *Solenopsis geminata*: https://www.antwiki.org/wiki/Solenopsis_geminata
 - Landcare Research, *Solenopsis geminata* information sheet: https://oldwww.landcareresearch.co.nz/__data/assets/pdf_file/0015/51063/solgem.pdf
+- Obin, M. S. & Vander Meer, R. K. (1985). Gaster flagging by fire ants (*Solenopsis* spp.): functional significance of venom dispersal behavior. *Journal of Chemical Ecology* 11: 1757–1768. https://link.springer.com/doi/10.1007/BF01012125
+- Ant pests (extension.org), "Ouch! I've been stung by a fire ant": https://ant-pests.extension.org/ouch-ive-been-stung-by-a-fire-ant
+- Howard, D. F. & Tschinkel, W. R. (1976). Aspects of necrophoric behavior in the red imported fire ant, *Solenopsis invicta*. *Behaviour* 56.

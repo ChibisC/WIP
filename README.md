@@ -169,6 +169,10 @@ npx vite-node tests/royals.ts                                       # termite ro
 npx vite-node tests/sickle.ts                                       # Sickle-Jaw Termites: the ramp, holds, rescue, one soldier per victim, size limit, miss, alarm, king, AI, litter, determinism
 npx vite-node tests/eciton.ts                                       # army ants: castes and old ids, diet, swarm front, lanes, porters, Soldier posts, bridges, plugs, hook, pinning, models unchanged, determinism
 npx vite-node tests/termants.ts                                     # Termants: genes from enemy corpses only, unlock, cost ×1.5, max 3, forget, glue and acid, wood, carton walls, one queen and no replacement, AI, determinism
+npx vite-node tests/animation.ts                                    # animation pass (render only): planted feet, variety, idles, hits, deaths, flings
+npx vite-node tools/anim-cost.ts -- 1040                            # the animation controller's CPU cost per frame for a crowd
+# animation lab (dev server): ?scene=animlab&clip=atk1 — attacks atk0–2, major0–1, flag, hits, deaths (by cause), fling, walk, stag_*;
+# &cdist= / &ctx= / &ctz= move the camera; tests/browser/anim_clips.py records clips (docs/realism/combat/)
 npx vite-node tests/fights.ts                                       # guard line, room in a fight, foes shared out, creatures apart, calm after a fight, marker orders (no attacking / gathering / climbing)
 npx vite-node tools/postfight.ts -- ant:lasius_soldier 20           # what fighters do once their foes are dead (zigzags, stop-start, states)
 npx vite-node tools/fightspread.ts -- ant:lasius_soldier 24 ant:formica_soldier 24   # how spread out a melee is, second by second

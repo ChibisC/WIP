@@ -323,6 +323,12 @@ Units: hp, damage, attack interval, armor, speed, range, mass, grip.
 * creatures: a dying creature raises dust; a boss slam throws a dust ring; the tarantula's hairs drift as a tawny cloud;
 * **telegraphs**: a boss's wind-up draws a red ground circle or cone that fills until the strike lands, so you can pull your ants out.
 
+**Animation (render only; spec 04, pilot: fire ants — `docs/realism/combat.md`):**
+* attacks move the body over planted feet in three beats (wind-up, a strike of a few frames on the damage tick, recovery); jaws, sting and gaster attack, the legs only plant, brace, lift and step;
+* fire ant workers fight in bouts: a series of 3–5 stings on one grip, pivoting round it, then jaws-only attacks; majors crush and swing the head; alarm is the gaster-flagging threat display;
+* a heavy hit (over a fifth of an ant's life) knocks it back a step;
+* deaths by cause: the sim records what last hurt an ant (`Ant.lastHit`: bite, venom, acid, crush, fall, drown, starve, decapitation; deterministic) and the render plays that death; corpses dry and sink.
+
 **Tools:**
 * `tools/battle.ts`: equal-cost matchups.
 * `tools/raid.ts`: a party raids a rival nest grown by the builder brain.
