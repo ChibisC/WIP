@@ -75,6 +75,10 @@ vec3 animP = position;
   vHit = aC.w;
   // body bob at twice the stride frequency (the planted feet allow for it)
   float bob = amp * uGait.w * 0.006 * cos(phase * 12.566);
+  // spec 04 (planted-feet species): the threat display (alarm: gaster flagged, user rating A11) and the sting
+  // (A4) plant the feet wider and lift the body on straightened legs; the feet stay on the ground
+  float stanceW = uPlant > 0.5 && (pose == 8 || pose == 4) ? poseW : 0.0;
+  float bodyUp = stanceW * uGait.w * (pose == 8 ? 0.06 : 0.045);
   vec3 UP = vec3(0.0, 1.0, 0.0);
   vec3 RIGHT = vec3(0.0, 0.0, 1.0);
   vSurf = aSurf; vLocal = position / uGait.w; vTint = floor((aD.z + 2.0) / 4.0); vColorVar = aD.z - 4.0 * vTint;
@@ -112,8 +116,9 @@ vec3 animP = position;
       // animation pass: the foot stays where it touched down. Its target on the ground moves back under the body
       // by the stance sweep (aD.y, mm) and round the body's centre by the turn (aE.y, rad) while planted, and
       // swings forward lifted; the leg reaches it by yaw at the coxa and a two-bone solve in its own plane.
+      // (spec 04: in the threat display and the sting the feet plant wider and the body rises on them)
       vec3 C = uLegCoxa[li]; vec3 K = uLegKnee[li]; vec3 F0 = uLegFoot[li]; vec3 NH = uLegHome[li];
-      vec3 tg = rotA(vec3(NH.x, 0.0, NH.z), UP, -pro * aE.y) + vec3(pro * aD.y, 0.0, 0.0);
+      vec3 tg = rotA(vec3(NH.x * (1.0 + 0.12 * stanceW), 0.0, NH.z * (1.0 + 0.3 * stanceW)), UP, -pro * aE.y) + vec3(pro * aD.y, 0.0, 0.0);
       vec2 r0 = F0.xz - C.xz;
       vec2 r1 = tg.xz - C.xz;
       yaw = wrapA(atan(r0.y, r0.x) - atan(r1.y, r1.x));
@@ -122,7 +127,7 @@ vec3 animP = position;
       vec2 ff = vec2(length(r0), F0.y - C.y);
       float la = length(kk);
       float lb = length(ff - kk);
-      vec2 tt = vec2(length(r1), ff.y + lift * uGait.y * amp * length(r0) * 0.75 - bob);
+      vec2 tt = vec2(length(r1), ff.y + lift * uGait.y * amp * length(r0) * 0.75 - bob - bodyUp);
       float Dd = clamp(length(tt), abs(la - lb) + 1e-4, (la + lb) * 0.999);
       float al = acos(clamp((la * la + Dd * Dd - lb * lb) / (2.0 * la * Dd), -1.0, 1.0));
       float sK = (ff.x * kk.y - ff.y * kk.x) >= 0.0 ? 1.0 : -1.0;
@@ -140,9 +145,12 @@ vec3 animP = position;
       float gs = fract(pph * 0.25) < 0.5 ? -1.0 : 1.0;
       if (side == gs) {
         float stroke = sin(pph * 6.2831);
-        yaw = mix(yaw, side * (1.05 + 0.18 * stroke), poseW);
-        lft = mix(lft, 1.05 + 0.2 * stroke, poseW);
-        knee = mix(knee, -1.5 + 0.25 * stroke, poseW);
+        // (planted-feet species: the leg comes up beside the head, not through it — user rating A1: the femur
+        // swung in front of the face; the tibia folds back so the strigil meets the antenna at the side)
+        bool pl = uPlant > 0.5;
+        yaw = mix(yaw, side * ((pl ? 0.72 : 1.05) + (pl ? 0.1 : 0.18) * stroke), poseW);
+        lft = mix(lft, (pl ? 0.9 : 1.05) + (pl ? 0.14 : 0.2) * stroke, poseW);
+        knee = mix(knee, (pl ? -1.85 : -1.5) + 0.25 * stroke, poseW);
         ankleF = mix(ankleF, 0.7, poseW);
       } else {
         yaw = mix(yaw, side * 0.15, poseW);
@@ -239,7 +247,8 @@ vec3 animP = position;
   } else if (part == 8) {
     // The sting slides out of the gaster tip while stinging (realism: retracted into the tip otherwise).
     if (abs(aSurf.w - 2.0) < 0.5) {
-      float sOut = pose == 4 ? poseW : 0.0;
+      // (planted-feet species: the sting shows in the threat display too, as in the reference footage)
+      float sOut = pose == 4 ? poseW : (pose == 8 && uPlant > 0.5 ? poseW * 0.75 : 0.0);
       animP.x += uRealV * 0.055 * uGait.w * (1.0 - sOut) - 0.05 * uGait.w * sOut;
     }
     // A full crop stretches the gaster (honeydew, liquid food).
@@ -253,15 +262,17 @@ vec3 animP = position;
       animP.z += uSoft * amp * gr * uGait.w * 0.01 * sin(phase * 6.283 + 0.6);
       animP.y = mix(animP.y, uGasterPivot.y + (animP.y - uGasterPivot.y) * 0.85, death);
     }
-    rotP(animP, N, uGasterPivot, RIGHT, -gPitch);
+    // the flagged gaster waves slowly in the threat display (planted-feet species)
+    float wave = uPlant > 0.5 && pose == 8 ? poseW * 0.12 * sin(pph * 4.2) : 0.0;
+    rotP(animP, N, uGasterPivot, RIGHT, -gPitch - wave);
   } else if (part == 9) {
     rotP(animP, N, uWaistPivot, RIGHT, -gPitch * 0.3);
   }
   // Soldier on guard: the whole body pitched up about the hind feet; pothole plug: body lowered onto the ground.
   if (pose == 11) { vec3 piv = (uLegCoxa[4] + uLegCoxa[5]) * 0.5; piv.y = 0.0; rotP(animP, N, piv, RIGHT, 0.26 * poseW); }
   if (pose == 13) animP.y -= poseW * uGait.w * 0.1;
-  // Body bob at twice the stride frequency.
-  animP.y += bob;
+  // Body bob at twice the stride frequency; the lift of the threat display and the sting (feet planted).
+  animP.y += bob + bodyUp;
   // Gold form: body lowered slightly (a rushing look).
   if (part < 10) animP.y -= goldA * uGait.w * 0.012;
   objectNormal = N;

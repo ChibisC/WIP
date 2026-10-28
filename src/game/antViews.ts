@@ -234,7 +234,9 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
     out.mandible = Math.max(out.mandible, 0.8);
     out.antennaPitch = 0.7;
     out.antennaActivity = 1;
-    out.gaster = Math.max(out.gaster, cd.sting ? 0.2 : 0.45);
+    // fire ants flag the gaster high in alarm, the sting out (spec 04 threat display; user rating A11), not mid-attack
+    const flag = cd.sting && cd.morph.startsWith('fire_') && a.state !== AS.Attack;
+    out.gaster = Math.max(out.gaster, flag ? 1.15 : cd.sting ? 0.2 : 0.45);
     if (out.pose === POSE.NONE) out.pose = POSE.ALARM;
   }
   if (a.pose === POSE.STING) out.gaster = -0.9;
