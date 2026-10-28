@@ -264,6 +264,14 @@ function clips(): Record<string, Clip> {
       cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.15, 0.35, 1], dist: 9, fov: 30 },
     };
   }
+  // the major's attacks (spec 04): 0 crushing bite, 1 head swing
+  for (const k of [0, 1]) {
+    C[`major${k}`] = {
+      ...C[`atk${k}`],
+      ants: [C.atk0.ants[0], { morph: 'fire_major', script: attacker(-R * 1.05, 0, 0, k, 1.0, 0.2, bite) }],
+      cam: { tx: -0.6, ty: 0.6, tz: 0, dir: [0.15, 0.35, 1], dist: 11, fov: 30 },
+    };
+  }
   // the same attack seen from the default gameplay zoom (readability)
   // (the game's surface camera: 38° field of view, 230 mm away at the default zoom, looking down at about 50°)
   C.attack_game = { ...C.attack, cam: { tx: 0, ty: 0, tz: 0, dir: [0.35, 1, 0.55], dist: 230, fov: 38 } };
