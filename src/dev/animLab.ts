@@ -284,6 +284,48 @@ function clips(): Record<string, Clip> {
       cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.15, 0.35, 1], dist: 9, fov: 30 },
     };
   }
+  // the sting series runs four stings and a quick one (a bout of five cycles): long enough to see it all
+  C.atk1 = { ...C.atk1, dur: 4.8 };
+  // spec 04: the threat display (alarm) — legs planted wide, body raised, gaster flagged up, the sting out
+  C.flag = {
+    dur: 4,
+    ants: [
+      {
+        script: (t, v) => {
+          v.x = 0;
+          v.y = 0;
+          v.heading = 0.3 + (t > 2.2 ? 0.25 : 0);
+          v.pose = t > 0.6 && t < 3.4 ? 8 : 0;
+          v.gaster = v.pose === 8 ? 1.15 : 0;
+          v.antennaPitch = v.pose === 8 ? 0.7 : 0;
+          v.antennaActivity = v.pose === 8 ? 1 : 0.3;
+          v.mandible = v.pose === 8 ? 0.8 : 0.1;
+          v.headYaw = v.pose === 8 ? 0.2 * Math.sin(t * 2.3) : 0;
+        },
+      },
+    ],
+    cam: { tx: 0, ty: 0.6, tz: 0, dir: [0.75, 0.45, 1], dist: 9, fov: 30 },
+  };
+  // spec 04: hit reactions — light bites (a recoil or a side flinch) and two heavy hits (knocked back a step)
+  C.hits = {
+    dur: 4.5,
+    ants: [
+      {
+        script: (t, v) => {
+          v.x = 0;
+          v.y = 0;
+          v.heading = 0;
+          v.antennaActivity = 1;
+          v.antennaPitch = 0.4;
+          // hit points after each hit: light bites of 6, heavy hits of 30 (more than a fifth of its life)
+          let hp = 100;
+          for (const [at, d] of [[0.6, 6], [1.1, 6], [1.7, 30], [2.6, 6], [3.2, 30]] as const) if (t >= at) hp -= d;
+          v.hp = hp;
+        },
+      },
+    ],
+    cam: { tx: -0.5, ty: 0.4, tz: 0, dir: [0.2, 0.45, 1], dist: 10, fov: 30 },
+  };
   // the major's attacks (spec 04): 0 crushing bite, 1 head swing
   for (const k of [0, 1]) {
     C[`major${k}`] = {
