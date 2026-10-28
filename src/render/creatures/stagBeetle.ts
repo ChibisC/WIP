@@ -481,6 +481,9 @@ function solveKnee(h: V, f: V, l1: number, l2: number, outZ: number, out: V): vo
 }
 
 /** Render-only state per beetle (animation pass): planted feet, the stepping order, idles, hit flinches, springs. */
+/** user rating A17: the old idle (no idle acts) */
+const STAG_OLD_IDLE = true;
+
 interface StagRA {
   feet?: Float32Array;
   start?: Float32Array;
@@ -508,6 +511,10 @@ interface StagRA {
   aSwV: number;
   pinchT: number;
   lastCd: number;
+  /** how much the old cyclic walk shows (walking straight on) against the planted steps (turning, starting, stopping) */
+  wOld?: number;
+  /** the feet's last places while alive (local), where the death fold starts from */
+  lastFoot?: Float32Array;
 }
 
 function stagRA(p: CrPose): StagRA {
@@ -634,7 +641,8 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   const busy = p.dead || p.state === ST.Rear || p.state === ST.WindUp || p.state === ST.Lift || (p.state === ST.Strike && st < 0.6) || pinch > 0;
   const still = speed < L * 0.03 && Math.abs(ra.om) < 0.05;
   ra.stillT = still && !busy ? ra.stillT + dt : 0;
-  if (!v2 || ra.stillT < 0.6) {
+  // (user rating A17: the old idle felt better — the head's slow look round and the jaws breathing, no idle acts)
+  if (!v2 || ra.stillT < 0.6 || STAG_OLD_IDLE) {
     if (ra.idle >= 0) ra.iwait = 0.8 + 1.5 * raRnd(ra);
     ra.idle = -1;
   } else if (ra.idle < 0) {
@@ -675,9 +683,16 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
     rock /= 3;
     heaveK /= 3;
   }
+  // user rating A13: the old walk cycle looked better walking straight on, the planted steps better turning and
+  // stopping — the old cycle shows while it walks steadily ahead, the planted steps the rest of the time
+  if (v2 && dt > 0) {
+    const want = !p.dead && speed > L * 0.06 && Math.abs(ra.om) < 0.3 ? 1 : 0;
+    ra.wOld = (ra.wOld ?? 0) + (want - (ra.wOld ?? 0)) * (1 - Math.exp(-dt * 5));
+  }
+  const wOld = v2 ? (ra.wOld ?? 0) : 1;
   const deadRoll = p.dead ? Math.PI * ease(p.deadT * 2) + (p.deadT > 0.5 && p.deadT < 0.8 ? 0.06 * Math.sin(Math.PI * ((p.deadT - 0.5) / 0.3)) : 0) : 0;
-  const roll = (v2 ? rock * 0.035 + 0.05 * ra.hitSide * (ra.hitV === 1 ? fl : 0) : Math.sin(ph) * 0.045 * moving) + deadRoll;
-  const heave = v2 ? heaveK * L * 0.005 : Math.abs(Math.sin(ph)) * L * 0.006 * moving;
+  const roll = (v2 ? rock * 0.035 * (1 - wOld) + Math.sin(ph) * 0.045 * moving * wOld + 0.05 * ra.hitSide * (ra.hitV === 1 ? fl : 0) : Math.sin(ph) * 0.045 * moving) + deadRoll;
+  const heave = v2 ? heaveK * L * 0.005 * (1 - wOld) + Math.abs(Math.sin(ph)) * L * 0.006 * moving * wOld : Math.abs(Math.sin(ph)) * L * 0.006 * moving;
   const pitchUp = rear * 0.52 + lift * 0.16 + wind * -0.05 - slam * 0.07 - crouch * 0.05 + rearIdle * 0.09 + (ra.hitV === 0 ? fl * 0.04 : 0);
   // place the body: tilted to the ground under its front and back, then reared
   {
@@ -740,8 +755,12 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   for (const sd of [-1, 1]) rig.ell(SB.eye.x * L, SB.eye.y * L, sd * (SB.eye.z * hk - 0.008) * L, 0.015 * L, 0.013 * L, 0.009 * L, SG2.eye, SURF.eye);
   // antler mandibles: open in the wind-up and when rearing, clamped while lifting, flung open in the toss
   const idle = 0.12 + 0.05 * Math.sin(p.t * 1.3 + p.v2 * 5);
-  let open = p.dead ? 0.25 : Math.max(idle, wind * (v2 ? 0.7 : 0.62) + tremble * 0.025, rear * 0.55, toss * 0.5, idle + 0.35 * jawIdle, 0.12 + 0.3 * pinch) * (1 - lift * 0.85) + lift * 0.02;
-  if (v2 && p.state === ST.Lift) open = Math.max(0.02, open + Math.sin(st * 30) * 0.02); // squeezing the struggling ants
+  // (user rating A14: grip the ant visibly — the antlers clamp past closed while lifting and stay shut through the
+  // flick of the toss, opening only as they let it go)
+  const tossOpen = v2 && p.state === ST.Strike ? sm01((st - 0.08) / 0.1) * (1 - sm01((st - 0.35) / 0.3)) : toss;
+  let open = p.dead ? 0.25 : Math.max(idle, wind * (v2 ? 0.7 : 0.62) + tremble * 0.025, rear * 0.55, tossOpen * 0.5, idle + 0.35 * jawIdle, 0.12 + 0.3 * pinch) * (1 - lift * 0.85) + lift * (v2 ? -0.07 : 0.02);
+  if (v2 && p.state === ST.Strike && st < 0.08) open = Math.min(open, -0.07); // still clamped through the flick
+  if (v2 && p.state === ST.Lift) open = open + Math.sin(st * 30) * 0.02; // squeezing the struggling ants
   for (const sd of [-1, 1] as const) {
     // a positive yaw turns +x toward −z: open the left (+z) antler with a negative one; the sway turns both alike
     // hinged at the front corners: the outer margin of each base continues the head's side
@@ -786,22 +805,35 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
       const j = i * 2 + (sd > 0 ? 1 : 0);
       hip.set(hx * L, (SB.belly + 0.025) * L, sd * hz * L);
       if (p.dead) {
-        // the legs fold in over half a second, twitching for a while
-        const curl = v2 ? ease(p.deadT / 0.5) : 1;
-        const tw = Math.sin(p.t * (v2 ? 23 : 7) + i * 2 + sd) * 0.08 * Math.max(0, 1 - p.deadT / (v2 ? 2.5 : 4)) * (v2 ? (Math.sin(p.t * 5 + i) > 0.3 ? 1 : 0.2) : 1);
-        footAt(foot, fx * L, sd * reach * L, i * 0.5, 0, 0, 1, 0.6);
+        // the legs fold in over half a second, twitching for a while (user rating A16: they jumped — the twitch
+        // switched on and off and the fold started from the rest pose, not from where the feet were)
+        const curl = v2 ? ease(p.deadT / 0.6) : 1;
+        const tw = Math.sin(p.t * (v2 ? 11 : 7) + i * 2 + sd) * (v2 ? 0.05 : 0.08) * Math.max(0, 1 - p.deadT / (v2 ? 2.5 : 4)) * (v2 ? 0.6 + 0.4 * Math.sin(p.t * 3 + i) : 1);
+        if (v2 && ra.lastFoot) foot.set(ra.lastFoot[j * 3], ra.lastFoot[j * 3 + 1], ra.lastFoot[j * 3 + 2]);
+        else footAt(foot, fx * L, sd * reach * L, i * 0.5, 0, 0, 1, 0.6);
         // folded in over the belly (the feet near the midline, just off it), not stuck out straight
         foot.set(foot.x + ((hx * 0.7 + tw) * L - foot.x) * curl, foot.y + (hip.y - 0.05 * L - foot.y) * curl, foot.z + (sd * (hz * 0.45 + 0.02) * L - foot.z) * curl);
       } else {
         if (v2 && ra.feet) {
           wv3.set(ra.feet[j * 3], ra.feet[j * 3 + 1], ra.feet[j * 3 + 2]).applyMatrix4(inv);
           foot.set(wv3.x, wv3.y, wv3.z);
+          if (wOld > 0.001) {
+            footAt(wv3, fx * L, sd * reach * L, p.phase + tripod(i, sd), sweep * L, 0.05 * L * moving, 1, 0.6);
+            wv3.y += rig.groundAt(wv3.x, wv3.z, p.ground);
+            foot.set(foot.x + (wv3.x - foot.x) * wOld, foot.y + (wv3.y - foot.y) * wOld, foot.z + (wv3.z - foot.z) * wOld);
+          }
         } else footAt(foot, fx * L, sd * reach * L, p.phase + tripod(i, sd), sweep * L, 0.05 * L * moving, 1, 0.6);
         // a rearing beetle lifts its fore legs and waves them; the others brace wider; the slam drives them down
         if (i === 0 && rear > 0) foot.set(foot.x + 0.12 * L * rear, foot.y + 0.18 * L * rear + Math.sin(p.t * 9 + sd) * 0.02 * L * rear, foot.z + sd * 0.04 * L * rear);
         else if (rear > 0 && !v2) foot.set(foot.x - 0.05 * L * rear, foot.y, foot.z + sd * 0.04 * L * rear);
         if (i === 0 && rearIdle > 0) foot.y += 0.035 * L * rearIdle;
         if (!v2 && !(i === 0 && rear > 0.3)) foot.y += rig.groundAt(foot.x, foot.z, p.ground);
+      }
+      if (v2 && !p.dead) {
+        ra.lastFoot ??= new Float32Array(18);
+        ra.lastFoot[j * 3] = foot.x;
+        ra.lastFoot[j * 3 + 1] = foot.y;
+        ra.lastFoot[j * 3 + 2] = foot.z;
       }
       // tarsus lies along the ground from the ankle to the claws
       const dx = foot.x - hip.x;

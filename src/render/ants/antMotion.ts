@@ -163,6 +163,8 @@ export interface Motion2 {
   spinAxis: number;
   air: boolean;
   bounceT: number;
+  /** the tumble's turn about the body's middle (eases out after the landing) */
+  tc: number;
   /** after landing: the half turn it came down on, and how long it lies there kicking before rolling upright */
   landK: number;
   rightT: number;
@@ -181,9 +183,11 @@ export interface MotionOut {
   yaw: number;
   pitch: number;
   roll: number;
-  /** tumbling while flung: about the body's long axis or its side axis */
+  /** tumbling while flung: about the body's long axis or its side axis, and how much the tumble turns about the
+   *  body's middle (in the air) rather than the ground under it (lying after the landing) */
   spinRoll: number;
   spinPitch: number;
+  tumbleC: number;
   /** planted feet: stance half-sweep (object mm) forward and sideways, and half the turn per stance (rad) */
   Dh: number;
   Dz: number;
@@ -209,7 +213,7 @@ export interface MotionOut {
 }
 
 export function newMotionOut(): MotionOut {
-  return { h: 0, fwd: 0, side: 0, up: 0, yaw: 0, pitch: 0, roll: 0, spinRoll: 0, spinPitch: 0, Dh: 0, Dz: 0, Ps: 0, flash: 0, deathLeg: 0, deathRoll: 0, decap: 0, squash: 0, gaster: 0, pose: 0, headYaw: 0, headPitch: 0, mand: 0, antPitch: 0, antSpread: 0, antAct: 0, clock: 1 };
+  return { h: 0, fwd: 0, side: 0, up: 0, yaw: 0, pitch: 0, roll: 0, spinRoll: 0, spinPitch: 0, tumbleC: 0, Dh: 0, Dz: 0, Ps: 0, flash: 0, deathLeg: 0, deathRoll: 0, decap: 0, squash: 0, gaster: 0, pose: 0, headYaw: 0, headPitch: 0, mand: 0, antPitch: 0, antSpread: 0, antAct: 0, clock: 1 };
 }
 
 const hash01 = (n: number, k: number): number => {
@@ -260,10 +264,12 @@ export function newMotion(id: number): Motion2 {
     deadV: r(7) < 0.5 ? 0 : 1,
     deadS: r(8) < 0.5 ? -1 : 1,
     spin: 0,
-    spinRate: (10 + 8 * r(9)) * (r(10) < 0.5 ? -1 : 1),
+    // (user rating A14: the tossed ant spun too fast to read; 1–1.5 turns a second)
+    spinRate: (6.5 + 3 * r(9)) * (r(10) < 0.5 ? -1 : 1),
     spinAxis: r(11) < 0.6 ? 0 : 1,
     air: false,
     bounceT: 9,
+    tc: 0,
     landK: 0,
     rightT: 0,
     freeze: 0,
@@ -428,9 +434,11 @@ export function stepMotion(
   const DzT = cad > 0 ? ((duty * (m.vs / cad)) / 2) / inp.scale : 0;
   // (standing, the last stance is held: the planted feet stay where they are rather than sliding home)
   if (moving) {
-    m.Dh = damp(m.Dh, DhT, 30, dt);
-    m.Ps = damp(m.Ps, PsT, 30, dt);
-    m.Dz = damp(m.Dz, DzT, 30, dt);
+    // (eased, not snapped: a sudden change of sweep slid the planted feet — user rating A2, a roughness in the legs
+    // when switching from walking to turning or stopping)
+    m.Dh = damp(m.Dh, DhT, 14, dt);
+    m.Ps = damp(m.Ps, PsT, 14, dt);
+    m.Dz = damp(m.Dz, DzT, 14, dt);
   }
   s.phase += cad * adt;
   const ampT = v.dead ? 0 : Math.min(1, cad / 4 + (moving ? 0.45 : 0));
@@ -515,6 +523,9 @@ export function stepMotion(
   }
   if (m.spinAxis === 0) out.spinRoll = m.spin;
   else out.spinPitch = m.spin;
+  // (user rating A10: the tumble swung round one end — it turned about the ground point under the ant)
+  m.tc = damp(m.tc, airborne ? 1 : 0, 14, dt);
+  out.tumbleC = m.tc;
   if (m.bounceT < 0.7) out.up += 0.16 * L * Math.abs(Math.sin((Math.PI * m.bounceT) / 0.2)) * Math.exp(-m.bounceT * 4.5);
 
   // ---- idles when standing still and calm

@@ -344,6 +344,8 @@ const qB = new THREE.Quaternion();
 const qT = new THREE.Quaternion();
 const vT = new THREE.Vector3();
 const vPiv = new THREE.Vector3();
+const vF0 = new THREE.Vector3();
+const vU0 = new THREE.Vector3();
 const AX_X = new THREE.Vector3(1, 0, 0);
 const AX_Y = new THREE.Vector3(0, 1, 0);
 const AX_Z = new THREE.Vector3(0, 0, 1);
@@ -721,6 +723,8 @@ export class AntRenderer {
       vR.crossVectors(vF, vU).normalize();
       vU.crossVectors(vR, vF).normalize();
       if (M) {
+        vF0.copy(vF);
+        vU0.copy(vU);
         // animation pass: the lean, a flung ant's tumble, the death roll
         if (M.spinPitch) {
           vF.applyAxisAngle(vR, M.spinPitch);
@@ -785,7 +789,14 @@ export class AntRenderer {
           const lowR = Math.min(rig.stance * c, top * c, mid * c - hw * Math.abs(Math.sin(dr)));
           const cp = Math.cos(dp);
           const lowP = Math.min(rig.stance * cp, top * cp, mid * cp - rig.length * 0.42 * Math.abs(Math.sin(dp)));
-          rest = Math.max(0, -lowR, -lowP);
+          rest = Math.max(0, -lowR, -lowP) * (1 - M.tumbleC);
+        }
+        if (M.tumbleC > 1e-3) {
+          // in the air the tumble turns about the body's middle: keep that point where it was before the turn
+          const cx = (rig.headTip.x + rig.gasterTip.x) / 2;
+          const cy = (rig.stance + (rig.bodyTop ?? rig.stance * 2.5)) / 2;
+          const k = M.tumbleC * scale;
+          vP.addScaledVector(vF0, cx * k).addScaledVector(vU0, cy * k).addScaledVector(vF, -cx * k).addScaledVector(vU, -cy * k);
         }
         // (mounted: the mount point already carries it — a held ant's sim height would lift it twice)
         // (along the ground's normal, not the body's up: a corpse on its back sinking was lifted instead — user rating A9)

@@ -227,7 +227,7 @@ function clips(): Record<string, Clip> {
           },
         },
       ],
-      cam: { tx: 0, ty: 2, tz: 0, dir: [0.1, 0.35, 1], dist: 20, follow: 0, fov: 30 },
+      cam: { tx: 0, ty: 3, tz: 0, dir: [0.1, 0.35, 1], dist: 30, follow: 0, fov: 30 },
     },
     // carrying (head up), digging, alarm (gaster raised, jaws open)
     poses: {
