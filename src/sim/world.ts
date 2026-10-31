@@ -35,7 +35,9 @@ export class World {
    * held on each creature (slots.ts), riding slots and room taken (creatures/climb.ts).
    */
   readonly tickCache = {
-    slotHeld: new Map<number, { tick: number; us: number[]; masks: Map<number, number> }>(),
+    /** attack slots held or reserved on each creature (outline fractions) and ant (world angles) this tick (slots.ts) */
+    slotHeld: new Map<number, { tick: number; v: number[]; ids: number[] }>(),
+    antSlotHeld: new Map<number, { tick: number; v: number[]; ids: number[] }>(),
     rideTaken: new Map<number, { tick: number; mask: number; units: number }>(),
     /** sickle-jaw lunges this tick: victim key → the lunging soldier (sickleJaws.ts) */
     lunging: { tick: -1, map: new Map<number, number>() },

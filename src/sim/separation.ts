@@ -1,15 +1,23 @@
 import { World } from './world';
-import { Ant, AS } from './types';
+import { Ant, AS, Creature } from './types';
 import { casteOf } from './species';
 import { BALANCE, GUARD } from './balance';
 import { dcos, dhypot, dsin } from './dmath';
-import { bodyHook } from './slots';
+import { bodyHook, fitsUnder } from './slots';
+import { climbDef } from './creatures/climb';
 import { creatureHooks } from './combat';
 import { queenBody, royalOf } from './termites';
 
 /**
  * Soft separation (fix brief: no stacking). Runs after creatures move.
  *
+ *  - **In a fight (combat v2, CHANGE_PLAN §16 step 1):** two allies who are both
+ *    fighting keep a personal space (`combat2.personalSpace` × the larger one's
+ *    length) centre to centre, pushed harder than walking ants; allies at the
+ *    slots of the same foe are spaced by the slots instead. Enemies keep only
+ *    their body radii, so two lines can meet (an attacker holds its own foe at
+ *    its hold point, combat.ts) — except two enemies each holding someone else:
+ *    separate duels drift a personal space apart, leaving ground between them.
  *  - **Ant–ant:** two ants closer than the sum of their radii (`radiusOfWidth`
  *    × body width) are pushed apart, each pair once (by the lower id), split
  *    by mass, capped at `maxPush` mm a tick so it never looks like a shove.
@@ -17,7 +25,9 @@ import { queenBody, royalOf } from './termites';
  *    queens, a termite king at his place) do not move but still push the others; the dead, the flung,
  *    climbers and riders, and prey in a hell ant's jaws take no part.
  *  - **Creature body:** an ant inside a creature's capsule is pushed out of
- *    it, unless it is holding on to that creature or riding it.
+ *    it, unless it is holding on to that creature or riding it, or small
+ *    enough to walk under it (combat v2: `combat2.clearance`); its feet (the
+ *    climb rails' feet) push every ant on the ground aside.
  *  - **Termite queen:** her 22 mm abdomen (behind her position, the thorax)
  *    is a capsule too (termites.ts queenBody); her own circle covers only her
  *    head and thorax.
@@ -43,19 +53,29 @@ export function separationSystem(w: World, dt: number): void {
     flag = new Uint8Array(n * 2);
     rad = new Float64Array(n * 2);
     mass = new Float64Array(n * 2);
+    len = new Float64Array(n * 2);
   }
-  // per-ant flags (bit 1 takes part, bit 2 movable) and the largest small radius
+  // per-ant flags (bit 1 takes part, bit 2 movable, 16 fighting, 32 holding an ant, 128 standing in a guard line; 64
+  // set below: pushed by a fighting ally, a stronger cap) and the largest small radius and fighting length
   let maxR = 0;
+  let maxFightL = 0;
+  let maxFightLBig = 0;
   for (let i = 0; i < n; i++) {
     const a = ants[i];
     pushX[i] = 0;
     pushY[i] = 0;
-    flag[i] = (takesPart(a) ? 1 : 0) | (movable(a) ? 2 : 0) | (fightStance(a) ? 16 : 0) | (a.state === AS.Grapple && a.gKind === 3 && a.pinned <= 0 ? 32 : 0);
+    flag[i] = (takesPart(a) ? 1 : 0) | (movable(a) ? 2 : 0) | (fighting(a) ? 16 : 0) | (a.state === AS.Grapple && a.gKind === 3 && a.pinned <= 0 ? 32 : 0) | (inLine(a) ? 128 : 0);
     const r = antRadius(a);
     rad[i] = r;
     mass[i] = antMass(a);
+    len[i] = antLen(a);
     if (r <= BIG && r > maxR) maxR = r;
+    if (flag[i] & 16) {
+      if (r <= BIG && len[i] > maxFightL) maxFightL = len[i];
+      if (len[i] > maxFightLBig) maxFightLBig = len[i];
+    }
   }
+  const PS = BALANCE.combat2.personalSpace;
   // Small ants find their neighbours with a short query (their radius + the
   // largest small radius); the few big ones (queens, majors, …) search wider
   // themselves, so the common query stays cheap. Pushes are summed per ant
@@ -63,6 +83,8 @@ export function separationSystem(w: World, dt: number): void {
   P.ants = ants;
   ants0 = ants;
   P.strength = S.strength;
+  P.fightStrength = BALANCE.combat2.fightStrength;
+  P.ps = PS;
   for (let i = 0; i < n; i++) {
     const fa = flag[i];
     if (!(fa & 1)) continue;
@@ -73,7 +95,13 @@ export function separationSystem(w: World, dt: number): void {
     P.fa = fa;
     P.ra = ra;
     P.big = ra > BIG;
-    w.antIdxNear(a.space, a.x, a.y, ra + (P.big ? Math.max(maxR, ra) : maxR), pairCb);
+    P.foeK = foeKind(a);
+    P.foeId = P.foeK ? foeId(a) : 0;
+    P.team = a.team ?? a.colony;
+    let q = ra + (P.big ? Math.max(maxR, ra) : maxR);
+    // a fighting ant looks as far as a fighting ally's personal space (pairs with big ants are the big one's)
+    if (fa & 16) q = Math.max(q, PS * Math.max(len[i], P.big ? maxFightLBig : maxFightL));
+    w.antIdxNear(a.space, a.x, a.y, q, pairCb);
   }
   // a termite queen's abdomen pushes ants out like a creature's body
   for (let i = 0; i < n; i++) {
@@ -91,17 +119,19 @@ export function separationSystem(w: World, dt: number): void {
     QB.l2 = l2;
     w.antIdxNear(q.space, mx, my, dhypot(dx, dy) / 2 + qb.r + maxR, queenCb);
   }
-  // creature bodies push ants out (harder: a body is solid)
+  // creature bodies push ants out (harder: a body is solid); small ants walk under (combat v2), only its feet push them
   for (const cr of w.s.creatures) {
     if (cr.dead) continue;
     const b = bodyHook.body(cr);
     const c = dcos(cr.h);
     const s = dsin(cr.h);
+    CB.cr = cr;
     w.antIdxNear(cr.space, cr.x, cr.y, b.hl + b.r + maxR, (i) => {
       if ((flag[i] & 3) !== 3) return false;
       const a = ants[i];
       if (a.gKind === 4 && a.gId === cr.id) return false; // holding on to it
       if (a.rideId === cr.id) return false;
+      if (fitsUnder(a, cr)) return false; // under it, among the legs
       const dx = a.x - cr.x;
       const dy = a.y - cr.y;
       const lx = dx * c + dy * s;
@@ -124,6 +154,18 @@ export function separationSystem(w: World, dt: number): void {
       flag[i] |= 4;
       return false;
     });
+    // its feet (the climb rails' feet) push the ants on the ground aside, the ones under it too
+    const def = climbDef(cr.kind);
+    if (!def) continue;
+    const C2 = BALANCE.combat2;
+    CB.r = Math.max(C2.footMinMm, cr.scale * C2.footRadius);
+    for (const rail of def.rails) {
+      const fx = rail.pts[0] * cr.scale;
+      const fy = rail.pts[2] * cr.scale;
+      CB.x = cr.x + fx * c - fy * s;
+      CB.y = cr.y + fx * s + fy * c;
+      w.antIdxNear(cr.space, CB.x, CB.y, CB.r + maxR, footCb);
+    }
   }
   for (let i = 0; i < n; i++) {
     let dx = pushX[i];
@@ -131,7 +173,7 @@ export function separationSystem(w: World, dt: number): void {
     if (dx * dx + dy * dy < 1e-6) continue; // under a thousandth of a millimetre: not worth a terrain test
     // capped so it is a gentle drift, never a shove (out of a body: twice that; out of a termite queen: all of it)
     const m = dhypot(dx, dy);
-    const lim = flag[i] & 8 ? m : flag[i] & 4 ? cap * 2 : cap;
+    const lim = flag[i] & 8 ? m : flag[i] & 4 ? cap * 2 : flag[i] & 64 ? cap * BALANCE.combat2.fightCapMul : cap;
     if (m > lim) {
       dx *= lim / m;
       dy *= lim / m;
@@ -217,6 +259,32 @@ function queenOutCb(i: number): boolean {
   return false;
 }
 
+/** The creature foot pushing (one shared callback). */
+const CB = { cr: null as unknown as Creature, x: 0, y: 0, r: 0 }; // det-ok: scratch
+
+function footCb(i: number): boolean {
+  if ((flag[i] & 3) !== 3) return false;
+  const a = ants0[i];
+  if (a.rideId === CB.cr.id) return false;
+  const dx = a.x - CB.x;
+  const dy = a.y - CB.y;
+  const min = CB.r + rad[i];
+  const d2 = dx * dx + dy * dy;
+  if (d2 >= min * min) return false;
+  const d = dhypot(dx, dy);
+  let nx = 1;
+  let ny = 0;
+  if (d > 1e-6) {
+    nx = dx / d;
+    ny = dy / d;
+  } else if (a.id & 1) nx = -1;
+  const push = (min - d) * BALANCE.separation.creatureStrength;
+  pushX[i] += nx * push;
+  pushY[i] += ny * push;
+  flag[i] |= 4;
+  return false;
+}
+
 /** The termite queen whose abdomen is pushing (one shared callback). */
 const QB = { q: null as unknown as Ant, dx: 0, dy: 0, l2: 0, w: null as unknown as World }; // det-ok: scratch
 const qb = { ax: 0, ay: 0, bx: 0, by: 0, r: 0 }; // det-ok: scratch
@@ -253,7 +321,26 @@ function queenCb(i: number): boolean {
 }
 
 /** The ant whose neighbours are being visited (one shared callback: no closure per ant). */
-const P = { ants: [] as Ant[], i: 0, a: null as unknown as Ant, fa: 0, ra: 0, big: false, strength: 0 }; // det-ok: scratch
+const P = { ants: [] as Ant[], i: 0, a: null as unknown as Ant, fa: 0, ra: 0, big: false, strength: 0, fightStrength: 0, ps: 0, foeK: 0, foeId: 0, team: 0 }; // det-ok: scratch
+
+/**
+ * The foe whose attack slot an ant holds (Grapple), has reserved while closing in, or is spraying as it closes in:
+ * kind (3 ant, 4 creature; 0 none).
+ * Allies at the slots of one foe are spaced by the slots; chasing or waiting allies keep a personal space.
+ */
+function foeKind(a: Ant): number {
+  if (a.state === AS.Grapple) return a.gKind === 3 || a.gKind === 4 ? a.gKind : 0;
+  if ((a.state === AS.Attack && (a.rsv ?? 0) !== 0 && a.rsv === a.tgt) || a.state === AS.Spray) return a.tk === 3 || a.tk === 4 ? a.tk : 0;
+  return 0;
+}
+/** Are two enemies fighting each other (one holding or going for the other)? */
+function engaged(a: Ant, o: Ant): boolean {
+  return (a.gKind === 3 && a.gId === o.id) || (o.gKind === 3 && o.gId === a.id) || (a.tk === 3 && a.tgt === o.id) || (o.tk === 3 && o.tgt === a.id);
+}
+
+function foeId(a: Ant): number {
+  return a.state === AS.Grapple ? a.gId : a.tgt;
+}
 
 function pairCb(j: number): boolean {
   const i = P.i;
@@ -261,26 +348,28 @@ function pairCb(j: number): boolean {
   const fa = P.fa;
   const fo = flag[j];
   if (!(fo & 1)) return false;
-  // Fighters keep a body's room from each other (user note 2026-10-25: fights were heaps). Two ants in a fight
-  // stance (16) that are not holding each other stand `fightRoom` × the usual radius apart, and an ant holding a
-  // foe (32), which does not give way to the crowd, is eased apart from the other fighters around it.
   const pa = P.a;
   const po = P.ants[j];
-  // (two holding the same foe stand at its limbs: the slots set their spacing; an ant and the foe it is going for or
-  // holding close in as before)
-  const fight = (fa & fo & 16) !== 0 && pa.gId !== po.id && po.gId !== pa.id && !(pa.tk === 3 && pa.tgt === po.id) && !(po.tk === 3 && po.tgt === pa.id) && !(pa.gId !== 0 && pa.gId === po.gId && pa.gKind === po.gKind);
-  const ma = (fa & 2) !== 0 || (fight && (fa & 32) !== 0);
-  const mo = (fo & 2) !== 0 || (fight && (fo & 32) !== 0);
+  // Combat v2 (step 1): two allies who are both fighting keep a personal space from each other, unless they are going
+  // for the same foe (its slots space them). Enemies keep only their bodies' radii (lines can meet; an attacker holds
+  // its own foe at its hold point). An ant holding a foe (32), which does not give way to the crowd, is eased apart
+  // from fighting allies round it.
+  // (Guard lines keep their own spacing: an ally standing in a line keeps `GUARD.fightRoom` × the radii as before.)
+  const ally = (po.team ?? po.colony) === P.team;
+  // …and two enemies each holding someone else (separate duels) drift apart too, so neighbouring duels keep ground
+  // between them; enemies closing in, or fighting each other, keep only their bodies' radii
+  const fight = (fa & fo & 16) !== 0 && (ally ? !(P.foeK !== 0 && foeKind(po) === P.foeK && foeId(po) === P.foeId) : pa.state === AS.Grapple && po.state === AS.Grapple && !engaged(pa, po));
+  const line = !fight && ally && ((fa | fo) & 128) !== 0 && (fa & 144) !== 0 && (fo & 144) !== 0;
+  const ma = (fa & 2) !== 0 || ((fight || line) && (fa & 32) !== 0);
+  const mo = (fo & 2) !== 0 || ((fight || line) && (fo & 32) !== 0);
   if (!ma && !mo) return false;
-  const a = P.a;
-  const o = P.ants[j];
   const ro = rad[j];
   // each pair once: by the lower id within a size class, else by the big one
   const oBig = ro > BIG;
-  if (P.big === oBig ? o.id <= a.id : !P.big) return false;
-  const dx = o.x - a.x;
-  const dy = o.y - a.y;
-  const min = (P.ra + ro) * (fight ? GUARD.fightRoom : 1);
+  if (P.big === oBig ? po.id <= pa.id : !P.big) return false;
+  const dx = po.x - pa.x;
+  const dy = po.y - pa.y;
+  const min = fight ? P.ps * Math.max(len[i], len[j]) : (P.ra + ro) * (line ? GUARD.fightRoom : 1);
   const d2 = dx * dx + dy * dy;
   if (d2 >= min * min) return false;
   const d = dhypot(dx, dy);
@@ -291,11 +380,11 @@ function pairCb(j: number): boolean {
     nx = dx / d;
     ny = dy / d;
   } else {
-    const ang = ((a.id * 7 + o.id * 13) % 360) * (Math.PI / 180);
+    const ang = ((pa.id * 7 + po.id * 13) % 360) * (Math.PI / 180);
     nx = dcos(ang);
     ny = dsin(ang);
   }
-  const push = (min - d) * P.strength;
+  const push = (min - d) * (fight ? P.fightStrength : P.strength);
   const wa = mass[i];
   const wo = mass[j];
   // share by mass: the lighter ant gives way more
@@ -305,6 +394,10 @@ function pairCb(j: number): boolean {
   pushY[i] -= ny * push * ka;
   pushX[j] += nx * push * ko;
   pushY[j] += ny * push * ko;
+  if (fight) {
+    flag[i] |= 64;
+    flag[j] |= 64;
+  }
   return false;
 }
 
@@ -314,6 +407,7 @@ let pushY = new Float64Array(0); // det-ok: scratch, cleared every tick
 let flag = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 let rad = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let mass = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let len = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 
 /** Radius (mm) above which an ant counts as big for the neighbour search. */
 const BIG = 2;
@@ -335,6 +429,10 @@ function antRadius(a: Ant): number {
   return r;
 }
 
+function antLen(a: Ant): number {
+  return casteOf(a.caste).length;
+}
+
 function antMass(a: Ant): number {
   let m = massOf.get(a.caste);
   if (m === undefined) {
@@ -344,12 +442,17 @@ function antMass(a: Ant): number {
   return m;
 }
 
-/** In the separation at all (as a body that pushes or is pushed)? */
-/** In a fight (closing in, spraying, holding a foe) or standing in a guard line / squad place: wants more room. */
-function fightStance(a: Ant): boolean {
-  return a.state === AS.Attack || a.state === AS.Spray || (a.state === AS.Grapple && a.gKind === 3) || (a.state === AS.Rally && a.task === 'marker');
+/** Fighting (closing in, spraying, holding a foe): keeps a personal space from fighting allies. */
+function fighting(a: Ant): boolean {
+  return a.state === AS.Attack || a.state === AS.Spray || a.state === AS.Grapple;
 }
 
+/** Standing in a guard line / squad place at a marker (guardLine.ts sets the line's own spacing). */
+function inLine(a: Ant): boolean {
+  return a.state === AS.Rally && a.task === 'marker';
+}
+
+/** In the separation at all (as a body that pushes or is pushed)? */
 function takesPart(a: Ant): boolean {
   // (army ants: bridge links, pothole plugs and ants walking over them are walked on, not crowded)
   return a.state !== AS.Dead && a.state !== AS.Flung && !a.heldBy && !(a.rideId ?? 0) && a.state !== AS.Bridge && a.state !== AS.Plug && (a.xing ?? 0) === 0;

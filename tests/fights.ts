@@ -8,7 +8,8 @@
 import { EventBus } from '../src/core/events';
 import { createWorld, GameSetup } from '../src/sim/mapGen';
 import { World } from '../src/sim/world';
-import { AS, Carry, SURFACE } from '../src/sim/types';
+import { Ant, AS, Carry, SURFACE } from '../src/sim/types';
+import { antSlotCount } from '../src/sim/slots';
 import { ARENA, BALANCE, GUARD } from '../src/sim/balance';
 import { TEAM_NAMES, arenaLayout } from '../src/sim/arena';
 import { STANCE, arenaOf } from '../src/sim/arenaState';
@@ -164,7 +165,9 @@ for (const unit of ['ant:lasius_soldier', 'ant:nasute_soldier', 'ant:rhy_soldier
   const foes = spreadN ? spread / spreadN : 0;
   check('melee: fighters keep apart (few within half a body of a teammate)', overlap < 0.55, `${(overlap * 100).toFixed(0)} % on average while fighting (88 % before the guard line and fight room)`);
   check('melee: the foes are shared out — attackers spread over many enemies, not one heap', foes >= 0.33, `${(foes * 100).toFixed(0)} distinct targets per 100 attackers (27 before)`);
-  check('melee: fewer holds on one ant (3; 4 on a big one)', BALANCE.combat.antSlots === 3 && BALANCE.combat.bigAntSlots === 4);
+  // (combat v2: slots by the victim's outline; tests/combatV2.ts checks them in detail)
+  const nSlots = antSlotCount({ caste: 'lasius_soldier' } as Ant, casteOf('lasius_soldier').length, false);
+  check('melee: few holds on one ant (2–4 on one of the same size, by its outline)', nSlots >= 2 && nSlots <= 4, `${nSlots}`);
 }
 
 // ---- creatures keep apart too, and still bite their foes

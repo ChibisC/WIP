@@ -1,0 +1,14 @@
+ 8 s  120 alive, 14 fighting: 12 clusters, largest 3, 100 % in clusters ≤ 4, 0 % overlapping, nn teammate 1.78 BL
+ 9 s  120 alive, 94 fighting: 42 clusters, largest 9, 60 % in clusters ≤ 4, 4 % overlapping, nn teammate 0.83 BL
+10 s  120 alive, 120 fighting: 21 clusters, largest 54, 16 % in clusters ≤ 4, 34 % overlapping, nn teammate 0.63 BL
+11 s  115 alive, 113 fighting: 8 clusters, largest 59, 5 % in clusters ≤ 4, 50 % overlapping, nn teammate 0.53 BL
+12 s  108 alive, 103 fighting: 4 clusters, largest 96, 7 % in clusters ≤ 4, 66 % overlapping, nn teammate 0.46 BL
+13 s  101 alive, 97 fighting: 2 clusters, largest 90, 0 % in clusters ≤ 4, 61 % overlapping, nn teammate 0.53 BL
+14 s  89 alive, 86 fighting: 2 clusters, largest 79, 0 % in clusters ≤ 4, 51 % overlapping, nn teammate 0.59 BL
+15 s  79 alive, 72 fighting: 3 clusters, largest 65, 3 % in clusters ≤ 4, 42 % overlapping, nn teammate 0.63 BL
+16 s  65 alive, 65 fighting: 4 clusters, largest 56, 14 % in clusters ≤ 4, 38 % overlapping, nn teammate 0.69 BL
+17 s  50 alive, 48 fighting: 3 clusters, largest 31, 4 % in clusters ≤ 4, 44 % overlapping, nn teammate 0.70 BL
+18 s  41 alive, 41 fighting: 6 clusters, largest 21, 15 % in clusters ≤ 4, 46 % overlapping, nn teammate 0.57 BL
+19 s  34 alive, 31 fighting: 3 clusters, largest 16, 10 % in clusters ≤ 4, 39 % overlapping, nn teammate 0.59 BL
+20 s  33 alive, 32 fighting: 1 clusters, largest 32, 0 % in clusters ≤ 4, 88 % overlapping, nn teammate 0.33 BL
+mean over 12 samples: 75 fighting, 8.3 clusters, largest 50.7, 11 % in clusters ≤ 4, 47 % overlapping, nn teammate 0.59 BL

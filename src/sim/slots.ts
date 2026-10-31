@@ -6,22 +6,34 @@ import { angleDiff } from './movement';
 import { dcos, dsin, datan2, dhypot } from './dmath';
 
 /**
- * Attack slots (fix brief: no spinning). Every target exposes a ring of
- * places to hold on to: an attacking ant takes the nearest free one, goes
- * there and stays; when all are taken it waits outside or picks another
- * target.
+ * Attack slots (combat v2, CHANGE_PLAN §16 steps 2–3). Every target has a
+ * limited ring of places to fight from, sized by its outline ("only a limited
+ * number can fight"): an attacker reserves a free one as it closes in, walks
+ * to its hold point and latches there; when all are taken it waits outside,
+ * flanks to a free one or picks another foe (combat.ts).
  *
- *  - **Ants:** the victim's legs and antennae (`LIMBS`, angles from its
- *    heading at the moment of the grab), stored as a *world* angle so the
- *    grappler does not orbit when the victim turns. 4 slots, 6 on an ant at
- *    least 1.5x the attacker's length, 8 on a queen.
- *  - **Creatures:** slots spread evenly round the body outline, a capsule
- *    (half-length `hl` along its heading, radius `r`), stored as a fraction
- *    `u` of the outline in the creature's frame (ants cling to the body and
- *    turn with it). One slot per `creatureSlotMm` of outline.
+ *  - **Outline.** A victim ant's outline is an ellipse (`combat2.antHalfLen` ×
+ *    its length along its heading, `antHalfWidth` × it across); a creature's
+ *    is its capsule (`bodyHook`, half-length `hl` along its heading, radius `r`).
+ *  - **Hold point.** The attacker stands where its front half (`frontHalf` −
+ *    `jawOverlap`, × its length) meets the outline in the slot's direction:
+ *    head to the outline, only the mandibles reaching over. No body overlap.
+ *  - **How many.** n = clamp(⌊P / (`slotWidth` × La × `slotSpacing`)⌋,
+ *    `slotsMin`, `slotsMax`), P the length of the line the attackers' centres
+ *    stand on (the outline pushed out by half the attacker's length). A queen
+ *    keeps at least `queenSlotsMin`.
+ *  - **Ants:** n equal sectors of world angle round the victim's centre (a
+ *    victim turning does not swing its attackers round it); an attacker's slot
+ *    is the sector's centre angle (`gSlot`).
+ *  - **Creatures:** n slots evenly along the outline as fractions u in the
+ *    creature's frame (ants cling to the body and turn with it). Ants small
+ *    enough to walk under it (combat2.clearance) also have an inner ring under
+ *    the body edge, among the legs (u + 1).
+ *  - **Reserved on approach.** Ants holding (Grapple) or reserving (Attack with
+ *    `rsv` = the target's id) a slot are gathered once a tick per target into
+ *    `World.tickCache` and kept up to date as ants reserve this tick (ants in id
+ *    order), so two ants never head for the same slot.
  */
-
-export const LIMBS = [0.45, -0.45, 1.25, -1.25, 1.75, -1.75, 2.45, -2.45];
 
 export interface Body {
   /** half the length of the straight middle part (mm) */
@@ -35,14 +47,17 @@ export const bodyHook: { body: (cr: Creature) => Body } = {
   body: (cr) => ({ hl: 0, r: cr.scale * 0.45 }),
 };
 
+const C2 = BALANCE.combat2;
+const TAU = Math.PI * 2;
+
 /** Length of the outline offset `off` mm outside the body. */
 export function outlineLen(b: Body, off: number): number {
-  return 2 * Math.PI * (b.r + off) + 4 * b.hl;
+  return 2 * Math.PI * Math.max(0, b.r + off) + 4 * b.hl;
 }
 
 /** Point (body frame: +x forward, +y left) at fraction u of the outline, and the outward normal angle. */
 export function outlinePoint(b: Body, off: number, u: number, out: { x: number; y: number; n: number }): void {
-  const R = b.r + off;
+  const R = Math.max(0, b.r + off);
   const L = 2 * b.hl;
   let s = (((u % 1) + 1) % 1) * outlineLen(b, off);
   if (s < L) {
@@ -67,7 +82,7 @@ export function outlinePoint(b: Body, off: number, u: number, out: { x: number; 
     return;
   }
   s -= L;
-  const ang = -Math.PI / 2 - s / R;
+  const ang = -Math.PI / 2 - (R > 0 ? s / R : 0);
   out.x = -b.hl + R * dcos(ang);
   out.y = R * dsin(ang);
   out.n = ang;
@@ -75,9 +90,10 @@ export function outlinePoint(b: Body, off: number, u: number, out: { x: number; 
 
 /** Fraction of the outline nearest to a body-frame point. */
 export function outlineU(b: Body, off: number, px: number, py: number): number {
-  const R = b.r + off;
+  const R = Math.max(0, b.r + off);
   const L = 2 * b.hl;
   const P = outlineLen(b, off);
+  if (P <= 0) return 0;
   const cx = Math.max(-b.hl, Math.min(b.hl, px));
   if (px > -b.hl && px < b.hl) {
     // beside the straight part
@@ -122,129 +138,289 @@ export function distToCreatureBody(cr: Creature, x: number, y: number): number {
   return dhypot(lx - cx, ly) - b.r;
 }
 
-/** Number of attack slots round a creature for an attacker standing `off` mm out. */
-export function creatureSlotCount(cr: Creature, off: number): number {
-  const C = BALANCE.combat;
-  return Math.max(C.creatureSlotsMin, Math.min(C.creatureSlotsMax, Math.round(outlineLen(bodyHook.body(cr), off) / C.creatureSlotMm)));
+// ---------------------------------------------------------------- hold points
+
+/** How far out from the outline an attacker of length `La` stands: its front half, less its mandibles. */
+export function frontOff(La: number): number {
+  return La * (C2.frontHalf - C2.jawOverlap);
 }
 
-/** Attack slots on an ant. */
-export function antSlotCount(victim: Ant, attackerLen: number, isQueen: boolean): number {
-  const C = BALANCE.combat;
-  if (isQueen) return C.queenSlots;
-  return casteOf(victim.caste).length >= attackerLen * 1.5 ? C.bigAntSlots : C.antSlots;
+/** Distance from a victim ant's centre to its outline (ellipse) in world direction `ang`. */
+export function antOutlineR(o: Ant, ang: number): number {
+  const L = casteOf(o.caste).length;
+  const A = L * C2.antHalfLen;
+  const B = L * C2.antHalfWidth;
+  const c = dcos(ang - o.h);
+  const s = dsin(ang - o.h);
+  return (A * B) / Math.sqrt(B * c * B * c + A * s * A * s);
 }
 
-const tmpP = { x: 0, y: 0, n: 0 };
+/** Where attacker `a` holds victim ant `o` from world angle `ang` (its centre). */
+export function antHoldPoint(a: Ant, o: Ant, ang: number, out: { x: number; y: number }): number {
+  const r = antOutlineR(o, ang) + frontOff(casteOf(a.caste).length);
+  out.x = o.x + dcos(ang) * r;
+  out.y = o.y + dsin(ang) * r;
+  return r;
+}
 
 /**
- * Where on each creature's outline ants already hold on (fractions u), found
- * once per creature per tick and kept up to date as ants latch this tick
- * (big creatures have hundreds of ants round them; scanning them for every
- * attacker every tick was the single biggest cost in the stress scene).
+ * Centre distance of two ants biting each other head to head: each one's front half to the other's, the mandibles
+ * reaching over (`jawOverlap` of each).
  */
+export function mutualHold(La: number, Lo: number): number {
+  return (La + Lo) * (C2.frontHalf - C2.jawOverlap / 2);
+}
 
-function heldEntry(w: World, cr: Creature): { tick: number; us: number[]; masks: Map<number, number> } {
-  const held = w.tickCache.slotHeld;
-  let e = held.get(cr.id);
-  if (e && e.tick === w.s.tick) return e;
-  if (!e) held.set(cr.id, (e = { tick: 0, us: [], masks: new Map() }));
-  e.tick = w.s.tick;
-  e.us.length = 0;
-  e.masks.clear();
+/** Can ant `a` walk (and fight) under creature `cr`? (its height is below the creature's underside) */
+export function fitsUnder(a: Ant, cr: Creature): boolean {
+  const k = C2.clearance[cr.kind] ?? 0;
+  return k > 0 && casteOf(a.caste).length * C2.antHeight < k * cr.scale;
+}
+
+/** The offset (mm, negative: inside) of a creature slot's ring for an attacker of length La: u ≥ 1 is under the body. */
+export function creatureSlotOff(cr: Creature, La: number, u: number): number {
+  return u >= 1 ? -C2.underInset * bodyHook.body(cr).r : frontOff(La);
+}
+
+// ---------------------------------------------------------------- how many
+
+function clampSlots(p: number, La: number): number {
+  return Math.max(C2.slotsMin, Math.min(C2.slotsMax, Math.floor(p / (C2.slotWidth * La * C2.slotSpacing) + 1e-9)));
+}
+
+/** Perimeter of an ellipse with half-axes A, B (Ramanujan). */
+function ellipsePerimeter(A: number, B: number): number {
+  return Math.PI * (3 * (A + B) - Math.sqrt((3 * A + B) * (A + 3 * B)));
+}
+
+/** Attack slots on an ant for an attacker of length `attackerLen`. */
+export function antSlotCount(victim: Ant, attackerLen: number, isQueen: boolean): number {
+  const L = casteOf(victim.caste).length;
+  const h = attackerLen / 2;
+  const n = clampSlots(ellipsePerimeter(L * C2.antHalfLen + h, L * C2.antHalfWidth + h), attackerLen);
+  return isQueen ? Math.max(C2.queenSlotsMin, n) : n;
+}
+
+/** Attack slots on a creature for an attacker of length `La`: on the ring round it, or (under) the ring under its body. */
+export function creatureSlotCount(cr: Creature, La: number, under = false): number {
   const b = bodyHook.body(cr);
-  const us = e.us;
-  w.antsNear(cr.space, cr.x, cr.y, b.hl + b.r + 12, (g) => {
-    if (g.state === AS.Grapple && g.gKind === 4 && g.gId === cr.id) us.push(g.gSlot);
-    return false;
-  });
-  if (held.size > 512) for (const [id, v] of held) if (v.tick !== w.s.tick) held.delete(id);
+  return clampSlots(outlineLen(b, under ? -C2.underInset * b.r : La / 2), La);
+}
+
+// ---------------------------------------------------------------- who holds what (per-tick cache)
+
+type Held = { tick: number; v: number[]; ids: number[] };
+
+function entry(map: Map<number, Held>, tick: number, id: number): { e: Held; fresh: boolean } {
+  let e = map.get(id);
+  if (e && e.tick === tick) return { e, fresh: false };
+  if (!e) map.set(id, (e = { tick: 0, v: [], ids: [] }));
+  e.tick = tick;
+  e.v.length = 0;
+  e.ids.length = 0;
+  if (map.size > 1024) for (const [k, x] of map) if (x.tick !== tick) map.delete(k);
+  return { e, fresh: true };
+}
+
+/** Slots held or reserved on creature `cr` this tick (outline fractions; ≥ 1: under the body). */
+function creatureHeld(w: World, cr: Creature): Held {
+  const { e, fresh } = entry(w.tickCache.slotHeld, w.s.tick, cr.id);
+  if (fresh) {
+    const b = bodyHook.body(cr);
+    w.antsNear(cr.space, cr.x, cr.y, b.hl + b.r + 30, (g) => {
+      if ((g.state === AS.Grapple && g.gKind === 4 && g.gId === cr.id) || (g.state === AS.Attack && (g.rsv ?? 0) === cr.id && g.tgt === cr.id && g.tk === 4)) {
+        e.v.push(g.gSlot);
+        e.ids.push(g.id);
+      }
+      return false;
+    });
+  }
   return e;
 }
 
-/** Bit k set: slot k of n is held (n ≤ 32). */
-function takenMask(w: World, cr: Creature, n: number): number {
-  const e = heldEntry(w, cr);
-  let m = e.masks.get(n);
-  if (m === undefined) {
-    m = 0;
-    for (const u of e.us) m |= 1 << (((Math.round(u * n - 0.5) % n) + n) % n);
-    e.masks.set(n, m);
+/** Slots held or reserved on ant `o` this tick (world angles). */
+function antHeld(w: World, o: Ant): Held {
+  const { e, fresh } = entry(w.tickCache.antSlotHeld, w.s.tick, o.id);
+  if (fresh) {
+    w.antsNear(o.space, o.x, o.y, casteOf(o.caste).length * 1.5 + 16, (g) => {
+      if ((g.state === AS.Grapple && g.gKind === 3 && g.gId === o.id) || (g.state === AS.Attack && (g.rsv ?? 0) === o.id && g.tgt === o.id && g.tk === 3)) {
+        e.v.push(g.gSlot);
+        e.ids.push(g.id);
+      }
+      return false;
+    });
   }
-  return m;
+  return e;
 }
 
-/** An ant has just latched onto fraction u of the creature's outline. */
-export function claimCreatureSlot(w: World, cr: Creature, u: number): void {
-  const e = heldEntry(w, cr);
-  e.us.push(u);
-  e.masks.clear();
+function drop(e: Held, id: number): void {
+  const i = e.ids.indexOf(id);
+  if (i < 0) return;
+  e.ids.splice(i, 1);
+  e.v.splice(i, 1);
+}
+
+function put(e: Held, id: number, v: number): void {
+  drop(e, id);
+  e.ids.push(id);
+  e.v.push(v);
+}
+
+/** How many slots on ant `o` are held or reserved this tick. */
+export function antSlotsTaken(w: World, o: Ant): number {
+  return antHeld(w, o).v.length;
+}
+
+/** Does ant `a` already hold or reserve a slot on target `id` (kind 3 ant, 4 creature)? */
+export function holdsSlotOn(a: Ant, id: number, kind: number): boolean {
+  return (a.state === AS.Grapple && a.gId === id && a.gKind === kind) || ((a.rsv ?? 0) === id && a.tgt === id && a.tk === kind && a.state === AS.Attack);
+}
+
+/** Sector index (of n) of a world angle round an ant. */
+function sector(ang: number, n: number): number {
+  const f = (((ang / TAU) % 1) + 1) % 1;
+  return Math.min(n - 1, Math.floor(f * n));
 }
 
 /**
- * Reserve the nearest free slot on a creature for ant `a` (standing `off` mm
- * out). Returns the outline fraction, or -1 when every slot is taken.
+ * Reserve a slot on an ant victim for attacker `a`: its own if it has one, else the free sector nearest the side it
+ * came from. Returns the world angle (the sector's centre), or NaN when every slot is taken.
  */
-export function reserveCreatureSlot(w: World, a: Ant, cr: Creature, off: number): number {
-  const n = creatureSlotCount(cr, off);
+export function reserveAntSlot(w: World, a: Ant, o: Ant, isQueen: boolean): number {
+  const e = antHeld(w, o);
+  const n = antSlotCount(o, casteOf(a.caste).length, isQueen);
+  const k0 = sector(datan2(a.y - o.y, a.x - o.x), n);
+  if (holdsSlotOn(a, o.id, 3) && e.ids.includes(a.id)) {
+    // already ours: keep it unless another ant (lower id this tick) sits in the same sector — or the sector we are
+    // in now is free (an approaching ant takes the place where it is, rather than walking round to the one it chose)
+    const k = sector(a.gSlot, n);
+    let clash = false;
+    let here = k0 !== k;
+    for (let i = 0; i < e.ids.length; i++) {
+      if (e.ids[i] === a.id) continue;
+      const ki = sector(e.v[i], n);
+      if (e.ids[i] < a.id && ki === k) clash = true;
+      if (ki === k0) here = false;
+    }
+    if (here && a.state === AS.Attack) {
+      const ang = ((k0 + 0.5) / n) * TAU;
+      put(e, a.id, ang);
+      return ang;
+    }
+    if (!clash) return a.gSlot;
+  }
+  let taken = 0;
+  let count = 0;
+  for (let i = 0; i < e.ids.length; i++) {
+    if (e.ids[i] === a.id) continue;
+    const bit = 1 << sector(e.v[i], n);
+    if (!(taken & bit)) count++;
+    taken |= bit;
+  }
+  if (count >= n) {
+    drop(e, a.id);
+    return NaN;
+  }
+  for (let step = 0; step < n; step++) {
+    for (const k of step === 0 ? [k0] : [(k0 + step) % n, (k0 - step + n) % n]) {
+      if (taken & (1 << k)) continue;
+      const ang = ((k + 0.5) / n) * TAU;
+      put(e, a.id, ang);
+      return ang;
+    }
+  }
+  drop(e, a.id);
+  return NaN;
+}
+
+/** Index (of n) of a creature slot fraction on its ring. */
+function slotIdx(u: number, n: number): number {
+  return (((Math.round((u % 1) * n - 0.5) % n) + n) % n);
+}
+
+/**
+ * Reserve a slot on creature `cr` for attacker `a`: its own if it has one, else the free slot nearest it on the ring
+ * round the body, or (an ant that fits under it, when that ring is full) on the ring under the body. Returns the
+ * outline fraction (u ≥ 1: under the body), or −1 when every slot it may take is taken.
+ */
+export function reserveCreatureSlot(w: World, a: Ant, cr: Creature): number {
+  const e = creatureHeld(w, cr);
+  const La = casteOf(a.caste).length;
+  const under = fitsUnder(a, cr);
   const b = bodyHook.body(cr);
-  const taken = takenMask(w, cr, n);
-  if (taken === (n >= 32 ? -1 : (1 << n) - 1)) return -1;
-  // the attacker's place on the outline: start there and look both ways
   const c = dcos(cr.h);
   const s = dsin(cr.h);
   const dx = a.x - cr.x;
   const dy = a.y - cr.y;
-  const u0 = outlineU(b, off, dx * c + dy * s, -dx * s + dy * c);
-  const k0 = Math.floor(u0 * n) % n;
-  if (!(taken & (1 << k0))) return (k0 + 0.5) / n;
-  for (let step = 1; step < n; step++) {
-    const k1 = (k0 + step) % n;
-    if (!(taken & (1 << k1))) return (k1 + 0.5) / n;
-    const k2 = (k0 - step + n) % n;
-    if (!(taken & (1 << k2))) return (k2 + 0.5) / n;
+  const px = dx * c + dy * s;
+  const py = -dx * s + dy * c;
+  if (holdsSlotOn(a, cr.id, 4) && e.ids.includes(a.id) && (a.gSlot < 1 || under)) {
+    const ring = a.gSlot >= 1 ? 1 : 0;
+    const n = creatureSlotCount(cr, La, ring === 1);
+    const k = slotIdx(a.gSlot, n);
+    // the slot the ant is beside now, on the same ring
+    const kHere = Math.floor(outlineU(b, ring === 1 ? -C2.underInset * b.r : frontOff(La), px, py) * n) % n;
+    let clash = false;
+    let here = kHere !== k;
+    for (let i = 0; i < e.ids.length; i++) {
+      if (e.ids[i] === a.id || (e.v[i] >= 1 ? 1 : 0) !== ring) continue;
+      const ki = slotIdx(e.v[i], n);
+      if (e.ids[i] < a.id && ki === k) clash = true;
+      if (ki === kHere) here = false;
+    }
+    // an approaching ant takes the free slot it is beside rather than walking round to the one it chose
+    if (here && a.state === AS.Attack) {
+      const u = (kHere + 0.5) / n + ring;
+      put(e, a.id, u);
+      return u;
+    }
+    if (!clash) return a.gSlot;
   }
+  for (let ring = 0; ring < (under ? 2 : 1); ring++) {
+    const n = creatureSlotCount(cr, La, ring === 1);
+    let taken = 0;
+    for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && (e.v[i] >= 1 ? 1 : 0) === ring) taken |= 1 << slotIdx(e.v[i], n);
+    if (taken === (n >= 32 ? -1 : (1 << n) - 1)) continue;
+    // the attacker's place on the ring: start there and look both ways
+    const off = ring === 1 ? -C2.underInset * b.r : frontOff(La);
+    const k0 = Math.floor(outlineU(b, off, px, py) * n) % n;
+    for (let step = 0; step < n; step++) {
+      for (const k of step === 0 ? [k0] : [(k0 + step) % n, (k0 - step + n) % n]) {
+        if (taken & (1 << k)) continue;
+        const u = (k + 0.5) / n + ring;
+        put(e, a.id, u);
+        return u;
+      }
+    }
+  }
+  drop(e, a.id);
   return -1;
 }
 
-/**
- * Reserve a limb on an ant victim for attacker `a`: the free one nearest the
- * side it came from (a little spread out from those already held). Returns the
- * world angle (from the victim to the attacker's place), or NaN when every
- * slot is taken.
- */
-export function reserveAntSlot(w: World, a: Ant, o: Ant, isQueen: boolean): number {
-  const cap = antSlotCount(o, casteOf(a.caste).length, isQueen);
-  const held: number[] = [];
-  w.antsNear(o.space, o.x, o.y, casteOf(o.caste).length * 2, (g) => {
-    if (g !== a && g.state === AS.Grapple && g.gKind === 3 && g.gId === o.id) held.push(g.gSlot);
-    return false;
-  });
-  if (held.length >= cap) return NaN;
-  const approach = datan2(a.y - o.y, a.x - o.x);
-  let best = NaN;
-  let bestS = -Infinity;
-  for (let i = 0; i < Math.max(cap, LIMBS.length); i++) {
-    const l = o.h + LIMBS[i % LIMBS.length];
-    let minD = Math.PI;
-    for (const h of held) minD = Math.min(minD, Math.abs(angleDiff(l, h)));
-    if (held.length && minD < 0.35) continue; // that limb is held already
-    // the free limb nearest the side we came from (no walking round the victim), a little spread out from the others
-    const sc = (held.length ? minD * 0.3 : 0) - Math.abs(angleDiff(l, approach));
-    if (sc > bestS) {
-      bestS = sc;
-      best = l;
-    }
+/** Is there a slot ant `a` could take on creature `cr` (round it, or under it if it fits)? */
+export function creatureHasRoom(w: World, a: Ant, cr: Creature): boolean {
+  const e = creatureHeld(w, cr);
+  const La = casteOf(a.caste).length;
+  for (let ring = 0; ring < (fitsUnder(a, cr) ? 2 : 1); ring++) {
+    const n = creatureSlotCount(cr, La, ring === 1);
+    let taken = 0;
+    for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && (e.v[i] >= 1 ? 1 : 0) === ring) taken |= 1 << slotIdx(e.v[i], n);
+    if (taken !== (n >= 32 ? -1 : (1 << n) - 1)) return true;
   }
-  return best;
+  return false;
 }
 
-/** Where the ant waits when every slot is taken: just outside the reach, on its own side. */
-export function outerRingPoint(a: Ant, tx: number, ty: number, reach: number, out: { x: number; y: number }): void {
-  const ang = datan2(a.y - ty, a.x - tx);
-  const r = reach + casteOf(a.caste).length * BALANCE.combat.outerRing;
-  out.x = tx + dcos(ang) * r;
-  out.y = ty + dsin(ang) * r;
+/** Ant `a` gives up its slot on a target this tick (it is leaving). */
+export function releaseSlot(w: World, a: Ant): void {
+  const id = a.state === AS.Grapple ? a.gId : (a.rsv ?? 0);
+  if (!id) return;
+  const kind = a.state === AS.Grapple ? a.gKind : a.tk;
+  const map = kind === 4 ? w.tickCache.slotHeld : w.tickCache.antSlotHeld;
+  const e = map.get(id);
+  if (e && e.tick === w.s.tick) drop(e, a.id);
 }
 
-export const slotTmp = tmpP;
+/** Angle difference helper re-exported for combat (keeps imports in one place). */
+export { angleDiff };
+
+export const slotTmp = { x: 0, y: 0, n: 0 };

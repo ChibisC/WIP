@@ -3,7 +3,7 @@ import { Ant, AS, Carry, Colony, Creature, POSE, SURFACE, nestSpace } from './ty
 import type { Projectile } from './types';
 import { casteOf, DamageType, isKing } from './species';
 import { angleDiff, antSpeed, faceToward, moveForward, steerTo, turnToward, goHome, goOut } from './movement';
-import { bodyHook, claimCreatureSlot, creatureSlotWorld, distToCreatureBody, outerRingPoint, outlineU, reserveAntSlot, reserveCreatureSlot, slotTmp } from './slots';
+import { antHoldPoint, antSlotCount, antSlotsTaken, bodyHook, creatureHasRoom, creatureSlotOff, creatureSlotWorld, distToCreatureBody, frontOff, holdsSlotOn, mutualHold, outlineU, releaseSlot, reserveAntSlot, reserveCreatureSlot, slotTmp } from './slots';
 import { killAnt, releaseGrapple } from './antAI';
 import { dropCarried, setTask } from './colony';
 import { abilityMods } from './abilities';
@@ -89,8 +89,10 @@ export function damageAnt(w: World, t: Ant, amount: number, type: DamageType, sr
     }
     killAnt(w, t);
   } else if (src && t.state !== AS.Grapple && t.state !== AS.Flung && t.state !== AS.Bridge && t.state !== AS.Plug && (t.xing ?? 0) === 0 && t.state !== AS.Hunt && t.state !== AS.Snap && t.state !== AS.Hold && t.state !== AS.Climb && t.id !== c?.queen && !(cd.acid?.kind === 'ramp' && t.tgt && t.state === AS.Attack) && !('caste' in src && !isEnemyAnt(t, src))) {
-    // Fight back.
-    if ('caste' in src) {
+    // Fight back (combat v2: an ant busy with its own foe in reach keeps it — no flicker between targets).
+    if (t.state === AS.Attack && t.tgt && (t.tk === 3 || t.tk === 4) && targetInReach(w, t)) {
+      // keeps its target
+    } else if ('caste' in src) {
       t.tgt = src.id;
       t.tk = 3;
     } else {
@@ -104,6 +106,20 @@ export function damageAnt(w: World, t: Ant, amount: number, type: DamageType, sr
       t.st = 0;
     }
   }
+}
+
+/** Is an attacking ant's own target within reach (its hold point no more than `keepTargetReach` of its length off)? */
+function targetInReach(w: World, a: Ant): boolean {
+  const L = casteOf(a.caste).length;
+  const C2 = BALANCE.combat2;
+  if (a.tk === 3) {
+    const o = w.antById.get(a.tgt);
+    if (!o || o.state === AS.Dead || o.space !== a.space) return false;
+    return dhypot(o.x - a.x, o.y - a.y) - casteOf(o.caste).length * C2.antHalfLen - frontOff(L) <= L * C2.keepTargetReach;
+  }
+  const cr = w.creatureById.get(a.tgt);
+  if (!cr || cr.dead || cr.space !== a.space) return false;
+  return distToCreatureBody(cr, a.x, a.y) - frontOff(L) <= L * C2.keepTargetReach;
 }
 
 export function applyVenom(w: World, t: { venom: number; venomT: number; venomDps: number }, dps: number, duration: number, maxStacks: number): void {
@@ -226,6 +242,20 @@ type Target = { kind: 3 | 4; id: number; x: number; y: number; d2: number };
 const found: Target = { kind: 3, id: 0, x: 0, y: 0, d2: 0 }; // det-ok: scratch result
 let hasFound = false; // det-ok: scratch
 
+/** The best foe with no free slot: taken only when no foe in sight has room (the ant then waits in its ring). */
+const full: Target = { kind: 3, id: 0, x: 0, y: 0, d2: 0 }; // det-ok: scratch result
+let hasFull = false; // det-ok: scratch
+
+function offerFull(kind: 3 | 4, id: number, x: number, y: number, score: number): void {
+  if (hasFull && score >= full.d2) return;
+  hasFull = true;
+  full.kind = kind;
+  full.id = id;
+  full.x = x;
+  full.y = y;
+  full.d2 = score;
+}
+
 function offer(kind: 3 | 4, id: number, x: number, y: number, score: number): void {
   if (hasFound && score >= found.d2) return;
   hasFound = true;
@@ -255,37 +285,80 @@ function attackers(w: World, id: number, team: number): number {
   return attackersOn.get(id * 16 + (team & 15)) ?? 0;
 }
 
+/** Enemy ants in sight this findTarget call (scratch, reused). */
+const cand: Ant[] = []; // det-ok: scratch, filled and read within one call
+const candD2: number[] = []; // det-ok: scratch
+
+/**
+ * Pick a foe (combat v2, CHANGE_PLAN §16 step 4): the nearest, roughly ahead, preferring pinned and high-threat ants
+ * and — heavily — ones few nestmates are already on (`combat2.crowdPenalty`), so a clash breaks into duels. A foe with
+ * every slot taken (and none of them the ant's) is picked only when no foe in sight has room: the ant waits in its ring. Focus fire (no crowd penalty; a full foe may be
+ * picked to wait in its ring) only when the ant's marker sits on the foe or its side outnumbers the foes in sight
+ * `focusOutnumber` to 1.
+ */
 function findTarget(w: World, a: Ant, c: Colony, r: number): Target | null {
   hasFound = false;
+  hasFull = false;
+  const C2 = BALANCE.combat2;
   const hx = dcos(a.h);
   const hy = dsin(a.h);
   const team = a.team ?? a.colony;
   const mine = a.tk === 3 && (a.state === AS.Attack || a.state === AS.Grapple) ? a.tgt : 0;
   const sickle = casteOf(a.caste).termite === 'sickle';
+  const L = casteOf(a.caste).length;
+  cand.length = 0;
+  candD2.length = 0;
   w.enemiesNear(a.space, team, a.x, a.y, r, (o, d2) => {
     if (!isEnemyAnt(a, o)) return false;
     // a sickle-jaw cannot grab what another already holds: it looks past it (sickleJaws.ts drops such a target)
     if (sickle && o.heldBy) return false;
+    cand.push(o);
+    candD2.push(d2);
+    return false;
+  });
+  // focus fire: our side outnumbers the foes in sight 4 to 1 (counted until it does), or the marker is on a foe
+  let outnumber = false;
+  if (cand.length > 0) {
+    const need = cand.length * C2.focusOutnumber;
+    let allies = 0;
+    w.antsNear(a.space, a.x, a.y, r, (o) => {
+      if ((o.team ?? o.colony) === team && o.state !== AS.Dead) allies++;
+      return allies >= need;
+    });
+    outnumber = allies >= need;
+  }
+  const mk = a.task === 'marker' && a.marker >= 0 ? c.markers[a.marker] : undefined;
+  const mOn = mk && mk.placed && mk.space === a.space ? mk : undefined;
+  for (let i = 0; i < cand.length; i++) {
+    const o = cand[i];
+    const d2 = candD2[i];
+    const focus = outnumber || (!!mOn && sq(mOn.x - o.x) + sq(mOn.y - o.y) <= sq(C2.focusMarkerMm));
     // Prefer pinned targets slightly and high-threat ants (tanks draw attacks); otherwise nearest.
     const threat = casteOf(o.caste).threat ?? 0;
     // …and ones roughly ahead, so a fight is not a constant turning about (fix brief: no spinning)
     const ahead = 1.25 - (0.25 * ((o.x - a.x) * hx + (o.y - a.y) * hy)) / Math.max(1e-3, Math.sqrt(d2));
-    // …and ones not already taken on by nestmates: the fight spreads along the front (GUARD.crowdPenalty)
-    const crowd = 1 + GUARD.crowdPenalty * Math.max(0, attackers(w, o.id, team) - (o.id === mine ? 1 : 0));
-    offer(3, o.id, o.x, o.y, (d2 * (o.pinned > 0 ? 0.6 : 1) * ahead * crowd) / (1 + threat));
-    return false;
-  });
+    // …and ones not already taken on by nestmates: the fight breaks into duels (combat v2)
+    const crowd = focus ? 1 : 1 + C2.crowdPenalty * Math.max(0, attackers(w, o.id, team) - (o.id === mine ? 1 : 0));
+    const score = (d2 * (o.pinned > 0 ? 0.6 : 1) * ahead * crowd) / (1 + threat);
+    // no free slot on it (and none of ours): only if no foe in sight has room (then it waits in this one's ring)
+    if (!focus && !holdsSlotOn(a, o.id, 3) && antSlotsTaken(w, o) >= antSlotCount(o, L, o.id === w.colony(o.colony)?.queen)) offerFull(3, o.id, o.x, o.y, score);
+    else offer(3, o.id, o.x, o.y, score);
+  }
+  cand.length = 0;
+  candD2.length = 0;
   if (a.space === SURFACE || w.s.creatures.length) {
     const cd = casteOf(a.caste);
     const fighter = cd.role === 'soldier' || cd.role === 'major' || a.task === 'marker' || a.alarm > 0.3;
-    const team = a.team ?? a.colony;
     const scan = (cr: Creature, d2: number) => {
       if (cr.space !== a.space || cr.dead || friendlyCreature(w, team, cr)) return false;
       const rel = creatureHooks.relation(cr);
       if (rel === 'ignore') return false;
       if (rel === 'prey' && !(a.task === 'forage' || a.task === 'marker' || fighter)) return false;
       if (rel === 'hostile' && !fighter && d2 > 64) return false;
-      offer(4, cr.id, cr.x, cr.y, d2 * (rel === 'prey' ? 1.2 : 0.9));
+      // every place round it taken (and none of ours, no marker on it): something else first
+      const focus = !!mOn && distToCreatureBody(cr, mOn.x, mOn.y) <= C2.focusMarkerMm;
+      if (!focus && !holdsSlotOn(a, cr.id, 4) && !creatureHasRoom(w, a, cr)) offerFull(4, cr.id, cr.x, cr.y, d2 * (rel === 'prey' ? 1.2 : 0.9));
+      else offer(4, cr.id, cr.x, cr.y, d2 * (rel === 'prey' ? 1.2 : 0.9));
       return false;
     };
     if (a.space === SURFACE) w.creaturesNear(a.x, a.y, r, scan);
@@ -295,7 +368,7 @@ function findTarget(w: World, a: Ant, c: Colony, r: number): Target | null {
       if (d2 < rr * rr) scan(cr, d2);
     }
   }
-  return hasFound ? found : null;
+  return hasFound ? found : hasFull ? full : null;
 }
 
 /** Returns true if the ant spent this tick on combat. */
@@ -424,7 +497,9 @@ function targetPos(w: World, a: Ant): { x: number; y: number; r: number; alive: 
 }
 
 function endCombat(w: World, a: Ant): void {
+  releaseSlot(w, a);
   releaseGrapple(w, a);
+  clearApproach(a);
   a.state = AS.Idle;
   a.st = 0;
   a.tgt = 0;
@@ -442,6 +517,7 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       a.tk = n.kind;
       a.st = 0;
       a.waitT = 0;
+      clearApproach(a);
       t = targetPos(w, a);
     }
     if (!t || t.space !== a.space) {
@@ -504,24 +580,29 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     }
     return true;
   }
-  // ---- melee: take a free attack slot on the target, go there and hold it (slots.ts)
+  // ---- melee (combat v2, CHANGE_PLAN §16 steps 2–5): reserve a free attack slot on the target as we close in, walk
+  // to its hold point (our front half on its outline: no body overlap) and latch there; every slot taken: another
+  // foe, or wait on a ring a personal space out; blocked on the way: pause and sidestep (slots.ts)
   const C = BALANCE.combat;
+  const C2 = BALANCE.combat2;
   const L = cd.length;
   if (a.tk === 4) {
     const cr = w.creatureById.get(a.tgt)!;
-    const off = L * BALANCE.creatureHold.stance;
-    const b = bodyHook.body(cr);
     const dBody = distToCreatureBody(cr, a.x, a.y);
     const latchable = creatureHooks.canLatch(cr);
-    if (dBody > L * (latchable ? 2.5 : 0.8)) {
+    if (sidestep(w, a, cr.x, cr.y, dt)) return true;
+    if (dBody > frontOff(L) + L * (latchable ? 2.5 : 0.8)) {
       // head for the nearest point of its body, not its middle
+      if (blocked(w, a, dBody, cr.v > antSpeed(w, a) * 0.25, dt)) return true;
+      const b = bodyHook.body(cr);
+      const off = frontOff(L);
       const c0 = dcos(cr.h);
       const s0 = dsin(cr.h);
       const dx = a.x - cr.x;
       const dy = a.y - cr.y;
       creatureSlotWorld(cr, off, outlineU(b, off, dx * c0 + dy * s0, -dx * s0 + dy * c0), slotTmp);
       steerTo(w, a, slotTmp.x, slotTmp.y, dt, 1.15, C.turnRate);
-      a.waitT = 0;
+      leaveRing(w, a, true);
       return true;
     }
     if (!latchable) {
@@ -534,37 +615,70 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       }
       return true;
     }
-    const u = reserveCreatureSlot(w, a, cr, off);
-    if (u < 0) return waitForSlot(w, a, c, cr.x, cr.y, b.r + b.hl + off, dt);
-    if (dBody > L * 0.8) {
-      // our slot is free: go to it
-      creatureSlotWorld(cr, off, u, slotTmp);
-      steerTo(w, a, slotTmp.x, slotTmp.y, dt, 1.0, C.turnRate);
-      a.waitT = 0;
-      return true;
-    }
+    // waiting in the ring: look for a free slot only every `ringCheckSec`
+    if ((a.waitT ?? 0) > 0 && !ringCheckDue(a, dt)) return waitForSlot(w, a, c, cr.x, cr.y, dBody, frontOff(L) + C2.personalSpace * L, dt, cr);
+    const u = reserveCreatureSlot(w, a, cr);
+    if (u < 0) return waitForSlot(w, a, c, cr.x, cr.y, dBody, frontOff(L) + C2.personalSpace * L, dt, cr);
+    a.rsv = cr.id;
     a.gSlot = u;
-    claimCreatureSlot(w, cr, u);
+    a.waitT = 0;
+    const offU = creatureSlotOff(cr, L, u);
+    creatureSlotWorld(cr, offU, u % 1, slotTmp);
+    // beside our slot at about the hold distance (reserveCreatureSlot moves the slot to where we are when it can)
+    const there = dBody <= offU + L * C2.arriveTol * 2 && dBody >= offU - L * (u >= 1 ? 1 : C2.arriveTol * 2) && dhypot(slotTmp.x - a.x, slotTmp.y - a.y) <= L * 0.6;
+    if (!there && !approachHold(w, a, cr.x, cr.y, slotTmp.x, slotTmp.y, dt, cr.v > antSpeed(w, a) * 0.25)) return true;
   } else {
-    const reach = t.r + L * 0.45;
-    if (d > reach + L * 1.5) {
-      steerTo(w, a, t.x, t.y, dt, 1.15, C.turnRate);
-      a.waitT = 0;
-      return true;
-    }
     const o = w.antById.get(a.tgt)!;
-    const ang = reserveAntSlot(w, a, o, o.id === w.colony(o.colony)?.queen);
-    if (Number.isNaN(ang)) return waitForSlot(w, a, c, t.x, t.y, reach, dt);
-    if (d > reach) {
-      // close: walk to the free slot itself, not into the crowd at the middle
-      const r = (casteOf(o.caste).length + L) * 0.42;
-      steerTo(w, a, o.x + dcos(ang) * r, o.y + dsin(ang) * r, dt, 1.0, C.turnRate);
-      a.waitT = 0;
+    const reach = casteOf(o.caste).length * C2.antHalfLen + frontOff(L);
+    if (sidestep(w, a, o.x, o.y, dt)) return true;
+    if (d > reach + L * 2.5) {
+      if (blocked(w, a, d, o.v > antSpeed(w, a) * 0.25, dt)) return true;
+      steerTo(w, a, t.x, t.y, dt, 1.15, C.turnRate);
+      leaveRing(w, a, true);
       return true;
     }
+    if ((a.waitT ?? 0) > 0 && !ringCheckDue(a, dt)) return waitForSlot(w, a, c, t.x, t.y, d - reach, C2.personalSpace * L, dt, null);
+    const isQ = o.id === w.colony(o.colony)?.queen;
+    const ang = reserveAntSlot(w, a, o, isQ);
+    if (Number.isNaN(ang)) return waitForSlot(w, a, c, t.x, t.y, d - reach, C2.personalSpace * L, dt, null);
+    // the only free slot is round the far side: a nearer foe with room first (overflow: switch, then flank)
+    if (a.rsv !== o.id && Math.abs(angleDiff(ang, datan2(a.y - o.y, a.x - o.x))) > Math.PI / 2) {
+      const n = underOrder(c, a, 'noAttack') ? null : findTarget(w, a, c, aggroRadius(w, a, c));
+      if (n && !(n.id === a.tgt && n.kind === a.tk)) {
+        releaseSlot(w, a);
+        a.tgt = n.id;
+        a.tk = n.kind;
+        a.st = 0;
+        clearApproach(a);
+        return true;
+      }
+    }
+    a.rsv = o.id;
     a.gSlot = ang;
+    a.waitT = 0;
+    const holdsMe = o.tk === 3 && o.tgt === a.id && (o.state === AS.Attack || o.state === AS.Grapple || o.state === AS.Spray);
+    if (holdsMe) {
+      // it is coming for us too: meet head to head at reach (front half to front half, only the mandibles over)
+      const D = mutualHold(L, casteOf(o.caste).length);
+      const dd = Math.max(1e-6, d);
+      if (d > D + L * C2.arriveTol) {
+        slotTmp.x = o.x + ((a.x - o.x) / dd) * D;
+        slotTmp.y = o.y + ((a.y - o.y) / dd) * D;
+        if (!approachHold(w, a, o.x, o.y, slotTmp.x, slotTmp.y, dt, o.v > antSpeed(w, a) * 0.25)) return true;
+      }
+    } else {
+      const hr = antHoldPoint(a, o, ang, slotTmp);
+      // in our slot's sector at about the hold distance: there (the grapple eases us onto the point)
+      const inSector = Math.abs(angleDiff(datan2(a.y - o.y, a.x - o.x), ang)) <= Math.PI / antSlotCount(o, L, isQ) && d <= hr + L * C2.arriveTol * 2;
+      if (!inSector && !approachHold(w, a, o.x, o.y, slotTmp.x, slotTmp.y, dt, o.v > antSpeed(w, a) * 0.25)) return true;
+    }
   }
+  // at the hold point: latch on
   a.waitT = 0;
+  a.rsv = 0;
+  a.blkT = 0;
+  a.blkD = 0;
+  if ((a.flk ?? 0) !== 0) a.flk = 0;
   a.gId = a.tgt;
   a.gKind = a.tk;
   a.state = AS.Grapple;
@@ -572,41 +686,168 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   return true;
 }
 
+/** Forget the approach (reservation, blocked timer, pause): a new target or the fight is over. */
+function clearApproach(a: Ant): void {
+  if ((a.rsv ?? 0) !== 0) a.rsv = 0;
+  if ((a.flk ?? 0) !== 0) a.flk = 0;
+  if ((a.blkT ?? 0) !== 0) a.blkT = 0;
+  if ((a.blkD ?? 0) !== 0) a.blkD = 0;
+  if ((a.repT ?? 0) !== 0) a.repT = 0;
+}
+
+/** Far from the target again: give back a reserved slot, stop waiting (`chasing`: keep the blocked timer running). */
+function leaveRing(w: World, a: Ant, chasing = false): void {
+  if ((a.rsv ?? 0) !== 0) {
+    releaseSlot(w, a);
+    a.rsv = 0;
+  }
+  a.waitT = 0;
+  if ((a.flk ?? 0) !== 0) a.flk = 0;
+  if (chasing) return;
+  if ((a.blkT ?? 0) !== 0) a.blkT = 0;
+  if ((a.blkD ?? 0) !== 0) a.blkD = 0;
+}
+
+/** Waiting in the ring: has another `ringCheckSec` gone by (look for a free slot or another foe now)? */
+function ringCheckDue(a: Ant, dt: number): boolean {
+  const k = BALANCE.combat2.ringCheckSec;
+  const t = a.waitT ?? 0;
+  return Math.floor((t + dt) / k + 1e-9) !== Math.floor(t / k + 1e-9);
+}
+
 /**
- * Every slot on the target is taken: wait in a ring just outside the reach,
- * facing it (backing off without turning round if too close), and after a
- * while look for another target with room (or keep waiting).
+ * Walk to the hold point (cx, cy: the target's centre). A slot more than `flankStep` round the ring is reached by
+ * sidling round the ring facing the target (`flankSpeed`), never through it. Returns true when there (within `arriveTol` of the ant's length).
+ * Blocked (EotU): no closer by `blockedGain` × its length in `blockedSec` while the target stands (`moving` false) →
+ * a pause and a sidestep (`sidestep`).
  */
-function waitForSlot(w: World, a: Ant, c: Colony, tx: number, ty: number, reach: number, dt: number): boolean {
+function approachHold(w: World, a: Ant, cx: number, cy: number, hx: number, hy: number, dt: number, moving: boolean): boolean {
+  const C2 = BALANCE.combat2;
   const L = casteOf(a.caste).length;
-  const ringR = reach + L * BALANCE.combat.outerRing;
-  const d = dhypot(a.x - tx, a.y - ty);
-  if (d < ringR - L * 0.5) {
+  const d = dhypot(hx - a.x, hy - a.y);
+  if (d <= L * C2.arriveTol) return true;
+  if (blocked(w, a, d, moving, dt)) return false;
+  const bearing = datan2(a.y - cy, a.x - cx);
+  const want = datan2(hy - cy, hx - cx);
+  const diff = angleDiff(want, bearing);
+  if (Math.abs(diff) > C2.flankStep) {
+    // flank: sidle round the ring toward the slot, facing the target, a little outside the hold point (never through
+    // it). The way round is chosen once (the shorter one; straight across, by the id) and kept, so an ant opposite its
+    // slot does not dither between the two ways.
+    const rNow = dhypot(a.x - cx, a.y - cy);
+    const rWant = dhypot(hx - cx, hy - cy) + L * 0.3;
+    if ((a.flk ?? 0) === 0) a.flk = Math.abs(diff) > Math.PI * 0.9 ? (a.id & 1 ? 1 : -1) : diff > 0 ? 1 : -1;
+    const side = a.flk ?? 1;
+    const radial = Math.max(-1, Math.min(1, (rWant - rNow) / L));
+    const h = a.h;
+    a.h = datan2(dsin(bearing + side * (Math.PI / 2)) + dsin(bearing) * radial, dcos(bearing + side * (Math.PI / 2)) + dcos(bearing) * radial);
+    moveForward(w, a, antSpeed(w, a) * C2.flankSpeed, dt);
+    a.h = h;
+    faceToward(a, cx, cy, dt);
+  } else {
+    if ((a.flk ?? 0) !== 0) a.flk = 0;
+    steerTo(w, a, hx, hy, dt, d > L * 2 ? 1.1 : 0.9, BALANCE.combat.turnRate);
+  }
+  return false;
+}
+
+/**
+ * The reposition rule (EotU: a unit that cannot reach its foe briefly stops attacking and moves to a better place): an
+ * attacker that has not come `blockedGain` × its length closer (`d`: to its hold point, or to the foe while still far)
+ * in `blockedSec`, while the foe stands (`moving` false: a chase is not a block), pauses `pauseMin`..`pauseMax` s and
+ * sidesteps (`sidestep`; seeded time and side). Returns true when the pause starts.
+ */
+function blocked(w: World, a: Ant, d: number, moving: boolean, dt: number): boolean {
+  const C2 = BALANCE.combat2;
+  const L = casteOf(a.caste).length;
+  if (moving || !(a.blkD ?? 0) || d < (a.blkD ?? 0) - L * C2.blockedGain) {
+    a.blkD = d;
+    a.blkT = 0;
+    return false;
+  }
+  a.blkT = (a.blkT ?? 0) + dt;
+  if ((a.blkT ?? 0) < C2.blockedSec) return false;
+  const t = w.rng.range(C2.pauseMin, C2.pauseMax);
+  a.repT = w.rng.next() < 0.5 ? t : -t;
+  a.blkT = 0;
+  a.blkD = 0;
+  a.v = 0;
+  return true;
+}
+
+/**
+ * Paused after being blocked: no attacking for a moment, sidestepping round the target (cx, cy) at a steady
+ * distance, facing it (the side is the sign of `repT`). Returns true while the pause lasts.
+ */
+function sidestep(w: World, a: Ant, cx: number, cy: number, dt: number): boolean {
+  const rep = a.repT ?? 0;
+  if (rep === 0) return false;
+  const side = rep > 0 ? 1 : -1;
+  const left = Math.abs(rep) - dt;
+  a.repT = left <= 0 ? 0 : left * side;
+  const ang = datan2(a.y - cy, a.x - cx) + side * Math.PI / 2;
+  const h = a.h;
+  a.h = ang;
+  moveForward(w, a, antSpeed(w, a) * BALANCE.combat2.sidestepSpeed, dt);
+  a.h = h;
+  faceToward(a, cx, cy, dt);
+  return true;
+}
+
+/**
+ * Every slot on the target is taken: wait on a loose ring `ring` mm out (a personal space beyond the slots; for a
+ * creature (`cr`) measured from its body, along its outline), facing the fight, backing off without turning round if
+ * too close. `gap` is how far out the ant stands now, measured the same way. Every `ringCheckSec` it looks for another
+ * foe with a free slot, and attackUpdate retries this one's slots.
+ */
+function waitForSlot(w: World, a: Ant, c: Colony, tx: number, ty: number, gap: number, ring: number, dt: number, cr: Creature | null): boolean {
+  if ((a.rsv ?? 0) !== 0) {
+    releaseSlot(w, a);
+    a.rsv = 0;
+  }
+  const L = casteOf(a.caste).length;
+  // how far beyond the ring it stands (negative: inside it)
+  const off = gap - ring;
+  if (off < -L * 0.5) {
     const h = a.h;
     a.h = datan2(a.y - ty, a.x - tx);
     moveForward(w, a, antSpeed(w, a) * 0.5, dt);
     a.h = h;
     faceToward(a, tx, ty, dt);
-  } else if (d > ringR + L * 0.5) {
-    outerRingPoint(a, tx, ty, reach, ringTmp);
-    steerTo(w, a, ringTmp.x, ringTmp.y, dt, 0.8, BALANCE.combat.turnRate);
+  } else if (off > L * 0.5) {
+    if (cr) {
+      const b = bodyHook.body(cr);
+      const c0 = dcos(cr.h);
+      const s0 = dsin(cr.h);
+      const dx = a.x - cr.x;
+      const dy = a.y - cr.y;
+      creatureSlotWorld(cr, ring, outlineU(b, ring, dx * c0 + dy * s0, -dx * s0 + dy * c0), slotTmp);
+    } else {
+      const ang = datan2(a.y - ty, a.x - tx);
+      const r = dhypot(a.x - tx, a.y - ty) - off;
+      slotTmp.x = tx + dcos(ang) * r;
+      slotTmp.y = ty + dsin(ang) * r;
+    }
+    steerTo(w, a, slotTmp.x, slotTmp.y, dt, 0.8, BALANCE.combat.turnRate);
   } else {
     a.v = 0;
     faceToward(a, tx, ty, dt);
   }
+  const due = ringCheckDue(a, dt);
   a.waitT = (a.waitT ?? 0) + dt;
-  if (a.waitT >= BALANCE.combat.waitRetarget) {
-    a.waitT = 0;
+  if (due) {
+    // a foe with room (findTarget skips full ones unless focus-firing, which may keep this one)
     const t = underOrder(c, a, 'noAttack') ? null : findTarget(w, a, c, aggroRadius(w, a, c));
     if (t && (t.id !== a.tgt || t.kind !== a.tk)) {
       a.tgt = t.id;
       a.tk = t.kind;
       a.st = 0;
+      a.waitT = 0;
+      clearApproach(a);
     }
   }
   return true;
 }
-const ringTmp = { x: 0, y: 0 }; // det-ok: scratch
 
 /** Is any enemy holding on to this ant? */
 function grappledBy(w: World, a: Ant): boolean {
@@ -638,21 +879,32 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       return false;
     }
     const ol = casteOf(o.caste).length;
-    const r = (ol + cd.length) * 0.42;
-    // Two ants biting each other: neither moves round the other (the old
-    // feedback loop span them both); they just hold and face each other.
+    // Two ants biting each other: neither moves round the other (the old feedback loop span them both); they hold head
+    // to head at reach (combat v2: front half to front half, only the mandibles over), each easing half the error.
     const mutual = o.state === AS.Grapple && o.gKind === 3 && o.gId === a.id;
     if (mutual) {
-      if (dhypot(o.x - a.x, o.y - a.y) > r * 1.6) return regripAttack(a);
+      const D = mutualHold(cd.length, ol);
+      const dx = a.x - o.x;
+      const dy = a.y - o.y;
+      const dd = dhypot(dx, dy);
+      if (dd > D * 1.6) return regripAttack(a);
+      if (dd > 1e-6 && a.pinned <= 0) {
+        const k = (D - dd) * Math.min(1, dt * 4) * 0.5;
+        const nx = a.x + (dx / dd) * k;
+        const ny = a.y + (dy / dd) * k;
+        if (w.walkable(a.space, nx, ny)) {
+          a.x = nx;
+          a.y = ny;
+        }
+      }
     } else {
-      // hold on at the slot: a world angle, so the victim turning does not swing us round it. Close to the slot the
-      // pull is gentle, so nestmates holding the foes next to ours can ease us apart (separation.ts) instead of being
-      // snapped back on top of each other every tick (user note 2026-10-25: fights too compact)
-      const tx = o.x + dcos(a.gSlot) * r;
-      const ty = o.y + dsin(a.gSlot) * r;
-      const k = Math.min(1, dt * (dhypot(tx - a.x, ty - a.y) > cd.length * GUARD.slotGive ? 10 : 1.5));
-      a.x += (tx - a.x) * k;
-      a.y += (ty - a.y) * k;
+      // hold on at the slot's hold point (a world angle: the victim turning does not swing us round it). Close to it the
+      // pull is gentle, so fighting allies near ours can ease us apart (separation.ts) instead of being snapped back on
+      // top of each other every tick
+      antHoldPoint(a, o, a.gSlot, slotTmp);
+      const k = Math.min(1, dt * (dhypot(slotTmp.x - a.x, slotTmp.y - a.y) > cd.length * GUARD.slotGive ? 10 : 1.5));
+      a.x += (slotTmp.x - a.x) * k;
+      a.y += (slotTmp.y - a.y) * k;
     }
     faceToward(a, o.x, o.y, dt);
     // Spread-eagle: grapplers on opposite sides immobilise the victim.
@@ -702,7 +954,10 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   // and close in again, and when it turns into us we are pushed back out to our stance.
   const H = BALANCE.creatureHold;
   const L = cd.length;
-  const off = L * H.stance;
+  // (combat v2: the stance is the hold point — our front half on the outline — or, for a small ant under the body,
+  // the ring under its edge among the legs)
+  const off = creatureSlotOff(cr, L, a.gSlot);
+  const under = a.gSlot >= 1;
   const b = bodyHook.body(cr);
   const c0 = dcos(cr.h);
   const s0 = dsin(cr.h);
@@ -711,13 +966,13 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   creatureSlotWorld(cr, off, outlineU(b, off, ex * c0 + ey * s0, -ex * s0 + ey * c0), slotTmp);
   const dBody = distToCreatureBody(cr, a.x, a.y);
   // well out of reach: let go and close in again on a free place beside it (attackUpdate reserves one)
-  if (dBody > L * H.release) return regripAttack(a);
-  if (dBody > L * H.reach) {
+  if (dBody - off > L * H.release) return regripAttack(a);
+  if (dBody - off > L * H.reach) {
     // it has moved a little: step after it, keeping our slot (no bite until we are beside it again)
     steerTo(w, a, slotTmp.x, slotTmp.y, dt, 1.0, BALANCE.combat.turnRate);
     return true;
   }
-  if (dBody < off * 0.5) {
+  if (!under && dBody < off * 0.5) {
     // the body swung into us: shoved back out to our stance, never round it
     const px = slotTmp.x - a.x;
     const py = slotTmp.y - a.y;
@@ -729,7 +984,9 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     }
   }
   a.v = 0;
-  faceToward(a, slotTmp.x - dcos(slotTmp.n) * (off + 1), slotTmp.y - dsin(slotTmp.n) * (off + 1), dt);
+  // facing the body: the nearest point of its middle line
+  const ax = Math.max(-b.hl, Math.min(b.hl, ex * c0 + ey * s0));
+  faceToward(a, cr.x + ax * c0, cr.y + ax * s0, dt);
   if (cd.snap && snapEligible(w, a, 4, cr.id)) return regrip(w, a);
   if (a.cd <= 0) {
     a.cd = biteGap(w, a, c, cd.attackInterval);

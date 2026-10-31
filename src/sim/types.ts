@@ -137,6 +137,17 @@ export interface Ant {
   gSlot: number;
   /** seconds spent waiting outside a target whose attack slots are all taken */
   waitT?: number;
+  /**
+   * Combat v2 (CHANGE_PLAN §16): the target whose attack slot this ant has reserved while closing in (its id; 0 none;
+   * the slot is `gSlot`); and the reposition rule: the nearest it has come to its hold point and the seconds since it
+   * last closed in (`blkD`, `blkT`), and the pause to sidestep round the ring (s; the sign is the side), 0 if none.
+   */
+  rsv?: number;
+  /** flanking round the target to a slot on the far side: the way round (+1 / −1), 0 when not flanking */
+  flk?: number;
+  blkD?: number;
+  blkT?: number;
+  repT?: number;
   /** climbing / riding: the creature id (0 = on the ground) */
   rideId?: number;
   /** climbing: 0 walking to the foot of the rail, 1 up, 2 riding, 3 down (1–3: untouchable) */
