@@ -51,17 +51,22 @@ export function battleStats(n = 50, seconds = 25, seed = 7): { spinners: number;
   w.reindex();
   const hist = new Map<number, number[]>();
   const histS = new Map<number, string[]>();
+  // path walked each tick (a spin is turning on the spot: a full turn while walking under one body length's circle)
+  const histP = new Map<number, number[]>();
   let turn = 0;
   let turnN = 0;
   let overlapPairs = 0;
   let samples = 0;
   for (let t = 0; t < seconds * 20; t++) {
     const before = new Map(ants.map((a) => [a.id, a.h]));
+    const beforeP = new Map(ants.map((a) => [a.id, [a.x, a.y]]));
     w.step(0.05);
     w.events.drain();
     for (const a of ants) {
       if (a.state === AS.Dead) continue;
       const d = wrap(a.h - before.get(a.id)!);
+      const bp = beforeP.get(a.id)!;
+      const moved = Math.hypot(a.x - bp[0], a.y - bp[1]);
       const fighting = a.state === AS.Attack || a.state === AS.Grapple;
       if (!fighting) continue;
       turn += Math.abs(d);
@@ -69,9 +74,12 @@ export function battleStats(n = 50, seconds = 25, seed = 7): { spinners: number;
       let h = hist.get(a.id);
       if (!h) hist.set(a.id, (h = []));
       h.push(d);
+      let hp = histP.get(a.id);
+      if (!hp) histP.set(a.id, (hp = []));
+      hp.push(moved);
       let hs = histS.get(a.id);
       if (!hs) histS.set(a.id, (hs = []));
-      hs.push(a.state === AS.Grapple ? (a.gKind === 3 && w.antById.get(a.gId)?.gId === a.id ? 'mutual' : 'grapple') : (a.waitT ?? 0) > 0 ? 'wait' : 'attack');
+      hs.push(a.state === AS.Grapple ? (a.gKind === 3 && w.antById.get(a.gId)?.gId === a.id ? 'mutual' : 'grapple') : (a.waitT ?? 0) > 0 ? 'wait' : (a.garT ?? 0) > 0 ? 'going round' : (a.repT ?? 0) !== 0 ? 'backing off' : 'attack');
     }
     if (t % 20 === 0) {
       samples++;
@@ -88,15 +96,35 @@ export function battleStats(n = 50, seconds = 25, seed = 7): { spinners: number;
   let spinners = 0;
   const spinStates: Record<string, number> = {};
   for (const [id, h] of hist) {
+    const hp = histP.get(id)!;
+    const L = casteOf(ants.find((x) => x.id === id)!.caste).length;
     for (let i = 0; i + 60 <= h.length; i += 10) {
       let s = 0;
-      for (let k = i; k < i + 60; k++) s += h[k];
-      // a spin: a full turn the same way round within 3 s (turning to and fro to face new targets is not)
-      if (Math.abs(s) > Math.PI * 2) {
+      let path = 0;
+      for (let k = i; k < i + 60; k++) {
+        s += h[k];
+        path += hp[k];
+      }
+      // a spin: a full turn the same way round within 3 s (turning to and fro to face new targets is not), on the spot —
+      // not walking round a fight (combat v2.1: ants go round fights; a turn that comes with an arc of a body length's
+      // radius or more is a walk, not a spin)
+      if (Math.abs(s) > Math.PI * 2 && path < Math.abs(s) * L) {
         spinners++;
         // where the turning happened
         const hs = histS.get(id)!;
         for (let k = i; k < i + 60; k++) spinStates[hs[k]] = (spinStates[hs[k]] ?? 0) + Math.abs(h[k]);
+        if ((globalThis as { __spinDump?: number }).__spinDump === id) {
+          for (let k = i; k < i + 60; k++) console.log(`  ${k - i} ${histS.get(id)![k].padEnd(12)} turn ${((h[k] * 180) / Math.PI).toFixed(1).padStart(6)}° moved ${hp[k].toFixed(2)}`);
+        }
+        if ((globalThis as { __spinLog?: boolean }).__spinLog) {
+          let line = `spinner ${id}:`;
+          let last = '';
+          for (let k = i; k < i + 60; k++) {
+            if (hs[k] !== last) line += ` [${k - i}] ${hs[k]}`;
+            last = hs[k];
+          }
+          console.log(line);
+        }
         break;
       }
     }
@@ -123,27 +151,40 @@ export function beetleRing(n = 30, seed = 7): { latched: number; ringErr: number
   }
   w.reindex();
   const hist = new Map<number, number[]>();
+  const histP = new Map<number, number[]>();
   for (let t = 0; t < 20 * 20; t++) {
-    const before = new Map(ants.map((a) => [a.id, a.h]));
+    const before = new Map(ants.map((a) => [a.id, [a.h, a.x, a.y]]));
     w.step(0.05);
     w.events.drain();
     for (const a of ants) {
+      const b = before.get(a.id)!;
       let h = hist.get(a.id);
       if (!h) hist.set(a.id, (h = []));
-      h.push(wrap(a.h - before.get(a.id)!));
+      h.push(wrap(a.h - b[0]));
+      let hp = histP.get(a.id);
+      if (!hp) histP.set(a.id, (hp = []));
+      hp.push(Math.hypot(a.x - b[1], a.y - b[2]));
     }
   }
   let spinners = 0;
-  for (const h of hist.values())
+  const L0 = casteOf('lasius_worker').length;
+  for (const [id, h] of hist) {
+    const hp = histP.get(id)!;
     for (let i = 200; i + 60 <= h.length; i += 10) {
       let s = 0;
-      for (let k = i; k < i + 60; k++) s += h[k];
-      // a spin: a full turn the same way round within 3 s (turning to and fro to face new targets is not)
-      if (Math.abs(s) > Math.PI * 2) {
+      let path = 0;
+      for (let k = i; k < i + 60; k++) {
+        s += h[k];
+        path += hp[k];
+      }
+      // a spin: a full turn the same way round within 3 s (turning to and fro to face new targets is not), on the spot
+      // (combat v2.1: walking round the beetle on an arc of a body length's radius or more is not a spin)
+      if (Math.abs(s) > Math.PI * 2 && path < Math.abs(s) * L0) {
         spinners++;
         break;
       }
     }
+  }
   const latched = ants.filter((a) => a.state === AS.Grapple && a.gId === cr.id).length;
   let stacked = 0;
   // (riders are up on its back, above the ants under it: not a stack)

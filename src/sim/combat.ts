@@ -2,8 +2,8 @@ import { World } from './world';
 import { Ant, AS, Carry, Colony, Creature, POSE, SURFACE, nestSpace } from './types';
 import type { Projectile } from './types';
 import { casteOf, DamageType, isKing } from './species';
-import { angleDiff, antSpeed, faceToward, moveForward, steerTo, turnToward, goHome, goOut } from './movement';
-import { antHoldPoint, antSlotCount, antSlotsTaken, bodyHook, creatureHasRoom, creatureSlotOff, creatureSlotWorld, distToCreatureBody, flankSide, frontOff, holdsSlotOn, mutualHold, outlineU, releaseSlot, reserveAntSlot, reserveCreatureSlot, slotTmp } from './slots';
+import { angleDiff, antSpeed, faceToward, moveForward, steerAvoid, steerTo, turnToward, goHome, goOut } from './movement';
+import { anchored, antHoldPoint, antOutlineR, antSectorFreeAt, antSlotCount, antSlotsTaken, bodyHook, creatureHasRoom, creatureSlotFreeAt, creatureSlotOff, creatureSlotWorld, distToCreatureBody, frontOff, holdsSlotOn, mutualHold, outlineU, pickSide, releaseSlot, reserveAntSlot, reserveCreatureSlot, slotTmp, takeAntSector, takeCreatureSlot } from './slots';
 import { killAnt, releaseGrapple } from './antAI';
 import { dropCarried, setTask } from './colony';
 import { abilityMods } from './abilities';
@@ -34,11 +34,14 @@ export const creatureHooks: {
   canLatch: (c: Creature) => boolean;
   /** slot radius for grapplers around the creature body */
   radius: (c: Creature) => number;
+  /** combat v2.1: in an attack (wind-up to recovery, or a planned lunge): anchored, nobody moves it */
+  attacking: (c: Creature) => boolean;
 } = {
   relation: () => 'hostile',
   armor: () => 0,
   canLatch: () => true,
   radius: (c) => c.scale * 0.45,
+  attacking: () => false,
 };
 
 /** Ants of different teams are enemies (allies share a team). */
@@ -184,6 +187,7 @@ export function flingAnt(w: World, a: Ant, fromX: number, fromY: number, power: 
   if (a.state === AS.Hold && isSickle(a)) return; // a holding sickle-jaw is planted
   dropCarried(w, a);
   releaseGrapple(w, a);
+  unanchor(a);
   const ang = datan2(a.y - fromY, a.x - fromX) + w.rng.range(-0.4, 0.4);
   const m = casteOf(a.caste).mass;
   const sp = (power * 40) / Math.sqrt(m + 0.5);
@@ -401,6 +405,8 @@ export function venomTick(w: World, a: Ant, dt: number): boolean {
 
 export function combatPreempt(w: World, a: Ant, c: Colony, dt: number): boolean {
   if (venomTick(w, a, dt)) return true;
+  // combat v2.1: the recovery after an attack runs down (anchored till then)
+  if ((a.anc ?? 0) > 0) a.anc = Math.max(0, (a.anc ?? 0) - dt);
   const isQueen = a.id === c.queen;
   if (a.state === AS.Grapple) return grappleUpdate(w, a, c, dt);
   if (a.state === AS.Attack) return attackUpdate(w, a, c, dt);
@@ -511,6 +517,7 @@ function endCombat(w: World, a: Ant): void {
   releaseSlot(w, a);
   releaseGrapple(w, a);
   clearApproach(a);
+  unanchor(a);
   a.state = AS.Idle;
   a.st = 0;
   a.tgt = 0;
@@ -537,6 +544,12 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     }
   }
   const cd = casteOf(a.caste);
+  // combat v2.1: recovering after an attack — it stands where it is, facing locked, before it moves again
+  if ((a.anc ?? 0) > 0) {
+    a.v = 0;
+    a.pose = POSE.ALARM;
+    return true;
+  }
   // large creatures and titans: climb up and ride it when the climb is ready, ranged units too (climbing.ts)
   if (a.tk === 4 && tryClimb(w, a, w.creatureById.get(a.tgt)!)) return true;
   if (cd.acid?.kind === 'ramp') return nasuteAttack(w, a, c, dt, biteMul(w, a, c));
@@ -581,9 +594,11 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       faceToward(a, t.x, t.y, dt);
       return true;
     }
-    // In range: hold the position and reload; nip at anything that climbs on.
+    // In range: hold the position and reload (anchored this tick, turning slowly: combat v2.1); nip at anything that
+    // climbs on.
     a.v = 0;
-    faceToward(a, t.x, t.y, dt);
+    a.anc = Math.max(a.anc ?? 0, 1e-6);
+    turnAt(a, t.x, t.y, dt, BALANCE.combat21.shooterTurn);
     if (d < reachS && a.cd <= 0 && a.tk === 3) {
       a.cd = cd.attackInterval;
       const o = w.antById.get(a.tgt);
@@ -591,9 +606,11 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     }
     return true;
   }
-  // ---- melee (combat v2, CHANGE_PLAN §16 steps 2–5): reserve a free attack slot on the target as we close in, walk
-  // to its hold point (our front half on its outline: no body overlap) and latch there; every slot taken: another
-  // foe, or wait on a ring a personal space out; blocked on the way: pause and sidestep (slots.ts)
+  // ---- melee (combat v2, CHANGE_PLAN §16 steps 2–5; combat v2.1 §17): reserve a free attack slot on the target as we
+  // close in, walk to its hold point (our front half on its outline: no body overlap) and latch there; every slot
+  // taken: another foe, or wait on a ring a personal space out. A slot round the far side, or blocked on the way (a
+  // teammate in front and no closer): back off and go round the fight on a ring outside the slots to the nearest free
+  // slot on the side picked, then close in (no shoving).
   const C = BALANCE.combat;
   const C2 = BALANCE.combat2;
   const L = cd.length;
@@ -601,10 +618,14 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     const cr = w.creatureById.get(a.tgt)!;
     const dBody = distToCreatureBody(cr, a.x, a.y);
     const latchable = creatureHooks.canLatch(cr);
-    if (sidestep(w, a, cr.x, cr.y, dt)) return true;
-    if (dBody > frontOff(L) + L * (latchable ? 2.5 : 0.8)) {
+    if (backingOff(w, a, cr.x, cr.y, dt)) return true;
+    // (going round, it walks a ring outside the slots: not a chase unless it has been pushed well beyond it)
+    const roundR = frontOff(L) + (BALANCE.combat21.ringPS * C2.personalSpace + 3) * L;
+    if (goingRound(a) && latchable && dBody <= roundR && goRoundCreature(w, a, c, cr, dt)) return true;
+    if (dBody > frontOff(L) + L * (latchable ? 2.5 : 0.8) && !(goingRound(a) && dBody <= roundR)) {
       // head for the nearest point of its body, not its middle
-      if (blocked(w, a, dBody, cr.v > antSpeed(w, a) * 0.25, dt)) return true;
+      const moving = cr.v > antSpeed(w, a) * 0.25;
+      if (blocked(w, a, dBody, moving, dt)) return true;
       const b = bodyHook.body(cr);
       const off = frontOff(L);
       const c0 = dcos(cr.h);
@@ -612,7 +633,7 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       const dx = a.x - cr.x;
       const dy = a.y - cr.y;
       creatureSlotWorld(cr, off, outlineU(b, off, dx * c0 + dy * s0, -dx * s0 + dy * c0), slotTmp);
-      steerTo(w, a, slotTmp.x, slotTmp.y, dt, 1.15, C.turnRate);
+      steerAvoid(w, a, slotTmp.x, slotTmp.y, dt, 1.15, C.turnRate);
       leaveRing(w, a, true);
       return true;
     }
@@ -630,31 +651,40 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     if ((a.waitT ?? 0) > 0 && !ringCheckDue(a, dt)) return waitForSlot(w, a, c, cr.x, cr.y, dBody, frontOff(L) + C2.personalSpace * L, dt, cr);
     const u = reserveCreatureSlot(w, a, cr);
     if (u < 0) return waitForSlot(w, a, c, cr.x, cr.y, dBody, frontOff(L) + C2.personalSpace * L, dt, cr);
-    if ((a.flk ?? 0) !== 0 && (a.rsv !== cr.id || a.gSlot !== u)) a.flk = 0;
+    const offU = creatureSlotOff(cr, L, u);
+    creatureSlotWorld(cr, offU, u % 1, slotTmp);
+    // its slot round the far side: go round on the ring outside the slots (reserving a slot when it gets there)
+    if (u < 1 && Math.abs(angleDiff(datan2(slotTmp.y - cr.y, slotTmp.x - cr.x), datan2(a.y - cr.y, a.x - cr.x))) > C2.flankStep && cr.v <= antSpeed(w, a) * 0.25) {
+      releaseSlot(w, a);
+      a.rsv = 0;
+      return startGoRound(w, a, c, 4, cr.id, false, dt) || waitForSlot(w, a, c, cr.x, cr.y, dBody, frontOff(L) + C2.personalSpace * L, dt, cr);
+    }
     a.rsv = cr.id;
     a.gSlot = u;
     a.waitT = 0;
-    const offU = creatureSlotOff(cr, L, u);
-    creatureSlotWorld(cr, offU, u % 1, slotTmp);
     // beside our slot at about the hold distance (reserveCreatureSlot moves the slot to where we are when it can)
     const there = dBody <= offU + L * C2.arriveTol * 2 && dBody >= offU - L * (u >= 1 ? 1 : C2.arriveTol * 2) && dhypot(slotTmp.x - a.x, slotTmp.y - a.y) <= L * 0.6;
-    if (!there && !approachHold(w, a, cr.x, cr.y, slotTmp.x, slotTmp.y, dt, cr.v > antSpeed(w, a) * 0.25)) return true;
+    if (!there && !approachHold(w, a, cr.x, cr.y, slotTmp.x, slotTmp.y, dt, cr.v > antSpeed(w, a) * 0.25, u >= 1)) return true;
   } else {
     const o = w.antById.get(a.tgt)!;
     const reach = casteOf(o.caste).length * C2.antHalfLen + frontOff(L);
-    if (sidestep(w, a, o.x, o.y, dt)) return true;
-    if (d > reach + L * 2.5) {
+    if (backingOff(w, a, o.x, o.y, dt)) return true;
+    const isQ = o.id === w.colony(o.colony)?.queen;
+    // going round the foe to a free slot (combat v2.1): a ring outside the slots, not a chase unless pushed well beyond it
+    const roundR = reach + (BALANCE.combat21.ringPS * C2.personalSpace + 3) * L;
+    if (goingRound(a) && d <= roundR && goRoundAnt(w, a, c, o, isQ, dt)) return true;
+    if (d > reach + L * 2.5 && !(goingRound(a) && d <= roundR)) {
       if (blocked(w, a, d, o.v > antSpeed(w, a) * 0.25, dt)) return true;
-      steerTo(w, a, t.x, t.y, dt, 1.15, C.turnRate);
+      steerAvoid(w, a, t.x, t.y, dt, 1.15, C.turnRate);
       leaveRing(w, a, true);
       return true;
     }
     if ((a.waitT ?? 0) > 0 && !ringCheckDue(a, dt)) return waitForSlot(w, a, c, t.x, t.y, d - reach, C2.personalSpace * L, dt, null);
-    const isQ = o.id === w.colony(o.colony)?.queen;
     const ang = reserveAntSlot(w, a, o, isQ);
     if (Number.isNaN(ang)) return waitForSlot(w, a, c, t.x, t.y, d - reach, C2.personalSpace * L, dt, null);
-    // the only free slot is round the far side: a nearer foe with room first (overflow: switch, then flank)
-    if (a.rsv !== o.id && Math.abs(angleDiff(ang, datan2(a.y - o.y, a.x - o.x))) > Math.PI / 2) {
+    const far = Math.abs(angleDiff(ang, datan2(a.y - o.y, a.x - o.x)));
+    // the only free slot is round the far side: a nearer foe with room first (overflow: switch, then go round)
+    if (a.rsv !== o.id && far > Math.PI / 2) {
       const n = underOrder(c, a, 'noAttack') ? null : findTarget(w, a, c, aggroRadius(w, a, c));
       if (n && !(n.id === a.tgt && n.kind === a.tk)) {
         releaseSlot(w, a);
@@ -665,12 +695,17 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
         return true;
       }
     }
-    // a new slot (or a slot moved): choose the way round afresh
-    if ((a.flk ?? 0) !== 0 && (a.rsv !== o.id || Math.abs(angleDiff(ang, a.gSlot)) > 1e-6)) a.flk = 0;
+    const holdsMe = o.tk === 3 && o.tgt === a.id && (o.state === AS.Attack || o.state === AS.Grapple || o.state === AS.Spray);
+    // its slot is round the far side of a foe that stands: go round on the ring outside the slots (no sidling through
+    // the fight; the slot is reserved on arrival)
+    if (!holdsMe && far > C2.flankStep && o.v <= antSpeed(w, a) * 0.25) {
+      releaseSlot(w, a);
+      a.rsv = 0;
+      return startGoRound(w, a, c, 3, o.id, isQ, dt) || waitForSlot(w, a, c, t.x, t.y, d - reach, C2.personalSpace * L, dt, null);
+    }
     a.rsv = o.id;
     a.gSlot = ang;
     a.waitT = 0;
-    const holdsMe = o.tk === 3 && o.tgt === a.id && (o.state === AS.Attack || o.state === AS.Grapple || o.state === AS.Spray);
     if (holdsMe) {
       // it is coming for us too: meet head to head at reach (front half to front half, only the mandibles over)
       const D = mutualHold(L, casteOf(o.caste).length);
@@ -682,18 +717,9 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       }
     } else {
       const hr = antHoldPoint(a, o, ang, slotTmp);
-      // going round to it: a way past no held slot (their holders are in the way); none → it cannot get there: wait
-      if ((a.flk ?? 0) === 0 && Math.abs(angleDiff(ang, datan2(a.y - o.y, a.x - o.x))) > C2.flankStep) {
-        const side = flankSide(w, a, o, isQ, ang);
-        if (side === 0) {
-          releaseSlot(w, a);
-          a.rsv = 0;
-          return waitForSlot(w, a, c, t.x, t.y, d - reach, C2.personalSpace * L, dt, null);
-        }
-        a.flk = side;
-      }
-      // in our slot's sector at about the hold distance: there (the grapple eases us onto the point)
-      const inSector = Math.abs(angleDiff(datan2(a.y - o.y, a.x - o.x), ang)) <= Math.PI / antSlotCount(o, L, isQ) && d <= hr + L * C2.arriveTol * 2;
+      // in our slot's sector at about the hold distance: there (the grapple plants us where we stand)
+      // (not inside its outline either: it would plant with its body in the foe's)
+      const inSector = Math.abs(angleDiff(datan2(a.y - o.y, a.x - o.x), ang)) <= Math.PI / antSlotCount(o, L, isQ) && d <= hr + L * C2.arriveTol * 2 && d >= hr - L * C2.arriveTol * 2;
       if (!inSector && !approachHold(w, a, o.x, o.y, slotTmp.x, slotTmp.y, dt, o.v > antSpeed(w, a) * 0.25)) return true;
     }
   }
@@ -709,6 +735,8 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   a.blkT = 0;
   a.blkD = 0;
   if ((a.flk ?? 0) !== 0) a.flk = 0;
+  if ((a.garT ?? 0) !== 0) a.garT = 0;
+  if ((a.bkI ?? 0) !== 0) a.bkI = 0;
   a.gId = a.tgt;
   a.gKind = a.tk;
   a.state = AS.Grapple;
@@ -716,16 +744,18 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   return true;
 }
 
-/** Forget the approach (reservation, blocked timer, pause): a new target or the fight is over. */
+/** Forget the approach (reservation, blocked timer, back-off, going round): a new target or the fight is over. */
 function clearApproach(a: Ant): void {
   if ((a.rsv ?? 0) !== 0) a.rsv = 0;
   if ((a.flk ?? 0) !== 0) a.flk = 0;
   if ((a.blkT ?? 0) !== 0) a.blkT = 0;
   if ((a.blkD ?? 0) !== 0) a.blkD = 0;
   if ((a.repT ?? 0) !== 0) a.repT = 0;
+  if ((a.garT ?? 0) !== 0) a.garT = 0;
+  if ((a.bkI ?? 0) !== 0) a.bkI = 0;
 }
 
-/** Far from the target again: give back a reserved slot, stop waiting (`chasing`: keep the blocked timer running). */
+/** Far from the target again: give back a reserved slot, stop waiting or going round (`chasing`: keep the blocked timer running). */
 function leaveRing(w: World, a: Ant, chasing = false): void {
   if ((a.rsv ?? 0) !== 0) {
     releaseSlot(w, a);
@@ -733,6 +763,7 @@ function leaveRing(w: World, a: Ant, chasing = false): void {
   }
   a.waitT = 0;
   if ((a.flk ?? 0) !== 0) a.flk = 0;
+  if ((a.garT ?? 0) !== 0) a.garT = 0;
   if (chasing) return;
   if ((a.blkT ?? 0) !== 0) a.blkT = 0;
   if ((a.blkD ?? 0) !== 0) a.blkD = 0;
@@ -746,90 +777,238 @@ function ringCheckDue(a: Ant, dt: number): boolean {
 }
 
 /**
- * Walk to the hold point (cx, cy: the target's centre). A slot more than `flankStep` round the ring is reached by
- * sidling round the ring facing the target (`flankSpeed`), never through it. Returns true when there (within `arriveTol` of the ant's length).
- * Blocked (EotU): no closer by `blockedGain` × its length in `blockedSec` while the target stands (`moving` false) →
- * a pause and a sidestep (`sidestep`).
+ * Walk to the hold point (cx, cy: the target's centre); returns true when there (within `arriveTol` of its length). It
+ * steers round teammates in its way (steerAvoid) — except squeezing in under a creature (`squeeze`). Its slot round the far side of a foe on the move: it keeps up on its
+ * own side (no circling a moving foe); a standing foe's far slots are reached by going round (attackUpdate). Blocked —
+ * a teammate in front and no closer — it backs off and goes round (`blocked`).
  */
-function approachHold(w: World, a: Ant, cx: number, cy: number, hx: number, hy: number, dt: number, moving: boolean): boolean {
+function approachHold(w: World, a: Ant, cx: number, cy: number, hx: number, hy: number, dt: number, moving: boolean, squeeze = false): boolean {
   const C2 = BALANCE.combat2;
   const L = casteOf(a.caste).length;
   const d = dhypot(hx - a.x, hy - a.y);
   if (d <= L * C2.arriveTol) return true;
+  // (squeezing in under a creature between its teammates' legs: straight in, nobody in its way — separation.ts)
+  if (squeeze) {
+    steerTo(w, a, hx, hy, dt, 0.9, BALANCE.combat.turnRate);
+    return false;
+  }
   if (blocked(w, a, d, moving, dt)) return false;
   const bearing = datan2(a.y - cy, a.x - cx);
   const want = datan2(hy - cy, hx - cx);
-  const diff = angleDiff(want, bearing);
-  if (Math.abs(diff) > C2.flankStep && moving) {
-    // its slot is round the far side of a foe on the move: keep up on our side (no circling a moving foe); flank once
-    // it stands
+  if (Math.abs(angleDiff(want, bearing)) > C2.flankStep && moving) {
     const r = dhypot(hx - cx, hy - cy) + L * 0.3;
-    if ((a.flk ?? 0) !== 0) a.flk = 0;
-    steerTo(w, a, cx + dcos(bearing) * r, cy + dsin(bearing) * r, dt, 1.0, BALANCE.combat.turnRate);
-  } else if (Math.abs(diff) > C2.flankStep) {
-    // flank: sidle round the ring toward the slot, facing the target, a little outside the hold point (never through
-    // it). The way round is chosen once (the shorter one; straight across, by the id) and kept, so an ant opposite its
-    // slot does not dither between the two ways.
-    const rNow = dhypot(a.x - cx, a.y - cy);
-    const rWant = dhypot(hx - cx, hy - cy) + L * 0.3;
-    // (attackUpdate picks the way past fewer held slots on an ant; turned back if it has just gone past its slot)
-    if ((a.flk ?? 0) === 0 || ((a.flk ?? 0) * diff < 0 && Math.abs(diff) < Math.PI * 0.5)) a.flk = Math.abs(diff) > Math.PI * 0.9 ? (a.id & 1 ? 1 : -1) : diff > 0 ? 1 : -1;
-    const side = a.flk ?? 1;
-    const radial = Math.max(-1, Math.min(1, (rWant - rNow) / L));
-    const h = a.h;
-    a.h = datan2(dsin(bearing + side * (Math.PI / 2)) + dsin(bearing) * radial, dcos(bearing + side * (Math.PI / 2)) + dcos(bearing) * radial);
-    moveForward(w, a, antSpeed(w, a) * C2.flankSpeed, dt);
-    a.h = h;
-    faceToward(a, cx, cy, dt);
-  } else {
-    if ((a.flk ?? 0) !== 0) a.flk = 0;
-    steerTo(w, a, hx, hy, dt, d > L * 2 ? 1.1 : 0.9, BALANCE.combat.turnRate);
-  }
+    steerAvoid(w, a, cx + dcos(bearing) * r, cy + dsin(bearing) * r, dt, 1.0, BALANCE.combat.turnRate);
+  } else steerAvoid(w, a, hx, hy, dt, d > L * 2 ? 1.1 : 0.9, BALANCE.combat.turnRate);
   return false;
 }
 
 /**
- * The reposition rule (EotU: a unit that cannot reach its foe briefly stops attacking and moves to a better place): an
- * attacker that has not come `blockedGain` × its length closer (`d`: to its hold point, or to the foe while still far)
- * in `blockedSec`, while the foe stands (`moving` false: a chase is not a block), pauses `pauseMin`..`pauseMax` s and
- * sidesteps (`sidestep`; seeded time and side). Returns true when the pause starts.
+ * Blocked (combat v2.1, EotU "back off and go around"): closing in, it has not come `blockedGain` × its length closer
+ * (`d`: to its hold point, or to the foe while still far) in `blockedSec`, while the foe stands (`moving` false: a chase
+ * is not a block) — a teammate in front of it, or anything else in the way. It backs off (`backingOff`) and then goes
+ * round on the side picked (`pickSide`; the other way if it was already going round). The slot it was making for is
+ * remembered (`bkS` on `bkI`): it is not tried again straight away. Returns true when the back-off starts.
  */
 function blocked(w: World, a: Ant, d: number, moving: boolean, dt: number): boolean {
-  const C2 = BALANCE.combat2;
+  const C21 = BALANCE.combat21;
   const L = casteOf(a.caste).length;
-  if (moving || !(a.blkD ?? 0) || d < (a.blkD ?? 0) - L * C2.blockedGain) {
+  if (moving || !(a.blkD ?? 0) || d < (a.blkD ?? 0) - L * C21.blockedGain) {
     a.blkD = d;
     a.blkT = 0;
     return false;
   }
   a.blkT = (a.blkT ?? 0) + dt;
-  if ((a.blkT ?? 0) < C2.blockedSec) return false;
-  const t = w.rng.range(C2.pauseMin, C2.pauseMax);
-  a.repT = w.rng.next() < 0.5 ? t : -t;
+  if ((a.blkT ?? 0) < C21.blockedSec - 1e-9) return false;
   a.blkT = 0;
   a.blkD = 0;
+  // never the same spot twice in a row
+  if ((a.rsv ?? 0) !== 0 && a.rsv === a.tgt) {
+    a.bkI = a.rsv;
+    a.bkS = a.gSlot;
+    releaseSlot(w, a);
+    a.rsv = 0;
+  }
+  const isQ = a.tk === 3 && a.tgt === w.colony(w.antById.get(a.tgt)?.colony ?? -1)?.queen;
+  let side = pickSide(w, a, a.tk, a.tgt, isQ);
+  if (goingRound(a) && side === Math.sign(a.flk ?? 0)) side = -side;
+  // (no side with room: it backs off all the same, turning by its id, and then waits on the ring — backingOff)
+  a.repT = (side === 0 ? (a.id & 1 ? 1 : -1) : side) * C21.backOffSec;
+  if ((a.garT ?? 0) !== 0) a.garT = 0;
+  if ((a.flk ?? 0) !== 0) a.flk = 0;
   a.v = 0;
   return true;
 }
 
 /**
- * Paused after being blocked: no attacking for a moment, sidestepping round the target (cx, cy) at a steady
- * distance, facing it (the side is the sign of `repT`). Returns true while the pause lasts.
+ * Backing off after a block: it steps back `backOffLen` × its length over `backOffSec`, still facing the fight, its
+ * body turning `backOffTurn` toward the side it picked (the sign of `repT`); then it goes round the side with room
+ * (pickSide, asked again), or — none — waits on the ring. Returns true while it backs off.
  */
-function sidestep(w: World, a: Ant, cx: number, cy: number, dt: number): boolean {
+function backingOff(w: World, a: Ant, cx: number, cy: number, dt: number): boolean {
   const rep = a.repT ?? 0;
   if (rep === 0) return false;
+  const C21 = BALANCE.combat21;
   const side = rep > 0 ? 1 : -1;
   const left = Math.abs(rep) - dt;
-  a.repT = left <= 0 ? 0 : left * side;
-  const ang = datan2(a.y - cy, a.x - cx) + side * Math.PI / 2;
+  a.repT = left <= 1e-9 ? 0 : left * side;
+  const L = casteOf(a.caste).length;
   const h = a.h;
-  a.h = ang;
-  moveForward(w, a, antSpeed(w, a) * BALANCE.combat2.sidestepSpeed, dt);
+  a.h = datan2(a.y - cy, a.x - cx) + side * C21.backOffTurn * 0.5;
+  moveForward(w, a, (C21.backOffLen * L) / C21.backOffSec, dt);
   a.h = h;
-  faceToward(a, cx, cy, dt);
+  turnToward(a, datan2(cy - a.y, cx - a.x) + side * C21.backOffTurn, dt, BALANCE.combat.turnRate);
+  if (a.repT === 0) {
+    // then round the side with room (asked again now: others may have taken it meanwhile), or wait on the ring
+    const isQ = a.tk === 3 && a.tgt === w.colony(w.antById.get(a.tgt)?.colony ?? -1)?.queen;
+    const s2 = pickSide(w, a, a.tk, a.tgt, isQ);
+    a.blkD = 0;
+    a.blkT = 0;
+    if (s2 === 0) a.waitT = 1e-6;
+    else {
+      a.flk = s2;
+      a.garT = 1e-6;
+    }
+  }
   return true;
 }
+
+/** Going round the fight to a free slot (combat v2.1)? */
+function goingRound(a: Ant): boolean {
+  return (a.garT ?? 0) > 0 && (a.flk ?? 0) !== 0;
+}
+
+/** Start going round target (`kind`, `id`) on the side picked; false when no slot is free anywhere round it. */
+function startGoRound(w: World, a: Ant, c: Colony, kind: number, id: number, isQ: boolean, dt: number): boolean {
+  const side = pickSide(w, a, kind, id, isQ);
+  if (side === 0) return false;
+  a.flk = side;
+  a.garT = 1e-6;
+  a.blkD = 0;
+  a.blkT = 0;
+  if (kind === 3) {
+    const o = w.antById.get(id);
+    return o ? goRoundAnt(w, a, c, o, isQ, dt) : false;
+  }
+  const cr = w.creatureById.get(id);
+  return cr ? goRoundCreature(w, a, c, cr, dt) : false;
+}
+
+/**
+ * Going round ant foe `o` on a ring a personal space outside its slots (the fighters stay inside it), at `ringSpeed`,
+ * aiming `ringLook` ahead, all the way on the side picked. Beside a free slot (not the one it was blocked on) it
+ * reserves it and closes in (returns false: attackUpdate goes on). All the way round with nothing free: it gives up
+ * going round (returns false: it waits on the ring or picks another foe). Blocked on the ring: it tries the other way,
+ * once.
+ */
+function goRoundAnt(w: World, a: Ant, c: Colony, o: Ant, isQ: boolean, dt: number): boolean {
+  const C21 = BALANCE.combat21;
+  const L = casteOf(a.caste).length;
+  const bearing = datan2(a.y - o.y, a.x - o.x);
+  const r0 = dhypot(a.x - o.x, a.y - o.y);
+  const hr = antOutlineR(o, bearing) + frontOff(L);
+  // beside a free slot (level with its middle, so it closes in straight), near the ring: take it
+  const ang = antSectorFreeAt(w, a, o, isQ, bearing);
+  if (!Number.isNaN(ang) && Math.abs(angleDiff(ang, bearing)) <= BALANCE.combat2.flankStep && r0 <= hr + BALANCE.combat2.personalSpace * L * 2.5) {
+    takeAntSector(w, a, o, ang);
+    a.rsv = o.id;
+    a.gSlot = ang;
+    a.flk = 0;
+    a.garT = 0;
+    a.blkD = 0;
+    a.blkT = 0;
+    return false;
+  }
+  // (half a circle at most: the nearest free slot on the side it picked is within that; then the other way, once)
+  if ((a.garT ?? 0) > Math.PI) {
+    a.flk = 0;
+    a.garT = 0;
+    return false;
+  }
+  const side = a.flk ?? 1;
+  const R = hr + C21.ringPS * BALANCE.combat2.personalSpace * L;
+  const next = bearing + Math.sign(side) * C21.ringLook;
+  // stuck on the ring: the other way, once (then it gives up: garT past a full turn)
+  if (blockedOnRing(a, dt)) {
+    // stuck: the other way round, once (|flk| 2 marks the second try); stuck again, it gives up going round
+    if (Math.abs(side) === 2) a.garT = Math.PI + 1e-3;
+    else {
+      a.flk = -2 * Math.sign(side);
+      a.garT = 1e-6;
+    }
+    return true;
+  }
+  steerAvoid(w, a, o.x + dcos(next) * R, o.y + dsin(next) * R, dt, C21.ringSpeed, BALANCE.combat.turnRate);
+  a.garT = (a.garT ?? 0) + Math.abs(angleDiff(bearing, datan2(a.y - o.y, a.x - o.x)));
+  void c;
+  return true;
+}
+
+/** The same round a creature's body: on the ring a personal space outside its slots, by outline fraction. */
+function goRoundCreature(w: World, a: Ant, c: Colony, cr: Creature, dt: number): boolean {
+  const C21 = BALANCE.combat21;
+  const L = casteOf(a.caste).length;
+  const b = bodyHook.body(cr);
+  const c0 = dcos(cr.h);
+  const s0 = dsin(cr.h);
+  const ex = a.x - cr.x;
+  const ey = a.y - cr.y;
+  const off = frontOff(L);
+  const uNow = outlineU(b, off, ex * c0 + ey * s0, -ex * s0 + ey * c0);
+  const dBody = distToCreatureBody(cr, a.x, a.y);
+  const u = creatureSlotFreeAt(w, a, cr, uNow);
+  if (u >= 0) creatureSlotWorld(cr, off, u, slotTmp);
+  if (u >= 0 && Math.abs(angleDiff(datan2(slotTmp.y - cr.y, slotTmp.x - cr.x), datan2(ey, ex))) <= BALANCE.combat2.flankStep && dBody <= off + BALANCE.combat2.personalSpace * L * 2.5) {
+    takeCreatureSlot(w, a, cr, u);
+    a.rsv = cr.id;
+    a.gSlot = u;
+    a.flk = 0;
+    a.garT = 0;
+    a.blkD = 0;
+    a.blkT = 0;
+    return false;
+  }
+  // (half a circle at most: the nearest free slot on the side it picked is within that; then the other way, once)
+  if ((a.garT ?? 0) > Math.PI) {
+    a.flk = 0;
+    a.garT = 0;
+    return false;
+  }
+  const side = a.flk ?? 1;
+  if (blockedOnRing(a, dt)) {
+    // stuck: the other way round, once (|flk| 2 marks the second try); stuck again, it gives up going round
+    if (Math.abs(side) === 2) a.garT = Math.PI + 1e-3;
+    else {
+      a.flk = -2 * Math.sign(side);
+      a.garT = 1e-6;
+    }
+    return true;
+  }
+  const R = off + C21.ringPS * BALANCE.combat2.personalSpace * L;
+  // (outline fractions run counter-clockwise round the body)
+  creatureSlotWorld(cr, R, (((uNow + (Math.sign(side) * C21.ringLook) / (Math.PI * 2)) % 1) + 1) % 1, slotTmp);
+  const before = datan2(a.y - cr.y, a.x - cr.x);
+  steerAvoid(w, a, slotTmp.x, slotTmp.y, dt, C21.ringSpeed, BALANCE.combat.turnRate);
+  a.garT = (a.garT ?? 0) + Math.abs(angleDiff(before, datan2(a.y - cr.y, a.x - cr.x)));
+  void c;
+  return true;
+}
+
+/** Going round but not getting round (no angle gained for `blockedSec`, `blkD` holding the angle walked so far). */
+function blockedOnRing(a: Ant, dt: number): boolean {
+  const C21 = BALANCE.combat21;
+  const g = a.garT ?? 0;
+  if (!(a.blkD ?? 0) || g > (a.blkD ?? 0) + 0.05) {
+    a.blkD = g + 1e-6;
+    a.blkT = 0;
+    return false;
+  }
+  a.blkT = (a.blkT ?? 0) + dt;
+  if ((a.blkT ?? 0) < C21.blockedSec * 2 - 1e-9) return false;
+  a.blkT = 0;
+  a.blkD = 0;
+  return true;
+}
+
 
 /**
  * Every slot on the target is taken: wait on a loose ring `ring` mm out (a personal space beyond the slots; for a
@@ -865,7 +1044,7 @@ function waitForSlot(w: World, a: Ant, c: Colony, tx: number, ty: number, gap: n
       slotTmp.x = tx + dcos(ang) * r;
       slotTmp.y = ty + dsin(ang) * r;
     }
-    steerTo(w, a, slotTmp.x, slotTmp.y, dt, 0.8, BALANCE.combat.turnRate);
+    steerAvoid(w, a, slotTmp.x, slotTmp.y, dt, 0.8, BALANCE.combat.turnRate);
   } else {
     a.v = 0;
     faceToward(a, tx, ty, dt);
@@ -907,47 +1086,45 @@ export function biteGap(w: World, a: Ant, c: Colony, interval: number): number {
 
 function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   const cd = casteOf(a.caste);
+  const C21 = BALANCE.combat21;
   a.pose = POSE.GRAPPLE;
   a.v = 0;
+  // Combat v2.1 (CHANGE_PLAN §17): a hold is anchored. The ant does not move with its foe or the crowd; it turns only in
+  // a bite's wind-up (the last `windupSec` before it), slowly; off its hold point by a little it takes one small step
+  // between bites and plants again; once its foe has left reach the hold ends where it stands (a recovery, then it
+  // closes in again).
+  if (stepping(w, a, dt)) return true;
+  const L = cd.length;
   if (a.gKind === 3) {
     const o = w.antById.get(a.gId);
     if (!o || o.state === AS.Dead || o.space !== a.space) {
       endCombat(w, a);
       return false;
     }
+    if (o.state === AS.Flung) return endHold(a); // knocked flying out of its grip
     const ol = casteOf(o.caste).length;
-    // Two ants biting each other: neither moves round the other (the old feedback loop span them both); they hold head
-    // to head at reach (combat v2: front half to front half, only the mandibles over), each easing half the error.
     const mutual = o.state === AS.Grapple && o.gKind === 3 && o.gId === a.id;
+    // where it should stand: head to head at reach (mutual), or at its slot's hold point (a world angle round the foe)
+    let err: number;
     if (mutual) {
-      const D = mutualHold(cd.length, ol);
+      const D = mutualHold(L, ol);
       const dx = a.x - o.x;
       const dy = a.y - o.y;
-      const dd = dhypot(dx, dy);
-      if (dd > D * 1.6) return regripAttack(a);
-      if (dd > 1e-6 && a.pinned <= 0) {
-        const k = Math.max(-antSpeed(w, a) * dt, Math.min(antSpeed(w, a) * dt, (D - dd) * Math.min(1, dt * 4) * 0.5));
-        const nx = a.x + (dx / dd) * k;
-        const ny = a.y + (dy / dd) * k;
-        if (w.walkable(a.space, nx, ny)) {
-          a.x = nx;
-          a.y = ny;
-        }
-      }
+      const dd = Math.max(1e-6, dhypot(dx, dy));
+      slotTmp.x = o.x + (dx / dd) * D;
+      slotTmp.y = o.y + (dy / dd) * D;
+      err = Math.abs(dd - D);
     } else {
-      // hold on at the slot's hold point (a world angle: the victim turning does not swing us round it). Close to it the
-      // pull is gentle, so fighting allies near ours can ease us apart (separation.ts) instead of being snapped back on
-      // top of each other every tick
-      // it steps toward its hold point (its victim may be moving) at most `combat2.holdFollow` × its walking speed:
-      // it keeps up and settles into place, it never snaps
-      if (o.state === AS.Flung) return regripAttack(a); // knocked flying out of its grip
-      antHoldPoint(a, o, a.gSlot, slotTmp);
-      const gap = dhypot(slotTmp.x - a.x, slotTmp.y - a.y);
-      const k = Math.min(1, dt * (gap > cd.length * GUARD.slotGive ? 10 : 1.5), gap > 1e-9 ? (antSpeed(w, a) * BALANCE.combat2.holdFollow * dt) / gap : 1);
-      a.x += (slotTmp.x - a.x) * k;
-      a.y += (slotTmp.y - a.y) * k;
+      // (reach is a distance: the hold point on the line from the foe to where the ant stands — the foe shifting a
+      // little sideways only needs a turn in the wind-up, not a step)
+      antHoldPoint(a, o, datan2(a.y - o.y, a.x - o.x), slotTmp);
+      err = dhypot(slotTmp.x - a.x, slotTmp.y - a.y);
     }
-    faceToward(a, o.x, o.y, dt);
+    if (err > L * C21.stepMax) return endHold(a);
+    // (in a mutual hold only the higher id adjusts, so the two never step at once)
+    if (err > L * C21.reachTol && (!mutual || a.id > o.id) && betweenBites(a, cd.attackInterval) && a.pinned <= 0) startStep(a, slotTmp.x, slotTmp.y, err);
+    else settleStep(w, a, cd.attackInterval, o.id, o.x, o.y);
+    windupFace(a, o.x, o.y, dt);
     // Spread-eagle: grapplers on opposite sides immobilise the victim.
     let opposite = false;
     w.antsNear(o.space, o.x, o.y, ol * 1.4, (g) => {
@@ -959,6 +1136,8 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       return false;
     });
     if (opposite) o.pinned = 0.3;
+    // a grip drags on its victim: half speed while held (it cannot simply walk off: combat v2.1)
+    o.slowT = Math.max(o.slowT, BALANCE.combat21.holdSlowSec);
     // hell ants: the snap is ready again on small prey → let go of the leg and snap
     if (cd.snap && snapEligible(w, a, 3, o.id)) return regrip(w, a);
     if (a.cd <= 0) {
@@ -989,14 +1168,9 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   }
   // large creatures and titans: let go and climb up when the climb is ready (climbing.ts)
   if (tryClimb(w, a, cr)) return true;
-  // Planted (user note 2026-10-25): we stand our ground beside the body and never swing round with it.
-  // We keep the slot we took (gSlot: it caps how many ants fit round the body) but stand where we are,
-  // facing the nearest point of the body and biting while it is in reach; when it has moved off we let go
-  // and close in again, and when it turns into us we are pushed back out to our stance.
-  const H = BALANCE.creatureHold;
-  const L = cd.length;
-  // (combat v2: the stance is the hold point — our front half on the outline — or, for a small ant under the body,
-  // the ring under its edge among the legs)
+  // Planted (user note 2026-10-25; anchored, combat v2.1): it stands its ground beside the body and never swings round
+  // with it. Its stance is its hold point — the front half on the outline — or, for a small ant under the body, the
+  // ring under its edge among the legs.
   const off = creatureSlotOff(cr, L, a.gSlot);
   const under = a.gSlot >= 1;
   const b = bodyHook.body(cr);
@@ -1004,30 +1178,20 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   const s0 = dsin(cr.h);
   const ex = a.x - cr.x;
   const ey = a.y - cr.y;
-  creatureSlotWorld(cr, off, outlineU(b, off, ex * c0 + ey * s0, -ex * s0 + ey * c0), slotTmp);
   const dBody = distToCreatureBody(cr, a.x, a.y);
-  // well out of reach: let go and close in again on a free place beside it (attackUpdate reserves one)
-  if (dBody - off > L * H.release) return regripAttack(a);
-  if (dBody - off > L * H.reach) {
-    // it has moved a little: step after it, keeping our slot (no bite until we are beside it again)
-    steerTo(w, a, slotTmp.x, slotTmp.y, dt, 1.0, BALANCE.combat.turnRate);
-    return true;
-  }
-  if (!under && dBody < off * 0.5) {
-    // the body swung into us: shoved back out to our stance, never round it
-    const px = slotTmp.x - a.x;
-    const py = slotTmp.y - a.y;
-    const d = dhypot(px, py);
-    const step = Math.min(d, H.pushMmPerSec * L * dt);
-    if (d > 1e-6 && w.walkable(a.space, a.x + (px / d) * step, a.y + (py / d) * step)) {
-      a.x += (px / d) * step;
-      a.y += (py / d) * step;
-    }
-  }
-  a.v = 0;
-  // facing the body: the nearest point of its middle line
-  const ax = Math.max(-b.hl, Math.min(b.hl, ex * c0 + ey * s0));
-  faceToward(a, cr.x + ax * c0, cr.y + ax * s0, dt);
+  const ax0 = Math.max(-b.hl, Math.min(b.hl, ex * c0 + ey * s0));
+  // the body turned into it: a large creature's push — the attack is cancelled and it plants again (attackUpdate walks
+  // it back out to a free place beside the body)
+  if (!under && dBody < off * 0.5) return cancelAttack(w, a);
+  // it moved off: the hold ends where the ant stands; a little: one small step between bites
+  const err = Math.abs(dBody - off);
+  if (dBody - off > L * C21.stepMax) return endHold(a);
+  if (err > L * C21.reachTol && betweenBites(a, cd.attackInterval) && a.pinned <= 0) {
+    creatureSlotWorld(cr, off, outlineU(b, off, ex * c0 + ey * s0, -ex * s0 + ey * c0), slotTmp);
+    startStep(a, slotTmp.x, slotTmp.y, err);
+  } else settleStep(w, a, cd.attackInterval, cr.id, cr.x + ax0 * c0, cr.y + ax0 * s0);
+  // facing the body (the nearest point of its middle line), turning only in the wind-up
+  windupFace(a, cr.x + ax0 * c0, cr.y + ax0 * s0, dt);
   if (cd.snap && snapEligible(w, a, 4, cr.id)) return regrip(w, a);
   if (a.cd <= 0) {
     a.cd = biteGap(w, a, c, cd.attackInterval);
@@ -1044,6 +1208,145 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     }
   }
   if (cd.sting) a.pose = POSE.STING;
+  return true;
+}
+
+// ---------------------------------------------------------------- combat v2.1: anchoring helpers
+
+/** Clear the anchor (knocked flying, the fight over). */
+function unanchor(a: Ant): void {
+  if ((a.anc ?? 0) !== 0) a.anc = 0;
+  if ((a.stp ?? 0) !== 0) a.stp = 0;
+}
+
+/**
+ * Between two bites — not in the wind-up (the last `windupSec`) nor in the recovery just after one (`recoverSec`) — or
+ * while it plants (the first `recoverSec` of the hold): the only times a holding ant may take its small step.
+ */
+function betweenBites(a: Ant, interval: number): boolean {
+  const C21 = BALANCE.combat21;
+  // (planting: the first recoverSec of a hold settles it before the first bite's wind-up)
+  if (a.st < C21.recoverSec && a.cd > C21.windupSec) return true;
+  return a.cd > C21.windupSec && a.cd < interval * C21.settleWindow - C21.recoverSec;
+}
+
+/** Turn toward (tx, ty) at `rate` rad/s (tiny corrections ignored, as faceToward). */
+function turnAt(a: Ant, tx: number, ty: number, dt: number, rate: number): void {
+  const C = BALANCE.combat;
+  const dx = tx - a.x;
+  const dy = ty - a.y;
+  if (dx * dx + dy * dy < C.nearZero * C.nearZero) return;
+  const want = datan2(dy, dx);
+  if (Math.abs(angleDiff(a.h, want)) < C.deadZone) return;
+  turnToward(a, want, dt, rate);
+}
+
+/** In a bite's wind-up the holder may turn toward its foe (slowly); from the bite to the next wind-up its facing is locked. */
+function windupFace(a: Ant, tx: number, ty: number, dt: number): void {
+  if (a.cd <= BALANCE.combat21.windupSec) turnAt(a, tx, ty, dt, BALANCE.combat21.windupTurn);
+}
+
+/** Start one small, deliberate step to (x, y) — `err` mm away — at `stepSpeed` × walking speed (a planned move). */
+function startStep(a: Ant, x: number, y: number, err: number): void {
+  const C21 = BALANCE.combat21;
+  const sp = casteOf(a.caste).speed * C21.stepSpeed;
+  a.stx = x;
+  a.sty = y;
+  a.stp = Math.max(0.05, err / Math.max(0.1, sp));
+}
+
+/**
+ * Planted too close (combat v2.1: anchored ants are never pushed, so this is settled with one deliberate step between
+ * bites, never a drift): another anchored ant's body overlapping its own, or anyone holding another foe inside its
+ * personal space (separate duels keep ground between them). The higher id steps (or the one not pinned). The step goes
+ * round its own foe (`fx`, `fy`; the part toward or away from the foe is dropped, so it stays in reach).
+ */
+function settleStep(w: World, a: Ant, interval: number, foeId: number, fx: number, fy: number): void {
+  if (!betweenBites(a, interval) || a.pinned > 0) return;
+  const S = BALANCE.separation;
+  const La = casteOf(a.caste).length;
+  const ra = La * S.widthOfLength * S.radiusOfWidth;
+  const PS = BALANCE.combat2.personalSpace;
+  const team = a.team ?? a.colony;
+  ST.x = 0;
+  ST.y = 0;
+  // (only as far as it needs to look: bodies touching, or the settling distance between duels)
+  const look = Math.max(ra * 3, PS * BALANCE.combat21.settlePS * La * 1.5);
+  w.antsNear(a.space, a.x, a.y, look, (g) => {
+    // (the higher id steps, unless it is pinned: then the other one)
+    if (g === a || g.id === foeId || (g.id > a.id && g.pinned <= 0) || g.state === AS.Dead || !anchored(g)) return false;
+    const Lg = casteOf(g.caste).length;
+    const rg = Lg * S.widthOfLength * S.radiusOfWidth;
+    const dx = a.x - g.x;
+    const dy = a.y - g.y;
+    const d = dhypot(dx, dy);
+    if (d < 1e-6) return false;
+    // bodies overlapping; or anyone fighting another foe within a personal space (a teammate, or an enemy holding
+    // someone else: separate duels keep ground between them, as in combat v2)
+    const otherDuel = g.state === AS.Grapple && g.gId !== foeId && g.gId !== a.id;
+    const min = otherDuel ? Math.max(ra + rg, PS * BALANCE.combat21.settlePS * Math.max(La, Lg)) : ra + rg;
+    if (d >= (otherDuel ? min : min * 0.8)) return false;
+    ST.x += (dx / d) * (min - d);
+    ST.y += (dy / d) * (min - d);
+    return false;
+  });
+  // round its foe: drop the part toward or away from it
+  const rx = a.x - fx;
+  const ry = a.y - fy;
+  const rl = dhypot(rx, ry);
+  if (rl > 1e-6) {
+    const k = (ST.x * rx + ST.y * ry) / (rl * rl);
+    ST.x -= rx * k;
+    ST.y -= ry * k;
+  }
+  let m = dhypot(ST.x, ST.y);
+  const cap = La * BALANCE.combat21.stepMax * BALANCE.combat21.settleCap;
+  if (m < ra * 0.2 || cap < ra * 0.2) return;
+  if (m > cap) {
+    ST.x *= cap / m;
+    ST.y *= cap / m;
+    m = cap;
+  }
+  startStep(a, a.x + ST.x, a.y + ST.y, m);
+}
+const ST = { x: 0, y: 0 }; // det-ok: scratch for settleStep
+
+/** Taking a small step: straight to the point fixed when it started, facing unchanged. Returns true while it lasts. */
+function stepping(w: World, a: Ant, dt: number): boolean {
+  if ((a.stp ?? 0) <= 0) return false;
+  const tx = a.stx ?? a.x;
+  const ty = a.sty ?? a.y;
+  const d = dhypot(tx - a.x, ty - a.y);
+  const step = Math.min(d, casteOf(a.caste).speed * BALANCE.combat21.stepSpeed * dt);
+  if (d > 1e-6 && w.walkable(a.space, a.x + ((tx - a.x) / d) * step, a.y + ((ty - a.y) / d) * step)) {
+    a.x += ((tx - a.x) / d) * step;
+    a.y += ((ty - a.y) / d) * step;
+  }
+  a.stp = Math.max(0, (a.stp ?? 0) - dt);
+  if (d - step < 1e-3) a.stp = 0;
+  return true;
+}
+
+/** The foe left reach (or was knocked out of the grip): the hold ends where the ant stands, a recovery, then it closes in again. */
+function endHold(a: Ant): boolean {
+  a.anc = BALANCE.combat21.recoverSec;
+  if ((a.stp ?? 0) !== 0) a.stp = 0;
+  return regripAttack(a);
+}
+
+/**
+ * A large creature walked (or turned) into an anchored ant: its attack is cancelled — no recovery — and it closes in
+ * again to plant at a free place (combat v2.1). Separation calls this too.
+ */
+export function cancelAttack(w: World, a: Ant): boolean {
+  if ((a.stp ?? 0) !== 0) a.stp = 0;
+  if ((a.anc ?? 0) !== 0) a.anc = 0;
+  if (a.state === AS.Grapple) return regripAttack(a);
+  if (a.state === AS.Spray) {
+    a.state = AS.Attack;
+    a.st = 0;
+  }
+  void w;
   return true;
 }
 
@@ -1080,10 +1383,11 @@ function sprayUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   const acid = cd.acid;
   a.v = 0;
   a.pose = POSE.SPRAY;
-  faceToward(a, t.x, t.y, dt);
-  // wind-up (gaster curling forward) and recovery, by spray kind
+  // wind-up (gaster curling forward) and recovery, by spray kind; anchored throughout (combat v2.1): it turns toward
+  // its target only in the wind-up, slowly, and holds its facing from the jet to the end
   const wind = acid.kind === 'rapid' ? 0.05 : acid.kind === 'lob' ? 0.5 : 0.45;
   const done = acid.kind === 'rapid' ? 0.1 : acid.kind === 'lob' ? 0.85 : 0.9;
+  if (a.st < wind - 1e-6) turnAt(a, t.x, t.y, dt, BALANCE.combat21.windupTurn);
   if (a.st >= wind - 1e-6 && a.cd2 <= 0) {
     // Gaster curled forward between the legs: jet (or arcing glob) of formic acid.
     const top = a.level >= 3;

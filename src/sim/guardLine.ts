@@ -177,7 +177,8 @@ export function holdGuardLine(w: World, a: Ant, c: Colony, mi: number, dt: numbe
     // every ant), then straight to the place from `directMm` out, so the line forms as it comes in rather than
     // funnelling through the marker
     const direct = w.s.mode.arena ? GUARD.directMmArena : GUARD.directMm;
-    if (d > direct && dhypot(m.x - a.x, m.y - a.y) > direct) goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${mi}`);
+    // (on the way round fights, not through them: combat v2.1; straight into its own place in the line)
+    if (d > direct && dhypot(m.x - a.x, m.y - a.y) > direct) goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${mi}`, 1, true);
     else steerTo(w, a, p.x, p.y, dt, d < len * 2 ? 0.6 : 1);
     a.alarm = Math.max(a.alarm, 0.15);
     return true;

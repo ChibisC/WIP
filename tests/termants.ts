@@ -141,6 +141,8 @@ const cmd = (w: World, body: Parameters<typeof applyCommand>[1]) => applyCommand
     run(w, 1);
     if ((vic.glueT ?? 0) > w.s.tick) gluedAt = t;
   }
+  // (the glue alone: the soldier's grip also drags its victim to half speed while it holds on — combat v2.1)
+  vic.slowT = 0;
   const v1 = antSpeed(w, vic);
   check(`the soldier's glue burst slows its target to ${TERMANT.glue.slowMul} ×`, gluedAt >= 0 && Math.abs(v1 / v0 - TERMANT.glue.slowMul) < 0.01, `speed ${v0.toFixed(1)} → ${v1.toFixed(1)}`);
   const hp = vic.hp;

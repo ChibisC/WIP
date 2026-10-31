@@ -7,6 +7,7 @@ import { GameView, Quality } from '../render/view';
 import { AntRenderer, AntSpaceAdapter, AntView } from '../render/ants/antRenderer';
 import { edible } from '../sim/diet';
 import { HitboxOverlay } from './hitboxOverlay';
+import { CombatDebugOverlay } from './combatDebugOverlay';
 import { CreatureRenderer } from '../render/creatures/creatureRenderer';
 import { climbCap } from '../sim/creatures/climb';
 import { mountBonus } from '../sim/combat';
@@ -154,6 +155,9 @@ export class GameSession {
   /** debug overlay: the sim's hitboxes (F3, or ?hitboxes=1; game/hitboxOverlay.ts) */
   private surfHit = new HitboxOverlay('surfaceHitboxes');
   hitboxes = false;
+  /** debug overlay: anchored fighters, blocked, backing off, going round, slots (?combatdebug=1; game/combatDebugOverlay.ts) */
+  private surfCombat = new CombatDebugOverlay('surfaceCombatDebug');
+  combatDebug = false;
   private surfDecor = new SurfaceDecor();
   private surfFx = new CombatFx();
   /** fire ant mounds: drawn domes that everything on the surface walks over */
@@ -209,7 +213,7 @@ export class GameSession {
     this.view.setActiveNest(this.viewedArea);
     this.surfAnts = new AntRenderer(this.view.renderer, 'surfaceAnts');
     this.surfAnts.lodScale = this.view.preset.lodScale;
-    this.view.surfaceScene.add(this.teamRings.group, this.surfHit.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfFx.group);
+    this.view.surfaceScene.add(this.teamRings.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfFx.group);
     // Pheromone overlay texture.
     const ph = w.phero;
     this.pheroData = new Uint8Array(ph.w * ph.h * 4);
@@ -528,6 +532,11 @@ export class GameSession {
   /** Show or hide the simulation's hitboxes (debug overlay). */
   setHitboxes(on: boolean): void {
     this.hitboxes = on;
+  }
+
+  /** Show or hide the combat debug view (anchored, blocked, backing off, going round, slots). */
+  setCombatDebug(on: boolean): void {
+    this.combatDebug = on;
   }
 
   private alert(space: number): void {
@@ -1419,6 +1428,7 @@ export class GameSession {
       // creatures first: climbing ants are placed on their animated legs and backs
       this.surfCreatures.update(w.s.creatures, SURFACE, alpha, realDt, this.surfHeight, cam, vh);
       this.surfHit.update(w, SURFACE, this.hitboxes, this.surfHeight, v.surfaceRig.goal.x, v.surfaceRig.goal.z, v.surfaceRig.distance * 2);
+      this.surfCombat.update(w, SURFACE, this.combatDebug, this.surfHeight, v.surfaceRig.goal.x, v.surfaceRig.goal.z, v.surfaceRig.distance * 2);
       this.surfAnts.mount = (av, a, out) => {
         const cr = w.creatureById.get(av.rideCr ?? 0);
         return !!cr && this.surfCreatures.mountPose(cr, av, a, out);
