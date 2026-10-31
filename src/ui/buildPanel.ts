@@ -9,6 +9,13 @@ import { button, el, esc, shield } from './dom';
 import { TERMANT } from '../sim/balance';
 import { STOLEN_CASTES, genomeOf, isTermant, stolenOf, threshold } from '../sim/termants';
 import { CLICK, TOUCH } from '../core/device';
+import { casteMount } from '../sim/creatures/climb';
+
+/** Caste card line: which creatures this caste can mount (combat v2, BALANCE.mount). */
+function mountText(caste: string): string {
+  const m = casteMount(caste);
+  return m === 'small' ? 'Mounts large and huge creatures' : m === 'large' ? 'Mounts huge creatures only' : 'Cannot mount creatures';
+}
 
 const TILE_COL: Record<string, string> = { food: '#6f8a34', fungus: '#d8d2c0', aphid: '#9a8a62', thatch: '#8a6436', mound: '#b4864e', queen: '#8fa2b8', highway: '#9a7a52', carton: '#a07848' };
 const ROMAN = ['', 'I', 'II', 'III'];
@@ -166,7 +173,7 @@ export class BuildPanel {
           'div',
           'caste-card',
           `${antSilhouette(cd.role, '#' + casteTint(cs).multiplyScalar(1.35).getHexString())}<div><div class="cc-t">${esc(cd.species === c.species ? cd.name : isTermant(c) && stolenOf(cs) ? `${stolenOf(cs)!.name} (stolen from ${sp.common})` : `${sp.common.replace(' Ant', '')} ${cd.name}`)}</div>
-          <div class="cc-s"><i>${esc(sp.scientific)}</i> · ${cd.length} mm · health ${cd.hp} · bite ${cd.bite}${cd.acid ? ' · formic acid' : ''}${cd.sting ? ' · venom sting' : ''}<br>${esc(cd.fact)}</div></div>`,
+          <div class="cc-s"><i>${esc(sp.scientific)}</i> · ${cd.length} mm · health ${cd.hp} · bite ${cd.bite}${cd.acid ? ' · formic acid' : ''}${cd.sting ? ' · venom sting' : ''}<br><span class="cc-mount">${mountText(cs)}</span><br>${esc(cd.fact)}</div></div>`,
         );
         this.grid.appendChild(card);
       }

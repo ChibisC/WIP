@@ -273,10 +273,9 @@ export function enforceMountRatio(w: World): void {
     let id = 0;
     let rider = false;
     if (a.state === AS.Climb) {
-      // walking to its leg, up it or riding (coming down: leaving)
+      // walking to its leg, up it or riding; one coming down is back with the ground force
       id = a.rideId ?? 0;
-      if ((a.ridePh ?? 0) === 3) continue;
-      rider = true;
+      rider = (a.ridePh ?? 0) <= 2;
     } else if (a.state === AS.Attack && a.tk === 4) id = a.tgt;
     else if (a.state === AS.Grapple && a.gKind === 4) id = a.gId;
     if (!id) continue;
@@ -308,10 +307,9 @@ export function enforceMountRatio(w: World): void {
 }
 const ratioTmp = new Map<number, number[]>(); // det-ok: scratch, rebuilt every call from the state (insertion order = ant id order)
 
-/** Seconds an ant has been on the creature (up the rail, then riding; −1 still walking to its leg). */
+/** Seconds an ant has been on the creature (since it got on the leg; −1 still walking to its leg). */
 function onTime(a: Ant): number {
-  const ph = a.ridePh ?? 0;
-  return ph === 2 ? CB.up + (a.rideT ?? 0) : ph === 1 ? (a.rideT ?? 0) * CB.up : -1;
+  return (a.ridePh ?? 0) === 0 ? -1 : a.st - (a.rideWalk ?? 0);
 }
 
 /** Climb cooldown (antSystem, every tick). */

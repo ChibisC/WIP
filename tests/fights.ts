@@ -243,7 +243,15 @@ for (const noClimb of [true, false]) {
   }
   const beetle = w.s.creatures.find((c) => c.faction === A.teams[1].colony)!;
   if (noClimb) check('no climbing: the group fights a titan from the ground, nobody climbs on', riders === 0 && beetle.hp < beetle.maxHp, `${riders} riding; beetle ${beetle.hp.toFixed(0)}/${beetle.maxHp}`);
-  else check('no climbing off: the same group swarms up it', riders > 5, `${riders} riding at most`);
+  else {
+    check('no climbing off: the same group swarms up it', riders > 5, `${riders} riding at most`);
+    // (combat v2) turning "no climbing" on while they ride: they climb down
+    const on = () => w.s.ants.filter((a) => a.state === AS.Climb && ((a.ridePh ?? 0) === 1 || (a.ridePh ?? 0) === 2)).length;
+    const before = on();
+    cmd({ type: 'markerOrder', i: 0, order: 'noClimb', on: true });
+    run(w, 20 * 3);
+    check('no climbing on while riding: the riders climb down', before > 0 && on() === 0, `${before} → ${on()}`);
+  }
 }
 
 // ---- marker orders: no gathering (a normal map: workers at a marker with food lying about)

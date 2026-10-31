@@ -640,6 +640,11 @@ export interface Creature {
   data: Record<string, number>;
   /** glued by a Termant soldier's burst: slowed (and formic acid hurts double) until this tick */
   glueT?: number;
+  /**
+   * Threat (combat v2, creatureAI.ts): the ants that hurt it most lately, as pairs [ant id, threat, …] (at most
+   * `combat2.threatMax`; each hit adds its damage × (1 + the caste's threat), decaying `threatDecay` a second).
+   */
+  thr?: number[];
 }
 
 export interface Projectile {

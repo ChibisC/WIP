@@ -233,9 +233,9 @@ function onIt(a: Ant, id: number): boolean {
   return a.state === AS.Climb && a.rideId === id && (a.ridePh ?? 0) <= 2;
 }
 
-/** Fighting it from the ground (closing in or holding on). */
+/** Fighting it from the ground (closing in or holding on; or climbing back down to it). */
 export function fightsFromGround(a: Ant, id: number): boolean {
-  return (a.state === AS.Attack && a.tk === 4 && a.tgt === id) || (a.state === AS.Grapple && a.gKind === 4 && a.gId === id);
+  return (a.state === AS.Attack && a.tk === 4 && a.tgt === id) || (a.state === AS.Grapple && a.gKind === 4 && a.gId === id) || (a.state === AS.Climb && a.rideId === id && (a.ridePh ?? 0) === 3);
 }
 
 type Taken = { tick: number; mask: number; cols: number[] };
