@@ -243,13 +243,10 @@ export const BALANCE = {
    */
   mount: { ratio: 0.3, capLarge: 8, capHuge: 12, bonusAt: 0.5, bonusMul: 1.25, largeCasteMm: 7, refRiderMm: 4.5, slotGap: 1.2 },
   /**
-   * Climbing large creatures and titans (CHANGE_PLAN §15.2): seconds up, riding and down, the
-   * cooldown before climbing again, damage × while riding, how close (body lengths) to a leg an
-   * attacker must be to start. How many ride at once follows sizes (user notes, 2026-10-25): a
-   * creature's back has room for its area ÷ `roomUnitMm2` units, and each rider takes the units of
-   * its size class (`sizeClasses`: [up to this body length in mm, units]; a small worker 1, an Atta
-   * major 4). At most `maxRiders` ants at once (riding slots, laid out by tools/climb-data.ts —
-   * re-run it after changing `roomUnitMm2` or `maxRiders`).
+   * Climbing large creatures and titans (CHANGE_PLAN §15.2): seconds up the leg (from the foot), riding and down,
+   * the cooldown before climbing again, damage × while riding, how close (body lengths, or of the creature's
+   * length, at least `joinMinMm`) to a leg an attacker must be to start, and how long it may walk to the leg. Who
+   * mounts and how many: `mount` (combat v2).
    */
   climb: {
     up: 1.5,
@@ -261,14 +258,6 @@ export const BALANCE = {
     joinOfCreature: 0.35,
     joinMinMm: 8,
     approachMax: 4,
-    roomUnitMm2: 20,
-    maxRiders: 32,
-    sizeClasses: [
-      [5, 1],
-      [7.5, 2],
-      [10, 3],
-      [999, 4],
-    ] as Array<[number, number]>,
   },
   /** leafcutters: fungus per unit of leaf delivered, food per unit of fungus eaten (other species get `leafAsFood` from a leaf) */
   atta: { leafToFungus: 1.2, fungusToFood: 1.6, leafAsFood: 0.3 },
