@@ -63,7 +63,10 @@ export type CommandBody =
   /** host only: let the AI drive a player's colony (a dropped player) or hand it back */
   | { type: 'setControl'; colony: number; human: boolean }
   /** plug extra entrance i with soil (close) or open it again; asking the opposite mid-way cancels (sim/entrances.ts) */
-  | { type: 'entrance'; i: number; close: boolean };
+  | { type: 'entrance'; i: number; close: boolean }
+  /** multiplayer game speed: ask for or agree to 2× / 4× (every player must), or go back down at once; the current
+   *  speed while a faster one is asked for is a "no" */
+  | { type: 'speedVote'; speed: number };
 
 export type CommandType = CommandBody['type'];
 
@@ -100,6 +103,7 @@ const TYPE_IDS: Record<CommandType, number> = {
   arenaClear: 21,
   markerOrder: 22,
   entrance: 23,
+  speedVote: 24,
 };
 const TYPE_NAMES: CommandType[] = [];
 for (const [k, v] of Object.entries(TYPE_IDS)) TYPE_NAMES[v] = k as CommandType;
@@ -233,6 +237,8 @@ export function applyCommand(w: World, cmd: Command): string | null {
     case 'entrance':
       if (!Number.isInteger(cmd.i) || cmd.i < 0 || cmd.i >= c.entrances.length) return 'no such entrance';
       return setEntranceShut(w, c, cmd.i, !!cmd.close);
+    case 'speedVote':
+      return speedVote(w, c, cmd.speed);
     case 'surrender': {
       const q = w.antById.get(c.queen);
       if (q) killAnt(w, q);
@@ -244,6 +250,46 @@ export function applyCommand(w: World, cmd: Command): string | null {
     }
   }
   return 'unknown command';
+}
+
+/** The speeds a match may run at (multiplayer speed vote). */
+export const GAME_SPEEDS = [1, 2, 4] as const;
+
+/**
+ * Multiplayer game speed (user request 2026-10-31): a faster speed needs every player to agree — each asks for or
+ * agrees to it with a vote, and it takes effect when the last one does; anyone may bring it back down at once (nobody
+ * is held to a faster game); voting the current speed while a faster one is asked for says no and clears the votes.
+ * Who must agree: the living colonies played by a person (not dropped to the AI).
+ */
+function speedVote(w: World, c: Colony, speed: number): string | null {
+  if (!(GAME_SPEEDS as readonly number[]).includes(speed)) return 'bad speed';
+  const st = w.s.settings;
+  const cur = st.gameSpeed ?? 1;
+  const n = w.s.colonies.reduce((m, o) => Math.max(m, o.id + 1), 0);
+  const votes = st.speedVotes && st.speedVotes.length === n ? st.speedVotes : new Array<number>(n).fill(0);
+  const pending = votes.find((v) => v > 0) ?? 0;
+  if (speed < cur) {
+    st.gameSpeed = speed;
+    st.speedVotes = new Array<number>(n).fill(0);
+    w.events.emit({ t: 'message', text: `${c.name} set the game speed back to ${speed}×.`, kind: 'info' });
+    return null;
+  }
+  if (speed === cur) {
+    st.speedVotes = new Array<number>(n).fill(0);
+    if (pending) w.events.emit({ t: 'message', text: `${c.name} said no to ${pending}× speed.`, kind: 'info' });
+    return null;
+  }
+  // a request, or agreeing to the one asked for (a different speed replaces it)
+  if (pending && pending !== speed) votes.fill(0);
+  votes[c.id] = speed;
+  st.speedVotes = votes;
+  const voters = w.s.colonies.filter((o) => o.alive && o.player && !o.ai);
+  if (voters.every((o) => votes[o.id] === speed)) {
+    st.gameSpeed = speed;
+    st.speedVotes = new Array<number>(n).fill(0);
+    w.events.emit({ t: 'message', text: `Every player agreed: the game now runs at ${speed}×.`, kind: 'info' });
+  } else if (!pending || pending !== speed) w.events.emit({ t: 'message', text: `${c.name} asks to play at ${speed}×: every player has to agree.`, kind: 'info' });
+  return null;
 }
 
 /** Canonical application order within a tick: by player, then sequence. */
@@ -450,6 +496,9 @@ function writeBody(b: Bytes, c: CommandBody): void {
       b.u8(c.i);
       b.u8(c.close ? 1 : 0);
       break;
+    case 'speedVote':
+      b.u8(c.speed);
+      break;
   }
 }
 
@@ -538,6 +587,8 @@ function readBody(r: Cursor): CommandBody {
       return { type, i: r.u8() - 1, order: MARKER_ORDERS[r.u8()] ?? 'noAttack', on: r.u8() === 1 };
     case 'entrance':
       return { type, i: r.u8(), close: r.u8() === 1 };
+    case 'speedVote':
+      return { type, speed: r.u8() };
   }
   throw new Error('commands: unknown command type');
 }

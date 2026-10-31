@@ -7,8 +7,10 @@ import { GameView, Quality } from '../render/view';
 import { AntRenderer, AntSpaceAdapter, AntView } from '../render/ants/antRenderer';
 import { edible } from '../sim/diet';
 import { HitboxOverlay } from './hitboxOverlay';
+import { CombatDebugOverlay } from './combatDebugOverlay';
 import { CreatureRenderer } from '../render/creatures/creatureRenderer';
-import { climbRoom } from '../sim/creatures/climb';
+import { climbCap } from '../sim/creatures/climb';
+import { mountBonus } from '../sim/combat';
 import { CREATURES } from '../sim/creatures/kinds';
 import { SurfaceMounds } from '../render/game/mounds';
 import { FoodRenderer, SpaceMapper } from '../render/game/foodRenderer';
@@ -153,6 +155,9 @@ export class GameSession {
   /** debug overlay: the sim's hitboxes (F3, or ?hitboxes=1; game/hitboxOverlay.ts) */
   private surfHit = new HitboxOverlay('surfaceHitboxes');
   hitboxes = false;
+  /** debug overlay: anchored fighters, blocked, backing off, going round, slots (?combatdebug=1; game/combatDebugOverlay.ts) */
+  private surfCombat = new CombatDebugOverlay('surfaceCombatDebug');
+  combatDebug = false;
   private surfDecor = new SurfaceDecor();
   private surfFx = new CombatFx();
   /** fire ant mounds: drawn domes that everything on the surface walks over */
@@ -209,7 +214,7 @@ export class GameSession {
     this.surfAnts = new AntRenderer(this.view.renderer, 'surfaceAnts');
     this.surfAnts.lodScale = this.view.preset.lodScale;
     this.surfAnts.space = SURFACE;
-    this.view.surfaceScene.add(this.teamRings.group, this.surfHit.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfFx.group);
+    this.view.surfaceScene.add(this.teamRings.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfFx.group);
     // Pheromone overlay texture.
     const ph = w.phero;
     this.pheroData = new Uint8Array(ph.w * ph.h * 4);
@@ -311,10 +316,22 @@ export class GameSession {
     this.loop.paused = !this.loop.paused;
   }
 
-  /** Game speed (single-player only; a multiplayer match always runs at 1×). */
+  /**
+   * Game speed. Multiplayer: a vote (sim/commands.ts `speedVote`) — faster only when every player agrees, slower at
+   * once; the match runs at the agreed speed (`settings.gameSpeed`).
+   */
   setSpeed(x: number): void {
-    if (this.net) return;
+    if (this.net) {
+      const sp = x >= 4 ? 4 : x >= 2 ? 2 : 1;
+      this.issue({ type: 'speedVote', speed: sp });
+      return;
+    }
     this.loop.speed = x;
+  }
+
+  /** The match's agreed speed (multiplayer) or the local speed (single-player). */
+  gameSpeed(): number {
+    return this.net ? (this.world.s.settings.gameSpeed ?? 1) : this.loop.speed;
   }
 
   /** Multiplayer: let the match drive the simulation (after useWorker). */
@@ -332,7 +349,9 @@ export class GameSession {
     const net = this.net;
     if (!net) return;
     net.update();
-    this.loop.speed = net.status().speed;
+    // (the agreed speed — every client runs its tick clock this much faster at the same time — times the lockstep's
+    // own slow-down when one client runs ahead)
+    this.loop.speed = net.status().speed * (this.world.s.settings.gameSpeed ?? 1);
     // A player who rejoined plays the missed ticks at full speed (the worker queues them).
     const behind = net.behind();
     if (behind > 4 && !this.loop.paused) for (let i = 0; i < Math.min(60, behind) && net.tryTick(); i++);
@@ -367,8 +386,8 @@ export class GameSession {
     const inp = this.input;
     inp.on('toggleView', () => this.toggleView());
     inp.on('pause', () => this.togglePause());
-    inp.on('speedUp', () => this.setSpeed(Math.min(8, this.loop.speed * 2)));
-    inp.on('speedDown', () => this.setSpeed(Math.max(0.25, this.loop.speed / 2)));
+    inp.on('speedUp', () => this.setSpeed(this.net ? this.gameSpeed() * 2 : Math.min(8, this.loop.speed * 2)));
+    inp.on('speedDown', () => this.setSpeed(this.net ? this.gameSpeed() / 2 : Math.max(0.25, this.loop.speed / 2)));
     inp.on('overlay', () => this.setPhero(!this.pheroOn));
     inp.on('recall', () => this.issue({ type: 'recall' }));
     inp.on('cancel', () => {
@@ -527,6 +546,11 @@ export class GameSession {
   /** Show or hide the simulation's hitboxes (debug overlay). */
   setHitboxes(on: boolean): void {
     this.hitboxes = on;
+  }
+
+  /** Show or hide the combat debug view (anchored, blocked, backing off, going round, slots). */
+  setCombatDebug(on: boolean): void {
+    this.combatDebug = on;
   }
 
   private alert(space: number): void {
@@ -1148,13 +1172,13 @@ export class GameSession {
   }
 
   /**
-   * Small health bars over climbable creatures (CHANGE_PLAN §15.2) that are
+   * Small health bars over mountable creatures (CHANGE_PLAN §15.2, §16) that are
    * hurt or have ants on them, in the space being viewed: screen position,
-   * health fraction, riders, and the room they take of the room on its back
-   * (riders take room by size class). Bosses use the boss bar.
+   * health fraction, riders / cap, and whether the mount bonus is on. Bosses
+   * use the boss bar.
    */
-  creatureBars(): Array<{ id: number; x: number; y: number; hp: number; riders: number; used: number; cap: number }> {
-    const out: Array<{ id: number; x: number; y: number; hp: number; riders: number; used: number; cap: number }> = [];
+  creatureBars(): Array<{ id: number; x: number; y: number; hp: number; riders: number; cap: number; bonus: boolean }> {
+    const out: Array<{ id: number; x: number; y: number; hp: number; riders: number; cap: number; bonus: boolean }> = [];
     if (this.view.transitioning) return out;
     const w = this.world;
     const space = this.activeSpace();
@@ -1163,14 +1187,14 @@ export class GameSession {
     const v = this.barTmp;
     for (const cr of w.s.creatures) {
       if (cr.dead || cr.space !== space || CREATURES[cr.kind]?.boss) continue;
-      const cap = climbRoom(cr);
+      const cap = climbCap(cr);
       if (cap <= 0) continue;
       const riders = cr.climbers ?? 0;
       if (riders === 0 && cr.hp >= cr.maxHp - 1e-6) continue;
       const gy = space === SURFACE ? this.surfHeight(cr.x, cr.y) : nt ? nt.heightAt(cr.x, cr.y) : 0;
       v.set(cr.x, gy + cr.scale * 0.55, cr.y).project(cam);
       if (v.z > 1 || v.z < -1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) continue;
-      out.push({ id: cr.id, x: ((v.x + 1) / 2) * window.innerWidth, y: ((1 - v.y) / 2) * window.innerHeight, hp: Math.max(0, cr.hp / Math.max(1, cr.maxHp)), riders, used: cr.climbUnits ?? 0, cap });
+      out.push({ id: cr.id, x: ((v.x + 1) / 2) * window.innerWidth, y: ((1 - v.y) / 2) * window.innerHeight, hp: Math.max(0, cr.hp / Math.max(1, cr.maxHp)), riders, cap, bonus: mountBonus(cr) });
       if (out.length >= 24) break;
     }
     return out;
@@ -1418,6 +1442,7 @@ export class GameSession {
       // creatures first: climbing ants are placed on their animated legs and backs
       this.surfCreatures.update(w.s.creatures, SURFACE, alpha, realDt, this.surfHeight, cam, vh);
       this.surfHit.update(w, SURFACE, this.hitboxes, this.surfHeight, v.surfaceRig.goal.x, v.surfaceRig.goal.z, v.surfaceRig.distance * 2);
+      this.surfCombat.update(w, SURFACE, this.combatDebug, this.surfHeight, v.surfaceRig.goal.x, v.surfaceRig.goal.z, v.surfaceRig.distance * 2);
       this.surfAnts.mount = (av, a, out) => {
         const cr = w.creatureById.get(av.rideCr || av.heldCr || 0);
         return !!cr && this.surfCreatures.mountPose(cr, av, a, out);

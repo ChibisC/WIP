@@ -9,6 +9,13 @@ import { button, el, esc, shield } from './dom';
 import { TERMANT } from '../sim/balance';
 import { STOLEN_CASTES, genomeOf, isTermant, stolenOf, threshold } from '../sim/termants';
 import { CLICK, TOUCH } from '../core/device';
+import { casteMount } from '../sim/creatures/climb';
+
+/** Caste card line: which creatures this caste can mount (combat v2, BALANCE.mount). */
+function mountText(caste: string): string {
+  const m = casteMount(caste);
+  return m === 'small' ? 'Mounts large and huge creatures' : m === 'large' ? 'Mounts huge creatures only' : 'Cannot mount creatures';
+}
 
 const TILE_COL: Record<string, string> = { food: '#6f8a34', fungus: '#d8d2c0', aphid: '#9a8a62', thatch: '#8a6436', mound: '#b4864e', queen: '#8fa2b8', highway: '#9a7a52', carton: '#a07848' };
 const ROMAN = ['', 'I', 'II', 'III'];
@@ -60,8 +67,12 @@ export class BuildPanel {
     const acts = el('div', 'bp-acts');
     this.foodBtn = button('', ICONS.eye, '<b>Food view</b>Highlight the food your colony can gather on the surface, and the stores in the nest.', () => (s.foodView = !s.foodView));
     this.speedBtn = button('', ICONS.fast + '<span class="spd">1×</span>', `<b>Game speed</b>${CLICK} to cycle 1×, 2×, 4×. <span class="k">−</span>/<span class="k">=</span> also change speed, <span class="k">P</span> pauses.`, () => {
-      if (s.net) return s.onEvent?.({ t: 'message', text: 'A multiplayer match always runs at 1×.', kind: 'info' });
       const order = [1, 2, 4];
+      if (s.net) {
+        // multiplayer: ask for the next speed (every player has to agree; back to 1× at once)
+        const cur = s.gameSpeed();
+        return s.setSpeed(order[(order.indexOf(cur) + 1) % order.length]);
+      }
       const i = order.indexOf(s.loop.speed);
       s.setSpeed(order[(i + 1) % order.length]);
       s.loop.paused = false;
@@ -162,7 +173,7 @@ export class BuildPanel {
           'div',
           'caste-card',
           `${antSilhouette(cd.role, '#' + casteTint(cs).multiplyScalar(1.35).getHexString())}<div><div class="cc-t">${esc(cd.species === c.species ? cd.name : isTermant(c) && stolenOf(cs) ? `${stolenOf(cs)!.name} (stolen from ${sp.common})` : `${sp.common.replace(' Ant', '')} ${cd.name}`)}</div>
-          <div class="cc-s"><i>${esc(sp.scientific)}</i> · ${cd.length} mm · health ${cd.hp} · bite ${cd.bite}${cd.acid ? ' · formic acid' : ''}${cd.sting ? ' · venom sting' : ''}<br>${esc(cd.fact)}</div></div>`,
+          <div class="cc-s"><i>${esc(sp.scientific)}</i> · ${cd.length} mm · health ${cd.hp} · bite ${cd.bite}${cd.acid ? ' · formic acid' : ''}${cd.sting ? ' · venom sting' : ''}<br><span class="cc-mount">${mountText(cs)}</span><br>${esc(cd.fact)}</div></div>`,
         );
         this.grid.appendChild(card);
       }
@@ -228,9 +239,11 @@ export class BuildPanel {
     }
     this.foodBtn.classList.toggle('on', s.foodView);
     const spd = this.speedBtn.querySelector('.spd')!;
-    const txt = s.loop.paused ? '❚❚' : `${s.loop.speed}×`;
+    const gs = s.gameSpeed();
+    const asked = s.net ? (s.world.s.settings.speedVotes ?? []).find((v) => v > 0) : 0;
+    const txt = s.loop.paused ? '❚❚' : asked ? `${gs}→${asked}×` : `${gs}×`;
     if (spd.textContent !== txt) spd.textContent = txt;
-    this.speedBtn.classList.toggle('on', s.loop.speed > 1);
+    this.speedBtn.classList.toggle('on', gs > 1);
     // the hovered hex (tools) or the selected tile
     let html = '';
     if (s.tool !== 'none' && s.tool !== 'marker') html = esc(s.ghostInfo || s.hoverMsg || (s.tool === 'dig' ? 'Drag over soil to mark it for digging.' : s.tool === 'tile' ? `${CLICK} or drag on dug floor to plan tiles; workers build them.` : s.tool === 'upgrade' ? `${CLICK} a tile to mark it for upgrading.` : `${CLICK} a tile to downgrade or delete it.`));

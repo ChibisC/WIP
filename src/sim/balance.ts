@@ -109,26 +109,59 @@ export const BALANCE = {
   /**
    * Fighting movement (fix: ants spinning in combat). Headings turn at most
    * `turnRate` (rad/s, 360°/s) and ignore changes under `deadZone` (~5°); a
-   * target closer than `nearZero` mm leaves the heading alone. Attack slots:
-   * 3 grapplers on an ant (4 on one at least 1.5x the attacker's length, 8 on a
-   * queen); creatures get one slot per `creatureSlotMm` of body outline within
-   * [min, max]. Attackers that find every slot taken wait `outerRing` body
-   * lengths outside the reach and look for another target after `waitRetarget` s.
-   * (2026-10-25, user note "fight too compact": 4/6 slots, a 0.8 ring and 2 s made heaps; fewer holds on one foe
-   * and a quicker look for another spread the fight along the front.)
+   * target closer than `nearZero` mm leaves the heading alone. (Attack slots,
+   * waiting and spacing: `combat2`.)
    */
-  combat: { turnRate: 6.283, deadZone: 0.087, nearZero: 0.3, antSlots: 3, bigAntSlots: 4, queenSlots: 8, creatureSlotMm: 4.5, creatureSlotsMin: 6, creatureSlotsMax: 32, outerRing: 1.3, waitRetarget: 1 },
+  combat: { turnRate: 6.283, deadZone: 0.087, nearZero: 0.3 },
   /**
    * Fighting a creature (user note 2026-10-25: "planted to their ground"): a latched ant stands still on the
    * ground and does not swing round with the body when the creature turns or walks. It bites while the body
-   * is within `reach` body lengths of it (edge distance); up to `release` it steps after the body, keeping its
-   * place in the ring; beyond that it lets go and closes in again on a free place beside the body; a body
-   * swinging into it pushes it back out to its stance (`stance` body lengths out) at `pushMmPerSec` × its
-   * length per second.
+   * is within `reach` body lengths beyond its hold line (combat v2: its front half on the outline, or the ring under
+   * the body for a small ant); up to `release` beyond it, it steps after the body, keeping its place in the ring;
+   * further, it lets go and closes in again on a free place beside the body; a body swinging into it pushes it back
+   * out at `pushMmPerSec` × its length per second.
    */
-  creatureHold: { reach: 0.8, release: 2.0, stance: 0.35, pushMmPerSec: 6 },
+  creatureHold: { reach: 0.45, release: 1.65, pushMmPerSec: 6 },
   /** creatures choosing which ant to attack: one straight behind counts as (1 + this) × the squared distance */
   creatureFrontBias: 1,
+  /**
+   * Creature melee reach (user note 2026-10-31: "increase some of the melee ranges of the creatures in a realistic
+   * manner so they don't move too much when fighting"; CHANGE_PLAN §18). Reach is measured from the body outline (the
+   * capsule ants plant round), no longer from the body's centre: `r` is how far its jaws, fangs or forelegs reach beyond
+   * the outline, × its length; `arc` how far each side of its heading (rad), seen from the front of its body, it strikes
+   * without turning. An ant is in reach when its centre is within r × L + `combat2.antHalfLen` × its own length of the
+   * outline (an ant planted on the outline always is). In reach and in its arc, a creature stands and strikes; an ant in
+   * reach but outside the arc it turns to (`turnTo` rad/s, standing); only with no ant in reach does it walk. From the
+   * models (front of the body vs the jaw, fang and foreleg tips: tools/fight-motion.ts notes) and the animals:
+   *  - ground beetle 0.12 ±1.3: sickle mandibles about an eighth of its length; the head and pronotum thrust and swing.
+   *  - rove beetle 0.12 ±2.2: long crossing mandibles on a very mobile head, and it curls its abdomen forward.
+   *  - stone centipede 0.12 ±2.4, giant centipede 0.1 ±2.0: venom claws, and the front segments swing the head far round.
+   *  - wolf spider, spiderling, wolf-spider mother 0.35 ±1.0; tarantula 0.35 ±0.9: the front legs and palps (feet at
+   *    about its own length ahead of its centre) grab and pull prey to the fangs.
+   *  - mantis 0.3 ±0.45, giant mantis 0.3 ±0.65: the raptorial forelegs strike about a third of its length ahead of
+   *    the head (its strike cone).
+   *  - stag beetle 0.15 ±0.6: the antler tips stand 0.14 of its length beyond the head; it swings them sideways a little.
+   */
+  creatureReach: {
+    groundBeetle: { r: 0.12, arc: 1.3 },
+    rove: { r: 0.12, arc: 2.2 },
+    lithobius: { r: 0.12, arc: 2.4 },
+    wolfSpider: { r: 0.35, arc: 1.0 },
+    spiderling: { r: 0.35, arc: 1.0 },
+    hogna: { r: 0.35, arc: 1.0 },
+    tarantula: { r: 0.35, arc: 0.9 },
+    mantis: { r: 0.3, arc: 0.45 },
+    giantMantis: { r: 0.3, arc: 0.65 },
+    stagBeetle: { r: 0.15, arc: 0.6 },
+    scolopendra: { r: 0.1, arc: 2.0 },
+  } as Record<string, { r: number; arc: number }>,
+  /**
+   * Reach of a kind not in the table; turning to an ant in reach (rad/s); a bite already coming lands `slack` × the reach
+   * (and arc). Splash strikes (the tarantula's fangs, the giant centipede's venom claws) hit a circle half way out along
+   * the reach, of radius (0.5 + `strikePad`) × the reach; the tarantula's body lurches `tarantulaLurch` × its length into
+   * the strike (the front legs do the reaching: it was a 0.4 lunge).
+   */
+  creatureReachDefault: { r: 0.1, arc: 1.2, turnTo: 3, slack: 1.3, strikePad: 0.3, tarantulaLurch: 0.1 },
   /**
    * Soft separation (light collision): each ant is a circle of radius
    * `radiusOfWidth` x its body width (`widthOfLength` x its length); overlaps are
@@ -138,13 +171,173 @@ export const BALANCE = {
    */
   separation: { radiusOfWidth: 0.8, widthOfLength: 0.28, strength: 0.5, maxPush: 0.15, creatureStrength: 0.9, creatureMaxPush: 0.6, creatureAllyRoom: 1.3 },
   /**
-   * Climbing large creatures and titans (CHANGE_PLAN §15.2): seconds up, riding and down, the
-   * cooldown before climbing again, damage × while riding, how close (body lengths) to a leg an
-   * attacker must be to start. How many ride at once follows sizes (user notes, 2026-10-25): a
-   * creature's back has room for its area ÷ `roomUnitMm2` units, and each rider takes the units of
-   * its size class (`sizeClasses`: [up to this body length in mm, units]; a small worker 1, an Atta
-   * major 4). At most `maxRiders` ants at once (riding slots, laid out by tools/climb-data.ts —
-   * re-run it after changing `roomUnitMm2` or `maxRiders`).
+   * Combat v2 (CHANGE_PLAN §16, project doc claude/combat/02-spec-combat-v2.md): spread-out, readable fights.
+   *
+   * Spacing (separation.ts): two allies who are both fighting keep `personalSpace` × the larger one's length
+   * centre to centre, pushed at `fightStrength` of the overlap a tick (walking: separation.strength) with
+   * `fightCapMul` × the usual cap; enemies who are not fighting each other keep only their body radii, so lines
+   * can meet. Allies going for the same foe stand at its slots instead.
+   *
+   * Stopping at reach (combat.ts, slots.ts): a victim ant's outline is an ellipse `antHalfLen` × its length
+   * along and `antHalfWidth` × it across (a creature's is its capsule). The attacker holds where its front half
+   * (`frontHalf` − `jawOverlap`, × its length) meets that outline in its slot's direction, so only the mandibles
+   * reach over; it latches within `arriveTol` × its length of that point, where it stands within its slot, and then
+   * keeps to the hold point at most `holdFollow` × its walking speed (it settles in, never snaps).
+   *
+   * Slots by perimeter: n = clamp(floor(P / (`slotWidth` × La × `slotSpacing`)), `slotsMin`, `slotsMax`), P the
+   * length of the line the attackers' centres stand on (the victim's outline pushed out by half the attacker's
+   * length); a queen keeps at least `queenSlotsMin`. (The plan's spacing 2.2 gave 8 slots on a worker; 5.6 puts
+   * neighbouring attackers about a personal space apart and gives the counts the spec asks for: a worker on a
+   * worker 3, a Lasius worker on a ground beetle 9, a boss the cap.)
+   *
+   * Overflow and duels (combat.ts findTarget / waitForSlot): each ant already on a foe counts `crowdPenalty` more
+   * (on the squared distance); a target with no free slot is skipped. Focus fire (no crowd penalty, may wait in a
+   * full target's ring) only when the ant's marker is within `focusMarkerMm` of the foe or its side outnumbers the
+   * foes in sight `focusOutnumber` to 1. Waiting ants stand on a ring at a personal space and look for a free slot
+   * every `ringCheckSec`; an ant whose slot is more than `flankStep` rad round the ring sidles round it facing the
+   * target at `flankSpeed` × its speed. A bitten ant turns on the
+   * biter only when its own target is more than `keepTargetReach` × its length from its hold point.
+   *
+   * Reposition (EotU): an attacker that has not closed `blockedGain` × its length on its hold point in
+   * `blockedSec` pauses attacking for `pauseMin`..`pauseMax` s and sidesteps round the ring at `sidestepSpeed`.
+   *
+   * Under large creatures: an ant whose height (`antHeight` × its length) is below a creature's underside
+   * (`clearance[kind]` × the creature's length) walks under it: only the feet (circles of `footRadius` × the
+   * creature's length, at least `footMinMm`) push it, and it may take a slot on a ring `underInset` × the body's
+   * half-width inside the outline (under the body, among the legs).
+   *
+   * Large-creature AI (creatureAI.ts): threat per attacker (damage × (1 + caste threat)), decaying `threatDecay`
+   * a second, at most `threatMax` attackers remembered; a creature changes target only for `threatSticky` × the
+   * current one's threat. Splash attacks are aimed at the most ground ants among `aimDirs` directions; a creature
+   * with `surroundN` ants within `surroundR` × its length and under `backOffHp` of its health backs off
+   * `backOffLen` × its length. Bosses shake their riders off every `shakeEverySec` once riders ≥ `shakeAtFrac` of
+   * the cap (`shakeWind` s telegraphed). A wolf spider drags its catch `dragLen` × its length out of the crowd.
+   */
+  combat2: {
+    personalSpace: 1.6,
+    fightStrength: 0.8,
+    fightCapMul: 2,
+    antHalfLen: 0.5,
+    antHalfWidth: 0.14,
+    frontHalf: 0.5,
+    jawOverlap: 0.08,
+    arriveTol: 0.15,
+    holdFollow: 2,
+    slotWidth: 0.28,
+    slotSpacing: 5.6,
+    slotsMin: 2,
+    slotsMax: 24,
+    queenSlotsMin: 8,
+    crowdPenalty: 2.5,
+    focusMarkerMm: 6,
+    focusOutnumber: 4,
+    ringCheckSec: 0.5,
+    flankStep: 0.7,
+    flankSpeed: 0.8,
+    keepTargetReach: 1,
+    blockedSec: 1,
+    blockedGain: 0.1,
+    pauseMin: 0.5,
+    pauseMax: 1,
+    sidestepSpeed: 0.6,
+    antHeight: 0.3,
+    clearance: {
+      groundBeetle: 0.085,
+      rove: 0.05,
+      wolfSpider: 0.1,
+      lithobius: 0.04,
+      cutworm: 0,
+      mantis: 0.1,
+      stagBeetle: 0.08,
+      tarantula: 0.12,
+      hogna: 0.12,
+      giantMantis: 0.1,
+      scolopendra: 0.012,
+    } as Record<string, number>,
+    footRadius: 0.02,
+    footMinMm: 0.5,
+    underInset: 0.45,
+    threatDecay: 0.1,
+    threatSticky: 1.3,
+    threatMax: 8,
+    aimDirs: 8,
+    surroundN: 10,
+    surroundR: 0.6,
+    backOffHp: 0.5,
+    backOffLen: 0.15,
+    shakeEverySec: 20,
+    shakeAtFrac: 0.5,
+    shakeWind: 1,
+    dragLen: 1.5,
+  },
+  /**
+   * Combat v2.1 (CHANGE_PLAN §17, user spec claude/combat/03-spec-anchor-and-flow-around.md).
+   *
+   * **Anchored attacks.** An ant holding a foe, firing a spray, holding its range as a shooter, or recovering
+   * (`recoverSec` after a hold ends) does not move: separation treats it as a fixed obstacle. Its bites have phases
+   * from the bite timer: the wind-up is the last `windupSec` before a bite, when it may turn toward its foe at
+   * `windupTurn` rad/s; from the bite to the next wind-up its facing is locked. A shooter holding its range turns at
+   * `shooterTurn`. A hold within `reachTol` × its length of the hold distance needs nothing; up to `stepMax` × its
+   * length off (between bites) it takes one small step (`stepSpeed` × walking speed) and re-anchors; farther, the foe has
+   * left reach: the hold ends where it stands. A grip drags on the ant held: it walks at half speed (`holdSlowSec`
+   * renewed every tick). Two anchored ants planted too close (bodies overlapping, or holding different foes within
+   * `settlePS` × a personal space) are settled by one small step of at most `settleCap` × `stepMax` × its length, round its own foe;
+   * small steps are taken between bites — not in the wind-up, nor until `recoverSec` after a bite, the bite's gap taken
+   * as `settleWindow` × the caste's attack interval. Creatures: every bite has a wind-up of `crWindupSec` (turning at most
+   * `crWindupTurn` rad/s) and a recovery of `crRecoverSec`, still and facing locked.
+   *
+   * **No shoving.** Closing in, an ant is blocked when a teammate stands in its forward cone (`blockCone` rad each side)
+   * within a personal space and it has not come `blockedGain` × its length closer in `blockedSec`. It backs off
+   * `backOffLen` × its length over `backOffSec` (turning `backOffTurn` rad to the side it picked), then walks round the
+   * fight on a ring a personal space (`ringPS`) outside the slots, at `ringSpeed` × walking speed, aiming `ringLook` rad
+   * ahead, to the nearest free slot on that side. The side: more free slots, minus `allyWeight` × the teammates on the
+   * way; ties by its id. Walking in a fight or to a marker, it steers round teammates in its way: `avoidLook` × its
+   * length ahead, in a cone of `avoidCone` rad, turning up to `avoidTurn` rad.
+   */
+  combat21: {
+    windupSec: 0.25,
+    windupTurn: 3,
+    shooterTurn: 2,
+    reachTol: 0.35,
+    stepMax: 0.6,
+    stepSpeed: 0.8,
+    recoverSec: 0.3,
+    holdSlowSec: 0.1,
+    settleCap: 0.5,
+    settlePS: 0,
+    settleWindow: 0.85,
+    crWindupSec: 0.3,
+    crWindupTurn: 3,
+    crRecoverSec: 0.3,
+    blockCone: 0.6,
+    blockedSec: 0.3,
+    blockedGain: 0.05,
+    backOffLen: 0.75,
+    backOffSec: 0.4,
+    backOffTurn: 0.5,
+    ringPS: 1,
+    ringSpeed: 1,
+    ringLook: 0.6,
+    allyWeight: 0.5,
+    avoidLook: 2,
+    avoidCone: 0.7,
+    avoidTurn: 0.9,
+  },
+  /**
+   * Mounting (EotU, CHANGE_PLAN §16 step 8): only ants and termites mount. A caste is small (mounts large and huge
+   * creatures), large (`largeCasteMm` long or more, or flagged `mount: 'large'`: mounts only huge ones) or flagged
+   * `mount: 'none'` (queens and kings too). Climbable creatures are large, bosses huge; at most `capLarge` /
+   * `capHuge` riders whatever the size (fewer where the authored mount slots run out). A colony's riders on a
+   * creature are at most `ratio` of its ants fighting it (riders + ground attackers): over that, the longest-mounted
+   * climbs down first; no ground force, no mounting. With riders ≥ `bonusAt` of the cap the creature takes
+   * `bonusMul` × damage from everyone. Mount slots are authored `slotGap` × `refRiderMm` apart (tools/climb-data.ts).
+   */
+  mount: { ratio: 0.3, capLarge: 8, capHuge: 12, bonusAt: 0.5, bonusMul: 1.25, largeCasteMm: 7, refRiderMm: 4.5, slotGap: 1.2 },
+  /**
+   * Climbing large creatures and titans (CHANGE_PLAN §15.2): seconds up the leg (from the foot), riding and down,
+   * the cooldown before climbing again, damage × while riding, how close (body lengths, or of the creature's
+   * length, at least `joinMinMm`) to a leg an attacker must be to start, and how long it may walk to the leg. Who
+   * mounts and how many: `mount` (combat v2).
    */
   climb: {
     up: 1.5,
@@ -156,14 +349,6 @@ export const BALANCE = {
     joinOfCreature: 0.35,
     joinMinMm: 8,
     approachMax: 4,
-    roomUnitMm2: 20,
-    maxRiders: 32,
-    sizeClasses: [
-      [5, 1],
-      [7.5, 2],
-      [10, 3],
-      [999, 4],
-    ] as Array<[number, number]>,
   },
   /** leafcutters: fungus per unit of leaf delivered, food per unit of fungus eaten (other species get `leafAsFood` from a leaf) */
   atta: { leafToFungus: 1.2, fungusToFood: 1.6, leafAsFood: 0.3 },

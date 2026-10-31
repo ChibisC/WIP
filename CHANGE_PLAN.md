@@ -506,3 +506,170 @@ Decisions from the user's answers: both kinds of corpse are timed food; every qu
 
 ### 15.9 Release
 - `npm test`, the species tests, browser checks, the determinism hash, the stress scene; DESIGN / README / PROGRESS; commit; build; publish as a new version of the existing artifact; re-zip `dist`.
+
+## 16. Combat v2 — EotU-style fight spacing, large-creature AI, titan mounting (user spec 2026-10-31)
+Spec: project doc `claude/combat/02-spec-combat-v2.md` (replaces / extends §15 and `claude/combat/01-spec-collision-and-climbing.md`). Branch `feature/combat-v2` (from `main`). Everything below is sim state: deterministic (dmath, `w.rng`, id order, per-tick caches on `World.tickCache`), numbers in `BALANCE.combat2` / `BALANCE.mount`, new optional fields default to 0 (never `undefined`: hash key order, PROGRESS.md 2026-10-25).
+
+### Survey: what there is now (and what the spec changes)
+- **Spacing.**
+  - Body radius 0.224 L (`separation.ts antRadius`). Hit radius 0.45 L.
+  - "Room in a fight" is ×1.9 (`GUARD.fightRoom`) for every pair in fight stance, friend and foe alike, about 0.85 L centre to centre, at the walking strength (0.5) and cap (3 mm/s).
+  - The spec wants a personal-space radius of 1.3–1.6 L between allies in a fight (stronger than walking), and only body radius between enemies who are not fighting each other.
+- **Slots and stopping.**
+  - Ants: fixed limb slots, 3 / 4 for big victims / 8 for queens (`slots.ts`). Creatures: one per 4.5 mm of outline, 6–32 (a ground beetle gets 12; the spec wants 6–10).
+  - Slots are claimed only on latching, so several ants approach the same limb.
+  - Stopping is centre-based (`d ≤ 0.45 (Lv + La)`). The grapple holds at 0.84 × the mean length, so the bodies overlap head to head.
+- **Overflow.** A ring at `reach + 1.3 L` and `findTarget` again every second. That does not prefer targets with free slots, so a waiting ant often re-picks the same one. There is no flanking choice and no "can't reach: pause and reposition".
+- **Targeting.**
+  - Score = d² × ahead × (1 + 0.8 × attackers) / (1 + threat). The crowd penalty is soft, so mobs still form; creature targets get none.
+  - Getting bitten retargets every non-grappling ant, so targets flicker.
+  - No focus-fire order.
+- **Large creatures.**
+  - One solid capsule: nothing goes under, and there are no leg footprints.
+  - No threat table; the target is the crowd-biased nearest.
+  - Splash attacks are centred on the creature, not aimed at clusters. Not every attack is telegraphed.
+  - Riders are never shaken off.
+- **Climbing.**
+  - Any non-royal ant climbs, capped by area room units (stag 111, up to 32 riders).
+  - Rails run foot → knee → one back slot, and slots fill lowest index first, so riders bunch at the rear.
+  - No ratio, ground-force rule, mount bonus, basic-attack-only rule, death on leaving the map, or dismount on noAttack / noClimb.
+  - Nothing in the data marks a creature as huge, only `boss`.
+- **Tests that pin v1 numbers** (to update with the new rules): combat.ts `maxRiders ≥ 24` and `caps.stagBeetle === 32`; arena.ts `riders ≥ 20`; fights.ts `antSlots === 3 && bigAntSlots === 4`.
+
+### Plan (in this order; each step committed with its tests)
+1. **Spacing** (`separation.ts`, `BALANCE.combat2`):
+   - Allies who are both in a fight keep `personalSpace` 1.45 L centre to centre, using the larger ant's length, at a stronger push (`fightStrength` 0.8, cap ×2).
+   - Enemies who are not engaged with each other keep body radius only, so lines can meet.
+   - An attacker and its own target keep exactly the hold distance (step 2).
+   - The guard line's spacing stays as it is; it is already wider.
+2. **Stop at reach, head to head without overlap** (`combat.ts`, `slots.ts`):
+   - The victim's outline is an ellipse: half its length along, its half-width across (ants: 0.5 L × 0.14 L; creatures: the existing capsule).
+   - The hold point is the outline in the slot's direction plus the attacker's front half (0.5 La − its own mandible overlap of 0.08 La). Approach stops there, and the grapple holds there.
+3. **Slots sized by perimeter:**
+   - `n = clamp(floor(perimeter(outline offset by 0.5 La) / (0.28 La × spacing 2.2)), 2, cap)`. A worker on a worker gets about 3, a 16 mm beetle about 8, a 100 mm boss about 24 (`slotsMax` 24). Queens keep a minimum of 8.
+   - Slot positions are spread evenly along the outline.
+   - Slots are **reserved on approach** in a per-tick cache (id order), so two ants never head for the same slot.
+4. **Overflow and duel distribution** (`findTarget`, `waitForSlot`):
+   - Targets with no free slot are skipped unless the ant already holds one there.
+   - The score weights the attacker count heavily (`crowdPenalty` 2.5), so a clash breaks into 1v1 and 2v1 duels.
+   - An ant with no target that has a free slot (a) takes the nearest one within its vision radius; else (b) flanks round the outline to a free slot on the far side, if there is one; else (c) waits on a loose ring at personal-space distance, facing the fight, and steps in when a slot frees (checked every 0.5 s).
+   - **Focus fire** only when a marker sits on an enemy (within 6 mm of it) or when the target is outnumbered 4 to 1 or worse. Those ants ignore the crowd penalty and may take the ring places.
+   - Being bitten retargets an ant only when its current target is out of reach (no more flicker).
+5. **Reposition when blocked:** an attacker that hasn't closed 0.1 L on its hold point in 1 s pauses attacking for 0.5–1 s (`w.rng`), then sidesteps along the ring (seeded side) before it tries again. It no longer shoves forever.
+6. **Under large creatures** (`creatureAI.ts`, `separation.ts`):
+   - Each creature kind gets an underside clearance (fraction of L) and foot points (the climb rails' feet).
+   - Ants shorter than the clearance collide only with foot circles, not the body capsule, so they walk and fight under it.
+   - The body still pushes ants that are taller than the clearance.
+   - Creature slots include points under the body and at the legs.
+7. **Creature threat and splash AI:**
+   - `cr.threat`: a small id/value list, add damage × caste threat, decay 10 %/s.
+   - Retarget only to an ant whose threat is 1.3 times the current target's (stickiness).
+   - Splash attacks (stag clamp / rear, tarantula frenzy / flick, scolopendra whip / constrict, mantis cone) are aimed: the centre or cone direction with the most ground ants in reach (a fixed set of candidate directions, counted in id order). The creature turns toward that cluster first.
+   - It backs off a few mm when surrounded (≥ 10 within 0.6 L) and its hp is below half.
+   - Every splash attack telegraphs its area.
+   - Titans (bosses) get a telegraphed **shake-off** that throws riders down (stag: rear-and-shake; tarantula: roll; scolopendra: thrash), roughly every 20 s once riders ≥ half the cap.
+   - Wolf spiders pounce and drag an ant 1–2 body lengths out of a cluster.
+8. **Mounting rules** (`climbing.ts`, `BALANCE.mount`):
+   - Creature size class: **large** (non-boss climbables) or **huge** (bosses).
+   - Caste mount class from data: small (default), large (≥ 7 mm or flagged: leafcutter mediae/majors, army-ant majors, fire majors, termite major soldiers) or none. Small castes mount large and huge; large castes mount only huge.
+   - Fixed caps: large 8, huge 12. These replace the area room units.
+   - **Ratio:** a colony's riders on a creature are at most 30 % of its ants fighting that creature (riders plus ground attackers). Over the ratio, the longest-mounted rider climbs down first. No ground force, no mounting.
+   - **Mount bonus:** riders ≥ half the cap → +25 % damage taken from everyone.
+   - **While mounted:** basic attack only, no acid or glue; fire ants keep their sting.
+   - **Dismount:** the timer (8 s, then a 6 s cooldown); the creature dies (drop and tumble); it leaves the map (riders die); the marker's no-attack / no-climb order (climb down).
+9. **Placement on the creature** (`tools/climb-data.ts`, `climbData.ts`, `creatureRenderer.mountPose`):
+   - Per creature, author **climbing points** at the feet and lower legs (the existing rails), **weak points** (head–thorax joint, leg bases, thorax–abdomen joint, top of the abdomen, neck) and **mount slots** spaced evenly round the weak points (≥ 1.2 rider lengths apart).
+   - Each rail runs foot → leg → its weak point.
+   - New riders take the free slot farthest from the occupied ones, so riders spread front to back on both sides.
+   - Render: slots oriented to the body surface (belly down, facing the weak point), lifted clear, following the animated frames.
+   - The debug overlay shows climbing points, rails, weak points and occupancy.
+   - Authored for: stag beetle, tarantula, Scolopendra, giant mantis, hogna (the wolf-spider mother), mantis, ground beetle, rove, wolf spider, Lithobius, cutworm.
+10. **UI:**
+    - Health bars and the boss bar show riders / cap and a mount-bonus icon.
+    - Caste cards say "Mounts large and huge creatures" / "huge only" / "cannot mount".
+    - The marker toggles dismount riders.
+11. **Tests and checks:**
+    - Update the v1-pinned numbers.
+    - New tests:
+      - spacing (allies ≥ 0.9 × personal space in a fight; enemies at body radius);
+      - stop-at-reach (no body overlap in grapples, using the outline ellipses);
+      - slot counts by perimeter (worker 2–4, beetle 6–10);
+      - reservation (no two approachers on one slot);
+      - overflow (flank, switch, ring), reposition when blocked;
+      - under-body movement and foot pushes;
+      - threat stickiness and splash aiming at the densest cluster;
+      - mount size rules, caps, 30 % ratio and dismount order, mount bonus, basic-only, dismount conditions;
+      - determinism (replay and restore);
+      - performance: 400 v 400 ants plus 4 titans at full caps, under 15 ms a tick (`tools/stress.ts`, `tools/climb-stress.ts`).
+    - Browser: 60 v 60 before / after screenshots against the reference and `tools/fightspread.ts` numbers; titan riders at default zoom; clips and shots in `docs/combat/v2/`.
+    - Update DESIGN.md §3.8–3.10, README.md and PROGRESS.md.
+
+## 17. Combat v2.1 — anchored attacks, back off and go around (user spec 2026-10-31)
+Spec: project doc `claude/combat/03-spec-anchor-and-flow-around.md`. Branch `feature/combat-v2.1` from `main` (`1803902`). Evidence: `tools/drift-probe.ts` (every sim system wrapped; each tick's movement and turning of an attacking unit attributed to the system that made it), output in `docs/combat/v2.1/before/probe.txt`, a per-tick trace in `docs/combat/v2.1/before/trace-clash.txt`, clips in `docs/combat/v2.1/before/` (`tests/browser/combat_v21.py`, hitboxes on).
+
+### 17.1 Findings: what moves an attacking unit
+Measured on the base (seed 4, 20 s; % of the unit's body length per second, by system; degrees per second):
+
+| scene | attacking units | moves | turns |
+|---|---|---|---|
+| 60 v 60 clash | holding an ant, one-way | 314 % BL/s (own hold-follow 191, separation 123) | 101°/s |
+| | holding an ant, mutual | 95 (separation 65, own easing 30) | 63°/s |
+| | spraying | 117 (separation 115) | 79°/s |
+| Formica v Lasius | spraying / shooter holding range | 52 / 48 (separation 44 / 27) | 58 / 23°/s |
+| ants on a tarantula | planted at it | 109 (own step-after 108.5) | 23°/s |
+| ants on a wolf spider | planted at it | 116 (own 72, separation 43) | 24°/s |
+| tarantula | 0.3 s before to 0.2 s after a bite | 31 % BL/s | 3°/s |
+| wolf spider | the same (pounce, then its bites) | 87 % BL/s | 41°/s; 72°/s while pouncing |
+| stag beetle | the same (its pinch) | 2.9 % BL/s | 10°/s |
+
+1. **Separation moves attackers** (`separation.ts`). An ant holding an ant is movable in a "fight" or guard-line pair (`ma = … || ((fight || line) && fa & 32)`); planted ants at a creature (`gKind 4`), sprayers and shooters are always movable. Of the separation movement of attacking ants in the clashes, 67–75 % comes from a fighting ally inside the personal space (1.6 L, strength 0.8, cap × 2 = 0.6 mm a separation tick), 6–29 % from an ally closing in with bodies touching, 6–10 % from enemies; at creatures 44–100 % is the body and feet. Trace: spraying ant 17 is pushed the full 0.6 mm on every separation tick while it fires.
+2. **The holds re-follow** (`grappleUpdate`). A one-way hold walks to its hold point (a world angle round the victim) every tick at up to 2 × walking speed (`combat2.holdFollow`): when the victim is shoved or walks, the holder follows (trace: ant 102 creeps 0.03–0.1 mm a tick). A mutual hold eases half the distance error a tick. A planted ant at a creature steps after it (`steerTo`) when the creature moves more than 0.45 L, and is shoved back out when the body swings in.
+3. **Facing** is re-aimed every tick (`faceToward` in grapple, spray and the shooter's hold: 60–100°/s). Ant bites are a timer (`cd`); there is no wind-up / strike / recovery.
+4. Not a cause: velocity (`a.v = 0` in every attack branch: nothing coasts).
+5. **Re-chasing inside an attack**: the creature hold's step-after (2); the ant holds' follow (2).
+6. **Creatures.** Hunters (ground beetle, rove, centipede, spiderlings) and the arena's creature-on-creature bites have no wind-up: they face the target at 6 rad/s and bite on the timer. The stag beetle's pinch bites while it walks or turns. The tarantula's lunge and the giant centipede's coil snap the heading to the aim (`cr.h = dir`) as the wind-up starts. The wolf spider's wind-up turns at 7.5 rad/s, and its pounce steers at a point (72°/s). Already still: the stag beetle's clamp wind-up, the mantis strike, the tarantula wind-up, the centipede coil, every shake-off. Creatures push each other during attacks (`creatureSpacing`); creature feet push planted ants whether the creature walks or attacks.
+7. **Render: not a cause.** Interpolation (`px → x`) adds nothing to a unit that does not move; ant and creature gaits advance only with distance walked (ants: and turning), and a stationary ant's feet settle (`antRenderer`). The sliding is the sim moving the unit. `render/ants` stays with `feature/realism`.
+
+**Shoving:**
+8. Ants closing in steer straight at their hold point; with a teammate in the way, separation splits the overlap by mass, so the walker pushes the one in front, often a holder (above: 6–29 %). A teammate's body against an ant's front while it closes in: 2–3 % of closing-in ticks in the clashes, 8–10 % at a 16 mm ground beetle and a 12 mm wolf spider; up to 0.4–0.95 s at a time.
+9. The blocked rule (`blkD`/`blkT`) needs 1 s without gaining 0.1 L, and pushing an ally forward counts as gaining, so it rarely fires; when it does, the ant pauses 0.5–1 s and sidesteps to a random side (`w.rng`), possibly back into the same press. Nothing remembers the blocked spot.
+10. The ally push has no direction rule: it can push an ant toward the enemy.
+11. At a ground beetle charged from the west, no holder is on the far side after 4 s, 2 of 4 at 6 s, about half by 10 s: the far slots fill slowly, by flanking.
+
+### 17.2 Plan (each step committed with its tests)
+1. **Anchor state (ants).** An ant is anchored while it holds a foe (Grapple, on an ant or planted at a creature), during a spray shot (plant, rear, fire, settle), while a shooter holds its range, while it holds prey, during a recovery after an attack ends (`anc`, seconds left) and during a small planned step (`stp` seconds, toward a fixed point `stx`, `sty`). `anchored(a)` in `slots.ts`. Bites get phases from the bite timer: wind-up = the last `combat21.windupSec` before the bite (`a.cd`), strike at the bite, recovery after. Facing turns only in the wind-up, at `combat21.windupTurn`; locked otherwise.
+2. **Separation.** Anchored ants are never moved by other ants: a fixed obstacle (the other one takes the whole push). Right of way between allies: anchored (3) > holding or closing in on a reserved slot (2) > looking for a slot, waiting, going round (1) > the rest (0): the lower one moves alone; equal: by mass as before. An ally push on a fighting or closing-in ant loses its component toward the ant's target (never pushed into the fight). A creature body or foot moves an anchored ant only while the creature walks (not during its attack); that cancels the ant's attack (recovery, then it re-plants). Anchored creatures are not moved by `creatureSpacing`.
+3. **Holds** (`grappleUpdate`): no hold-follow, no easing, no step-after. The hold distance is checked each tick: within `reachTol` × L, bite on the timer; off by up to `stepMax` × L between bites → one small step (`stp`) to the hold point, then re-anchor; farther (the foe left reach) → the hold ends where the ant stands, `recoverSec` of recovery, then it closes in again (Attack). Mutual holds: both anchored; the same rule. A creature turning into a planted ant is a push from a large creature: the ant's attack is cancelled and it re-plants.
+4. **Sprays and shooters**: anchored per shot (turning only before the jet), shooters holding range anchored (turning slowly between shots); moving to keep range only between shots.
+5. **Creatures**: `cr.anc` (seconds) and a facing lock. Every bite has a wind-up (`combat21.crWindupSec`, turning at most `crWindupTurn`), the strike, a recovery (`crRecoverSec`) — hunters, the stag beetle's pinch, the arena's creature bites. No heading snaps: the tarantula lunge and centipede coil turn toward the aim during the wind-up; the lunge, pounce and coil strike go along the heading fixed at the strike start (planned paths). Splash areas are fixed when the wind-up starts. Backing off only between attacks.
+6. **No shoving.** Blocked: a teammate in the forward cone (`blockCone`) within a personal space and no closer to the slot or target for `blockedSec` (0.3 s). Then: back off `backOffLen` × L over `backOffSec`, turning a little to the chosen side; pick a side (more free slots, fewer allies on the way; ties by id parity); walk round on a ring (target outline + reach + personal space, outside the fighters) to the nearest free slot on that side, keeping the side; reserve it on arrival, move in, anchor. Nothing free all round → another enemy with room, or wait on the outer ring (v2). The blocked slot is remembered (`bkS`, on `rsv`'s target): never tried twice in a row. Replaces v2's pause and sidestep.
+7. **Avoidance instead of pushing.** Ants closing in, going round, waiting, and squads walking to a marker steer sideways round teammates in their path (look-ahead `avoidLook` × L, cone `avoidCone`): a cheap velocity-obstacle test against nearby teammates (the spatial grid), turning away from the nearest one ahead by up to `avoidTurn`; ties by id.
+8. **Numbers** in `BALANCE.combat21`; DESIGN.md §3.8.
+9. **Debug view** `?combatdebug=1` (and in the arena's panel): a pin on anchored units, blocked (red), backing off (an arrow back), the side chosen (an arrow along the ring), the target slot, free / taken slots round each target.
+10. **Tests** `tests/combatV21.ts` (the spec's checklist), the v2 tests that pin the follow and the pause-and-sidestep updated; clips after; stress (400 v 400 + 4 titans); determinism; LAN tests; docs; merge; the artifact (with `feature/realism` combined while it is unmerged).
+
+## 18. Creature melee reach from the body outline (user note 2026-10-31)
+"Maybe a factor that makes them move so much is that they all have too short of a range — how about increasing some of the melee ranges of the creatures in a realistic manner so they don't move too much when fighting." Branch `feature/melee-reach` from `main` (`1ec3f1b`). Evidence: `tools/fight-motion.ts` (every sim system wrapped; each tick's movement of a creature that is fighting, and of every fighting ant, put down to the system and the state that made it; hold endings by cause; `kill` mode: real health), clips `docs/combat/reach/` (`tests/browser/melee_reach.py`).
+
+### 18.1 Findings
+Seed 4, 20 s, 40 Black garden ants (a quarter soldiers) round one creature; % of the creature's length a second:
+
+| creature | walks | turns | bites | ants' grips lost a minute | why |
+|---|---|---|---|---|---|
+| ground beetle | 5.1 | 11°/s | 18 | 1.8 | bite reach from its centre (radius + 3 mm) is short of the ants at its head and tail: it walks at them |
+| rove beetle | 15.4 | 46°/s | 5 | 18.2 | the same, a longer body: it walks while ants hold it (9.7 ticks a second), their holds end |
+| stone centipede | 14.9 | 30°/s | 17 | 4.3 | the same |
+| stag beetle | 2.0 | 9°/s | **1** | **82.5** | walks while its target is over 0.45 L from its centre, but ants planted at its head stand at 0.48 L: it walks into its own attackers and never stops to pinch |
+| mantis | 0 | 28°/s | 4 | 34.9 | strike reach 0.42 L from its middle, short of its own head (0.48 L): only ants beside its forelegs; it swings to track ants and sweeps the holders |
+| tarantula | 7.2 | 34°/s | 7 | 39.5 | a 0.4 L lunge each strike, and walking to crowds |
+| giant centipede | 11.4 | 65°/s | 3 | 5.8 | strikes when an ant is within 0.35 L of its *middle*, then lunges the whole 180 mm body 0.3 L |
+| wolf spider / mother | 122 / 51 | 14 / 25°/s | 19 / 8 | 7.0 / 9.1 | pounces from 16 mm (sprint at 3 × speed) even on ants its front legs could reach, then drags its catch |
+
+Also found: an ant may latch up to 2 × `arriveTol` (0.3 L) inside its hold distance at a creature, but a hold was cancelled once the body was more than half the hold distance (0.21 L) inside it: those ants latched and cancelled every other tick without moving or biting (most of the stag's 82.5). Arena creature-on-creature reach was the two radii from the centres, so long bodies could not reach each other's ends.
+
+### 18.2 Changes
+1. **Reach from the outline** (`BALANCE.creatureReach`, `creatureReachDefault`): per kind the jaw, fang or foreleg reach beyond the body capsule (× its length) and the strike arc each side of its heading, seen from the front of its body (DESIGN §3.8). `inReach` (an ant's centre within reach × L + half the ant's length of the outline), `inStrike` (and in the arc).
+2. **Reach first** (`reachPick`, `standAndFace`): in reach, a creature stands and strikes; an ant in its arc first, then threat, then the one nearest its heading; sticky; retaliation (× 1.3 threat) still wins. An ant in reach outside the arc it turns to (3 rad/s) — never a long body to an ant planted beside it (it would sweep the others off). Only with no ant in reach does it walk. Hunters, the stag's pinch, wolf spiders (an ant in reach is grabbed without the sprint), the tarantula (the strike area is its front legs' reach in front of it, fixed at the wind-up; the body lurches 0.1 L instead of lunging 0.4 L), the giant centipede (the head strikes an ant in its arc, the body does not move; it lunged 0.3 L), the mantis (the raptorial reach past its head; it turns only to ants not holding it), bite landing (`biteSeq`: reach and arc × 1.3), the creature system's and `pickAnt`'s "clinging out of reach" checks.
+3. **Arena creatures**: reach capsule to capsule (`bodyGap`), facing the foe's nearest point from the front of the body.
+4. **An ant holding a creature**: a little way inside its hold distance it steps back between bites (as a little way outside); only over `stepMax` inside is the hold cancelled.
+5. Tools: `tools/fight-motion.ts`; tests `tests/combatV21.ts` (the one-sided split is checked at 6 s); clips; docs.

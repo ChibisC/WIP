@@ -1,4 +1,5 @@
 import { World } from './world';
+import { anchored } from './slots';
 import { Ant, AS, Carry, Colony, POSE, SURFACE, nestSpace, snapping } from './types';
 import { casteOf, tierOf } from './species';
 import { BALANCE } from './balance';
@@ -165,7 +166,8 @@ export function assignJobs(w: World, c: Colony): void {
         continue;
       }
     }
-    if (a.state === AS.Attack || a.state === AS.Grapple || a.state === AS.Flung || snapping(a.state) || a.stun > 0) continue;
+    // (fighting ants are not drafted: closing in, holding, spraying, recovering after an attack, up on a creature)
+    if (a.state === AS.Attack || a.state === AS.Grapple || a.state === AS.Spray || a.state === AS.Climb || a.state === AS.Flung || snapping(a.state) || a.stun > 0 || anchored(a)) continue;
     if (a.carry !== Carry.None && a.carry !== Carry.Soil) continue;
     if (a.task === 'marker') {
       const m = a.marker >= 0 ? c.markers[a.marker] : null;

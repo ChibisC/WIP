@@ -1,11 +1,12 @@
 import { GameSession } from '../game/session';
 import { el } from './dom';
+import { BALANCE } from '../sim/balance';
 
 /**
- * Small health bars over the large creatures that can be climbed (CHANGE_PLAN
- * §15.2) while they are hurt or carrying ants, with the riders counter: room
- * taken on its back / room there is (riders take room by size class). The
- * boss bar shows the same counter for bosses.
+ * Small health bars over the large creatures that can be mounted (CHANGE_PLAN
+ * §15.2, §16) while they are hurt or carrying ants, with the riders counter
+ * (ants on it / its cap) and the mount-bonus mark when enough are on it to
+ * make it take more damage. The boss bar shows the same for bosses.
  */
 export class CreatureBars {
   readonly root = el('div', 'cr-bars');
@@ -34,13 +35,15 @@ export class CreatureBars {
       }
       p.box.style.display = '';
       p.box.style.transform = `translate(${b.x.toFixed(0)}px, ${b.y.toFixed(0)}px) translate(-50%, -100%)`;
-      const key = `${(b.hp * 100).toFixed(0)}|${b.riders}|${b.used}|${b.cap}`;
+      const key = `${(b.hp * 100).toFixed(0)}|${b.riders}|${b.cap}|${b.bonus}`;
       if (key === p.key) continue;
       p.key = key;
       p.fill.style.width = (b.hp * 100).toFixed(0) + '%';
-      // room taken on its back / room there is (bigger ants take more: a small worker 1, a soldier 2–3, an Atta major 4)
-      p.count.textContent = `${b.used}/${b.cap}`;
-      p.count.classList.toggle('full', b.used >= b.cap);
+      // ants on it / most that can mount it; the bonus mark: it takes extra damage while that many ride
+      p.count.textContent = `${b.riders}/${b.cap}`;
+      p.count.classList.toggle('full', b.riders >= b.cap);
+      p.count.classList.toggle('bonus', b.bonus);
+      p.count.title = b.bonus ? `Mounted: takes ${Math.round((BALANCE.mount.bonusMul - 1) * 100)} % more damage` : '';
     }
   }
 }
