@@ -6,6 +6,7 @@ the side-by-side videos and the stills; the separate "after" videos are not kept
 
   python3 tools/combat-v21-compare.py docs/combat/v2.1
   python3 tools/combat-v21-compare.py docs/combat/reach
+  python3 tools/combat-v21-compare.py docs/combat/underpass   (combat v2.2, tests/browser/underpass.py)
 """
 import os, sys, subprocess, shutil
 from PIL import Image, ImageDraw, ImageFont
@@ -26,10 +27,17 @@ TITLES = {
     "six_beetles": "45 workers v six ground beetles",
     "wolf_spider": "a wolf spider and 12 workers",
     "tarantula_mantis": "a tarantula and a mantis v 40 soldiers",
+    # under-pass (docs/combat/underpass)
+    "minims_through_majors": "8 Atta minims run at a row of majors",
+    "atta_mixed_beetle": "4 Atta majors + 20 minims v a ground beetle",
+    "eciton_raid": "Eciton soldiers, porters, workers v Red wood ants",
+    "from_beneath": "25 fire-ant minors v 2 Atta majors",
+    "outline_top": "minims under majors, from above",
 }
 REACH = os.path.basename(os.path.normpath(D)) == "reach"
-LB, LA = ("before (reach from the centre)", "after (reach from the outline)") if REACH else ("before (combat v2)", "after (combat v2.1)")
-VB, VA = ("before", "after (reach)") if REACH else ("before (v2)", "after (v2.1)")
+UNDER = os.path.basename(os.path.normpath(D)) == "underpass"
+LB, LA = ("before (reach from the centre)", "after (reach from the outline)") if REACH else ("before (main)", "after (under-pass)") if UNDER else ("before (combat v2)", "after (combat v2.1)")
+VB, VA = ("before", "after (reach)") if REACH else ("before", "after (under-pass)") if UNDER else ("before (v2)", "after (v2.1)")
 for name, title in TITLES.items():
     a = os.path.join(D, "before", name + ".jpg")
     b = os.path.join(D, "after", name + ".jpg")

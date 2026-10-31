@@ -161,6 +161,14 @@ export interface Ant {
   bkS?: number;
   bkI?: number;
   garT?: number;
+  /**
+   * Under-pass (combat v2.2, sim/underpass.ts; set by separation every pass): the unit it stands under (an ant's id, a
+   * creature's −id; 0 none); `fhd` 1 while something under its front is mid-attack (its braced front waits to lower).
+   */
+  udr?: number;
+  fhd?: number;
+  /** its slot on an ant foe is under the foe's body (combat v2.2: from beneath a tall enemy), 1; else 0 */
+  gUn?: number;
   /** climbing / riding: the creature id (0 = on the ground) */
   rideId?: number;
   /** climbing: 0 walking to the foot of the rail, 1 up, 2 riding, 3 down (1–3: untouchable) */

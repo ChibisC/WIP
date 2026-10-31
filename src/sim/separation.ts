@@ -3,7 +3,9 @@ import { Ant, AS, Creature } from './types';
 import { casteOf } from './species';
 import { BALANCE, GUARD } from './balance';
 import { dcos, dhypot, dsin } from './dmath';
-import { anchored, bodyHook, fitsUnder } from './slots';
+import { anchored, bodyHook } from './slots';
+import { antClear, antFitsUnderCreatureAt, antHeights, antNeed, feetN, footAt, footR, stackCap, zoneAt } from './underpass';
+import { HEIGHTS } from './heightData';
 import { climbDef } from './creatures/climb';
 import { cancelAttack, creatureHooks } from './combat';
 import { queenBody, royalOf } from './termites';
@@ -70,6 +72,12 @@ export function separationSystem(w: World, dt: number): void {
     cancel = new Uint8Array(n * 2);
     under = new Uint8Array(n * 2);
     wt = new Uint8Array(n * 2);
+    need = new Float64Array(n * 2);
+    clr = new Float64Array(n * 6);
+    cmax = new Float64Array(n * 2);
+    udrN = new Float64Array(n * 2);
+    ucnt = new Uint8Array(n * 2);
+    fhdN = new Uint8Array(n * 2);
   }
   // per-ant flags (bit 1 takes part, bit 2 movable, 16 fighting, 32 anchored (combat v2.1), 128 standing in a guard line; 64
   // set below: pushed by a fighting ally, a stronger cap) and the largest small radius and fighting length
@@ -103,6 +111,17 @@ export function separationSystem(w: World, dt: number): void {
         }
       }
     }
+    // under-pass (combat v2.2): how tall it is (with the margin), the clearance under its rear, middle and front in
+    // its pose (its front held up while something under it is mid-attack: `fhd` from the last pass)
+    need[i] = antNeed(a);
+    antClear(a, CLR, (a.fhd ?? 0) > 0);
+    clr[i * 3] = CLR[0];
+    clr[i * 3 + 1] = CLR[1];
+    clr[i * 3 + 2] = CLR[2];
+    cmax[i] = Math.max(CLR[0], CLR[1], CLR[2]);
+    udrN[i] = 0;
+    ucnt[i] = 0;
+    fhdN[i] = 0;
     const r = antRadius(a);
     rad[i] = r;
     mass[i] = antMass(a);
@@ -124,6 +143,7 @@ export function separationSystem(w: World, dt: number): void {
   P.fightStrength = BALANCE.combat2.fightStrength;
   P.ps = PS;
   P.ws = BALANCE.combat21.waitSpace;
+  P.dt = dt;
   for (let i = 0; i < n; i++) {
     const fa = flag[i];
     if (!(fa & 1)) continue;
@@ -141,6 +161,18 @@ export function separationSystem(w: World, dt: number): void {
     // a fighting ant looks as far as a fighting ally's personal space (pairs with big ants are the big one's)
     if (fa & 16) q = Math.max(q, PS * Math.max(len[i], P.big ? maxFightLBig : maxFightL));
     w.antIdxNear(a.space, a.x, a.y, q, pairCb);
+  }
+  // the feet of tall ants push the small ants standing under them (combat v2.2)
+  for (let t = 0; t < n; t++) {
+    if (!ucnt[t]) continue;
+    const B = ants[t];
+    const d = antHeights(B.caste);
+    FT.t = t;
+    FT.r = footR(len[t]);
+    for (let k = 0; k < feetN(d); k++) {
+      footAt(d, len[t], B.x, B.y, B.h, k, FT);
+      w.antIdxNear(B.space, FT.x, FT.y, FT.r + maxR, footAntCb);
+    }
   }
   // a termite queen's abdomen pushes ants out like a creature's body
   for (let i = 0; i < n; i++) {
@@ -172,7 +204,11 @@ export function separationSystem(w: World, dt: number): void {
       const a = ants[i];
       if (a.gKind === 4 && a.gId === cr.id) return false; // holding on to it
       if (a.rideId === cr.id) return false;
-      if (fitsUnder(a, cr)) return false; // under it, among the legs
+      // under it where it fits (combat v2.2: the zone of the body over it, from the model), among the legs
+      if (antFitsUnderCreatureAt(a, cr, a.x, a.y)) {
+        udrN[i] = -cr.id;
+        return false;
+      }
       const dx = a.x - cr.x;
       const dy = a.y - cr.y;
       const lx = dx * c + dy * s;
@@ -196,11 +232,20 @@ export function separationSystem(w: World, dt: number): void {
       if (flag[i] & 32) cancel[i] = 1;
       return false;
     });
-    // its feet (the climb rails' feet) push the ants on the ground aside, the ones under it too
-    const def = climbDef(cr.kind);
-    if (!def) continue;
+    // its feet push the ants on the ground aside, the ones under it too (combat v2.2: the feet of its model, every
+    // kind; before, the climb rails' feet of the climbable ones)
     const C2 = BALANCE.combat2;
     CB.r = Math.max(C2.footMinMm, cr.scale * C2.footRadius);
+    const hd = HEIGHTS.creature[cr.kind];
+    if (hd) {
+      for (let k = 0; k < feetN(hd); k++) {
+        footAt(hd, cr.scale, cr.x, cr.y, cr.h, k, CB);
+        w.antIdxNear(cr.space, CB.x, CB.y, CB.r + maxR, footCb);
+      }
+      continue;
+    }
+    const def = climbDef(cr.kind);
+    if (!def) continue;
     for (const rail of def.rails) {
       const fx = rail.pts[0] * cr.scale;
       const fy = rail.pts[2] * cr.scale;
@@ -226,6 +271,12 @@ export function separationSystem(w: World, dt: number): void {
     nudge(w, a, dx, dy);
     // a large creature walked into an anchored ant: its attack is cancelled, and it plants again (combat v2.1)
     if (cancel[i] && (a.x !== x0 || a.y !== y0)) cancelAttack(w, a);
+  }
+  // the under-pass map of this pass (render: hidden units; the next pass: who keeps its place, whose front waits)
+  for (let i = 0; i < n; i++) {
+    const a = ants[i];
+    if ((a.udr ?? 0) !== udrN[i]) a.udr = udrN[i];
+    if ((a.fhd ?? 0) !== fhdN[i]) a.fhd = fhdN[i];
   }
   creatureSpacing(w, dt);
   // a termite queen is solid: after the shared pushes (crowd pressure can cancel hers), anyone still inside her
@@ -370,7 +421,7 @@ function queenCb(i: number): boolean {
 }
 
 /** The ant whose neighbours are being visited (one shared callback: no closure per ant). */
-const P = { ants: [] as Ant[], i: 0, a: null as unknown as Ant, fa: 0, ra: 0, big: false, strength: 0, fightStrength: 0, ps: 0, ws: 0, foeK: 0, foeId: 0, team: 0 }; // det-ok: scratch
+const P = { ants: [] as Ant[], i: 0, a: null as unknown as Ant, fa: 0, ra: 0, big: false, strength: 0, fightStrength: 0, ps: 0, ws: 0, foeK: 0, foeId: 0, team: 0, dt: 0 }; // det-ok: scratch
 
 /**
  * The foe whose attack slot an ant holds (Grapple), has reserved while closing in, or is spraying as it closes in:
@@ -414,6 +465,19 @@ function pairCb(j: number): boolean {
   const wait = ally && (fa & fo & 16) !== 0 && (wt[i] | wt[j]) !== 0;
   const fight = wait || ((fa & fo & 16) !== 0 && (ally ? !sameFoe : pa.state === AS.Grapple && po.state === AS.Grapple && !engaged(pa, po)));
   const line = !fight && ally && ((fa | fo) & 128) !== 0 && (fa & 144) !== 0 && (fo & 144) !== 0;
+  const ro = rad[j];
+  // each pair once: by the lower id within a size class, else by the big one
+  const oBig = ro > BIG;
+  if (P.big === oBig ? po.id <= pa.id : !P.big) return false;
+  // under-pass (combat v2.2): the shorter one fits under the taller one where it stands — no body push between them (the
+  // taller one's feet push it: below); where it does not fit, beside it, only their bodies' radii (no personal space)
+  let mixed = false;
+  if ((ally ? UP.allies : UP.enemies) && (need[i] <= cmax[j] || need[j] <= cmax[i])) {
+    const sm = need[i] <= cmax[j] && (need[j] > cmax[i] || need[i] <= need[j]) ? i : j;
+    const r = underPair(sm, sm === i ? j : i);
+    if (r !== 0) return false;
+    mixed = true;
+  }
   // (anchored ants never move: the other takes the whole push — combat v2.1)
   let ma = (fa & 2) !== 0;
   let mo = (fo & 2) !== 0;
@@ -423,13 +487,9 @@ function pairCb(j: number): boolean {
     if (prio[i] > prio[j]) ma = false;
     else mo = false;
   }
-  const ro = rad[j];
-  // each pair once: by the lower id within a size class, else by the big one
-  const oBig = ro > BIG;
-  if (P.big === oBig ? po.id <= pa.id : !P.big) return false;
   const dx = po.x - pa.x;
   const dy = po.y - pa.y;
-  const min = fight ? (wait && wt[i] && wt[j] ? P.ws : P.ps) * Math.max(len[i], len[j]) : (P.ra + ro) * (line ? GUARD.fightRoom : 1);
+  const min = fight && !mixed ? (wait && wt[i] && wt[j] ? P.ws : P.ps) * Math.max(len[i], len[j]) : (P.ra + ro) * (line && !mixed ? GUARD.fightRoom : 1);
   const d2 = dx * dx + dy * dy;
   if (d2 >= min * min) return false;
   const d = dhypot(dx, dy);
@@ -445,7 +505,7 @@ function pairCb(j: number): boolean {
     ny = dsin(ang);
   }
   // (two waiting ants ease apart at the walking strength: a crowd settling, not a fight's spacing)
-  const calm = wait && wt[i] && wt[j];
+  const calm = (wait && wt[i] && wt[j]) || mixed;
   const push = (min - d) * (fight && !calm ? P.fightStrength : P.strength);
   const wa = mass[i];
   const wo = mass[j];
@@ -492,6 +552,83 @@ let tdx = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let tdy = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let cancel = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 let under = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
+/** under-pass (combat v2.2): height with the margin, clearance per zone (3 per ant) and its largest, the unit each stands
+ * under this pass (an ant's id, a creature's −id), how many stand under each, front held up */
+let need = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let clr = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let cmax = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let udrN = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let ucnt = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
+let fhdN = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
+const CLR = [0, 0, 0]; // det-ok: scratch
+const UP = BALANCE.underpass;
+
+/**
+ * The shorter ant `sm` and the taller `tl` (combat v2.2). Where `sm` stands, does it fit under `tl` (the zone of `tl`'s
+ * body over it, in `tl`'s pose)? Under its body, it counts toward `tl`'s stack (at most stackCap at once; one already
+ * under it keeps its place); when the stack is full it stays beside instead. Returns 1: under it (no push between them);
+ * 2: it was under `tl` and no longer fits (`tl` lowered): it steps out sideways — only it moves — or, mid-attack, stays
+ * till its attack is done (and `tl`'s front waits); 0: beside `tl` where it does not fit (bodies' radii only).
+ */
+function underPair(sm: number, tl: number): number {
+  const A = P.ants[sm];
+  const B = P.ants[tl];
+  const d = antHeights(B.caste);
+  const LB = len[tl];
+  const z = zoneAt(d, LB, B.x, B.y, B.h, A.x, A.y);
+  const c = clr[tl * 3 + z];
+  const cs = dcos(B.h);
+  const sn = dsin(B.h);
+  const lx = (A.x - B.x) * cs + (A.y - B.y) * sn;
+  const ly = -(A.x - B.x) * sn + (A.y - B.y) * cs;
+  const half = d.hw * LB;
+  // (under its body: within its length along it and its half-width across)
+  const underBody = Math.abs(ly) < half + rad[sm] * 0.5 && Math.abs(lx) < LB * 0.5 + rad[sm] * 0.5;
+  const was = (A.udr ?? 0) === B.id;
+  if (need[sm] <= c) {
+    if (underBody) {
+      if (!was && ucnt[tl] >= stackCap(len[sm], LB)) return 0;
+      if (ucnt[tl] < 255) ucnt[tl]++;
+      udrN[sm] = B.id;
+      if (z === 2 && flag[sm] & 32) fhdN[tl] = 1;
+    }
+    return 1;
+  }
+  if (!was || !underBody) return 0;
+  udrN[sm] = B.id;
+  // mid-attack under it: it finishes first (no push); its front waits to lower
+  if (flag[sm] & 32) {
+    if (z === 2) fhdN[tl] = 1;
+    return 2;
+  }
+  if (!(flag[sm] & 2)) return 2;
+  // steps out sideways, to the side it is on, clear of the body: a short planned move at the small-step speed
+  const out = half + rad[sm] + UP.stepOut * len[sm] - Math.abs(ly);
+  const side = ly >= 0 ? 1 : -1;
+  const step = Math.min(out, casteOf(A.caste).speed * BALANCE.combat21.stepSpeed * P.dt);
+  pushX[sm] += -sn * side * step;
+  pushY[sm] += cs * side * step;
+  flag[sm] |= 4;
+  return 2;
+}
+
+/** A tall ant's feet push the small ants standing under it (only those: the rest meet its body as usual). */
+const FT = { t: 0, x: 0, y: 0, r: 0 }; // det-ok: scratch
+function footAntCb(j: number): boolean {
+  if (udrN[j] !== P.ants[FT.t].id || !(flag[j] & 2)) return false;
+  const a = P.ants[j];
+  const dx = a.x - FT.x;
+  const dy = a.y - FT.y;
+  const min = FT.r + rad[j];
+  const d2 = dx * dx + dy * dy;
+  if (d2 >= min * min) return false;
+  const d = dhypot(dx, dy);
+  const nx = d > 1e-6 ? dx / d : a.id & 1 ? 1 : -1;
+  const ny = d > 1e-6 ? dy / d : 0;
+  pushX[j] += nx * (min - d) * P.strength;
+  pushY[j] += ny * (min - d) * P.strength;
+  return false;
+}
 let wt = new Uint8Array(0); // det-ok: scratch, rebuilt every tick (waiting for a slot)
 
 /** Radius (mm) above which an ant counts as big for the neighbour search. */

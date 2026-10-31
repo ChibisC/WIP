@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GameView, NestStage } from '../render/view';
 import { AntRenderer, AntSpaceAdapter, AntView } from '../render/ants/antRenderer';
+import { UnderOutline } from '../render/game/underOutline';
 import { HitboxOverlay } from './hitboxOverlay';
 import { CreatureRenderer } from '../render/creatures/creatureRenderer';
 import { FoodRenderer, SpaceMapper } from '../render/game/foodRenderer';
@@ -39,6 +40,8 @@ export class NestView {
   readonly creatures: CreatureRenderer;
   /** debug overlay: the sim's hitboxes */
   readonly hit: HitboxOverlay;
+  /** combat v2.2: outlines of ants standing under a taller unit (render/game/underOutline.ts) */
+  readonly under: UnderOutline;
   readonly brood = new BroodRenderer();
   readonly decor: TileDecor;
   readonly markers = new WorldMarkers();
@@ -66,7 +69,8 @@ export class NestView {
     this.decor = new TileDecor(nt);
     this.creatures = new CreatureRenderer('areaCreatures' + space);
     this.hit = new HitboxOverlay('areaHitboxes' + space);
-    stage.scene.add(this.hit.group, this.ants.group, this.creatures.group, this.food.group, this.brood.group, this.decor.group, this.markers.group, this.fx.group, this.rings.mesh);
+    this.under = new UnderOutline('areaUnderOutline' + space);
+    stage.scene.add(this.hit.group, this.under.group, this.ants.group, this.creatures.group, this.food.group, this.brood.group, this.decor.group, this.markers.group, this.fx.group, this.rings.mesh);
     // The nest is a plane: ants walk on the floor heightfield (and up the entrance ramps).
     this.adapter = {
       toWorld: (x, y, out) => out.set(x, nt.heightAt(x, y), y),

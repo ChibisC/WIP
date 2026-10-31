@@ -82,6 +82,10 @@ export function makeAnt(w: World, colony: number, caste: string, space: number, 
     jobK: 0,
     jobQ: -1,
     lostT: 0,
+    // combat v2.2 (the under-pass): set from the start so every ant keeps one object shape (written every other tick)
+    udr: 0,
+    fhd: 0,
+    gUn: 0,
   };
   // Species extras, only on the castes that use them (other species' records stay as they were).
   if (c.termite) {

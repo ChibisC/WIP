@@ -346,7 +346,9 @@ function separateOnly(w: World, n: number): void {
   cr.hp = cr.maxHp = 1e7;
   cr.stun = 1e9;
   // a small worker right under its belly (its height under the beetle's underside) and a Formica soldier, too tall
-  const small = makeAnt(w, 0, 'lasius_worker', SURFACE, p.x - 2.5, p.y, 0);
+  // (combat v2.2: heights from the models — the beetle's belly is 0.74 mm up, so the small one is a fire-ant nanitic;
+  // a Black garden worker, 1.2 mm tall, no longer fits)
+  const small = makeAnt(w, 0, 'solenopsis_nanitic', SURFACE, p.x + 0.5, p.y, 0);
   const big = makeAnt(w, 0, 'formica_soldier', SURFACE, p.x + 2, p.y + 1, 0);
   for (const a of [small, big]) a.stun = 1e9;
   w.reindex();
