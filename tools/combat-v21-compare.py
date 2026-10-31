@@ -28,7 +28,7 @@ TITLES = {
     "wolf_spider": "a wolf spider and 12 workers",
     "tarantula_mantis": "a tarantula and a mantis v 40 soldiers",
     # under-pass (docs/combat/underpass)
-    "minims_through_majors": "8 Atta minims run through a column of majors",
+    "minims_through_majors": "8 Atta minims run at a row of majors",
     "atta_mixed_beetle": "4 Atta majors + 20 minims v a ground beetle",
     "eciton_raid": "Eciton soldiers, porters, workers v Red wood ants",
     "from_beneath": "25 fire-ant minors v 2 Atta majors",
