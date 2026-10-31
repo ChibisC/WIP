@@ -680,3 +680,21 @@ Also found: an ant may latch up to 2 × `arriveTol` (0.3 L) inside its hold dist
 **Causes.** (1) Focus fire: with our side outnumbering the foes in sight 4 to 1, `findTarget` dropped the crowd penalty *and* let a full foe be chosen, so every ant took the nearest foe and the overflow waited on it while other foes had free slots (seed 7: 57 % of the fighting time idle that way). (2) Waiting: ants waiting on the same foe kept only their bodies' room and were held on an exact ring a personal space out (stepping back on to it whenever pushed past half a body length): with 30 of them, a ring shoulder to shoulder that overflowed into a spiral and kept moving — waiting ants walked 1.6–2 body lengths a second.
 
 **Changes.** Outnumbering drops the crowd penalty only; a full foe is chosen only when no foe in sight has room (or a marker is on it), and then the waiting is spread by the crowd on each. Waiting ants stand anywhere in a band from just inside the ring to `combat21.waitBand` (3) of their lengths beyond it; two waiting teammates keep `combat21.waitSpace` (1) × the larger length apart and ease apart at the walking strength; a waiting ant and a teammate fighting keep a personal space even on the same foe.
+
+## 20. Combat v2.2 — unit heights: smaller ants walk and fight under taller ones (user spec 2026-10-31)
+User spec: project doc `claude/combat/04-spec-height-and-underpass.md` ("Unit Heights: Smaller Ants Walk and Fight Under Taller Allies (Leafcutters and Army Ants first)"). Branch `feature/underpass` from `main` (`ab4d193`). Research and the measured table: `docs/combat/underpass.md`.
+
+### 20.1 Plan
+1. **Heights from the models** (`tools/heightLib.ts`, `tools/height-data.ts` → `src/sim/heightData.ts`): per ant morph (termites included) and creature kind — height, the lowest point under the body in three zones (rear, middle, front; zone limits per model), half-width and feet, as fractions of the length. A test fails when the file no longer matches the builders. The published build regenerates it from the realism + main models.
+2. **The rule** (`src/sim/underpass.ts`, `BALANCE.underpass`): A fits under B in a zone when A's height × 1.1 ≤ B's clearance there in B's pose (braced bite: front × 0.5; a porter carrying: middle 0; rearing: front × 1.3; dead or flung: 0). Stacking: ⌊L_B / (3 L_A)⌋, 1–4.
+3. **Separation**: a pair that fits (allies; enemies with the toggle) is not pushed apart while the small one is under the body (it counts toward the stack); the tall ant's feet push only the ants under it. One that no longer fits steps out sideways (a planned move, only it moves); mid-attack it stays and B's braced front waits (`Ant.fhd`, sim state). Creatures: the model's zones and feet replace `combat2.clearance` and the climb rails' feet.
+4. **Two-layer slots**: an attacker may take a slot held by one teammate it fits under at that spot (creatures: ring 0; ants: the sector). Full: an under slot on a tall enemy ant (`Ant.gUn`, angle + 100 in the held list), at most the stack, its sides first.
+5. **Movement**: avoidance ignores teammates you pass under (or that pass under you).
+6. **Visibility**: outline of hidden ants; click cycling; health bars; posture handed to the realism session.
+7. **Debug view** in `?combatdebug`; tests `tests/underpass.ts`; clips; docs; determinism, multiplayer, performance.
+
+### 20.2 Findings
+- Shipped models: the Atta minim fits under the media, soldier and major (rear and middle; their heads are low) and the queen; the media does not fit under the major (needs 3.14 mm, 1.99). The Eciton worker fits under the soldier (rear and middle) and the queen, not under the porter (needs 1.68, 1.55) or the media (1.58). Handed to the realism session with the models.
+- Creatures are lower than combat v2 assumed: a ground beetle's middle is 0.74 mm (v2 1.36), so Lasius workers no longer fight from under it; wolf spiders, rove beetles and stone centipedes likewise; titans unchanged.
+- Fights against creatures gain little (v2's slots were already per attacker size and allies on one foe never kept a personal space); the gain is in walking (no detours round big teammates, no shoves) and in small ants under tall enemy ants.
+- Performance: lazily added `Ant` fields gave the ants many more V8 object shapes (everything reading ants ~20 % slower); `makeAnt` sets them to 0.

@@ -354,6 +354,34 @@ export const BALANCE = {
    */
   mount: { ratio: 0.3, capLarge: 8, capHuge: 12, bonusAt: 0.5, bonusMul: 1.25, largeCasteMm: 7, refRiderMm: 4.5, slotGap: 1.2 },
   /**
+   * Unit heights and the under-pass (combat v2.2, CHANGE_PLAN §20, user spec claude/combat/04-spec-height-and-underpass.md;
+   * EotU: "Smaller creatures can move and attack beneath larger ones"). Every unit's height, the clearance under the
+   * rear, middle and front of its body, its half-width and its feet come from its model (src/sim/heightData.ts,
+   * tools/height-data.ts). Unit A passes under unit B where B's body is over it when A's height × (1 + `margin`) is
+   * at most B's clearance there, in B's pose: then A does not collide with B's body there, only with its feet (circles
+   * of `footR` × B's length, at least `footMinMm`), and neither pushes the other; where it does not fit, B's body
+   * there (that zone, `hw` wide) blocks as usual. At most `stackLen`-th of B's length in A's lengths (1..`maxStack`)
+   * may stand under B at once (1 small worker under a media, 2–3 under a major). Teammates when `allies`; enemies
+   * when `enemies`. Poses (zone multipliers on the clearance): a braced heavy bite (`braced` castes holding a foe) lowers
+   * the front to `pose.braced`; a porter carrying prey slung under it (`porters`) drops its middle to
+   * `pose.porterLoaded`; rearing to spray raises the front by `pose.rearing`; dead or flung: nothing passes under.
+   * A unit that no longer fits steps out sideways (`stepOut` × its length clear of the body) in a planned move; one
+   * mid-attack finishes its attack first, and B's front waits to lower until it has.
+   */
+  underpass: {
+    margin: 0.1,
+    allies: true,
+    enemies: true,
+    footR: 0.03,
+    footMinMm: 0.25,
+    stackLen: 3,
+    maxStack: 4,
+    pose: { braced: 0.5, porterLoaded: 0, rearing: 1.3 },
+    braced: ['atta_major', 'atta_soldier', 'eciton_major'] as string[],
+    porters: ['eciton_submajor'] as string[],
+    stepOut: 0.3,
+  },
+  /**
    * Climbing large creatures and titans (CHANGE_PLAN §15.2): seconds up the leg (from the foot), riding and down,
    * the cooldown before climbing again, damage × while riding, how close (body lengths, or of the creature's
    * length, at least `joinMinMm`) to a leg an attacker must be to start, and how long it may walk to the leg. Who

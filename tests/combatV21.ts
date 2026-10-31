@@ -331,7 +331,11 @@ const pct = (e: { mm: number; len: number }) => (e.len > 0 ? (e.mm / e.len) * 20
       } else streak.delete(a.id);
     }
   });
-  check('no shoving: a swarm charging a beetle from one side splits round both sides within a few seconds', sides5.n >= 3 && sides5.s >= 3, `after 6 s: ${sides5.n} holding on the north side, ${sides5.s} on the south (before v2.1, at 5 s: 2 and 1)`);
+  // (since combat v2.2 the beetle's clearance is its model's — 0.74 mm under its middle, and a Lasius worker needs 1.33 —
+  // so no worker holds from under it any more and the ring is smaller: seeds 1–9 have 2–5 on the thinner side at 6 s,
+  // 2–6 before. The split is what this checks: both sides held, the thinner at least a third)
+  const thin = Math.min(sides5.n, sides5.s);
+  check('no shoving: a swarm charging a beetle from one side splits round both sides within a few seconds', thin >= 2 && thin * 3 >= sides5.n + sides5.s, `after 6 s: ${sides5.n} holding on the north side, ${sides5.s} on the south (before v2.1, at 5 s: 2 and 1)`);
   check('no shoving: … and wraps round to the far side', far10 >= 3, `after 10 s: ${far10} holding on the far (east) side`);
   // (ants still bump into a teammate as they arrive — about 8 % of closing-in ticks, as before v2.1 — but they back off
   // instead of pressing on: on the base the longest press here was 0.65 s)
