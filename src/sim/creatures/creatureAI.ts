@@ -454,6 +454,7 @@ function riderShake(w: World, cr: Creature, dt: number, state: number): boolean 
 // ---------------------------------------------------------------------------
 
 /** States in which a creature is in an attack — still, or on a planned lunge — and no other creature moves it. */
+// (CS.Lift: the stag beetle holding ants up between its antlers — merge of feature/realism)
 const ATTACKING = new Set<number>([CS.WindUp, CS.Attack, CS.Strike, CS.Pounce, CS.Coil, CS.Whip, CS.Rear, CS.Flick, CS.Display, CS.Leap, CS.Eat, CS.Lift]); // det-ok: constant
 
 /** In an attack, from the wind-up to the end of its recovery (or holding its catch, or shaking riders off)? */
@@ -1150,13 +1151,13 @@ function stagPlough(w: World, cr: Creature, k: CreatureKind, dt: number): void {
     if (c && a.id === c.queen) continue;
     // away from the beetle's line of travel, to whichever side the ant already is
     const side = (a.x - cr.x) * -hy + (a.y - cr.y) * hx >= 0 ? 1 : -1;
+    // (combat v2.1) an anchored ant shoved by the walking beetle loses its attack and plants again
+    if (anchored(a)) cancelAttack(w, a);
     const nx = a.x + -hy * side * STAG.shove * dt + hx * STAG.shove * 0.3 * dt;
     const ny = a.y + hx * side * STAG.shove * dt + hy * STAG.shove * 0.3 * dt;
     if (w.walkable(a.space, nx, ny)) {
       a.x = nx;
       a.y = ny;
-      // (a creature walking into an anchored ant cancels its attack: combat v2.1)
-      if (anchored(a)) cancelAttack(w, a);
     }
     a.stun = Math.max(a.stun, 0.12);
   }
@@ -1168,7 +1169,7 @@ function stag(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   if (cr.state !== CS.Lift && (cr.data.held1 || cr.data.held2)) stagRelease(cr);
   const jx = cr.x + dcos(cr.h) * L * STAG.jaw;
   const jy = cr.y + dsin(cr.h) * L * STAG.jaw;
-  // rears and shakes its riders off (combat v2); not while ants hang in its antlers
+  // rears and shakes its riders off (combat v2) — not while it holds ants up between its antlers (realism's lift)
   if (cr.state !== CS.Lift && riderShake(w, cr, dt, CS.Rear)) return;
   if (backOff(w, cr, k, dt)) return;
   // a pinch of the antlers under way: wind-up, pinch, recovery (combat v2.1)
@@ -1283,12 +1284,12 @@ function stag(w: World, cr: Creature, k: CreatureKind, dt: number): void {
     turnCreature(cr, aim.dir, dt, 2.5);
     return;
   }
-  // it walks to an ant out of its reach, or one only in its way (not fighting it: it walks on through a swarm,
-  // ploughing the ants in front aside); an ant fighting it in reach, it stands for, turning its antlers to one outside
-  // their arc
+  // it walks to an ant out of its reach, or one only in its way (not fighting it: it walks on through a swarm); an ant
+  // fighting it in reach, it stands for, turning its antlers to one outside their arc
   let ready = false;
   if (!near && !(engagedWith(cr, a) && inReach(cr, k, a))) {
     walkTo(w, cr, k, a.x, a.y, 1, dt, 2.5);
+    // (realism) walking, it ploughs the ants in its way aside
     stagPlough(w, cr, k, dt);
   } else ready = standAndFace(cr, k, a, dt, 2.25);
   if (aim) {

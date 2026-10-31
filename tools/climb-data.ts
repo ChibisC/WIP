@@ -89,11 +89,12 @@ const KINDS: Record<string, { legs: (name: string) => boolean; parts: Part[]; we
     weak: [{ name: 'thorax–abdomen', frame: 'body', x: 0.03 }, { name: 'abdomen', frame: 'body', x: -0.1 }, { name: 'neck', frame: 'body', x: 0.16 }],
     legBases: true,
   },
-  // the sculpted stag beetle (render/creatures/stagBeetle.ts SB): elytra, pronotum, the broad head
+  // the sculpted stag beetle (realism: render/creatures/stagBeetle.ts SB): elytra, pronotum, the broad head — the
+  // weak points moved with them (merge of feature/realism and main's EotU mounting format)
   stagBeetle: {
     legs: () => true,
     parts: [part('body', -0.275, 0.14, 0.19, 0.065, 0.142), part('body', -0.02, 0.14, 0.075, 0.05, 0.138), part('body', 0.125, 0.118, 0.08, 0.036, 0.15)],
-    weak: [{ name: 'thorax–abdomen', frame: 'body', x: -0.075 }, { name: 'abdomen', frame: 'body', x: -0.3 }, { name: 'neck', frame: 'body', x: 0.04 }, { name: 'pronotum', frame: 'body', x: -0.02 }],
+    weak: [{ name: 'thorax–abdomen', frame: 'body', x: -0.09 }, { name: 'abdomen', frame: 'body', x: -0.3 }, { name: 'neck', frame: 'body', x: 0.06 }, { name: 'pronotum', frame: 'body', x: -0.02 }],
     legBases: true,
   },
   wolfSpider: { legs: () => true, parts: spiderParts(1), weak: spiderWeak, legBases: true },
