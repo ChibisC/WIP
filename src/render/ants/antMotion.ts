@@ -24,7 +24,7 @@ import { ATK } from './attackPoses';
  */
 
 /** Which morphs use the pass (the pilot: the tropical fire ant; the rollout widens this). */
-export const ANIM_V2_PREFIXES = ['fire_', 'lasius_', 'formica_', 'plagiaria_'];
+export const ANIM_V2_PREFIXES = ['fire_', 'lasius_', 'formica_', 'plagiaria_', 'atta_'];
 /** Lab switch: false shows the old motion (before/after clips). */
 export const animSettings = { v2: true };
 export const animV2 = (morph: string): boolean => animSettings.v2 && ANIM_V2_PREFIXES.some((p) => morph.startsWith(p));
@@ -71,6 +71,19 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
   // formicines (rollout batch 1): a lunge bite, a clamp and tug, and biting then spraying formic acid
   if (morph.startsWith('lasius_') || morph.startsWith('formica_') || morph.startsWith('plagiaria_')) {
     out.variant = [ATK.LUNGE, ATK.ACID, ATK.CLAMP][av];
+    return out;
+  }
+  // (overnight spec 3.1, Atta) minims cling and bite; medias bite and hold; soldiers fast heavy bites and head
+  // slams; majors a slow, braced scissor cut from a low stance
+  if (morph.startsWith('atta_')) {
+    out.variant =
+      morph === 'atta_major'
+        ? [ATK.CRUSH, ATK.CLAMP, ATK.CRUSH][av]
+        : morph === 'atta_soldier'
+          ? [ATK.LUNGE, ATK.HEAD_SWING, ATK.LUNGE][av]
+          : morph === 'atta_minim'
+            ? [ATK.CLAMP, ATK.CLAMP, ATK.LUNGE][av]
+            : [ATK.CLAMP, ATK.LUNGE, ATK.CLAMP][av];
     return out;
   }
   if (!morph.startsWith('fire_')) {

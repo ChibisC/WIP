@@ -528,6 +528,7 @@ function setaeOn(acc: Acc, rng: Rng, pts: number[], radial: number, nRings: numb
  */
 export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const formicine = /^(lasius|formica|plagiaria)/.test(m.key);
+  const atta = m.key.startsWith('atta_');
   if ((m as { builder?: string }).builder === 'hell') return buildHellAnt(m, detail, seed);
   const acc = new Acc();
   const rng = new Rng(seed * 101 + m.key.length * 7);
@@ -649,7 +650,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   // ---------- head ----------
   // (overnight review round 3: a formicine carries its face tilted down, the jaws hanging below the clypeus — level,
   // they read as a forward beak)
-  const headRestPitch = m.real && formicine ? -0.36 : -0.12;
+  // (Atta, overnight pass: the same — the jaws hang under the face, the major's like heavy shears)
+  const headRestPitch = m.real && formicine ? -0.36 : m.real && atta ? -0.3 : -0.12;
   const headM = new THREE.Matrix4().compose(neck, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), headRestPitch), new THREE.Vector3(1, 1, 1));
   const hp = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyMatrix4(headM);
   let socketL = new THREE.Vector3();
@@ -765,6 +767,16 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         acc.piece(transformPts(pp, headM), ii, PART.HEAD, solid(look.head), look.head);
       }
     }
+    // (Atta, overnight pass: the frontal lobes — two flat plates roofing the antennal sockets, a ridge running back
+    // from each)
+    if (m.real && atta && hi) {
+      for (const sd of [-1, 1]) {
+        const [pp, ii] = ellipsoid(new THREE.Vector3(hL * 0.84, headCY + hH * 0.2, sd * hW * 0.15), new THREE.Vector3(hL * 0.07, hH * 0.05, hW * 0.075), 10);
+        acc.piece(transformPts(pp, headM), ii, PART.HEAD, (x, y, z) => headCol(x - neck.x, y - neck.y, z), look.head);
+        const [pr, ir] = tube([new THREE.Vector3(hL * 0.82, headCY + hH * 0.22, sd * hW * 0.16), new THREE.Vector3(hL * 0.6, headCY + hH * 0.3, sd * hW * 0.2), new THREE.Vector3(hL * 0.38, headCY + hH * 0.32, sd * hW * 0.24)], [hH * 0.035, hH * 0.03, hH * 0.012], 6, true, true);
+        acc.piece(transformPts(pr, headM), ir, PART.HEAD, (x, y, z) => headCol(x - neck.x, y - neck.y, z), look.head);
+      }
+    }
     // compound eyes (faceted in shader via flag 1)
     const eyeT = m.eyes.pos;
     const eyeR = (m.eyes.size * hL) / 2;
@@ -802,7 +814,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     }
     // (realism: near the front, close to the midline just behind the clypeus, as in Solenopsis — photo fire_07)
     // (formicines, review round 3: at the front of the frons just behind the clypeus, not on top of the head)
-    socketL = m.real && formicine ? hp(hL * 0.86, headCY + hH * 0.1, -hW * 0.17) : m.real ? hp(hL * 0.84, headCY + hH * 0.24, -hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, -hW * 0.17);
+    socketL = m.real && (formicine || atta) ? hp(hL * 0.86, headCY + hH * 0.1, -hW * (atta ? 0.14 : 0.17)) : m.real ? hp(hL * 0.84, headCY + hH * 0.24, -hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, -hW * 0.17);
     socketR = m.real ? hp(hL * 0.84, headCY + hH * 0.24, hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, hW * 0.17);
     mandPivL = hp(hL * 0.95, headCY - hH * 0.22, -hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
     mandPivR = hp(hL * 0.95, headCY - hH * 0.22, hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
@@ -976,7 +988,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // Scape: forward-outward-up; funiculus: forward-outward-down (elbowed).
     // (review round 2: a formicine's scapes rise up and back from sockets near the midline, then the funiculus bends
     // forward — they read as rods sticking out of the face's sides when set forward-outward)
-    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && m.key.startsWith('atta_') ? new THREE.Vector3(0.3, 0.68, 0.55 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
+    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && atta ? new THREE.Vector3(-0.3, 0.45, 0.75 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
     const elbow = sock.clone().addScaledVector(scDir, scapeLen);
     elbows.push(elbow);
     const scMid = sock.clone().lerp(elbow, 0.5).add(new THREE.Vector3(0, scapeLen * 0.04, 0));

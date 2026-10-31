@@ -213,8 +213,12 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
       break;
     case AS.Collect:
     case AS.CutLeaf:
-      out.mandible = 0.3 + Math.max(0, Math.sin(w.time * 12 + a.id)) * 0.6;
+      // (overnight spec 3.1) hind legs anchored on the leaf edge, the body swinging in an arc as the jaws cut a
+      // semicircle; a fine vibration in the jaws while cutting
+      out.mandible = 0.3 + Math.max(0, Math.sin(w.time * 12 + a.id)) * 0.6 + Math.sin(w.time * 70 + a.id) * 0.05;
       out.headPitch = -0.3;
+      out.headYaw = Math.sin(w.time * 0.9 + a.id) * 0.45;
+      out.roll = Math.sin(w.time * 0.9 + a.id) * 0.06;
       break;
     case AS.Troph:
       // (overnight spec 3.4) face to face, mouthparts touching: the jaws parted, the head nodding gently as
