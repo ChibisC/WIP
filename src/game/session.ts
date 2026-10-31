@@ -8,6 +8,7 @@ import { AntRenderer, AntSpaceAdapter, AntView } from '../render/ants/antRendere
 import { edible } from '../sim/diet';
 import { HitboxOverlay } from './hitboxOverlay';
 import { CombatDebugOverlay } from './combatDebugOverlay';
+import { UnderOutline } from '../render/game/underOutline';
 import { CreatureRenderer } from '../render/creatures/creatureRenderer';
 import { climbCap } from '../sim/creatures/climb';
 import { mountBonus } from '../sim/combat';
@@ -152,6 +153,8 @@ export class GameSession {
   private surfCreatures = new CreatureRenderer('surfaceCreatures');
   /** battle arena: a ring in the team colour under every unit */
   private teamRings = new TeamRings();
+  /** combat v2.2: outlines of ants standing under a taller unit, drawn through it (render/game/underOutline.ts) */
+  private surfUnder = new UnderOutline('surfaceUnderOutline');
   /** debug overlay: the sim's hitboxes (F3, or ?hitboxes=1; game/hitboxOverlay.ts) */
   private surfHit = new HitboxOverlay('surfaceHitboxes');
   hitboxes = false;
@@ -213,7 +216,7 @@ export class GameSession {
     this.view.setActiveNest(this.viewedArea);
     this.surfAnts = new AntRenderer(this.view.renderer, 'surfaceAnts');
     this.surfAnts.lodScale = this.view.preset.lodScale;
-    this.view.surfaceScene.add(this.teamRings.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfFx.group);
+    this.view.surfaceScene.add(this.teamRings.group, this.surfUnder.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfFx.group);
     // Pheromone overlay texture.
     const ph = w.phero;
     this.pheroData = new Uint8Array(ph.w * ph.h * 4);
@@ -742,7 +745,14 @@ export class GameSession {
     return this.view.space === 'nest' ? this.viewedArea : SURFACE;
   }
 
-  /** Nearest ant or creature under the cursor in the active space. */
+  /** The last click's pick (combat v2.2: clicking the same spot again cycles through the units under it). */
+  private lastPick = { cx: -1e9, cy: -1e9, kind: '', id: 0 };
+
+  /**
+   * The ant or creature under the cursor in the active space: the nearest; clicking the same spot again (within a few
+   * pixels) picks the next nearest there, round and round — so an ant standing under a taller one (combat v2.2) can be
+   * picked as well as the one above it.
+   */
   pickAnt(clientX: number, clientY: number): Inspect | null {
     const w = this.world;
     let px: number;
@@ -759,25 +769,27 @@ export class GameSession {
       py = sp.z;
     }
     const space = this.activeSpace();
-    let best: Inspect | null = null;
-    let bd = Infinity;
+    const hits: Array<{ d: number; it: Inspect }> = [];
     for (const a of w.s.ants) {
       if (a.space !== space || a.state === AS.Dead) continue;
       const L = CASTES[a.caste].length;
       const d = Math.hypot(a.x - px, a.y - py);
-      if (d < Math.max(3, L * 0.9) && d < bd) {
-        bd = d;
-        best = { kind: 'ant', id: a.id };
-      }
+      if (d < Math.max(3, L * 0.9)) hits.push({ d, it: { kind: 'ant', id: a.id } });
     }
     for (const cr of w.s.creatures) {
       if (cr.space !== space || cr.dead) continue;
       const d = Math.hypot(cr.x - px, cr.y - py);
-      if (d < cr.scale * 0.6 && d < bd) {
-        bd = d;
-        best = { kind: 'creature', id: cr.id };
-      }
+      if (d < cr.scale * 0.6) hits.push({ d, it: { kind: 'creature', id: cr.id } });
     }
+    hits.sort((p, q) => p.d - q.d || (p.it.kind < q.it.kind ? -1 : p.it.kind > q.it.kind ? 1 : p.it.id - q.it.id));
+    const lp = this.lastPick;
+    let k = 0;
+    if (Math.hypot(clientX - lp.cx, clientY - lp.cy) <= 6) {
+      const at = hits.findIndex((h) => h.it.kind === lp.kind && h.it.id === lp.id);
+      if (at >= 0) k = (at + 1) % hits.length;
+    }
+    const best = hits[k]?.it ?? null;
+    this.lastPick = { cx: clientX, cy: clientY, kind: best?.kind ?? '', id: best?.id ?? 0 };
     return best;
   }
 
@@ -1406,6 +1418,7 @@ export class GameSession {
       const owner = w.colony(colonyOfSpace(v.activeNest)) ?? null;
       if (nv) nv.overlay = this.tileOverlay;
       if (nv) nv.update(w, owner, this.player, cam, alpha, realDt, vh, v.observing ? v.observeRig.distance * 3 : v.nestRig.distance, sel, v.time, shown, this.pendingHexes());
+      if (nv) nv.under.update(w, v.activeNest, alpha, (x, y) => nv.stage.terrain.heightAt(x, y), this.player.id);
       if (nv) nv.hit.update(w, v.activeNest, this.hitboxes, (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.goal.x, v.nestRig.goal.z, v.nestRig.distance * 2);
     } else {
       const views = this.views;
@@ -1435,6 +1448,7 @@ export class GameSession {
       };
       this.surfAnts.update(list, alpha, realDt, cam, this.surfAdapter, vh);
       this.teamRings.update(w, alpha, this.surfHeight);
+      this.surfUnder.update(w, SURFACE, alpha, this.surfHeight, this.player.id);
       this.surfFood.update(w, SURFACE, alpha, this.surfMap);
       this.surfDecor.update(w, this.foodView, (f) => edible(this.player, f));
       if (this.sim.kind === 'worker') {
