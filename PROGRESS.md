@@ -943,3 +943,12 @@ User spec: project doc `claude/combat/03-spec-anchor-and-flow-around.md`. Branch
 - **Performance** (idle machine; `main` measured the same day): `tools/climb-stress.ts -- 30 400` (400 v 400 and four full titans) 14.7 ms a tick (`main` 12.0; v2's 10.7 was on a quieter day), under the 15 ms target but closer to it; `tools/stress.ts -- 400 30 100` 13.6 ms (`main` 11.1), no tick over 50 ms. The cost is going round and the avoidance search; going round is only started toward a side with more free slots than teammates (half weight) already on the way.
 - **Tests.** `tests/combatV21.ts` (in `npm test`). Updated: the v2 blocked test (now: backs off and goes round); `tools/spinScenes.ts` counts a spin only when the turn is on the spot (a full turn in 3 s while walking less than a body length's circle; walking an arc round a fight is not a spin — under the old count going round a small foe read as spinning).
 - **Fixed on the way:** the job allocator drafted ants that were spraying, recovering or up on a creature into nest jobs.
+
+### 2026-10-31 (afternoon) — Atta jaws rebuilt and spines shortened (user: "make the spike thing on the attas smaller cos some of them have it too long"; "the attas mandibles dont look right, redo them and make them more accurate")
+- **Jaws**: a dedicated generator, `attaMandible` (`src/render/anatomy/mandibleSpecs.ts`), replaces the formicine
+  triangle bent into hooks. From the reference photos: broad flat red-brown blades hanging below the face, the external
+  margin evenly convex, a long straight masticatory margin with a saw of near-black teeth (minim 8, media and soldier
+  10, major 11), the blade darkening to black along it; closed, a V below the clypeus with the apical teeth crossing,
+  open two toothed blades. Numbers in `docs/creatures/atta-cephalotes.md` ("Mandibles").
+- **Spines**: every Atta caste's mesosoma and occipital spines about 40 % shorter (the media's had grown to .13 L).
+- Morph hashes: only `atta_*` changed (re-baselined). Photo-vs-render sheet sent to the user in chat (study only).

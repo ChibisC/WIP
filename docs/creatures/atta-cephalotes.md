@@ -61,10 +61,25 @@ smooth and shining, without A. sexdens's hexagonal microsculpture).
 | Major | 14 mm | .40 / .44 (6.2 mm: the key's 5.5–6.4) | huge heart, deep notch .30, two glossy lobes | .03, short and blunt | .08, set far forward | .07 / .06 / .06 | .22 | 1.0 |
 | Queen | 21 mm | .20 / .25 (5.2 mm) | heart, no occipital tooth | none | .2, ocelli | low: .03 / 0 / .03, a huge rounded mesosoma with wing scars | .48, huge, rounded | .7 |
 
-**Mandibles**: triangular blades, the masticatory margin with 7–8 teeth, the apical tooth long and hooked, the
-teeth darkening to near black. Media: like a broad formicine triangle but stronger and more curved. Soldier and
-major: thick, broad, strongly curved shears (photos: dark red-brown to near black, a row of ~8 black teeth along a
-long cutting edge, the closed pair crossing).
+**Mandibles** (rebuilt 2026-10-31 from the reference photos, the user: "the attas mandibles dont look right";
+`attaMandible` in `src/render/anatomy/mandibleSpecs.ts`): broad, flat triangular blades hanging down in front of the
+face, not hooks. The external margin evenly convex from the hinge at the head's front corner to a long curved apical
+tooth; the masticatory margin long and straight from the basal angle (u .24) to the apex, a saw of nearly even, sharp,
+near-black teeth (minim 8, media and soldier 10, major 11); the blade red-brown like the head, darkening to black
+along the toothed margin. Closed, the pair overlaps below the clypeus in a V, the apical teeth crossing; open, two
+toothed blades. Larger castes: broader, thicker, more steeply hanging blades.
+
+| Unit | Teeth | Blade width at the basal angle (of the length) | Thickness at the hinge | Hang (hinge / middle / apex, rad, on top of the head's tilt) | Heading (hinge → apex) |
+|---|---|---|---|---|---|
+| Minim | 8 | .36 | .14 | −.15 / −.35 / −.65 | .22 → 1.22 |
+| Media | 10 | .39 | .16 | −.25 / −.45 / −.80 | .20 → 1.25 |
+| Soldier | 10 | .39 | .17 | −.30 / −.50 / −.85 | .30 → 1.30 |
+| Major | 11 | .38 | .16 | −.30 / −.50 / −.82 | .42 → 1.37 |
+
+**Spines** (user, 2026-10-31: some were too long): about 40 % shorter than the geometry pass, as fractions of L —
+pronotal / mesonotal / second mesonotal / propodeal, occipital: minim .035 / .028 / – / .035, .035; media .075 / .05 /
+.025 / .06, .08; soldier .06 / .04 / .02 / .05, .045; major .055 / .04 / .018 / .045, .03 (the table above is the
+overnight pass's first estimate).
 
 **Colour and surface** (photo samples, approximate sRGB): media and soldier rusty orange-brown (#8a4424–#9a5030),
 matte and finely rough with tubercles and short hooked golden hairs; minim paler orange-tan (#b07040); major head

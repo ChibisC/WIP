@@ -1,4 +1,4 @@
-import type { MandibleSpec } from './mandible';
+import type { MandibleSpec, ToothSpec } from './mandible';
 
 /**
  * Mandible specs per species (jaws pass). The numbers come from each species' "Mandibles" section in
@@ -317,17 +317,85 @@ export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x5e3c
 export const FORMICA_WORKER = formicineMandible({ teeth: 8, color: { base: 0x5a2618, mid: 0x502214, tip: 0x2e140c, teeth: 0x100604, dark: [0.66, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.85, pitch: [-0.12, -0.3, -0.56], edgeDark: 0.65, roll: 0.6, heading: 0.6 });
 
 /**
- * (Atta review round 1: the jaws read as flat V plates — curved hooks with a dark toothed inner edge, a gap between
- * them when closed, as in the photos)
- * Leafcutter (Atta cephalotes), overnight pass: triangular blades with 6–8 teeth along a long masticatory margin,
- * the apical tooth long and hooked, the teeth near black (docs/creatures/atta-cephalotes.md). The minim's small and
- * fine; the media's the classic leaf-cutting scissors, curving in more than a formicine's; the soldier's and the
- * major's thick, broad, strongly curved shears, dark red-brown to near black.
+ * Leafcutter (Atta cephalotes) jaws, rebuilt from the reference photos (user, 2026-10-31: "the attas mandibles dont
+ * look right"). Not a formicine plate and not a hook: a broad, flat triangular blade hanging down in front of the
+ * face — the external margin evenly convex from the hinge at the head's front corner to a long, curved apical tooth;
+ * the masticatory margin long and straight from the basal angle (a quarter of the way along) to the apex, lined with
+ * a saw of `teeth` sharp, near-black teeth, nearly even in size, a little smaller toward the base. The blade is
+ * red-brown like the head and darkens to black along the toothed margin. Closed, the pair overlaps below the
+ * clypeus in a V, the saws crossing; open, two toothed blades hang apart. Larger castes: broader, thicker, more
+ * steeply hanging blades (docs/creatures/atta-cephalotes.md, "Mandibles").
  */
-export const ATTA_MINIM_JAW = formicineMandible({ teeth: 6, color: { base: 0x8a4a22, mid: 0x7e4220, tip: 0x3a1a0c, teeth: 0x1a0c06, dark: [0.72, 1.0] }, reach: 1.1, thick: 1.4, pitch: [-0.1, -0.24, -0.46], edgeDark: 0.55, roll: 0.4, heading: 0.55, curve: 1.25 });
-export const ATTA_MEDIA_JAW = formicineMandible({ teeth: 8, color: { base: 0x4a2010, mid: 0x3a180c, tip: 0x140806, teeth: 0x080404, dark: [0.55, 1.0] }, reach: 1.16, broad: 0.85, thick: 1.7, pitch: [-0.1, -0.25, -0.5], edgeDark: 0.85, roll: 0.45, heading: 0.36, curve: 1.9, toothK: 2.0 });
-export const ATTA_SOLDIER_JAW = formicineMandible({ teeth: 8, color: { base: 0x2e140a, mid: 0x221008, tip: 0x0e0604, teeth: 0x060303, dark: [0.5, 1.0] }, reach: 1.14, broad: 0.85, thick: 2.4, pitch: [-0.22, -0.42, -0.75], edgeDark: 0.8, roll: 0.4, heading: 0.36, curve: 2.1, toothK: 2.1 });
-export const ATTA_MAJOR_JAW = formicineMandible({ teeth: 8, color: { base: 0x4a1c0e, mid: 0x3a160a, tip: 0x140806, teeth: 0x0a0504, dark: [0.55, 1.0] }, reach: 1.12, broad: 0.72, thick: 2.2, pitch: [-0.35, -0.6, -0.95], edgeDark: 0.85, roll: 0.35, heading: 0.3, curve: 2.2, toothK: 2.2 });
+export function attaMandible(o: { teeth: number; color: MandibleSpec['color']; reach?: number; broad?: number; thick?: number; pitch: [number, number, number]; heading?: number; curve?: number; toothK?: number; roll?: number; edgeDark?: number }): MandibleSpec {
+  const teeth: ToothSpec[] = [];
+  const n = Math.max(2, o.teeth - 1);
+  const tk = o.toothK ?? 1;
+  // the apex is the apical tooth; the subapical tooth is the next largest, then an even saw down to the basal angle
+  for (let k = 0; k < n; k++) {
+    const f = k / (n - 1);
+    const u = 0.9 - 0.64 * f;
+    teeth.push({ u, size: (k === 0 ? 0.06 : 0.048 - 0.016 * f) * tk, base: 0.42 / n, lean: 0.4 - 0.15 * f });
+  }
+  const b = o.broad ?? 1;
+  const h = o.heading ?? 0.2;
+  const cv = o.curve ?? 1;
+  const th = o.thick ?? 1;
+  return {
+    ...FIRE_WORKER,
+    // the external margin evenly convex: the heading turns in steadily, faster toward the apical tooth
+    yaw: [
+      [0, h],
+      [0.3, h + 0.16 * cv],
+      [0.6, h + 0.4 * cv],
+      [0.85, h + 0.72 * cv],
+      [1, h + 1.0 * cv],
+    ],
+    // hinge, 0.55 along, apex: the blade hangs, curving down toward the point
+    pitch: [
+      [0, o.pitch[0]],
+      [0.55, o.pitch[1]],
+      [1, o.pitch[2]],
+    ],
+    outer: [
+      [0, 0.06],
+      [0.45, 0.075],
+      [0.85, 0.05],
+      [1, 0.014],
+    ],
+    // the basal margin (under the clypeus) to the basal angle at u 0.24, then the straight masticatory margin
+    inner: [
+      [0, 0.2 * b],
+      [0.24, 0.36 * b],
+      [0.6, 0.2 * b],
+      [1, 0.004],
+    ],
+    // a flat blade, thicker at the base
+    thick: [
+      [0, 0.13 * th],
+      [0.4, 0.085 * th],
+      [1, 0.04 * th],
+    ],
+    edgeIn: 1.2,
+    edgeOut: 2.4,
+    edgeMin: 0.14,
+    teeth,
+    color: o.color,
+    reach: o.reach ?? 1.14,
+    edgeDark: o.edgeDark ?? 0.85,
+    ...(o.roll ? { roll: [[0, o.roll * 0.5], [0.5, o.roll], [1, o.roll]] as [number, number][] } : {}),
+    nu: 140,
+    nv: 11,
+  };
+}
+
+/** Minim (garden worker): small, fine blades, orange-brown like the body, 8 teeth. */
+export const ATTA_MINIM_JAW = attaMandible({ teeth: 8, color: { base: 0x8a4a22, mid: 0x7a401c, tip: 0x2e1408, teeth: 0x140a04, dark: [0.7, 1.0] }, broad: 1.0, thick: 1.1, pitch: [-0.15, -0.35, -0.65], heading: 0.22, curve: 1.0, toothK: 0.9, reach: 1.12, edgeDark: 0.7 });
+/** Media (the leaf cutter): the classic toothed shears, red-brown with black saw edges, 10 teeth. */
+export const ATTA_MEDIA_JAW = attaMandible({ teeth: 10, color: { base: 0x5e2a14, mid: 0x50220f, tip: 0x1c0a05, teeth: 0x0a0504, dark: [0.62, 1.0] }, broad: 1.08, thick: 1.25, pitch: [-0.25, -0.45, -0.8], heading: 0.2, curve: 1.05, toothK: 1.1, reach: 1.16 });
+/** Soldier: heavier, darker blades hanging more steeply. */
+export const ATTA_SOLDIER_JAW = attaMandible({ teeth: 10, color: { base: 0x4a1c0e, mid: 0x3e170b, tip: 0x140705, teeth: 0x080403, dark: [0.58, 1.0] }, broad: 1.08, thick: 1.3, pitch: [-0.3, -0.5, -0.85], heading: 0.3, curve: 1.0, toothK: 1.15, reach: 1.16 });
+/** Major: massive broad blades, dark red-brown, hanging down in front of the huge head, 11 teeth. */
+export const ATTA_MAJOR_JAW = attaMandible({ teeth: 11, color: { base: 0x4e1e0e, mid: 0x40180b, tip: 0x160806, teeth: 0x0a0504, dark: [0.6, 1.0] }, broad: 1.05, thick: 1.2, pitch: [-0.3, -0.5, -0.82], heading: 0.42, curve: 0.95, toothK: 1.2, reach: 1.16 });
 
 /** Army ant worker (Eciton burchellii minor), overnight pass: short toothed clamps — a small triangle with 4–5 teeth, black. */
 export const ECITON_MINOR_JAW = formicineMandible({ teeth: 5, color: { base: 0x2a1a12, mid: 0x221610, tip: 0x120c0a, teeth: 0x080606, dark: [0.6, 1.0] }, reach: 1.12, thick: 1.6, pitch: [-0.08, -0.2, -0.4], edgeDark: 0.6, roll: 0.35, heading: 0.58, curve: 1.3, toothK: 1.2 });
