@@ -11,7 +11,7 @@ import { createSurfaceEnvironment } from '../render/environment';
 import { textures } from '../render/textures';
 import { globalUniforms } from '../render/shaderPatch';
 import { applyLabLight } from './labLight';
-import { blankView } from '../game/antViews';
+import { blankView, sprayPose } from '../game/antViews';
 import { CREATURES } from '../sim/creatures/kinds';
 import { STAG } from '../sim/balance';
 import type { Creature } from '../sim/types';
@@ -153,6 +153,50 @@ function clips(): Record<string, Clip> {
       dur: 5,
       ants: [{ script: pathWalker(0, 0, 0, [{ d: 0.5 }, { d: 1.2, turn: 2.6 }, { d: 0.5 }, { d: 1.2, turn: -2.6 }, { d: 1.6 }]) }],
       cam: { tx: 0, ty: 0.3, tz: 0, dir: [0.2, 1, 0.5], dist: 9, fov: 30 },
+    },
+    // (overnight spec 3.3) the three Formica sprayers side by side, as game/antViews.ts sprayPose: a plain worker
+    // (bite, then spray: wind-up 0.45 s), the Mortar (lob: a long wind-up, a rear and a big recoil every 2.4 s) and the
+    // Rapid Sprayer (short spurts every 0.45 s)
+    spray: {
+      dur: 7,
+      ants: (
+        [
+          ['formica_worker', 'jet', 1.8, -11],
+          ['formica_mortar', 'lob', 2.4, 0],
+          ['formica_rapid', 'rapid', 0.45, 11],
+        ] as const
+      ).map(([morph, kind, period, x]) => ({
+        morph,
+        script: ((t: number, v: AntView) => {
+          v.x = x;
+          v.y = 0;
+          v.heading = 0;
+          v.antennaActivity = 0.8;
+          v.gaster = 0.2;
+          v.pitch = 0;
+          v.lift = 0;
+          if (t < 0.6) return;
+          const st = (t - 0.6) % period;
+          if (st < (kind === 'rapid' ? 0.1 : kind === 'lob' ? 0.85 : 0.9)) sprayPose(v, kind === 'jet' ? undefined : kind, st, MORPHS[morph].L);
+        }) as AntScript,
+      })),
+      cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.12, 0.3, 1], dist: 16, fov: 30 },
+    },
+    // (overnight spec 3.4) trophallaxis: two workers face to face, mouthparts touching, as antViews' Troph pose
+    troph: {
+      dur: 6,
+      ants: [0, 1].map((i) => ({
+        script: ((t: number, v: AntView) => {
+          v.x = i ? 1.27 : -1.27;
+          v.y = 0;
+          v.heading = i ? Math.PI : 0;
+          v.mandible = 0.55;
+          v.headPitch = 0.1 + Math.sin(t * 3.1 + i) * 0.05;
+          v.antennaPitch = 0.25;
+          v.antennaActivity = 1;
+        }) as AntScript,
+      })),
+      cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.1, 0.45, 1], dist: 7, fov: 30 },
     },
     // a hundred workers idling side by side
     idle100: {

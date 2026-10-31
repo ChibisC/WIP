@@ -574,12 +574,15 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         // worker profile: propodeum hump, metanotal groove, mesonotum, pronotum
         // `meso.smooth` (Saiy-Ants, Camponotus-like): one even arch, no metanotal groove or mesonotal bump
         const sm = (m.meso as { smooth?: boolean }).smooth ? 0 : 1;
-        const prop = 0.62 * ss(0.0, 0.2, t);
-        const groove = -0.16 * sm * Math.exp(-((t - 0.32) ** 2) / 0.003);
+        // (rollout: the groove's depth and the propodeum's height per species — Formica's mesonotal groove deep and
+        // its propodeum strongly convex, Lasius's metanotal groove deep: the user's photos)
+        const mx = m.meso as { groove?: number; prop?: number; pinch?: number };
+        const prop = (mx.prop ?? 0.62) * ss(0.0, 0.2, t);
+        const groove = -(mx.groove ?? 0.16) * sm * Math.exp(-((t - 0.32) ** 2) / 0.003);
         const meso = 0.12 * sm * Math.exp(-((t - 0.48) ** 2) / 0.01);
         const pro = 0.36 * ss(0.4, 0.72, t) - 0.48 * ss(0.86, 1.0, t);
         top = 0.38 + prop + groove + meso + pro;
-        wid = 0.62 + 0.38 * Math.exp(-((t - 0.78) ** 2) / 0.03) - 0.12 * Math.exp(-((t - 0.32) ** 2) / 0.01) - 0.35 * ss(0.9, 1.0, t);
+        wid = 0.62 + 0.38 * Math.exp(-((t - 0.78) ** 2) / 0.03) - (mx.pinch ?? 0.12) * Math.exp(-((t - 0.32) ** 2) / 0.01) - 0.35 * ss(0.9, 1.0, t);
       }
       const close = Math.pow(Math.min(1, t / 0.06), 0.5) * Math.pow(Math.min(1, (1 - t) / 0.05), 0.5);
       const height = mH * top * Math.max(0.12, close);
@@ -688,7 +691,12 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const headCol = grad(look.head, (x, y, z) => {
       // (rollout, AntWiki F. rufa: the clypeus, genae, the sides behind the eyes and the underside red; the frons and
       // vertex dark brown to black, the red grading into the dark without a sharp border)
-      if (m.key.startsWith('formica') || m.key.startsWith('plagiaria')) return (m.real ? ss(0.5, 0.97, x / hL) * 0.85 + ss(0.32, 0.47, Math.abs(z) / hW) * 0.55 : ss(0.15, 0.95, x / hL) * 0.6) + ss(0.05, -0.4, (y - headCY) / hH) * 0.7;
+      // (the user's photos, full face: the frons and vertex dark down to the antennal sockets; red below them — the
+      // genae and the clypeus' sides — and on the sides behind the eyes)
+      if (m.key.startsWith('formica') || m.key.startsWith('plagiaria'))
+        return m.real
+          ? ss(0.12, -0.18, (y - headCY) / hH) * ss(0.35, 0.75, x / hL) * 0.9 + ss(0.34, 0.47, Math.abs(z) / hW) * ss(0.45, 0.05, (y - headCY) / hH) * 0.7 + ss(0.05, -0.4, (y - headCY) / hH) * 0.5
+          : ss(0.15, 0.95, x / hL) * 0.6 + ss(0.05, -0.4, (y - headCY) / hH) * 0.7;
       if (m.head.frontMix !== undefined) return (m.real ? Math.min(1, ss(0.3, 0.86, x / hL) + 0.35 * ss(0.5, 0.95, x / hL) * ss(0.05, -0.35, (y - headCY) / hH)) : ss(0.55, 1.0, x / hL)) * m.head.frontMix; // (realism: the face darkens gradually into the jaws, the lower front most)
       return ss(0.5, 1.0, x / hL) * 0.5;
     });
@@ -753,14 +761,18 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const smoothEye = !!(m.eyes as { smooth?: boolean }).smooth;
     const eyeZ = (hW / 2) * headWidthAt(eyeT) * 0.93 * (smoothEye ? 0.9 : 1);
     if (!m.eyes.none) for (const s of [-1, 1]) {
-      const c = new THREE.Vector3(eyeT * hL, headCY + (hH / 2) * m.eyes.height, s * eyeZ);
+      // (rollout, the user's photos: the eye sits in the head's outline, only its low dome standing proud — set the
+      // larger eyes of the realism morphs in by part of their depth)
+      const inset = m.real ? eyeR * Math.max(0, (m.eyes.size - 0.15) * 1.6) : 0;
+      const c = new THREE.Vector3(eyeT * hL, headCY + (hH / 2) * m.eyes.height, s * (eyeZ - inset));
       // (rollout, user note: the eyes bulged out too much — an ant's eye is a low dome on the head's side; the bigger
       // the eye, the flatter: the fire ant's small eye keeps its 0.78, a Formica's large one sits nearly flush)
       const bulge = m.real ? Math.min(0.78, Math.max(0.36, 0.78 - (m.eyes.size - 0.15) * 3.2)) : 0.6;
       const r = m.eyes.single ? new THREE.Vector3(eyeR, eyeR, eyeR * 0.8) : new THREE.Vector3(eyeR * (m.eyes.oval ?? 1.15), eyeR * 0.95, eyeR * bulge);
       const [pp, ii] = ellipsoid(c, r, hi ? (m.real ? 24 : 18) : 8);
       // realism v2: a bulging, glossy dome (the facets too fine to read except as a faint grain)
-      const eyeLook: PartLook = smoothEye ? { color: 0, rough: 0.12, coat: 1, sheen: 0 } : m.real ? { color: 0x0b0806, rough: 0.16, coat: 0.7, sheen: 0 } : { color: 0x0b0806, rough: 0.32, coat: 0.15, sheen: 0 };
+      // (rollout, the user's photos: the formicines' larger eyes are a satin grey-black, not glass beads)
+      const eyeLook: PartLook = smoothEye ? { color: 0, rough: 0.12, coat: 1, sheen: 0 } : m.real ? (m.eyes.size > 0.18 && /^(lasius|formica|plagiaria)/.test(m.key) ? { color: 0x15120f, rough: 0.3, coat: 0.35, sheen: 0.1 } : { color: 0x0b0806, rough: 0.16, coat: 0.7, sheen: 0 }) : { color: 0x0b0806, rough: 0.32, coat: 0.15, sheen: 0 };
       acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(smoothEye ? 0x161c1a : m.eyes.single ? 0x2a1a10 : 0x0d0a08), eyeLook, smoothEye ? 3 : m.eyes.single ? 0 : 1);
     }
     if (m.eyes.ocelli && hi) {
@@ -770,7 +782,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         [0.24, 0.07],
       ]) {
         const c = new THREE.Vector3(hL * ox, headCY + hH * 0.47, hW * oz);
-        const [pp, ii] = ellipsoid(c, new THREE.Vector3(0.012 * Lm, 0.008 * Lm, 0.012 * Lm), 8);
+        // (rollout, the user's photos: the ocelli are tiny glints set into the vertex, not beads on it)
+        const [pp, ii] = ellipsoid(m.real ? c.clone().setY(c.y - 0.002 * Lm) : c, m.real ? new THREE.Vector3(0.0065 * Lm, 0.0035 * Lm, 0.0065 * Lm) : new THREE.Vector3(0.012 * Lm, 0.008 * Lm, 0.012 * Lm), 8);
         acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(0x120c08), { color: 0, rough: 0.1, coat: 1, sheen: 0 });
       }
     }
@@ -953,6 +966,18 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const scMid = sock.clone().lerp(elbow, 0.5).add(new THREE.Vector3(0, scapeLen * 0.04, 0));
     const [p1, i1, m1] = tube([sock, scMid, elbow], [antThick * 0.8, antThick * 0.95, antThick * 1.15], hi ? 7 : 5, true, true);
     acc.piece(p1, i1, s < 0 ? PART.SCAPE_L : PART.SCAPE_R, grad(look.antenna, () => 0), look.antenna, 0, undefined, detOf(m1, REGION.ANTENNA));
+    // (overnight spec 3.4: erect hairs standing out of the scapes are L. niger's field mark — L. platythorax has
+    // few or none)
+    if (hi && m.real && m.key.startsWith('lasius')) {
+      const hc = new THREE.Color(m.setae?.color ?? 0x8a7c6c);
+      const side1 = new THREE.Vector3().crossVectors(scDir, new THREE.Vector3(0, 1, 0)).normalize();
+      for (let k = 0; k < 9; k++) {
+        const t = 0.12 + (k / 8) * 0.8;
+        const ang = rng.range(-0.3, Math.PI + 0.3);
+        const out = side1.clone().multiplyScalar(Math.cos(ang)).add(new THREE.Vector3(0, Math.sin(ang), 0)).normalize();
+        seta(acc, rng, sock.clone().lerp(elbow, t).addScaledVector(out, antThick * 0.45), out, setaLen(rng, [0.012, 0.03], Lm), Lm, s < 0 ? PART.SCAPE_L : PART.SCAPE_R, hc, undefined, scDir);
+      }
+    }
     // funiculus
     const fDir = m.real ? new THREE.Vector3(0.8, -0.45, -0.2 * s).normalize() : new THREE.Vector3(0.86, -0.36, 0.3 * s).normalize();
     const nseg = m.antenna.segments - 1;
@@ -1128,12 +1153,21 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       acc.piece(pp, ii, PART.GASTER, () => tmpC.setHex(0x3a2210), { color: 0, rough: 0.3, coat: 0.5, sheen: 0 }, 2);
     } else if (hi) {
       // acidopore: ring of short hairs (coronula) around a round opening
-      for (let k = 0; k < 10; k++) {
-        const a = (k / 10) * Math.PI * 2;
-        const base = gasterTip.clone().add(new THREE.Vector3(0.008 * Lm, Math.sin(a) * 0.015 * Lm, Math.cos(a) * 0.015 * Lm));
-        const tip = base.clone().add(new THREE.Vector3(-0.025 * Lm, Math.sin(a) * 0.012 * Lm, Math.cos(a) * 0.012 * Lm));
+      const pk = m.gaster.pore ?? 1;
+      const nH = Math.round(10 * Math.min(1.6, pk));
+      for (let k = 0; k < nH; k++) {
+        const a = (k / nH) * Math.PI * 2;
+        const base = gasterTip.clone().add(new THREE.Vector3(0.008 * Lm, Math.sin(a) * 0.015 * Lm * pk, Math.cos(a) * 0.015 * Lm * pk));
+        const tip = base.clone().add(new THREE.Vector3(-0.025 * Lm * Math.sqrt(pk), Math.sin(a) * 0.012 * Lm * pk, Math.cos(a) * 0.012 * Lm * pk));
         const [pp, ii] = tube([base, tip], [0.003 * Lm, 0.0006 * Lm], 3, false, true);
         acc.piece(pp, ii, PART.GASTER, () => tmpC.setHex(0x8a7050), { color: 0, rough: 0.6, coat: 0, sheen: 0 });
+      }
+      if (pk > 1) {
+        // the nozzle itself: a dark round opening in a pale, slightly raised rim
+        const [pr, ir] = ellipsoid(gasterTip.clone().add(new THREE.Vector3(-0.004 * Lm, 0, 0)), new THREE.Vector3(0.008 * Lm, 0.011 * Lm * pk, 0.011 * Lm * pk), 10);
+        acc.piece(pr, ir, PART.GASTER, () => tmpC.setHex(0x6a5038), { color: 0, rough: 0.35, coat: 0.4, sheen: 0 });
+        const [ph, ih] = ellipsoid(gasterTip.clone().add(new THREE.Vector3(-0.0075 * Lm, 0, 0)), new THREE.Vector3(0.005 * Lm, 0.006 * Lm * pk, 0.006 * Lm * pk), 8);
+        acc.piece(ph, ih, PART.GASTER, () => tmpC.setHex(0x120a06), { color: 0, rough: 0.5, coat: 0.2, sheen: 0 });
       }
     }
     // Erect setae on the gaster and head (LOD0)
@@ -1336,7 +1370,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       const hc = new THREE.Color(m.setae?.color ?? 0x7a6448);
       const segs: Array<[THREE.Vector3, THREE.Vector3, number, number]> = [
         [trEnd, knee, pid, 5],
-        [knee, ankle, pid + 1, 6],
+        // (overnight spec 3.4: L. niger's tibiae bristle with erect hairs — a field mark)
+        [knee, ankle, pid + 1, m.key.startsWith('lasius') ? 11 : 6],
       ];
       for (const [a0, a1, prt, cnt] of segs) {
         const dl = a1.clone().sub(a0).normalize();

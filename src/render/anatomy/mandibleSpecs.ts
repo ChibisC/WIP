@@ -252,25 +252,62 @@ export const stagMandibleShare = (size: number): number => 0.075 + 0.265 * Math.
  * apex) down to the basal angle, larger and smaller alternating and shrinking toward the base (Formicinae: 7–9
  * teeth), and the species' colours.
  */
-export function formicineMandible(o: { teeth: number; color: MandibleSpec['color']; reach?: number; broad?: number }): MandibleSpec {
+export function formicineMandible(o: { teeth: number; color: MandibleSpec['color']; reach?: number; broad?: number; thick?: number; pitch?: [number, number] | [number, number, number]; edgeDark?: number; heading?: number; roll?: number }): MandibleSpec {
   const n = Math.max(1, o.teeth - 1);
   const teeth = [];
   for (let k = 0; k < n; k++) {
     const f = k / Math.max(1, n - 1);
-    // from just behind the apex (u 0.9) to the basal angle (u 0.5)
-    teeth.push({ u: 0.9 - 0.4 * f, size: (0.034 - 0.014 * f) * (k % 2 ? 0.75 : 1), base: 0.042, lean: 0.32 - 0.1 * f });
+    // from just behind the apex (u 0.92) to the basal angle (u 0.4)
+    teeth.push({ u: 0.92 - 0.52 * f, size: (0.036 - 0.014 * f) * (k % 2 ? 0.75 : 1), base: 0.045, lean: 0.32 - 0.1 * f });
   }
   const b = o.broad ?? 1;
+  const h = o.heading ?? 0.68;
   return {
     ...FIRE_WORKER,
-    inner: FIRE_WORKER.inner.map(([u, v]) => [u, v * b] as [number, number]),
+    // (user note: real formicine jaws are triangles, not crescents) — the external margin nearly straight from
+    // the hinge, set well inward, turning in only over the last fifth to the apical tooth; the masticatory
+    // margin a straight toothed line from the apex back to a broad basal angle (u 0.3, 0.46 of the length
+    // across): a flat triangular plate. Closed, the pair is a blunt arrowhead in front of the clypeus, the
+    // apical teeth crossing; open, two toothed triangles (docs/realism/jaws.md)
+    yaw: [
+      [0, h],
+      [0.5, h + 0.1],
+      [0.8, h + 0.27],
+      [0.94, h + 0.52],
+      [1, h + 0.77],
+    ],
+    outer: [
+      [0, 0.05],
+      [0.6, 0.05],
+      [1, 0.015],
+    ],
+    inner: [
+      [0, 0.2 * b],
+      [0.3, 0.46 * b],
+      [1, 0.004],
+    ],
     teeth,
     color: o.color,
-    reach: o.reach ?? 1.12,
+    reach: o.reach ?? 1.1,
+    ...(o.thick ? { thick: FIRE_WORKER.thick.map(([u, v]) => [u, v * o.thick!] as [number, number]) } : {}),
+    // three values: hinge, 0.6 along, apex — the blade hooks down toward the point (a beak from the side)
+    ...(o.pitch ? { pitch: (o.pitch.length === 3 ? [[0, o.pitch[0]], [0.6, o.pitch[1]], [1, o.pitch[2]]] : [[0, o.pitch[0]], [1, o.pitch[1]]]) as [number, number][] } : {}),
+    ...(o.edgeDark !== undefined ? { edgeDark: o.edgeDark } : {}),
+    // (the user's photos: open, seen from the side, the jaw is a big triangle, its teeth along the lower front
+    // edge — the blade is tilted, the toothed margin below the external one)
+    ...(o.roll ? { roll: [[0, o.roll * 0.6], [0.5, o.roll], [1, o.roll]] as [number, number][] } : {}),
   };
 }
 
 /** Black garden ant (Lasius niger): dark brown jaws, a little paler and redder along the masticatory margin, the teeth black (docs/creatures/lasius-niger.md). */
-export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x3a2618, mid: 0x4a2e1a, tip: 0x241610, teeth: 0x0c0806, dark: [0.78, 1.0] } });
+// (the user's photos: the jaws orange-brown, paler than the head, darkening at the teeth)
+// (closed, the formicine jaws overlap well past the midline, the apical teeth crossing: larger blades than the fire
+// ant's — the photos)
+// (user note: they didn't look like the photos — closed, Lasius jaws are a broad, thick, rounded muzzle in front of the
+// head, curving down like a beak, orange-brown and paler than the head, only the cutting edge darker)
+export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x7a4a24, mid: 0x8a5428, tip: 0x6a3a1c, teeth: 0x2a1408, dark: [0.86, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.9, pitch: [-0.1, -0.26, -0.5], edgeDark: 0.45, roll: 0.55 });
 /** Red wood ant (Formica rufa): reddish-brown jaws darkening to black at the teeth (docs/creatures/formica-rufa.md). */
-export const FORMICA_WORKER = formicineMandible({ teeth: 8, color: { base: 0x7a3a1c, mid: 0x6a3018, tip: 0x2a140a, teeth: 0x0e0705, dark: [0.72, 1.0] }, broad: 1.05 });
+// (the user's photos: red-orange jaws, near black at the teeth)
+// (user note and photos: closed, a pointed beak projecting forward and down from the head, red-orange and paler than
+// the face; open, two big curved red blades with dark tips and teeth)
+export const FORMICA_WORKER = formicineMandible({ teeth: 8, color: { base: 0xa04a20, mid: 0x9a4220, tip: 0x5a2410, teeth: 0x1a0a06, dark: [0.8, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.85, pitch: [-0.12, -0.3, -0.56], edgeDark: 0.6, roll: 0.6 });

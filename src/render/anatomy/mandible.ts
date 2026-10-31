@@ -85,6 +85,9 @@ export interface MandibleSpec {
   yaw: Curve;
   /** elevation of the centreline (rad, + up) */
   pitch: Curve;
+  /** twist of the blade about the centreline (rad, + the inner margin down; default none) — a formicine's
+   * toothed margin sits lower than its external margin, so the open jaw shows its flat face from the side */
+  roll?: Curve;
   /** top-view outline: distance from the centreline to the outer and to the inner margin (fractions of len) */
   outer: Curve;
   inner: Curve;
@@ -137,7 +140,7 @@ interface Frame {
 const TABLE = 200;
 
 /** The centreline: positions and frames at TABLE + 1 even steps of u (unit length; scale by len). */
-function centreline(yaw: Curve, pitch: Curve, side: number): Frame[] {
+function centreline(yaw: Curve, pitch: Curve, side: number, roll?: Curve): Frame[] {
   const out: Frame[] = [];
   const p = new THREE.Vector3();
   for (let i = 0; i <= TABLE; i++) {
@@ -147,6 +150,12 @@ function centreline(yaw: Curve, pitch: Curve, side: number): Frame[] {
     const T = new THREE.Vector3(Math.cos(pt) * Math.cos(y), Math.sin(pt), -side * Math.cos(pt) * Math.sin(y));
     const In = new THREE.Vector3(-Math.sin(y), 0, -side * Math.cos(y));
     const Up = new THREE.Vector3().crossVectors(T, In).multiplyScalar(side).normalize();
+    if (roll) {
+      const r = curveAt(roll, u);
+      const In0 = In.clone();
+      In.multiplyScalar(Math.cos(r)).addScaledVector(Up, -Math.sin(r));
+      Up.multiplyScalar(Math.cos(r)).addScaledVector(In0, Math.sin(r));
+    }
     out.push({ p: p.clone(), T, In, Up });
     // integrate with the mid-step heading (one step ahead)
     const um = (i + 0.5) / TABLE;
@@ -345,7 +354,7 @@ export function buildMandible(spec: MandibleSpec, side: 1 | -1): MandibleMesh {
   const len = spec.len;
   const nu = spec.nu ?? 40;
   const nv = spec.nv ?? 9;
-  const tab = centreline(spec.yaw, spec.pitch, side);
+  const tab = centreline(spec.yaw, spec.pitch, side, spec.roll);
   // samples along: even, plus every tooth's point and base ends (so the points are sharp)
   const set: number[] = [];
   for (let i = 0; i <= nu; i++) set.push(i / nu);

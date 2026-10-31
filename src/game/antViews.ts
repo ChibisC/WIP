@@ -204,10 +204,7 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
       out.headPitch = -0.15;
       break;
     case AS.Spray:
-      out.gaster = -2.1; // gaster curled forward between the legs
-      out.mandible = 0.6;
-      out.pitch = -0.12;
-      out.antennaPitch = 0.4;
+      sprayPose(out, cd.acid?.kind, a.st, cd.length);
       break;
     case AS.Dig:
       out.mandible = 0.4 + Math.max(0, Math.sin(w.time * 16 + a.id)) * 0.55;
@@ -220,8 +217,11 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
       out.headPitch = -0.3;
       break;
     case AS.Troph:
+      // (overnight spec 3.4) face to face, mouthparts touching: the jaws parted, the head nodding gently as
+      // the drop passes, antennae stroking the partner's head
       out.mandible = 0.55;
-      out.headPitch = 0.1;
+      out.headPitch = 0.1 + Math.sin(w.time * 3.1 + a.id) * 0.05;
+      out.antennaPitch = 0.25;
       out.antennaActivity = 1;
       break;
     case AS.FeedLarva:
@@ -229,8 +229,10 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
       out.headPitch = -0.35;
       break;
     case AS.TendAphids:
-      out.antennaPitch = 0.1;
+      // (overnight spec 3.4) drumming on the aphid with the antennae (fast: see armyAnt's waveMul), head low
+      out.antennaPitch = -0.35;
       out.antennaActivity = 1;
+      out.headPitch = -0.2;
       break;
   }
   if (out.carrying) out.mandible = Math.max(out.mandible, 0.35);
@@ -271,8 +273,28 @@ function termantLook(w: World, a: Ant, out: AntView): void {
  * `queenSwell`: no phase cycle); a porter's load under the body (porter pose); a Soldier at its trail post rears up
  * with the mandibles open (guard pose); bridge links and pothole plugs.
  */
+/**
+ * Spraying formic acid (render only, from the sim's state time `st`): the gaster curls forward between the legs.
+ * (overnight spec 3.3) It curls through the wind-up (combat.ts sprayUpdate's `wind`, by kind) and kicks back at the
+ * shot: the Mortar rears and its legs soak up a big recoil after the lob; the Rapid Sprayer's spurts are quick small
+ * pulses. Shared with the animation lab's `spray` clip.
+ */
+export function sprayPose(out: Pick<AntView, 'gaster' | 'pitch' | 'lift' | 'mandible' | 'antennaPitch'>, kind: string | undefined, st: number, len: number): void {
+  const wind = kind === 'rapid' ? 0.05 : kind === 'lob' ? 0.5 : 0.45;
+  const c = Math.min(1, st / wind);
+  const curl = c * c * (3 - 2 * c);
+  const after = st - wind;
+  const kick = after > 0 ? Math.exp(-after * (kind === 'rapid' ? 40 : 9)) * Math.min(1, after * 60) : 0;
+  out.gaster = -0.9 - 1.2 * curl + kick * (kind === 'lob' ? 0.55 : 0.25);
+  out.pitch = -0.12 + (kind === 'lob' ? 0.16 : 0.06) * curl + kick * (kind === 'lob' ? 0.14 : 0.04);
+  out.lift = Math.max(out.lift, kick * len * (kind === 'lob' ? 0.03 : 0.01));
+  out.mandible = 0.6;
+  out.antennaPitch = 0.4;
+}
+
 function armyAnt(w: World, a: Ant, out: AntView): void {
-  out.waveMul = undefined;
+  // (overnight spec 3.4: the antennae drum on the aphid — fast)
+  out.waveMul = a.state === AS.TendAphids ? 2.6 : undefined;
   out.carryUnder = undefined;
   const cd = casteOf(a.caste);
   if (cd.species !== 'eciton') return;
