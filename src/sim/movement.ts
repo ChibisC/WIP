@@ -1,3 +1,4 @@
+import { antClear, antNeed } from './underpass';
 import { World } from './world';
 import { Ant, AS, Carry, Colony, Entrance, SURFACE, nestSpace, colonyOfSpace } from './types';
 import { canEnter, canLeave, passEntrance, usableMask } from './entrances';
@@ -161,6 +162,13 @@ export function avoidHeading(w: World, a: Ant, want: number, look: number, fight
   AV.ay = a.y;
   AV.a = a;
   AV.fighters = fightersOnly;
+  // (combat v2.2: teammates it can pass under, or that can pass under it, are not in its way — only their feet are)
+  AV.up = BALANCE.underpass.allies;
+  if (AV.up) {
+    AV.need = antNeed(a);
+    antClear(a, AVC);
+    AV.cmax = Math.max(AVC[0], AVC[1], AVC[2]);
+  }
   AV.best = Infinity;
   AV.side = 0;
   AV.odd = (a.id & 1) === 1;
@@ -170,6 +178,10 @@ export function avoidHeading(w: World, a: Ant, want: number, look: number, fight
 function avoidCb(g: Ant, d2: number): boolean {
   if (g === AV.a || (g.team ?? g.colony) !== AV.team || g.state === AS.Dead || g.state === AS.Flung || (g.ridePh ?? 0) >= 1 || d2 >= AV.best) return false;
   if (AV.fighters && g.state !== AS.Attack && g.state !== AS.Grapple && g.state !== AS.Spray) return false;
+  if (AV.up) {
+    antClear(g, AVC);
+    if (AV.need <= Math.max(AVC[0], AVC[1], AVC[2]) || antNeed(g) <= AV.cmax) return false;
+  }
   const gx = g.x - AV.ax;
   const gy = g.y - AV.ay;
   const fwd = gx * AV.cw + gy * AV.sw;
@@ -192,7 +204,8 @@ function bodyRadius(caste: string): number {
   return r;
 }
 const radiusOf = new Map<string, number>(); // det-ok: cache of static caste data
-const AV = { best: 0, side: 0, cone: NaN, tan: 0, team: 0, ra: 0, cw: 0, sw: 0, ax: 0, ay: 0, a: null as unknown as Ant, fighters: false, odd: false }; // det-ok: scratch for avoidHeading's callback
+const AV = { best: 0, side: 0, cone: NaN, tan: 0, team: 0, ra: 0, cw: 0, sw: 0, ax: 0, ay: 0, a: null as unknown as Ant, fighters: false, odd: false, up: false, need: 0, cmax: 0 }; // det-ok: scratch for avoidHeading's callback
+const AVC = [0, 0, 0]; // det-ok: scratch
 
 /**
  * Steer to a point like steerTo, but round teammates in the way instead of into them (avoidHeading, looking

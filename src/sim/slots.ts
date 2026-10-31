@@ -1,3 +1,4 @@
+import { antClear, antFitsUnderCreature, antFitsUnderCreatureAt, antHeights, antNeed, stackCap, zoneAt } from './underpass';
 import { World } from './world';
 import { Ant, AS, Creature } from './types';
 import { casteOf } from './species';
@@ -172,10 +173,13 @@ export function mutualHold(La: number, Lo: number): number {
   return (La + Lo) * (C2.frontHalf - C2.jawOverlap / 2);
 }
 
-/** Can ant `a` walk (and fight) under creature `cr`? (its height is below the creature's underside) */
+/**
+ * Can ant `a` walk (and fight) under creature `cr`? Its height (with the margin) is below the clearance under some part
+ * of the creature's body — combat v2.2: both from the models (sim/underpass.ts); the under ring's slots are only where
+ * it fits (reserveCreatureSlot).
+ */
 export function fitsUnder(a: Ant, cr: Creature): boolean {
-  const k = C2.clearance[cr.kind] ?? 0;
-  return k > 0 && casteOf(a.caste).length * C2.antHeight < k * cr.scale;
+  return antFitsUnderCreature(a, cr);
 }
 
 /** The offset (mm, negative: inside) of a creature slot's ring for an attacker of length La: u ≥ 1 is under the body. */
@@ -245,7 +249,8 @@ function antHeld(w: World, o: Ant): Held {
   if (fresh) {
     w.antsNear(o.space, o.x, o.y, casteOf(o.caste).length * 1.5 + 16, (g) => {
       if ((g.state === AS.Grapple && g.gKind === 3 && g.gId === o.id) || (g.state === AS.Attack && (g.rsv ?? 0) === o.id && g.tgt === o.id && g.tk === 3)) {
-        e.v.push(g.gSlot);
+        // (a place under the foe's body, combat v2.2: its angle + UNDER)
+        e.v.push(g.gSlot + ((g.gUn ?? 0) > 0 ? UNDER : 0));
         e.ids.push(g.id);
       }
       return false;
@@ -283,6 +288,110 @@ function sector(ang: number, n: number): number {
   return Math.min(n - 1, Math.floor(f * n));
 }
 
+// ---------------------------------------------------------------- combat v2.2: sharing a tall teammate's slot
+
+const SH = [0, 0, 0]; // det-ok: scratch
+const SHP = { x: 0, y: 0 }; // det-ok: scratch
+/**
+ * Two-layer slots (combat v2.2, CHANGE_PLAN §20): may attacker `a` stand at (x, y) under teammate `id` (holding or
+ * reserving a slot on the same target), between its legs — `a` fits under the zone of its body over that point, in its
+ * pose, and the point is under its body? Then that teammate's slot is not taken for `a` (one sharer per slot).
+ */
+export function canShare(w: World, a: Ant, id: number, x: number, y: number): boolean {
+  if (!BALANCE.underpass.allies) return false;
+  const b = w.antById.get(id);
+  if (!b || b === a || (b.team ?? b.colony) !== (a.team ?? a.colony) || b.state === AS.Dead) return false;
+  const need = antNeed(a);
+  antClear(b, SH, (b.fhd ?? 0) > 0);
+  if (need > Math.max(SH[0], SH[1], SH[2])) return false;
+  const d = antHeights(b.caste);
+  const Lb = casteOf(b.caste).length;
+  if (need > SH[zoneAt(d, Lb, b.x, b.y, b.h, x, y)]) return false;
+  const ly = -(x - b.x) * dsin(b.h) + (y - b.y) * dcos(b.h);
+  return Math.abs(ly) <= d.hw * Lb;
+}
+
+/** Sector occupancy for attacker `a` on ant `o` (n sectors): a bit per sector it may not take (two-layer: a sector held by
+ * one teammate it can stand under is free to it). */
+const secN: number[] = []; // det-ok: scratch
+const secId: number[] = []; // det-ok: scratch
+function antTaken(w: World, a: Ant, o: Ant, e: Held, n: number, share = true): number {
+  for (let k = 0; k < n; k++) {
+    secN[k] = 0;
+    secId[k] = 0;
+  }
+  for (let i = 0; i < e.ids.length; i++) {
+    if (e.ids[i] === a.id || e.v[i] >= UNDER) continue;
+    const k = sector(e.v[i], n);
+    secN[k]++;
+    secId[k] = e.ids[i];
+  }
+  let taken = 0;
+  for (let k = 0; k < n; k++) {
+    if (!secN[k]) continue;
+    if (secN[k] === 1 && share) {
+      antHoldPoint(a, o, ((k + 0.5) / n) * TAU, SHP);
+      if (canShare(w, a, secId[k], SHP.x, SHP.y)) continue;
+    }
+    taken |= 1 << k;
+  }
+  return taken;
+}
+
+/** Is there a sector attacker `a` could take on ant `o` (its own, a free one, one it can share under a teammate, or one
+ * under `o` itself)? */
+export function antHasRoom(w: World, a: Ant, o: Ant, isQueen: boolean): boolean {
+  if (holdsSlotOn(a, o.id, 3)) return true;
+  const n = antSlotCount(o, casteOf(a.caste).length, isQueen);
+  const e = antHeld(w, o);
+  // (as before: fewer holding or closing in on it than it has slots — every entry this tick counted, as antSlotsTaken)
+  let ground = 0;
+  for (let i = 0; i < e.ids.length; i++) if (e.v[i] < UNDER) ground++;
+  if (ground < n) return true;
+  // full: a slot it can share under a teammate, or a place under the foe (combat v2.2)
+  if ((antTaken(w, a, o, e, n, false) & ~antTaken(w, a, o, e, n, true)) !== 0) return true;
+  return !Number.isNaN(underSector(w, a, o, e));
+}
+
+// ---------------------------------------------------------------- combat v2.2: from beneath a tall enemy ant
+
+/** Held values of slots under an ant foe's body: the world angle + UNDER. */
+const UNDER = 100;
+const UP2 = { x: 0, y: 0 }; // det-ok: scratch
+const UNDER_DIRS = [Math.PI / 2, -Math.PI / 2, Math.PI / 4, -Math.PI / 4, (3 * Math.PI) / 4, (-3 * Math.PI) / 4, 0, Math.PI];
+
+/** Where attacker `a` stands under ant foe `o` at world angle `ang`: inside its outline, half its half-width out. */
+export function antUnderPoint(o: Ant, ang: number, out: { x: number; y: number }): void {
+  const r = antHeights(o.caste).hw * casteOf(o.caste).length * 0.5;
+  out.x = o.x + dcos(ang) * r;
+  out.y = o.y + dsin(ang) * r;
+}
+
+/**
+ * A free place for `a` under ant foe `o` (enemies under-pass on, `a` short enough for the zone over the place), at most
+ * stackCap of them, its sides first: the world angle, or NaN.
+ */
+function underSector(w: World, a: Ant, o: Ant, e: Held): number {
+  if (!BALANCE.underpass.enemies || (o.team ?? o.colony) === (a.team ?? a.colony)) return NaN;
+  const need = antNeed(a);
+  antClear(o, SH, (o.fhd ?? 0) > 0);
+  if (need > Math.max(SH[0], SH[1], SH[2])) return NaN;
+  let used = 0;
+  for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && e.v[i] >= UNDER) used++;
+  const Lo = casteOf(o.caste).length;
+  if (used >= stackCap(casteOf(a.caste).length, Lo)) return NaN;
+  const d = antHeights(o.caste);
+  for (const rel of UNDER_DIRS) {
+    const ang = o.h + rel;
+    let clash = false;
+    for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && e.v[i] >= UNDER && Math.abs(angleDiff(e.v[i] - UNDER, ang)) < 0.3) clash = true;
+    if (clash) continue;
+    antUnderPoint(o, ang, UP2);
+    if (need <= SH[zoneAt(d, Lo, o.x, o.y, o.h, UP2.x, UP2.y)]) return ang;
+  }
+  return NaN;
+}
+
 /**
  * Reserve a slot on an ant victim for attacker `a`: its own if it has one, else the free sector nearest the side it
  * came from. Returns the world angle (the sector's centre), or NaN when every slot is taken.
@@ -291,17 +400,29 @@ export function reserveAntSlot(w: World, a: Ant, o: Ant, isQueen: boolean): numb
   const e = antHeld(w, o);
   const n = antSlotCount(o, casteOf(a.caste).length, isQueen);
   const k0 = sector(datan2(a.y - o.y, a.x - o.x), n);
+  // its place under the foe (combat v2.2): kept while it still fits there
+  if ((a.gUn ?? 0) > 0) {
+    if (holdsSlotOn(a, o.id, 3) && e.ids.includes(a.id)) {
+      antUnderPoint(o, a.gSlot, UP2);
+      antClear(o, SH, (o.fhd ?? 0) > 0);
+      if (antNeed(a) <= SH[zoneAt(antHeights(o.caste), casteOf(o.caste).length, o.x, o.y, o.h, UP2.x, UP2.y)]) return a.gSlot;
+    }
+    a.gUn = 0;
+  }
   if (holdsSlotOn(a, o.id, 3) && e.ids.includes(a.id)) {
     // already ours: keep it unless another ant (lower id this tick) sits in the same sector — or the sector we are
     // in now is free (an approaching ant takes the place where it is, rather than walking round to the one it chose)
     const k = sector(a.gSlot, n);
     let clash = false;
     let here = k0 !== k;
+    // (combat v2.2: a teammate in our sector we stand under is no clash; one in the sector we are in now that we could
+    // stand under leaves it free to us)
+    const tk = antTaken(w, a, o, e, n);
     for (let i = 0; i < e.ids.length; i++) {
-      if (e.ids[i] === a.id) continue;
+      if (e.ids[i] === a.id || e.v[i] >= UNDER) continue;
       const ki = sector(e.v[i], n);
-      if (e.ids[i] < a.id && ki === k) clash = true;
-      if (ki === k0) here = false;
+      if (e.ids[i] < a.id && ki === k && tk & (1 << k)) clash = true;
+      if (ki === k0 && tk & (1 << k0)) here = false;
     }
     if (here && a.state === AS.Attack) {
       const ang = ((k0 + 0.5) / n) * TAU;
@@ -310,15 +431,15 @@ export function reserveAntSlot(w: World, a: Ant, o: Ant, isQueen: boolean): numb
     }
     if (!clash) return a.gSlot;
   }
-  let taken = 0;
-  let count = 0;
-  for (let i = 0; i < e.ids.length; i++) {
-    if (e.ids[i] === a.id) continue;
-    const bit = 1 << sector(e.v[i], n);
-    if (!(taken & bit)) count++;
-    taken |= bit;
-  }
-  if (count >= n) {
+  const taken = antTaken(w, a, o, e, n);
+  if (taken === (n >= 32 ? -1 : (1 << n) - 1)) {
+    // every place round it taken: one under it, if it is tall enough over us (combat v2.2)
+    const u = underSector(w, a, o, e);
+    if (!Number.isNaN(u)) {
+      put(e, a.id, u + UNDER);
+      a.gUn = 1;
+      return u;
+    }
     drop(e, a.id);
     return NaN;
   }
@@ -343,7 +464,7 @@ export function flankSide(w: World, a: Ant, o: Ant, isQueen: boolean, want: numb
   const e = antHeld(w, o);
   const n = antSlotCount(o, casteOf(a.caste).length, isQueen);
   let taken = 0;
-  for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id) taken |= 1 << sector(e.v[i], n);
+  for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && e.v[i] < UNDER) taken |= 1 << sector(e.v[i], n);
   const b = datan2(a.y - o.y, a.x - o.x);
   const mine = sector(want, n);
   let best = 0;
@@ -365,6 +486,31 @@ export function flankSide(w: World, a: Ant, o: Ant, isQueen: boolean, want: numb
     }
   }
   return bestK === Infinity ? 0 : best;
+}
+
+/** Slot occupancy for attacker `a` on creature `cr`'s ring `ring` (n slots at offset `off`): a bit per slot it may not take
+ * (two-layer, combat v2.2: a ground slot held by one teammate it can stand under is free to it). */
+function crTaken(w: World, a: Ant, cr: Creature, e: Held, ring: number, n: number, off: number): number {
+  for (let k = 0; k < n; k++) {
+    secN[k] = 0;
+    secId[k] = 0;
+  }
+  for (let i = 0; i < e.ids.length; i++) {
+    if (e.ids[i] === a.id || (e.v[i] >= 1 ? 1 : 0) !== ring) continue;
+    const k = slotIdx(e.v[i], n);
+    secN[k]++;
+    secId[k] = e.ids[i];
+  }
+  let taken = 0;
+  for (let k = 0; k < n; k++) {
+    if (!secN[k]) continue;
+    if (secN[k] === 1 && ring === 0) {
+      creatureSlotWorld(cr, off, (k + 0.5) / n, UT);
+      if (canShare(w, a, secId[k], UT.x, UT.y)) continue;
+    }
+    taken |= 1 << k;
+  }
+  return taken;
 }
 
 /** Index (of n) of a creature slot fraction on its ring. */
@@ -393,14 +539,16 @@ export function reserveCreatureSlot(w: World, a: Ant, cr: Creature): number {
     const n = creatureSlotCount(cr, La, ring === 1);
     const k = slotIdx(a.gSlot, n);
     // the slot the ant is beside now, on the same ring
-    const kHere = Math.floor(outlineU(b, ring === 1 ? -C2.underInset * b.r : frontOff(La), px, py) * n) % n;
+    const offR = ring === 1 ? -C2.underInset * b.r : frontOff(La);
+    const kHere = Math.floor(outlineU(b, offR, px, py) * n) % n;
     let clash = false;
     let here = kHere !== k;
+    const tk = crTaken(w, a, cr, e, ring, n, offR);
     for (let i = 0; i < e.ids.length; i++) {
       if (e.ids[i] === a.id || (e.v[i] >= 1 ? 1 : 0) !== ring) continue;
       const ki = slotIdx(e.v[i], n);
-      if (e.ids[i] < a.id && ki === k) clash = true;
-      if (ki === kHere) here = false;
+      if (e.ids[i] < a.id && ki === k && tk & (1 << k)) clash = true;
+      if (ki === kHere && tk & (1 << kHere)) here = false;
     }
     // an approaching ant takes the free slot it is beside rather than walking round to the one it chose
     if (here && a.state === AS.Attack) {
@@ -412,15 +560,19 @@ export function reserveCreatureSlot(w: World, a: Ant, cr: Creature): number {
   }
   for (let ring = 0; ring < (under ? 2 : 1); ring++) {
     const n = creatureSlotCount(cr, La, ring === 1);
-    let taken = 0;
-    for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && (e.v[i] >= 1 ? 1 : 0) === ring) taken |= 1 << slotIdx(e.v[i], n);
+    const off = ring === 1 ? -C2.underInset * b.r : frontOff(La);
+    const taken = crTaken(w, a, cr, e, ring, n, off);
     if (taken === (n >= 32 ? -1 : (1 << n) - 1)) continue;
     // the attacker's place on the ring: start there and look both ways
-    const off = ring === 1 ? -C2.underInset * b.r : frontOff(La);
     const k0 = Math.floor(outlineU(b, off, px, py) * n) % n;
     for (let step = 0; step < n; step++) {
       for (const k of step === 0 ? [k0] : [(k0 + step) % n, (k0 - step + n) % n]) {
         if (taken & (1 << k)) continue;
+        // under the body: only where it fits (combat v2.2: a low head or abdomen blocks that part)
+        if (ring === 1) {
+          creatureSlotWorld(cr, off, (k + 0.5) / n, UT);
+          if (!antFitsUnderCreatureAt(a, cr, UT.x, UT.y)) continue;
+        }
         const u = (k + 0.5) / n + ring;
         put(e, a.id, u);
         return u;
@@ -431,14 +583,16 @@ export function reserveCreatureSlot(w: World, a: Ant, cr: Creature): number {
   return -1;
 }
 
+const UT = { x: 0, y: 0, n: 0 }; // det-ok: scratch
+
 /** Is there a slot ant `a` could take on creature `cr` (round it, or under it if it fits)? */
 export function creatureHasRoom(w: World, a: Ant, cr: Creature): boolean {
   const e = creatureHeld(w, cr);
   const La = casteOf(a.caste).length;
+  const b = bodyHook.body(cr);
   for (let ring = 0; ring < (fitsUnder(a, cr) ? 2 : 1); ring++) {
     const n = creatureSlotCount(cr, La, ring === 1);
-    let taken = 0;
-    for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && (e.v[i] >= 1 ? 1 : 0) === ring) taken |= 1 << slotIdx(e.v[i], n);
+    const taken = crTaken(w, a, cr, e, ring, n, ring === 1 ? -C2.underInset * b.r : frontOff(La));
     if (taken !== (n >= 32 ? -1 : (1 << n) - 1)) return true;
   }
   return false;
@@ -469,7 +623,7 @@ export function antSectorFreeAt(w: World, a: Ant, o: Ant, isQueen: boolean, ang:
   const e = antHeld(w, o);
   const n = antSlotCount(o, casteOf(a.caste).length, isQueen);
   const k = sector(ang, n);
-  for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && sector(e.v[i], n) === k) return NaN;
+  for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && e.v[i] < UNDER && sector(e.v[i], n) === k) return NaN;
   const bk = blockedSlot(a, o.id);
   if (!Number.isNaN(bk) && sector(bk, n) === k) return NaN;
   return ((k + 0.5) / n) * TAU;
@@ -522,7 +676,7 @@ export function pickSide(w: World, a: Ant, kind: number, id: number, isQueen: bo
     const e = antHeld(w, o);
     n = antSlotCount(o, La, isQueen);
     let taken = 0;
-    for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id) taken |= 1 << sector(e.v[i], n);
+    for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && e.v[i] < UNDER) taken |= 1 << sector(e.v[i], n);
     const bk = blockedSlot(a, id);
     if (!Number.isNaN(bk)) taken |= 1 << sector(bk, n);
     free = (k) => !(taken & (1 << k));

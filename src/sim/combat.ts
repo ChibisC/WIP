@@ -1,9 +1,10 @@
+import { antFitsUnderAnt as antFitsUnderAntAt } from './underpass';
 import { World } from './world';
 import { Ant, AS, Carry, Colony, Creature, POSE, SURFACE, nestSpace } from './types';
 import type { Projectile } from './types';
 import { casteOf, DamageType, isKing } from './species';
 import { angleDiff, antSpeed, faceToward, moveForward, steerAvoid, steerTo, turnToward, goHome, goOut } from './movement';
-import { anchored, antHoldPoint, antOutlineR, antSectorFreeAt, antSlotCount, antSlotsTaken, bodyHook, creatureHasRoom, creatureSlotFreeAt, creatureSlotOff, creatureSlotWorld, distToCreatureBody, frontOff, holdsSlotOn, mutualHold, outlineU, pickSide, releaseSlot, reserveAntSlot, reserveCreatureSlot, slotTmp, takeAntSector, takeCreatureSlot } from './slots';
+import { anchored, antUnderPoint, antHoldPoint, antOutlineR, antSectorFreeAt, antHasRoom, antSlotCount, bodyHook, creatureHasRoom, creatureSlotFreeAt, creatureSlotOff, creatureSlotWorld, distToCreatureBody, frontOff, holdsSlotOn, mutualHold, outlineU, pickSide, releaseSlot, reserveAntSlot, reserveCreatureSlot, slotTmp, takeAntSector, takeCreatureSlot } from './slots';
 import { killAnt, releaseGrapple } from './antAI';
 import { dropCarried, setTask } from './colony';
 import { abilityMods } from './abilities';
@@ -359,7 +360,7 @@ function findTarget(w: World, a: Ant, c: Colony, r: number): Target | null {
     // waiting spread by the crowd on each). Only a marker on it (an order) makes a full foe worth waiting for; our side
     // outnumbering them only drops the crowd penalty (2026-10-31: with it, every ant took the nearest foe and dozens
     // circled one ant while other foes had room)
-    if (!ordered && !holdsSlotOn(a, o.id, 3) && antSlotsTaken(w, o) >= antSlotCount(o, L, o.id === w.colony(o.colony)?.queen)) offerFull(3, o.id, o.x, o.y, base * crowd);
+    if (!ordered && !antHasRoom(w, a, o, o.id === w.colony(o.colony)?.queen)) offerFull(3, o.id, o.x, o.y, base * crowd);
     else offer(3, o.id, o.x, o.y, base * (outnumber || ordered ? 1 : crowd));
   }
   cand.length = 0;
@@ -685,6 +686,15 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     if ((a.waitT ?? 0) > 0 && !ringCheckDue(a, dt)) return waitForSlot(w, a, c, t.x, t.y, d - reach, C2.personalSpace * L, dt, null);
     const ang = reserveAntSlot(w, a, o, isQ);
     if (Number.isNaN(ang)) return waitForSlot(w, a, c, t.x, t.y, d - reach, C2.personalSpace * L, dt, null);
+    // a place under the foe's body (combat v2.2: it is tall enough over us): straight in under it, between its legs
+    if ((a.gUn ?? 0) > 0) {
+      a.rsv = o.id;
+      a.gSlot = ang;
+      a.waitT = 0;
+      antUnderPoint(o, ang, slotTmp);
+      if (dhypot(slotTmp.x - a.x, slotTmp.y - a.y) > L * C2.arriveTol * 2 && !approachHold(w, a, o.x, o.y, slotTmp.x, slotTmp.y, dt, o.v > antSpeed(w, a) * 0.25, true)) return true;
+      return latchOn(a);
+    }
     const far = Math.abs(angleDiff(ang, datan2(a.y - o.y, a.x - o.x)));
     // the only free slot is round the far side: a nearer foe with room first (overflow: switch, then go round)
     if (a.rsv !== o.id && far > Math.PI / 2) {
@@ -733,6 +743,11 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     const off = angleDiff(datan2(a.y - o.y, a.x - o.x), a.gSlot);
     a.gSlot += Math.max(-half, Math.min(half, off));
   }
+  return latchOn(a);
+}
+
+/** Latch on to its target where it stands (attackUpdate): the hold starts, anchored. */
+function latchOn(a: Ant): boolean {
   a.waitT = 0;
   a.rsv = 0;
   a.blkT = 0;
@@ -750,6 +765,7 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
 /** Forget the approach (reservation, blocked timer, back-off, going round): a new target or the fight is over. */
 function clearApproach(a: Ant): void {
   if ((a.rsv ?? 0) !== 0) a.rsv = 0;
+  if ((a.gUn ?? 0) !== 0) a.gUn = 0;
   if ((a.flk ?? 0) !== 0) a.flk = 0;
   if ((a.blkT ?? 0) !== 0) a.blkT = 0;
   if ((a.blkD ?? 0) !== 0) a.blkD = 0;
@@ -1110,9 +1126,15 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     if (o.state === AS.Flung) return endHold(a); // knocked flying out of its grip
     const ol = casteOf(o.caste).length;
     const mutual = o.state === AS.Grapple && o.gKind === 3 && o.gId === a.id;
-    // where it should stand: head to head at reach (mutual), or at its slot's hold point (a world angle round the foe)
+    // where it should stand: head to head at reach (mutual), or at its slot's hold point (a world angle round the foe);
+    // under the foe's body (combat v2.2): its place there, while it still fits (the foe lowering or moving off ends it)
     let err: number;
-    if (mutual) {
+    if ((a.gUn ?? 0) > 0) {
+      const ang = datan2(a.y - o.y, a.x - o.x);
+      antUnderPoint(o, ang, slotTmp);
+      err = dhypot(slotTmp.x - a.x, slotTmp.y - a.y);
+      if (!antFitsUnderAntAt(a, o)) return endHold(a);
+    } else if (mutual) {
       const D = mutualHold(L, ol);
       const dx = a.x - o.x;
       const dy = a.y - o.y;
@@ -1283,6 +1305,8 @@ function settleStep(w: World, a: Ant, interval: number, foeId: number, fx: numbe
   w.antsNear(a.space, a.x, a.y, look, (g) => {
     // (the higher id steps, unless it is pinned: then the other one)
     if (g === a || g.id === foeId || (g.id > a.id && g.pinned <= 0) || g.state === AS.Dead || !anchored(g)) return false;
+    // (one standing under the other, combat v2.2: not planted too close)
+    if ((a.udr ?? 0) === g.id || (g.udr ?? 0) === a.id) return false;
     const Lg = casteOf(g.caste).length;
     const rg = Lg * S.widthOfLength * S.radiusOfWidth;
     const dx = a.x - g.x;
@@ -1360,6 +1384,7 @@ export function cancelAttack(w: World, a: Ant): boolean {
 
 /** Lost hold of a mutual grapple (one was knocked away): close in again. */
 function regripAttack(a: Ant): boolean {
+  if ((a.gUn ?? 0) !== 0) a.gUn = 0;
   a.tgt = a.gId;
   a.tk = a.gKind;
   a.gId = 0;
