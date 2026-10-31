@@ -325,12 +325,13 @@ const attaSetae = { color: 0xb88a50, head: 130, meso: 120, gaster: 160, len: [0.
 const attaMedia: AntMorph = {
   key: 'atta_media',
   L: 8,
-  head: { len: 0.3, width: 0.3, height: 0.19, shape: 'heart', notch: 0.22, occSpines: 0.14, groove: 0.14 },
+  head: { len: 0.3, width: 0.3, height: 0.19, shape: 'heart', notch: 0.22, occSpines: 0.08, groove: 0.14 },
   eyes: { size: 0.18, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.3, club: 0, thick: 0.009 },
   mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.7 },
-  // (geometry pass, the photos: long paired pronotal spines, two mesonotal pairs, long propodeal spines)
-  meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.13, meso: 0.09, meso2: 0.045, prop: 0.11 } },
+  // (geometry pass, the photos: paired pronotal spines, two mesonotal pairs, propodeal spines; user 2026-10-31:
+  // every Atta caste's spines about 40 % shorter, they were too long)
+  meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.075, meso: 0.05, meso2: 0.025, prop: 0.06 } },
   waist: { nodes: 2, len: 0.1, nodeH: 0.08 },
   // (review round 2: a small gaster for the body, not a big round ball)
   gaster: { len: 0.22, width: 0.17, height: 0.14, sting: true },
@@ -348,10 +349,10 @@ const attaMinim: AntMorph = {
   L: 2,
   // (user note 2026-10-31: the minim's head didn't match the other castes — the same heart shape, its lobes lower and
   // the notch shallower at this size, small occipital spines)
-  head: { len: 0.27, width: 0.27, height: 0.18, shape: 'heart', notch: 0.12, occSpines: 0.05, groove: 0.08 },
+  head: { len: 0.27, width: 0.27, height: 0.18, shape: 'heart', notch: 0.12, occSpines: 0.035, groove: 0.08 },
   eyes: { size: 0.16, pos: 0.6, height: 0.2, ocelli: false },
   mandible: { type: 'triangular', len: 0.33, teeth: 6, width: 0.55, spec: ATTA_MINIM_JAW, open: 0.7 },
-  meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.05, meso: 0.04, prop: 0.05 } },
+  meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.035, meso: 0.028, prop: 0.035 } },
   gaster: { len: 0.3, width: 0.21, height: 0.17, sting: true },
   legs: { hind: 1.05, thick: 0.0175 },
   // paler, orange-tan
@@ -365,11 +366,11 @@ const attaSoldier: AntMorph = {
   ...attaMedia,
   key: 'atta_soldier',
   L: 10.5,
-  head: { len: 0.33, width: 0.36, height: 0.2, shape: 'heart', notch: 0.22, occSpines: 0.07, groove: 0.14 },
+  head: { len: 0.33, width: 0.36, height: 0.2, shape: 'heart', notch: 0.22, occSpines: 0.045, groove: 0.14 },
   eyes: { size: 0.15, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.8, funiculus: 1.25, club: 0, thick: 0.0085 },
   mandible: { type: 'massive', len: 0.38, teeth: 8, width: 0.68, spec: ATTA_SOLDIER_JAW, open: 0.6 },
-  meso: { len: 0.28, width: 0.12, height: 0.14, spines: { pro: 0.1, meso: 0.07, meso2: 0.035, prop: 0.08 } },
+  meso: { len: 0.28, width: 0.12, height: 0.14, spines: { pro: 0.06, meso: 0.04, meso2: 0.02, prop: 0.05 } },
   gaster: { len: 0.25, width: 0.18, height: 0.15, sting: true },
   legs: { hind: 1.1, thick: 0.015 },
   look: { ...attaLook, head: L(0x7a3418, 0.48, 0.2, 0.08, 0x5a2410) },
@@ -381,11 +382,11 @@ const attaMajor: AntMorph = {
   key: 'atta_major',
   L: 14,
   // (the photos: two big rounded lobes split by a deep median groove)
-  head: { len: 0.4, width: 0.44, height: 0.24, shape: 'heart', notch: 0.3, occSpines: 0.04, groove: 0.2 },
+  head: { len: 0.4, width: 0.44, height: 0.24, shape: 'heart', notch: 0.3, occSpines: 0.03, groove: 0.2 },
   eyes: { size: 0.11, pos: 0.64, height: 0.1, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.7, funiculus: 1.2, club: 0, thick: 0.0072 },
   mandible: { type: 'massive', len: 0.36, teeth: 8, width: 0.75, spec: ATTA_MAJOR_JAW, open: 0.55 },
-  meso: { len: 0.25, width: 0.11, height: 0.12, spines: { pro: 0.09, meso: 0.07, meso2: 0.03, prop: 0.07 } },
+  meso: { len: 0.25, width: 0.11, height: 0.12, spines: { pro: 0.055, meso: 0.04, meso2: 0.018, prop: 0.045 } },
   waist: { nodes: 2, len: 0.08, nodeH: 0.07 },
   gaster: { len: 0.22, width: 0.16, height: 0.13, sting: true },
   legs: { hind: 1.0, thick: 0.0135 },

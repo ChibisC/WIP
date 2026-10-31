@@ -913,3 +913,12 @@ mesosoma, and the queen's mesosoma reads as three bulbs.
 - Blind review after the first half of this pass: Atta 3, 4, 3, 3, 3, 2, 3; Eciton 3, 3, 3, 3, 3, 2 — its shape notes
   drove the second half (sockets, occipital spines, crossing jaws, the queen, the neck).
 
+
+### 2026-10-31 (afternoon) — Atta jaws rebuilt and spines shortened (user: "make the spike thing on the attas smaller cos some of them have it too long"; "the attas mandibles dont look right, redo them and make them more accurate")
+- **Jaws**: a dedicated generator, `attaMandible` (`src/render/anatomy/mandibleSpecs.ts`), replaces the formicine
+  triangle bent into hooks. From the reference photos: broad flat red-brown blades hanging below the face, the external
+  margin evenly convex, a long straight masticatory margin with a saw of near-black teeth (minim 8, media and soldier
+  10, major 11), the blade darkening to black along it; closed, a V below the clypeus with the apical teeth crossing,
+  open two toothed blades. Numbers in `docs/creatures/atta-cephalotes.md` ("Mandibles").
+- **Spines**: every Atta caste's mesosoma and occipital spines about 40 % shorter (the media's had grown to .13 L).
+- Morph hashes: only `atta_*` changed (re-baselined). Photo-vs-render sheet sent to the user in chat (study only).
