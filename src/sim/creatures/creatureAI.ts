@@ -3,8 +3,8 @@ import { HF_CREATURE } from '../../world/surfaceLayout';
 import { Ant, AS, Creature, SURFACE } from '../types';
 import { casteOf } from '../species';
 import { ARENA, BALANCE, ECITON, TERMANT } from '../balance';
-import { riding } from '../climbing';
-import { riderUnits } from './climb';
+import { enforceMountRatio, riding, throwRiders } from '../climbing';
+import { climbCap } from './climb';
 import { applyVenom, creatureHooks, damageAnt, damageCreature, flingAnt } from '../combat';
 import { STANCE, arenaTeam, stanceOf } from '../arenaState';
 import { killAnt } from '../antAI';
@@ -1146,9 +1146,11 @@ export function creatureSystem(w: World, dt: number): void {
     cr.latched = 0;
     cr.latchGrip = 0;
   }
+  // the mount ratio (combat v2): with too few of a colony's ants left fighting from the ground, riders climb down
+  enforceMountRatio(w);
   for (const cr of w.s.creatures) {
     cr.climbers = 0;
-    cr.climbUnits = 0;
+    if ((cr.rideMask ?? 0) !== 0) cr.rideMask = 0;
   }
   for (const a of w.s.ants) {
     if (a.state === AS.Climb) {
@@ -1156,7 +1158,8 @@ export function creatureSystem(w: World, dt: number): void {
       const cr = (a.ridePh ?? 0) >= 1 ? w.creatureById.get(a.rideId ?? 0) : undefined;
       if (cr) {
         cr.climbers = (cr.climbers ?? 0) + 1;
-        cr.climbUnits = (cr.climbUnits ?? 0) + riderUnits(casteOf(a.caste).length);
+        // mount slots taken (the climb debug overlay draws them)
+        cr.rideMask = (cr.rideMask ?? 0) | (1 << (a.rideSlot ?? 0));
         // army ants on its back pin it as surely as ants holding its legs
         if (casteOf(a.caste).species === 'eciton') ecPins.set(cr.id, (ecPins.get(cr.id) ?? 0) + 1);
       }

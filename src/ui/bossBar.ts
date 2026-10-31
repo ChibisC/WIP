@@ -1,7 +1,9 @@
 import { GameSession } from '../game/session';
 import { SimEvent } from '../core/events';
 import { CREATURES } from '../sim/creatures/kinds';
-import { climbRoom } from '../sim/creatures/climb';
+import { climbCap } from '../sim/creatures/climb';
+import { mountBonus } from '../sim/combat';
+import { BALANCE } from '../sim/balance';
 import { el } from './dom';
 
 /**
@@ -54,11 +56,12 @@ export class BossBar {
     const f = Math.max(0, Math.min(1, boss.hp / Math.max(1, boss.maxHp)));
     const w = (f * 100).toFixed(1) + '%';
     if (this.fill.style.width !== w) this.fill.style.width = w;
-    // ants climbing it / most that fit (CHANGE_PLAN §15.2)
-    // (room taken / room on its back; riders take room by size class)
-    const room = climbRoom(boss);
-    const r = room > 0 ? `${boss.climbers ?? 0} riding · ${boss.climbUnits ?? 0}/${room}` : '';
+    // ants on it / its mount cap, and the mount bonus (CHANGE_PLAN §16): enough riders and it takes more damage
+    const cap = climbCap(boss);
+    const bonus = mountBonus(boss);
+    const r = cap > 0 ? `${boss.climbers ?? 0}/${cap} riding${bonus ? ` · +${Math.round((BALANCE.mount.bonusMul - 1) * 100)} % damage` : ''}` : '';
     if (this.riders.textContent !== r) this.riders.textContent = r;
+    this.riders.classList.toggle('bonus', bonus);
     const ph = this.phaseNames.get(boss.id) ?? '';
     if (this.phase.textContent !== ph) this.phase.textContent = ph;
     this.root.classList.toggle('enraged', boss.phase > 0);

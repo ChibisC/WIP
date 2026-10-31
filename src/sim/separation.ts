@@ -358,7 +358,8 @@ function pairCb(j: number): boolean {
   const ally = (po.team ?? po.colony) === P.team;
   // …and two enemies each holding someone else (separate duels) drift apart too, so neighbouring duels keep ground
   // between them; enemies closing in, or fighting each other, keep only their bodies' radii
-  const fight = (fa & fo & 16) !== 0 && (ally ? !(P.foeK !== 0 && foeKind(po) === P.foeK && foeId(po) === P.foeId) : pa.state === AS.Grapple && po.state === AS.Grapple && !engaged(pa, po));
+  const sameFoe = ally && P.foeK !== 0 && foeKind(po) === P.foeK && foeId(po) === P.foeId;
+  const fight = (fa & fo & 16) !== 0 && (ally ? !sameFoe : pa.state === AS.Grapple && po.state === AS.Grapple && !engaged(pa, po));
   const line = !fight && ally && ((fa | fo) & 128) !== 0 && (fa & 144) !== 0 && (fo & 144) !== 0;
   const ma = (fa & 2) !== 0 || ((fight || line) && (fa & 32) !== 0);
   const mo = (fo & 2) !== 0 || ((fight || line) && (fo & 32) !== 0);

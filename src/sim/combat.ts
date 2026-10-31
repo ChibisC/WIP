@@ -3,7 +3,7 @@ import { Ant, AS, Carry, Colony, Creature, POSE, SURFACE, nestSpace } from './ty
 import type { Projectile } from './types';
 import { casteOf, DamageType, isKing } from './species';
 import { angleDiff, antSpeed, faceToward, moveForward, steerTo, turnToward, goHome, goOut } from './movement';
-import { antHoldPoint, antSlotCount, antSlotsTaken, bodyHook, creatureHasRoom, creatureSlotOff, creatureSlotWorld, distToCreatureBody, frontOff, holdsSlotOn, mutualHold, outlineU, releaseSlot, reserveAntSlot, reserveCreatureSlot, slotTmp } from './slots';
+import { antHoldPoint, antSlotCount, antSlotsTaken, bodyHook, creatureHasRoom, creatureSlotOff, creatureSlotWorld, distToCreatureBody, flankSide, frontOff, holdsSlotOn, mutualHold, outlineU, releaseSlot, reserveAntSlot, reserveCreatureSlot, slotTmp } from './slots';
 import { killAnt, releaseGrapple } from './antAI';
 import { dropCarried, setTask } from './colony';
 import { abilityMods } from './abilities';
@@ -14,6 +14,7 @@ import { startSurge, surging } from './surge';
 import { hellUpdate, isHellState, release, snapEligible, startHunt } from './hellAnts';
 import { isSickle, sickleAlarm, sickleAttack, sickleUpdate } from './sickleJaws';
 import { riding, tryClimb } from './climbing';
+import { climbCap } from './creatures/climb';
 import { afterBite, guardRush, hookMul } from './eciton';
 import { acidMulOn, glueBurst as termantGlue, termantArmorMul } from './termants';
 import { underOrder } from './markers';
@@ -134,6 +135,8 @@ export function damageCreature(w: World, cr: Creature, amount: number, type: Dam
   let dmg = amount;
   if (type === 'bite') dmg = Math.max(amount * 0.25, amount - armor);
   else if (type === 'acid') dmg = Math.max(amount * 0.7, amount - armor * 0.25) * acidMulOn(w, cr.glueT);
+  // mount bonus (EotU): enough ants on its back and it takes more damage from everyone
+  if (mountBonus(cr)) dmg *= BALANCE.mount.bonusMul;
   cr.hp -= dmg;
   creatureHooks.onDamaged?.(w, cr, src, dmg);
   if (cr.hp <= 0) {
@@ -147,6 +150,14 @@ export function damageCreature(w: World, cr: Creature, amount: number, type: Dam
     w.events.emit({ t: 'death', x: cr.x, y: cr.y, space: cr.space, kind: 'creature', id: cr.id, colony: -1, what: cr.kind });
     creatureHooks.onKilled?.(w, cr);
   }
+}
+
+/** Does a creature carry enough riders for the mount bonus (`mount.bonusAt` of its cap)? */
+export function mountBonus(cr: Creature): boolean {
+  const n = cr.climbers ?? 0;
+  if (n <= 0) return false;
+  const cap = climbCap(cr);
+  return cap > 0 && n >= Math.max(1, Math.ceil(cap * BALANCE.mount.bonusAt - 1e-9));
 }
 
 /** Alarm: pheromone on the surface; in the nest it spreads ant-to-ant. */
@@ -619,6 +630,7 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     if ((a.waitT ?? 0) > 0 && !ringCheckDue(a, dt)) return waitForSlot(w, a, c, cr.x, cr.y, dBody, frontOff(L) + C2.personalSpace * L, dt, cr);
     const u = reserveCreatureSlot(w, a, cr);
     if (u < 0) return waitForSlot(w, a, c, cr.x, cr.y, dBody, frontOff(L) + C2.personalSpace * L, dt, cr);
+    if ((a.flk ?? 0) !== 0 && (a.rsv !== cr.id || a.gSlot !== u)) a.flk = 0;
     a.rsv = cr.id;
     a.gSlot = u;
     a.waitT = 0;
@@ -653,6 +665,8 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
         return true;
       }
     }
+    // a new slot (or a slot moved): choose the way round afresh
+    if ((a.flk ?? 0) !== 0 && (a.rsv !== o.id || Math.abs(angleDiff(ang, a.gSlot)) > 1e-6)) a.flk = 0;
     a.rsv = o.id;
     a.gSlot = ang;
     a.waitT = 0;
@@ -668,12 +682,28 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       }
     } else {
       const hr = antHoldPoint(a, o, ang, slotTmp);
+      // going round to it: a way past no held slot (their holders are in the way); none → it cannot get there: wait
+      if ((a.flk ?? 0) === 0 && Math.abs(angleDiff(ang, datan2(a.y - o.y, a.x - o.x))) > C2.flankStep) {
+        const side = flankSide(w, a, o, isQ, ang);
+        if (side === 0) {
+          releaseSlot(w, a);
+          a.rsv = 0;
+          return waitForSlot(w, a, c, t.x, t.y, d - reach, C2.personalSpace * L, dt, null);
+        }
+        a.flk = side;
+      }
       // in our slot's sector at about the hold distance: there (the grapple eases us onto the point)
       const inSector = Math.abs(angleDiff(datan2(a.y - o.y, a.x - o.x), ang)) <= Math.PI / antSlotCount(o, L, isQ) && d <= hr + L * C2.arriveTol * 2;
       if (!inSector && !approachHold(w, a, o.x, o.y, slotTmp.x, slotTmp.y, dt, o.v > antSpeed(w, a) * 0.25)) return true;
     }
   }
-  // at the hold point: latch on
+  // at the hold point: latch on — where it stands, within its slot (no snapping across to the slot's middle)
+  if (a.tk === 3) {
+    const o = w.antById.get(a.tgt)!;
+    const half = (Math.PI / antSlotCount(o, L, o.id === w.colony(o.colony)?.queen)) * 0.9;
+    const off = angleDiff(datan2(a.y - o.y, a.x - o.x), a.gSlot);
+    a.gSlot += Math.max(-half, Math.min(half, off));
+  }
   a.waitT = 0;
   a.rsv = 0;
   a.blkT = 0;
@@ -730,13 +760,20 @@ function approachHold(w: World, a: Ant, cx: number, cy: number, hx: number, hy: 
   const bearing = datan2(a.y - cy, a.x - cx);
   const want = datan2(hy - cy, hx - cx);
   const diff = angleDiff(want, bearing);
-  if (Math.abs(diff) > C2.flankStep) {
+  if (Math.abs(diff) > C2.flankStep && moving) {
+    // its slot is round the far side of a foe on the move: keep up on our side (no circling a moving foe); flank once
+    // it stands
+    const r = dhypot(hx - cx, hy - cy) + L * 0.3;
+    if ((a.flk ?? 0) !== 0) a.flk = 0;
+    steerTo(w, a, cx + dcos(bearing) * r, cy + dsin(bearing) * r, dt, 1.0, BALANCE.combat.turnRate);
+  } else if (Math.abs(diff) > C2.flankStep) {
     // flank: sidle round the ring toward the slot, facing the target, a little outside the hold point (never through
     // it). The way round is chosen once (the shorter one; straight across, by the id) and kept, so an ant opposite its
     // slot does not dither between the two ways.
     const rNow = dhypot(a.x - cx, a.y - cy);
     const rWant = dhypot(hx - cx, hy - cy) + L * 0.3;
-    if ((a.flk ?? 0) === 0) a.flk = Math.abs(diff) > Math.PI * 0.9 ? (a.id & 1 ? 1 : -1) : diff > 0 ? 1 : -1;
+    // (attackUpdate picks the way past fewer held slots on an ant; turned back if it has just gone past its slot)
+    if ((a.flk ?? 0) === 0 || ((a.flk ?? 0) * diff < 0 && Math.abs(diff) < Math.PI * 0.5)) a.flk = Math.abs(diff) > Math.PI * 0.9 ? (a.id & 1 ? 1 : -1) : diff > 0 ? 1 : -1;
     const side = a.flk ?? 1;
     const radial = Math.max(-1, Math.min(1, (rWant - rNow) / L));
     const h = a.h;
@@ -889,7 +926,7 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       const dd = dhypot(dx, dy);
       if (dd > D * 1.6) return regripAttack(a);
       if (dd > 1e-6 && a.pinned <= 0) {
-        const k = (D - dd) * Math.min(1, dt * 4) * 0.5;
+        const k = Math.max(-antSpeed(w, a) * dt, Math.min(antSpeed(w, a) * dt, (D - dd) * Math.min(1, dt * 4) * 0.5));
         const nx = a.x + (dx / dd) * k;
         const ny = a.y + (dy / dd) * k;
         if (w.walkable(a.space, nx, ny)) {
@@ -901,8 +938,12 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       // hold on at the slot's hold point (a world angle: the victim turning does not swing us round it). Close to it the
       // pull is gentle, so fighting allies near ours can ease us apart (separation.ts) instead of being snapped back on
       // top of each other every tick
+      // it steps toward its hold point (its victim may be moving) at most `combat2.holdFollow` × its walking speed:
+      // it keeps up and settles into place, it never snaps
+      if (o.state === AS.Flung) return regripAttack(a); // knocked flying out of its grip
       antHoldPoint(a, o, a.gSlot, slotTmp);
-      const k = Math.min(1, dt * (dhypot(slotTmp.x - a.x, slotTmp.y - a.y) > cd.length * GUARD.slotGive ? 10 : 1.5));
+      const gap = dhypot(slotTmp.x - a.x, slotTmp.y - a.y);
+      const k = Math.min(1, dt * (gap > cd.length * GUARD.slotGive ? 10 : 1.5), gap > 1e-9 ? (antSpeed(w, a) * BALANCE.combat2.holdFollow * dt) / gap : 1);
       a.x += (slotTmp.x - a.x) * k;
       a.y += (slotTmp.y - a.y) * k;
     }

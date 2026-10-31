@@ -259,6 +259,34 @@ function separateOnly(w: World, n: number): void {
   check('duels: few bodies overlap in the clash', r.overlap <= 0.2, `${(r.overlap * 100).toFixed(0)} % (base 24 %)`);
 }
 
+// ---------------------------------------------------------------- no snapping: ants walk into place and keep up
+{
+  const { w, p } = field(15);
+  for (let i = 0; i < 30; i++) {
+    fighter(w, 0, 'lasius_worker', p.x - 22 + (i % 5) * 3, p.y - 15 + Math.floor(i / 5) * 5, 0);
+    fighter(w, 1, 'fire_soldier', p.x + 22 - (i % 5) * 3, p.y - 15 + Math.floor(i / 5) * 5, Math.PI);
+  }
+  w.reindex();
+  const steps: number[] = [];
+  let latchJump = 0;
+  for (let t = 0; t < 15 * 20; t++) {
+    const before = new Map(w.s.ants.map((a) => [a.id, { x: a.x, y: a.y, s: a.state }]));
+    w.step(0.05);
+    w.events.drain();
+    for (const a of w.s.ants) {
+      const b = before.get(a.id);
+      if (!b || a.state !== AS.Grapple || a.gKind !== 3) continue;
+      const v = Math.hypot(a.x - b.x, a.y - b.y) / 0.05 / casteOf(a.caste).speed;
+      steps.push(v);
+      if (b.s !== AS.Grapple) latchJump = Math.max(latchJump, v);
+    }
+  }
+  steps.sort((x, y) => x - y);
+  const p99 = steps[Math.floor(steps.length * 0.99)] ?? 0;
+  check('no snapping: an ant latches where it stands (no jump onto its slot)', latchJump <= C2.holdFollow + 0.5, `${latchJump.toFixed(2)} × its walking speed on the latching tick`);
+  check('no snapping: holders keep to their hold point at most a brisk walk', p99 <= C2.holdFollow + 0.05, `99th percentile ${p99.toFixed(2)} × walking speed (${steps.length} ticks)`);
+}
+
 // ---------------------------------------------------------------- step 5: blocked → pause and sidestep
 {
   const { w } = field(14);

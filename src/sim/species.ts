@@ -75,6 +75,12 @@ export interface CasteDef {
   glue?: { cooldown: number; slow: number; slowMul: number; damage: number; range: number };
   /** army-ant porter (submajor): carries loads slung under the body, prefers big items, leads team carries (sim/eciton.ts) */
   porter?: boolean;
+  /**
+   * Mounting (combat v2, BALANCE.mount): 'large' castes mount only huge creatures (bosses), 'none' never mount (the
+   * shooters, which keep their range). Unset: by length (`mount.largeCasteMm` and longer is large, else small, which
+   * mounts large and huge creatures); queens and kings never mount.
+   */
+  mount?: 'small' | 'large' | 'none';
   /** army-ant Soldier (major): its hooked mandibles lock on after a bite (sim/eciton.ts) */
   hook?: { hold: number; softBonus: number; dislodge: number };
   forage: boolean;
@@ -162,14 +168,14 @@ export const CASTES: Record<string, CasteDef> = {
     fact: 'Formica rufa workers range from about 4.5 to 9 mm; the biggest, armoured workers wade into fights and soak up the enemy’s bites.',
   }),
   formica_mortar: C({
-    id: 'formica_mortar', species: 'formica', name: 'Mortar', role: 'soldier', morph: 'formica_mortar', length: 7.6, speed: 20,
+    id: 'formica_mortar', species: 'formica', name: 'Mortar', role: 'soldier', morph: 'formica_mortar', length: 7.6, speed: 20, mount: 'none',
     hp: 20, bite: 1.2, attackInterval: 1.2, armor: 0, carry: 4, grip: 2, mass: 2.6, forage: true, dig: true, nurse: false,
     acid: { range: 56, damage: 12, cooldown: 1.25, kind: 'lob' },
     cost: 22, devTime: 1.5, pop: 1, cocoon: true,
     fact: 'Formica workers can squirt formic acid well beyond their own body length, aiming the jet by bending the gaster.',
   }),
   formica_rapid: C({
-    id: 'formica_rapid', species: 'formica', name: 'Rapid Sprayer', role: 'soldier', morph: 'formica_rapid', length: 7.2, speed: 22,
+    id: 'formica_rapid', species: 'formica', name: 'Rapid Sprayer', role: 'soldier', morph: 'formica_rapid', length: 7.2, speed: 22, mount: 'none',
     hp: 20, bite: 1.2, attackInterval: 1.2, armor: 0, carry: 4, grip: 2, mass: 2.4, forage: true, dig: true, nurse: false,
     acid: { range: 32, damage: 3, cooldown: 0.22, kind: 'rapid' },
     cost: 22, devTime: 1.5, pop: 1, cocoon: true,
@@ -221,7 +227,7 @@ export const CASTES: Record<string, CasteDef> = {
     cost: 6, devTime: 0.85, pop: 0.8, cocoon: false, fact: 'Tropical fire ant workers run from about 3 to 8 mm; the mid-sized ones are quick to sting anything that disturbs the mound.',
   }),
   fire_major: C({
-    id: 'fire_major', species: 'solenopsis', name: 'Major', role: 'major', morph: 'fire_major', length: 6, speed: 11, hp: 75, bite: 6, attackInterval: 1.2,
+    id: 'fire_major', species: 'solenopsis', name: 'Major', role: 'major', morph: 'fire_major', length: 6, speed: 11, hp: 75, bite: 6, attackInterval: 1.2, mount: 'large',
     armor: 2, carry: 5, grip: 3, mass: 3, forage: true, dig: true, nurse: false, threat: 0.8,
     sting: { dps: 1.8, duration: 7, maxStacks: 12 },
     cost: 14, devTime: 1.3, pop: 1.5, cocoon: false, fact: 'Solenopsis geminata majors have huge square heads and blunt mandibles built for milling seeds, which the colony stores in granaries.',
@@ -287,7 +293,7 @@ export const CASTES: Record<string, CasteDef> = {
     fact: 'Nasutitermes workers are blind, creamy and soft; the dark wood they have eaten shows through the abdomen. Large workers are female, small ones male.',
   }),
   nasute_soldier: C({
-    id: 'nasute_soldier', species: 'nasutitermes', name: 'Nasute', role: 'soldier', morph: 'termite_nasute', termite: 'nasute',
+    id: 'nasute_soldier', species: 'nasutitermes', name: 'Nasute', role: 'soldier', morph: 'termite_nasute', termite: 'nasute', mount: 'none',
     length: 5, speed: 13.6, // × 0.85
     hp: 12.8, // × 0.8
     bite: 0.3, attackInterval: 1.2, armor: 0, carry: 2, grip: 0.6, mass: 0.8, forage: true, dig: false, nurse: false, // gathers like an ant soldier (user note 2026-10-25)
@@ -297,7 +303,7 @@ export const CASTES: Record<string, CasteDef> = {
     fact: 'A nasute squirts sticky, noxious terpenes from the cone on its head (the nasus). Its mandibles are mere points: it cannot bite, and workers must feed it.',
   }),
   nasute_major: C({
-    id: 'nasute_major', species: 'nasutitermes', name: 'Major', role: 'major', morph: 'termite_major', termite: 'major',
+    id: 'nasute_major', species: 'nasutitermes', name: 'Major', role: 'major', morph: 'termite_major', termite: 'major', mount: 'large',
     length: 6.5, speed: 12, // × 0.75
     hp: 48, // × 3
     bite: 4.33, attackInterval: 1.0, // 4.33 dps = × 1.5

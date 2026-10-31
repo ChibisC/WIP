@@ -101,9 +101,9 @@ const KINDS: Record<string, { legs: (name: string) => boolean; parts: Part[]; we
   mantis: { legs: () => true, parts: mantisParts(1), weak: mantisWeak, legBases: true },
   giantMantis: { legs: () => true, parts: mantisParts(1.3), weak: mantisWeak, legBases: true },
   // chains: segment frames, rails up every other leg pair
-  lithobius: { legs: (n) => Number(n.slice(1, -1)) % 2 === 0, parts: chainParts(16, 2, 13, 0.018, 0.05), weak: chainWeak(16, 1, 13), legBases: false },
+  lithobius: { legs: (n) => Number(n.slice(1, -1)) % 2 === 0, parts: chainParts(16, 2, 13, 0.018, 0.05), weak: chainWeak(16, 2, 13), legBases: false },
   scolopendra: { legs: (n) => Number(n.slice(1, -1)) % 2 === 0, parts: chainParts(22, 1, 21, 0.022, 0.055), weak: chainWeak(22, 1, 21), legBases: false },
-  cutworm: { legs: () => true, parts: chainParts(13, 2, 11, 0.085, 0.085), weak: chainWeak(13, 1, 11), legBases: false },
+  cutworm: { legs: () => true, parts: chainParts(13, 2, 11, 0.085, 0.085), weak: chainWeak(13, 2, 11), legBases: false },
 };
 
 function restPose(kind: string, L: number): CrPose {
@@ -173,6 +173,43 @@ interface Cand {
   w: number;
 }
 
+/**
+ * Greedy spread: (`weakFirst`) the place nearest each weak point, in order, then always the candidate farthest from
+ * those taken, never two closer than `gap`; at most `cap`. (Without `weakFirst`: from the first weak point only.)
+ */
+function pick(cands: Cand[], weak: Array<{ world: P3 }>, gap: number, cap: number, weakFirst: boolean): Cand[] {
+  const chosen: Cand[] = [];
+  const ok = (c: Cand) => chosen.every((o) => len(sub(o.world, c.world)) >= gap - 1e-9);
+  for (let wi = 0; wi < (weakFirst ? weak.length : 1) && chosen.length < cap; wi++) {
+    let best: Cand | null = null;
+    let bd = Infinity;
+    for (const c of cands) {
+      if ((weakFirst && c.w !== wi) || chosen.includes(c) || !ok(c)) continue;
+      const d = len(sub(c.world, weak[wi].world));
+      if (d < bd) {
+        bd = d;
+        best = c;
+      }
+    }
+    if (best) chosen.push(best);
+  }
+  while (chosen.length < cap) {
+    let best: Cand | null = null;
+    let bd = -1;
+    for (const c of cands) {
+      if (chosen.includes(c) || !ok(c)) continue;
+      const d = Math.min(...chosen.map((o) => len(sub(o.world, c.world))));
+      if (d > bd) {
+        bd = d;
+        best = c;
+      }
+    }
+    if (!best) break;
+    chosen.push(best);
+  }
+  return chosen;
+}
+
 const out: string[] = [];
 const sizes: string[] = [];
 const M = BALANCE.mount;
@@ -234,8 +271,8 @@ for (const [kind, def] of Object.entries(KINDS)) {
   };
   for (const p of def.parts) {
     const f = frameAt(p.frame);
-    for (const th of [0, 0.35, 0.7, 1.0]) {
-      const steps = th === 0 ? 1 : 12;
+    for (const th of [0, 0.25, 0.5, 0.75, 1.0, 1.2]) {
+      const steps = th === 0 ? 1 : 16;
       for (let i = 0; i < steps; i++) {
         const ph = (i / steps) * Math.PI * 2;
         const x = p.cx + Math.sin(th) * Math.cos(ph) * p.rx;
@@ -259,36 +296,11 @@ for (const [kind, def] of Object.entries(KINDS)) {
       const side = Math.sign(knee[2] - hip[2]) || 1;
       cands.push({ frame: 'body', pos: sub(world, bf), world, n: norm([0, 1, 0.6 * side]), w: legW[i] });
     });
-  // pick: nearest to each weak point first (authored order, then leg bases), then always the farthest from those taken
-  const chosen: Cand[] = [];
-  const ok = (c: Cand) => chosen.every((o) => len(sub(o.world, c.world)) >= gap - 1e-9);
-  for (let wi = 0; wi < weak.length && chosen.length < cap; wi++) {
-    let best: Cand | null = null;
-    let bd = Infinity;
-    for (const c of cands) {
-      if (c.w !== wi || chosen.includes(c) || !ok(c)) continue;
-      const d = len(sub(c.world, weak[wi].world));
-      if (d < bd) {
-        bd = d;
-        best = c;
-      }
-    }
-    if (best) chosen.push(best);
-  }
-  while (chosen.length < cap) {
-    let best: Cand | null = null;
-    let bd = -1;
-    for (const c of cands) {
-      if (chosen.includes(c) || !ok(c)) continue;
-      const d = Math.min(...chosen.map((o) => len(sub(o.world, c.world))));
-      if (d > bd) {
-        bd = d;
-        best = c;
-      }
-    }
-    if (!best) break;
-    chosen.push(best);
-  }
+  // pick: the place nearest each weak point first (authored order, then leg bases) when the slots there pack well,
+  // then always the farthest from those taken; keep whichever way fits more
+  const chosen = pick(cands, weak, gap, cap, true);
+  const alt = pick(cands, weak, gap, cap, false);
+  if (alt.length > chosen.length) chosen.splice(0, chosen.length, ...alt);
   const frames = new Set<string>(['body', ...chosen.map((c) => c.frame), ...weak.map((wk) => wk.frame)]);
   const frameStr = [...frames]
     .filter((f) => rec.frames.has(f))

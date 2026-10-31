@@ -614,9 +614,9 @@ export interface Creature {
   /** number of ants grappling it (recomputed each tick) */
   latched: number;
   latchGrip: number;
-  /** ants climbing or riding it, and the room they take (size-class units) (recomputed each tick) */
+  /** ants on it (up a leg, riding or coming down), and the mount slots they hold (bit k = slot k) (recomputed each tick) */
   climbers?: number;
-  climbUnits?: number;
+  rideMask?: number;
   /** boss phase */
   phase: number;
   /** telegraph/wind-up timer */

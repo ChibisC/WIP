@@ -266,6 +266,10 @@
 .cr-riders { font-size: calc(11 * var(--u)); line-height: 1; color: #f3e8cf; font-variant-numeric: tabular-nums; min-width: calc(22 * var(--u)); text-shadow: 0 1px 1px #000; }
 .cr-riders::before { content: ''; display: inline-block; width: 0; height: 0; margin-right: calc(3 * var(--u)); border-left: calc(3 * var(--u)) solid transparent; border-right: calc(3 * var(--u)) solid transparent; border-bottom: calc(5 * var(--u)) solid var(--bronze-hi); vertical-align: 1px; }
 .cr-riders.full { color: var(--bronze-hi); }
+/* mount bonus (combat v2): enough riders on it, it takes extra damage */
+.cr-riders.bonus::after { content: '✦'; color: #ffcf5a; margin-left: calc(3 * var(--u)); text-shadow: 0 0 calc(4 * var(--u)) rgba(255, 190, 60, 0.8); }
+.boss-riders.bonus { color: #ffcf5a; }
+.boss-riders.bonus::before { content: '✦ '; text-shadow: 0 0 calc(4 * var(--u)) rgba(255, 190, 60, 0.8); }
 
 /* ---- Phase 13: narrator captions, sandbox tools */
 .caption { position: absolute; left: 50%; bottom: calc(285 * var(--u)); transform: translateX(-50%); max-width: calc(760 * var(--u)); padding: calc(8 * var(--u)) calc(18 * var(--u)); background: rgba(10, 7, 4, 0.72); border-radius: calc(4 * var(--u)); font-family: var(--body-font); font-style: italic; font-size: calc(17 * var(--u)); line-height: 1.45; color: #f3e8cf; text-align: center; text-shadow: 0 1px 2px #000; pointer-events: none; opacity: 0; transition: opacity .6s; text-wrap: balance; }

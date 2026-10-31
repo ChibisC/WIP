@@ -143,7 +143,8 @@ export const BALANCE = {
    * Stopping at reach (combat.ts, slots.ts): a victim ant's outline is an ellipse `antHalfLen` × its length
    * along and `antHalfWidth` × it across (a creature's is its capsule). The attacker holds where its front half
    * (`frontHalf` − `jawOverlap`, × its length) meets that outline in its slot's direction, so only the mandibles
-   * reach over; it latches within `arriveTol` × its length of that point.
+   * reach over; it latches within `arriveTol` × its length of that point, where it stands within its slot, and then
+   * keeps to the hold point at most `holdFollow` × its walking speed (it settles in, never snaps).
    *
    * Slots by perimeter: n = clamp(floor(P / (`slotWidth` × La × `slotSpacing`)), `slotsMin`, `slotsMax`), P the
    * length of the line the attackers' centres stand on (the victim's outline pushed out by half the attacker's
@@ -183,6 +184,7 @@ export const BALANCE = {
     frontHalf: 0.5,
     jawOverlap: 0.08,
     arriveTol: 0.15,
+    holdFollow: 2,
     slotWidth: 0.28,
     slotSpacing: 5.6,
     slotsMin: 2,

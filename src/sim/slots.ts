@@ -333,6 +333,39 @@ export function reserveAntSlot(w: World, a: Ant, o: Ant, isQueen: boolean): numb
   return NaN;
 }
 
+/**
+ * Which way round ant victim `o` attacker `a` should sidle to reach its slot at world angle `want`: a way that passes
+ * no slot held by others (their holders are in the way), the shorter if both are clear. +1 counter-clockwise, −1;
+ * 0 when both ways are blocked (the slot cannot be reached: the attacker waits or picks another foe).
+ */
+export function flankSide(w: World, a: Ant, o: Ant, isQueen: boolean, want: number): number {
+  const e = antHeld(w, o);
+  const n = antSlotCount(o, casteOf(a.caste).length, isQueen);
+  let taken = 0;
+  for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id) taken |= 1 << sector(e.v[i], n);
+  const b = datan2(a.y - o.y, a.x - o.x);
+  const mine = sector(want, n);
+  let best = 0;
+  let bestK = Infinity;
+  for (const side of [1, -1]) {
+    const span = ((((side > 0 ? want - b : b - want) / TAU) % 1) + 1) % 1;
+    const steps = Math.max(1, Math.ceil(span * n * 4));
+    let crossed = 0;
+    let last = -1;
+    for (let i = 1; i < steps; i++) {
+      const k = sector(b + side * ((span * TAU * i) / steps), n);
+      if (k !== last && k !== mine && taken & (1 << k)) crossed++;
+      last = k;
+    }
+    if (crossed > 0) continue;
+    if (span < bestK - 1e-9) {
+      bestK = span;
+      best = side;
+    }
+  }
+  return bestK === Infinity ? 0 : best;
+}
+
 /** Index (of n) of a creature slot fraction on its ring. */
 function slotIdx(u: number, n: number): number {
   return (((Math.round((u % 1) * n - 0.5) % n) + n) % n);

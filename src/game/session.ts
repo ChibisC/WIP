@@ -8,7 +8,8 @@ import { AntRenderer, AntSpaceAdapter, AntView } from '../render/ants/antRendere
 import { edible } from '../sim/diet';
 import { HitboxOverlay } from './hitboxOverlay';
 import { CreatureRenderer } from '../render/creatures/creatureRenderer';
-import { climbRoom } from '../sim/creatures/climb';
+import { climbCap } from '../sim/creatures/climb';
+import { mountBonus } from '../sim/combat';
 import { CREATURES } from '../sim/creatures/kinds';
 import { SurfaceMounds } from '../render/game/mounds';
 import { FoodRenderer, SpaceMapper } from '../render/game/foodRenderer';
@@ -1148,13 +1149,13 @@ export class GameSession {
   }
 
   /**
-   * Small health bars over climbable creatures (CHANGE_PLAN §15.2) that are
+   * Small health bars over mountable creatures (CHANGE_PLAN §15.2, §16) that are
    * hurt or have ants on them, in the space being viewed: screen position,
-   * health fraction, riders, and the room they take of the room on its back
-   * (riders take room by size class). Bosses use the boss bar.
+   * health fraction, riders / cap, and whether the mount bonus is on. Bosses
+   * use the boss bar.
    */
-  creatureBars(): Array<{ id: number; x: number; y: number; hp: number; riders: number; used: number; cap: number }> {
-    const out: Array<{ id: number; x: number; y: number; hp: number; riders: number; used: number; cap: number }> = [];
+  creatureBars(): Array<{ id: number; x: number; y: number; hp: number; riders: number; cap: number; bonus: boolean }> {
+    const out: Array<{ id: number; x: number; y: number; hp: number; riders: number; cap: number; bonus: boolean }> = [];
     if (this.view.transitioning) return out;
     const w = this.world;
     const space = this.activeSpace();
@@ -1163,14 +1164,14 @@ export class GameSession {
     const v = this.barTmp;
     for (const cr of w.s.creatures) {
       if (cr.dead || cr.space !== space || CREATURES[cr.kind]?.boss) continue;
-      const cap = climbRoom(cr);
+      const cap = climbCap(cr);
       if (cap <= 0) continue;
       const riders = cr.climbers ?? 0;
       if (riders === 0 && cr.hp >= cr.maxHp - 1e-6) continue;
       const gy = space === SURFACE ? this.surfHeight(cr.x, cr.y) : nt ? nt.heightAt(cr.x, cr.y) : 0;
       v.set(cr.x, gy + cr.scale * 0.55, cr.y).project(cam);
       if (v.z > 1 || v.z < -1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) continue;
-      out.push({ id: cr.id, x: ((v.x + 1) / 2) * window.innerWidth, y: ((1 - v.y) / 2) * window.innerHeight, hp: Math.max(0, cr.hp / Math.max(1, cr.maxHp)), riders, used: cr.climbUnits ?? 0, cap });
+      out.push({ id: cr.id, x: ((v.x + 1) / 2) * window.innerWidth, y: ((1 - v.y) / 2) * window.innerHeight, hp: Math.max(0, cr.hp / Math.max(1, cr.maxHp)), riders, cap, bonus: mountBonus(cr) });
       if (out.length >= 24) break;
     }
     return out;
