@@ -125,6 +125,44 @@ export const BALANCE = {
   /** creatures choosing which ant to attack: one straight behind counts as (1 + this) × the squared distance */
   creatureFrontBias: 1,
   /**
+   * Creature melee reach (user note 2026-10-31: "increase some of the melee ranges of the creatures in a realistic
+   * manner so they don't move too much when fighting"; CHANGE_PLAN §18). Reach is measured from the body outline (the
+   * capsule ants plant round), no longer from the body's centre: `r` is how far its jaws, fangs or forelegs reach beyond
+   * the outline, × its length; `arc` how far each side of its heading (rad), seen from the front of its body, it strikes
+   * without turning. An ant is in reach when its centre is within r × L + `combat2.antHalfLen` × its own length of the
+   * outline (an ant planted on the outline always is). In reach and in its arc, a creature stands and strikes; an ant in
+   * reach but outside the arc it turns to (`turnTo` rad/s, standing); only with no ant in reach does it walk. From the
+   * models (front of the body vs the jaw, fang and foreleg tips: tools/fight-motion.ts notes) and the animals:
+   *  - ground beetle 0.12 ±1.3: sickle mandibles about an eighth of its length; the head and pronotum thrust and swing.
+   *  - rove beetle 0.12 ±2.2: long crossing mandibles on a very mobile head, and it curls its abdomen forward.
+   *  - stone centipede 0.12 ±2.4, giant centipede 0.1 ±2.0: venom claws, and the front segments swing the head far round.
+   *  - wolf spider, spiderling, wolf-spider mother 0.35 ±1.0; tarantula 0.35 ±0.9: the front legs and palps (feet at
+   *    about its own length ahead of its centre) grab and pull prey to the fangs.
+   *  - mantis 0.3 ±0.45, giant mantis 0.3 ±0.65: the raptorial forelegs strike about a third of its length ahead of
+   *    the head (its strike cone).
+   *  - stag beetle 0.15 ±0.6: the antler tips stand 0.14 of its length beyond the head; it swings them sideways a little.
+   */
+  creatureReach: {
+    groundBeetle: { r: 0.12, arc: 1.3 },
+    rove: { r: 0.12, arc: 2.2 },
+    lithobius: { r: 0.12, arc: 2.4 },
+    wolfSpider: { r: 0.35, arc: 1.0 },
+    spiderling: { r: 0.35, arc: 1.0 },
+    hogna: { r: 0.35, arc: 1.0 },
+    tarantula: { r: 0.35, arc: 0.9 },
+    mantis: { r: 0.3, arc: 0.45 },
+    giantMantis: { r: 0.3, arc: 0.65 },
+    stagBeetle: { r: 0.15, arc: 0.6 },
+    scolopendra: { r: 0.1, arc: 2.0 },
+  } as Record<string, { r: number; arc: number }>,
+  /**
+   * Reach of a kind not in the table; turning to an ant in reach (rad/s); a bite already coming lands `slack` × the reach
+   * (and arc). Splash strikes (the tarantula's fangs, the giant centipede's venom claws) hit a circle half way out along
+   * the reach, of radius (0.5 + `strikePad`) × the reach; the tarantula's body lurches `tarantulaLurch` × its length into
+   * the strike (the front legs do the reaching: it was a 0.4 lunge).
+   */
+  creatureReachDefault: { r: 0.1, arc: 1.2, turnTo: 3, slack: 1.3, strikePad: 0.3, tarantulaLurch: 0.1 },
+  /**
    * Soft separation (light collision): each ant is a circle of radius
    * `radiusOfWidth` x its body width (`widthOfLength` x its length); overlaps are
    * pushed apart by `strength` of the overlap per tick, at most `maxPush` x the
