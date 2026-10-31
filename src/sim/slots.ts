@@ -1,4 +1,4 @@
-import { antClear, antFitsUnderCreature, antFitsUnderCreatureAt, antHeights, antNeed, stackCap, zoneAt } from './underpass';
+import { antClear, antFitsUnderCreature, antFitsUnderCreatureAt, antHeights, antMostClear, antNeed, stackCap, zoneAt } from './underpass';
 import { World } from './world';
 import { Ant, AS, Creature } from './types';
 import { casteOf } from './species';
@@ -302,6 +302,7 @@ export function canShare(w: World, a: Ant, id: number, x: number, y: number): bo
   const b = w.antById.get(id);
   if (!b || b === a || (b.team ?? b.colony) !== (a.team ?? a.colony) || b.state === AS.Dead) return false;
   const need = antNeed(a);
+  if (need > antMostClear(b.caste)) return false;
   antClear(b, SH, (b.fhd ?? 0) > 0);
   if (need > Math.max(SH[0], SH[1], SH[2])) return false;
   const d = antHeights(b.caste);
@@ -329,7 +330,7 @@ function antTaken(w: World, a: Ant, o: Ant, e: Held, n: number, share = true): n
   let taken = 0;
   for (let k = 0; k < n; k++) {
     if (!secN[k]) continue;
-    if (secN[k] === 1 && share) {
+    if (secN[k] === 1 && share && mayShare(w, a, secId[k])) {
       antHoldPoint(a, o, ((k + 0.5) / n) * TAU, SHP);
       if (canShare(w, a, secId[k], SHP.x, SHP.y)) continue;
     }
@@ -348,8 +349,11 @@ export function antHasRoom(w: World, a: Ant, o: Ant, isQueen: boolean): boolean 
   let ground = 0;
   for (let i = 0; i < e.ids.length; i++) if (e.v[i] < UNDER) ground++;
   if (ground < n) return true;
-  // full: a slot it can share under a teammate, or a place under the foe (combat v2.2)
-  if ((antTaken(w, a, o, e, n, false) & ~antTaken(w, a, o, e, n, true)) !== 0) return true;
+  // full: a slot it can share under a teammate, or a place under the foe (combat v2.2) — the quick checks first
+  let share = false;
+  for (let i = 0; i < e.ids.length && !share; i++) if (e.v[i] < UNDER && e.ids[i] !== a.id && mayShare(w, a, e.ids[i])) share = true;
+  if (share && (antTaken(w, a, o, e, n, false) & ~antTaken(w, a, o, e, n, true)) !== 0) return true;
+  if (!BALANCE.underpass.enemies || antNeed(a) > antMostClear(o.caste)) return false;
   return !Number.isNaN(underSector(w, a, o, e));
 }
 
@@ -374,6 +378,7 @@ export function antUnderPoint(o: Ant, ang: number, out: { x: number; y: number }
 function underSector(w: World, a: Ant, o: Ant, e: Held): number {
   if (!BALANCE.underpass.enemies || (o.team ?? o.colony) === (a.team ?? a.colony)) return NaN;
   const need = antNeed(a);
+  if (need > antMostClear(o.caste)) return NaN;
   antClear(o, SH, (o.fhd ?? 0) > 0);
   if (need > Math.max(SH[0], SH[1], SH[2])) return NaN;
   let used = 0;
@@ -504,13 +509,20 @@ function crTaken(w: World, a: Ant, cr: Creature, e: Held, ring: number, n: numbe
   let taken = 0;
   for (let k = 0; k < n; k++) {
     if (!secN[k]) continue;
-    if (secN[k] === 1 && ring === 0) {
+    if (secN[k] === 1 && ring === 0 && mayShare(w, a, secId[k])) {
       creatureSlotWorld(cr, off, (k + 0.5) / n, UT);
       if (canShare(w, a, secId[k], UT.x, UT.y)) continue;
     }
     taken |= 1 << k;
   }
   return taken;
+}
+
+/** Quick check before working out where a slot is: could `a` stand under holder `id` in any pose at all? */
+function mayShare(w: World, a: Ant, id: number): boolean {
+  if (!BALANCE.underpass.allies) return false;
+  const b = w.antById.get(id);
+  return !!b && (b.team ?? b.colony) === (a.team ?? a.colony) && antNeed(a) <= antMostClear(b.caste);
 }
 
 /** Index (of n) of a creature slot fraction on its ring. */

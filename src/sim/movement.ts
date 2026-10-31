@@ -1,4 +1,4 @@
-import { antClear, antNeed } from './underpass';
+import { antClear, antMostClear, antNeed } from './underpass';
 import { World } from './world';
 import { Ant, AS, Carry, Colony, Entrance, SURFACE, nestSpace, colonyOfSpace } from './types';
 import { canEnter, canLeave, passEntrance, usableMask } from './entrances';
@@ -178,10 +178,6 @@ export function avoidHeading(w: World, a: Ant, want: number, look: number, fight
 function avoidCb(g: Ant, d2: number): boolean {
   if (g === AV.a || (g.team ?? g.colony) !== AV.team || g.state === AS.Dead || g.state === AS.Flung || (g.ridePh ?? 0) >= 1 || d2 >= AV.best) return false;
   if (AV.fighters && g.state !== AS.Attack && g.state !== AS.Grapple && g.state !== AS.Spray) return false;
-  if (AV.up) {
-    antClear(g, AVC);
-    if (AV.need <= Math.max(AVC[0], AVC[1], AVC[2]) || antNeed(g) <= AV.cmax) return false;
-  }
   const gx = g.x - AV.ax;
   const gy = g.y - AV.ay;
   const fwd = gx * AV.cw + gy * AV.sw;
@@ -189,6 +185,14 @@ function avoidCb(g: Ant, d2: number): boolean {
   const lat = -gx * AV.sw + gy * AV.cw;
   if (Math.abs(lat) > fwd * AV.tan) return false;
   if (Math.abs(lat) > (AV.ra + bodyRadius(g.caste)) * 1.4) return false;
+  // (combat v2.2: a teammate it can pass under, or that can pass under it, is not in its way — feet aside)
+  if (AV.up) {
+    if (antNeed(g) <= AV.cmax) return false;
+    if (AV.need <= antMostClear(g.caste)) {
+      antClear(g, AVC);
+      if (AV.need <= Math.max(AVC[0], AVC[1], AVC[2])) return false;
+    }
+  }
   AV.best = d2;
   AV.side = lat > 1e-6 ? -1 : lat < -1e-6 ? 1 : AV.odd ? 1 : -1;
   return false;

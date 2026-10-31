@@ -41,9 +41,34 @@ export function creatureHeights(kind: string): HeightDef {
   return d;
 }
 
+/** Per caste: its heights, length (mm), height with the margin (mm) and the most clearance any pose gives (mm). */
+interface CasteRec {
+  d: HeightDef;
+  L: number;
+  need: number;
+  most: number;
+}
+const casteRec = new Map<string, CasteRec>(); // det-ok: constant lookups
+function recOf(caste: string): CasteRec {
+  let r = casteRec.get(caste);
+  if (!r) {
+    const d = antHeights(caste);
+    const L = casteOf(caste).length;
+    const k = Math.max(1, U.pose.braced, U.pose.porterLoaded, U.pose.rearing);
+    r = { d, L, need: d.h * L * (1 + U.margin), most: Math.max(d.c[0], d.c[1], d.c[2]) * L * k };
+    casteRec.set(caste, r);
+  }
+  return r;
+}
+
 /** An ant's height with the margin (mm): what must fit under another. */
 export function antNeed(a: Ant): number {
-  return antHeights(a.caste).h * casteOf(a.caste).length * (1 + U.margin);
+  return recOf(a.caste).need;
+}
+
+/** The most clearance an ant of this caste has in any pose (mm): a quick "nothing fits under it" check. */
+export function antMostClear(caste: string): number {
+  return recOf(caste).most;
 }
 
 const braced = new Set(U.braced); // det-ok: constant
@@ -54,9 +79,10 @@ const porters = new Set(U.porters); // det-ok: constant
  * under its front is mid-attack, so its front waits to lower (a braced bite).
  */
 export function antClear(b: Ant, out: number[], holdFront = false): number[] {
-  const d = antHeights(b.caste);
-  const L = casteOf(b.caste).length;
-  if (b.state === AS.Dead || b.state === AS.Flung) {
+  const rc = recOf(b.caste);
+  const d = rc.d;
+  const L = rc.L;
+  if (rc.most === 0 || b.state === AS.Dead || b.state === AS.Flung) {
     out[0] = out[1] = out[2] = 0;
     return out;
   }
