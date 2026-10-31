@@ -305,7 +305,7 @@ export function formicineMandible(o: { teeth: number; color: MandibleSpec['color
 // ant's — the photos)
 // (user note: they didn't look like the photos — closed, Lasius jaws are a broad, thick, rounded muzzle in front of the
 // head, curving down like a beak, orange-brown and paler than the head, only the cutting edge darker)
-export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x7a4a24, mid: 0x8a5428, tip: 0x6a3a1c, teeth: 0x2a1408, dark: [0.86, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.9, pitch: [-0.1, -0.26, -0.5], edgeDark: 0.45, roll: 0.55 });
+export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x946038, mid: 0x9e6634, tip: 0x784626, teeth: 0x2a1408, dark: [0.86, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.9, pitch: [-0.1, -0.26, -0.5], edgeDark: 0.45, roll: 0.55 });
 /** Red wood ant (Formica rufa): reddish-brown jaws darkening to black at the teeth (docs/creatures/formica-rufa.md). */
 // (the user's photos: red-orange jaws, near black at the teeth)
 // (user note and photos: closed, a pointed beak projecting forward and down from the head, red-orange and paler than

@@ -144,12 +144,14 @@ const lasiusWorker: AntMorph = {
   legs: { hind: 0.95, thick: 0.0118 },
   // (rollout batch 1, the user's photos: dark brown, not black; the mesosoma a shade paler; a satin, faintly grey
   // sheen from the pubescence; legs brown, paler and more orange toward the tarsi)
+  // (overnight colour check, docs/realism/lasius-niger: the renders sampled 20–30 L* darker than the photos and
+  // over-saturated — lighter, more neutral browns; spec 02 cause 3)
   look: {
-    head: L(0x2c2016, 0.55, 0.12, 0.24),
-    meso: L(0x4a3020, 0.55, 0.12, 0.2),
-    waist: L(0x3e2a1c, 0.55, 0.1, 0.16),
-    gaster: L(0x30231a, 0.46, 0.2, 0.38),
-    legs: L(0x5a3e24, 0.52, 0.08, 0.15, 0x9a6c3c),
+    head: L(0x4a3a2c, 0.55, 0.12, 0.24),
+    meso: L(0x664c36, 0.55, 0.12, 0.2),
+    waist: L(0x4c3828, 0.55, 0.1, 0.16),
+    gaster: L(0x3e3228, 0.46, 0.2, 0.38),
+    legs: L(0x684a30, 0.52, 0.08, 0.15, 0xa07850),
     // (scapes lighter, yellowish brown; mandibles and knees too: AntWiki, Wilson 1955, Borowiec & Salata 2022)
     antenna: L(0x5a4028, 0.56, 0.06, 0.15, 0x4a3424),
     mandible: L(0x2e2016, 0.55, 0.12, 0.0),
@@ -209,12 +211,14 @@ const formicaWorker: AntMorph = {
   legs: { hind: 1.1, thick: 0.0108 },
   // (the photos: dull, microreticulate and finely pubescent everywhere — a satin at most, never a gloss)
   look: {
-    head: L(0x2a1f19, 0.6, 0.08, 0.2, 0x8a4220),
+    // (overnight colour check, docs/realism/formica-rufa: the renders sampled 15–25 L* darker than the photos
+    // and over-saturated — lighter, less saturated reds and browns)
+    head: L(0x3c2e24, 0.6, 0.08, 0.2, 0xa65634),
     // bright rusty red, a little orange
-    meso: L(0x8e4424, 0.62, 0.06, 0.18, 0x2a1a10),
-    waist: L(0x84391c, 0.6, 0.06, 0.14),
+    meso: L(0xb0603a, 0.62, 0.06, 0.18, 0x3a2a1e),
+    waist: L(0x974a28, 0.6, 0.06, 0.14),
     // dark grey-brown, dull under a silvery pubescence, the hind margins of the tergites pale
-    gaster: L(0x3e3029, 0.58, 0.1, 0.65, 0x5a3424),
+    gaster: L(0x443830, 0.58, 0.1, 0.65, 0x5e3a2a),
     legs: L(0x2a1d16, 0.5, 0.12, 0.15, 0x4a3022),
     antenna: L(0x2a1d16, 0.5, 0.1, 0.1, 0x553a2a),
     mandible: L(0x52281a, 0.45, 0.25, 0),
