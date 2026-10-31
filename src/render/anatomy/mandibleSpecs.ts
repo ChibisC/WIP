@@ -299,15 +299,17 @@ export function formicineMandible(o: { teeth: number; color: MandibleSpec['color
   };
 }
 
+// (overnight review round 1: the jaws were a small orange spike — the photos' are robust, darker toothed
+// triangles projecting well in front: set more forward (heading .52, a longer blade for the same reach), darker)
 /** Black garden ant (Lasius niger): dark brown jaws, a little paler and redder along the masticatory margin, the teeth black (docs/creatures/lasius-niger.md). */
 // (the user's photos: the jaws orange-brown, paler than the head, darkening at the teeth)
 // (closed, the formicine jaws overlap well past the midline, the apical teeth crossing: larger blades than the fire
 // ant's — the photos)
 // (user note: they didn't look like the photos — closed, Lasius jaws are a broad, thick, rounded muzzle in front of the
 // head, curving down like a beak, orange-brown and paler than the head, only the cutting edge darker)
-export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x946038, mid: 0x9e6634, tip: 0x784626, teeth: 0x2a1408, dark: [0.86, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.9, pitch: [-0.1, -0.26, -0.5], edgeDark: 0.45, roll: 0.55 });
+export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x6e4428, mid: 0x7a4c2c, tip: 0x4a2c18, teeth: 0x1e1008, dark: [0.8, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.9, pitch: [-0.1, -0.26, -0.5], edgeDark: 0.55, roll: 0.55, heading: 0.52 });
 /** Red wood ant (Formica rufa): reddish-brown jaws darkening to black at the teeth (docs/creatures/formica-rufa.md). */
 // (the user's photos: red-orange jaws, near black at the teeth)
 // (user note and photos: closed, a pointed beak projecting forward and down from the head, red-orange and paler than
 // the face; open, two big curved red blades with dark tips and teeth)
-export const FORMICA_WORKER = formicineMandible({ teeth: 8, color: { base: 0xa04a20, mid: 0x9a4220, tip: 0x5a2410, teeth: 0x1a0a06, dark: [0.8, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.85, pitch: [-0.12, -0.3, -0.56], edgeDark: 0.6, roll: 0.6 });
+export const FORMICA_WORKER = formicineMandible({ teeth: 8, color: { base: 0x6e3020, mid: 0x6a2c1c, tip: 0x3a1a10, teeth: 0x140806, dark: [0.72, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.85, pitch: [-0.12, -0.3, -0.56], edgeDark: 0.65, roll: 0.6, heading: 0.52 });

@@ -62,7 +62,7 @@ export interface AntMorph {
     open?: number;
   };
   /** `smooth`: one even arch, no metanotal groove (Saiy-Ants, Termants) */
-  meso: { len: number; width: number; height: number; queen?: boolean; smooth?: boolean; spines?: { pro?: number; meso?: number; prop?: number }; /** worker profile: groove depth (default 0.16), propodeum height (0.62), the waist of the mesosoma seen from above (0.12) */ groove?: number; prop?: number; pinch?: number };
+  meso: { len: number; width: number; height: number; queen?: boolean; smooth?: boolean; spines?: { pro?: number; meso?: number; prop?: number }; /** worker profile: groove depth (default 0.16), propodeum height (0.62), the waist of the mesosoma seen from above (0.12) */ groove?: number; prop?: number; pinch?: number; /** formicines: the pronotum slopes down into the neck over this much of the length (default: a short steep front) */ neck?: number };
   waist: {
     nodes: 1 | 2;
     len: number;
@@ -130,35 +130,41 @@ const L = (color: number, rough: number, coat: number, sheen: number, color2?: n
 const lasiusWorker: AntMorph = {
   key: 'lasius_worker',
   L: 4,
-  head: { len: 0.23, width: 0.21, height: 0.15, shape: 'rect' },
+  // (overnight review round 1: the head deeper — a rounded box, not a flat lid)
+  head: { len: 0.23, width: 0.21, height: 0.17, shape: 'rect' },
   // (overnight spec 3.4: three tiny ocelli on the vertex — the realism ocelli are glints set into it)
   eyes: { size: 0.22, pos: 0.52, height: 0.15, ocelli: true },
   // (the user's photos: slender antennae and legs, lighter brown)
-  antenna: { segments: 12, scape: 1.0, funiculus: 1.25, club: 0, thick: 0.0108 },
+  antenna: { segments: 12, scape: 1.0, funiculus: 1.25, club: 0, thick: 0.0088 },
   // rollout batch 1: the formicine jaw generator (8 teeth, closing neatly in front of the clypeus)
   mandible: { type: 'triangular', len: 0.42, teeth: 8, width: 0.55, spec: LASIUS_WORKER, open: 0.7 },
-  meso: { len: 0.32, width: 0.13, height: 0.13, groove: 0.24, prop: 0.68 },
-  waist: { nodes: 1, len: 0.05, scale: true, nodeH: 0.11 },
+  // (overnight review round 1: one continuous convex profile, not stepped blocks)
+  meso: { len: 0.32, width: 0.145, height: 0.13, groove: 0.13, prop: 0.6, neck: 0.16 },
+  waist: { nodes: 1, len: 0.05, scale: true, nodeH: 0.1 },
   // (the photos: a broad, rounded oval, about as wide as the head or wider)
   gaster: { len: 0.38, width: 0.26, height: 0.21, sting: false },
-  legs: { hind: 0.95, thick: 0.0118 },
+  // (overnight review round 1: the photos' legs are about half again as thick — the femora stout)
+  legs: { hind: 0.86, thick: 0.0158 },
   // (rollout batch 1, the user's photos: dark brown, not black; the mesosoma a shade paler; a satin, faintly grey
   // sheen from the pubescence; legs brown, paler and more orange toward the tarsi)
   // (overnight colour check, docs/realism/lasius-niger: the renders sampled 20–30 L* darker than the photos and
   // over-saturated — lighter, more neutral browns; spec 02 cause 3)
   look: {
-    head: L(0x4a3a2c, 0.55, 0.12, 0.24),
-    meso: L(0x664c36, 0.55, 0.12, 0.2),
-    waist: L(0x4c3828, 0.55, 0.1, 0.16),
-    gaster: L(0x3e3228, 0.46, 0.2, 0.38),
-    legs: L(0x684a30, 0.52, 0.08, 0.15, 0xa07850),
+    // (review round 1: uniformly dark — the mesosoma no paler than the head; legs a translucent brown, not tan;
+    // a grey pubescent sheen on the gaster)
+    head: L(0x44362a, 0.55, 0.12, 0.26),
+    meso: L(0x4a3a2c, 0.55, 0.12, 0.22),
+    waist: L(0x42342a, 0.55, 0.1, 0.16),
+    gaster: L(0x3e3228, 0.44, 0.22, 0.55),
+    legs: L(0x4e3a2a, 0.5, 0.1, 0.15, 0x7a5c40),
     // (scapes lighter, yellowish brown; mandibles and knees too: AntWiki, Wilson 1955, Borowiec & Salata 2022)
-    antenna: L(0x5a4028, 0.56, 0.06, 0.15, 0x4a3424),
+    antenna: L(0x544030, 0.56, 0.06, 0.15, 0x46362a),
     mandible: L(0x2e2016, 0.55, 0.12, 0.0),
   },
   hair: 0.6,
   // erect hairs on the gaster (and scapes and tibiae, diagnostic); fine, pale greyish, short
-  setae: { color: 0x8a7c6c, head: 22, meso: 16, gaster: 90, len: [0.012, 0.05] },
+  // (review round 1: the hairs read as white scratches — darker, a golden grey)
+  setae: { color: 0x6e6254, head: 22, meso: 16, gaster: 80, len: [0.012, 0.05] },
   real: true,
   stance: 0.13,
 };
@@ -171,8 +177,8 @@ const lasiusSoldier: AntMorph = {
   head: { len: 0.25, width: 0.245, height: 0.165, shape: 'rect' },
   eyes: { size: 0.2, pos: 0.52, height: 0.15, ocelli: true },
   mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.62, spec: LASIUS_WORKER, open: 0.7 },
-  meso: { len: 0.31, width: 0.14, height: 0.14 },
-  legs: { hind: 0.93, thick: 0.0165 },
+  meso: { len: 0.31, width: 0.14, height: 0.14, neck: 0.16 },
+  legs: { hind: 0.84, thick: 0.019 },
 };
 
 const lasiusQueen: AntMorph = {
@@ -197,36 +203,40 @@ const lasiusQueen: AntMorph = {
 const formicaWorker: AntMorph = {
   key: 'formica_worker',
   L: 7,
-  head: { len: 0.24, width: 0.22, height: 0.15, shape: 'tri' },
+  // (overnight review round 1: deeper, rounder head as in the side photos)
+  // (review round 1: broad and rounded-trapezoidal with convex sides, not a wedge: the realism 'rect' outline)
+  head: { len: 0.24, width: 0.23, height: 0.175, shape: 'rect' },
   // elongate oval, ~0.27 of the head's length (AntWiki: Borowiec & Salata 2022)
   eyes: { size: 0.27, pos: 0.48, height: 0.25, ocelli: true, oval: 1.3 },
-  antenna: { segments: 12, scape: 1.15, funiculus: 1.2, club: 0, thick: 0.0096 },
+  antenna: { segments: 12, scape: 1.15, funiculus: 1.2, club: 0, thick: 0.0078 },
   mandible: { type: 'triangular', len: 0.4, teeth: 8, width: 0.6, spec: FORMICA_WORKER, open: 0.7 },
   // (rollout batch 1, the user's photos: the mesonotal groove deep and the propodeum high and rounded; the
   // mesosoma pinched in the middle seen from above)
-  meso: { len: 0.34, width: 0.12, height: 0.13, groove: 0.22, prop: 0.64, pinch: 0.22 },
-  waist: { nodes: 1, len: 0.05, scale: true, nodeH: 0.12 },
+  meso: { len: 0.34, width: 0.145, height: 0.13, groove: 0.12, prop: 0.6, pinch: 0.12, neck: 0.16 },
+  // (overnight review round 1: the scale no taller than the propodeum, not a fin)
+  waist: { nodes: 1, len: 0.05, scale: true, nodeH: 0.1 },
   // (the photos: a big, broad oval gaster)
   gaster: { len: 0.37, width: 0.25, height: 0.21, sting: false },
-  legs: { hind: 1.1, thick: 0.0108 },
+  legs: { hind: 0.95, thick: 0.0148 },
   // (the photos: dull, microreticulate and finely pubescent everywhere — a satin at most, never a gloss)
   look: {
     // (overnight colour check, docs/realism/formica-rufa: the renders sampled 15–25 L* darker than the photos
     // and over-saturated — lighter, less saturated reds and browns)
-    head: L(0x3c2e24, 0.6, 0.08, 0.2, 0xa65634),
-    // bright rusty red, a little orange
-    meso: L(0xb0603a, 0.62, 0.06, 0.18, 0x3a2a1e),
-    waist: L(0x974a28, 0.6, 0.06, 0.14),
+    // (review round 1: deep rust red, not a flat bright orange; darker dorsal patches)
+    head: L(0x3a2c24, 0.6, 0.08, 0.2, 0x8e4a32),
+    meso: L(0x94482e, 0.62, 0.06, 0.18, 0x3a2a20),
+    waist: L(0x5a2c1e, 0.6, 0.06, 0.14),
     // dark grey-brown, dull under a silvery pubescence, the hind margins of the tergites pale
     gaster: L(0x443830, 0.58, 0.1, 0.65, 0x5e3a2a),
-    legs: L(0x2a1d16, 0.5, 0.12, 0.15, 0x4a3022),
+    // (the photos: coxae and femora reddish brown at the base, the tibiae and tarsi dark)
+    legs: L(0x5a3020, 0.5, 0.12, 0.15, 0x2c2019),
     antenna: L(0x2a1d16, 0.5, 0.1, 0.1, 0x553a2a),
     mandible: L(0x52281a, 0.45, 0.25, 0),
   },
   hair: 0.35,
   // sparse erect hairs (rufa is hairier than polyctena): head, pronotum, gaster
   // (the photos: the gaster bristles with erect hairs in silhouette)
-  setae: { color: 0xb09a80, head: 18, meso: 16, gaster: 110, len: [0.015, 0.075] },
+  setae: { color: 0x7a6a58, head: 18, meso: 16, gaster: 90, len: [0.015, 0.07] },
   real: true,
   stance: 0.15,
 };
@@ -251,16 +261,16 @@ const formicaSoldier: AntMorph = {
   ...formicaWorker,
   key: 'formica_soldier',
   L: 8.6,
-  head: { len: 0.27, width: 0.275, height: 0.17, shape: 'tri' },
+  head: { len: 0.27, width: 0.28, height: 0.19, shape: 'rect' },
   eyes: { size: 0.26, pos: 0.48, height: 0.25, ocelli: true },
   mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.7, spec: FORMICA_WORKER, open: 0.7 },
-  meso: { len: 0.33, width: 0.145, height: 0.15 },
+  meso: { len: 0.33, width: 0.145, height: 0.15, neck: 0.16 },
   gaster: { len: 0.35, width: 0.22, height: 0.18, sting: false },
-  legs: { hind: 1.02, thick: 0.0158 },
+  legs: { hind: 0.9, thick: 0.0195 },
   look: {
     ...formicaWorker.look,
-    head: L(0x241a14, 0.58, 0.1, 0.18, 0x7e3a1c),
-    meso: L(0x6a2c14, 0.45, 0.18, 0.1, 0x1e140d),
+    head: L(0x2e221c, 0.58, 0.1, 0.18, 0x7e3e28),
+    meso: L(0x7a3a24, 0.45, 0.18, 0.1, 0x2a1c14),
   },
 };
 
@@ -269,10 +279,10 @@ const formicaMortar: AntMorph = {
   ...formicaWorker,
   key: 'formica_mortar',
   L: 7.6,
-  meso: { len: 0.31, width: 0.12, height: 0.13 },
+  meso: { len: 0.31, width: 0.12, height: 0.13, neck: 0.16 },
   // (overnight spec 3.3: a bigger, more muscular gaster — the acid reservoir — and a visible acidopore)
   gaster: { len: 0.44, width: 0.27, height: 0.22, sting: false, pore: 1.7 },
-  legs: { hind: 1.02, thick: 0.0136 },
+  legs: { hind: 0.9, thick: 0.017 },
   look: { ...formicaWorker.look, gaster: L(0x1a120c, 0.28, 0.45, 0.2, 0x5a3418) },
 };
 
@@ -281,7 +291,7 @@ const formicaRapid: AntMorph = {
   ...formicaWorker,
   key: 'formica_rapid',
   L: 7.2,
-  meso: { len: 0.33, width: 0.115, height: 0.125 },
+  meso: { len: 0.33, width: 0.115, height: 0.125, neck: 0.16 },
   gaster: { len: 0.4, width: 0.215, height: 0.17, sting: false, pore: 1.5 },
   look: { ...formicaWorker.look, gaster: L(0x1c120d, 0.36, 0.3, 0.22, 0x7a3018) },
 };

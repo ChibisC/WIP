@@ -527,6 +527,7 @@ function setaeOn(acc: Acc, rng: Rng, pts: number[], radial: number, nRings: numb
  * Build an ant. detail 0 = full (observe camera), 1 = medium.
  */
 export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
+  const formicine = /^(lasius|formica|plagiaria)/.test(m.key);
   if ((m as { builder?: string }).builder === 'hell') return buildHellAnt(m, detail, seed);
   const acc = new Acc();
   const rng = new Rng(seed * 101 + m.key.length * 7);
@@ -584,7 +585,10 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         top = 0.38 + prop + groove + meso + pro;
         wid = 0.62 + 0.38 * Math.exp(-((t - 0.78) ** 2) / 0.03) - (mx.pinch ?? 0.12) * Math.exp(-((t - 0.32) ** 2) / 0.01) - 0.35 * ss(0.9, 1.0, t);
       }
-      const close = Math.pow(Math.min(1, t / 0.06), 0.5) * Math.pow(Math.min(1, (1 - t) / 0.05), 0.5);
+      // (overnight review: the formicine pronotum is a smooth dome sloping down into the neck, not a box with a
+      // vertical front wall — `meso.neck` sets how far back from the front the slope starts)
+      const nk = (m.meso as { neck?: number }).neck;
+      const close = Math.pow(Math.min(1, t / 0.06), 0.5) * (nk ? Math.pow(Math.min(1, (1 - t) / nk), 0.75) : Math.pow(Math.min(1, (1 - t) / 0.05), 0.5));
       const height = mH * top * Math.max(0.12, close);
       // (realism v2: a rounder section — the promesonotum a convex dome, not a box)
       rings.push({ x: t * mL, y: mBottom + height * 0.5, rz: (mW / 2) * wid * Math.max(0.15, close), ry: height * 0.5, n: m.real ? 2.1 : 2.4 });
@@ -658,7 +662,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     else if (sh === 'round') w = Math.sin(Math.PI * (0.12 + t * 0.8));
     else if (sh === 'tri') w = 1.0 - 0.38 * ss(0.3, 1.0, t) + 0.05 * Math.exp(-((t - 0.3) ** 2) / 0.02);
     else w = 0.98 + 0.08 * Math.exp(-((t - 0.25) ** 2) / 0.02) - 0.3 * ss(0.45, 1.0, t); // heart
-    const close = Math.pow(Math.min(1, t / 0.13), 0.32) * Math.pow(Math.min(1, (1 - t) / 0.07), 0.45);
+    // (overnight review round 1: the formicine head ends in a broad clypeus, not a bullet's nose)
+    const close = Math.pow(Math.min(1, t / 0.13), 0.32) * (formicine ? Math.pow(Math.min(1, (1 - t) / 0.05), 0.28) : Math.pow(Math.min(1, (1 - t) / 0.07), 0.45));
     return w * Math.max(0.12, close);
   };
   {
@@ -772,8 +777,9 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       const [pp, ii] = ellipsoid(c, r, hi ? (m.real ? 24 : 18) : 8);
       // realism v2: a bulging, glossy dome (the facets too fine to read except as a faint grain)
       // (rollout, the user's photos: the formicines' larger eyes are a satin grey-black, not glass beads)
-      const eyeLook: PartLook = smoothEye ? { color: 0, rough: 0.12, coat: 1, sheen: 0 } : m.real ? (m.eyes.size > 0.18 && /^(lasius|formica|plagiaria)/.test(m.key) ? { color: 0x15120f, rough: 0.3, coat: 0.35, sheen: 0.1 } : { color: 0x0b0806, rough: 0.16, coat: 0.7, sheen: 0 }) : { color: 0x0b0806, rough: 0.32, coat: 0.15, sheen: 0 };
-      acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(smoothEye ? 0x161c1a : m.eyes.single ? 0x2a1a10 : 0x0d0a08), eyeLook, smoothEye ? 3 : m.eyes.single ? 0 : 1);
+      // (overnight review round 1: the formicines' eyes a matte, faceted grey — not glossy black beads)
+      const eyeLook: PartLook = smoothEye ? { color: 0, rough: 0.12, coat: 1, sheen: 0 } : m.real ? (formicine ? { color: 0x3a3836, rough: 0.5, coat: 0.12, sheen: 0.15 } : { color: 0x0b0806, rough: 0.16, coat: 0.7, sheen: 0 }) : { color: 0x0b0806, rough: 0.32, coat: 0.15, sheen: 0 };
+      acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(smoothEye ? 0x161c1a : m.eyes.single ? 0x2a1a10 : formicine && m.real ? 0x34312e : 0x0d0a08), eyeLook, smoothEye ? 3 : m.eyes.single ? 0 : 1);
     }
     if (m.eyes.ocelli && hi) {
       for (const [ox, oz] of [

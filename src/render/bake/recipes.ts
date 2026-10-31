@@ -79,7 +79,7 @@ export const LASIUS: DetailRecipe = {
     [REGION.MESO]: { sculpt: LAS_MESO, shade: shade(0.8, 0.45, 0.5, 0.2, 0.4, { coatRough: 0.34, wear: 0.15, dust: 0.1, mid: 0.08, bands: [0.6], band: [0.009, 0.22, 0.1, 0.02] }), px: [1024, 512] },
     [REGION.WAIST]: { sculpt: LAS_WAIST, shade: shade(0.8, 0.06, 0.3, 0.2, 0.3, { coatRough: 0.36, wear: 0.15, dust: 0.12 }), px: [256, 256] },
     // (the user's photos: the hind margin of each tergite a plain pale, translucent band)
-    [REGION.GASTER]: { sculpt: LAS_GASTER, shade: shade(0.75, 0.3, 0.35, 0.22, 0.5, { coatRough: 0.32, wear: 0.15, dust: 0.06, mid: 0.08, bands: [0.4, 0.6, 0.77, 0.9], band: [0.008, 0.22, 0.45, 0.04] }), px: [512, 512] },
+    [REGION.GASTER]: { sculpt: LAS_GASTER, shade: shade(0.75, 0.3, 0.35, 0.22, 0.5, { coatRough: 0.32, wear: 0.15, dust: 0.06, mid: 0.08, bands: [0.4, 0.6, 0.77, 0.9], band: [0.011, 0.34, 0.6, 0.05] }), px: [512, 512] },
     [REGION.LEG]: { sculpt: LAS_LEG, shade: shade(1.0, 0.5, 0, 0.5, 0.35, { coatRough: 0.34, wear: 0.25, dust: 0.35, mid: 0.2, tipThin: 0.5 }), px: [128, 320] },
     [REGION.TARSUS]: { sculpt: FIRE_TARSUS, shade: shade(0.9, 0.45, 0, 0.5, 0.35, { coatRough: 0.4, dust: 0.55, mid: 0.15, tipThin: 0.45 }), px: [64, 128] },
     [REGION.ANTENNA]: { sculpt: FIRE_ANTENNA, shade: shade(0.7, 0.05, 0, 0.5, 0.35, { coatRough: 0.36, dust: 0.15, mid: 0, tipThin: 0.4 }), px: [64, 160] },
@@ -104,7 +104,7 @@ export const FORMICA: DetailRecipe = {
     [REGION.HEAD]: { sculpt: FOR_HEAD, shade: shade(0.8, 0.35, 0.45, 0.22, 0.4, { coatRough: 0.2, wear: 0.2, dust: 0.08, mid: 0.1 }), px: [512, 512] },
     [REGION.MESO]: { sculpt: FOR_MESO, shade: shade(0.8, 0.45, 0.5, 0.22, 0.4, { coatRough: 0.2, wear: 0.2, dust: 0.1, mid: 0.1, bands: [0.6], band: [0.009, 0.22, 0.1, 0.02] }), px: [1024, 512] },
     [REGION.WAIST]: { sculpt: FOR_WAIST, shade: shade(0.8, 0.06, 0.3, 0.22, 0.3, { coatRough: 0.24, wear: 0.2, dust: 0.12 }), px: [256, 256] },
-    [REGION.GASTER]: { sculpt: FOR_GASTER, shade: shade(0.75, 0.3, 0.35, 0.24, 0.5, { coatRough: 0.36, wear: 0.15, dust: 0.06, mid: 0.08, bands: [0.4, 0.6, 0.77, 0.9], band: [0.008, 0.2, 0.4, 0.035] }), px: [512, 512] },
+    [REGION.GASTER]: { sculpt: FOR_GASTER, shade: shade(0.75, 0.3, 0.35, 0.24, 0.5, { coatRough: 0.36, wear: 0.15, dust: 0.06, mid: 0.08, bands: [0.4, 0.6, 0.77, 0.9], band: [0.011, 0.36, 0.65, 0.05] }), px: [512, 512] },
     [REGION.LEG]: { sculpt: FOR_LEG, shade: shade(1.0, 0.5, 0, 0.5, 0.35, { coatRough: 0.28, wear: 0.3, dust: 0.35, mid: 0.25, tipThin: 0.55 }), px: [128, 320] },
     [REGION.TARSUS]: { sculpt: FIRE_TARSUS, shade: shade(0.9, 0.45, 0, 0.5, 0.35, { coatRough: 0.38, dust: 0.55, mid: 0.2, tipThin: 0.5 }), px: [64, 128] },
     [REGION.ANTENNA]: { sculpt: FIRE_ANTENNA, shade: shade(0.7, 0.05, 0, 0.5, 0.35, { coatRough: 0.32, dust: 0.15, mid: 0, tipThin: 0.4 }), px: [64, 160] },
