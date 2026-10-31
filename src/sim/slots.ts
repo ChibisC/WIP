@@ -504,7 +504,7 @@ export function takeCreatureSlot(w: World, a: Ant, cr: Creature, u: number): voi
  * the ring (outer ring only; not the one it was blocked on) minus `allyWeight` × the teammates already on the way there
  * (closing in or waiting, not holding: within two personal spaces outside the slots, before the nearest free slot).
  * +1 counter-clockwise, −1 clockwise; ties by its id (odd +1), so neighbours split between the two sides. 0 when no
- * slot is free anywhere.
+ * side has more free slots than teammates already on the way to them (then it waits, or picks another foe).
  */
 export function pickSide(w: World, a: Ant, kind: number, id: number, isQueen: boolean): number {
   const La = casteOf(a.caste).length;
@@ -583,6 +583,8 @@ export function pickSide(w: World, a: Ant, kind: number, id: number, isQueen: bo
       return false;
     });
     const score = nFree - C21.allyWeight * allies;
+    // (a side whose free slots the teammates already on the way will take is no way to go: it waits instead)
+    if (score <= 1e-9) continue;
     if (score > bestScore + 1e-9 || (Math.abs(score - bestScore) <= 1e-9 && side === (a.id & 1 ? 1 : -1))) {
       bestScore = score;
       best = side;

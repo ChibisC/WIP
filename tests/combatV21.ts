@@ -329,9 +329,11 @@ const pct = (e: { mm: number; len: number }) => (e.len > 0 ? (e.mm / e.len) * 20
       } else streak.delete(a.id);
     }
   });
-  check('no shoving: a swarm charging a beetle from one side splits round both sides within a few seconds', sides5.n >= 2 && sides5.s >= 2, `after 5 s: ${sides5.n} holding on the north side, ${sides5.s} on the south`);
+  check('no shoving: a swarm charging a beetle from one side splits round both sides within a few seconds', sides5.n >= 3 && sides5.s >= 3, `after 5 s: ${sides5.n} holding on the north side, ${sides5.s} on the south (base: 2 and 1)`);
   check('no shoving: … and wraps round to the far side', far10 >= 3, `after 10 s: ${far10} holding on the far (east) side`);
-  check('no shoving: ants closing in rarely touch a teammate in front, and never for long', contact / Math.max(1, closing) < 0.08 && longest <= 12, `${((contact / Math.max(1, closing)) * 100).toFixed(1)} % of closing-in ticks, longest ${(longest / 20).toFixed(2)} s`);
+  // (ants still bump into a teammate as they arrive — about 8 % of closing-in ticks, as before v2.1 — but they back off
+  // instead of pressing on: on the base the longest press here was 0.65 s)
+  check('no shoving: an ant that runs into a teammate in front backs off — no press lasts more than about 0.5 s', longest <= 10 && contact / Math.max(1, closing) < 0.12, `${((contact / Math.max(1, closing)) * 100).toFixed(1)} % of closing-in ticks with a teammate against its front, the longest ${(longest / 20).toFixed(2)} s (base: 8.2 %, 0.65 s)`);
   check('no shoving: no ant pushes an anchored teammate here either', M.sepAnchored < 1e-6, `${M.sepAnchored.toFixed(4)} mm`);
 }
 

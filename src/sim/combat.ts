@@ -802,19 +802,6 @@ function approachHold(w: World, a: Ant, cx: number, cy: number, hx: number, hy: 
   return false;
 }
 
-/** A teammate in its forward cone (`blockCone`) within a personal space? */
-function allyAhead(w: World, a: Ant): boolean {
-  const C21 = BALANCE.combat21;
-  const team = a.team ?? a.colony;
-  let hit = false;
-  w.antsNear(a.space, a.x, a.y, BALANCE.combat2.personalSpace * casteOf(a.caste).length, (g) => {
-    if (g === a || (g.team ?? g.colony) !== team || g.state === AS.Dead || g.state === AS.Flung || riding(g)) return false;
-    if (Math.abs(angleDiff(a.h, datan2(g.y - a.y, g.x - a.x))) <= C21.blockCone) hit = true;
-    return hit;
-  });
-  return hit;
-}
-
 /**
  * Blocked (combat v2.1, EotU "back off and go around"): closing in, it has not come `blockedGain` × its length closer
  * (`d`: to its hold point, or to the foe while still far) in `blockedSec`, while the foe stands (`moving` false: a chase
@@ -844,8 +831,8 @@ function blocked(w: World, a: Ant, d: number, moving: boolean, dt: number): bool
   const isQ = a.tk === 3 && a.tgt === w.colony(w.antById.get(a.tgt)?.colony ?? -1)?.queen;
   let side = pickSide(w, a, a.tk, a.tgt, isQ);
   if (goingRound(a) && side === Math.sign(a.flk ?? 0)) side = -side;
-  if (side === 0) side = a.id & 1 ? 1 : -1;
-  a.repT = side * C21.backOffSec;
+  // (no side with room: it backs off all the same, turning by its id, and then waits on the ring — backingOff)
+  a.repT = (side === 0 ? (a.id & 1 ? 1 : -1) : side) * C21.backOffSec;
   if ((a.garT ?? 0) !== 0) a.garT = 0;
   if ((a.flk ?? 0) !== 0) a.flk = 0;
   a.v = 0;
@@ -854,8 +841,8 @@ function blocked(w: World, a: Ant, d: number, moving: boolean, dt: number): bool
 
 /**
  * Backing off after a block: it steps back `backOffLen` × its length over `backOffSec`, still facing the fight, its
- * body turning `backOffTurn` toward the side it picked (the sign of `repT`); then it goes round that way. Returns true
- * while it backs off.
+ * body turning `backOffTurn` toward the side it picked (the sign of `repT`); then it goes round the side with room
+ * (pickSide, asked again), or — none — waits on the ring. Returns true while it backs off.
  */
 function backingOff(w: World, a: Ant, cx: number, cy: number, dt: number): boolean {
   const rep = a.repT ?? 0;
@@ -871,10 +858,16 @@ function backingOff(w: World, a: Ant, cx: number, cy: number, dt: number): boole
   a.h = h;
   turnToward(a, datan2(cy - a.y, cx - a.x) + side * C21.backOffTurn, dt, BALANCE.combat.turnRate);
   if (a.repT === 0) {
-    a.flk = side;
-    a.garT = 1e-6;
+    // then round the side with room (asked again now: others may have taken it meanwhile), or wait on the ring
+    const isQ = a.tk === 3 && a.tgt === w.colony(w.antById.get(a.tgt)?.colony ?? -1)?.queen;
+    const s2 = pickSide(w, a, a.tk, a.tgt, isQ);
     a.blkD = 0;
     a.blkT = 0;
+    if (s2 === 0) a.waitT = 1e-6;
+    else {
+      a.flk = s2;
+      a.garT = 1e-6;
+    }
   }
   return true;
 }
@@ -1277,7 +1270,9 @@ function settleStep(w: World, a: Ant, interval: number, foeId: number, fx: numbe
   const team = a.team ?? a.colony;
   ST.x = 0;
   ST.y = 0;
-  w.antsNear(a.space, a.x, a.y, PS * La * 1.5, (g) => {
+  // (only as far as it needs to look: bodies touching, or the settling distance between duels)
+  const look = Math.max(ra * 3, PS * BALANCE.combat21.settlePS * La * 1.5);
+  w.antsNear(a.space, a.x, a.y, look, (g) => {
     // (the higher id steps, unless it is pinned: then the other one)
     if (g === a || g.id === foeId || (g.id > a.id && g.pinned <= 0) || g.state === AS.Dead || !anchored(g)) return false;
     const Lg = casteOf(g.caste).length;

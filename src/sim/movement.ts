@@ -148,29 +148,51 @@ export function avoidHeading(w: World, a: Ant, want: number, look: number, fight
   const C21 = BALANCE.combat21;
   const cw = dcos(want);
   const sw = dsin(want);
-  const team = a.team ?? a.colony;
-  const S = BALANCE.separation;
-  const ra = casteOf(a.caste).length * S.widthOfLength * S.radiusOfWidth;
+  // (the cone test as |lateral| ≤ forward × tan(cone): no angle per neighbour)
+  if (AV.cone !== C21.avoidCone) {
+    AV.cone = C21.avoidCone;
+    AV.tan = dsin(C21.avoidCone) / dcos(C21.avoidCone);
+  }
+  AV.team = a.team ?? a.colony;
+  AV.ra = bodyRadius(a.caste);
+  AV.cw = cw;
+  AV.sw = sw;
+  AV.ax = a.x;
+  AV.ay = a.y;
+  AV.a = a;
+  AV.fighters = fightersOnly;
   AV.best = Infinity;
   AV.side = 0;
-  w.antsNear(a.space, a.x, a.y, look, (g, d2) => {
-    if (g === a || (g.team ?? g.colony) !== team || g.state === AS.Dead || g.state === AS.Flung || (g.ridePh ?? 0) >= 1 || d2 >= AV.best) return false;
-    if (fightersOnly && g.state !== AS.Attack && g.state !== AS.Grapple && g.state !== AS.Spray) return false;
-    const gx = g.x - a.x;
-    const gy = g.y - a.y;
-    const fwd = gx * cw + gy * sw;
-    if (fwd <= 0) return false;
-    const lat = -gx * sw + gy * cw;
-    if (Math.abs(datan2(lat, fwd)) > C21.avoidCone) return false;
-    const rg = casteOf(g.caste).length * S.widthOfLength * S.radiusOfWidth;
-    if (Math.abs(lat) > (ra + rg) * 1.4) return false;
-    AV.best = d2;
-    AV.side = lat > 1e-6 ? -1 : lat < -1e-6 ? 1 : a.id & 1 ? 1 : -1;
-    return false;
-  });
+  AV.odd = (a.id & 1) === 1;
+  w.antsNear(a.space, a.x, a.y, look, avoidCb);
   return AV.side === 0 ? want : want + AV.side * C21.avoidTurn * (1 - Math.sqrt(AV.best) / look);
 }
-const AV = { best: 0, side: 0 }; // det-ok: scratch for avoidHeading's callback
+function avoidCb(g: Ant, d2: number): boolean {
+  if (g === AV.a || (g.team ?? g.colony) !== AV.team || g.state === AS.Dead || g.state === AS.Flung || (g.ridePh ?? 0) >= 1 || d2 >= AV.best) return false;
+  if (AV.fighters && g.state !== AS.Attack && g.state !== AS.Grapple && g.state !== AS.Spray) return false;
+  const gx = g.x - AV.ax;
+  const gy = g.y - AV.ay;
+  const fwd = gx * AV.cw + gy * AV.sw;
+  if (fwd <= 0) return false;
+  const lat = -gx * AV.sw + gy * AV.cw;
+  if (Math.abs(lat) > fwd * AV.tan) return false;
+  if (Math.abs(lat) > (AV.ra + bodyRadius(g.caste)) * 1.4) return false;
+  AV.best = d2;
+  AV.side = lat > 1e-6 ? -1 : lat < -1e-6 ? 1 : AV.odd ? 1 : -1;
+  return false;
+}
+/** Body (crowding) radius of a caste: static data, cached. */
+function bodyRadius(caste: string): number {
+  let r = radiusOf.get(caste);
+  if (r === undefined) {
+    const S = BALANCE.separation;
+    r = casteOf(caste).length * S.widthOfLength * S.radiusOfWidth;
+    radiusOf.set(caste, r);
+  }
+  return r;
+}
+const radiusOf = new Map<string, number>(); // det-ok: cache of static caste data
+const AV = { best: 0, side: 0, cone: NaN, tan: 0, team: 0, ra: 0, cw: 0, sw: 0, ax: 0, ay: 0, a: null as unknown as Ant, fighters: false, odd: false }; // det-ok: scratch for avoidHeading's callback
 
 /**
  * Steer to a point like steerTo, but round teammates in the way instead of into them (avoidHeading, looking

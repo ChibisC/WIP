@@ -43,7 +43,7 @@ CLIPS = {
     "drift_spray": ([S(0, "ant:formica_worker", 30), S(0, "ant:formica_mortar", 10), S(0, "ant:formica_rapid", 10), S(1, "ant:lasius_worker", 50)], 10, {"d": 90, "p": 0.3, "fight": True}),
     "creature_bites": ([S(1, "cr:tarantula", 1, 1, (250, 280)), S(1, "cr:stagBeetle", 1, 1, (330, 280)), S(0, "ant:lasius_soldier", 40)], 8, {"x": 290, "y": 280, "d": 190, "p": 0.3}),
     "oneside_beetle": ([{"type": "arenaStance", "team": 1, "stance": 2}, S(1, "cr:groundBeetle", 1, 1, (300, 300)), S(0, "ant:lasius_worker", 30, 1, (240, 300))], 2, {"x": 295, "y": 300, "d": 70, "p": 0.45}),
-    "six_creatures": ([S(1, "cr:groundBeetle", 6, 1, (300, 300)), S(0, "ant:lasius_worker", 45)], 6, {"x": 300, "y": 300, "d": 130, "p": 0.35}),
+    "six_creatures": ([S(1, "cr:groundBeetle", 6, 1, (300, 300)), S(0, "ant:lasius_worker", 45)], 6, {"d": 150, "p": 0.35, "fight": True}),
 }
 
 

@@ -280,7 +280,7 @@ export const BALANCE = {
     ringPS: 1,
     ringSpeed: 1,
     ringLook: 0.6,
-    allyWeight: 1,
+    allyWeight: 0.5,
     avoidLook: 2,
     avoidCone: 0.7,
     avoidTurn: 0.9,
