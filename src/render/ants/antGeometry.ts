@@ -996,7 +996,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // Scape: forward-outward-up; funiculus: forward-outward-down (elbowed).
     // (review round 2: a formicine's scapes rise up and back from sockets near the midline, then the funiculus bends
     // forward — they read as rods sticking out of the face's sides when set forward-outward)
-    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && atta ? new THREE.Vector3(-0.25, 0.3, 0.92 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
+    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && atta ? new THREE.Vector3(-0.42, 0.6, 0.5 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
     const elbow = sock.clone().addScaledVector(scDir, scapeLen);
     elbows.push(elbow);
     const scMid = sock.clone().lerp(elbow, 0.5).add(new THREE.Vector3(0, scapeLen * 0.04, 0));

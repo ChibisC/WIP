@@ -632,7 +632,7 @@ const ecitonQueen: AntMorph = {
     head: L(0x5a2418, 0.4, 0.26, 0.05, 0x7a3a24),
     meso: L(0x5a2418, 0.42, 0.22, 0.05, 0x7a3a24),
     waist: L(0x5a2418, 0.42, 0.2, 0.05, 0x7a3a24),
-    gaster: L(0x3e1c10, 0.34, 0.3, 0.06, 0xa8845e),
+    gaster: L(0x3e1c10, 0.34, 0.3, 0.06, 0x8a5a3a),
     legs: L(0x6e2e1a, 0.45, 0.14, 0.06, 0x9a5a3a),
     mandible: L(0x2a1612, 0.36, 0.32, 0, 0x120a08),
   },

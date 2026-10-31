@@ -867,6 +867,12 @@ mesosoma massive and taller than her head.
 Round 3 → 4 fixes: scapes sweeping sideways from low on the face (they rose from the head's top), a dense coat of
 short golden hairs (130/120/160 per head/mesosoma/gaster, 11 on each tibia), the queen's gaster globular.
 
+| 4 | 3 | 3 | 3 | 3 | 3 | 3 | 3 |
+
+Round 4 (a harsher reviewer: photos 9–10, every render 3): the sideways scapes read as "stilts to the ground" —
+reverted to round 3's; the denser hair still read as pins. **Stopped at 4 rounds; kept round 3's look** (plus the
+colour check) as the best.
+
 ### Eciton burchellii — blind review (render panel; photos scored 9–10)
 | Round | E1 soldier 3/4 | E2 soldier side | E3 soldier face | E4 worker 3/4 | E5 worker side | E6 queen top |
 |---|---|---|---|---|---|---|
@@ -882,4 +888,10 @@ mesosoma, a broad dark gaster with narrow membranes, short jaws (hers had made a
 Round 2 → 3 fixes: thicker soldier hooks, a smaller soldier head with visible pin eyes, three visible gaster plates
 in a duller rust (still read as a ringed grub), a smoother worker mesosoma, the queen's massive petiole and pale
 stretched membranes between dark plates, 11 hairs on each tibia.
+| 3 | 3 | 3 | 3 | 3 | 3 | 2 |
+
+Round 3 (the same harsher reviewer): the queen's paler membranes read as candy stripes — reverted to round 2's darker
+ones. **Stopped after 3 rounds (the spec's minimum), below target**; the best round was 2. Still blocking: the
+gaster reads as a ringed grub, the soldier's hooks insert under the head instead of at its front corners, blocky
+mesosoma, and the queen's mesosoma reads as three bulbs.
 
