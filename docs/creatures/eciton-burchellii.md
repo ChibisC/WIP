@@ -66,3 +66,22 @@ The user chose the display names: the major is the in-game "Soldier" (it guards 
 - Powell S. & Franks N. R. 2007, "How a few help all: living pothole plugs…", *Animal Behaviour* 73:1067–1076 (cited via Wikipedia)
 - Reid C. R. et al. 2015, "Army ants dynamically adjust living bridges…", *PNAS* 112:15113 (cited via Wikipedia)
 - Couzin I. D. & Franks N. R. 2003, "Self-organized lane formation and optimized traffic flow in army ants", *Proc. R. Soc. B* 270:139–146
+
+## Realism pass (overnight 2026-10-31)
+Studied (never shipped): the user's 7 Eciton photos (Alex Wild soldiers in three-quarter, profile and face; a soldier
+with prey; Kronauer's and a field photo of workers; Naskrecki's queen among workers) and the references in
+claude/army-ants/02-reference-eciton.md. Shapes as numbers (fractions of L):
+
+| Unit | L | Head (len / width) | Head look | Eyes | Mandibles | Legs (hind) |
+|---|---|---|---|---|---|---|
+| Worker (minor) | 4 mm | .20 / .17 | glossy-to-satin black | single lens, .05 | short toothed clamps: the formicine triangle generator, 5 teeth, black | 1.5 |
+| Porter (submajor) | 6.5 mm | .22 / .20 | black | .045 | long narrow slightly curved sickles (.5) | 1.75 |
+| Media | 8 mm | .25 / .25 | pale yellow-tan darkening toward the mouth | .04 | thick curved toothless sickles (.62) | 1.5 |
+| Soldier (major) | 11 mm | .26 / .27, rounded-square (review: about the mesosoma's size, not an egg) | whitish tan on the vertex shading to orange-brown over the frons and clypeus, smooth | pin eyes .05 | 1.45 head lengths: slender black sickles rising from the front corners, sweeping up then hooking down and in, tips free and apart, a small barb near each tip | 1.4 |
+| Queen | 22 mm | .18 / .24, broad and flat | dark red-brown | tiny | short (.32) | .8 |
+
+Colours (sRGB): workers' head and mesosoma a dull black (#1e1c1c / #261c18), legs dark rust (#4a2416) a little paler at
+the tarsi (not blond), gasters a dull rust-amber (#9a5428; the saturated orange read as a grub in review); medias and
+soldiers tan-rust bodies (#6e2e1a, #8a4a28); the queen #5a2418 with dark gaster plates (#3e1c10) and narrow pale
+membranes (#8a5a3a). Surface: semi-glossy over a shallow microreticulation, sparse fine golden hairs, denser on the
+gaster and legs (recipe `ECITON`, src/render/bake/recipes.ts).

@@ -157,7 +157,7 @@ const ecRegions = {
   [REGION.HEAD]: { sculpt: EC_HEAD, shade: shade(0.8, 0.35, 0.45, 0.22, 0.35, { coatRough: 0.16, wear: 0.25, dust: 0.08, mid: 0.1 }), px: [512, 512] as [number, number] },
   [REGION.MESO]: { sculpt: EC_MESO, shade: shade(0.8, 0.45, 0.5, 0.22, 0.4, { coatRough: 0.2, wear: 0.25, dust: 0.14, mid: 0.1 }), px: [1024, 512] as [number, number] },
   [REGION.WAIST]: { sculpt: FIRE_WAIST, shade: shade(0.8, 0.06, 0.3, 0.25, 0.3, { coatRough: 0.2, wear: 0.2, dust: 0.14 }), px: [256, 256] as [number, number] },
-  [REGION.GASTER]: { sculpt: EC_GASTER_S, shade: shade(0.75, 0.3, 0.35, 0.32, 0.5, { coatRough: 0.14, wear: 0.15, dust: 0.06, mid: 0.12, bands: [0.42, 0.6, 0.76, 0.9], band: [0.009, 0.22, 0.55, 0.045] }), px: [512, 512] as [number, number] },
+  [REGION.GASTER]: { sculpt: EC_GASTER_S, shade: shade(0.75, 0.3, 0.35, 0.32, 0.5, { coatRough: 0.14, wear: 0.15, dust: 0.06, mid: 0.12, bands: [0.5, 0.75], band: [0.008, 0.14, 0.3, 0.03] }), px: [512, 512] as [number, number] },
   [REGION.LEG]: { sculpt: EC_LEG, shade: shade(1.0, 0.5, 0, 0.6, 0.35, { coatRough: 0.24, wear: 0.3, dust: 0.3, mid: 0.3, tipThin: 0.6 }), px: [128, 320] as [number, number] },
   [REGION.TARSUS]: { sculpt: FIRE_TARSUS, shade: shade(0.9, 0.45, 0, 0.6, 0.35, { coatRough: 0.36, dust: 0.5, mid: 0.2, tipThin: 0.5 }), px: [64, 128] as [number, number] },
   [REGION.ANTENNA]: { sculpt: FIRE_ANTENNA, shade: shade(0.7, 0.05, 0, 0.6, 0.35, { coatRough: 0.3, dust: 0.15, mid: 0, tipThin: 0.4 }), px: [64, 160] as [number, number] },

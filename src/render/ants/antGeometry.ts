@@ -915,7 +915,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         const hook = Math.pow(t, 3.2);
         const inn = ecR ? -mandLen * 0.1 * Math.sin(t * Math.PI) + hook * inwardToMid * 0.8 * (1 + hk * 0.2) : (-mandLen * 0.06 * Math.sin(t * Math.PI) + hook * (inwardToMid * 1.15 + mandLen * 0.12)) * (1 + hk * 0.55);
         pts.push(new THREE.Vector3(fwd, ecR ? Math.sin(Math.min(1, t / 0.75) * Math.PI) * mandLen * 0.14 - ss(0.7, 1, t) * mandLen * 0.16 : -t * t * mandLen * 0.04 + Math.sin(t * Math.PI) * mandLen * 0.05, -s * inn));
-        rad.push(mandLen * ((ecR ? 0.034 : 0.05) * (1 - t) + 0.005));
+        rad.push(mandLen * ((ecR ? 0.046 : 0.05) * (1 - t) + 0.006));
       }
       [pp, ii] = tube(pts, rad, hi ? 8 : 5, true, true, 0.75);
       if (hi && m.mandible.barb) {
@@ -996,7 +996,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // Scape: forward-outward-up; funiculus: forward-outward-down (elbowed).
     // (review round 2: a formicine's scapes rise up and back from sockets near the midline, then the funiculus bends
     // forward — they read as rods sticking out of the face's sides when set forward-outward)
-    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && atta ? new THREE.Vector3(-0.42, 0.6, 0.5 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
+    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && atta ? new THREE.Vector3(-0.25, 0.3, 0.92 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
     const elbow = sock.clone().addScaledVector(scDir, scapeLen);
     elbows.push(elbow);
     const scMid = sock.clone().lerp(elbow, 0.5).add(new THREE.Vector3(0, scapeLen * 0.04, 0));
@@ -1408,7 +1408,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       const segs: Array<[THREE.Vector3, THREE.Vector3, number, number]> = [
         [trEnd, knee, pid, 5],
         // (overnight spec 3.4: L. niger's tibiae bristle with erect hairs — a field mark)
-        [knee, ankle, pid + 1, m.key.startsWith('lasius') ? 11 : 6],
+        [knee, ankle, pid + 1, m.key.startsWith('lasius') || atta || m.key.startsWith('eciton_') ? 11 : 6],
       ];
       for (const [a0, a1, prt, cnt] of segs) {
         const dl = a1.clone().sub(a0).normalize();

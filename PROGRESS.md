@@ -862,6 +862,11 @@ bigger black teeth, the head against the pronotum (a neck showed), frontal lobes
 buttons), longer occipital spines and a deeper notch, a smaller media gaster, dark red-brown legs, the queen's
 mesosoma massive and taller than her head.
 
+| 3 | 4 | 4 | 3 | 4 | 4 | 3 | 4 |
+
+Round 3 → 4 fixes: scapes sweeping sideways from low on the face (they rose from the head's top), a dense coat of
+short golden hairs (130/120/160 per head/mesosoma/gaster, 11 on each tibia), the queen's gaster globular.
+
 ### Eciton burchellii — blind review (render panel; photos scored 9–10)
 | Round | E1 soldier 3/4 | E2 soldier side | E3 soldier face | E4 worker 3/4 | E5 worker side | E6 queen top |
 |---|---|---|---|---|---|---|
@@ -872,3 +877,9 @@ closed loop), thinner, the barb smaller; the soldier's head rounded-square and s
 the vertex shading to orange-brown on the face, pin eyes; gasters a dull rust-brown (the saturated orange read as a
 grub); the black parts duller; no blond tarsi; slimmer femora; the queen dichthadiiform — broad flat head and
 mesosoma, a broad dark gaster with narrow membranes, short jaws (hers had made a wire loop).
+| 2 | 4 | 4 | 3 | 4 | 4 | 3 |
+
+Round 2 → 3 fixes: thicker soldier hooks, a smaller soldier head with visible pin eyes, three visible gaster plates
+in a duller rust (still read as a ringed grub), a smoother worker mesosoma, the queen's massive petiole and pale
+stretched membranes between dark plates, 11 hairs on each tibia.
+
