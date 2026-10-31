@@ -519,10 +519,11 @@ const RP = { a: null as Ant | null, arc: false, thr: 0, off: 0, t: null as Ant |
  * its strike arc come before those it has to turn to; then the most threat; then the one nearest its heading; then the
  * lower id. It keeps its current target while that stays in reach (and in the arc, if any other is). Retaliation
  * (combat v2) still wins: an ant in reach with `threatSticky` × the threat of that one is taken instead, even if it
- * has to turn to it. A long body does not turn to an ant planted beside it (it would sweep the others off), so those
- * count only in its arc. Null when no ant is in reach: then the program may walk to one.
+ * has to turn to it (a long body: only one in its arc). A long body does not turn to an ant planted beside it (it would sweep the others off), so those
+ * count only in its arc. `engagedOnly`: only ants fighting it (the stag beetle: it fights what fights it, and walks on
+ * through ants that are only in its way). Null when no ant is in reach: then the program may walk to one.
  */
-function reachPick(w: World, cr: Creature, k: CreatureKind): Ant | null {
+function reachPick(w: World, cr: Creature, k: CreatureKind, engagedOnly = false): Ant | null {
   const R = reachOf(k);
   const b = creatureBody(cr);
   const team = cr.faction >= 0 ? w.teamOf(cr.faction) : -1;
@@ -533,7 +534,7 @@ function reachPick(w: World, cr: Creature, k: CreatureKind): Ant | null {
   w.antsNear(cr.space, cr.x, cr.y, b.hl + b.r + R.r * k.length + 8, (a) => {
     if (a.state === AS.Dead || a.state === AS.Flung || riding(a) || casteOf(a.caste).role === 'king') return false;
     if (team >= 0 && (a.team ?? a.colony) === team) return false;
-    if (!inReach(cr, k, a)) return false;
+    if (!inReach(cr, k, a) || (engagedOnly && !engagedWith(cr, a))) return false;
     const off = offFront(cr, a.x, a.y);
     const arc = off <= R.arc;
     if (!arc && long && onBody(cr, a)) return false;
@@ -567,8 +568,14 @@ function reachPick(w: World, cr: Creature, k: CreatureKind): Ant | null {
     pick = RP.cur;
     pickThr = RP.curThr;
   }
-  if (RP.t && pick !== RP.t && RP.tThr > pickThr && RP.tThr >= pickThr * C2.threatSticky) return RP.t;
+  // (a long body retaliates only within its arc: swinging round to an ant would sweep the ones holding on off)
+  if (RP.t && pick !== RP.t && (RP.tArc || !long) && RP.tThr > pickThr && RP.tThr >= pickThr * C2.threatSticky) return RP.t;
   return pick;
+}
+
+/** Is this ant fighting the creature: holding on to it, closing in on it, or having hurt it (threat)? */
+function engagedWith(cr: Creature, a: Ant): boolean {
+  return onBody(cr, a) || (a.tk === 4 && a.tgt === cr.id) || threatOf(cr, a.id) > 0;
 }
 
 /**
@@ -1168,9 +1175,9 @@ function stag(w: World, cr: Creature, k: CreatureKind, dt: number): void {
     telegraph(w, cr, cr.x, cr.y, L * 0.55, 1.2);
     return;
   }
-  // one target (the pinch): an ant within reach of the antlers first (2026-10-31: it pinches from where it stands),
-  // else the ant with the most threat close by, else the nearest in a crowd
-  const near = reachPick(w, cr, k);
+  // one target (the pinch): an ant fighting it within reach of the antlers first (2026-10-31: it pinches from where it
+  // stands), else the ant with the most threat close by, else the nearest in a crowd
+  const near = reachPick(w, cr, k, true);
   const a = near ?? threatPick(w, cr, L * 0.6) ?? pickAnt(w, cr, cr.x, cr.y, k.sense, (o, d2) => d2 / (1 + crowd(w, cr, o)));
   if (!a) {
     setState(cr, CS.Wander);
@@ -1186,9 +1193,10 @@ function stag(w: World, cr: Creature, k: CreatureKind, dt: number): void {
     turnCreature(cr, aim.dir, dt, 2.5);
     return;
   }
-  // it walks only to an ant out of its reach; in reach it stands, turning its antlers to one outside their arc
+  // it walks to an ant out of its reach, or one only in its way (not fighting it: it walks on through a swarm); an ant
+  // fighting it in reach, it stands for, turning its antlers to one outside their arc
   let ready = false;
-  if (!near && !inReach(cr, k, a)) walkTo(w, cr, k, a.x, a.y, 1, dt, 2.5);
+  if (!near && !(engagedWith(cr, a) && inReach(cr, k, a))) walkTo(w, cr, k, a.x, a.y, 1, dt, 2.5);
   else ready = standAndFace(cr, k, a, dt, 2.25);
   if (aim) {
     setState(cr, CS.WindUp);
