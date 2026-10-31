@@ -794,4 +794,6 @@ User spec: project doc `claude/realism/04-spec-ant-attack-and-death-animations.m
 - **Round-1 rating fixes:** A1, A2, A3, A4, A5, A9, A10, A11, A13, A14, A16, A17 (list in combat.md).
 - **Checks:** check-determinism clean; tests/animation.ts and tests/combat.ts pass.
 - **Clips:** `docs/realism/combat/fire-ant/`, `docs/realism/combat/stag-beetle/`.
-- Waiting for the user's ratings on the round-2 review page before rollout.
+- CPU: the motion controller costs 0.79 ms a frame for 1,040 ants and 2.8 ms for 4,160 (`tools/anim-cost.ts`); the GPU side needs a device.
+- Round-2 review page https://claude.ai/artifact/9jbgV66mmYctu2Jy6HmsPM: 20 clips (round 1 beside round 2 where there was one), six acceptance checks and the rollout decision, stored in its `ratings` collection (B1–B20, E1–E6, D2). The game artifact is republished from this branch (version 19).
+- Waiting for the user's ratings before rollout.
