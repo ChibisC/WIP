@@ -308,11 +308,12 @@ const formicaRapid: AntMorph = {
 // the minim paler, orange-tan; the queen dark chestnut)
 // (Atta review round 1: not one brick colour — orange on the head grading to dark red-brown on the body)
 const attaLook = {
-  head: L(0x8e4622, 0.64, 0.08, 0.12, 0x6e3218),
+  head: L(0x8a4222, 0.64, 0.08, 0.12, 0x6a3018),
   meso: L(0x6e301a, 0.66, 0.06, 0.12, 0x5a2814),
   waist: L(0x642c18, 0.66, 0.06, 0.1),
   gaster: L(0x5e2a18, 0.62, 0.08, 0.16, 0x4a2214),
-  legs: L(0x7a3a1e, 0.6, 0.06, 0.1, 0x5e2c16),
+  // (review round 2: the legs dark red-brown like the body, not orange)
+  legs: L(0x5e2c18, 0.6, 0.06, 0.1, 0x4e2414),
   antenna: L(0x8a4826, 0.64, 0.05, 0.08, 0x9a5630),
   mandible: L(0x5a2410, 0.4, 0.3, 0, 0x1a0a04),
 };
@@ -322,13 +323,14 @@ const attaSetae = { color: 0xb88a50, head: 64, meso: 60, gaster: 90, len: [0.012
 const attaMedia: AntMorph = {
   key: 'atta_media',
   L: 8,
-  head: { len: 0.3, width: 0.3, height: 0.19, shape: 'heart', notch: 0.18, occSpines: 0.1, groove: 0.1 },
+  head: { len: 0.3, width: 0.3, height: 0.19, shape: 'heart', notch: 0.22, occSpines: 0.14, groove: 0.14 },
   eyes: { size: 0.18, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.3, club: 0, thick: 0.009 },
   mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.7 },
   meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.09, meso: 0.07, prop: 0.08 } },
   waist: { nodes: 2, len: 0.1, nodeH: 0.08 },
-  gaster: { len: 0.26, width: 0.2, height: 0.16, sting: true },
+  // (review round 2: a small gaster for the body, not a big round ball)
+  gaster: { len: 0.22, width: 0.17, height: 0.14, sting: true },
   legs: { hind: 1.2, thick: 0.0125 },
   look: attaLook,
   hair: 0.2,
@@ -384,7 +386,9 @@ const attaMajor: AntMorph = {
   legs: { hind: 1.0, thick: 0.0135 },
   // the head deep chestnut, shining; the frontal woolly tufts as a dense patch of longer red hairs on the head
   // (review round 1: mirror-glossy read as chocolate — a satin shine over the smooth cuticle)
-  look: { ...attaLook, head: L(0x7a3018, 0.42, 0.3, 0.08, 0x5c2a16) },
+  // (review rounds 1–2: any gloss read as plastic or chocolate — the user's major photos are matte and sculptured; the
+  // photos win over the key's "shining")
+  look: { ...attaLook, head: L(0x7a3018, 0.58, 0.12, 0.1, 0x5c2a16) },
   setae: { ...attaSetae, color: 0xa0502a, head: 70, len: [0.006, 0.026] },
   stance: 0.14,
 };
@@ -398,7 +402,8 @@ const attaQueen: AntMorph = {
   eyes: { size: 0.2, pos: 0.6, height: 0.2, ocelli: true },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.2, club: 0, thick: 0.0062 },
   mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.6 },
-  meso: { len: 0.27, width: 0.15, height: 0.17, queen: true, spines: { pro: 0.03, meso: 0, prop: 0.03 } },
+  // (review round 2: a massive mesosoma, much taller than the head)
+  meso: { len: 0.28, width: 0.18, height: 0.22, queen: true, spines: { pro: 0.03, meso: 0, prop: 0.03 } },
   waist: { nodes: 2, len: 0.06, nodeH: 0.06 },
   // (review round 1: huge and rounded, not a sausage)
   gaster: { len: 0.43, width: 0.34, height: 0.29, sting: true },
@@ -503,13 +508,15 @@ const fireQueen: AntMorph = {
 // mesosoma near-black, legs dark rust paler toward the tarsi, gaster orange-amber; media and Soldier pale heads and
 // tan-rust bodies; queen dark red-brown with a plated gaster. Builder options: mandible.hook/barb, head.sockets,
 // head.frontMix, gaster.segs/stripes/stripeW/physo, waist.thick, gait.
-const EC_GASTER = L(0xc97a30, 0.38, 0.26, 0.06, 0x8e4e1e); // orange-amber, faint darker segment bands
+// (overnight review round 1: the saturated orange read as a grub — a dull rust-brown oval, the user's photos)
+const EC_GASTER = L(0x9a5428, 0.46, 0.18, 0.08, 0x7a3e1e); // rust-amber, faint darker segment bands
 const EC_DARK = {
-  head: L(0x1a1a1c, 0.34, 0.3, 0.04, 0x2e2a28),
-  meso: L(0x241a16, 0.4, 0.22, 0.05, 0x3a2a22),
+  // (review round 1: glossy plastic black — a duller, finely sculptured black)
+  head: L(0x1e1c1c, 0.5, 0.14, 0.05, 0x2e2a28),
+  meso: L(0x261c18, 0.55, 0.1, 0.05, 0x3a2a22),
   waist: L(0x3a2218, 0.42, 0.18, 0.05, 0x4a2a1c),
   gaster: EC_GASTER,
-  legs: L(0x4a2416, 0.45, 0.14, 0.06, 0x8a5a3a), // color2: paler toward the tarsi and claws
+  legs: L(0x4a2416, 0.5, 0.12, 0.06, 0x5e3420), // color2: a little paler toward the tarsi (review: not blond)
   antenna: L(0x3a2218, 0.45, 0.14, 0.05, 0x6a4a32),
   mandible: L(0x2a1a12, 0.38, 0.3, 0, 0x120c0a),
 };
@@ -517,7 +524,7 @@ const EC_TAN = {
   ...EC_DARK,
   meso: L(0x6e2e1a, 0.42, 0.22, 0.05, 0x8a4a2c),
   waist: L(0x6e2e1a, 0.42, 0.18, 0.05, 0x8a4a2c),
-  legs: L(0x6e2e1a, 0.45, 0.14, 0.06, 0xb89470), // pale tarsi and claws
+  legs: L(0x6e2e1a, 0.5, 0.12, 0.06, 0x7e4428), // slightly paler tarsi (review: not blond)
   antenna: L(0x5a2818, 0.45, 0.14, 0.05, 0x8a5a3a),
 };
 const EC_GAIT = { lift: 0.42, duty: 0.5 }; // high-stepping and fast
@@ -532,7 +539,7 @@ const ecitonMinor: AntMorph = {
   meso: { len: 0.36, width: 0.105, height: 0.12 },
   waist: { nodes: 2, len: 0.11, nodeH: 0.08 },
   gaster: { len: 0.3, width: 0.17, height: 0.145, sting: true, segs: 5 },
-  legs: { hind: 1.5, thick: 0.0135 },
+  legs: { hind: 1.5, thick: 0.0115 },
   look: EC_DARK,
   hair: 0.45,
   // (overnight pass: sparse, fine golden hairs, denser on the gaster and legs)
@@ -580,16 +587,18 @@ const ecitonMajor: AntMorph = {
   ...ecitonMinor,
   key: 'eciton_major',
   L: 11,
-  head: { len: 0.3, width: 0.32, height: 0.19, shape: 'round', frontMix: 0.45, sockets: 1 },
-  eyes: { size: 0.03, pos: 0.5, height: 0.25, ocelli: false, single: true },
+  // (review round 1: a huge featureless egg — rounded-square, about the mesosoma's size, whitish tan on the vertex
+  // shading to orange-brown over the frons and clypeus, pin eyes on the sides)
+  head: { len: 0.26, width: 0.27, height: 0.18, shape: 'square', frontMix: 0.8, sockets: 1 },
+  eyes: { size: 0.05, pos: 0.52, height: 0.15, ocelli: false, single: true },
   antenna: { segments: 12, scape: 0.75, funiculus: 1.05, club: 0, thick: 0.0082 },
-  mandible: { type: 'falcate', len: 1.15, teeth: 0, width: 0.2, hook: 1, barb: 1 },
+  mandible: { type: 'falcate', len: 1.45, teeth: 0, width: 0.2, hook: 0.7, barb: 1 },
   meso: { len: 0.3, width: 0.1, height: 0.115 },
   gaster: { len: 0.27, width: 0.16, height: 0.13, sting: true, segs: 5 },
   legs: { hind: 1.4, thick: 0.0108 },
   look: {
     ...EC_TAN,
-    head: L(0xaa9868, 0.38, 0.18, 0.05, 0x867244), // the package's #BCAC7C, a little darker (it read as white under the game's sun)
+    head: L(0xc0aa7a, 0.42, 0.16, 0.08, 0xa0602e), // pale tan vertex → orange-brown frons and clypeus (frontMix)
     mandible: L(0x0e0e10, 0.3, 0.4, 0, 0x060606),
     meso: L(0x8a4a28, 0.42, 0.22, 0.05, 0xa8683a),
     waist: L(0x8a4a28, 0.42, 0.18, 0.05, 0xa8683a),
@@ -602,20 +611,22 @@ const ecitonQueen: AntMorph = {
   ...ecitonMinor,
   key: 'eciton_queen',
   L: 22,
-  head: { len: 0.18, width: 0.19, height: 0.125, shape: 'round', frontMix: 0.3 },
+  // (review round 1: dichthadiiform — a broad flattened head and mesosoma; short jaws, not a wire loop)
+  head: { len: 0.18, width: 0.24, height: 0.12, shape: 'square', frontMix: 0.3 },
   eyes: { size: 0.02, pos: 0.5, height: 0.25, ocelli: false, single: true },
   antenna: { segments: 12, scape: 0.6, funiculus: 0.8, club: 0, thick: 0.007 },
-  mandible: { type: 'falcate', len: 0.55, teeth: 0, width: 0.3, hook: 0.5 },
-  meso: { len: 0.24, width: 0.11, height: 0.11 },
+  mandible: { type: 'falcate', len: 0.32, teeth: 0, width: 0.3, hook: 0.15 },
+  meso: { len: 0.24, width: 0.16, height: 0.11 },
   waist: { nodes: 1, len: 0.06, scale: false, nodeH: 0.07, thick: 2.2 },
-  gaster: { len: 0.55, width: 0.24, height: 0.2, sting: true, segs: 7, stripes: 7, stripeW: 0.22, physo: 1 },
+  // (review round 1: a huge, broad, rounded dark gaster, glossy plates — not a striped spindle)
+  gaster: { len: 0.55, width: 0.32, height: 0.26, sting: true, segs: 7, stripes: 7, stripeW: 0.14, physo: 1 },
   legs: { hind: 0.8, thick: 0.0095 },
   look: {
     ...EC_DARK,
     head: L(0x5a2418, 0.4, 0.26, 0.05, 0x7a3a24),
     meso: L(0x5a2418, 0.42, 0.22, 0.05, 0x7a3a24),
     waist: L(0x5a2418, 0.42, 0.2, 0.05, 0x7a3a24),
-    gaster: L(0x32180f, 0.36, 0.3, 0.04, 0xb89068),
+    gaster: L(0x3e1c10, 0.34, 0.3, 0.06, 0x8a5a3a),
     legs: L(0x6e2e1a, 0.45, 0.14, 0.06, 0x9a5a3a),
     mandible: L(0x2a1612, 0.36, 0.32, 0, 0x120a08),
   },

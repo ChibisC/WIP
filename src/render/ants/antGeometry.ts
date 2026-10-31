@@ -560,7 +560,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const mBottom = stanceY; // ventral line of the mesosoma
   // (overnight review round 3: on the formicines a bare neck showed between the sloping pronotum and the head —
   // the head sits right against the pronotum)
-  const neck = new THREE.Vector3(mL + (m.real && formicine ? -0.012 : 0.012) * Lm, mBottom + mH * 0.62, 0);
+  const neck = new THREE.Vector3(mL + (m.real && (formicine || atta) ? -0.012 : 0.012) * Lm, mBottom + mH * 0.62, 0);
 
   // ---------- mesosoma ----------
   {
@@ -774,7 +774,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // from each)
     if (m.real && atta && hi) {
       for (const sd of [-1, 1]) {
-        const [pp, ii] = ellipsoid(new THREE.Vector3(hL * 0.84, headCY + hH * 0.2, sd * hW * 0.15), new THREE.Vector3(hL * 0.07, hH * 0.05, hW * 0.075), 10);
+        // (review round 2: they read as buttons — thin flaps flaring sideways over the sockets)
+        const [pp, ii] = ellipsoid(new THREE.Vector3(hL * 0.85, headCY + hH * 0.17, sd * hW * 0.17), new THREE.Vector3(hL * 0.08, hH * 0.022, hW * 0.09), 10);
         acc.piece(transformPts(pp, headM), ii, PART.HEAD, (x, y, z) => headCol(x - neck.x, y - neck.y, z), look.head);
         const [pr, ir] = tube([new THREE.Vector3(hL * 0.82, headCY + hH * 0.22, sd * hW * 0.16), new THREE.Vector3(hL * 0.6, headCY + hH * 0.3, sd * hW * 0.2), new THREE.Vector3(hL * 0.38, headCY + hH * 0.32, sd * hW * 0.24)], [hH * 0.035, hH * 0.03, hH * 0.012], 6, true, true);
         acc.piece(transformPts(pr, headM), ir, PART.HEAD, (x, y, z) => headCol(x - neck.x, y - neck.y, z), look.head);
@@ -907,11 +908,14 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         const t = i / segs;
         const jj = Math.max(0, (t - 0.62) / 0.38);
         // Sickle: runs forward almost straight, then hooks sharply inward at the tip.
+        // (Eciton review round 1: the soldier's hooks met in a closed loop — the tips stay free and apart, the blade
+        // sweeping up then hooking down)
+        const ecR = m.real && m.key.startsWith('eciton_');
         const fwd = mandLen * (0.82 * Math.sin(Math.min(t, 0.8) / 0.8 * Math.PI * 0.42) + (t > 0.8 ? (t - 0.8) * 0.4 : 0)) - hk * mandLen * 0.3 * jj * jj;
         const hook = Math.pow(t, 3.2);
-        const inn = (-mandLen * 0.06 * Math.sin(t * Math.PI) + hook * (inwardToMid * 1.15 + mandLen * 0.12)) * (1 + hk * 0.55);
-        pts.push(new THREE.Vector3(fwd, -t * t * mandLen * 0.04 + Math.sin(t * Math.PI) * mandLen * 0.05, -s * inn));
-        rad.push(mandLen * (0.05 * (1 - t) + 0.006));
+        const inn = ecR ? -mandLen * 0.1 * Math.sin(t * Math.PI) + hook * inwardToMid * 0.8 * (1 + hk * 0.2) : (-mandLen * 0.06 * Math.sin(t * Math.PI) + hook * (inwardToMid * 1.15 + mandLen * 0.12)) * (1 + hk * 0.55);
+        pts.push(new THREE.Vector3(fwd, ecR ? Math.sin(Math.min(1, t / 0.75) * Math.PI) * mandLen * 0.14 - ss(0.7, 1, t) * mandLen * 0.16 : -t * t * mandLen * 0.04 + Math.sin(t * Math.PI) * mandLen * 0.05, -s * inn));
+        rad.push(mandLen * ((ecR ? 0.034 : 0.05) * (1 - t) + 0.005));
       }
       [pp, ii] = tube(pts, rad, hi ? 8 : 5, true, true, 0.75);
       if (hi && m.mandible.barb) {
@@ -922,7 +926,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         db.z -= s * 0.9;
         db.y += 0.25;
         db.normalize();
-        const [bp, bi] = tube([pb.clone().addScaledVector(db, -mandLen * 0.01), pb.clone().addScaledVector(db, mandLen * 0.07), pb.clone().addScaledVector(db, mandLen * 0.13)], [mandLen * 0.032, mandLen * 0.018, mandLen * 0.003], 5, false, true);
+        const bk = m.real ? 0.55 : 1;
+        const [bp, bi] = tube([pb.clone().addScaledVector(db, -mandLen * 0.01), pb.clone().addScaledVector(db, mandLen * 0.07 * bk), pb.clone().addScaledVector(db, mandLen * 0.13 * bk)], [mandLen * 0.032 * bk, mandLen * 0.018 * bk, mandLen * 0.003], 5, false, true);
         const off = pp.length / 3;
         pp = pp.concat(bp);
         ii = ii.concat(bi.map((q) => q + off));

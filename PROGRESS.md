@@ -854,3 +854,21 @@ toothed inner edge and a gap between them closed (were flat V plates); bigger ov
 the lobe tops, longer and slender; mesosoma spines slender and sharp (were blunt cones); scapes running back from
 under the frontal lobes; orange head grading to a dark red-brown body; slimmer legs; more and longer golden hairs;
 the queen's head bigger, gaster rounder, the wing scars small and brown.
+| 2 | 3 | 4 | 3 | 3 | 4 | 3 | 3 |
+
+Round 2 → 3 fixes: no gloss on any Atta head (the user's major photos are matte and sculptured — the photos win over
+the key's "shining"; recorded as a decision), finer and lower granules (they read as orange peel), darker jaws with
+bigger black teeth, the head against the pronotum (a neck showed), frontal lobes as thin flaring flaps (they read as
+buttons), longer occipital spines and a deeper notch, a smaller media gaster, dark red-brown legs, the queen's
+mesosoma massive and taller than her head.
+
+### Eciton burchellii — blind review (render panel; photos scored 9–10)
+| Round | E1 soldier 3/4 | E2 soldier side | E3 soldier face | E4 worker 3/4 | E5 worker side | E6 queen top |
+|---|---|---|---|---|---|---|
+| 1 | 3 | 3 | 2 | 3 | 3 | 3 |
+
+Round 1 → 2 fixes: the soldier's hooks with free, separated tips that sweep up and then hook down (they met in a
+closed loop), thinner, the barb smaller; the soldier's head rounded-square and smaller (an oversized egg), pale tan on
+the vertex shading to orange-brown on the face, pin eyes; gasters a dull rust-brown (the saturated orange read as a
+grub); the black parts duller; no blond tarsi; slimmer femora; the queen dichthadiiform — broad flat head and
+mesosoma, a broad dark gaster with narrow membranes, short jaws (hers had made a wire loop).

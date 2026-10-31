@@ -119,8 +119,9 @@ export const FORMICA: DetailRecipe = {
  * from the trails; the major's head the exception: smooth and shining, without A. sexdens's hexagonal
  * microsculpture (Antkey; Longino's key: a smooth patch on the mesosoma's side) — docs/creatures/atta-cephalotes.md.
  */
-const ATTA_HEAD: Sculpt = { tile: [1.2, 1.2], noise: 0.0005, granules: { cell: 0.045, height: 0.0055 }, pits: { n: 30, r: 0.006, depth: 0.0012, pale: 0.25, stub: { len: 0.04, dir: -1, share: 0.8 } }, wave: { cell: 0.25, amp: 0.004 }, rough: [0.26, 0.5], roughVar: 0.06, dirt: 0.32, mottle: 0.16, cavityDark: 0.3 };
-const ATTA_MESO: Sculpt = { tile: [3, 1.2], noise: 0.0006, granules: { cell: 0.055, height: 0.007 }, pits: { n: 26, r: 0.006, depth: 0.0012, pale: 0.25, stub: { len: 0.04, dir: -1, share: 0.8 } }, wave: { cell: 0.22, amp: 0.005 }, rough: [0.28, 0.52], roughVar: 0.06, dirt: 0.38, mottle: 0.18, cavityDark: 0.32 };
+// (review rounds 1–2: the granules read as orange peel — finer and lower)
+const ATTA_HEAD: Sculpt = { tile: [1.2, 1.2], noise: 0.0005, granules: { cell: 0.03, height: 0.0028 }, pits: { n: 30, r: 0.006, depth: 0.0012, pale: 0.25, stub: { len: 0.04, dir: -1, share: 0.8 } }, wave: { cell: 0.25, amp: 0.004 }, rough: [0.26, 0.5], roughVar: 0.06, dirt: 0.32, mottle: 0.16, cavityDark: 0.3 };
+const ATTA_MESO: Sculpt = { tile: [3, 1.2], noise: 0.0006, granules: { cell: 0.035, height: 0.0035 }, pits: { n: 26, r: 0.006, depth: 0.0012, pale: 0.25, stub: { len: 0.04, dir: -1, share: 0.8 } }, wave: { cell: 0.22, amp: 0.005 }, rough: [0.28, 0.52], roughVar: 0.06, dirt: 0.38, mottle: 0.18, cavityDark: 0.32 };
 const ATTA_WAIST: Sculpt = { tile: [0.8, 0.8], noise: 0.0006, granules: { cell: 0.05, height: 0.006 }, pits: { n: 30, r: 0.006, depth: 0.0012, pale: 0.25 }, rough: [0.28, 0.5], roughVar: 0.06, dirt: 0.38, mottle: 0.14, cavityDark: 0.32 };
 const ATTA_GASTER: Sculpt = { tile: [1.6, 1.6], noise: 0.0004, granules: { cell: 0.04, height: 0.0035 }, pits: { n: 60, r: 0.004, depth: 0.0008, pale: 0.3, stub: { len: 0.035, dir: 1, share: 0.9 } }, wave: { cell: 0.3, amp: 0.004 }, rough: [0.2, 0.42], roughVar: 0.06, dirt: 0.25, mottle: 0.14, cavityDark: 0.26 };
 const ATTA_LEG: Sculpt = { ...FIRE_LEG, tile: [0.4, 1.0], granules: { cell: 0.035, height: 0.003 }, rough: [0.22, 0.42], dirt: 0.45 };
@@ -171,7 +172,6 @@ export function antRecipe(morphKey: string): DetailRecipe | null {
   // (the Gene Thief ant is a Formica — modelled on F. sanguinea: the same microreticulate head and mesosoma, a dull pubescent gaster)
   if (morphKey.startsWith('formica_') || morphKey.startsWith('plagiaria_')) return FORMICA;
   // (overnight pass: the major's head smooth and shining, every other caste matte and tuberculate)
-  if (morphKey === 'atta_major') return ATTA_MAJOR;
   if (morphKey.startsWith('atta_')) return ATTA;
   if (morphKey.startsWith('eciton_')) return ECITON;
   return null;
