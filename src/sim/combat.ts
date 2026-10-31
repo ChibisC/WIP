@@ -383,17 +383,20 @@ function findTarget(w: World, a: Ant, c: Colony, r: number): Target | null {
   for (let i = 0; i < cand.length; i++) {
     const o = cand[i];
     const d2 = candD2[i];
-    const focus = outnumber || (!!mOn && sq(mOn.x - o.x) + sq(mOn.y - o.y) <= sq(C2.focusMarkerMm));
+    const ordered = !!mOn && sq(mOn.x - o.x) + sq(mOn.y - o.y) <= sq(C2.focusMarkerMm);
     // Prefer pinned targets slightly and high-threat ants (tanks draw attacks); otherwise nearest.
     const threat = casteOf(o.caste).threat ?? 0;
     // …and ones roughly ahead, so a fight is not a constant turning about (fix brief: no spinning)
     const ahead = 1.25 - (0.25 * ((o.x - a.x) * hx + (o.y - a.y) * hy)) / Math.max(1e-3, Math.sqrt(d2));
-    // …and ones not already taken on by nestmates: the fight breaks into duels (combat v2)
-    const crowd = focus ? 1 : 1 + C2.crowdPenalty * Math.max(0, attackers(w, o.id, team) - (o.id === mine ? 1 : 0));
-    const score = (d2 * (o.pinned > 0 ? 0.6 : 1) * ahead * crowd) / (1 + threat);
-    // no free slot on it (and none of ours): only if no foe in sight has room (then it waits in this one's ring)
-    if (!focus && !holdsSlotOn(a, o.id, 3) && antSlotsTaken(w, o) >= antSlotCount(o, L, o.id === w.colony(o.colony)?.queen)) offerFull(3, o.id, o.x, o.y, score);
-    else offer(3, o.id, o.x, o.y, score);
+    const base = (d2 * (o.pinned > 0 ? 0.6 : 1) * ahead) / (1 + threat);
+    // …and ones not already taken on by nestmates: the fight breaks into duels (combat v2); focus fire drops this
+    const crowd = 1 + C2.crowdPenalty * Math.max(0, attackers(w, o.id, team) - (o.id === mine ? 1 : 0));
+    // no free slot on it (and none of ours): only if no foe in sight has room (then it waits in this one's ring, the
+    // waiting spread by the crowd on each). Only a marker on it (an order) makes a full foe worth waiting for; our side
+    // outnumbering them only drops the crowd penalty (2026-10-31: with it, every ant took the nearest foe and dozens
+    // circled one ant while other foes had room)
+    if (!ordered && !holdsSlotOn(a, o.id, 3) && antSlotsTaken(w, o) >= antSlotCount(o, L, o.id === w.colony(o.colony)?.queen)) offerFull(3, o.id, o.x, o.y, base * crowd);
+    else offer(3, o.id, o.x, o.y, base * (outnumber || ordered ? 1 : crowd));
   }
   cand.length = 0;
   candD2.length = 0;
@@ -1059,25 +1062,28 @@ function waitForSlot(w: World, a: Ant, c: Colony, tx: number, ty: number, gap: n
     a.rsv = 0;
   }
   const L = casteOf(a.caste).length;
-  // how far beyond the ring it stands (negative: inside it)
+  // how far beyond the ring it stands (negative: inside it); it stands anywhere from just inside it to `waitBand` × its
+  // length beyond (a loose crowd, not a ring it keeps stepping back on to: 2026-10-31)
   const off = gap - ring;
+  const band = BALANCE.combat21.waitBand * L;
   if (off < -L * 0.5) {
     const h = a.h;
     a.h = datan2(a.y - ty, a.x - tx);
     moveForward(w, a, antSpeed(w, a) * 0.5, dt);
     a.h = h;
     faceToward(a, tx, ty, dt);
-  } else if (off > L * 0.5) {
+  } else if (off > band) {
     if (cr) {
       const b = bodyHook.body(cr);
       const c0 = dcos(cr.h);
       const s0 = dsin(cr.h);
       const dx = a.x - cr.x;
       const dy = a.y - cr.y;
-      creatureSlotWorld(cr, ring, outlineU(b, ring, dx * c0 + dy * s0, -dx * s0 + dy * c0), slotTmp);
+      const r = ring + band * 0.5;
+      creatureSlotWorld(cr, r, outlineU(b, r, dx * c0 + dy * s0, -dx * s0 + dy * c0), slotTmp);
     } else {
       const ang = datan2(a.y - ty, a.x - tx);
-      const r = dhypot(a.x - tx, a.y - ty) - off;
+      const r = dhypot(a.x - tx, a.y - ty) - off + band * 0.5;
       slotTmp.x = tx + dcos(ang) * r;
       slotTmp.y = ty + dsin(ang) * r;
     }

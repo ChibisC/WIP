@@ -189,6 +189,7 @@ npx vite-node tests/combatV2.ts                                     # combat v2:
 npx vite-node tests/combatV21.ts                                    # combat v2.1: anchored attacks (no drift, facing locked, creatures still), splash fixed at the wind-up, back off and go round, no pushing anchored ants, duels, tunnels
 npx vite-node tools/drift-probe.ts -- [scene=all] [secs] [seed] [trace=0]   # what moves or turns attacking units, by system; shoving metrics
 npx vite-node tools/fight-motion.ts -- [scene=all] [secs] [seed] [move|kill]   # how far creatures and ants walk while fighting, and why; grips lost; kill: real-health outcomes
+npx vite-node tools/orbit-probe.ts -- [seed] [secs] [mine] [theirs]   # one side outnumbering the other: ants waiting or going round, idle while a foe has room, how far they wait and how much they walk
 npx vite-node tools/duels.ts -- ant:lasius_worker 60 ant:fire_soldier 60 20   # how a 60 v 60 clash breaks into duels (clusters, overlap)
 npx vite-node tools/spin-check.ts                                   # 50 v 50 spinning, 30 ants on a beetle, tunnel flow
 npx vite-node tools/climb-stress.ts -- 40 400                       # 4 titans with full riders + a 400 v 400 clash: tick time with and without mounting

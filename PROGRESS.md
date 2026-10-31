@@ -974,3 +974,10 @@ User note: "maybe a factor that makes them move so much is that they all have to
 - Then (user): the soldier's jaws a little shorter (set more inward, about 12 %); the minim's skin relief softer too
   (normal strength .45, cavities lighter): fine grain instead of lumps.
 - Morph hashes: only `atta_*` changed (Eciton morphs are not in the hash guard).
+
+## 2026-10-31 — Ants circling one foe (CHANGE_PLAN §19)
+User note with a screenshot: dozens of Black garden ants in a big spiral round one Red wood ant. Branch `feature/no-orbit`.
+- **Causes** (`tools/orbit-probe.ts`): focus fire for a side outnumbering the foes 4 to 1 also let full foes be chosen, so the overflow waited on the nearest foe while others had room; ants waiting on one foe stood shoulder to shoulder on an exact ring and stepped back on to it whenever pushed, walking 1.6–2 body lengths a second.
+- **Fix**: outnumbering only drops the crowd penalty (full foes are passed over while another has room; a marker on a foe still means wait for it); waiting ants stand in a loose band (up to 3 body lengths beyond the ring), a body length apart from each other, a personal space from teammates fighting.
+- **Measured** (45 v 8, seeds 4, 7, 11, 13, 21): time idle while a foe had room 18 / 57 / 19 / 24 / 17 % → 15 / 19 / 15 / 27 / 19 % (seed 7 is the screenshot's case: the overflow now goes to the other foes; at the end, with one or two foes left, about 30 still wait — there is nowhere else to go); waiting ants walk 160–200 % → 50–90 % of a body length a second (all fighting ants: waiting movement 71 → 25 % BL/s); 60 v 60 duels (`tools/duels.ts`, seeds 3, 4, 7): 15.2 / 15.2 / 13.5 → 15.6 / 15.3 / 15.6 clusters, overlap 7 / 9 / 7 → 8 / 12 / 9 %.
+- `npm test` 680 pass; determinism clean.
