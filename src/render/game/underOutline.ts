@@ -11,12 +11,17 @@ const MINE = new THREE.Color('#9cf59a');
 const ALLY = new THREE.Color('#79b8ff');
 const FOE = new THREE.Color('#ff7563');
 const SEG = 14;
+/** two outlines a little apart (a WebGL line is one pixel wide), the team colour lightened toward white */
+const RINGS = [1, 1.14];
+const LIGHT = 0.45;
+const WHITE = new THREE.Color(1, 1, 1);
+const tc = new THREE.Color();
 
 /**
  * Under-pass (combat v2.2, CHANGE_PLAN §20; render only): an ant standing under a taller unit (`Ant.udr`) is hidden by
  * the body above it, so its outline is drawn through it — the shape of its body at half its height, in its team's
- * colour (the arena's team colour; elsewhere green yours, blue an ally's, red a foe's), over everything (no depth
- * test). Ants that are not under anything have none.
+ * colour (the arena's team colour; elsewhere green yours, blue an ally's, red a foe's) lightened toward white so it
+ * reads against the team rings, doubled, over everything (no depth test). Ants that are not under anything have none.
  */
 export class UnderOutline {
   readonly group = new THREE.Group();
@@ -43,7 +48,7 @@ export class UnderOutline {
     let n = 0;
     for (const a of w.s.ants) {
       if ((a.udr ?? 0) === 0 || a.space !== space || a.state === AS.Dead) continue;
-      const need = (n + 1) * SEG * 6;
+      const need = (n + 1) * SEG * 6 * RINGS.length;
       if (need > this.pos.length) {
         const p = new Float32Array(Math.max(need, this.pos.length * 2));
         p.set(this.pos);
@@ -58,17 +63,17 @@ export class UnderOutline {
       const z = a.py + (a.y - a.py) * alpha;
       const y = heightAt(x, z) + d.h * L * 0.5;
       const t = team.get(a.colony);
-      const c = t !== undefined ? this.cols[t % this.cols.length] : a.colony === player ? MINE : w.colony(a.colony)?.team === myTeam && myTeam >= 0 ? ALLY : FOE;
+      const c = tc.copy(t !== undefined ? this.cols[t % this.cols.length] : a.colony === player ? MINE : w.colony(a.colony)?.team === myTeam && myTeam >= 0 ? ALLY : FOE).lerp(WHITE, LIGHT);
       const ch = Math.cos(a.h);
       const sh = Math.sin(a.h);
       const rx = L * 0.5;
       const rz = Math.max(d.hw * L, L * 0.08);
-      let o = n * SEG * 6;
-      for (let k = 0; k < SEG; k++) {
+      let o = n * SEG * 6 * RINGS.length;
+      for (const g of RINGS) for (let k = 0; k < SEG; k++) {
         for (const kk of [k, k + 1]) {
           const u = (kk / SEG) * Math.PI * 2;
-          const lx = Math.cos(u) * rx;
-          const lz = Math.sin(u) * rz;
+          const lx = Math.cos(u) * rx * g;
+          const lz = Math.sin(u) * rz * g;
           this.pos[o] = x + lx * ch - lz * sh;
           this.pos[o + 1] = y;
           this.pos[o + 2] = z + lx * sh + lz * ch;
@@ -88,7 +93,7 @@ export class UnderOutline {
       g.getAttribute('position').needsUpdate = true;
       g.getAttribute('color').needsUpdate = true;
     }
-    g.setDrawRange(0, n * SEG * 2);
+    g.setDrawRange(0, n * SEG * 2 * RINGS.length);
     this.group.visible = n > 0;
   }
 }

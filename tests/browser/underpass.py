@@ -1,8 +1,8 @@
 """Under-pass clips (combat v2.2, CHANGE_PLAN §20, docs/combat/underpass.md), docs/combat/underpass/<LABEL>/: short
 real-time clips in the arena, recorded on main before the change (LABEL=before) and after it (LABEL=after):
 
-  minims_through_majors  a column of five Atta majors standing across the way and eight minims running to a beetle
-                         beyond it: round the column, or straight under it?
+  minims_through_majors  a row of five Atta majors standing side by side across the way and eight minims running to a
+                         beetle beyond it: round the row, or straight under it?
   atta_mixed_beetle      4 Atta majors + 20 minims v a ground beetle (the majors' ring, minims where they fit)
   eciton_raid            3 Eciton soldiers, 3 porters and 30 workers v 12 Red wood ants: workers among the long legs
   from_beneath           25 fire-ant minors v 2 Atta majors: small foes under a tall enemy ant's body
@@ -30,13 +30,14 @@ res = []
 S = lambda team, unit, n, lv=1, at=None: {"type": "arenaSpawn", "team": team, "unit": unit, "n": n, "level": lv, "at": at is not None, "x": at[0] if at else 0, "y": at[1] if at else 0}
 PASSIVE = lambda team: {"type": "arenaStance", "team": team, "stance": 2}
 
-# a column of team 0's majors standing across the way at x (head to tail along y, facing +y), held still
-# (pinned: they do not walk; nothing about them is drawn differently), and the minims put in a block west of it
+# a row of team 0's majors standing side by side across the way at x (facing the beetle, +x, a little more than a body
+# width apart: no gap a minim's body fits through), held still (pinned: they do not walk and are not pushed; nothing
+# about them is drawn differently), and the minims put in a block west of it
 COLUMN = """(o) => { const s = window.__session; const w = s.world; const T = w.s.mode.arena.teams[0];
   const mine = w.s.ants.filter((a) => a.colony === T.colony);
   const big = mine.filter((a) => a.caste === o.tall), small = mine.filter((a) => a.caste === o.small);
-  big.forEach((a, i) => { a.x = a.px = o.x; a.y = a.py = o.y + (i - (big.length - 1) / 2) * o.gap; a.h = a.ph = Math.PI / 2; a.pinned = 1e9; });
-  small.forEach((a, i) => { a.x = a.px = o.x - 26 - (i % 2) * 4; a.y = a.py = o.y + (Math.floor(i / 2) - 1.5) * 4; a.h = a.ph = 0; });
+  big.forEach((a, i) => { a.x = a.px = o.x; a.y = a.py = o.y + (i - (big.length - 1) / 2) * o.gap; a.h = a.ph = 0; a.pinned = 1e9; });
+  small.forEach((a, i) => { a.x = a.px = o.x - 26 - (i % 2) * 4; a.y = a.py = o.y + (Math.floor(i / 2) - 1.5) * 3; a.h = a.ph = 0; });
   w.reindex(); return [big.length, small.length]; }"""
 
 CAM = """(c) => { const s = window.__session; const A = s.world.s.mode.arena; const r = s.view.surfaceRig;
@@ -47,14 +48,14 @@ CAM = """(c) => { const s = window.__session; const A = s.world.s.mode.arena; co
   r.jumpTo(x, y, c.d); r.yaw = r.goalYaw = c.yaw ?? 0.6; if (c.p !== undefined) r.pitchBias = c.p; return [x, y]; }"""
 
 WALK = ([S(0, "ant:atta_major", 5, 1, (300, 300)), S(0, "ant:atta_minim", 8, 1, (270, 300)), S(1, "cr:groundBeetle", 1, 1, (360, 300)), PASSIVE(1)],
-        {"tall": "atta_major", "small": "atta_minim", "x": 300, "y": 300, "gap": 14.7})
+        {"tall": "atta_major", "small": "atta_minim", "x": 300, "y": 300, "gap": 6})
 # name: (setup commands, column, seconds to advance before recording, camera)
 CLIPS = {
-    "minims_through_majors": (WALK[0], WALK[1], 0, {"x": 296, "y": 300, "d": 70, "p": -0.3, "yaw": 1.9}),
+    "minims_through_majors": (WALK[0], WALK[1], 0.6, {"x": 298, "y": 300, "d": 38, "p": -0.3, "yaw": 1.9}),
     "atta_mixed_beetle": ([S(0, "ant:atta_major", 4, 1, (280, 300)), S(0, "ant:atta_minim", 20, 1, (275, 300)), S(1, "cr:groundBeetle", 1, 1, (320, 300)), PASSIVE(1)], None, 3, {"d": 70, "p": -0.25, "cr": 0, "yaw": 1.2}),
     "eciton_raid": ([S(0, "ant:eciton_major", 3, 1, (270, 300)), S(0, "ant:eciton_submajor", 3, 1, (270, 300)), S(0, "ant:eciton_minor", 30, 1, (265, 300)), S(1, "ant:formica_worker", 12, 1, (320, 300))], None, 3, {"d": 90, "p": -0.25, "fight": True, "yaw": 1.2}),
     "from_beneath": ([S(0, "ant:atta_major", 2, 1, (300, 300)), S(1, "ant:fire_minor", 25, 1, (325, 300))], None, 3, {"d": 60, "p": -0.25, "fight": True, "yaw": 1.2}),
-    "outline_top": (WALK[0], WALK[1], 1.6, {"x": 300, "y": 300, "d": 60, "p": 0.5, "yaw": 0.6}),
+    "outline_top": (WALK[0], WALK[1], 1.2, {"x": 298, "y": 300, "d": 34, "p": 0.5, "yaw": 0.6}),
 }
 
 

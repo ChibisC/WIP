@@ -142,12 +142,18 @@ Combat v2 assumed every ant is 0.3 × its length tall and gave each creature one
 
 ## 7. Results
 Tests (`tests/underpass.ts`, in `npm test`; `main`'s models):
-- An Atta minim walks through a column of four standing majors: 0.00 mm off its line, no foot overlap, nobody shoved (under-pass off: 2.0 mm detour, 0.09 mm shove). An Eciton worker through a column of soldiers: 0.00 (off: 3.05 mm, 0.05).
+- An Atta minim walks through a column of five standing majors: 0.00 mm off its line, no foot overlap, nobody shoved (under-pass off: 2.0 mm detour, 0.09 mm shove). An Eciton worker through a column of soldiers: 0.00 (off: 3.05 mm, 0.05).
 - Poses: a loaded porter's middle 1.51 → 0 mm; a braced major's front 1.43 → 0.72 mm; equal sizes, dead ants: nothing under. A minim under a major's head steps out sideways when the major braces (3.8 mm out, the major not moved); mid-attack it stays and the head waits.
 - From beneath: 30 Atta minims on an Eciton soldier held from every side: 1 under it (toggle off: 0).
 - Mixed squads: 4 Atta majors + 20 minims v a ground beetle, 7.7 holding on average (13 at most), killed in 11.2 s (off 8.3, 13, 11.8 s); 3 Eciton soldiers + 3 porters + 30 workers v a tarantula, 3.9 (7) v 3.7 (7). Combat v2's slots were already per attacker size, and teammates on one foe never needed personal space, so on creatures the gain is small; the spec's "clearly more attackers" is not met. The beetle's belly is too low for Atta minims under its middle (only its front), so the majors' ring decides.
 - Determinism: the same mixed fight twice gives the same result; `tools/check-determinism.ts` clean.
 - Performance (`tools/climb-stress.ts -- 30 400`: 400 v 400 and four titans with full loads of riders, 1440 ants; `main` measured in between): 15.7 and 16.1 ms a tick (`main` 15.5), mounting off 12.5 and 12.2 (`main` 12.6). Profiles: the new checks cost about 2 % of the sim (the slot sharing round creatures, the height checks in avoidance, the feet). *Found on the way:* writing the new `Ant` fields on ants only when they first went under something gave the ants many more object shapes in V8, and everything that reads ants got slower (`antSystem` +36 %, 18–20 ms a tick); they are now set to 0 when an ant is made.
+
+## Clips
+`docs/combat/underpass/compare_*.mp4` (before = `main` before the change, after = this branch; `main`'s models; `tests/browser/underpass.py`, `python3 tools/combat-v21-compare.py docs/combat/underpass`):
+- `from_beneath` — 25 fire-ant minors v 2 Atta majors: after, the minors that find every place round a major taken go under its body; before, they wait round it. The clearest difference.
+- `minims_through_majors` and `outline_top` — 8 minims run at a row of five majors standing side by side: the paths look the same before and after. Before, the soft separation already let 2 mm minims squeeze between the majors' bodies (the 2 mm detour measured in the test). The difference is in the rule (no push, the feet, the stack) and the outlines, which show while a minim is under a major (about half a second each).
+- `atta_mixed_beetle`, `eciton_raid` — mixed squads on a ground beetle and on Red wood ants: little visible change, as in the numbers above.
 
 ## 8. Visibility and control
 - An ant under a taller unit (`Ant.udr`) is outlined through it: its body's outline at half its height, in its team's colour (the arena's team colours; elsewhere green yours, blue an ally's, red a foe's), drawn over everything (`render/game/underOutline.ts`; on the surface and in the nests).
