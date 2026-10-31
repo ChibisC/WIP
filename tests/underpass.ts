@@ -19,6 +19,7 @@ import { mixedVsCreature, walkThrough } from '../tools/underpassScenes';
 import { openGround } from '../tools/spinScenes';
 
 const t0 = Date.now();
+const an = (c: string) => (/^[aeiou]/.test(c) ? `an ${c}` : `a ${c}`);
 let failed = 0;
 function check(name: string, ok: boolean, detail = ''): void {
   if (!ok) failed++;
@@ -77,7 +78,7 @@ const fits = (small: string, tall: string) => {
     U.allies = false;
     const off = walkThrough(sp, tall, small);
     U.allies = true;
-    check(`walking: a ${small} goes straight under a column of ${tall}s (no detour, no foot overlap, nobody shoved)`, on.arrived && on.dev < 0.3 && on.footIn <= 0 && on.shove < 0.01 && on.under > 0, `strays ${on.dev.toFixed(2)} mm, ${on.under} ticks under, foot overlap ${Math.max(0, on.footIn).toFixed(2)} mm, shoved ${on.shove.toFixed(2)} mm; under-pass off: strays ${off.dev.toFixed(2)} mm, shoves ${off.shove.toFixed(2)} mm`);
+    check(`walking: ${an(small)} goes straight under a column of ${tall}s (no detour, no foot overlap, nobody shoved)`, on.arrived && on.dev < 0.3 && on.footIn <= 0 && on.shove < 0.01 && on.under > 0, `strays ${on.dev.toFixed(2)} mm, ${on.under} ticks under, foot overlap ${Math.max(0, on.footIn).toFixed(2)} mm, shoved ${on.shove.toFixed(2)} mm; under-pass off: strays ${off.dev.toFixed(2)} mm, shoves ${off.shove.toFixed(2)} mm`);
   }
 }
 
@@ -103,27 +104,44 @@ function sepOnly(w: World, ticks: number): void {
   porter.carry = Carry.Food;
   const loaded = antClear(porter, CL)[1];
   check('poses: nothing passes under a porter carrying prey slung under it (its middle drops to nothing)', loaded === 0 && free > 0, `middle clearance ${free.toFixed(2)} → ${loaded.toFixed(2)} mm`);
-  const maj = makeAnt(w, 0, 'atta_major', SURFACE, p.x + 40, p.y, 0);
-  const up = antClear(maj, CL)[2];
-  maj.state = AS.Grapple;
-  const down = antClear(maj, CL)[2];
-  check('poses: a braced bite lowers the major\'s head (front clearance)', down < up, `${up.toFixed(2)} → ${down.toFixed(2)} mm`);
+  // (the first braced caste with any room under its head: on the realism models an Atta major's head is on the ground)
+  const bc = BALANCE.underpass.braced.find((c) => antHeights(c).c[2] > 0) ?? 'atta_major';
+  const bq = makeAnt(w, casteOf(bc).species === 'eciton' ? 1 : 0, bc, SURFACE, p.x + 40, p.y, 0);
+  const up = antClear(bq, CL)[2];
+  bq.state = AS.Grapple;
+  const down = antClear(bq, CL)[2];
+  check(`poses: a braced bite lowers the head (front clearance; ${bc})`, down < up, `${up.toFixed(2)} → ${down.toFixed(2)} mm`);
+  const maj = makeAnt(w, 0, 'atta_major', SURFACE, p.x + 160, p.y, 0);
   const same = antNeed(makeAnt(w, 0, 'atta_major', SURFACE, p.x + 80, p.y, 0)) > Math.max(...antClear(maj, CL));
   check('poses: an ant as big as the other never passes under it', same);
   const dead = makeAnt(w, 0, 'atta_major', SURFACE, p.x + 120, p.y, 0);
   dead.state = AS.Dead;
   check('poses: nothing passes under a dead ant', Math.max(...antClear(dead, CL)) === 0);
 }
-// a minim under a major's head: the major lowers it for a braced bite → the minim steps out sideways; mid-attack, the
-// major's head waits
-for (const busy of [false, true]) {
+// a small nestmate under a braced caste's head (on `main`'s models: an Atta minim under a major's): the big one lowers
+// its head for a braced bite → the small one steps out sideways; mid-attack, the head waits. The pair comes from the
+// models: a braced caste and a nestmate that fits under its head standing but not braced (none: not tested)
+const PB = (() => {
+  for (const tall of BALANCE.underpass.braced) {
+    const sp = casteOf(tall).species;
+    const front = antHeights(tall).c[2] * casteOf(tall).length;
+    for (const small of Object.keys(CASTES)) {
+      if ((CASTES[small] as { species?: string }).species !== sp || small === tall) continue;
+      const need = antHeights(small).h * casteOf(small).length * (1 + BALANCE.underpass.margin);
+      if (need <= front && need > front * BALANCE.underpass.pose.braced) return { tall, small, col: sp === 'eciton' ? 1 : 0 };
+    }
+  }
+  return null;
+})();
+if (!PB) console.log('  ..  pose change: with these models no small nestmate fits under a braced caste\'s head even standing — not tested');
+for (const busy of PB ? [false, true] : []) {
   const { w, p } = field(7);
-  const maj = makeAnt(w, 0, 'atta_major', SURFACE, p.x, p.y, 0);
-  const Lm = casteOf('atta_major').length;
-  const d = antHeights('atta_major');
+  const maj = makeAnt(w, PB!.col, PB!.tall, SURFACE, p.x, p.y, 0);
+  const Lm = casteOf(PB!.tall).length;
+  const d = antHeights(PB!.tall);
   // under its head (front zone), on its axis
   const fx = p.x + ((d.zx[1] + 0.5) / 2) * Lm * 0.8;
-  const mini = makeAnt(w, 0, 'atta_minim', SURFACE, fx, p.y + 0.2, 0);
+  const mini = makeAnt(w, PB!.col, PB!.small, SURFACE, fx, p.y + 0.2, 0);
   for (const a of [maj, mini]) a.state = AS.Idle;
   sepOnly(w, 2);
   const wasUnder = (mini.udr ?? 0) === maj.id;
@@ -134,8 +152,8 @@ for (const busy of [false, true]) {
   sepOnly(w, 30);
   const out = Math.abs(mini.y - p.y);
   const majMoved = Math.hypot(maj.x - m0.x, maj.y - m0.y);
-  if (!busy) check('pose change: a minim under a major\'s head steps out sideways when the major braces (the major is not moved)', wasUnder && out >= d.hw * Lm && majMoved < 1e-6, `under first: ${wasUnder}; ${out.toFixed(2)} mm out (body half-width ${(d.hw * Lm).toFixed(2)}), major moved ${majMoved.toFixed(3)} mm`);
-  else check('pose change: mid-attack it stays (the major\'s head waits to lower)', wasUnder && Math.hypot(mini.x - s0.x, mini.y - s0.y) < 1e-6 && (maj.fhd ?? 0) === 1, `moved ${Math.hypot(mini.x - s0.x, mini.y - s0.y).toFixed(3)} mm, front held ${maj.fhd ?? 0}`);
+  if (!busy) check(`pose change: ${an(PB!.small)} under ${an(PB!.tall)}'s head steps out sideways when it braces (the big one is not moved)`, wasUnder && out >= d.hw * Lm && majMoved < 1e-6, `under first: ${wasUnder}; ${out.toFixed(2)} mm out (body half-width ${(d.hw * Lm).toFixed(2)}), major moved ${majMoved.toFixed(3)} mm`);
+  else check(`pose change: mid-attack it stays (the ${PB!.tall}'s head waits to lower)`, wasUnder && Math.hypot(mini.x - s0.x, mini.y - s0.y) < 1e-6 && (maj.fhd ?? 0) === 1, `moved ${Math.hypot(mini.x - s0.x, mini.y - s0.y).toFixed(3)} mm, front held ${maj.fhd ?? 0}`);
 }
 
 // ---------------------------------------------------------------- 5. fighting from beneath
