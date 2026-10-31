@@ -3,9 +3,9 @@ import { Ant, AS, Creature } from './types';
 import { casteOf } from './species';
 import { BALANCE, GUARD } from './balance';
 import { dcos, dhypot, dsin } from './dmath';
-import { bodyHook, fitsUnder } from './slots';
+import { anchored, bodyHook, fitsUnder } from './slots';
 import { climbDef } from './creatures/climb';
-import { creatureHooks } from './combat';
+import { cancelAttack, creatureHooks } from './combat';
 import { queenBody, royalOf } from './termites';
 
 /**
@@ -32,6 +32,16 @@ import { queenBody, royalOf } from './termites';
  *    is a capsule too (termites.ts queenBody); her own circle covers only her
  *    head and thorax.
  *  - A push that would land on rock is dropped (or kept along one axis).
+ *  - **Combat v2.1 (CHANGE_PLAN §17):** an anchored ant (holding a foe, firing,
+ *    recovering: slots.ts `anchored`) is a fixed obstacle — the other ant takes
+ *    the whole push. Between teammates the right of way decides who gives way:
+ *    anchored (3) > holding or closing in on a reserved slot (2) > looking for a
+ *    slot, waiting or going round (1) > the rest (0); the lower one moves alone,
+ *    equals share by mass. A teammate's push never moves a fighting ant toward its
+ *    target (that component is dropped). A creature's body or feet move an
+ *    anchored ant only while the creature walks (not in its own attack), and that
+ *    cancels the ant's attack (combat.ts `cancelAttack`). A creature in an attack
+ *    is not moved by other creatures.
  *
  * Deterministic: ants in id order, the spatial hash built at the tick start.
  */
@@ -54,8 +64,12 @@ export function separationSystem(w: World, dt: number): void {
     rad = new Float64Array(n * 2);
     mass = new Float64Array(n * 2);
     len = new Float64Array(n * 2);
+    prio = new Uint8Array(n * 2);
+    tdx = new Float64Array(n * 2);
+    tdy = new Float64Array(n * 2);
+    cancel = new Uint8Array(n * 2);
   }
-  // per-ant flags (bit 1 takes part, bit 2 movable, 16 fighting, 32 holding an ant, 128 standing in a guard line; 64
+  // per-ant flags (bit 1 takes part, bit 2 movable, 16 fighting, 32 anchored (combat v2.1), 128 standing in a guard line; 64
   // set below: pushed by a fighting ally, a stronger cap) and the largest small radius and fighting length
   let maxR = 0;
   let maxFightL = 0;
@@ -64,7 +78,25 @@ export function separationSystem(w: World, dt: number): void {
     const a = ants[i];
     pushX[i] = 0;
     pushY[i] = 0;
-    flag[i] = (takesPart(a) ? 1 : 0) | (movable(a) ? 2 : 0) | (fighting(a) ? 16 : 0) | (a.state === AS.Grapple && a.gKind === 3 && a.pinned <= 0 ? 32 : 0) | (inLine(a) ? 128 : 0);
+    const anch = anchored(a);
+    flag[i] = (takesPart(a) ? 1 : 0) | (!anch && movable(a) ? 2 : 0) | (fighting(a) ? 16 : 0) | (anch ? 32 : 0) | (inLine(a) ? 128 : 0);
+    cancel[i] = 0;
+    // right of way (combat v2.1), and the way to its target (a teammate never pushes it that way)
+    prio[i] = anch ? 3 : a.state === AS.Attack && (a.rsv ?? 0) !== 0 && a.rsv === a.tgt ? 2 : fighting(a) ? 1 : 0;
+    tdx[i] = 0;
+    tdy[i] = 0;
+    if (prio[i] === 1 || prio[i] === 2) {
+      const t = a.tk === 3 ? w.antById.get(a.tgt) : a.tk === 4 ? w.creatureById.get(a.tgt) : undefined;
+      if (t) {
+        const dx = t.x - a.x;
+        const dy = t.y - a.y;
+        const d = dhypot(dx, dy);
+        if (d > 1e-6) {
+          tdx[i] = dx / d;
+          tdy[i] = dy / d;
+        }
+      }
+    }
     const r = antRadius(a);
     rad[i] = r;
     mass[i] = antMass(a);
@@ -126,8 +158,10 @@ export function separationSystem(w: World, dt: number): void {
     const c = dcos(cr.h);
     const s = dsin(cr.h);
     CB.cr = cr;
+    // (an anchored ant gives way only to a creature walking into it, not to one in its own attack: combat v2.1)
+    CB.walking = cr.v > 0.5 && !creatureHooks.attacking(cr);
     w.antIdxNear(cr.space, cr.x, cr.y, b.hl + b.r + maxR, (i) => {
-      if ((flag[i] & 3) !== 3) return false;
+      if (!(flag[i] & 1) || (!(flag[i] & 2) && !(CB.walking && flag[i] & 32))) return false;
       const a = ants[i];
       if (a.gKind === 4 && a.gId === cr.id) return false; // holding on to it
       if (a.rideId === cr.id) return false;
@@ -152,6 +186,7 @@ export function separationSystem(w: World, dt: number): void {
       pushX[i] += (nx * c - ny * s) * push;
       pushY[i] += (nx * s + ny * c) * push;
       flag[i] |= 4;
+      if (flag[i] & 32) cancel[i] = 1;
       return false;
     });
     // its feet (the climb rails' feet) push the ants on the ground aside, the ones under it too
@@ -178,7 +213,12 @@ export function separationSystem(w: World, dt: number): void {
       dx *= lim / m;
       dy *= lim / m;
     }
-    nudge(w, ants[i], dx, dy);
+    const a = ants[i];
+    const x0 = a.x;
+    const y0 = a.y;
+    nudge(w, a, dx, dy);
+    // a large creature walked into an anchored ant: its attack is cancelled, and it plants again (combat v2.1)
+    if (cancel[i] && (a.x !== x0 || a.y !== y0)) cancelAttack(w, a);
   }
   creatureSpacing(w, dt);
   // a termite queen is solid: after the shared pushes (crowd pressure can cancel hers), anyone still inside her
@@ -208,7 +248,8 @@ function creatureSpacing(w: World, dt: number): void {
   const cap = S.creatureMaxPush * dt * BALANCE.tickHz;
   for (let i = 0; i < crs.length; i++) {
     const a = crs[i];
-    if (a.dead) continue;
+    // (in an attack it stands its ground: the other one gives way — combat v2.1)
+    if (a.dead || creatureHooks.attacking(a)) continue;
     const ra = creatureHooks.radius(a);
     let px = 0;
     let py = 0;
@@ -232,8 +273,8 @@ function creatureSpacing(w: World, dt: number): void {
         nx = i < j ? dcos(ang) : -dcos(ang);
         ny = i < j ? dsin(ang) : -dsin(ang);
       }
-      // the smaller one gives way more
-      const share = o.scale / (a.scale + o.scale);
+      // the smaller one gives way more (all of it to one in an attack)
+      const share = creatureHooks.attacking(o) ? 1 : o.scale / (a.scale + o.scale);
       px += nx * (min - d) * 0.5 * share;
       py += ny * (min - d) * 0.5 * share;
     }
@@ -260,10 +301,10 @@ function queenOutCb(i: number): boolean {
 }
 
 /** The creature foot pushing (one shared callback). */
-const CB = { cr: null as unknown as Creature, x: 0, y: 0, r: 0 }; // det-ok: scratch
+const CB = { cr: null as unknown as Creature, x: 0, y: 0, r: 0, walking: false }; // det-ok: scratch
 
 function footCb(i: number): boolean {
-  if ((flag[i] & 3) !== 3) return false;
+  if (!(flag[i] & 1) || (!(flag[i] & 2) && !(CB.walking && flag[i] & 32))) return false;
   const a = ants0[i];
   if (a.rideId === CB.cr.id) return false;
   const dx = a.x - CB.x;
@@ -282,6 +323,7 @@ function footCb(i: number): boolean {
   pushX[i] += nx * push;
   pushY[i] += ny * push;
   flag[i] |= 4;
+  if (flag[i] & 32) cancel[i] = 1;
   return false;
 }
 
@@ -361,9 +403,15 @@ function pairCb(j: number): boolean {
   const sameFoe = ally && P.foeK !== 0 && foeKind(po) === P.foeK && foeId(po) === P.foeId;
   const fight = (fa & fo & 16) !== 0 && (ally ? !sameFoe : pa.state === AS.Grapple && po.state === AS.Grapple && !engaged(pa, po));
   const line = !fight && ally && ((fa | fo) & 128) !== 0 && (fa & 144) !== 0 && (fo & 144) !== 0;
-  const ma = (fa & 2) !== 0 || ((fight || line) && (fa & 32) !== 0);
-  const mo = (fo & 2) !== 0 || ((fight || line) && (fo & 32) !== 0);
+  // (anchored ants never move: the other takes the whole push — combat v2.1)
+  let ma = (fa & 2) !== 0;
+  let mo = (fo & 2) !== 0;
   if (!ma && !mo) return false;
+  // right of way between teammates: only the lower one gives way
+  if (ally && ma && mo && prio[i] !== prio[j]) {
+    if (prio[i] > prio[j]) ma = false;
+    else mo = false;
+  }
   const ro = rad[j];
   // each pair once: by the lower id within a size class, else by the big one
   const oBig = ro > BIG;
@@ -391,10 +439,27 @@ function pairCb(j: number): boolean {
   // share by mass: the lighter ant gives way more
   const ka = !ma ? 0 : !mo ? 1 : wo / (wa + wo);
   const ko = !mo ? 0 : !ma ? 1 : wa / (wa + wo);
-  pushX[i] -= nx * push * ka;
-  pushY[i] -= ny * push * ka;
-  pushX[j] += nx * push * ko;
-  pushY[j] += ny * push * ko;
+  let ax = -nx * push * ka;
+  let ay = -ny * push * ka;
+  let ox = nx * push * ko;
+  let oy = ny * push * ko;
+  // a teammate never pushes a fighting ant toward its target (it would shove it into the fight)
+  if (ally) {
+    const da = ax * tdx[i] + ay * tdy[i];
+    if (da > 0) {
+      ax -= da * tdx[i];
+      ay -= da * tdy[i];
+    }
+    const dO = ox * tdx[j] + oy * tdy[j];
+    if (dO > 0) {
+      ox -= dO * tdx[j];
+      oy -= dO * tdy[j];
+    }
+  }
+  pushX[i] += ax;
+  pushY[i] += ay;
+  pushX[j] += ox;
+  pushY[j] += oy;
   if (fight) {
     flag[i] |= 64;
     flag[j] |= 64;
@@ -409,6 +474,10 @@ let flag = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 let rad = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let mass = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let len = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let prio = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
+let tdx = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let tdy = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let cancel = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 
 /** Radius (mm) above which an ant counts as big for the neighbour search. */
 const BIG = 2;

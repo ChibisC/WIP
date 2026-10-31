@@ -377,6 +377,8 @@ function aimDir(w: World, cr: Creature, reach: number, half: number): { dir: num
  * Returns true while it is backing off.
  */
 function backOff(w: World, cr: Creature, k: CreatureKind, dt: number): boolean {
+  // (between attacks only: combat v2.1)
+  if ((cr.data.backT ?? 0) <= 0 && creatureAttacking(cr)) return false;
   if ((cr.data.backT ?? 0) > 0) {
     cr.data.backT = Math.max(0, (cr.data.backT ?? 0) - dt);
     const step = ((C2.backOffLen * k.length) / 0.5) * dt;
@@ -441,6 +443,74 @@ function riderShake(w: World, cr: Creature, dt: number, state: number): boolean 
   cr.data.shake = 1;
   telegraph(w, cr, cr.x, cr.y, cr.scale * 0.6, C2.shakeWind);
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Combat v2.1 (CHANGE_PLAN §17): anchored creature attacks
+// ---------------------------------------------------------------------------
+
+/** States in which a creature is in an attack — still, or on a planned lunge — and no other creature moves it. */
+const ATTACKING = new Set<number>([CS.WindUp, CS.Attack, CS.Strike, CS.Pounce, CS.Coil, CS.Whip, CS.Rear, CS.Flick, CS.Display, CS.Leap, CS.Eat]); // det-ok: constant
+
+/** In an attack, from the wind-up to the end of its recovery (or holding its catch, or shaking riders off)? */
+export function creatureAttacking(cr: Creature): boolean {
+  return ATTACKING.has(cr.state) || !!cr.data.shake;
+}
+
+/** Start a bite on ant `a`: a wind-up of `wind` s (CS.WindUp, still, turning slowly toward it), then the bite. */
+function startBite(cr: Creature, a: Ant, wind = BALANCE.combat21.crWindupSec): void {
+  cr.tgt = a.id;
+  cr.tk = 3;
+  setState(cr, CS.WindUp);
+  cr.data.bw = wind;
+}
+
+/**
+ * A bite under way (startBite): in the wind-up the creature stands still and turns toward its ant at most
+ * `crWindupTurn`; then the bite (CS.Attack) — a miss if the ant has left `reach`, it never follows — and a recovery of
+ * `crRecoverSec`, still, facing locked. `fling` > 0 throws the bitten ant. Returns true while the bite lasts.
+ */
+function biteSeq(w: World, cr: Creature, k: CreatureKind, reach: number, dt: number, mul = 1, fling = 0): boolean {
+  const C21 = BALANCE.combat21;
+  if (cr.state === CS.WindUp && (cr.data.bw ?? 0) > 0) {
+    cr.v = 0;
+    const a = cr.tk === 3 && cr.tgt ? w.antById.get(cr.tgt) : undefined;
+    const live = a && a.state !== AS.Dead && a.space === cr.space && !riding(a) ? a : null;
+    if (live) faceAnt(cr, live, dt, C21.crWindupTurn);
+    if (cr.st >= (cr.data.bw ?? 0) - 1e-9) {
+      cr.data.bw = 0;
+      setState(cr, CS.Attack);
+      cr.cd = k.attackInterval;
+      if (live && dhypot(live.x - cr.x, live.y - cr.y) < reach) {
+        bite(w, cr, k, live, mul);
+        if (fling > 0 && live.state !== AS.Dead) flingAnt(w, live, cr.x, cr.y, fling);
+      }
+    }
+    return true;
+  }
+  if (cr.state === CS.Attack) {
+    cr.v = 0;
+    if (cr.st >= C21.crRecoverSec - 1e-9) setState(cr, CS.Chase);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * A planned lunge (pounce, leap, strike): straight on along its heading to (tx, ty), at `speedMul` × its speed, never
+ * turning. Returns the distance left.
+ */
+function lunge(w: World, cr: Creature, k: CreatureKind, speedMul: number, dt: number): number {
+  const d = dhypot(cr.tx - cr.x, cr.ty - cr.y);
+  const step = Math.min(d, k.speed * speedMul * dt);
+  const nx = cr.x + dcos(cr.h) * step;
+  const ny = cr.y + dsin(cr.h) * step;
+  if (step > 0 && walkable(w, cr, nx, ny)) {
+    cr.x = nx;
+    cr.y = ny;
+    cr.v = step / Math.max(dt, 1e-3);
+  } else cr.v = 0;
+  return d - step;
 }
 
 /** A held prey ant: kept in the creature's jaws, drained, then killed. */
@@ -549,12 +619,14 @@ function hunter(w: World, cr: Creature, k: CreatureKind, dt: number, opts: { bit
     shakeOff(w, cr, 1, 1);
     cr.cd2 = 1.6;
   }
-  if (cr.state !== CS.WindUp && backOff(w, cr, k, dt)) return;
+  if (backOff(w, cr, k, dt)) return;
   const reach = creatureRadius(cr) + 3;
+  // a bite under way: the wind-up (the rove beetle raises its tail, jaws open), the bite, the recovery (combat v2.1)
+  if (biteSeq(w, cr, k, reach + (opts.display ? 4 : 2), dt, opts.biteMul ?? 1, opts.display ? 1.2 : 0)) return;
   const target = cr.tgt ? w.antById.get(cr.tgt) : undefined;
   let a: Ant | null = target && target.state !== AS.Dead && target.space === cr.space ? target : null;
   // retaliation: the ant with the most threat close by (sticky), else the nearest as before
-  const th = cr.state !== CS.WindUp ? threatPick(w, cr, reach + k.length * 0.5) : null;
+  const th = threatPick(w, cr, reach + k.length * 0.5);
   if (th && th !== a) {
     a = th;
     cr.tgt = th.id;
@@ -581,36 +653,18 @@ function hunter(w: World, cr: Creature, k: CreatureKind, dt: number, opts: { bit
     return;
   }
   const d = dhypot(a.x - cr.x, a.y - cr.y);
-  if (cr.state === CS.WindUp) {
-    // rove beetle: tail raised like a scorpion, jaws open, then the bite
-    cr.v = 0;
-    faceAnt(cr, a, dt, 4.5);
-    if (cr.st >= 0.8) {
-      if (d < reach + 4) {
-        bite(w, cr, k, a, opts.biteMul ?? 1);
-        if (a.state !== AS.Dead) flingAnt(w, a, cr.x, cr.y, 1.2);
-      }
-      cr.cd = k.attackInterval;
-      setState(cr, CS.Chase);
-    }
-    return;
-  }
   if (d > reach) {
     setState(cr, CS.Chase);
     walkTo(w, cr, k, a.x, a.y, 1, dt, 6);
     return;
   }
+  // in reach, between bites: it stands and faces its ant; the next bite's wind-up starts so that the bite lands when
+  // the timer is up (the rove beetle's display: a telegraphed 0.8 s, after the timer)
   cr.v = 0;
   faceAnt(cr, a, dt, 6);
-  if (cr.cd <= 0) {
-    if (opts.display) {
-      setState(cr, CS.WindUp);
-      telegraph(w, cr, a.x, a.y, 6, 0.8);
-      return;
-    }
-    setState(cr, CS.Attack);
-    bite(w, cr, k, a, opts.biteMul ?? 1);
-    cr.cd = k.attackInterval;
+  if (opts.display ? cr.cd <= 0 : cr.cd <= BALANCE.combat21.crWindupSec) {
+    startBite(cr, a, opts.display ? 0.8 : BALANCE.combat21.crWindupSec);
+    if (opts.display) telegraph(w, cr, a.x, a.y, 6, 0.8);
   }
 }
 
@@ -652,9 +706,16 @@ function stalker(w: World, cr: Creature, k: CreatureKind, dt: number, frenzy = 1
     }
     return;
   }
+  if (cr.state === CS.Strike) {
+    // the recovery after a pounce that caught nothing (combat v2.1)
+    cr.v = 0;
+    if (cr.st >= BALANCE.combat21.crRecoverSec) setState(cr, CS.Wander);
+    return;
+  }
   if (cr.state === CS.Pounce) {
+    // a planned lunge: straight along the heading it had when it sprang (combat v2.1)
     const sp = 3 * frenzy;
-    const d = walkTo(w, cr, k, cr.tx, cr.ty, sp, dt, 2);
+    const d = lunge(w, cr, k, sp, dt);
     if (d < 2 || cr.st > 0.6) {
       const a = pickAnt(w, cr, cr.x + dcos(cr.h) * creatureRadius(cr), cr.y + dsin(cr.h) * creatureRadius(cr), creatureRadius(cr) + 5);
       if (a) {
@@ -669,25 +730,27 @@ function stalker(w: World, cr: Creature, k: CreatureKind, dt: number, frenzy = 1
         }
       }
       cr.cd = 1.2 / frenzy;
-      setState(cr, CS.Wander);
+      setState(cr, CS.Strike);
     }
     return;
   }
-  if (cr.state !== CS.WindUp && backOff(w, cr, k, dt)) return;
+  if (backOff(w, cr, k, dt)) return;
   const a = threatPick(w, cr, creatureRadius(cr) + 16) ?? pickAnt(w, cr, cr.x, cr.y, k.sense);
   if (a) {
     const d = dhypot(a.x - cr.x, a.y - cr.y);
     const face = datan2(a.y - cr.y, a.x - cr.x);
     if (cr.state === CS.WindUp) {
+      // the wind-up: still, turning toward its prey at most crWindupTurn; it springs along the heading it then has
       cr.v = 0;
-      faceAnt(cr, a, dt, 7.5);
+      faceAnt(cr, a, dt, BALANCE.combat21.crWindupTurn * frenzy);
       if (cr.st > 0.3 / frenzy) {
-        cr.tx = a.x + dcos(face) * 2;
-        cr.ty = a.y + dsin(face) * 2;
+        cr.tx = cr.x + dcos(cr.h) * (d + 2);
+        cr.ty = cr.y + dsin(cr.h) * (d + 2);
         setState(cr, CS.Pounce);
       }
       return;
     }
+    void face;
     if (d < creatureRadius(cr) + 16 && cr.cd <= 0) {
       setState(cr, CS.WindUp);
       telegraph(w, cr, a.x, a.y, 5, 0.3 / frenzy);
@@ -916,7 +979,9 @@ function stag(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   const L = k.length;
   // rears and shakes its riders off (combat v2)
   if (riderShake(w, cr, dt, CS.Rear)) return;
-  if (cr.state !== CS.WindUp && cr.state !== CS.Rear && backOff(w, cr, k, dt)) return;
+  if (backOff(w, cr, k, dt)) return;
+  // a pinch of the antlers under way: wind-up, pinch, recovery (combat v2.1)
+  if (biteSeq(w, cr, k, L * 0.55, dt)) return;
   if (cr.state === CS.WindUp) {
     cr.v = 0;
     if (cr.st >= 0.9) {
@@ -983,10 +1048,10 @@ function stag(w: World, cr: Creature, k: CreatureKind, dt: number): void {
     telegraph(w, cr, cr.x + dcos(cr.h) * L * 0.3, cr.y + dsin(cr.h) * L * 0.3, L * 0.32, 0.9, { dir: cr.h, half: 0.9 });
     return;
   }
-  // a pinch of the antlers on the nearest ant in front
-  if (cr.cd <= 0 && d < L * 0.5) {
-    bite(w, cr, k, a);
-    cr.cd = k.attackInterval;
+  // a pinch of the antlers on the nearest ant in front — standing still, with a wind-up (combat v2.1)
+  if (cr.cd <= BALANCE.combat21.crWindupSec && d < L * 0.5 && cr.v === 0) {
+    startBite(cr, a);
+    return;
   }
   if (cr.latched >= 8 && cr.st > 2) {
     shakeOff(w, cr, 2, 1.5);
@@ -1010,10 +1075,11 @@ function tarantula(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   const frenzy = p >= 2 ? 2 : 1;
   // rears up and shakes its riders off (combat v2)
   if (riderShake(w, cr, dt, CS.Rear)) return;
-  if (cr.state !== CS.WindUp && cr.state !== CS.Pounce && cr.state !== CS.Flick && backOff(w, cr, k, dt)) return;
+  if (backOff(w, cr, k, dt)) return;
   if (cr.state === CS.WindUp) {
-    // threat posture: front legs and palps raised, fangs shown
+    // threat posture: front legs and palps raised, fangs shown; it turns toward the aimed lunge (no snap: combat v2.1)
     cr.v = 0;
+    turnCreature(cr, cr.data.aimH ?? cr.h, dt, BALANCE.combat21.crWindupTurn);
     if (cr.st >= 0.8 / frenzy) {
       cr.tx = cr.x + dcos(cr.h) * L * 0.4;
       cr.ty = cr.y + dsin(cr.h) * L * 0.4;
@@ -1022,7 +1088,7 @@ function tarantula(w: World, cr: Creature, k: CreatureKind, dt: number): void {
     return;
   }
   if (cr.state === CS.Pounce) {
-    walkTo(w, cr, k, cr.tx, cr.ty, 4, dt, 1);
+    lunge(w, cr, k, 4, dt);
     if (cr.st > 0.35) {
       // the downward fang strike
       const ants = antsIn(w, cr, cr.x + dcos(cr.h) * L * 0.35, cr.y + dsin(cr.h) * L * 0.35, L * 0.2);
@@ -1079,7 +1145,7 @@ function tarantula(w: World, cr: Creature, k: CreatureKind, dt: number): void {
     // the lunge lands among the most ants in front (aimed: combat v2), else on its target
     const aim = aimDir(w, cr, L * 0.6, 0.5);
     const dir = aim.n >= 2 ? aim.dir : face;
-    if (aim.n >= 2 || !onBody(cr, a)) cr.h = dir;
+    cr.data.aimH = aim.n >= 2 || !onBody(cr, a) ? dir : cr.h;
     setState(cr, CS.WindUp);
     telegraph(w, cr, cr.x + dcos(dir) * L * 0.5, cr.y + dsin(dir) * L * 0.5, L * 0.22, 0.8 / frenzy);
     // in the frenzy the lunge also throws everything round it: that area is shown too
@@ -1110,10 +1176,11 @@ function scolopendra(w: World, cr: Creature, k: CreatureKind, dt: number): void 
   const fast = p >= 2 ? 1.3 : 1;
   // thrashes its riders off (combat v2)
   if (riderShake(w, cr, dt, CS.Whip)) return;
-  if (cr.state !== CS.Coil && cr.state !== CS.Pounce && cr.state !== CS.Whip && cr.state !== CS.Rear && backOff(w, cr, k, dt)) return;
+  if (backOff(w, cr, k, dt)) return;
   if (cr.state === CS.Coil) {
-    // head rises and draws back
+    // head rises and draws back, turning toward the strike (no snap: combat v2.1)
     cr.v = 0;
+    turnCreature(cr, cr.data.aimH ?? cr.h, dt, BALANCE.combat21.crWindupTurn);
     if (cr.st >= 0.7 / fast) {
       cr.tx = cr.x + dcos(cr.h) * L * 0.3;
       cr.ty = cr.y + dsin(cr.h) * L * 0.3;
@@ -1122,7 +1189,7 @@ function scolopendra(w: World, cr: Creature, k: CreatureKind, dt: number): void 
     return;
   }
   if (cr.state === CS.Pounce) {
-    walkTo(w, cr, k, cr.tx, cr.ty, 4, dt, 1);
+    lunge(w, cr, k, 4, dt);
     if (cr.st > 0.3) {
       const hx = cr.x + dcos(cr.h) * L * 0.1;
       const hy = cr.y + dsin(cr.h) * L * 0.1;
@@ -1187,9 +1254,10 @@ function scolopendra(w: World, cr: Creature, k: CreatureKind, dt: number): void 
   const d = dhypot(a.x - cr.x, a.y - cr.y);
   setState(cr, CS.Chase);
   if (d < L * 0.35 && cr.cd <= 0) {
-    if (!onBody(cr, a)) cr.h = datan2(a.y - cr.y, a.x - cr.x);
+    const dir = onBody(cr, a) ? cr.h : datan2(a.y - cr.y, a.x - cr.x);
+    cr.data.aimH = dir;
     setState(cr, CS.Coil);
-    telegraph(w, cr, cr.x + dcos(cr.h) * L * 0.3, cr.y + dsin(cr.h) * L * 0.3, 8, 0.7 / fast, { dir: cr.h, half: 0.25 });
+    telegraph(w, cr, cr.x + dcos(dir) * L * 0.3, cr.y + dsin(dir) * L * 0.3, 8, 0.7 / fast, { dir, half: 0.25 });
     return;
   }
   walkTo(w, cr, k, a.x, a.y, fast, dt, 3);
@@ -1268,6 +1336,8 @@ function arenaCreature(w: World, cr: Creature, k: CreatureKind, dt: number): boo
   // arena creatures fight to the end (their programs get the kind with no fleeing: arenaKind)
   if (cr.state === CS.Flee || cr.state === CS.Hide) setState(cr, CS.Wander);
   if (k.bite <= 0) return false;
+  // a bite on an ant under way: its own program finishes it (combat v2.1)
+  if (cr.state === CS.WindUp && (cr.data.bw ?? 0) > 0) return false;
   const team = w.teamOf(cr.faction);
   // the nearest enemy creature anywhere (few creatures: a plain scan, in array order)
   let foe: Creature | null = null;
@@ -1294,18 +1364,36 @@ function arenaCreature(w: World, cr: Creature, k: CreatureKind, dt: number): boo
   if (foe && (fd2 <= sense2 || fd2 <= sq(meleeReach(cr, foe))) && fd2 <= ad2) {
     cr.data.foe = foe.id;
     const d = Math.sqrt(fd2);
+    const want = datan2(foe.y - cr.y, foe.x - cr.x);
+    const C21 = BALANCE.combat21;
+    // combat v2.1: a wind-up (still, turning slowly), the bite (a miss if the foe has moved off: it never follows), a
+    // recovery
+    if (cr.state === CS.WindUp && (cr.data.cbw ?? 0) > 0) {
+      cr.v = 0;
+      turnCreature(cr, want, dt, C21.crWindupTurn);
+      if (cr.st >= (cr.data.cbw ?? 0) - 1e-9) {
+        cr.data.cbw = 0;
+        setState(cr, CS.Attack);
+        cr.cd = k.attackInterval;
+        if (d <= meleeReach(cr, foe) + 2 && Math.abs(angleTo(cr.h, want)) < 0.8) biteCreature(w, cr, k, foe);
+      }
+      return true;
+    }
+    if (cr.state === CS.Attack) {
+      cr.v = 0;
+      if (cr.st >= C21.crRecoverSec - 1e-9) setState(cr, CS.Chase);
+      return true;
+    }
     if (d > meleeReach(cr, foe)) {
       if (cr.state !== CS.Chase) setState(cr, CS.Chase);
       walkTo(w, cr, k, foe.x, foe.y, 1, dt, 6);
       return true;
     }
     cr.v = 0;
-    const want = datan2(foe.y - cr.y, foe.x - cr.x);
     turnCreature(cr, want, dt, 6);
-    if (cr.cd <= 0 && Math.abs(angleTo(cr.h, want)) < 0.8) {
-      setState(cr, CS.Attack);
-      biteCreature(w, cr, k, foe);
-      cr.cd = k.attackInterval;
+    if (cr.cd <= C21.crWindupSec && Math.abs(angleTo(cr.h, want)) < 0.8) {
+      setState(cr, CS.WindUp);
+      cr.data.cbw = C21.crWindupSec;
     }
     return true;
   }
@@ -1534,6 +1622,7 @@ export function registerCreatureHooks(): void {
     return true;
   };
   creatureHooks.radius = (cr) => creatureRadius(cr);
+  creatureHooks.attacking = (cr) => creatureAttacking(cr);
   bodyHook.body = creatureBody;
   creatureHooks.onDamaged = (w, cr, from, dmg) => {
     cr.data.hitT = 4;

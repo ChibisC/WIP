@@ -233,6 +233,51 @@ export const BALANCE = {
     dragLen: 1.5,
   },
   /**
+   * Combat v2.1 (CHANGE_PLAN §17, user spec claude/combat/03-spec-anchor-and-flow-around.md).
+   *
+   * **Anchored attacks.** An ant holding a foe, firing a spray, holding its range as a shooter, or recovering
+   * (`recoverSec` after a hold ends) does not move: separation treats it as a fixed obstacle. Its bites have phases
+   * from the bite timer: the wind-up is the last `windupSec` before a bite, when it may turn toward its foe at
+   * `windupTurn` rad/s; from the bite to the next wind-up its facing is locked. A shooter holding its range turns at
+   * `shooterTurn`. A hold within `reachTol` × its length of the hold distance needs nothing; up to `stepMax` × its
+   * length off (between bites) it takes one small step (`stepSpeed` × walking speed) and re-anchors; farther, the foe has
+   * left reach: the hold ends where it stands. Creatures: every bite has a wind-up of `crWindupSec` (turning at most
+   * `crWindupTurn` rad/s) and a recovery of `crRecoverSec`, still and facing locked.
+   *
+   * **No shoving.** Closing in, an ant is blocked when a teammate stands in its forward cone (`blockCone` rad each side)
+   * within a personal space and it has not come `blockedGain` × its length closer in `blockedSec`. It backs off
+   * `backOffLen` × its length over `backOffSec` (turning `backOffTurn` rad to the side it picked), then walks round the
+   * fight on a ring a personal space (`ringPS`) outside the slots, at `ringSpeed` × walking speed, aiming `ringLook` rad
+   * ahead, to the nearest free slot on that side. The side: more free slots, minus `allyWeight` × the teammates on the
+   * way; ties by its id. Walking in a fight or to a marker, it steers round teammates in its way: `avoidLook` × its
+   * length ahead, in a cone of `avoidCone` rad, turning up to `avoidTurn` rad.
+   */
+  combat21: {
+    windupSec: 0.25,
+    windupTurn: 3,
+    shooterTurn: 2,
+    reachTol: 0.2,
+    stepMax: 0.6,
+    stepSpeed: 0.8,
+    recoverSec: 0.3,
+    crWindupSec: 0.3,
+    crWindupTurn: 3,
+    crRecoverSec: 0.3,
+    blockCone: 0.6,
+    blockedSec: 0.3,
+    blockedGain: 0.05,
+    backOffLen: 0.75,
+    backOffSec: 0.4,
+    backOffTurn: 0.5,
+    ringPS: 1,
+    ringSpeed: 1,
+    ringLook: 0.6,
+    allyWeight: 1,
+    avoidLook: 2,
+    avoidCone: 0.7,
+    avoidTurn: 0.9,
+  },
+  /**
    * Mounting (EotU, CHANGE_PLAN §16 step 8): only ants and termites mount. A caste is small (mounts large and huge
    * creatures), large (`largeCasteMm` long or more, or flagged `mount: 'large'`: mounts only huge ones) or flagged
    * `mount: 'none'` (queens and kings too). Climbable creatures are large, bosses huge; at most `capLarge` /
