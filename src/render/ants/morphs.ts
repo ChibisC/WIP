@@ -308,8 +308,9 @@ const formicaRapid: AntMorph = {
 // the minim paler, orange-tan; the queen dark chestnut)
 // (Atta review round 1: not one brick colour — orange on the head grading to dark red-brown on the body)
 const attaLook = {
-  head: L(0x8a4222, 0.64, 0.08, 0.12, 0x6a3018),
-  meso: L(0x6e301a, 0.66, 0.06, 0.12, 0x5a2814),
+  // (overnight colour check vs the field photo: lighter and less saturated — the render sampled 20–30 L* darker)
+  head: L(0x9e5632, 0.64, 0.08, 0.12, 0x7a3a20),
+  meso: L(0x7a4030, 0.66, 0.06, 0.12, 0x5e2e1e),
   waist: L(0x642c18, 0.66, 0.06, 0.1),
   gaster: L(0x5e2a18, 0.62, 0.08, 0.16, 0x4a2214),
   // (review round 2: the legs dark red-brown like the body, not orange)
@@ -603,8 +604,9 @@ const ecitonMajor: AntMorph = {
     ...EC_TAN,
     head: L(0xc0aa7a, 0.42, 0.16, 0.08, 0xa0602e), // pale tan vertex → orange-brown frons and clypeus (frontMix)
     mandible: L(0x0e0e10, 0.3, 0.4, 0, 0x060606),
-    meso: L(0x8a4a28, 0.42, 0.22, 0.05, 0xa8683a),
-    waist: L(0x8a4a28, 0.42, 0.18, 0.05, 0xa8683a),
+    // (overnight colour check: the photo's soldier mesosoma #3d1e10 — dark brown, not orange; render was #7e4016)
+    meso: L(0x4a2618, 0.48, 0.16, 0.05, 0x5a301c),
+    waist: L(0x4a2618, 0.48, 0.14, 0.05, 0x5a301c),
   },
   stance: 0.19,
 };
