@@ -60,8 +60,12 @@ export class BuildPanel {
     const acts = el('div', 'bp-acts');
     this.foodBtn = button('', ICONS.eye, '<b>Food view</b>Highlight the food your colony can gather on the surface, and the stores in the nest.', () => (s.foodView = !s.foodView));
     this.speedBtn = button('', ICONS.fast + '<span class="spd">1×</span>', `<b>Game speed</b>${CLICK} to cycle 1×, 2×, 4×. <span class="k">−</span>/<span class="k">=</span> also change speed, <span class="k">P</span> pauses.`, () => {
-      if (s.net) return s.onEvent?.({ t: 'message', text: 'A multiplayer match always runs at 1×.', kind: 'info' });
       const order = [1, 2, 4];
+      if (s.net) {
+        // multiplayer: ask for the next speed (every player has to agree; back to 1× at once)
+        const cur = s.gameSpeed();
+        return s.setSpeed(order[(order.indexOf(cur) + 1) % order.length]);
+      }
       const i = order.indexOf(s.loop.speed);
       s.setSpeed(order[(i + 1) % order.length]);
       s.loop.paused = false;
@@ -228,9 +232,11 @@ export class BuildPanel {
     }
     this.foodBtn.classList.toggle('on', s.foodView);
     const spd = this.speedBtn.querySelector('.spd')!;
-    const txt = s.loop.paused ? '❚❚' : `${s.loop.speed}×`;
+    const gs = s.gameSpeed();
+    const asked = s.net ? (s.world.s.settings.speedVotes ?? []).find((v) => v > 0) : 0;
+    const txt = s.loop.paused ? '❚❚' : asked ? `${gs}→${asked}×` : `${gs}×`;
     if (spd.textContent !== txt) spd.textContent = txt;
-    this.speedBtn.classList.toggle('on', s.loop.speed > 1);
+    this.speedBtn.classList.toggle('on', gs > 1);
     // the hovered hex (tools) or the selected tile
     let html = '';
     if (s.tool !== 'none' && s.tool !== 'marker') html = esc(s.ghostInfo || s.hoverMsg || (s.tool === 'dig' ? 'Drag over soil to mark it for digging.' : s.tool === 'tile' ? `${CLICK} or drag on dug floor to plan tiles; workers build them.` : s.tool === 'upgrade' ? `${CLICK} a tile to mark it for upgrading.` : `${CLICK} a tile to downgrade or delete it.`));

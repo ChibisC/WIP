@@ -231,6 +231,9 @@
 .net-banner { text-align: center; width: calc(440 * var(--u)); white-space: normal; font-variant-numeric: tabular-nums; }
 /* fixed width and tabular digits, and the button centred on its own line, so it stays put while the seconds count up */
 .net-banner .chip { display: block; margin: 6px auto 0; pointer-events: auto; }
+/* the game-speed vote: below the waiting banner, its two buttons side by side */
+.net-banner.net-vote { top: calc(118 * var(--u)); }
+.net-banner.net-vote button, .net-banner.net-vote .chip { display: inline-block; margin: 6px 4px 0; pointer-events: auto; }
 .net-chat { position: absolute; left: calc(12 * var(--u)); bottom: calc(250 * var(--u)); max-width: calc(420 * var(--u)); display: flex; flex-direction: column; gap: 3px; font-size: calc(13.5 * var(--u)); text-shadow: 0 1px 2px #000, 0 0 6px #000; }
 .net-chat b { color: var(--bronze-hi); }
 .net-chat-input { position: absolute; left: calc(12 * var(--u)); bottom: calc(222 * var(--u)); width: calc(420 * var(--u)); display: none; pointer-events: auto; font: inherit; font-size: calc(14 * var(--u)); color: #f2e6cc; background: rgba(10,7,4,0.85); border: 1px solid var(--bronze); border-radius: 4px; padding: 6px 8px; }

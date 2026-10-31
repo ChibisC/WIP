@@ -680,6 +680,13 @@ export interface SimSettings {
   enemyStatMul: number;
   aggression: number;
   foodRespawn: number;
+  /**
+   * Multiplayer game speed (1, 2 or 4; undefined = 1): faster only when every player agrees (`speedVote`). Each
+   * colony's vote, by colony id (0 = none): the speed it asks for or agrees to. Not simulation logic: the clients
+   * run their tick clocks this much faster, all together.
+   */
+  gameSpeed?: number;
+  speedVotes?: number[];
 }
 
 export interface SimState {

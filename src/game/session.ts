@@ -297,10 +297,22 @@ export class GameSession {
     this.loop.paused = !this.loop.paused;
   }
 
-  /** Game speed (single-player only; a multiplayer match always runs at 1×). */
+  /**
+   * Game speed. Multiplayer: a vote (sim/commands.ts `speedVote`) — faster only when every player agrees, slower at
+   * once; the match runs at the agreed speed (`settings.gameSpeed`).
+   */
   setSpeed(x: number): void {
-    if (this.net) return;
+    if (this.net) {
+      const sp = x >= 4 ? 4 : x >= 2 ? 2 : 1;
+      this.issue({ type: 'speedVote', speed: sp });
+      return;
+    }
     this.loop.speed = x;
+  }
+
+  /** The match's agreed speed (multiplayer) or the local speed (single-player). */
+  gameSpeed(): number {
+    return this.net ? (this.world.s.settings.gameSpeed ?? 1) : this.loop.speed;
   }
 
   /** Multiplayer: let the match drive the simulation (after useWorker). */
@@ -318,7 +330,9 @@ export class GameSession {
     const net = this.net;
     if (!net) return;
     net.update();
-    this.loop.speed = net.status().speed;
+    // (the agreed speed — every client runs its tick clock this much faster at the same time — times the lockstep's
+    // own slow-down when one client runs ahead)
+    this.loop.speed = net.status().speed * (this.world.s.settings.gameSpeed ?? 1);
     // A player who rejoined plays the missed ticks at full speed (the worker queues them).
     const behind = net.behind();
     if (behind > 4 && !this.loop.paused) for (let i = 0; i < Math.min(60, behind) && net.tryTick(); i++);
@@ -353,8 +367,8 @@ export class GameSession {
     const inp = this.input;
     inp.on('toggleView', () => this.toggleView());
     inp.on('pause', () => this.togglePause());
-    inp.on('speedUp', () => this.setSpeed(Math.min(8, this.loop.speed * 2)));
-    inp.on('speedDown', () => this.setSpeed(Math.max(0.25, this.loop.speed / 2)));
+    inp.on('speedUp', () => this.setSpeed(this.net ? this.gameSpeed() * 2 : Math.min(8, this.loop.speed * 2)));
+    inp.on('speedDown', () => this.setSpeed(this.net ? this.gameSpeed() / 2 : Math.max(0.25, this.loop.speed / 2)));
     inp.on('overlay', () => this.setPhero(!this.pheroOn));
     inp.on('recall', () => this.issue({ type: 'recall' }));
     inp.on('cancel', () => {
