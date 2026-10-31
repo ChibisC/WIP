@@ -557,7 +557,9 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const hH = m.head.height * Lm;
   const stanceY = m.stance * Lm;
   const mBottom = stanceY; // ventral line of the mesosoma
-  const neck = new THREE.Vector3(mL + 0.012 * Lm, mBottom + mH * 0.62, 0);
+  // (overnight review round 3: on the formicines a bare neck showed between the sloping pronotum and the head —
+  // the head sits right against the pronotum)
+  const neck = new THREE.Vector3(mL + (m.real && formicine ? -0.012 : 0.012) * Lm, mBottom + mH * 0.62, 0);
 
   // ---------- mesosoma ----------
   {
@@ -598,7 +600,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       p,
       ind,
       PART.BODY,
-      grad(look.meso, (x, y) => (m.key.startsWith('formica') ? ss(0.55, 0.95, (y - mBottom) / mH) * ss(0.45, 0.65, x / mL) * 0.85 : 0)),
+      grad(look.meso, (x, y) => (m.key.startsWith('formica') ? ss(0.55, 0.95, (y - mBottom) / mH) * ss(0.3, 0.8, x / mL) * 0.8 : 0)),
       look.meso,
       0,
       undefined,
@@ -645,7 +647,9 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   }
 
   // ---------- head ----------
-  const headRestPitch = -0.12;
+  // (overnight review round 3: a formicine carries its face tilted down, the jaws hanging below the clypeus — level,
+  // they read as a forward beak)
+  const headRestPitch = m.real && formicine ? -0.36 : -0.12;
   const headM = new THREE.Matrix4().compose(neck, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), headRestPitch), new THREE.Vector3(1, 1, 1));
   const hp = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyMatrix4(headM);
   let socketL = new THREE.Vector3();
@@ -718,12 +722,14 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // (spec jaws: a lobe projecting over the closed jaws' bases to just behind their cutting edges, filling the
     // space between them, as in Solenopsis; its size from the jaws' hinge distance `wzSpec`)
     const wzSpec = (hW / 2) * headWidthAt(0.95) * 0.84;
-    const clypLobe = m.real && !!m.mandible.spec && m.mandible.type !== 'massive';
+    // (overnight review round 2: on the formicines the Solenopsis-style lobe and the dark labrum read as pasted-on
+    // lips — their clypeus is just the head's broad front)
+    const clypLobe = m.real && !!m.mandible.spec && m.mandible.type !== 'massive' && m.key.startsWith('fire_');
     // (pilot finish, back to the user's spec: the jaws are "clearly visible at the front of the head", so the lobe
     // only covers their bases; the dark labrum fills the space between the closed jaws behind their cutting edges)
     const clypFront = clypLobe ? hL * 0.965 + wzSpec * 0.2 : 0;
     // (a major's massive jaws fill the front: no separate clypeus knob above them — jaws review)
-    if (!(m.real && m.mandible.type === 'massive')) {
+    if (!(m.real && m.mandible.type === 'massive') && !(m.real && !m.key.startsWith('fire_'))) {
       const c = clypLobe ? new THREE.Vector3(hL * 0.955 - wzSpec * 0.12, headCY - hH * 0.04, 0) : m.real ? new THREE.Vector3(hL * 0.9, headCY + hH * 0.12, 0) : new THREE.Vector3(hL * 0.93, headCY + hH * 0.18, 0);
       // (flat: a plate continuing the face, not a disc standing on it)
       const r = clypLobe ? new THREE.Vector3(wzSpec * 0.34, hH * 0.07, wzSpec * 0.72) : m.real ? new THREE.Vector3(hL * 0.085, hH * 0.11, hW * 0.27) : new THREE.Vector3(hL * 0.1, hH * 0.18, hW * 0.24);
@@ -768,7 +774,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     if (!m.eyes.none) for (const s of [-1, 1]) {
       // (rollout, the user's photos: the eye sits in the head's outline, only its low dome standing proud — set the
       // larger eyes of the realism morphs in by part of their depth)
-      const inset = m.real ? eyeR * Math.max(0, (m.eyes.size - 0.15) * 1.6) : 0;
+      // (review round 2: the formicines' big eyes read as small beads when set in this deep)
+      const inset = m.real ? eyeR * Math.max(0, (m.eyes.size - 0.15) * (formicine ? 0.3 : 1.6)) : 0;
       const c = new THREE.Vector3(eyeT * hL, headCY + (hH / 2) * m.eyes.height, s * (eyeZ - inset));
       // (rollout, user note: the eyes bulged out too much — an ant's eye is a low dome on the head's side; the bigger
       // the eye, the flatter: the fire ant's small eye keeps its 0.78, a Formica's large one sits nearly flush)
@@ -778,8 +785,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       // realism v2: a bulging, glossy dome (the facets too fine to read except as a faint grain)
       // (rollout, the user's photos: the formicines' larger eyes are a satin grey-black, not glass beads)
       // (overnight review round 1: the formicines' eyes a matte, faceted grey — not glossy black beads)
-      const eyeLook: PartLook = smoothEye ? { color: 0, rough: 0.12, coat: 1, sheen: 0 } : m.real ? (formicine ? { color: 0x3a3836, rough: 0.5, coat: 0.12, sheen: 0.15 } : { color: 0x0b0806, rough: 0.16, coat: 0.7, sheen: 0 }) : { color: 0x0b0806, rough: 0.32, coat: 0.15, sheen: 0 };
-      acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(smoothEye ? 0x161c1a : m.eyes.single ? 0x2a1a10 : formicine && m.real ? 0x34312e : 0x0d0a08), eyeLook, smoothEye ? 3 : m.eyes.single ? 0 : 1);
+      const eyeLook: PartLook = smoothEye ? { color: 0, rough: 0.12, coat: 1, sheen: 0 } : m.real ? (formicine ? { color: 0x5a5650, rough: 0.5, coat: 0.12, sheen: 0.15 } : { color: 0x0b0806, rough: 0.16, coat: 0.7, sheen: 0 }) : { color: 0x0b0806, rough: 0.32, coat: 0.15, sheen: 0 };
+      acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(smoothEye ? 0x161c1a : m.eyes.single ? 0x2a1a10 : formicine && m.real ? 0x4c4844 : 0x0d0a08), eyeLook, smoothEye ? 3 : m.eyes.single ? 0 : 1);
     }
     if (m.eyes.ocelli && hi) {
       for (const [ox, oz] of [
@@ -794,7 +801,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       }
     }
     // (realism: near the front, close to the midline just behind the clypeus, as in Solenopsis — photo fire_07)
-    socketL = m.real ? hp(hL * 0.84, headCY + hH * 0.24, -hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, -hW * 0.17);
+    // (formicines, review round 3: at the front of the frons just behind the clypeus, not on top of the head)
+    socketL = m.real && formicine ? hp(hL * 0.86, headCY + hH * 0.1, -hW * 0.17) : m.real ? hp(hL * 0.84, headCY + hH * 0.24, -hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, -hW * 0.17);
     socketR = m.real ? hp(hL * 0.84, headCY + hH * 0.24, hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, hW * 0.17);
     mandPivL = hp(hL * 0.95, headCY - hH * 0.22, -hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
     mandPivR = hp(hL * 0.95, headCY - hH * 0.22, hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
@@ -966,7 +974,9 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   for (const s of [-1, 1]) {
     const sock = s < 0 ? socketL : socketR;
     // Scape: forward-outward-up; funiculus: forward-outward-down (elbowed).
-    const scDir = new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
+    // (review round 2: a formicine's scapes rise up and back from sockets near the midline, then the funiculus bends
+    // forward — they read as rods sticking out of the face's sides when set forward-outward)
+    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && m.key.startsWith('atta_') ? new THREE.Vector3(0.3, 0.68, 0.55 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
     const elbow = sock.clone().addScaledVector(scDir, scapeLen);
     elbows.push(elbow);
     const scMid = sock.clone().lerp(elbow, 0.5).add(new THREE.Vector3(0, scapeLen * 0.04, 0));
@@ -1054,7 +1064,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     if (m.waist.nodes === 1) {
       // formicine scale: thin upright plate, top slightly notched (Lasius)
       const c = new THREE.Vector3(-wL * 0.45, mBottom + mH * 0.28 + nodeH * 0.38, 0);
-      const [pp, ii] = ellipsoid(c, new THREE.Vector3(0.025 * Lm * Math.max(1, wk * 0.7), nodeH * 0.55, mW * 0.42 * Math.max(1, wk * 0.45)), hi ? 12 : 8, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.18));
+      // (review round 2: a thin upright scale, narrower than the propodeum — not a disc)
+      const [pp, ii] = ellipsoid(c, new THREE.Vector3(0.025 * Lm * Math.max(1, wk * 0.7), nodeH * 0.55, mW * (m.real && formicine ? 0.3 : 0.42) * Math.max(1, wk * 0.45)), hi ? 12 : 8, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.18));
       if (m.key.startsWith('lasius'))
         for (let i = 0; i < pp.length; i += 3) {
           const top = pp[i + 1] - c.y;

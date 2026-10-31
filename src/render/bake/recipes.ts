@@ -65,7 +65,7 @@ export const FIRE_ANT: DetailRecipe = {
  * reticulate, cells ~12 µm) under a dense coat of short appressed hairs that lie back along the body and give a
  * grey sheen, strongest on the gaster; a few erect hairs (the setae). No gloss to speak of (docs/creatures/lasius-niger.md).
  */
-const LAS_HEAD: Sculpt = { tile: [0.5, 0.5], noise: 0.0003, reticulum: { cell: 0.012, depth: 0.0006 }, pits: { n: 170, r: 0.0032, depth: 0.0006, pale: 0.4, stub: { len: 0.03, dir: -1, share: 1 } }, wave: { cell: 0.14, amp: 0.002 }, rough: [0.18, 0.42], roughVar: 0.05, dirt: 0.2, mottle: 0.08, cavityDark: 0.25 };
+const LAS_HEAD: Sculpt = { tile: [0.5, 0.5], noise: 0.0003, reticulum: { cell: 0.012, depth: 0.0004 }, pits: { n: 70, r: 0.0028, depth: 0.0005, pale: 0.25, stub: { len: 0.03, dir: -1, share: 1 } }, wave: { cell: 0.14, amp: 0.002 }, rough: [0.18, 0.42], roughVar: 0.05, dirt: 0.2, mottle: 0.08, cavityDark: 0.25 };
 const LAS_MESO: Sculpt = { tile: [1.3, 0.5], noise: 0.0003, reticulum: { cell: 0.013, depth: 0.0006 }, pits: { n: 150, r: 0.0032, depth: 0.0006, pale: 0.4, stub: { len: 0.03, dir: -1, share: 1 } }, wave: { cell: 0.12, amp: 0.0025 }, rough: [0.2, 0.42], roughVar: 0.05, dirt: 0.28, mottle: 0.12, cavityDark: 0.26 };
 const LAS_WAIST: Sculpt = { tile: [0.35, 0.35], noise: 0.0005, reticulum: { cell: 0.014, depth: 0.0008 }, pits: { n: 60, r: 0.004, depth: 0.001, pale: 0.35 }, rough: [0.2, 0.4], roughVar: 0.06, dirt: 0.3, mottle: 0.1, cavityDark: 0.3 };
 const LAS_GASTER: Sculpt = { tile: [0.7, 0.7], noise: 0.0003, reticulum: { cell: 0.012, depth: 0.0005 }, pits: { n: 340, r: 0.003, depth: 0.0005, pale: 0.55, stub: { len: 0.04, dir: 1, share: 1 } }, wave: { cell: 0.16, amp: 0.003 }, rough: [0.14, 0.4], roughVar: 0.06, dirt: 0.15, mottle: 0.16, cavityDark: 0.22 };
@@ -76,10 +76,10 @@ export const LASIUS: DetailRecipe = {
   key: 'lasius',
   regions: {
     [REGION.HEAD]: { sculpt: LAS_HEAD, shade: shade(0.8, 0.35, 0.45, 0.2, 0.4, { coatRough: 0.34, wear: 0.15, dust: 0.08, mid: 0.08 }), px: [512, 512] },
-    [REGION.MESO]: { sculpt: LAS_MESO, shade: shade(0.8, 0.45, 0.5, 0.2, 0.4, { coatRough: 0.34, wear: 0.15, dust: 0.1, mid: 0.08, bands: [0.6], band: [0.009, 0.22, 0.1, 0.02] }), px: [1024, 512] },
+    [REGION.MESO]: { sculpt: LAS_MESO, shade: shade(0.8, 0.45, 0.5, 0.2, 0.4, { coatRough: 0.34, wear: 0.15, dust: 0.1, mid: 0.08 }), px: [1024, 512] },
     [REGION.WAIST]: { sculpt: LAS_WAIST, shade: shade(0.8, 0.06, 0.3, 0.2, 0.3, { coatRough: 0.36, wear: 0.15, dust: 0.12 }), px: [256, 256] },
     // (the user's photos: the hind margin of each tergite a plain pale, translucent band)
-    [REGION.GASTER]: { sculpt: LAS_GASTER, shade: shade(0.75, 0.3, 0.35, 0.22, 0.5, { coatRough: 0.32, wear: 0.15, dust: 0.06, mid: 0.08, bands: [0.4, 0.6, 0.77, 0.9], band: [0.011, 0.34, 0.6, 0.05] }), px: [512, 512] },
+    [REGION.GASTER]: { sculpt: LAS_GASTER, shade: shade(0.75, 0.3, 0.35, 0.22, 0.5, { coatRough: 0.32, wear: 0.15, dust: 0.06, mid: 0.08, bands: [0.4, 0.6, 0.77, 0.9], band: [0.011, 0.2, 0.7, 0.06] }), px: [512, 512] },
     [REGION.LEG]: { sculpt: LAS_LEG, shade: shade(1.0, 0.5, 0, 0.5, 0.35, { coatRough: 0.34, wear: 0.25, dust: 0.35, mid: 0.2, tipThin: 0.5 }), px: [128, 320] },
     [REGION.TARSUS]: { sculpt: FIRE_TARSUS, shade: shade(0.9, 0.45, 0, 0.5, 0.35, { coatRough: 0.4, dust: 0.55, mid: 0.15, tipThin: 0.45 }), px: [64, 128] },
     [REGION.ANTENNA]: { sculpt: FIRE_ANTENNA, shade: shade(0.7, 0.05, 0, 0.5, 0.35, { coatRough: 0.36, dust: 0.15, mid: 0, tipThin: 0.4 }), px: [64, 160] },
@@ -92,7 +92,7 @@ export const LASIUS: DetailRecipe = {
  * scattered hair pits; the gaster blackish and duller under dense, fine, silvery pubescence; legs dark, finely
  * punctate (docs/creatures/formica-rufa.md).
  */
-const FOR_HEAD: Sculpt = { tile: [0.9, 0.9], noise: 0.0004, reticulum: { cell: 0.016, depth: 0.0009 }, pits: { n: 40, r: 0.005, depth: 0.0012, pale: 0.15, stub: { len: 0.03, dir: -1, share: 0.6 } }, wave: { cell: 0.2, amp: 0.003 }, rough: [0.24, 0.48], roughVar: 0.05, dirt: 0.18, mottle: 0.12, cavityDark: 0.25 };
+const FOR_HEAD: Sculpt = { tile: [0.9, 0.9], noise: 0.0004, reticulum: { cell: 0.016, depth: 0.0005 }, pits: { n: 14, r: 0.005, depth: 0.0012, pale: 0.15, stub: { len: 0.03, dir: -1, share: 0.6 } }, wave: { cell: 0.2, amp: 0.003 }, rough: [0.24, 0.48], roughVar: 0.05, dirt: 0.18, mottle: 0.12, cavityDark: 0.25 };
 const FOR_MESO: Sculpt = { tile: [2.2, 0.9], noise: 0.0004, reticulum: { cell: 0.017, depth: 0.001 }, pits: { n: 36, r: 0.005, depth: 0.0012, pale: 0.15, stub: { len: 0.03, dir: -1, share: 0.6 } }, wave: { cell: 0.18, amp: 0.0035 }, rough: [0.26, 0.5], roughVar: 0.05, dirt: 0.25, mottle: 0.16, cavityDark: 0.26 };
 const FOR_WAIST: Sculpt = { tile: [0.6, 0.6], noise: 0.0006, reticulum: { cell: 0.018, depth: 0.0009 }, pits: { n: 40, r: 0.006, depth: 0.0014, pale: 0.25 }, rough: [0.08, 0.32], roughVar: 0.06, dirt: 0.3, mottle: 0.12, cavityDark: 0.3 };
 const FOR_GASTER: Sculpt = { tile: [1.2, 1.2], noise: 0.0003, reticulum: { cell: 0.014, depth: 0.0005 }, pits: { n: 1500, r: 0.0022, depth: 0.0004, pale: 0.3, stub: { len: 0.05, dir: 1, share: 1 } }, wave: { cell: 0.22, amp: 0.004 }, rough: [0.12, 0.36], roughVar: 0.06, dirt: 0.15, mottle: 0.14, cavityDark: 0.22 };
@@ -102,14 +102,45 @@ export const FORMICA: DetailRecipe = {
   key: 'formica',
   regions: {
     [REGION.HEAD]: { sculpt: FOR_HEAD, shade: shade(0.8, 0.35, 0.45, 0.22, 0.4, { coatRough: 0.2, wear: 0.2, dust: 0.08, mid: 0.1 }), px: [512, 512] },
-    [REGION.MESO]: { sculpt: FOR_MESO, shade: shade(0.8, 0.45, 0.5, 0.22, 0.4, { coatRough: 0.2, wear: 0.2, dust: 0.1, mid: 0.1, bands: [0.6], band: [0.009, 0.22, 0.1, 0.02] }), px: [1024, 512] },
+    // (review round 3: the promesonotal suture's band read as a seam across the mesosoma)
+    [REGION.MESO]: { sculpt: FOR_MESO, shade: shade(0.8, 0.45, 0.5, 0.22, 0.4, { coatRough: 0.2, wear: 0.2, dust: 0.1, mid: 0.1 }), px: [1024, 512] },
     [REGION.WAIST]: { sculpt: FOR_WAIST, shade: shade(0.8, 0.06, 0.3, 0.22, 0.3, { coatRough: 0.24, wear: 0.2, dust: 0.12 }), px: [256, 256] },
-    [REGION.GASTER]: { sculpt: FOR_GASTER, shade: shade(0.75, 0.3, 0.35, 0.24, 0.5, { coatRough: 0.36, wear: 0.15, dust: 0.06, mid: 0.08, bands: [0.4, 0.6, 0.77, 0.9], band: [0.011, 0.36, 0.65, 0.05] }), px: [512, 512] },
+    [REGION.GASTER]: { sculpt: FOR_GASTER, shade: shade(0.75, 0.3, 0.35, 0.24, 0.5, { coatRough: 0.36, wear: 0.15, dust: 0.06, mid: 0.08, bands: [0.4, 0.6, 0.77, 0.9], band: [0.011, 0.2, 0.75, 0.06] }), px: [512, 512] },
     [REGION.LEG]: { sculpt: FOR_LEG, shade: shade(1.0, 0.5, 0, 0.5, 0.35, { coatRough: 0.28, wear: 0.3, dust: 0.35, mid: 0.25, tipThin: 0.55 }), px: [128, 320] },
     [REGION.TARSUS]: { sculpt: FIRE_TARSUS, shade: shade(0.9, 0.45, 0, 0.5, 0.35, { coatRough: 0.38, dust: 0.55, mid: 0.2, tipThin: 0.5 }), px: [64, 128] },
     [REGION.ANTENNA]: { sculpt: FIRE_ANTENNA, shade: shade(0.7, 0.05, 0, 0.5, 0.35, { coatRough: 0.32, dust: 0.15, mid: 0, tipThin: 0.4 }), px: [64, 160] },
     [REGION.MANDIBLE]: { sculpt: FOR_MAND, shade: shade(0.8, 0.1, 0, 0.45, 0.35, { coatRough: 0.2, wear: 0.5, dust: 0.05, tipThin: 0.7 }), px: [96, 192] },
   },
+};
+
+/**
+ * Leafcutter (Atta cephalotes), overnight realism pass: the workers matte and finely rough all over — the cuticle
+ * densely tuberculate (small rounded tubercles on head, mesosoma, waist and gaster) with short hooked hairs, dusty
+ * from the trails; the major's head the exception: smooth and shining, without A. sexdens's hexagonal
+ * microsculpture (Antkey; Longino's key: a smooth patch on the mesosoma's side) — docs/creatures/atta-cephalotes.md.
+ */
+const ATTA_HEAD: Sculpt = { tile: [1.2, 1.2], noise: 0.0005, granules: { cell: 0.045, height: 0.0055 }, pits: { n: 30, r: 0.006, depth: 0.0012, pale: 0.25, stub: { len: 0.04, dir: -1, share: 0.8 } }, wave: { cell: 0.25, amp: 0.004 }, rough: [0.26, 0.5], roughVar: 0.06, dirt: 0.32, mottle: 0.16, cavityDark: 0.3 };
+const ATTA_MESO: Sculpt = { tile: [3, 1.2], noise: 0.0006, granules: { cell: 0.055, height: 0.007 }, pits: { n: 26, r: 0.006, depth: 0.0012, pale: 0.25, stub: { len: 0.04, dir: -1, share: 0.8 } }, wave: { cell: 0.22, amp: 0.005 }, rough: [0.28, 0.52], roughVar: 0.06, dirt: 0.38, mottle: 0.18, cavityDark: 0.32 };
+const ATTA_WAIST: Sculpt = { tile: [0.8, 0.8], noise: 0.0006, granules: { cell: 0.05, height: 0.006 }, pits: { n: 30, r: 0.006, depth: 0.0012, pale: 0.25 }, rough: [0.28, 0.5], roughVar: 0.06, dirt: 0.38, mottle: 0.14, cavityDark: 0.32 };
+const ATTA_GASTER: Sculpt = { tile: [1.6, 1.6], noise: 0.0004, granules: { cell: 0.04, height: 0.0035 }, pits: { n: 60, r: 0.004, depth: 0.0008, pale: 0.3, stub: { len: 0.035, dir: 1, share: 0.9 } }, wave: { cell: 0.3, amp: 0.004 }, rough: [0.2, 0.42], roughVar: 0.06, dirt: 0.25, mottle: 0.14, cavityDark: 0.26 };
+const ATTA_LEG: Sculpt = { ...FIRE_LEG, tile: [0.4, 1.0], granules: { cell: 0.035, height: 0.003 }, rough: [0.22, 0.42], dirt: 0.45 };
+const ATTA_MAND: Sculpt = { ...FIRE_MAND, tile: [0.35, 0.8], striae: { per: 120, depth: 0.0001, angle: 0, wobble: 0.2 }, cavityDark: 0.2 };
+// the major's head: smooth and shining, sparse hair pits, a faint undulation so the highlight breaks up
+const ATTA_MAJOR_HEAD: Sculpt = { tile: [3, 3], noise: 0.0004, pits: { n: 6, r: 0.012, depth: 0.003, pale: 0.12 }, wave: { cell: 0.5, amp: 0.01 }, rough: [-0.04, 0.22], roughVar: 0.05, dirt: 0.12, mottle: 0.12, cavityDark: 0.22 };
+const attaRegions = {
+  [REGION.HEAD]: { sculpt: ATTA_HEAD, shade: shade(0.85, 0.35, 0.45, 0.2, 0.45, { coatRough: 0.32, wear: 0.25, dust: 0.18, mid: 0.1 }), px: [512, 512] as [number, number] },
+  [REGION.MESO]: { sculpt: ATTA_MESO, shade: shade(0.85, 0.45, 0.5, 0.2, 0.45, { coatRough: 0.32, wear: 0.25, dust: 0.22, mid: 0.1 }), px: [1024, 512] as [number, number] },
+  [REGION.WAIST]: { sculpt: ATTA_WAIST, shade: shade(0.85, 0.06, 0.3, 0.2, 0.35, { coatRough: 0.32, wear: 0.2, dust: 0.22 }), px: [256, 256] as [number, number] },
+  [REGION.GASTER]: { sculpt: ATTA_GASTER, shade: shade(0.8, 0.3, 0.35, 0.24, 0.5, { coatRough: 0.3, wear: 0.15, dust: 0.12, mid: 0.08, bands: [0.45, 0.65, 0.8, 0.92], band: [0.009, 0.28, 0.4, 0.035] }), px: [512, 512] as [number, number] },
+  [REGION.LEG]: { sculpt: ATTA_LEG, shade: shade(1.0, 0.5, 0, 0.55, 0.35, { coatRough: 0.32, wear: 0.3, dust: 0.4, mid: 0.25, tipThin: 0.6 }), px: [128, 320] as [number, number] },
+  [REGION.TARSUS]: { sculpt: FIRE_TARSUS, shade: shade(0.9, 0.45, 0, 0.55, 0.35, { coatRough: 0.38, dust: 0.55, mid: 0.2, tipThin: 0.5 }), px: [64, 128] as [number, number] },
+  [REGION.ANTENNA]: { sculpt: FIRE_ANTENNA, shade: shade(0.7, 0.05, 0, 0.55, 0.35, { coatRough: 0.32, dust: 0.2, mid: 0, tipThin: 0.4 }), px: [64, 160] as [number, number] },
+  [REGION.MANDIBLE]: { sculpt: ATTA_MAND, shade: shade(0.8, 0.1, 0, 0.45, 0.35, { coatRough: 0.2, wear: 0.55, dust: 0.08, tipThin: 0.7 }), px: [96, 192] as [number, number] },
+};
+export const ATTA: DetailRecipe = { key: 'atta', regions: attaRegions };
+export const ATTA_MAJOR: DetailRecipe = {
+  key: 'atta_major',
+  regions: { ...attaRegions, [REGION.HEAD]: { sculpt: ATTA_MAJOR_HEAD, shade: shade(0.8, 0.35, 0.45, 0.2, 0.3, { coatRough: 0.16, wear: 0.4, dust: 0.06, mid: 0.12 }), px: [512, 512] } },
 };
 
 /** Recipe for an ant morph (null: no baked detail yet, the material stays as before). */
@@ -118,6 +149,9 @@ export function antRecipe(morphKey: string): DetailRecipe | null {
   if (morphKey.startsWith('lasius_')) return LASIUS;
   // (the Gene Thief ant is a Formica — modelled on F. sanguinea: the same microreticulate head and mesosoma, a dull pubescent gaster)
   if (morphKey.startsWith('formica_') || morphKey.startsWith('plagiaria_')) return FORMICA;
+  // (overnight pass: the major's head smooth and shining, every other caste matte and tuberculate)
+  if (morphKey === 'atta_major') return ATTA_MAJOR;
+  if (morphKey.startsWith('atta_')) return ATTA;
   return null;
 }
 

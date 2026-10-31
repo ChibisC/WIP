@@ -818,3 +818,14 @@ User order (02:35): finish *Lasius niger* and *Formica rufa* first, then Atta, t
 | Round | F1 side | F2 field 3/4 | F3 head | F4 jaws open | F5 top | F6 face | L1 3/4 | L2 head | L3 side | L4 field |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 3 | 3 | 3 | 3 | 3 | 3 | 4 | 3 | 4 | 4 |
+| 2 | 3 | 3 | 3 | 2 | 4 | 2 | 3 | 3 | 3 | 3 |
+| 3 | 3 | 3 | 2 | 2 | 3 | 3 | 3 | 3 | 3 | 3 |
+
+Fixes between rounds: (1→2) continuous mesosoma, stouter shorter legs, deeper heads with a broad front, longer
+darker jaws, matte grey eyes, thinner antennae, darker hairs, uniformly dark Lasius, rust-red Formica, low dark
+petiole, tergite margins; (2→3) no Solenopsis clypeal lobe or labrum on formicines/Atta (read as lips), a thin
+narrow petiole scale, rounder gasters, bigger eyes, Lasius greyer; (3→4) the formicine face tilted down (−0.36 rad)
+so the closed jaws hang below the clypeus instead of a forward beak, antennal sockets at the front of the frons with
+the scapes rising up and back, the head set against the pronotum (no bare neck), no suture band across the
+mesosoma, larger and lower eyes, satin gasters.
+

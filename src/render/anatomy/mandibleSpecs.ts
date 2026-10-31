@@ -252,16 +252,18 @@ export const stagMandibleShare = (size: number): number => 0.075 + 0.265 * Math.
  * apex) down to the basal angle, larger and smaller alternating and shrinking toward the base (Formicinae: 7–9
  * teeth), and the species' colours.
  */
-export function formicineMandible(o: { teeth: number; color: MandibleSpec['color']; reach?: number; broad?: number; thick?: number; pitch?: [number, number] | [number, number, number]; edgeDark?: number; heading?: number; roll?: number }): MandibleSpec {
+export function formicineMandible(o: { teeth: number; color: MandibleSpec['color']; reach?: number; broad?: number; thick?: number; pitch?: [number, number] | [number, number, number]; edgeDark?: number; heading?: number; roll?: number; curve?: number; toothK?: number }): MandibleSpec {
   const n = Math.max(1, o.teeth - 1);
   const teeth = [];
   for (let k = 0; k < n; k++) {
     const f = k / Math.max(1, n - 1);
     // from just behind the apex (u 0.92) to the basal angle (u 0.4)
-    teeth.push({ u: 0.92 - 0.52 * f, size: (0.036 - 0.014 * f) * (k % 2 ? 0.75 : 1), base: 0.045, lean: 0.32 - 0.1 * f });
+    teeth.push({ u: 0.92 - 0.52 * f, size: (0.036 - 0.014 * f) * (k % 2 ? 0.75 : 1) * (o.toothK ?? 1), base: 0.045, lean: 0.32 - 0.1 * f });
   }
   const b = o.broad ?? 1;
   const h = o.heading ?? 0.68;
+  // `curve`: the external margin's turn scaled (a leafcutter's jaws curve in more strongly than a formicine's)
+  const cv = o.curve ?? 1;
   return {
     ...FIRE_WORKER,
     // (user note: real formicine jaws are triangles, not crescents) — the external margin nearly straight from
@@ -271,10 +273,10 @@ export function formicineMandible(o: { teeth: number; color: MandibleSpec['color
     // apical teeth crossing; open, two toothed triangles (docs/realism/jaws.md)
     yaw: [
       [0, h],
-      [0.5, h + 0.1],
-      [0.8, h + 0.27],
-      [0.94, h + 0.52],
-      [1, h + 0.77],
+      [0.5, h + 0.1 * cv],
+      [0.8, h + 0.27 * cv],
+      [0.94, h + 0.52 * cv],
+      [1, h + 0.77 * cv],
     ],
     outer: [
       [0, 0.05],
@@ -307,9 +309,20 @@ export function formicineMandible(o: { teeth: number; color: MandibleSpec['color
 // ant's — the photos)
 // (user note: they didn't look like the photos — closed, Lasius jaws are a broad, thick, rounded muzzle in front of the
 // head, curving down like a beak, orange-brown and paler than the head, only the cutting edge darker)
-export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x6e4428, mid: 0x7a4c2c, tip: 0x4a2c18, teeth: 0x1e1008, dark: [0.8, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.9, pitch: [-0.1, -0.26, -0.5], edgeDark: 0.55, roll: 0.55, heading: 0.52 });
+export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x5e3c26, mid: 0x684228, tip: 0x3c2414, teeth: 0x1a0e06, dark: [0.75, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.9, pitch: [-0.1, -0.26, -0.5], edgeDark: 0.55, roll: 0.55, heading: 0.6 });
 /** Red wood ant (Formica rufa): reddish-brown jaws darkening to black at the teeth (docs/creatures/formica-rufa.md). */
 // (the user's photos: red-orange jaws, near black at the teeth)
 // (user note and photos: closed, a pointed beak projecting forward and down from the head, red-orange and paler than
 // the face; open, two big curved red blades with dark tips and teeth)
-export const FORMICA_WORKER = formicineMandible({ teeth: 8, color: { base: 0x6e3020, mid: 0x6a2c1c, tip: 0x3a1a10, teeth: 0x140806, dark: [0.72, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.85, pitch: [-0.12, -0.3, -0.56], edgeDark: 0.65, roll: 0.6, heading: 0.52 });
+export const FORMICA_WORKER = formicineMandible({ teeth: 8, color: { base: 0x5a2618, mid: 0x502214, tip: 0x2e140c, teeth: 0x100604, dark: [0.66, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.85, pitch: [-0.12, -0.3, -0.56], edgeDark: 0.65, roll: 0.6, heading: 0.6 });
+
+/**
+ * Leafcutter (Atta cephalotes), overnight pass: triangular blades with 6–8 teeth along a long masticatory margin,
+ * the apical tooth long and hooked, the teeth near black (docs/creatures/atta-cephalotes.md). The minim's small and
+ * fine; the media's the classic leaf-cutting scissors, curving in more than a formicine's; the soldier's and the
+ * major's thick, broad, strongly curved shears, dark red-brown to near black.
+ */
+export const ATTA_MINIM_JAW = formicineMandible({ teeth: 6, color: { base: 0x8a4a22, mid: 0x7e4220, tip: 0x3a1a0c, teeth: 0x1a0c06, dark: [0.72, 1.0] }, reach: 1.1, thick: 1.4, pitch: [-0.1, -0.24, -0.46], edgeDark: 0.55, roll: 0.4, heading: 0.55, curve: 1.25 });
+export const ATTA_MEDIA_JAW = formicineMandible({ teeth: 8, color: { base: 0x7a3818, mid: 0x6e3016, tip: 0x2a120a, teeth: 0x120806, dark: [0.7, 1.0] }, reach: 1.12, broad: 1.1, thick: 1.7, pitch: [-0.1, -0.25, -0.5], edgeDark: 0.6, roll: 0.45, heading: 0.5, curve: 1.35 });
+export const ATTA_SOLDIER_JAW = formicineMandible({ teeth: 8, color: { base: 0x5a2410, mid: 0x4a1e0e, tip: 0x1c0a06, teeth: 0x0c0604, dark: [0.62, 1.0] }, reach: 1.15, broad: 1.2, thick: 2.4, pitch: [-0.16, -0.32, -0.62], edgeDark: 0.7, roll: 0.4, heading: 0.46, curve: 1.45, toothK: 1.2 });
+export const ATTA_MAJOR_JAW = formicineMandible({ teeth: 8, color: { base: 0x4a1c0e, mid: 0x3a160a, tip: 0x140806, teeth: 0x0a0504, dark: [0.55, 1.0] }, reach: 1.16, broad: 1.3, thick: 3.2, pitch: [-0.2, -0.38, -0.7], edgeDark: 0.75, roll: 0.35, heading: 0.42, curve: 1.5, toothK: 1.35 });

@@ -4,7 +4,7 @@
  * noted; colours are linear-ish sRGB hex.
  */
 import type { MandibleSpec } from '../anatomy/mandible';
-import { FIRE_MAJOR, FIRE_WORKER, FORMICA_WORKER, LASIUS_WORKER } from '../anatomy/mandibleSpecs';
+import { ATTA_MAJOR_JAW, ATTA_MEDIA_JAW, ATTA_MINIM_JAW, ATTA_SOLDIER_JAW, FIRE_MAJOR, FIRE_WORKER, FORMICA_WORKER, LASIUS_WORKER } from '../anatomy/mandibleSpecs';
 
 export type HeadShape = 'round' | 'heart' | 'rect' | 'tri' | 'square';
 export type MandibleType = 'triangular' | 'falcate' | 'massive' | 'small';
@@ -131,18 +131,19 @@ const lasiusWorker: AntMorph = {
   key: 'lasius_worker',
   L: 4,
   // (overnight review round 1: the head deeper — a rounded box, not a flat lid)
-  head: { len: 0.23, width: 0.21, height: 0.17, shape: 'rect' },
+  head: { len: 0.21, width: 0.2, height: 0.16, shape: 'rect' },
   // (overnight spec 3.4: three tiny ocelli on the vertex — the realism ocelli are glints set into it)
-  eyes: { size: 0.22, pos: 0.52, height: 0.15, ocelli: true },
+  eyes: { size: 0.27, pos: 0.5, height: 0.08, ocelli: true },
   // (the user's photos: slender antennae and legs, lighter brown)
-  antenna: { segments: 12, scape: 1.0, funiculus: 1.25, club: 0, thick: 0.0088 },
+  antenna: { segments: 12, scape: 1.0, funiculus: 1.25, club: 0, thick: 0.0072 },
   // rollout batch 1: the formicine jaw generator (8 teeth, closing neatly in front of the clypeus)
   mandible: { type: 'triangular', len: 0.42, teeth: 8, width: 0.55, spec: LASIUS_WORKER, open: 0.7 },
   // (overnight review round 1: one continuous convex profile, not stepped blocks)
-  meso: { len: 0.32, width: 0.145, height: 0.13, groove: 0.13, prop: 0.6, neck: 0.16 },
+  meso: { len: 0.32, width: 0.145, height: 0.13, groove: 0.13, prop: 0.6, neck: 0.075 },
   waist: { nodes: 1, len: 0.05, scale: true, nodeH: 0.1 },
   // (the photos: a broad, rounded oval, about as wide as the head or wider)
-  gaster: { len: 0.38, width: 0.26, height: 0.21, sting: false },
+  // (review round 2: a broad, rounded gaster, glossy under the pubescence — not a pointed matte spindle)
+  gaster: { len: 0.38, width: 0.28, height: 0.23, sting: false },
   // (overnight review round 1: the photos' legs are about half again as thick — the femora stout)
   legs: { hind: 0.86, thick: 0.0158 },
   // (rollout batch 1, the user's photos: dark brown, not black; the mesosoma a shade paler; a satin, faintly grey
@@ -152,11 +153,14 @@ const lasiusWorker: AntMorph = {
   look: {
     // (review round 1: uniformly dark — the mesosoma no paler than the head; legs a translucent brown, not tan;
     // a grey pubescent sheen on the gaster)
-    head: L(0x44362a, 0.55, 0.12, 0.26),
-    meso: L(0x4a3a2c, 0.55, 0.12, 0.22),
-    waist: L(0x42342a, 0.55, 0.1, 0.16),
-    gaster: L(0x3e3228, 0.44, 0.22, 0.55),
-    legs: L(0x4e3a2a, 0.5, 0.1, 0.15, 0x7a5c40),
+    // (review round 2: too warm, milk-chocolate — a dark grey-black-brown; the legs an amber brown, lighter toward
+    // the tarsi without a hard break)
+    head: L(0x3a322c, 0.5, 0.14, 0.3),
+    meso: L(0x3e342c, 0.5, 0.14, 0.26),
+    waist: L(0x3a302a, 0.52, 0.12, 0.18),
+    // (review round 3: satin and pubescent, between the round-1 matte and the round-2 gloss)
+    gaster: L(0x36302a, 0.48, 0.16, 0.62),
+    legs: L(0x4a3a2c, 0.48, 0.12, 0.15, 0x5e4a38),
     // (scapes lighter, yellowish brown; mandibles and knees too: AntWiki, Wilson 1955, Borowiec & Salata 2022)
     antenna: L(0x544030, 0.56, 0.06, 0.15, 0x46362a),
     mandible: L(0x2e2016, 0.55, 0.12, 0.0),
@@ -177,7 +181,7 @@ const lasiusSoldier: AntMorph = {
   head: { len: 0.25, width: 0.245, height: 0.165, shape: 'rect' },
   eyes: { size: 0.2, pos: 0.52, height: 0.15, ocelli: true },
   mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.62, spec: LASIUS_WORKER, open: 0.7 },
-  meso: { len: 0.31, width: 0.14, height: 0.14, neck: 0.16 },
+  meso: { len: 0.31, width: 0.14, height: 0.14, neck: 0.075 },
   legs: { hind: 0.84, thick: 0.019 },
 };
 
@@ -205,18 +209,19 @@ const formicaWorker: AntMorph = {
   L: 7,
   // (overnight review round 1: deeper, rounder head as in the side photos)
   // (review round 1: broad and rounded-trapezoidal with convex sides, not a wedge: the realism 'rect' outline)
-  head: { len: 0.24, width: 0.23, height: 0.175, shape: 'rect' },
+  head: { len: 0.225, width: 0.22, height: 0.165, shape: 'rect' },
   // elongate oval, ~0.27 of the head's length (AntWiki: Borowiec & Salata 2022)
-  eyes: { size: 0.27, pos: 0.48, height: 0.25, ocelli: true, oval: 1.3 },
-  antenna: { segments: 12, scape: 1.15, funiculus: 1.2, club: 0, thick: 0.0078 },
+  eyes: { size: 0.31, pos: 0.48, height: 0.12, ocelli: true, oval: 1.3 },
+  antenna: { segments: 12, scape: 1.15, funiculus: 1.2, club: 0, thick: 0.0064 },
   mandible: { type: 'triangular', len: 0.4, teeth: 8, width: 0.6, spec: FORMICA_WORKER, open: 0.7 },
   // (rollout batch 1, the user's photos: the mesonotal groove deep and the propodeum high and rounded; the
   // mesosoma pinched in the middle seen from above)
-  meso: { len: 0.34, width: 0.145, height: 0.13, groove: 0.12, prop: 0.6, pinch: 0.12, neck: 0.16 },
+  meso: { len: 0.34, width: 0.145, height: 0.13, groove: 0.12, prop: 0.6, pinch: 0.12, neck: 0.075 },
   // (overnight review round 1: the scale no taller than the propodeum, not a fin)
   waist: { nodes: 1, len: 0.05, scale: true, nodeH: 0.1 },
   // (the photos: a big, broad oval gaster)
-  gaster: { len: 0.37, width: 0.25, height: 0.21, sting: false },
+  // (review round 2: rounder and glossy black-brown, wider than the head)
+  gaster: { len: 0.37, width: 0.27, height: 0.23, sting: false },
   legs: { hind: 0.95, thick: 0.0148 },
   // (the photos: dull, microreticulate and finely pubescent everywhere — a satin at most, never a gloss)
   look: {
@@ -227,9 +232,10 @@ const formicaWorker: AntMorph = {
     meso: L(0x94482e, 0.62, 0.06, 0.18, 0x3a2a20),
     waist: L(0x5a2c1e, 0.6, 0.06, 0.14),
     // dark grey-brown, dull under a silvery pubescence, the hind margins of the tergites pale
-    gaster: L(0x443830, 0.58, 0.1, 0.65, 0x5e3a2a),
+    gaster: L(0x3a302a, 0.48, 0.16, 0.62, 0x56362a),
     // (the photos: coxae and femora reddish brown at the base, the tibiae and tarsi dark)
-    legs: L(0x5a3020, 0.5, 0.12, 0.15, 0x2c2019),
+    // (review round 2: the legs read as thick orange tubes — dark, the coxae only a little reddish)
+    legs: L(0x3e2820, 0.5, 0.12, 0.15, 0x2a1e18),
     antenna: L(0x2a1d16, 0.5, 0.1, 0.1, 0x553a2a),
     mandible: L(0x52281a, 0.45, 0.25, 0),
   },
@@ -264,7 +270,7 @@ const formicaSoldier: AntMorph = {
   head: { len: 0.27, width: 0.28, height: 0.19, shape: 'rect' },
   eyes: { size: 0.26, pos: 0.48, height: 0.25, ocelli: true },
   mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.7, spec: FORMICA_WORKER, open: 0.7 },
-  meso: { len: 0.33, width: 0.145, height: 0.15, neck: 0.16 },
+  meso: { len: 0.33, width: 0.145, height: 0.15, neck: 0.075 },
   gaster: { len: 0.35, width: 0.22, height: 0.18, sting: false },
   legs: { hind: 0.9, thick: 0.0195 },
   look: {
@@ -279,7 +285,7 @@ const formicaMortar: AntMorph = {
   ...formicaWorker,
   key: 'formica_mortar',
   L: 7.6,
-  meso: { len: 0.31, width: 0.12, height: 0.13, neck: 0.16 },
+  meso: { len: 0.31, width: 0.12, height: 0.13, neck: 0.075 },
   // (overnight spec 3.3: a bigger, more muscular gaster — the acid reservoir — and a visible acidopore)
   gaster: { len: 0.44, width: 0.27, height: 0.22, sting: false, pore: 1.7 },
   legs: { hind: 0.9, thick: 0.017 },
@@ -291,35 +297,42 @@ const formicaRapid: AntMorph = {
   ...formicaWorker,
   key: 'formica_rapid',
   L: 7.2,
-  meso: { len: 0.33, width: 0.115, height: 0.125, neck: 0.16 },
+  meso: { len: 0.33, width: 0.115, height: 0.125, neck: 0.075 },
   gaster: { len: 0.4, width: 0.215, height: 0.17, sting: false, pore: 1.5 },
   look: { ...formicaWorker.look, gaster: L(0x1c120d, 0.36, 0.3, 0.22, 0x7a3018) },
 };
 
 // ---------- Atta cephalotes ----------
+// (overnight realism pass, docs/creatures/atta-cephalotes.md: rusty orange-brown, matte and finely tuberculate with
+// short hooked golden hairs; legs a shade lighter; the teeth near black; the major's head deep chestnut and shining;
+// the minim paler, orange-tan; the queen dark chestnut)
 const attaLook = {
-  head: L(0x5a2a14, 0.72, 0.05, 0.08, 0x44200e),
-  meso: L(0x62301a, 0.78, 0.03, 0.08),
-  waist: L(0x5c2c16, 0.78, 0.03, 0.08),
-  gaster: L(0x522814, 0.75, 0.05, 0.1),
-  legs: L(0x66341c, 0.7, 0.04, 0.08, 0x7a4224),
-  antenna: L(0x66341c, 0.7, 0.04, 0.06),
-  mandible: L(0x4a1e0c, 0.4, 0.3, 0, 0x1a0a04),
+  head: L(0x84401f, 0.66, 0.06, 0.12, 0x6a3018),
+  meso: L(0x8a4422, 0.7, 0.05, 0.12, 0x6e321a),
+  waist: L(0x7e3e1e, 0.7, 0.05, 0.1),
+  gaster: L(0x7a3a1c, 0.6, 0.1, 0.18, 0x5e2c16),
+  legs: L(0x8e4a26, 0.62, 0.06, 0.1, 0x9a5630),
+  antenna: L(0x8a4826, 0.64, 0.05, 0.08, 0x9a5630),
+  mandible: L(0x5a2410, 0.4, 0.3, 0, 0x1a0a04),
 };
+// short, curved, golden hairs over everything (hooked at the tip in life: too small to model)
+const attaSetae = { color: 0xb88a50, head: 40, meso: 40, gaster: 70, len: [0.008, 0.03] as [number, number] };
 
 const attaMedia: AntMorph = {
   key: 'atta_media',
   L: 8,
-  head: { len: 0.3, width: 0.3, height: 0.17, shape: 'heart', notch: 0.18, occSpines: 0.06 },
+  head: { len: 0.3, width: 0.3, height: 0.19, shape: 'heart', notch: 0.18, occSpines: 0.06 },
   eyes: { size: 0.13, pos: 0.62, height: 0.2, ocelli: false },
-  antenna: { segments: 11, scape: 0.95, funiculus: 1.3, club: 0, thick: 0.0115 },
-  mandible: { type: 'triangular', len: 0.36, teeth: 7, width: 0.6 },
-  meso: { len: 0.3, width: 0.12, height: 0.14, spines: { pro: 0.09, meso: 0.07, prop: 0.08 } },
+  antenna: { segments: 11, scape: 0.95, funiculus: 1.3, club: 0, thick: 0.009 },
+  mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.7 },
+  meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.09, meso: 0.07, prop: 0.08 } },
   waist: { nodes: 2, len: 0.1, nodeH: 0.08 },
-  gaster: { len: 0.26, width: 0.19, height: 0.15, sting: true },
-  legs: { hind: 1.2, thick: 0.0136 },
+  gaster: { len: 0.26, width: 0.2, height: 0.16, sting: true },
+  legs: { hind: 1.2, thick: 0.0155 },
   look: attaLook,
   hair: 0.2,
+  setae: attaSetae,
+  real: true,
   stance: 0.15,
 };
 
@@ -327,42 +340,49 @@ const attaMinim: AntMorph = {
   ...attaMedia,
   key: 'atta_minim',
   L: 2,
-  head: { len: 0.27, width: 0.25, height: 0.17, shape: 'round', notch: 0.05 },
+  head: { len: 0.27, width: 0.25, height: 0.18, shape: 'round', notch: 0.05 },
   eyes: { size: 0.16, pos: 0.6, height: 0.2, ocelli: false },
-  mandible: { type: 'triangular', len: 0.33, teeth: 6, width: 0.55 },
-  meso: { len: 0.3, width: 0.12, height: 0.14, spines: { pro: 0.05, meso: 0.04, prop: 0.05 } },
+  mandible: { type: 'triangular', len: 0.33, teeth: 6, width: 0.55, spec: ATTA_MINIM_JAW, open: 0.7 },
+  meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.05, meso: 0.04, prop: 0.05 } },
   gaster: { len: 0.3, width: 0.21, height: 0.17, sting: true },
-  legs: { hind: 1.05, thick: 0.0163 },
-  look: { ...attaLook, head: L(0x6a3a1e, 0.7, 0.05, 0.08), gaster: L(0x5e3018, 0.72, 0.05, 0.08) },
+  legs: { hind: 1.05, thick: 0.0175 },
+  // paler, orange-tan
+  look: { ...attaLook, head: L(0xb06a38, 0.62, 0.06, 0.12, 0x9a5a2c), meso: L(0xb06a38, 0.66, 0.05, 0.12), waist: L(0xa86234, 0.66, 0.05, 0.1), gaster: L(0x9e5a30, 0.58, 0.1, 0.18), legs: L(0xb8743e, 0.6, 0.06, 0.1, 0xc2804a), antenna: L(0xb8743e, 0.62, 0.05, 0.08) },
+  setae: { ...attaSetae, head: 18, meso: 16, gaster: 30 },
   stance: 0.15,
 };
 
-/** Atta soldier: a scaled-up minim with a bigger head and slightly redder colour. */
+/** Atta soldier: the big-headed trail guard between the media and the major — a heart head with small occipital spines, heavy shears. */
 const attaSoldier: AntMorph = {
-  ...attaMinim,
+  ...attaMedia,
   key: 'atta_soldier',
   L: 10.5,
-  head: { len: 0.3, width: 0.31, height: 0.18, shape: 'round', notch: 0.09, occSpines: 0.03 },
-  eyes: { size: 0.13, pos: 0.6, height: 0.2, ocelli: false },
-  mandible: { type: 'triangular', len: 0.38, teeth: 6, width: 0.62 },
-  meso: { len: 0.29, width: 0.12, height: 0.14, spines: { pro: 0.07, meso: 0.05, prop: 0.06 } },
-  legs: { hind: 1.08, thick: 0.0145 },
-  look: { ...attaLook, head: L(0x7a3318, 0.66, 0.06, 0.08, 0x5a2410), meso: L(0x76361a, 0.72, 0.04, 0.08), gaster: L(0x6a2c16, 0.7, 0.05, 0.08) },
+  head: { len: 0.33, width: 0.36, height: 0.2, shape: 'heart', notch: 0.22, occSpines: 0.045 },
+  eyes: { size: 0.12, pos: 0.62, height: 0.18, ocelli: false },
+  antenna: { segments: 11, scape: 0.8, funiculus: 1.25, club: 0, thick: 0.0085 },
+  mandible: { type: 'massive', len: 0.38, teeth: 8, width: 0.68, spec: ATTA_SOLDIER_JAW, open: 0.6 },
+  meso: { len: 0.28, width: 0.12, height: 0.14, spines: { pro: 0.07, meso: 0.05, prop: 0.06 } },
+  gaster: { len: 0.25, width: 0.18, height: 0.15, sting: true },
+  legs: { hind: 1.1, thick: 0.015 },
+  look: { ...attaLook, head: L(0x7a3418, 0.48, 0.2, 0.08, 0x5a2410) },
 };
 
+/** Atta major: a disproportionately huge, deeply lobed head — smooth and shining (A. cephalotes) — with short blunt occipital spines and heavy shears. */
 const attaMajor: AntMorph = {
   ...attaMedia,
   key: 'atta_major',
   L: 14,
-  head: { len: 0.4, width: 0.44, height: 0.21, shape: 'heart', notch: 0.3, occSpines: 0.05 },
+  head: { len: 0.4, width: 0.44, height: 0.23, shape: 'heart', notch: 0.3, occSpines: 0.03 },
   eyes: { size: 0.08, pos: 0.66, height: 0.15, ocelli: false },
-  antenna: { segments: 11, scape: 0.7, funiculus: 1.2, club: 0, thick: 0.0086 },
-  mandible: { type: 'massive', len: 0.36, teeth: 5, width: 0.75 },
-  meso: { len: 0.25, width: 0.1, height: 0.12, spines: { pro: 0.07, meso: 0.06, prop: 0.06 } },
+  antenna: { segments: 11, scape: 0.7, funiculus: 1.2, club: 0, thick: 0.0072 },
+  mandible: { type: 'massive', len: 0.36, teeth: 8, width: 0.75, spec: ATTA_MAJOR_JAW, open: 0.55 },
+  meso: { len: 0.25, width: 0.11, height: 0.12, spines: { pro: 0.07, meso: 0.06, prop: 0.06 } },
   waist: { nodes: 2, len: 0.08, nodeH: 0.07 },
   gaster: { len: 0.22, width: 0.16, height: 0.13, sting: true },
-  legs: { hind: 1.0, thick: 0.0122 },
-  look: { ...attaLook, head: L(0x4e2210, 0.55, 0.14, 0.05, 0x3a180a) },
+  legs: { hind: 1.0, thick: 0.0135 },
+  // the head deep chestnut, shining; the frontal woolly tufts as a dense patch of longer red hairs on the head
+  look: { ...attaLook, head: L(0x7a3018, 0.3, 0.55, 0.06, 0x5c2a16) },
+  setae: { ...attaSetae, color: 0xa0502a, head: 70, len: [0.006, 0.026] },
   stance: 0.14,
 };
 
@@ -370,13 +390,18 @@ const attaQueen: AntMorph = {
   ...attaMedia,
   key: 'atta_queen',
   L: 21,
-  head: { len: 0.17, width: 0.2, height: 0.11, shape: 'heart', notch: 0.12, occSpines: 0.03 },
+  // (Borgmeier: head width 5.2 mm; no occipital tooth)
+  head: { len: 0.2, width: 0.25, height: 0.13, shape: 'heart', notch: 0.12 },
   eyes: { size: 0.2, pos: 0.6, height: 0.2, ocelli: true },
-  antenna: { segments: 11, scape: 0.95, funiculus: 1.2, club: 0, thick: 0.0072 },
-  meso: { len: 0.27, width: 0.14, height: 0.16, queen: true, spines: { pro: 0.03, meso: 0, prop: 0.03 } },
+  antenna: { segments: 11, scape: 0.95, funiculus: 1.2, club: 0, thick: 0.0062 },
+  mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.6 },
+  meso: { len: 0.27, width: 0.15, height: 0.17, queen: true, spines: { pro: 0.03, meso: 0, prop: 0.03 } },
   waist: { nodes: 2, len: 0.06, nodeH: 0.06 },
-  gaster: { len: 0.48, width: 0.3, height: 0.24, sting: true },
-  legs: { hind: 0.7, thick: 0.0105 },
+  gaster: { len: 0.48, width: 0.3, height: 0.25, sting: true },
+  legs: { hind: 0.7, thick: 0.0115 },
+  // dark chestnut, golden hairs, a satin gaster (Naskrecki's queen; the caste series)
+  look: { ...attaLook, head: L(0x5a2a16, 0.55, 0.12, 0.14, 0x48200f), meso: L(0x5e2c18, 0.52, 0.14, 0.14), waist: L(0x5a2a16, 0.55, 0.1, 0.12), gaster: L(0x52261a, 0.42, 0.22, 0.3, 0x3e1c10), legs: L(0x6a3018, 0.56, 0.08, 0.1, 0x7a3a1e) },
+  setae: { ...attaSetae, color: 0xc89a58, head: 40, meso: 50, gaster: 120, len: [0.006, 0.022] },
   wingScars: true,
   stance: 0.11,
 };
