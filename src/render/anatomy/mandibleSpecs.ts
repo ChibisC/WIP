@@ -317,12 +317,18 @@ export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x5e3c
 export const FORMICA_WORKER = formicineMandible({ teeth: 8, color: { base: 0x5a2618, mid: 0x502214, tip: 0x2e140c, teeth: 0x100604, dark: [0.66, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.85, pitch: [-0.12, -0.3, -0.56], edgeDark: 0.65, roll: 0.6, heading: 0.6 });
 
 /**
+ * (Atta review round 1: the jaws read as flat V plates — curved hooks with a dark toothed inner edge, a gap between
+ * them when closed, as in the photos)
  * Leafcutter (Atta cephalotes), overnight pass: triangular blades with 6–8 teeth along a long masticatory margin,
  * the apical tooth long and hooked, the teeth near black (docs/creatures/atta-cephalotes.md). The minim's small and
  * fine; the media's the classic leaf-cutting scissors, curving in more than a formicine's; the soldier's and the
  * major's thick, broad, strongly curved shears, dark red-brown to near black.
  */
 export const ATTA_MINIM_JAW = formicineMandible({ teeth: 6, color: { base: 0x8a4a22, mid: 0x7e4220, tip: 0x3a1a0c, teeth: 0x1a0c06, dark: [0.72, 1.0] }, reach: 1.1, thick: 1.4, pitch: [-0.1, -0.24, -0.46], edgeDark: 0.55, roll: 0.4, heading: 0.55, curve: 1.25 });
-export const ATTA_MEDIA_JAW = formicineMandible({ teeth: 8, color: { base: 0x7a3818, mid: 0x6e3016, tip: 0x2a120a, teeth: 0x120806, dark: [0.7, 1.0] }, reach: 1.12, broad: 1.1, thick: 1.7, pitch: [-0.1, -0.25, -0.5], edgeDark: 0.6, roll: 0.45, heading: 0.5, curve: 1.35 });
-export const ATTA_SOLDIER_JAW = formicineMandible({ teeth: 8, color: { base: 0x5a2410, mid: 0x4a1e0e, tip: 0x1c0a06, teeth: 0x0c0604, dark: [0.62, 1.0] }, reach: 1.15, broad: 1.2, thick: 2.4, pitch: [-0.16, -0.32, -0.62], edgeDark: 0.7, roll: 0.4, heading: 0.46, curve: 1.45, toothK: 1.2 });
-export const ATTA_MAJOR_JAW = formicineMandible({ teeth: 8, color: { base: 0x4a1c0e, mid: 0x3a160a, tip: 0x140806, teeth: 0x0a0504, dark: [0.55, 1.0] }, reach: 1.16, broad: 1.3, thick: 3.2, pitch: [-0.2, -0.38, -0.7], edgeDark: 0.75, roll: 0.35, heading: 0.42, curve: 1.5, toothK: 1.35 });
+export const ATTA_MEDIA_JAW = formicineMandible({ teeth: 8, color: { base: 0x7a3818, mid: 0x6e3016, tip: 0x2a120a, teeth: 0x120806, dark: [0.7, 1.0] }, reach: 1.04, broad: 0.85, thick: 1.7, pitch: [-0.1, -0.25, -0.5], edgeDark: 0.75, roll: 0.45, heading: 0.42, curve: 1.9, toothK: 1.5 });
+export const ATTA_SOLDIER_JAW = formicineMandible({ teeth: 8, color: { base: 0x5a2410, mid: 0x4a1e0e, tip: 0x1c0a06, teeth: 0x0c0604, dark: [0.62, 1.0] }, reach: 1.0, broad: 0.85, thick: 2.4, pitch: [-0.16, -0.32, -0.62], edgeDark: 0.8, roll: 0.4, heading: 0.36, curve: 2.1, toothK: 1.7 });
+export const ATTA_MAJOR_JAW = formicineMandible({ teeth: 8, color: { base: 0x4a1c0e, mid: 0x3a160a, tip: 0x140806, teeth: 0x0a0504, dark: [0.55, 1.0] }, reach: 0.98, broad: 0.85, thick: 3.0, pitch: [-0.2, -0.38, -0.7], edgeDark: 0.85, roll: 0.35, heading: 0.3, curve: 2.2, toothK: 1.8 });
+
+/** Army ant worker (Eciton burchellii minor), overnight pass: short toothed clamps — a small triangle with 4–5 teeth, black. */
+export const ECITON_MINOR_JAW = formicineMandible({ teeth: 5, color: { base: 0x2a1a12, mid: 0x221610, tip: 0x120c0a, teeth: 0x080606, dark: [0.6, 1.0] }, reach: 1.12, thick: 1.6, pitch: [-0.08, -0.2, -0.4], edgeDark: 0.6, roll: 0.35, heading: 0.58, curve: 1.3, toothK: 1.2 });
+

@@ -623,7 +623,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
           d.normalize();
           const tip = base.clone().addScaledVector(d, len * Lm);
           const mid = base.clone().lerp(tip, 0.5);
-          const [pp, ii] = tube([base, mid, tip], [0.022 * Lm, 0.012 * Lm, 0.002 * Lm], hi ? 6 : 4, true, true);
+          // (Atta review round 1: slender, sharp spines — not blunt cones)
+          const [pp, ii] = tube([base, mid, tip], m.real ? [0.013 * Lm, 0.006 * Lm, 0.0008 * Lm] : [0.022 * Lm, 0.012 * Lm, 0.002 * Lm], hi ? 6 : 4, true, true);
           acc.piece(pp, ii, PART.BODY, solid(look.meso), look.meso);
         }
       };
@@ -633,8 +634,9 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     }
     if (m.wingScars) {
       for (const s of [-1, 1]) {
-        const [pp, ii] = ellipsoid(new THREE.Vector3(mL * 0.6, mBottom + mH * 0.62, s * mW * 0.5), new THREE.Vector3(0.025 * Lm, 0.012 * Lm, 0.006 * Lm), hi ? 8 : 6);
-        acc.piece(pp, ii, PART.BODY, () => tmpC.setHex(0x1a1410), { color: 0x1a1410, rough: 0.5, coat: 0.2, sheen: 0 });
+        // (Atta review round 1: the scar read as a black blob — small, a dark brown of the body)
+        const [pp, ii] = ellipsoid(new THREE.Vector3(mL * 0.6, mBottom + mH * 0.62, s * mW * 0.5), m.real ? new THREE.Vector3(0.016 * Lm, 0.008 * Lm, 0.004 * Lm) : new THREE.Vector3(0.025 * Lm, 0.012 * Lm, 0.006 * Lm), hi ? 8 : 6);
+        acc.piece(pp, ii, PART.BODY, () => tmpC.setHex(m.real ? 0x2e1c12 : 0x1a1410), { color: 0x1a1410, rough: 0.5, coat: 0.2, sheen: 0 });
       }
     }
   }
@@ -761,9 +763,10 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // occipital spines
     if (m.head.occSpines) {
       for (const s of [-1, 1]) {
-        const base = new THREE.Vector3(hL * 0.12, headCY + hH * 0.3, s * hW * 0.32);
-        const tip = base.clone().add(new THREE.Vector3(-0.3, 0.6, s * 0.5).normalize().multiplyScalar(m.head.occSpines * Lm));
-        const [pp, ii] = tube([base, base.clone().lerp(tip, 0.5), tip], [0.02 * Lm, 0.01 * Lm, 0.001 * Lm], 5);
+        // (Atta review round 1: on top of each occipital lobe, pointing up and back, slender and sharp)
+        const base = m.real && atta ? new THREE.Vector3(hL * 0.14, headCY + hH * 0.38, s * hW * 0.36) : new THREE.Vector3(hL * 0.12, headCY + hH * 0.3, s * hW * 0.32);
+        const tip = base.clone().add((m.real && atta ? new THREE.Vector3(-0.45, 0.8, s * 0.3) : new THREE.Vector3(-0.3, 0.6, s * 0.5)).normalize().multiplyScalar(m.head.occSpines * Lm));
+        const [pp, ii] = tube([base, base.clone().lerp(tip, 0.5), tip], m.real && atta ? [0.016 * Lm, 0.008 * Lm, 0.0008 * Lm] : [0.02 * Lm, 0.01 * Lm, 0.001 * Lm], 5);
         acc.piece(transformPts(pp, headM), ii, PART.HEAD, solid(look.head), look.head);
       }
     }
@@ -797,8 +800,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       // realism v2: a bulging, glossy dome (the facets too fine to read except as a faint grain)
       // (rollout, the user's photos: the formicines' larger eyes are a satin grey-black, not glass beads)
       // (overnight review round 1: the formicines' eyes a matte, faceted grey — not glossy black beads)
-      const eyeLook: PartLook = smoothEye ? { color: 0, rough: 0.12, coat: 1, sheen: 0 } : m.real ? (formicine ? { color: 0x5a5650, rough: 0.5, coat: 0.12, sheen: 0.15 } : { color: 0x0b0806, rough: 0.16, coat: 0.7, sheen: 0 }) : { color: 0x0b0806, rough: 0.32, coat: 0.15, sheen: 0 };
-      acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(smoothEye ? 0x161c1a : m.eyes.single ? 0x2a1a10 : formicine && m.real ? 0x4c4844 : 0x0d0a08), eyeLook, smoothEye ? 3 : m.eyes.single ? 0 : 1);
+      const eyeLook: PartLook = smoothEye ? { color: 0, rough: 0.12, coat: 1, sheen: 0 } : m.real ? (formicine || atta ? { color: 0x5a5650, rough: 0.5, coat: 0.12, sheen: 0.15 } : { color: 0x0b0806, rough: 0.16, coat: 0.7, sheen: 0 }) : { color: 0x0b0806, rough: 0.32, coat: 0.15, sheen: 0 };
+      acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(smoothEye ? 0x161c1a : m.eyes.single ? 0x2a1a10 : (formicine || atta) && m.real ? 0x4c4844 : 0x0d0a08), eyeLook, smoothEye ? 3 : m.eyes.single ? 0 : 1);
     }
     if (m.eyes.ocelli && hi) {
       for (const [ox, oz] of [
@@ -988,7 +991,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // Scape: forward-outward-up; funiculus: forward-outward-down (elbowed).
     // (review round 2: a formicine's scapes rise up and back from sockets near the midline, then the funiculus bends
     // forward — they read as rods sticking out of the face's sides when set forward-outward)
-    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && atta ? new THREE.Vector3(-0.3, 0.45, 0.75 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
+    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && atta ? new THREE.Vector3(-0.42, 0.6, 0.5 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
     const elbow = sock.clone().addScaledVector(scDir, scapeLen);
     elbows.push(elbow);
     const scMid = sock.clone().lerp(elbow, 0.5).add(new THREE.Vector3(0, scapeLen * 0.04, 0));

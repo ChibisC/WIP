@@ -143,6 +143,27 @@ export const ATTA_MAJOR: DetailRecipe = {
   regions: { ...attaRegions, [REGION.HEAD]: { sculpt: ATTA_MAJOR_HEAD, shade: shade(0.8, 0.35, 0.45, 0.2, 0.3, { coatRough: 0.16, wear: 0.4, dust: 0.06, mid: 0.12 }), px: [512, 512] } },
 };
 
+/**
+ * Army ant (Eciton burchellii), overnight realism pass: semi-glossy, the cuticle finely microsculptured (a shallow net
+ * that turns the gloss into a sheen) with scattered hair pits; sparse fine golden hairs, denser on the gaster and legs;
+ * the soldier's big head smooth and glossy with darker antennal sockets (docs/creatures/eciton-burchellii.md).
+ */
+const EC_HEAD: Sculpt = { tile: [0.8, 0.8], noise: 0.0003, reticulum: { cell: 0.016, depth: 0.0003 }, pits: { n: 14, r: 0.005, depth: 0.001, pale: 0.12, stub: { len: 0.03, dir: -1, share: 0.7 } }, wave: { cell: 0.2, amp: 0.003 }, rough: [-0.02, 0.26], roughVar: 0.05, dirt: 0.18, mottle: 0.12, cavityDark: 0.22 };
+const EC_MESO: Sculpt = { tile: [2.2, 0.8], noise: 0.0004, reticulum: { cell: 0.018, depth: 0.0006 }, pits: { n: 18, r: 0.005, depth: 0.0012, pale: 0.12, stub: { len: 0.03, dir: -1, share: 0.7 } }, wave: { cell: 0.18, amp: 0.004 }, rough: [0.06, 0.32], roughVar: 0.05, dirt: 0.3, mottle: 0.16, cavityDark: 0.26 };
+const EC_GASTER_S: Sculpt = { tile: [1.2, 1.2], noise: 0.0003, reticulum: { cell: 0.014, depth: 0.0003 }, pits: { n: 60, r: 0.004, depth: 0.0008, pale: 0.25, stub: { len: 0.04, dir: 1, share: 0.9 } }, wave: { cell: 0.22, amp: 0.004 }, rough: [-0.02, 0.26], roughVar: 0.05, dirt: 0.14, mottle: 0.12, cavityDark: 0.2 };
+const EC_LEG: Sculpt = { ...FIRE_LEG, tile: [0.3, 0.9], rough: [0.04, 0.3], dirt: 0.4 };
+const ecRegions = {
+  [REGION.HEAD]: { sculpt: EC_HEAD, shade: shade(0.8, 0.35, 0.45, 0.22, 0.35, { coatRough: 0.16, wear: 0.25, dust: 0.08, mid: 0.1 }), px: [512, 512] as [number, number] },
+  [REGION.MESO]: { sculpt: EC_MESO, shade: shade(0.8, 0.45, 0.5, 0.22, 0.4, { coatRough: 0.2, wear: 0.25, dust: 0.14, mid: 0.1 }), px: [1024, 512] as [number, number] },
+  [REGION.WAIST]: { sculpt: FIRE_WAIST, shade: shade(0.8, 0.06, 0.3, 0.25, 0.3, { coatRough: 0.2, wear: 0.2, dust: 0.14 }), px: [256, 256] as [number, number] },
+  [REGION.GASTER]: { sculpt: EC_GASTER_S, shade: shade(0.75, 0.3, 0.35, 0.32, 0.5, { coatRough: 0.14, wear: 0.15, dust: 0.06, mid: 0.12, bands: [0.42, 0.6, 0.76, 0.9], band: [0.009, 0.22, 0.55, 0.045] }), px: [512, 512] as [number, number] },
+  [REGION.LEG]: { sculpt: EC_LEG, shade: shade(1.0, 0.5, 0, 0.6, 0.35, { coatRough: 0.24, wear: 0.3, dust: 0.3, mid: 0.3, tipThin: 0.6 }), px: [128, 320] as [number, number] },
+  [REGION.TARSUS]: { sculpt: FIRE_TARSUS, shade: shade(0.9, 0.45, 0, 0.6, 0.35, { coatRough: 0.36, dust: 0.5, mid: 0.2, tipThin: 0.5 }), px: [64, 128] as [number, number] },
+  [REGION.ANTENNA]: { sculpt: FIRE_ANTENNA, shade: shade(0.7, 0.05, 0, 0.6, 0.35, { coatRough: 0.3, dust: 0.15, mid: 0, tipThin: 0.4 }), px: [64, 160] as [number, number] },
+  [REGION.MANDIBLE]: { sculpt: FIRE_MAND, shade: shade(0.8, 0.1, 0, 0.45, 0.35, { coatRough: 0.14, wear: 0.5, dust: 0.04, tipThin: 0.7 }), px: [96, 192] as [number, number] },
+};
+export const ECITON: DetailRecipe = { key: 'eciton', regions: ecRegions };
+
 /** Recipe for an ant morph (null: no baked detail yet, the material stays as before). */
 export function antRecipe(morphKey: string): DetailRecipe | null {
   if (morphKey.startsWith('fire_')) return FIRE_ANT;
@@ -152,6 +173,7 @@ export function antRecipe(morphKey: string): DetailRecipe | null {
   // (overnight pass: the major's head smooth and shining, every other caste matte and tuberculate)
   if (morphKey === 'atta_major') return ATTA_MAJOR;
   if (morphKey.startsWith('atta_')) return ATTA;
+  if (morphKey.startsWith('eciton_')) return ECITON;
   return null;
 }
 

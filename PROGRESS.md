@@ -843,3 +843,14 @@ the reviewers keep naming it:
 4. Presentation: the plain studio renders vs studio photos with soft fill light.
 Suggestions recorded in docs/realism/formica-lasius-suggestions.md.
 
+
+### Atta cephalotes — blind review (render panel; photos scored 9–10)
+| Round | A1 media field | A2 media face | A3 major face | A4 major side | A5 soldier face | A6 queen side | A7 major 3/4 |
+|---|---|---|---|---|---|---|---|
+| 1 | 3 | 3 | 2 | 3 | 3 | 3 | 2 |
+
+Round 1 → 2 fixes: the major's head satin instead of mirror-glossy (read as chocolate); jaws curved hooks with a dark
+toothed inner edge and a gap between them closed (were flat V plates); bigger oval matte eyes; occipital spines on
+the lobe tops, longer and slender; mesosoma spines slender and sharp (were blunt cones); scapes running back from
+under the frontal lobes; orange head grading to a dark red-brown body; slimmer legs; more and longer golden hairs;
+the queen's head bigger, gaster rounder, the wing scars small and brown.

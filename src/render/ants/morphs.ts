@@ -4,7 +4,7 @@
  * noted; colours are linear-ish sRGB hex.
  */
 import type { MandibleSpec } from '../anatomy/mandible';
-import { ATTA_MAJOR_JAW, ATTA_MEDIA_JAW, ATTA_MINIM_JAW, ATTA_SOLDIER_JAW, FIRE_MAJOR, FIRE_WORKER, FORMICA_WORKER, LASIUS_WORKER } from '../anatomy/mandibleSpecs';
+import { ECITON_MINOR_JAW, ATTA_MAJOR_JAW, ATTA_MEDIA_JAW, ATTA_MINIM_JAW, ATTA_SOLDIER_JAW, FIRE_MAJOR, FIRE_WORKER, FORMICA_WORKER, LASIUS_WORKER } from '../anatomy/mandibleSpecs';
 
 export type HeadShape = 'round' | 'heart' | 'rect' | 'tri' | 'square';
 export type MandibleType = 'triangular' | 'falcate' | 'massive' | 'small';
@@ -306,29 +306,30 @@ const formicaRapid: AntMorph = {
 // (overnight realism pass, docs/creatures/atta-cephalotes.md: rusty orange-brown, matte and finely tuberculate with
 // short hooked golden hairs; legs a shade lighter; the teeth near black; the major's head deep chestnut and shining;
 // the minim paler, orange-tan; the queen dark chestnut)
+// (Atta review round 1: not one brick colour — orange on the head grading to dark red-brown on the body)
 const attaLook = {
-  head: L(0x84401f, 0.66, 0.06, 0.12, 0x6a3018),
-  meso: L(0x8a4422, 0.7, 0.05, 0.12, 0x6e321a),
-  waist: L(0x7e3e1e, 0.7, 0.05, 0.1),
-  gaster: L(0x7a3a1c, 0.6, 0.1, 0.18, 0x5e2c16),
-  legs: L(0x8e4a26, 0.62, 0.06, 0.1, 0x9a5630),
+  head: L(0x8e4622, 0.64, 0.08, 0.12, 0x6e3218),
+  meso: L(0x6e301a, 0.66, 0.06, 0.12, 0x5a2814),
+  waist: L(0x642c18, 0.66, 0.06, 0.1),
+  gaster: L(0x5e2a18, 0.62, 0.08, 0.16, 0x4a2214),
+  legs: L(0x7a3a1e, 0.6, 0.06, 0.1, 0x5e2c16),
   antenna: L(0x8a4826, 0.64, 0.05, 0.08, 0x9a5630),
   mandible: L(0x5a2410, 0.4, 0.3, 0, 0x1a0a04),
 };
 // short, curved, golden hairs over everything (hooked at the tip in life: too small to model)
-const attaSetae = { color: 0xb88a50, head: 40, meso: 40, gaster: 70, len: [0.008, 0.03] as [number, number] };
+const attaSetae = { color: 0xb88a50, head: 64, meso: 60, gaster: 90, len: [0.012, 0.045] as [number, number] };
 
 const attaMedia: AntMorph = {
   key: 'atta_media',
   L: 8,
-  head: { len: 0.3, width: 0.3, height: 0.19, shape: 'heart', notch: 0.18, occSpines: 0.06, groove: 0.1 },
-  eyes: { size: 0.13, pos: 0.62, height: 0.2, ocelli: false },
+  head: { len: 0.3, width: 0.3, height: 0.19, shape: 'heart', notch: 0.18, occSpines: 0.1, groove: 0.1 },
+  eyes: { size: 0.18, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.3, club: 0, thick: 0.009 },
   mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.7 },
   meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.09, meso: 0.07, prop: 0.08 } },
   waist: { nodes: 2, len: 0.1, nodeH: 0.08 },
   gaster: { len: 0.26, width: 0.2, height: 0.16, sting: true },
-  legs: { hind: 1.2, thick: 0.0155 },
+  legs: { hind: 1.2, thick: 0.0125 },
   look: attaLook,
   hair: 0.2,
   setae: attaSetae,
@@ -357,8 +358,8 @@ const attaSoldier: AntMorph = {
   ...attaMedia,
   key: 'atta_soldier',
   L: 10.5,
-  head: { len: 0.33, width: 0.36, height: 0.2, shape: 'heart', notch: 0.22, occSpines: 0.045, groove: 0.14 },
-  eyes: { size: 0.12, pos: 0.62, height: 0.18, ocelli: false },
+  head: { len: 0.33, width: 0.36, height: 0.2, shape: 'heart', notch: 0.22, occSpines: 0.07, groove: 0.14 },
+  eyes: { size: 0.15, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.8, funiculus: 1.25, club: 0, thick: 0.0085 },
   mandible: { type: 'massive', len: 0.38, teeth: 8, width: 0.68, spec: ATTA_SOLDIER_JAW, open: 0.6 },
   meso: { len: 0.28, width: 0.12, height: 0.14, spines: { pro: 0.07, meso: 0.05, prop: 0.06 } },
@@ -373,8 +374,8 @@ const attaMajor: AntMorph = {
   key: 'atta_major',
   L: 14,
   // (the photos: two big rounded lobes split by a deep median groove)
-  head: { len: 0.4, width: 0.44, height: 0.24, shape: 'heart', notch: 0.3, occSpines: 0.03, groove: 0.2 },
-  eyes: { size: 0.08, pos: 0.66, height: 0.15, ocelli: false },
+  head: { len: 0.4, width: 0.44, height: 0.24, shape: 'heart', notch: 0.3, occSpines: 0.04, groove: 0.2 },
+  eyes: { size: 0.11, pos: 0.64, height: 0.1, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.7, funiculus: 1.2, club: 0, thick: 0.0072 },
   mandible: { type: 'massive', len: 0.36, teeth: 8, width: 0.75, spec: ATTA_MAJOR_JAW, open: 0.55 },
   meso: { len: 0.25, width: 0.11, height: 0.12, spines: { pro: 0.07, meso: 0.06, prop: 0.06 } },
@@ -382,7 +383,8 @@ const attaMajor: AntMorph = {
   gaster: { len: 0.22, width: 0.16, height: 0.13, sting: true },
   legs: { hind: 1.0, thick: 0.0135 },
   // the head deep chestnut, shining; the frontal woolly tufts as a dense patch of longer red hairs on the head
-  look: { ...attaLook, head: L(0x7a3018, 0.3, 0.55, 0.06, 0x5c2a16) },
+  // (review round 1: mirror-glossy read as chocolate — a satin shine over the smooth cuticle)
+  look: { ...attaLook, head: L(0x7a3018, 0.42, 0.3, 0.08, 0x5c2a16) },
   setae: { ...attaSetae, color: 0xa0502a, head: 70, len: [0.006, 0.026] },
   stance: 0.14,
 };
@@ -392,13 +394,14 @@ const attaQueen: AntMorph = {
   key: 'atta_queen',
   L: 21,
   // (Borgmeier: head width 5.2 mm; no occipital tooth)
-  head: { len: 0.2, width: 0.25, height: 0.13, shape: 'heart', notch: 0.12 },
+  head: { len: 0.22, width: 0.27, height: 0.15, shape: 'heart', notch: 0.12 },
   eyes: { size: 0.2, pos: 0.6, height: 0.2, ocelli: true },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.2, club: 0, thick: 0.0062 },
   mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.6 },
   meso: { len: 0.27, width: 0.15, height: 0.17, queen: true, spines: { pro: 0.03, meso: 0, prop: 0.03 } },
   waist: { nodes: 2, len: 0.06, nodeH: 0.06 },
-  gaster: { len: 0.48, width: 0.3, height: 0.25, sting: true },
+  // (review round 1: huge and rounded, not a sausage)
+  gaster: { len: 0.43, width: 0.34, height: 0.29, sting: true },
   legs: { hind: 0.7, thick: 0.0115 },
   // dark chestnut, golden hairs, a satin gaster (Naskrecki's queen; the caste series)
   look: { ...attaLook, head: L(0x5a2a16, 0.55, 0.12, 0.14, 0x48200f), meso: L(0x5e2c18, 0.52, 0.14, 0.14), waist: L(0x5a2a16, 0.55, 0.1, 0.12), gaster: L(0x52261a, 0.42, 0.22, 0.3, 0x3e1c10), legs: L(0x6a3018, 0.56, 0.08, 0.1, 0x7a3a1e) },
@@ -525,13 +528,16 @@ const ecitonMinor: AntMorph = {
   head: { len: 0.2, width: 0.17, height: 0.14, shape: 'round', frontMix: 0.35 },
   eyes: { size: 0.05, pos: 0.55, height: 0.25, ocelli: false, single: true },
   antenna: { segments: 12, scape: 1.05, funiculus: 1.25, club: 0, thick: 0.0115 },
-  mandible: { type: 'triangular', len: 0.3, teeth: 4, width: 0.42 },
+  mandible: { type: 'triangular', len: 0.3, teeth: 5, width: 0.42, spec: ECITON_MINOR_JAW, open: 0.7 },
   meso: { len: 0.36, width: 0.105, height: 0.12 },
   waist: { nodes: 2, len: 0.11, nodeH: 0.08 },
   gaster: { len: 0.3, width: 0.17, height: 0.145, sting: true, segs: 5 },
-  legs: { hind: 1.5, thick: 0.0125 },
+  legs: { hind: 1.5, thick: 0.0135 },
   look: EC_DARK,
   hair: 0.45,
+  // (overnight pass: sparse, fine golden hairs, denser on the gaster and legs)
+  setae: { color: 0xc09a60, head: 14, meso: 16, gaster: 60, len: [0.01, 0.045] },
+  real: true,
   stance: 0.21,
   gait: EC_GAIT,
 };

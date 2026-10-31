@@ -24,7 +24,7 @@ import { ATK } from './attackPoses';
  */
 
 /** Which morphs use the pass (the pilot: the tropical fire ant; the rollout widens this). */
-export const ANIM_V2_PREFIXES = ['fire_', 'lasius_', 'formica_', 'plagiaria_', 'atta_'];
+export const ANIM_V2_PREFIXES = ['fire_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_'];
 /** Lab switch: false shows the old motion (before/after clips). */
 export const animSettings = { v2: true };
 export const animV2 = (morph: string): boolean => animSettings.v2 && ANIM_V2_PREFIXES.some((p) => morph.startsWith(p));
@@ -75,6 +75,12 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
   }
   // (overnight spec 3.1, Atta) minims cling and bite; medias bite and hold; soldiers fast heavy bites and head
   // slams; majors a slow, braced scissor cut from a low stance
+  // (overnight spec 3.2, Eciton) workers bite and hold (group pinning); the porter and media lunge with their
+  // sickles; the soldier hooks its prey and holds it (the barbs don't let go)
+  if (morph.startsWith('eciton_')) {
+    out.variant = morph === 'eciton_major' ? [ATK.CLAMP, ATK.CLAMP, ATK.LUNGE][av] : morph === 'eciton_minor' ? [ATK.CLAMP, ATK.LUNGE, ATK.CLAMP][av] : [ATK.LUNGE, ATK.CLAMP, ATK.LUNGE][av];
+    return out;
+  }
   if (morph.startsWith('atta_')) {
     out.variant =
       morph === 'atta_major'
