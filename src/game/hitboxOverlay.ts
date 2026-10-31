@@ -24,7 +24,7 @@ export class HitboxOverlay {
   private lines: THREE.LineSegments;
   private p = pos;
   private c = new Float32Array(0);
-  private n = 0;
+  protected n = 0;
 
   constructor(name: string) {
     const g = new THREE.BufferGeometry();
@@ -64,6 +64,11 @@ export class HitboxOverlay {
       this.capsule(cr.x - c * b.hl, cr.y - s * b.hl, cr.x + c * b.hl, cr.y + s * b.hl, b.r, heightAt, 0x40e8ff);
       this.circle(cr.x, heightAt(cr.x, cr.y) + 0.2, cr.y, creatureHooks.radius(cr) + 3, 0xff4ad8);
     }
+    this.flush();
+  }
+
+  /** Upload the lines drawn since `n` was reset. */
+  protected flush(): void {
     const g = this.lines.geometry;
     if ((g.getAttribute('position') as THREE.BufferAttribute | undefined)?.array !== this.p) {
       g.setAttribute('position', new THREE.BufferAttribute(this.p, 3));
@@ -74,7 +79,7 @@ export class HitboxOverlay {
     g.setDrawRange(0, this.n * 2);
   }
 
-  private circle(x: number, y: number, z: number, r: number, col: number): void {
+  protected circle(x: number, y: number, z: number, r: number, col: number): void {
     for (let i = 0; i < SEG; i++) {
       const a0 = (i / SEG) * Math.PI * 2;
       const a1 = ((i + 1) / SEG) * Math.PI * 2;
@@ -112,7 +117,7 @@ export class HitboxOverlay {
     }
   }
 
-  private line(ax: number, ay: number, az: number, bx: number, by: number, bz: number, col: number): void {
+  protected line(ax: number, ay: number, az: number, bx: number, by: number, bz: number, col: number): void {
     if ((this.n + 1) * 6 > this.p.length) {
       const np = new Float32Array(Math.max(6000, this.p.length * 2));
       np.set(this.p);

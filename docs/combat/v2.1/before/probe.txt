@@ -1,0 +1,56 @@
+
+== clash: 60 Black garden workers v 60 fire-ant soldiers (arena, charge)
+  ant hold ant (one-way)    4400 unit-ticks: moves 314.0 % BL/s (ants 190.8, separation 123.3); turns 101°/s (ants 101)
+  ant hold ant (mutual)     3574 unit-ticks: moves 95.1 % BL/s (separation 65.2, ants 29.8); turns 63°/s (ants 63)
+  ant spray                 1385 unit-ticks: moves 117.0 % BL/s (separation 114.8, ants 2.2); turns 79°/s (ants 79)
+  separation moved attacking ants (share of the mm): fighting ally in personal space 75 %, enemy bodies touching 10 %, ally closing in, bodies touching 9 %, other (spread over the tick) 5 %
+  pressing into a teammate while closing in: 757 streaks, median 0.05 s, p90 0.10 s, longest 0.40 s; 2 lasted ≥ 0.4 s (0.8 ant-seconds)
+  closing in with a teammate's body against its front: 3 % of 6611 closing-in ticks; 131 contacts, median 0.05 s, p90 0.20 s, longest 0.35 s
+
+== formica: 30 workers + 10 mortars + 10 rapid sprayers v 50 Black garden workers
+  ant spray                 2811 unit-ticks: moves 52.2 % BL/s (separation 44.3, ants 7.9); turns 58°/s (ants 58)
+  ant hold ant (mutual)     1878 unit-ticks: moves 81.2 % BL/s (separation 55.7, ants 25.5); turns 54°/s (ants 54)
+  ant hold ant (one-way)    1303 unit-ticks: moves 245.3 % BL/s (ants 164.9, separation 80.5); turns 100°/s (ants 100)
+  ant shooter in range      1065 unit-ticks: moves 47.9 % BL/s (separation 26.6, ants 21.2); turns 23°/s (ants 23)
+  separation moved attacking ants (share of the mm): fighting ally in personal space 67 %, other (spread over the tick) 21 %, enemy bodies touching 6 %, ally closing in, bodies touching 6 %
+  pressing into a teammate while closing in: 385 streaks, median 0.05 s, p90 0.10 s, longest 0.40 s; 2 lasted ≥ 0.4 s (0.8 ant-seconds)
+  closing in with a teammate's body against its front: 2 % of 4150 closing-in ticks; 50 contacts, median 0.05 s, p90 0.20 s, longest 0.35 s
+   2 s: 0 holding (0 on the far, east side; 0 north, 0 south), 10 closing in or waiting
+   4 s: 5 holding (0 on the far, east side; 2 north, 3 south), 18 closing in or waiting
+   6 s: 4 holding (2 on the far, east side; 2 north, 2 south), 17 closing in or waiting
+   8 s: 5 holding (2 on the far, east side; 2 north, 3 south), 12 closing in or waiting
+  10 s: 6 holding (4 on the far, east side; 3 north, 3 south), 13 closing in or waiting
+  12 s: 5 holding (3 on the far, east side; 2 north, 3 south), 10 closing in or waiting
+
+== beetle: 30 Black garden workers on one ground beetle (16 mm), all from the west; the beetle fights back
+  ant hold creature          934 unit-ticks: moves 45.4 % BL/s (separation 26.4, ants 18.9); turns 20°/s (ants 20)
+  ant spray                  724 unit-ticks: moves 38.3 % BL/s (separation 36.1, ants 2.2); turns 19°/s (ants 19)
+  groundBeetle Attack        159 ticks: moves 2.1 % BL/s (creatures 2.1); turns 2°/s (creatures 2)
+  separation moved attacking ants (share of the mm): creature body or foot 49 %, ally closing in, bodies touching 29 %, fighting ally in personal space 21 %, other (spread over the tick) 0 %
+  pressing into a teammate while closing in: 130 streaks, median 0.05 s, p90 0.30 s, longest 0.90 s; 10 lasted ≥ 0.4 s (5.4 ant-seconds)
+  closing in with a teammate's body against its front: 8 % of 1833 closing-in ticks; 64 contacts, median 0.10 s, p90 0.20 s, longest 0.40 s
+
+== creatures: a tarantula (90 mm) fighting 40 Black garden ants
+  ant hold creature         2214 unit-ticks: moves 108.9 % BL/s (ants 108.5, separation 0.4); turns 23°/s (ants 23)
+  ant spray                  306 unit-ticks: moves 1.0 % BL/s (separation 1.0); turns 49°/s (ants 49)
+  tarantula WindUp            64 ticks: moves 0.0 % BL/s (none); turns 0°/s (none)
+  tarantula Pounce            32 ticks: moves 48.4 % BL/s (creatures 48.4); turns 0°/s (none)
+  separation moved attacking ants (share of the mm): creature body or foot 100 %
+  pressing into a teammate while closing in: 8 streaks, median 0.10 s, p90 0.20 s, longest 0.20 s; 0 lasted ≥ 0.4 s (0.0 ant-seconds)
+  closing in with a teammate's body against its front: 0 % of 1601 closing-in ticks; 5 contacts, median 0.10 s, p90 0.10 s, longest 0.10 s
+
+== creatures: a stagBeetle (100 mm) fighting 40 Black garden ants
+  ant hold creature         2170 unit-ticks: moves 33.2 % BL/s (ants 31.8, separation 1.4); turns 20°/s (ants 20)
+  ant spray                  158 unit-ticks: moves 2.3 % BL/s (separation 2.3); turns 36°/s (ants 36)
+  separation moved attacking ants (share of the mm): creature body or foot 59 %, fighting ally in personal space 25 %, other (spread over the tick) 16 %
+  pressing into a teammate while closing in: 4 streaks, median 0.05 s, p90 0.05 s, longest 0.05 s; 0 lasted ≥ 0.4 s (0.0 ant-seconds)
+  closing in with a teammate's body against its front: 1 % of 1433 closing-in ticks; 3 contacts, median 0.05 s, p90 0.30 s, longest 0.30 s
+
+== creatures: a wolfSpider (12 mm) fighting 40 Black garden ants
+  ant hold creature         2515 unit-ticks: moves 116.2 % BL/s (ants 71.9, separation 42.9, creatures 1.4); turns 24°/s (ants 24)
+  ant spray                  958 unit-ticks: moves 75.2 % BL/s (separation 73.6, ants 1.6); turns 39°/s (ants 39)
+  wolfSpider Pounce          139 ticks: moves 103.5 % BL/s (creatures 103.5); turns 72°/s (creatures 72)
+  wolfSpider WindUp           84 ticks: moves 0.0 % BL/s (none); turns 3°/s (creatures 3)
+  separation moved attacking ants (share of the mm): creature body or foot 44 %, ally closing in, bodies touching 29 %, fighting ally in personal space 23 %, other (spread over the tick) 3 %
+  pressing into a teammate while closing in: 264 streaks, median 0.05 s, p90 0.35 s, longest 1.00 s; 22 lasted ≥ 0.4 s (12.3 ant-seconds)
+  closing in with a teammate's body against its front: 10 % of 2417 closing-in ticks; 90 contacts, median 0.10 s, p90 0.25 s, longest 0.95 s

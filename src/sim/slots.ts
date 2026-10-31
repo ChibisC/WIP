@@ -48,6 +48,7 @@ export const bodyHook: { body: (cr: Creature) => Body } = {
 };
 
 const C2 = BALANCE.combat2;
+const C21 = BALANCE.combat21;
 const TAU = Math.PI * 2;
 
 /** Length of the outline offset `off` mm outside the body. */
@@ -451,6 +452,157 @@ export function releaseSlot(w: World, a: Ant): void {
   const map = kind === 4 ? w.tickCache.slotHeld : w.tickCache.antSlotHeld;
   const e = map.get(id);
   if (e && e.tick === w.s.tick) drop(e, a.id);
+}
+
+// ---------------------------------------------------------------- combat v2.1: going round to a free slot
+
+/** Slot on target (`kind` 3 ant / 4 creature) that ant `a` was last blocked on (never tried twice in a row), or NaN. */
+function blockedSlot(a: Ant, id: number): number {
+  return (a.bkI ?? 0) === id ? (a.bkS ?? NaN) : NaN;
+}
+
+/**
+ * Going round ant victim `o`: is the sector at world angle `ang` free for `a` (nobody else holds or reserves it, and it
+ * is not the one `a` was just blocked on)? Returns the sector's centre angle, or NaN.
+ */
+export function antSectorFreeAt(w: World, a: Ant, o: Ant, isQueen: boolean, ang: number): number {
+  const e = antHeld(w, o);
+  const n = antSlotCount(o, casteOf(a.caste).length, isQueen);
+  const k = sector(ang, n);
+  for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && sector(e.v[i], n) === k) return NaN;
+  const bk = blockedSlot(a, o.id);
+  if (!Number.isNaN(bk) && sector(bk, n) === k) return NaN;
+  return ((k + 0.5) / n) * TAU;
+}
+
+/** Reserve the sector centred at `ang` on ant victim `o` for `a` (after antSectorFreeAt). */
+export function takeAntSector(w: World, a: Ant, o: Ant, ang: number): void {
+  put(antHeld(w, o), a.id, ang);
+}
+
+/**
+ * Going round creature `cr` on the ring round its body: is the slot beside the outline fraction `u` free for `a`? Returns
+ * the slot's fraction, or −1.
+ */
+export function creatureSlotFreeAt(w: World, a: Ant, cr: Creature, u: number): number {
+  const e = creatureHeld(w, cr);
+  const n = creatureSlotCount(cr, casteOf(a.caste).length, false);
+  const k = Math.floor((((u % 1) + 1) % 1) * n) % n;
+  for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && e.v[i] < 1 && slotIdx(e.v[i], n) === k) return -1;
+  const bk = blockedSlot(a, cr.id);
+  if (!Number.isNaN(bk) && bk < 1 && slotIdx(bk, n) === k) return -1;
+  return (k + 0.5) / n;
+}
+
+/** Reserve the slot at fraction `u` round creature `cr` for `a` (after creatureSlotFreeAt). */
+export function takeCreatureSlot(w: World, a: Ant, cr: Creature, u: number): void {
+  put(creatureHeld(w, cr), a.id, u);
+}
+
+/**
+ * Which way round should `a` go (combat v2.1, "back off and go around")? For each side, the free slots on that half of
+ * the ring (outer ring only; not the one it was blocked on) minus `allyWeight` × the teammates already on the way there
+ * (closing in or waiting, not holding: within two personal spaces outside the slots, before the nearest free slot).
+ * +1 counter-clockwise, −1 clockwise; ties by its id (odd +1), so neighbours split between the two sides. 0 when no
+ * side has more free slots than teammates already on the way to them (then it waits, or picks another foe).
+ */
+export function pickSide(w: World, a: Ant, kind: number, id: number, isQueen: boolean): number {
+  const La = casteOf(a.caste).length;
+  const team = a.team ?? a.colony;
+  let n: number;
+  let centre: { x: number; y: number };
+  let bearingU: number;
+  let free: (k: number) => boolean;
+  let angOf: (k: number) => number;
+  let rIn = 0;
+  let rOut = 0;
+  if (kind === 3) {
+    const o = w.antById.get(id);
+    if (!o) return 0;
+    const e = antHeld(w, o);
+    n = antSlotCount(o, La, isQueen);
+    let taken = 0;
+    for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id) taken |= 1 << sector(e.v[i], n);
+    const bk = blockedSlot(a, id);
+    if (!Number.isNaN(bk)) taken |= 1 << sector(bk, n);
+    free = (k) => !(taken & (1 << k));
+    centre = o;
+    bearingU = ((((datan2(a.y - o.y, a.x - o.x) / TAU) % 1) + 1) % 1) * n;
+    angOf = (k) => ((k + 0.5) / n) * TAU;
+    rIn = casteOf(o.caste).length * 0.3 + frontOff(La);
+    rOut = rIn + C2.personalSpace * La * 2 + La;
+  } else {
+    const cr = w.creatureById.get(id);
+    if (!cr) return 0;
+    const e = creatureHeld(w, cr);
+    n = creatureSlotCount(cr, La, false);
+    let taken = 0;
+    for (let i = 0; i < e.ids.length; i++) if (e.ids[i] !== a.id && e.v[i] < 1) taken |= 1 << slotIdx(e.v[i], n);
+    const bk = blockedSlot(a, id);
+    if (!Number.isNaN(bk) && bk < 1) taken |= 1 << slotIdx(bk, n);
+    free = (k) => !(taken & (1 << k));
+    centre = cr;
+    const b = bodyHook.body(cr);
+    const c = dcos(cr.h);
+    const s = dsin(cr.h);
+    const dx = a.x - cr.x;
+    const dy = a.y - cr.y;
+    bearingU = outlineU(b, frontOff(La), dx * c + dy * s, -dx * s + dy * c) * n;
+    angOf = (k) => {
+      creatureSlotWorld(cr, frontOff(La), (k + 0.5) / n, sideTmp);
+      return datan2(sideTmp.y - cr.y, sideTmp.x - cr.x);
+    };
+    rIn = b.r + frontOff(La);
+    rOut = b.hl + b.r + frontOff(La) + C2.personalSpace * La * 2 + La;
+  }
+  let best = 0;
+  let bestScore = -Infinity;
+  const half = Math.floor(n / 2);
+  const k0 = Math.floor(bearingU) % n;
+  const myAng = datan2(a.y - centre.y, a.x - centre.x);
+  for (const side of [1, -1]) {
+    let nFree = 0;
+    let nearest = -1;
+    for (let j = 0; j <= half; j++) {
+      const k = (((k0 + side * j) % n) + n) % n;
+      if (free(k)) {
+        nFree++;
+        if (nearest < 0) nearest = j;
+      }
+    }
+    if (nFree === 0) continue;
+    // teammates on the way to its nearest free slot on this side
+    const span = angleDiff(myAng, angOf((((k0 + side * nearest) % n) + n) % n));
+    let allies = 0;
+    w.antsNear(a.space, centre.x, centre.y, rOut, (g) => {
+      if (g === a || (g.team ?? g.colony) !== team || g.state !== AS.Attack) return false;
+      const r = dhypot(g.x - centre.x, g.y - centre.y);
+      if (r < rIn) return false;
+      const ga = angleDiff(myAng, datan2(g.y - centre.y, g.x - centre.x));
+      if (side * ga > 0 && Math.abs(ga) <= Math.abs(span) + 0.2) allies++;
+      return false;
+    });
+    const score = nFree - C21.allyWeight * allies;
+    // (a side whose free slots the teammates already on the way will take is no way to go: it waits instead)
+    if (score <= 1e-9) continue;
+    if (score > bestScore + 1e-9 || (Math.abs(score - bestScore) <= 1e-9 && side === (a.id & 1 ? 1 : -1))) {
+      bestScore = score;
+      best = side;
+    }
+  }
+  return best;
+}
+const sideTmp = { x: 0, y: 0, n: 0 }; // det-ok: scratch
+
+/**
+ * Combat v2.1 (CHANGE_PLAN §17): is the ant anchored — holding a foe, firing a spray, a shooter holding its range
+ * (`anc` refreshed every tick), recovering after an attack, taking a planned small step, holding prey in its jaws?
+ * Nothing but knockback, a large creature walking into it, or its own planned moves shifts it; separation treats it as
+ * a fixed obstacle.
+ */
+export function anchored(a: Ant): boolean {
+  if ((a.anc ?? 0) > 0 || (a.stp ?? 0) > 0) return true;
+  return a.state === AS.Grapple || a.state === AS.Spray || a.state === AS.Hold || a.state === AS.Snap;
 }
 
 /** Angle difference helper re-exported for combat (keeps imports in one place). */

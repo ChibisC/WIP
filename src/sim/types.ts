@@ -148,6 +148,19 @@ export interface Ant {
   blkD?: number;
   blkT?: number;
   repT?: number;
+  /**
+   * Combat v2.1 (CHANGE_PLAN §17): seconds of recovery left after an attack ended (anchored: it does not move); a small
+   * planned step back to its hold point (seconds left, and the point), anchored otherwise; the slot it was last blocked
+   * on (`bkS`: an angle or outline fraction, on target `bkI`), never tried twice in a row; going round the fight: the
+   * angle walked round so far (rad; the side is `flk`).
+   */
+  anc?: number;
+  stp?: number;
+  stx?: number;
+  sty?: number;
+  bkS?: number;
+  bkI?: number;
+  garT?: number;
   /** climbing / riding: the creature id (0 = on the ground) */
   rideId?: number;
   /** climbing: 0 walking to the foot of the rail, 1 up, 2 riding, 3 down (1–3: untouchable) */

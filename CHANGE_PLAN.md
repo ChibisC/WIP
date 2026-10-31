@@ -603,3 +603,47 @@ Spec: project doc `claude/combat/02-spec-combat-v2.md` (replaces / extends §15 
       - performance: 400 v 400 ants plus 4 titans at full caps, under 15 ms a tick (`tools/stress.ts`, `tools/climb-stress.ts`).
     - Browser: 60 v 60 before / after screenshots against the reference and `tools/fightspread.ts` numbers; titan riders at default zoom; clips and shots in `docs/combat/v2/`.
     - Update DESIGN.md §3.8–3.10, README.md and PROGRESS.md.
+
+## 17. Combat v2.1 — anchored attacks, back off and go around (user spec 2026-10-31)
+Spec: project doc `claude/combat/03-spec-anchor-and-flow-around.md`. Branch `feature/combat-v2.1` from `main` (`1803902`). Evidence: `tools/drift-probe.ts` (every sim system wrapped; each tick's movement and turning of an attacking unit attributed to the system that made it), output in `docs/combat/v2.1/before/probe.txt`, a per-tick trace in `docs/combat/v2.1/before/trace-clash.txt`, clips in `docs/combat/v2.1/before/` (`tests/browser/combat_v21.py`, hitboxes on).
+
+### 17.1 Findings: what moves an attacking unit
+Measured on the base (seed 4, 20 s; % of the unit's body length per second, by system; degrees per second):
+
+| scene | attacking units | moves | turns |
+|---|---|---|---|
+| 60 v 60 clash | holding an ant, one-way | 314 % BL/s (own hold-follow 191, separation 123) | 101°/s |
+| | holding an ant, mutual | 95 (separation 65, own easing 30) | 63°/s |
+| | spraying | 117 (separation 115) | 79°/s |
+| Formica v Lasius | spraying / shooter holding range | 52 / 48 (separation 44 / 27) | 58 / 23°/s |
+| ants on a tarantula | planted at it | 109 (own step-after 108.5) | 23°/s |
+| ants on a wolf spider | planted at it | 116 (own 72, separation 43) | 24°/s |
+| tarantula | 0.3 s before to 0.2 s after a bite | 31 % BL/s | 3°/s |
+| wolf spider | the same (pounce, then its bites) | 87 % BL/s | 41°/s; 72°/s while pouncing |
+| stag beetle | the same (its pinch) | 2.9 % BL/s | 10°/s |
+
+1. **Separation moves attackers** (`separation.ts`). An ant holding an ant is movable in a "fight" or guard-line pair (`ma = … || ((fight || line) && fa & 32)`); planted ants at a creature (`gKind 4`), sprayers and shooters are always movable. Of the separation movement of attacking ants in the clashes, 67–75 % comes from a fighting ally inside the personal space (1.6 L, strength 0.8, cap × 2 = 0.6 mm a separation tick), 6–29 % from an ally closing in with bodies touching, 6–10 % from enemies; at creatures 44–100 % is the body and feet. Trace: spraying ant 17 is pushed the full 0.6 mm on every separation tick while it fires.
+2. **The holds re-follow** (`grappleUpdate`). A one-way hold walks to its hold point (a world angle round the victim) every tick at up to 2 × walking speed (`combat2.holdFollow`): when the victim is shoved or walks, the holder follows (trace: ant 102 creeps 0.03–0.1 mm a tick). A mutual hold eases half the distance error a tick. A planted ant at a creature steps after it (`steerTo`) when the creature moves more than 0.45 L, and is shoved back out when the body swings in.
+3. **Facing** is re-aimed every tick (`faceToward` in grapple, spray and the shooter's hold: 60–100°/s). Ant bites are a timer (`cd`); there is no wind-up / strike / recovery.
+4. Not a cause: velocity (`a.v = 0` in every attack branch: nothing coasts).
+5. **Re-chasing inside an attack**: the creature hold's step-after (2); the ant holds' follow (2).
+6. **Creatures.** Hunters (ground beetle, rove, centipede, spiderlings) and the arena's creature-on-creature bites have no wind-up: they face the target at 6 rad/s and bite on the timer. The stag beetle's pinch bites while it walks or turns. The tarantula's lunge and the giant centipede's coil snap the heading to the aim (`cr.h = dir`) as the wind-up starts. The wolf spider's wind-up turns at 7.5 rad/s, and its pounce steers at a point (72°/s). Already still: the stag beetle's clamp wind-up, the mantis strike, the tarantula wind-up, the centipede coil, every shake-off. Creatures push each other during attacks (`creatureSpacing`); creature feet push planted ants whether the creature walks or attacks.
+7. **Render: not a cause.** Interpolation (`px → x`) adds nothing to a unit that does not move; ant and creature gaits advance only with distance walked (ants: and turning), and a stationary ant's feet settle (`antRenderer`). The sliding is the sim moving the unit. `render/ants` stays with `feature/realism`.
+
+**Shoving:**
+8. Ants closing in steer straight at their hold point; with a teammate in the way, separation splits the overlap by mass, so the walker pushes the one in front, often a holder (above: 6–29 %). A teammate's body against an ant's front while it closes in: 2–3 % of closing-in ticks in the clashes, 8–10 % at a 16 mm ground beetle and a 12 mm wolf spider; up to 0.4–0.95 s at a time.
+9. The blocked rule (`blkD`/`blkT`) needs 1 s without gaining 0.1 L, and pushing an ally forward counts as gaining, so it rarely fires; when it does, the ant pauses 0.5–1 s and sidesteps to a random side (`w.rng`), possibly back into the same press. Nothing remembers the blocked spot.
+10. The ally push has no direction rule: it can push an ant toward the enemy.
+11. At a ground beetle charged from the west, no holder is on the far side after 4 s, 2 of 4 at 6 s, about half by 10 s: the far slots fill slowly, by flanking.
+
+### 17.2 Plan (each step committed with its tests)
+1. **Anchor state (ants).** An ant is anchored while it holds a foe (Grapple, on an ant or planted at a creature), during a spray shot (plant, rear, fire, settle), while a shooter holds its range, while it holds prey, during a recovery after an attack ends (`anc`, seconds left) and during a small planned step (`stp` seconds, toward a fixed point `stx`, `sty`). `anchored(a)` in `slots.ts`. Bites get phases from the bite timer: wind-up = the last `combat21.windupSec` before the bite (`a.cd`), strike at the bite, recovery after. Facing turns only in the wind-up, at `combat21.windupTurn`; locked otherwise.
+2. **Separation.** Anchored ants are never moved by other ants: a fixed obstacle (the other one takes the whole push). Right of way between allies: anchored (3) > holding or closing in on a reserved slot (2) > looking for a slot, waiting, going round (1) > the rest (0): the lower one moves alone; equal: by mass as before. An ally push on a fighting or closing-in ant loses its component toward the ant's target (never pushed into the fight). A creature body or foot moves an anchored ant only while the creature walks (not during its attack); that cancels the ant's attack (recovery, then it re-plants). Anchored creatures are not moved by `creatureSpacing`.
+3. **Holds** (`grappleUpdate`): no hold-follow, no easing, no step-after. The hold distance is checked each tick: within `reachTol` × L, bite on the timer; off by up to `stepMax` × L between bites → one small step (`stp`) to the hold point, then re-anchor; farther (the foe left reach) → the hold ends where the ant stands, `recoverSec` of recovery, then it closes in again (Attack). Mutual holds: both anchored; the same rule. A creature turning into a planted ant is a push from a large creature: the ant's attack is cancelled and it re-plants.
+4. **Sprays and shooters**: anchored per shot (turning only before the jet), shooters holding range anchored (turning slowly between shots); moving to keep range only between shots.
+5. **Creatures**: `cr.anc` (seconds) and a facing lock. Every bite has a wind-up (`combat21.crWindupSec`, turning at most `crWindupTurn`), the strike, a recovery (`crRecoverSec`) — hunters, the stag beetle's pinch, the arena's creature bites. No heading snaps: the tarantula lunge and centipede coil turn toward the aim during the wind-up; the lunge, pounce and coil strike go along the heading fixed at the strike start (planned paths). Splash areas are fixed when the wind-up starts. Backing off only between attacks.
+6. **No shoving.** Blocked: a teammate in the forward cone (`blockCone`) within a personal space and no closer to the slot or target for `blockedSec` (0.3 s). Then: back off `backOffLen` × L over `backOffSec`, turning a little to the chosen side; pick a side (more free slots, fewer allies on the way; ties by id parity); walk round on a ring (target outline + reach + personal space, outside the fighters) to the nearest free slot on that side, keeping the side; reserve it on arrival, move in, anchor. Nothing free all round → another enemy with room, or wait on the outer ring (v2). The blocked slot is remembered (`bkS`, on `rsv`'s target): never tried twice in a row. Replaces v2's pause and sidestep.
+7. **Avoidance instead of pushing.** Ants closing in, going round, waiting, and squads walking to a marker steer sideways round teammates in their path (look-ahead `avoidLook` × L, cone `avoidCone`): a cheap velocity-obstacle test against nearby teammates (the spatial grid), turning away from the nearest one ahead by up to `avoidTurn`; ties by id.
+8. **Numbers** in `BALANCE.combat21`; DESIGN.md §3.8.
+9. **Debug view** `?combatdebug=1` (and in the arena's panel): a pin on anchored units, blocked (red), backing off (an arrow back), the side chosen (an arrow along the ring), the target slot, free / taken slots round each target.
+10. **Tests** `tests/combatV21.ts` (the spec's checklist), the v2 tests that pin the follow and the pause-and-sidestep updated; clips after; stress (400 v 400 + 4 titans); determinism; LAN tests; docs; merge; the artifact (with `feature/realism` combined while it is unmerged).

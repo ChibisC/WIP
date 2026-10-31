@@ -51,6 +51,7 @@ export class ArenaPanel {
   private viewEl = el('div', 'ar-row ar-view');
   private railsBtn: HTMLButtonElement;
   private hitBtn: HTMLButtonElement;
+  private combatBtn: HTMLButtonElement;
   private key = '';
 
   constructor(private s: GameSession) {
@@ -60,7 +61,8 @@ export class ArenaPanel {
     // views for testing climbing and contact: the creatures' climb rails and riding slots, and the hitboxes
     this.railsBtn = button('chip small', 'Climb rails', '<b>Climb rails</b>Show the routes ants take up each creature\'s legs and the places they ride on its back.', () => s.setClimbDebug(!s.climbDebug));
     this.hitBtn = button('chip small', 'Hitboxes', '<b>Hitboxes</b>Show every body\'s hit shapes (what bites and climbs test against).', () => s.setHitboxes(!s.hitboxes));
-    this.viewEl.append(el('span', 'ar-lbl', 'Show'), this.railsBtn, this.hitBtn);
+    this.combatBtn = button('chip small', 'Combat', '<b>Combat</b>Show what the fighters are doing: a pin on anchored ones (holding, firing, recovering), blocked (red), backing off (orange), going round (cyan arrows), their reserved slots (green) and the free and taken slots round each target.', () => s.setCombatDebug(!s.combatDebug));
+    this.viewEl.append(el('span', 'ar-lbl', 'Show'), this.railsBtn, this.hitBtn, this.combatBtn);
     this.root.append(el('div', 'ar-title sc', 'Battle Arena'), this.teamsEl, this.stanceEl, this.tabsEl, this.speciesEl, this.rosterEl, this.optsEl, this.ctrlEl, this.viewEl);
     this.build();
   }
@@ -193,6 +195,7 @@ export class ArenaPanel {
     this.placeBtn.classList.toggle('on', s.tool === 'arena');
     this.railsBtn.classList.toggle('on', s.climbDebug);
     this.hitBtn.classList.toggle('on', s.hitboxes);
+    this.combatBtn.classList.toggle('on', s.combatDebug);
     this.pauseBtn.classList.toggle('on', s.loop.paused);
     this.pauseBtn.textContent = s.loop.paused ? '▶' : '❚❚';
     for (const b of Array.from(this.ctrlEl.querySelectorAll<HTMLElement>('.ar-speed'))) b.classList.toggle('on', Number(b.dataset.v) === s.loop.speed && !s.loop.paused);

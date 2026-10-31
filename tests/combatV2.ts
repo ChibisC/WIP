@@ -290,7 +290,7 @@ function separateOnly(w: World, n: number): void {
   check('no snapping: holders keep to their hold point at most a brisk walk', p99 <= C2.holdFollow + 0.05, `99th percentile ${p99.toFixed(2)} × walking speed (${steps.length} ticks)`);
 }
 
-// ---------------------------------------------------------------- step 5: blocked → pause and sidestep
+// ---------------------------------------------------------------- step 5: blocked → back off and go round (v2.1)
 {
   const { w } = field(14);
   // a short rock with open ground on both sides: the attacker on one side, its (stunned) target on the other
@@ -314,8 +314,10 @@ function separateOnly(w: World, n: number): void {
     a.tgt = v.id;
     a.tk = 3;
     w.reindex();
-    let paused = 0;
+    // (combat v2.1: blocked, it backs off and goes round instead of the v2 pause and sidestep)
+    let backing = 0;
     let moved = 0;
+    let round = 0;
     let px = a.x;
     let py = a.y;
     let bitDuring = 0;
@@ -323,15 +325,16 @@ function separateOnly(w: World, n: number): void {
       v.stun = 1;
       const hp = v.hp;
       if ((a.repT ?? 0) !== 0) {
-        paused++;
+        backing++;
         moved += Math.hypot(a.x - px, a.y - py);
         if (v.hp < hp) bitDuring++;
       }
+      if ((a.garT ?? 0) > 0) round++;
       px = a.x;
       py = a.y;
     });
-    check('blocked: an attacker that cannot close in (a rock in the way) pauses instead of shoving', paused >= 0.5 * 20 * 0.9 && bitDuring === 0, `${(paused / 20).toFixed(2)} s paused`);
-    check('blocked: it sidesteps round its target while it waits', moved > 1, `${moved.toFixed(2)} mm moved in the pauses`);
+    check('blocked: an attacker that cannot close in (a rock in the way) backs off instead of shoving', backing >= BALANCE.combat21.backOffSec * 20 * 0.9 && bitDuring === 0, `${(backing / 20).toFixed(2)} s backing off`);
+    check('blocked: it steps back, then goes round', moved > 1 && round > 0, `${moved.toFixed(2)} mm moved backing off, ${(round / 20).toFixed(2)} s going round`);
   }
 }
 
