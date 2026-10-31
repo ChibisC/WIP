@@ -328,6 +328,11 @@ Units: hp, damage, attack interval, armor, speed, range, mass, grip.
 * fire ant workers fight in bouts: a series of 3–5 stings on one grip, pivoting round it, then jaws-only attacks; majors crush and swing the head; alarm is the gaster-flagging threat display;
 * a heavy hit (over a fifth of an ant's life) knocks it back a step;
 * deaths by cause: the sim records what last hurt an ant (`Ant.lastHit`: bite, venom, acid, crush, fall, drown, starve, decapitation; deterministic) and the render plays that death; corpses dry and sink.
+* realism rollout (overnight 2026-10-31, `docs/realism/OVERNIGHT-REPORT.md`): Lasius, Formica (and the Gene Thief's
+  Formica), Atta and Eciton are realism morphs on the same animation — formicine jaws as flat triangular blades under a
+  down-tilted face, Formica's sprayers rearing and recoiling by spray kind, Lasius trophallaxis and aphid drumming;
+  Atta castes fight differently (minims cling, medias bite and hold, soldiers bite and head-slam, majors a braced
+  scissor crush) and cut leaves with an arcing body; Eciton workers bite and hold, soldiers hook and hold.
 
 **Tools:**
 * `tools/battle.ts`: equal-cost matchups.

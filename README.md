@@ -173,6 +173,8 @@ npx vite-node tests/animation.ts                                    # animation 
 npx vite-node tools/anim-cost.ts -- 1040                            # the animation controller's CPU cost per frame for a crowd
 # animation lab (dev server): ?scene=animlab&clip=atk1 — attacks atk0–2, major0–1, flag, hits, deaths (by cause), fling, walk, stag_*;
 # &cdist= / &ctx= / &ctz= move the camera; tests/browser/anim_clips.py records clips (docs/realism/combat/)
+# any species in the lab: &ant=<morph>&big=<morph> (e.g. &ant=atta_media&big=atta_major); clip=spray (Formica's three sprayers), troph (Lasius)
+# realism sheets and clips per species: docs/realism/<species>/ (render only); the overnight report: docs/realism/OVERNIGHT-REPORT.md
 npx vite-node tests/fights.ts                                       # guard line, room in a fight, foes shared out, creatures apart, calm after a fight, marker orders (no attacking / gathering / climbing)
 npx vite-node tools/postfight.ts -- ant:lasius_soldier 20           # what fighters do once their foes are dead (zigzags, stop-start, states)
 npx vite-node tools/fightspread.ts -- ant:lasius_soldier 24 ant:formica_soldier 24   # how spread out a melee is, second by second
