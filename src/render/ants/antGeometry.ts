@@ -484,6 +484,8 @@ const SETA_LOOK: PartLook = { color: 0, rough: 0.42, coat: 0.12, sheen: 0 };
  * One erect seta (realism pass v2): a thin hair from `base` standing out along `out`, leaning back (and a
  * little to one side) and curving further back along its length, tapering to a fine point; `l` its length.
  */
+/** hair radius scale for the morph being built (Atta/Eciton geometry pass: a hair's thickness doesn't grow with the ant — the big castes' hairs read as pins) */
+let setaScale = 1; // det-ok: render geometry only, set per buildAnt call
 function seta(acc: Acc, rng: Rng, base: THREE.Vector3, out: THREE.Vector3, l: number, Lm: number, part: number, color: THREE.Color, xform?: THREE.Matrix4, lean?: THREE.Vector3): void {
   const lv = lean ? lean.clone().normalize() : new THREE.Vector3(-1, 0, 0);
   const dir = out.clone().normalize();
@@ -491,7 +493,7 @@ function seta(acc: Acc, rng: Rng, base: THREE.Vector3, out: THREE.Vector3, l: nu
   dir.z += rng.range(-0.22, 0.22);
   dir.normalize();
   const bend = lv.clone().add(new THREE.Vector3(0, -0.3, rng.range(-0.25, 0.25))).normalize().multiplyScalar(rng.range(0.1, 0.4));
-  const r0 = 0.0007 * Lm * rng.range(0.75, 1.2);
+  const r0 = 0.0007 * Lm * setaScale * rng.range(0.75, 1.2);
   const pts: THREE.Vector3[] = [];
   const rad: number[] = [];
   const N = 5;
@@ -529,6 +531,10 @@ function setaeOn(acc: Acc, rng: Rng, pts: number[], radial: number, nRings: numb
 export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const formicine = /^(lasius|formica|plagiaria)/.test(m.key);
   const atta = m.key.startsWith('atta_');
+  const eciton = m.key.startsWith('eciton_');
+  // (Atta and Eciton geometry pass, 2026-10-31: curved, tapering, elbowed antennae; shaped legs)
+  const curvy = m.real && (atta || eciton);
+  setaScale = curvy ? Math.min(1, 4.5 / m.L) * 0.8 : 1;
   if ((m as { builder?: string }).builder === 'hell') return buildHellAnt(m, detail, seed);
   const acc = new Acc();
   const rng = new Rng(seed * 101 + m.key.length * 7);
@@ -560,7 +566,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const mBottom = stanceY; // ventral line of the mesosoma
   // (overnight review round 3: on the formicines a bare neck showed between the sloping pronotum and the head —
   // the head sits right against the pronotum)
-  const neck = new THREE.Vector3(mL + (m.real && (formicine || atta) ? -0.012 : 0.012) * Lm, mBottom + mH * 0.62, 0);
+  const neck = new THREE.Vector3(mL + (m.real && (formicine || atta || eciton) ? -0.012 : 0.012) * Lm, mBottom + mH * 0.62, 0);
 
   // ---------- mesosoma ----------
   {
@@ -630,6 +636,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       };
       spine(mL * 0.86, 0.3, 0.7, new THREE.Vector3(0.45, 0.35, 0.85), sp.pro ?? 0);
       spine(mL * 0.55, 0.8, 0.45, new THREE.Vector3(-0.25, 0.95, 0.35), sp.meso ?? 0);
+      // (Atta geometry pass: a second, smaller mesonotal pair behind the first)
+      spine(mL * 0.4, 0.82, 0.4, new THREE.Vector3(-0.35, 0.9, 0.3), sp.meso2 ?? 0);
       spine(mL * 0.1, 0.85, 0.5, new THREE.Vector3(-0.75, 0.6, 0.25), sp.prop ?? 0);
     }
     if (m.wingScars) {
@@ -741,6 +749,12 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       // (realism: the head's own colour gradient, so a major's face darkens toward the jaws under it too)
       acc.piece(transformPts(pp, headM), ii, PART.HEAD, m.real ? (x, y, z) => headCol(x - neck.x, y - neck.y, z) : solid(look.head), look.head);
     }
+    if (curvy && hi) {
+      // (geometry pass: the loft's front pole read as a stray black dot in the face — a low clypeal plate in the
+      // face's own colour covers it)
+      const [pc, ic] = ellipsoid(new THREE.Vector3(hL * 0.965, headCY - hH * 0.06, 0), new THREE.Vector3(hL * 0.04, hH * 0.09, hW * 0.12), 12);
+      acc.piece(transformPts(pc, headM), ic, PART.HEAD, (x, y, z) => headCol(x - neck.x, y - neck.y, z), look.head);
+    }
     if (clypLobe) {
       // the labrum: a dark lip under the clypeus, between the closed jaws' bases
       const [pp, ii] = ellipsoid(new THREE.Vector3(hL * 0.965 + wzSpec * 0.16, headCY - hH * 0.2, 0), new THREE.Vector3(wzSpec * 0.26, hH * 0.06, wzSpec * 0.42), hi ? 12 : 6);
@@ -764,8 +778,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     if (m.head.occSpines) {
       for (const s of [-1, 1]) {
         // (Atta review round 1: on top of each occipital lobe, pointing up and back, slender and sharp)
-        const base = m.real && atta ? new THREE.Vector3(hL * 0.14, headCY + hH * 0.38, s * hW * 0.36) : new THREE.Vector3(hL * 0.12, headCY + hH * 0.3, s * hW * 0.32);
-        const tip = base.clone().add((m.real && atta ? new THREE.Vector3(-0.45, 0.8, s * 0.3) : new THREE.Vector3(-0.3, 0.6, s * 0.5)).normalize().multiplyScalar(m.head.occSpines * Lm));
+        const base = m.real && atta ? new THREE.Vector3(hL * 0.16, headCY + hH * 0.34, s * hW * 0.41) : new THREE.Vector3(hL * 0.12, headCY + hH * 0.3, s * hW * 0.32);
+        const tip = base.clone().add((m.real && atta ? new THREE.Vector3(-0.25, 0.75, s * 0.6) : new THREE.Vector3(-0.3, 0.6, s * 0.5)).normalize().multiplyScalar(m.head.occSpines * Lm));
         const [pp, ii] = tube([base, base.clone().lerp(tip, 0.5), tip], m.real && atta ? [0.016 * Lm, 0.008 * Lm, 0.0008 * Lm] : [0.02 * Lm, 0.01 * Lm, 0.001 * Lm], 5);
         acc.piece(transformPts(pp, headM), ii, PART.HEAD, solid(look.head), look.head);
       }
@@ -818,10 +832,16 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     }
     // (realism: near the front, close to the midline just behind the clypeus, as in Solenopsis — photo fire_07)
     // (formicines, review round 3: at the front of the frons just behind the clypeus, not on top of the head)
-    socketL = m.real && (formicine || atta) ? hp(hL * 0.86, headCY + hH * 0.1, -hW * (atta ? 0.14 : 0.17)) : m.real ? hp(hL * 0.84, headCY + hH * 0.24, -hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, -hW * 0.17);
-    socketR = m.real ? hp(hL * 0.84, headCY + hH * 0.24, hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, hW * 0.17);
-    mandPivL = hp(hL * 0.95, headCY - hH * 0.22, -hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
-    mandPivR = hp(hL * 0.95, headCY - hH * 0.22, hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
+    // (geometry pass, review: Atta's and Eciton's antennae read as rising from the top of the head — they insert low on
+    // the face, beside the clypeus and the jaw bases)
+    const sockAt = (s: number) => (m.real && atta ? hp(hL * 0.9, headCY - hH * 0.02, s * hW * 0.15) : m.real && eciton ? hp(hL * 0.92, headCY - hH * 0.04, s * hW * 0.15) : m.real && formicine ? hp(hL * 0.86, headCY + hH * 0.1, s * hW * 0.17) : m.real ? hp(hL * 0.84, headCY + hH * 0.24, s * hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, s * hW * 0.17));
+    // (2026-10-31: the right socket had kept the old position when the left one moved — lopsided antennae)
+    socketL = sockAt(-1);
+    socketR = sockAt(1);
+    // (Eciton geometry pass: the sickles insert at the head's front corners, wide apart — not together underneath)
+    const ecPiv = m.real && eciton && m.mandible.type === 'falcate';
+    mandPivL = ecPiv ? hp(hL * 0.93, headCY - hH * 0.12, -(hW / 2) * headWidthAt(0.93) * 0.78) : hp(hL * 0.95, headCY - hH * 0.22, -hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
+    mandPivR = ecPiv ? hp(hL * 0.93, headCY - hH * 0.12, (hW / 2) * headWidthAt(0.93) * 0.78) : hp(hL * 0.95, headCY - hH * 0.22, hW * 0.26 * headWidthAt(0.95) / Math.max(0.3, headWidthAt(0.95)));
     if (m.mandible.spec) {
       // jaws pass: hinged at the head's anterolateral corners, just under the front margin
       const wz = (hW / 2) * headWidthAt(0.95) * 0.84;
@@ -915,7 +935,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         const hook = Math.pow(t, 3.2);
         const inn = ecR ? -mandLen * 0.1 * Math.sin(t * Math.PI) + hook * inwardToMid * 0.8 * (1 + hk * 0.2) : (-mandLen * 0.06 * Math.sin(t * Math.PI) + hook * (inwardToMid * 1.15 + mandLen * 0.12)) * (1 + hk * 0.55);
         pts.push(new THREE.Vector3(fwd, ecR ? Math.sin(Math.min(1, t / 0.75) * Math.PI) * mandLen * 0.14 - ss(0.7, 1, t) * mandLen * 0.16 : -t * t * mandLen * 0.04 + Math.sin(t * Math.PI) * mandLen * 0.05, -s * inn));
-        rad.push(mandLen * ((ecR ? 0.046 : 0.05) * (1 - t) + 0.006));
+        rad.push(mandLen * ((ecR ? 0.058 : 0.05) * (1 - t) + 0.007));
       }
       [pp, ii] = tube(pts, rad, hi ? 8 : 5, true, true, 0.75);
       if (hi && m.mandible.barb) {
@@ -996,12 +1016,29 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // Scape: forward-outward-up; funiculus: forward-outward-down (elbowed).
     // (review round 2: a formicine's scapes rise up and back from sockets near the midline, then the funiculus bends
     // forward — they read as rods sticking out of the face's sides when set forward-outward)
-    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && atta ? new THREE.Vector3(-0.42, 0.6, 0.5 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
+    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && atta ? new THREE.Vector3(-0.62, 0.32, 0.72 * s).normalize() : m.real && eciton ? new THREE.Vector3(0.15, 0.5, 0.85 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
     const elbow = sock.clone().addScaledVector(scDir, scapeLen);
     elbows.push(elbow);
     const scMid = sock.clone().lerp(elbow, 0.5).add(new THREE.Vector3(0, scapeLen * 0.04, 0));
-    const [p1, i1, m1] = tube([sock, scMid, elbow], [antThick * 0.8, antThick * 0.95, antThick * 1.15], hi ? 7 : 5, true, true);
-    acc.piece(p1, i1, s < 0 ? PART.SCAPE_L : PART.SCAPE_R, grad(look.antenna, () => 0), look.antenna, 0, undefined, detOf(m1, REGION.ANTENNA));
+    if (curvy && hi) {
+      // a bowed scape, slim at the base and clubbed toward the elbow, out of a socket bulb (the torulus)
+      const bow = new THREE.Vector3().crossVectors(scDir, new THREE.Vector3(0, 0, s)).normalize();
+      if (bow.y < 0) bow.negate();
+      const pts: THREE.Vector3[] = [];
+      const rad: number[] = [];
+      for (let k = 0; k <= 7; k++) {
+        const t = k / 7;
+        pts.push(sock.clone().lerp(elbow, t).addScaledVector(bow, Math.sin(Math.PI * t) * scapeLen * 0.08));
+        rad.push(antThick * (0.5 + 0.3 * t + 0.35 * ss(0.7, 1, t)));
+      }
+      const [p1, i1, m1] = tube(pts, rad, 9, true, true);
+      acc.piece(p1, i1, s < 0 ? PART.SCAPE_L : PART.SCAPE_R, grad(look.antenna, () => 0), look.antenna, 0, undefined, detOf(m1, REGION.ANTENNA));
+      const [pb, ib] = ellipsoid(sock.clone(), new THREE.Vector3(antThick * 0.95, antThick * 0.7, antThick * 0.95), 8);
+      acc.piece(pb, ib, s < 0 ? PART.SCAPE_L : PART.SCAPE_R, grad(look.antenna, () => 0.3), look.antenna);
+    } else {
+      const [p1, i1, m1] = tube([sock, scMid, elbow], [antThick * 0.8, antThick * 0.95, antThick * 1.15], hi ? 7 : 5, true, true);
+      acc.piece(p1, i1, s < 0 ? PART.SCAPE_L : PART.SCAPE_R, grad(look.antenna, () => 0), look.antenna, 0, undefined, detOf(m1, REGION.ANTENNA));
+    }
     // (overnight spec 3.4: erect hairs standing out of the scapes are L. niger's field mark — L. platythorax has
     // few or none)
     if (hi && m.real && m.key.startsWith('lasius')) {
@@ -1035,17 +1072,18 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     if (hi && !(m.antenna as { smooth?: boolean }).smooth) {
       for (let i = 0; i < nseg; i++) {
         const segL = (lens[i] / tot) * funLen;
-        // slight downward curl toward the tip
-        const d = fDir.clone().add(new THREE.Vector3(0, -0.25 * (i / nseg), 0)).normalize();
+        // slight downward curl toward the tip (curvy: a smooth curl down and in along the whole funiculus)
+        const fi = i / nseg;
+        const d = curvy ? fDir.clone().add(new THREE.Vector3(0, -0.7 * Math.pow(fi, 1.3), -s * 0.3 * fi)).normalize() : fDir.clone().add(new THREE.Vector3(0, -0.25 * (i / nseg), 0)).normalize();
         const c = cur.clone().addScaledVector(d, segL * 0.5);
-        let r = antThick * (0.62 + 0.3 * (i / nseg)) * (1 + (m.antenna.bead ?? 0) * 0.45 * (i / nseg));
+        let r = curvy ? antThick * (0.48 + (atta ? 0.5 : 0.3) * Math.pow(fi, 1.4)) : antThick * (0.62 + 0.3 * (i / nseg)) * (1 + (m.antenna.bead ?? 0) * 0.45 * (i / nseg));
         if (clubN > 0 && i >= nseg - clubN) r = antThick * (1.25 + 0.15 * (i - (nseg - clubN)));
         const col = grad(look.antenna, () => ss(0.2, 1.0, i / nseg))(0, 0, 0).clone();
         if (m.real) {
           // realism v2: each segment a short cylinder widening toward its tip (obconical), close-set
           const nxt = cur.clone().addScaledVector(d, segL);
           const club = clubN > 0 && i >= nseg - clubN;
-          const rr = club ? [r * 0.8, r * 0.98, r, r * 0.9] : [r * 0.88, r * 0.95, r, r * 0.97];
+          const rr = club ? [r * 0.8, r * 0.98, r, r * 0.9] : curvy ? [r * 0.8, r * 0.97, r, r * 0.9] : [r * 0.88, r * 0.95, r, r * 0.97];
           // closed at both ends (an open end would show the background through the joint)
           const [pp, ii, fm] = tube([cur.clone().addScaledVector(d, -segL * 0.06), cur.clone().lerp(nxt, 0.25), cur.clone().lerp(nxt, 0.8), nxt.clone().addScaledVector(d, -segL * 0.02)], rr, 9, true, true);
           acc.piece(pp, ii, funPart, () => col, look.antenna, 0, undefined, detOf(fm, REGION.ANTENNA));
@@ -1134,17 +1172,20 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const N = hi ? (fine ? 72 : m.real ? 56 : 22) : fine ? 36 : 12;
     // realism v2: four overlapping tergites — each plate's front tucked under the margin of the one before
     // (the same places as the seams in the baked detail, recipes.ts FIRE_ANT gaster bands)
-    const plates = [0.44, 0.63, 0.79, 0.91];
+    // (Eciton geometry pass: the workers' gaster an elongate oval tapering to a point, the first plate long — it read
+    // as a ringed grub)
+    const ecG = m.real && eciton && !G.physo;
+    const plates = ecG ? [0.52, 0.76, 0.9] : [0.44, 0.63, 0.79, 0.91];
     const gl = look.gaster;
     const bands = G.segs ? Array.from({ length: G.segs - 1 }, (_, q) => 0.1 + (0.85 * (q + 1)) / G.segs!) : [0.27, 0.47, 0.64, 0.79, 0.9];
     const cy = gasterFront.y + gH * 0.08;
     for (let i = 0; i < N; i++) {
       const t = i / (N - 1);
       let e = Math.pow(Math.sin(Math.PI * Math.min(1, t * 0.85 + 0.03)), 0.62);
-      e *= 1 - 0.18 * ss(0.75, 1.0, t);
+      e *= ecG ? 1 - 0.32 * ss(0.55, 1.0, t) : 1 - 0.18 * ss(0.75, 1.0, t);
       let groove = 0;
       if (hi && m.real) {
-        for (const b of plates) if (t > b) groove += 0.028 * Math.exp(-(t - b) / 0.03);
+        for (const b of plates) if (t > b) groove += (ecG ? 0.014 : 0.028) * Math.exp(-(t - b) / 0.03);
       } else if (hi) for (const b of bands) groove += 0.035 * Math.exp(-((t - b) ** 2) / 0.0006);
       const close = Math.pow(Math.min(1, t / 0.07), 0.5);
       const front = 0.32 + 0.68 * close;
@@ -1335,7 +1376,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         const t = i / n;
         pts.push(trEnd.clone().lerp(knee, t));
         // realism v2: a narrow neck at the trochanter, the club, and the knee condyles
-        rad.push(m.real && hi ? th * (0.72 + 0.68 * Math.sin(Math.PI * Math.pow(t, 0.8)) - 0.12 * t + 0.14 * ss(0.86, 1, t)) : th * (0.88 + 0.26 * Math.sin(Math.PI * Math.pow(t, 0.8)) - 0.1 * t));
+        // (curvy: a clearly clubbed femur — slim at the trochanter, thickest past the middle, narrowing to the knee)
+        rad.push(curvy && hi ? th * (0.55 + 1.0 * Math.sin(Math.PI * Math.pow(t, 0.9)) - 0.1 * t + 0.12 * ss(0.88, 1, t)) : m.real && hi ? th * (0.72 + 0.68 * Math.sin(Math.PI * Math.pow(t, 0.8)) - 0.12 * t + 0.14 * ss(0.86, 1, t)) : th * (0.88 + 0.26 * Math.sin(Math.PI * Math.pow(t, 0.8)) - 0.1 * t));
       }
       const [pp, ii, fm] = tube(pts, rad, hi ? 8 : 5, true, true, m.real && hi ? 0.68 : 0.8);
       acc.piece(pp, ii, pid, lcol, ll, 0, undefined, detOf(fm, REGION.LEG));
@@ -1350,7 +1392,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         const t = i / nT;
         pts.push(knee.clone().lerp(ankle, t));
         // realism v2: thin just below the knee, widening to the apex (where the spur and tarsus attach)
-        rad.push(m.real && hi ? th * (0.56 + 0.2 * ss(0.0, 0.2, t) + 0.1 * t + 0.12 * ss(0.84, 1, t)) : th * (0.78 - 0.12 * t + 0.1 * ss(0.85, 1, t)));
+        rad.push(curvy && hi ? th * (0.42 + 0.14 * ss(0.0, 0.2, t) + 0.12 * t + 0.14 * ss(0.84, 1, t)) : m.real && hi ? th * (0.56 + 0.2 * ss(0.0, 0.2, t) + 0.1 * t + 0.12 * ss(0.84, 1, t)) : th * (0.78 - 0.12 * t + 0.1 * ss(0.85, 1, t)));
       }
       const [pp, ii, tm] = m.real && hi ? tube(pts, rad, 8, true, true, 0.82) : tube(pts, rad, hi ? 7 : 5);
       acc.piece(pp, ii, pid + 1, lcol, ll, 0, undefined, detOf(tm, REGION.LEG));
