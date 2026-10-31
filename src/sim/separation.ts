@@ -68,6 +68,7 @@ export function separationSystem(w: World, dt: number): void {
     tdx = new Float64Array(n * 2);
     tdy = new Float64Array(n * 2);
     cancel = new Uint8Array(n * 2);
+    under = new Uint8Array(n * 2);
   }
   // per-ant flags (bit 1 takes part, bit 2 movable, 16 fighting, 32 anchored (combat v2.1), 128 standing in a guard line; 64
   // set below: pushed by a fighting ally, a stronger cap) and the largest small radius and fighting length
@@ -81,6 +82,9 @@ export function separationSystem(w: World, dt: number): void {
     const anch = anchored(a);
     flag[i] = (takesPart(a) ? 1 : 0) | (!anch && movable(a) ? 2 : 0) | (fighting(a) ? 16 : 0) | (anch ? 32 : 0) | (inLine(a) ? 128 : 0);
     cancel[i] = 0;
+    // squeezing in under a creature to a slot under its body (small enough to go under): it passes between its
+    // teammates' legs, no push between them (combat v2.1)
+    under[i] = a.state === AS.Attack && a.tk === 4 && (a.rsv ?? 0) === a.tgt && a.gSlot >= 1 ? 1 : 0;
     // right of way (combat v2.1), and the way to its target (a teammate never pushes it that way)
     prio[i] = anch ? 3 : a.state === AS.Attack && (a.rsv ?? 0) !== 0 && a.rsv === a.tgt ? 2 : fighting(a) ? 1 : 0;
     tdx[i] = 0;
@@ -398,6 +402,7 @@ function pairCb(j: number): boolean {
   // from fighting allies round it.
   // (Guard lines keep their own spacing: an ally standing in a line keeps `GUARD.fightRoom` × the radii as before.)
   const ally = (po.team ?? po.colony) === P.team;
+  if (ally && (under[i] || under[j])) return false;
   // …and two enemies each holding someone else (separate duels) drift apart too, so neighbouring duels keep ground
   // between them; enemies closing in, or fighting each other, keep only their bodies' radii
   const sameFoe = ally && P.foeK !== 0 && foeKind(po) === P.foeK && foeId(po) === P.foeId;
@@ -478,6 +483,7 @@ let prio = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 let tdx = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let tdy = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let cancel = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
+let under = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 
 /** Radius (mm) above which an ant counts as big for the neighbour search. */
 const BIG = 2;

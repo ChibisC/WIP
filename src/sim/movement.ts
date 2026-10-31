@@ -139,6 +139,66 @@ export function steerTo(w: World, a: Ant, tx: number, ty: number, dt: number, sp
   return d;
 }
 
+/**
+ * Combat v2.1 (CHANGE_PLAN §17: avoidance, not pushing): heading `want` (rad) turned aside round the nearest teammate in
+ * the way (`fightersOnly`: only teammates in a fight) — within `look` mm ahead, inside the cone `combat21.avoidCone`, and close enough to the line to touch — away
+ * from the side it is on (dead ahead: by the ant's id), by up to `combat21.avoidTurn`, more the nearer it is.
+ */
+export function avoidHeading(w: World, a: Ant, want: number, look: number, fightersOnly = false): number {
+  const C21 = BALANCE.combat21;
+  const cw = dcos(want);
+  const sw = dsin(want);
+  const team = a.team ?? a.colony;
+  const S = BALANCE.separation;
+  const ra = casteOf(a.caste).length * S.widthOfLength * S.radiusOfWidth;
+  AV.best = Infinity;
+  AV.side = 0;
+  w.antsNear(a.space, a.x, a.y, look, (g, d2) => {
+    if (g === a || (g.team ?? g.colony) !== team || g.state === AS.Dead || g.state === AS.Flung || (g.ridePh ?? 0) >= 1 || d2 >= AV.best) return false;
+    if (fightersOnly && g.state !== AS.Attack && g.state !== AS.Grapple && g.state !== AS.Spray) return false;
+    const gx = g.x - a.x;
+    const gy = g.y - a.y;
+    const fwd = gx * cw + gy * sw;
+    if (fwd <= 0) return false;
+    const lat = -gx * sw + gy * cw;
+    if (Math.abs(datan2(lat, fwd)) > C21.avoidCone) return false;
+    const rg = casteOf(g.caste).length * S.widthOfLength * S.radiusOfWidth;
+    if (Math.abs(lat) > (ra + rg) * 1.4) return false;
+    AV.best = d2;
+    AV.side = lat > 1e-6 ? -1 : lat < -1e-6 ? 1 : a.id & 1 ? 1 : -1;
+    return false;
+  });
+  return AV.side === 0 ? want : want + AV.side * C21.avoidTurn * (1 - Math.sqrt(AV.best) / look);
+}
+const AV = { best: 0, side: 0 }; // det-ok: scratch for avoidHeading's callback
+
+/**
+ * Steer to a point like steerTo, but round teammates in the way instead of into them (avoidHeading, looking
+ * `combat21.avoidLook` × its length ahead); within 0.8 of its length of the point it goes straight. Returns the distance
+ * left.
+ */
+export function steerAvoid(w: World, a: Ant, tx: number, ty: number, dt: number, speedMul = 1, rate = 8): number {
+  const dx = tx - a.x;
+  const dy = ty - a.y;
+  const d = dhypot(dx, dy);
+  if (d < 0.05) {
+    a.v = 0;
+    return 0;
+  }
+  let want = datan2(dy, dx);
+  const L = casteOf(a.caste).length;
+  if (d > L * 0.8) want = avoidHeading(w, a, want, Math.min(d, BALANCE.combat21.avoidLook * L));
+  // (a turn while walking, not a pivot: at least half speed, and no tighter than a body length's radius, until it is
+  // close to the point)
+  const v0 = antSpeed(w, a) * speedMul;
+  const far = d > L * 1.5;
+  turnToward(a, want, dt, far ? Math.min(rate, Math.max(1.5, v0 / L)) : rate);
+  const facing = dcos(angleDiff(a.h, want));
+  const sp = v0 * Math.max(far ? 0.5 : 0.15, facing);
+  moveForward(w, a, Math.min(sp, d / Math.max(dt, 1e-3)), dt);
+  return d;
+}
+
 /** Follow a nest flow field; returns 'arrived' at a target cell, 'moving' or 'stuck'. */
 export function followNest(w: World, a: Ant, dist: Float32Array, dt: number, speedMul = 1): 'arrived' | 'moving' | 'stuck' {
   const flow = w.flowOf(a.space);
@@ -252,7 +312,7 @@ export function goHome(w: World, a: Ant, dt: number, speedMul = 1): boolean {
  * cached field (one per marker); it is rebuilt when the point moves.
  * Returns the remaining distance.
  */
-export function goToSurfacePoint(w: World, a: Ant, x: number, y: number, dt: number, key: string, speedMul = 1): number {
+export function goToSurfacePoint(w: World, a: Ant, x: number, y: number, dt: number, key: string, speedMul = 1, avoid = false): number {
   const d = dhypot(x - a.x, y - a.y);
   if (d < 30) {
     steerTo(w, a, x, y, dt, speedMul);
@@ -262,7 +322,9 @@ export function goToSurfacePoint(w: World, a: Ant, x: number, y: number, dt: num
   const stamp = Math.round(x / cell) * 10007 + Math.round(y / cell);
   const f = w.surfFlow.field(key, stamp, [{ x, y }]);
   if (w.surfFlow.dir(f, a.x, a.y, tmp)) {
-    const want = datan2(tmp.y, tmp.x) + dsin(w.time * 2 + a.id) * 0.12;
+    let want = datan2(tmp.y, tmp.x) + dsin(w.time * 2 + a.id) * 0.12;
+    // a squad on its way to a marker passes round fights instead of plowing through them (combat v2.1)
+    if (avoid) want = avoidHeading(w, a, want, BALANCE.combat21.avoidLook * casteOf(a.caste).length, true);
     turnToward(a, want, dt, 6);
     moveForward(w, a, antSpeed(w, a) * speedMul, dt);
   } else steerTo(w, a, x, y, dt, speedMul);

@@ -1261,7 +1261,7 @@ function marker(w: World, a: Ant, c: Colony, dt: number): void {
     if (a.space !== SURFACE) goToNestPoint(w, a, null, m.x, m.y, dt, 1);
     else if (holdGuardLine(w, a, c, a.marker, dt)) return;
     else if (d > radius) {
-      goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${a.marker}`);
+      goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${a.marker}`, 1, true);
       a.alarm = Math.max(a.alarm, 0.15);
     } else wander(w, a, dt, 1, { h: datan2(m.y - a.y, m.x - a.x), k: d / radius }, 0.6);
     return;
@@ -1306,7 +1306,7 @@ function marker(w: World, a: Ant, c: Colony, dt: number): void {
   // Fighters (and workers in a nest): mill around the marker, ready to fight.
   const d = dhypot(m.x - a.x, m.y - a.y);
   if (d > radius) {
-    if (a.space === SURFACE) goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${a.marker}`);
+    if (a.space === SURFACE) goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${a.marker}`, 1, true);
     else goToNestPoint(w, a, null, m.x, m.y, dt, 1);
     a.alarm = Math.max(a.alarm, 0.15);
     return;

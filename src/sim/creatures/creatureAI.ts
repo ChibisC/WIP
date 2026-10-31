@@ -1142,10 +1142,16 @@ function tarantula(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   const face = datan2(a.y - cr.y, a.x - cr.x);
   setState(cr, CS.Chase);
   if (d < L * 0.6 && cr.cd <= 0) {
-    // the lunge lands among the most ants in front (aimed: combat v2), else on its target
+    // the lunge lands among the most ants in front (aimed: combat v2), else on its target; it turns there first,
+    // between attacks, so the wind-up's area is where the lunge lands (combat v2.1: no snap, no turning after it)
     const aim = aimDir(w, cr, L * 0.6, 0.5);
-    const dir = aim.n >= 2 ? aim.dir : face;
-    cr.data.aimH = aim.n >= 2 || !onBody(cr, a) ? dir : cr.h;
+    const dir = aim.n >= 2 || !onBody(cr, a) ? (aim.n >= 2 ? aim.dir : face) : cr.h;
+    if (Math.abs(angleTo(cr.h, dir)) > 0.3) {
+      cr.v = 0;
+      turnCreature(cr, dir, dt, 2.5);
+      return;
+    }
+    cr.data.aimH = dir;
     setState(cr, CS.WindUp);
     telegraph(w, cr, cr.x + dcos(dir) * L * 0.5, cr.y + dsin(dir) * L * 0.5, L * 0.22, 0.8 / frenzy);
     // in the frenzy the lunge also throws everything round it: that area is shown too
@@ -1254,7 +1260,13 @@ function scolopendra(w: World, cr: Creature, k: CreatureKind, dt: number): void 
   const d = dhypot(a.x - cr.x, a.y - cr.y);
   setState(cr, CS.Chase);
   if (d < L * 0.35 && cr.cd <= 0) {
+    // it faces its prey first, between attacks (combat v2.1: the coil then strikes where it was telegraphed)
     const dir = onBody(cr, a) ? cr.h : datan2(a.y - cr.y, a.x - cr.x);
+    if (Math.abs(angleTo(cr.h, dir)) > 0.3) {
+      cr.v = 0;
+      turnCreature(cr, dir, dt, 3);
+      return;
+    }
     cr.data.aimH = dir;
     setState(cr, CS.Coil);
     telegraph(w, cr, cr.x + dcos(dir) * L * 0.3, cr.y + dsin(dir) * L * 0.3, 8, 0.7 / fast, { dir, half: 0.25 });

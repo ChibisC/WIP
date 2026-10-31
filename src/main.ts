@@ -150,6 +150,7 @@ function startGame(): void {
       if (q.get('spawn')) creatureDemo(s, q.get('spawn')!);
       if (q.get('climbdebug')) s.setClimbDebug(true);
       if (q.get('hitboxes')) s.setHitboxes(true);
+      if (q.get('combatdebug')) s.setCombatDebug(true);
       if (q.get('layout') || q.get('battle') || q.get('chamber') || q.get('spawn')) s.replayable = false; // test scenes edit the world directly
       // The simulation runs in a Web Worker (the screenshot harness steps it synchronously in this thread; ?worker=0 too).
       if (!q.get('shot') && q.get('worker') !== '0') s.useWorker();
@@ -213,6 +214,7 @@ function startGame(): void {
     // the climb debug overlay and hitboxes from the URL, as for the other games
     if (q.get('climbdebug')) s.setClimbDebug(true);
     if (q.get('hitboxes')) s.setHitboxes(true);
+    if (q.get('combatdebug')) s.setCombatDebug(true);
     if (!q.get('shot') && q.get('worker') !== '0') s.useWorker();
     if (q.get('shot')) {
       let vt = performance.now();

@@ -241,7 +241,11 @@ export const BALANCE = {
    * `windupTurn` rad/s; from the bite to the next wind-up its facing is locked. A shooter holding its range turns at
    * `shooterTurn`. A hold within `reachTol` × its length of the hold distance needs nothing; up to `stepMax` × its
    * length off (between bites) it takes one small step (`stepSpeed` × walking speed) and re-anchors; farther, the foe has
-   * left reach: the hold ends where it stands. Creatures: every bite has a wind-up of `crWindupSec` (turning at most
+   * left reach: the hold ends where it stands. A grip drags on the ant held: it walks at half speed (`holdSlowSec`
+   * renewed every tick). Two anchored ants planted too close (bodies overlapping, or holding different foes within
+   * `settlePS` × a personal space) are settled by one small step of at most `settleCap` × `stepMax` × its length, round its own foe;
+   * small steps are taken between bites — not in the wind-up, nor until `recoverSec` after a bite, the bite's gap taken
+   * as `settleWindow` × the caste's attack interval. Creatures: every bite has a wind-up of `crWindupSec` (turning at most
    * `crWindupTurn` rad/s) and a recovery of `crRecoverSec`, still and facing locked.
    *
    * **No shoving.** Closing in, an ant is blocked when a teammate stands in its forward cone (`blockCone` rad each side)
@@ -256,10 +260,14 @@ export const BALANCE = {
     windupSec: 0.25,
     windupTurn: 3,
     shooterTurn: 2,
-    reachTol: 0.2,
+    reachTol: 0.35,
     stepMax: 0.6,
     stepSpeed: 0.8,
     recoverSec: 0.3,
+    holdSlowSec: 0.1,
+    settleCap: 0.5,
+    settlePS: 0,
+    settleWindow: 0.85,
     crWindupSec: 0.3,
     crWindupTurn: 3,
     crRecoverSec: 0.3,
