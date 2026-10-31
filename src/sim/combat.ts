@@ -1,4 +1,5 @@
 import { World } from './world';
+import { casteOnBite, casteOnKill, rageMul, tauntOf } from './casteAbilities';
 import { Ant, AS, Carry, Colony, Creature, HIT, POSE, SURFACE, nestSpace } from './types';
 import type { Projectile } from './types';
 import { casteOf, DamageType, isKing } from './species';
@@ -96,10 +97,12 @@ export function damageAnt(w: World, t: Ant, amount: number, type: DamageType, sr
       if (kc) kc.stats.kills++;
     }
     killAnt(w, t);
+    // an army-ant soldier's rage grows with its kills (casteAbilities.ts)
+    if (src && 'caste' in src) casteOnKill(w, src);
   } else if (src && t.state !== AS.Grapple && t.state !== AS.Flung && t.state !== AS.Bridge && t.state !== AS.Plug && (t.xing ?? 0) === 0 && t.state !== AS.Hunt && t.state !== AS.Snap && t.state !== AS.Hold && t.state !== AS.Climb && t.id !== c?.queen && !(cd.acid?.kind === 'ramp' && t.tgt && t.state === AS.Attack) && !('caste' in src && !isEnemyAnt(t, src))) {
     // Fight back (combat v2: an ant busy with its own foe in reach keeps it — no flicker between targets).
-    if (t.state === AS.Attack && t.tgt && (t.tk === 3 || t.tk === 4) && targetInReach(w, t)) {
-      // keeps its target
+    if ((t.state === AS.Attack && t.tgt && (t.tk === 3 || t.tk === 4) && targetInReach(w, t)) || (tauntOf(w, t) && t.tgt === t.tauntBy)) {
+      // keeps its target (or the leafcutter major taunting it)
     } else if ('caste' in src) {
       t.tgt = src.id;
       t.tk = 3;
@@ -156,6 +159,7 @@ export function damageCreature(w: World, cr: Creature, amount: number, type: Dam
     }
     w.events.emit({ t: 'death', x: cr.x, y: cr.y, space: cr.space, kind: 'creature', id: cr.id, colony: -1, what: cr.kind });
     creatureHooks.onKilled?.(w, cr);
+    if (src) casteOnKill(w, src);
   }
 }
 
@@ -724,7 +728,8 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     if (Number.isNaN(ang)) return waitForSlot(w, a, c, t.x, t.y, d - reach, C2.personalSpace * L, dt, null);
     const far = Math.abs(angleDiff(ang, datan2(a.y - o.y, a.x - o.x)));
     // the only free slot is round the far side: a nearer foe with room first (overflow: switch, then go round)
-    if (a.rsv !== o.id && far > Math.PI / 2) {
+    // (a taunted ant stays on the leafcutter major taunting it: casteAbilities.ts)
+    if (a.rsv !== o.id && far > Math.PI / 2 && !(tauntOf(w, a) && a.tgt === a.tauntBy)) {
       const n = underOrder(c, a, 'noAttack') ? null : findTarget(w, a, c, aggroRadius(w, a, c));
       if (n && !(n.id === a.tgt && n.kind === a.tk)) {
         releaseSlot(w, a);
@@ -1096,7 +1101,7 @@ function waitForSlot(w: World, a: Ant, c: Colony, tx: number, ty: number, gap: n
   a.waitT = (a.waitT ?? 0) + dt;
   if (due) {
     // a foe with room (findTarget skips full ones unless focus-firing, which may keep this one)
-    const t = underOrder(c, a, 'noAttack') ? null : findTarget(w, a, c, aggroRadius(w, a, c));
+    const t = underOrder(c, a, 'noAttack') || (tauntOf(w, a) && a.tgt === a.tauntBy) ? null : findTarget(w, a, c, aggroRadius(w, a, c));
     if (t && (t.id !== a.tgt || t.kind !== a.tk)) {
       a.tgt = t.id;
       a.tk = t.kind;
@@ -1118,8 +1123,15 @@ function grappledBy(w: World, a: Ant): boolean {
   return held;
 }
 
+/** Does this bite sting? Every bite for most stingers; every `every`-th for the army ants (user 2026-10-31). */
+function stingNow(a: Ant, st: { every?: number }): boolean {
+  if (!st.every) return true;
+  a.stingN = (a.stingN ?? 0) + 1;
+  return a.stingN % st.every === 0;
+}
+
 export function biteMul(w: World, a: Ant, c: Colony): number {
-  return (a.power || 1) * (c.player ? w.s.settings.statMul : w.s.settings.enemyStatMul) * (surging(a) ? BALANCE.surge.damageMul : 1);
+  return (a.power || 1) * (c.player ? w.s.settings.statMul : w.s.settings.enemyStatMul) * (surging(a) ? BALANCE.surge.damageMul : 1) * rageMul(w, a);
 }
 
 /** Seconds to the next bite: the caste's interval, a little jitter, faster in the gold surge and the fire-ant frenzy. */
@@ -1195,13 +1207,15 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
         if (g) damageAnt(w, o, g, 'pure', a);
       }
       w.events.emit({ t: 'bite', x: o.x, y: o.y, space: o.space, strength: cd.bite / 10, by: a.caste, on: 'ant', gold: surging(a) || undefined });
-      if (cd.sting) {
+      casteOnBite(w, a);
+      if (cd.sting && stingNow(a, cd.sting)) {
         applyVenom(w, o, cd.sting.dps * (a.power || 1), cd.sting.duration, cd.sting.maxStacks);
         w.events.emit({ t: 'sting', x: o.x, y: o.y, space: o.space, by: a.caste });
       }
     }
-    // stinging ants curl the gaster under while they hold on (no more pivoting round the bite)
-    if (cd.sting) a.pose = POSE.STING;
+    // stinging ants curl the gaster under while they hold on (no more pivoting round the bite); army ants sting
+    // only now and then (the render shows it on the stinging bites)
+    if (cd.sting && !cd.sting.every) a.pose = POSE.STING;
     return true;
   }
   const cr = w.creatureById.get(a.gId);
@@ -1247,12 +1261,13 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       if (g) damageCreature(w, cr, g, 'pure', a);
     }
     w.events.emit({ t: 'bite', x: a.x, y: a.y, space: a.space, strength: cd.bite / 10, by: a.caste, on: 'creature', gold: surging(a) || undefined });
-    if (cd.sting) {
+    casteOnBite(w, a);
+    if (cd.sting && stingNow(a, cd.sting)) {
       applyVenom(w, cr, cd.sting.dps * (a.power || 1), cd.sting.duration, cd.sting.maxStacks * 3);
       w.events.emit({ t: 'sting', x: a.x, y: a.y, space: a.space, by: a.caste });
     }
   }
-  if (cd.sting) a.pose = POSE.STING;
+  if (cd.sting && !cd.sting.every) a.pose = POSE.STING;
   return true;
 }
 

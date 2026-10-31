@@ -1,4 +1,5 @@
 import { separationSystem } from './separation';
+import { casteAbilitySystem } from './casteAbilities';
 import { EventBus } from '../core/events';
 import { Rng } from '../core/rng';
 import { MapStyle, Terrain, defaultTerrainParams, mapTerrainParams } from '../world/terrain';
@@ -115,6 +116,8 @@ export function registerSystems(w: World): void {
     // battle arena: tallies, charge targets, the round (sim/arena.ts)
     { name: 'arena', fn: arenaSystem },
     { name: 'brood', fn: broodSystem },
+    // caste abilities: taunt timers, rage fading and the rage aura (casteAbilities.ts)
+    { name: 'casteAbility', fn: casteAbilitySystem },
     { name: 'ants', fn: antSystem },
     { name: 'food', fn: foodSystem },
     { name: 'projectiles', fn: projectileSystem },

@@ -112,7 +112,8 @@ export interface AntMorph {
   real?: boolean;
   /** walk cycle: leg lift and duty factor (defaults .24 / .55; army ants step high and fast) */
   gait?: { lift: number; duty: number };
-  legs: { hind: number; thick: number };
+  /** `splay`: how far out the feet stand (× the default; leafcutters and army ants .8 — compact, as EotU draws them) */
+  legs: { hind: number; thick: number; splay?: number };
   look: {
     head: PartLook;
     meso: PartLook;
@@ -335,13 +336,15 @@ const attaMedia: AntMorph = {
   eyes: { size: 0.18, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.3, club: 0, thick: 0.009 },
   mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.7 },
+  // (user 2026-10-31: leafcutter and army-ant legs too long and the walk too wide-legged — more compact, like EotU:
+  // every caste's legs about 15 % shorter (army ants 13 %) and the feet in under the body, `splay` .8)
   // (geometry pass, the photos: paired pronotal spines, two mesonotal pairs, propodeal spines; user 2026-10-31:
   // every Atta caste's spines about 40 % shorter, they were too long)
   meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.075, meso: 0.05, meso2: 0.025, prop: 0.06 } },
   waist: { nodes: 2, len: 0.1, nodeH: 0.08 },
   // (review round 2: a small gaster for the body, not a big round ball)
   gaster: { len: 0.22, width: 0.17, height: 0.14, sting: true },
-  legs: { hind: 1.2, thick: 0.0125 },
+  legs: { hind: 1.0, thick: 0.0125, splay: 0.8 },
   look: attaLook,
   hair: 0.2,
   setae: attaSetae,
@@ -360,7 +363,7 @@ const attaMinim: AntMorph = {
   mandible: { type: 'triangular', len: 0.33, teeth: 8, width: 0.55, spec: ATTA_MINIM_JAW, open: 0.7 },
   meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.035, meso: 0.028, prop: 0.035 } },
   gaster: { len: 0.3, width: 0.21, height: 0.17, sting: true },
-  legs: { hind: 1.05, thick: 0.0175 },
+  legs: { hind: 0.92, thick: 0.0175, splay: 0.8 },
   // paler, orange-tan
   look: { ...attaLook, head: L(0xb06a38, 0.62, 0.06, 0.12, 0x9a5a2c), meso: L(0xb06a38, 0.66, 0.05, 0.12), waist: L(0xa86234, 0.66, 0.05, 0.1), gaster: L(0x9e5a30, 0.58, 0.1, 0.18), legs: L(0xb8743e, 0.6, 0.06, 0.1, 0xc2804a), antenna: L(0xb8743e, 0.62, 0.05, 0.08) },
   setae: { ...attaSetae, head: 18, meso: 16, gaster: 30 },
@@ -378,7 +381,7 @@ const attaSoldier: AntMorph = {
   mandible: { type: 'massive', len: 0.38, teeth: 8, width: 0.68, spec: ATTA_SOLDIER_JAW, open: 0.6 },
   meso: { len: 0.28, width: 0.12, height: 0.14, spines: { pro: 0.06, meso: 0.04, meso2: 0.02, prop: 0.05 } },
   gaster: { len: 0.25, width: 0.18, height: 0.15, sting: true },
-  legs: { hind: 1.1, thick: 0.015 },
+  legs: { hind: 0.94, thick: 0.015, splay: 0.8 },
   look: { ...attaLook, head: L(0x7a3418, 0.48, 0.2, 0.08, 0x5a2410) },
 };
 
@@ -395,7 +398,7 @@ const attaMajor: AntMorph = {
   meso: { len: 0.25, width: 0.11, height: 0.12, spines: { pro: 0.055, meso: 0.04, meso2: 0.018, prop: 0.045 } },
   waist: { nodes: 2, len: 0.08, nodeH: 0.07 },
   gaster: { len: 0.22, width: 0.16, height: 0.13, sting: true },
-  legs: { hind: 1.0, thick: 0.0135 },
+  legs: { hind: 0.86, thick: 0.0135, splay: 0.8 },
   // the head deep chestnut, shining; the frontal woolly tufts as a dense patch of longer red hairs on the head
   // (review round 1: mirror-glossy read as chocolate — a satin shine over the smooth cuticle)
   // (review rounds 1–2: any gloss read as plastic or chocolate — the user's major photos are matte and sculptured; the
@@ -420,7 +423,7 @@ const attaQueen: AntMorph = {
   // (review round 1: huge and rounded, not a sausage)
   // (review round 3: globular, nearly as tall as long)
   gaster: { len: 0.4, width: 0.36, height: 0.34, sting: true },
-  legs: { hind: 0.7, thick: 0.0115 },
+  legs: { hind: 0.64, thick: 0.0115, splay: 0.8 },
   // dark chestnut, golden hairs, a satin gaster (Naskrecki's queen; the caste series)
   look: { ...attaLook, head: L(0x5a2a16, 0.55, 0.12, 0.14, 0x48200f), meso: L(0x5e2c18, 0.52, 0.14, 0.14), waist: L(0x5a2a16, 0.55, 0.1, 0.12), gaster: L(0x52261a, 0.42, 0.22, 0.3, 0x3e1c10), legs: L(0x6a3018, 0.56, 0.08, 0.1, 0x7a3a1e) },
   setae: { ...attaSetae, color: 0xc89a58, head: 40, meso: 50, gaster: 120, len: [0.006, 0.022] },
@@ -555,7 +558,7 @@ const ecitonMinor: AntMorph = {
   // (review rounds 1–2: a ringed grub — fewer visible plates, a duller rust)
   gaster: { len: 0.3, width: 0.17, height: 0.145, sting: true, segs: 2 },
   // (user note 2026-10-31: the legs were too long — the photos' hind leg is about the body's length)
-  legs: { hind: 1.15, thick: 0.014 },
+  legs: { hind: 1.0, thick: 0.014, splay: 0.8 },
   look: EC_DARK,
   hair: 0.45,
   // (overnight pass: sparse, fine golden hairs, denser on the gaster and legs)
@@ -576,7 +579,7 @@ const ecitonSubmajor: AntMorph = {
   mandible: { type: 'falcate', len: 0.5, teeth: 0, width: 0.16, hook: 0.15 },
   meso: { len: 0.37, width: 0.105, height: 0.12, smooth: true },
   gaster: { len: 0.29, width: 0.165, height: 0.14, sting: true, segs: 2 },
-  legs: { hind: 1.3, thick: 0.0135 },
+  legs: { hind: 1.12, thick: 0.0135, splay: 0.8 },
   look: { ...EC_DARK, head: L(0x222226, 0.34, 0.3, 0.04, 0x34302e) },
   stance: 0.25,
 };
@@ -592,7 +595,7 @@ const ecitonMedia: AntMorph = {
   mandible: { type: 'falcate', len: 0.62, teeth: 0, width: 0.26, hook: 0.35 },
   meso: { len: 0.34, width: 0.11, height: 0.125, smooth: true },
   gaster: { len: 0.28, width: 0.165, height: 0.14, sting: true, segs: 2 },
-  legs: { hind: 1.2, thick: 0.0135 },
+  legs: { hind: 1.04, thick: 0.0135, splay: 0.8 },
   // (the package's #B09C64 head, a little darker: the game's sun lifted it to white on the surface)
   look: { ...EC_TAN, head: L(0x9e8854, 0.42, 0.14, 0.05, 0x6e5430), mandible: L(0x1a1410, 0.36, 0.32, 0, 0x0a0806) },
   stance: 0.21,
@@ -611,7 +614,7 @@ const ecitonMajor: AntMorph = {
   mandible: { type: 'falcate', len: 1.55, teeth: 0, width: 0.2, hook: 0.9, barb: 1 },
   meso: { len: 0.3, width: 0.1, height: 0.115, smooth: true },
   gaster: { len: 0.27, width: 0.16, height: 0.13, sting: true, segs: 2 },
-  legs: { hind: 1.1, thick: 0.0128 },
+  legs: { hind: 0.95, thick: 0.0128, splay: 0.8 },
   look: {
     ...EC_TAN,
     head: L(0xc0aa7a, 0.42, 0.16, 0.08, 0xa0602e), // pale tan vertex → orange-brown frons and clypeus (frontMix)
@@ -642,7 +645,7 @@ const ecitonQueen: AntMorph = {
   meso: { len: 0.21, width: 0.12, height: 0.13, smooth: true },
   waist: { nodes: 1, len: 0.07, scale: false, nodeH: 0.15, thick: 2.6, horns: 0.085 },
   gaster: { len: 0.55, width: 0.27, height: 0.28, sting: true, tergites: { n: 5, front: 0.6 }, physo: 1 },
-  legs: { hind: 0.62, thick: 0.014 },
+  legs: { hind: 0.6, thick: 0.014, splay: 0.8 },
   look: {
     ...EC_DARK,
     head: L(0x7a3220, 0.3, 0.45, 0.05, 0x8a3c24),

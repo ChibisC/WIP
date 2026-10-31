@@ -60,6 +60,15 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
   const n = Math.max(0, v.atkN ?? 0);
   const av = (((v.atkVar ?? 0) % 3) + 3) % 3;
   const hs = (k: number, j: number) => hash01(seed * 1000 + k, j);
+  // caste abilities (sim/casteAbilities.ts): the leafcutter major's taunt display, the army-ant soldier's rage
+  if (v.special === 1) {
+    out.variant = ATK.TAUNT;
+    return out;
+  }
+  if (v.special === 2) {
+    out.variant = ATK.RAGE;
+    return out;
+  }
   if (morph.startsWith('fire_major')) {
     if (!v.atkSeq) out.variant = [ATK.CRUSH, ATK.HEAD_SWING, ATK.LUNGE][av];
     else {
@@ -78,6 +87,12 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
   // (overnight spec 3.2, Eciton) workers bite and hold (group pinning); the porter and media lunge with their
   // sickles; the soldier hooks its prey and holds it (the barbs don't let go)
   if (morph.startsWith('eciton_')) {
+    // (user 2026-10-31) army ants sting every third bite: that bite is a quick sting — the gaster cocked and whipped
+    // under the body
+    if (v.stingNext) {
+      out.variant = ATK.QUICK_STING;
+      return out;
+    }
     out.variant = morph === 'eciton_major' ? [ATK.CLAMP, ATK.CLAMP, ATK.LUNGE][av] : morph === 'eciton_minor' ? [ATK.CLAMP, ATK.LUNGE, ATK.CLAMP][av] : [ATK.LUNGE, ATK.CLAMP, ATK.LUNGE][av];
     return out;
   }

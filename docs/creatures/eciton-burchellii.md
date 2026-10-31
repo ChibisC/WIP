@@ -92,3 +92,10 @@ and curl back over the front of the gaster, glossy dark (#4e2014) with orange-br
 (`gaster.tergites`), each near black (#24120c) with a soft orange-brown (#9a4e24) on its upper front fading back into the
 dark, a dark seam where it overlaps the next, patches of hair pits, the tip orange-brown (recipe `ECITON_QUEEN`). Surface: semi-glossy over a shallow microreticulation, sparse fine golden hairs, denser on the
 gaster and legs (recipe `ECITON`, src/render/bake/recipes.ts).
+
+**Legs in the game** (user 2026-10-31: more compact, like EotU): hind legs worker 1.0, porter 1.12, media 1.04, soldier
+.95, queen .6 of L (were 1.15 / 1.3 / 1.2 / 1.1 / .62), the feet 20 % further in under the body (`legs.splay` .8).
+
+**Stings and rage** (DESIGN §3.11b): army ants sting every third bite, each sting a little stronger than a fire ant's
+(fire ants still deal about twice the venom); the soldier's rage from kills (+9 % a kill, up to +45 %, for it and
+nestmates within 3 lengths).

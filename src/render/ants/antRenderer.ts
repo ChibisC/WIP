@@ -96,6 +96,12 @@ export interface AntView {
    *  the render picks the attacks itself (the game) or plays `atkVar`'s (the lab's single-attack clips) */
   atkN?: number;
   atkSeq?: boolean;
+  /** caste abilities (sim/casteAbilities.ts): 1 the leafcutter major's taunt display, 2 an army-ant soldier's rage
+   *  pulse (played as this attack cycle); the rage glow 0..1 (a red flush); this cycle's bite stings (army ants
+   *  sting only every third bite) */
+  special?: number;
+  rageGlow?: number;
+  stingNext?: boolean;
   /** dead: what killed it (sim HIT.*: the render picks the death), and a corpse's drying 0..1 (its gloss fades) */
   cause?: number;
   dry?: number;
@@ -884,7 +890,7 @@ export class AntRenderer {
       at.a.setXYZW(n, s.phase, s.amp, hy, hp);
       at.b.setXYZW(n, mo, act * 0.3 + (v.antennaPitch > 0.5 ? 0.6 : 0) + (M ? M.antSpread : 0), s.ap, s.wave);
       // pose id + 0.99 × its weight; the hit flash
-      at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, M ? M.flash : 0);
+      at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, M ? Math.max(M.flash, v.rageGlow ?? 0) : 0);
       // colour variation −1..1, plus 4 × the Termant tint code (decoded in the shader); the planted feet's stance sweep
       at.d.setXYZW(n, M ? M.deathLeg : s.death, M ? M.Dh : 0, Math.max(-1, Math.min(1, v.colorVar)) + 4 * (v.tint ?? 0), s.pph);
       // gold × ripple direction, the planted feet's turn per stance, exhausted, hair sway

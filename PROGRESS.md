@@ -1021,3 +1021,25 @@ User note: "maybe a factor that makes them move so much is that they all have to
 - **Balance** (user decision: keep it). Creatures that wasted their time walking now bite: in 60 s (seeds 4, 7, 11), six ground beetles v 45 workers kill all 45 (was 21–31) and keep 30–37 % health (18–27 %); the stag beetle v 40 soldiers kills 14–16 (was 0–3: the bug above); the wolf-spider mother kills 38–40 (21–34) but keeps only 44–47 % health (66–75 %). Single small creatures still die in 4–9 s; the tarantula, the mantises and the giant centipede lose more health than before.
 - **Performance**: `tools/climb-stress.ts -- 30 400` 12.9 ms a tick (`main` 13.9 the same hour).
 - **Tests**: `npm test` 680 pass; `tests/combatV21.ts`'s one-sided split is checked at 6 s (the beetle stops a few mm sooner, on this seed the split comes half a second later; seeds 1–9 at 10 s: 14–18 holding, 5–7 on the far side, `main` 4–14).
+
+## 2026-10-31 — Species animation review; caste abilities; army-ant stings; compact leafcutters and army ants
+User request: an animation review page for the four species like the fire ant's; animations in the fire ant's style
+keeping each species' traits; leafcutter majors only taunt and army-ant soldiers only rage, as in Empires of the
+Undergrowth; leafcutters have no sting, army ants sting a little harder than fire ants but less often, so fire ants
+stay worth it; then: leafcutter (and army-ant) legs too long and their walk too wide, more compact like EotU.
+- **Merged `main`** (combat v2.1, melee reach) into `feature/realism` first, with the handoff notes' resolutions (merge
+  commit 74f8b02; climb data regenerated with the sculpted stag beetle in main's mounting format). 595 tests passed.
+- **Taunt and rage** (`sim/casteAbilities.ts`, `BALANCE.casteAbility`, DESIGN §3.11b): EotU's numbers where its wiki
+  gives them (taunt 30 % a bite above 30 % health, cooldown 10 s, 4–6 s → 5 s; rage capped at +45 %). One change from
+  EotU, as the user asked: rage grows with kills, not hits.
+- **Stings**: army ants every third bite, each a little stronger than a fire ant's; tests: in 30 s on a dummy a fire
+  ant 37 stings and 363 venom, an army ant 12 stings and 184 venom. No leafcutter caste has a sting.
+- **Render**: `ATK.TAUNT` (rearing threat display, stridulating), `ATK.RAGE` (sickle snaps, head toss) and the rage
+  flush; army ants play the quick sting on their stinging bites only; the taunt's ring (`combatFx`).
+- **Compact legs** (user; EotU draws them close in): leafcutter legs about 15 % shorter, army ants about 13 %, and
+  the feet 20 % further in under the body (`legs.splay` .8), standing and walking.
+- **Lab clips**: `taunt`, `rage`, `sting`, `lineup` (`castes=`: every caste walking side by side, at real sizes).
+- **Tests**: `tests/casteAbilities.ts` (24 checks, in `npm test`): no leafcutter stings; every third army-ant bite
+  stings; fire ants still deal more venom; only the major taunts, with its chance, reach, cooldown and health floor;
+  taunted ants stay on it; creatures are taunted; only the soldier rages, up to +45 %, nestmates near it only, fading;
+  determinism.

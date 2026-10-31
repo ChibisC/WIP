@@ -44,7 +44,11 @@ export interface CasteDef {
   /** body mass used for knockback/drag */
   mass: number;
   /** venom stacks applied per sting (fire ants, Eciton, Atta workers weakly) */
-  sting?: { dps: number; duration: number; maxStacks: number };
+  sting?: { dps: number; duration: number; maxStacks: number; /** sting only every n-th bite (Eciton: 3; default every bite) */ every?: number };
+  /** leafcutter major (user 2026-10-31, after EotU): the automatic taunt (casteAbilities.ts) */
+  taunt?: boolean;
+  /** army-ant soldier (user 2026-10-31, after EotU): rage from kills, for itself and nestmates nearby (casteAbilities.ts) */
+  rage?: boolean;
   /**
    * Formic acid (formicines). `opener`: a short spray as the ant closes in,
    * then it bites; `lob`: arcing mortar shots from long range (splash at
@@ -205,7 +209,7 @@ export const CASTES: Record<string, CasteDef> = {
   }),
   atta_major: C({
     id: 'atta_major', species: 'atta', name: 'Major', role: 'major', morph: 'atta_major', length: 14, speed: 12, hp: 220, bite: 16, attackInterval: 1.4,
-    armor: 4, carry: 6, grip: 7, mass: 12, forage: true, dig: false, nurse: false,
+    armor: 4, carry: 6, grip: 7, mass: 12, forage: true, dig: false, nurse: false, taunt: true,
     cost: 45, devTime: 2, pop: 3, cocoon: false, fact: 'Atta majors have mandibles sharp enough to slice skin; they guard trails and the nest.',
   }),
   atta_queen: C({
@@ -241,25 +245,25 @@ export const CASTES: Record<string, CasteDef> = {
   eciton_minor: C({
     id: 'eciton_minor', species: 'eciton', name: 'Worker', role: 'worker', morph: 'eciton_minor', length: 4, speed: 30, hp: 14, bite: 2.0, attackInterval: 0.8,
     armor: 0, carry: 2, grip: 2, mass: 1, forage: true, dig: false, nurse: true,
-    sting: { dps: 0.8, duration: 4, maxStacks: 6 },
+    sting: { dps: 1.4, duration: 6, maxStacks: 6, every: 3 },
     cost: 5, devTime: 0.9, pop: 1, cocoon: true, fact: 'Eciton workers have eyes reduced to a single facet and find their way by pheromones. They plug potholes in the trail with their own bodies and link up into living bridges.',
   }),
   eciton_submajor: C({
     id: 'eciton_submajor', species: 'eciton', name: 'Porter', role: 'worker', morph: 'eciton_submajor', length: 6.5, speed: 33, hp: 24, bite: 3.2, attackInterval: 0.9,
     armor: 0, carry: 5, grip: 3, mass: 2, forage: true, dig: false, nurse: false, porter: true,
-    sting: { dps: 0.96, duration: 4, maxStacks: 6 },
+    sting: { dps: 1.6, duration: 6, maxStacks: 6, every: 3 },
     cost: 9, devTime: 1.1, pop: 1, cocoon: true, fact: 'Porters are only about 3 % of an Eciton colony, but their long legs leave room to carry big prey slung under the body, and they lead the teams that carry the biggest items.',
   }),
   eciton_media: C({
     id: 'eciton_media', species: 'eciton', name: 'Media', role: 'soldier', morph: 'eciton_media', length: 8, speed: 27, hp: 40, bite: 5.5, attackInterval: 1.0,
     armor: 1, carry: 2, grip: 4, mass: 3.2, forage: true, dig: false, nurse: false,
-    sting: { dps: 1.2, duration: 5, maxStacks: 4 },
+    sting: { dps: 1.8, duration: 6, maxStacks: 6, every: 3 },
     cost: 14, devTime: 1.25, pop: 1.2, cocoon: true, fact: 'Medias are the mid-sized army-ant workers: they escort the raid columns and help carry large prey in teams.',
   }),
   eciton_major: C({
     id: 'eciton_major', species: 'eciton', name: 'Soldier', role: 'major', morph: 'eciton_major', length: 11, speed: 24, hp: 70, bite: 11, attackInterval: 1.1,
-    armor: 2, carry: 0, grip: 6, mass: 7, forage: false, dig: false, nurse: false, hook: ECITON.hook,
-    sting: { dps: 1.5, duration: 5, maxStacks: 4 },
+    armor: 2, carry: 0, grip: 6, mass: 7, forage: false, dig: false, nurse: false, hook: ECITON.hook, rage: true,
+    sting: { dps: 2.0, duration: 6, maxStacks: 6, every: 3 },
     cost: 30, devTime: 1.6, pop: 2, cocoon: true, fact: 'Eciton soldiers serve almost only as defence: they stand along the raid columns with their long hooked mandibles open and never carry food.',
   }),
   eciton_queen: C({

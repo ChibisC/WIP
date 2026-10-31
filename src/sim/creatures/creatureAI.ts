@@ -1,4 +1,5 @@
 import { World } from '../world';
+import { tauntOf } from '../casteAbilities';
 import { HF_CREATURE } from '../../world/surfaceLayout';
 import { Ant, AS, Creature, SURFACE } from '../types';
 import { casteOf } from '../species';
@@ -193,6 +194,9 @@ function walkTo(w: World, cr: Creature, k: CreatureKind, tx: number, ty: number,
 
 /** Live ants within r of a point in the creature's space; the best by score (lower is better). */
 function pickAnt(w: World, cr: Creature, x: number, y: number, r: number, score?: (a: Ant, d2: number) => number): Ant | null {
+  // taunted by a leafcutter major (casteAbilities.ts): that one
+  const tn = tauntOf(w, cr);
+  if (tn && !riding(tn)) return tn;
   let best: Ant | null = null;
   let bs = Infinity;
   const kind = creatureKind(cr.kind);
@@ -317,6 +321,8 @@ function decayThreat(w: World, cr: Creature, dt: number): void {
  * reach (then the program picks as before: the nearest, or a cluster).
  */
 function threatPick(w: World, cr: Creature, reach: number): Ant | null {
+  const tn = tauntOf(w, cr);
+  if (tn && !riding(tn)) return tn;
   const t = cr.thr;
   if (!t || t.length === 0) return null;
   const team = cr.faction >= 0 ? w.teamOf(cr.faction) : -1;
@@ -527,6 +533,9 @@ const RP = { a: null as Ant | null, arc: false, thr: 0, off: 0, t: null as Ant |
  * through ants that are only in its way). Null when no ant is in reach: then the program may walk to one.
  */
 function reachPick(w: World, cr: Creature, k: CreatureKind, engagedOnly = false): Ant | null {
+  // taunted: only the taunting major counts, once it is in reach (until then the programs walk to it: threatPick)
+  const tn = tauntOf(w, cr);
+  if (tn && !riding(tn)) return inReach(cr, k, tn) ? tn : null;
   const R = reachOf(k);
   const b = creatureBody(cr);
   const team = cr.faction >= 0 ? w.teamOf(cr.faction) : -1;

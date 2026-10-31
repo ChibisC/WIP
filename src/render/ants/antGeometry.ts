@@ -1368,9 +1368,12 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const trEnd = coxaEnd.clone().addScaledVector(new THREE.Vector3(outward * 0.4, -0.2, side * 0.9).normalize(), tL);
     // foot rest targets
     let foot: THREE.Vector3;
-    if (pair === 0) foot = new THREE.Vector3(coxaX[0] + 0.26 * Lm * legFactor, 0, side * 0.4 * Lm * legFactor);
-    else if (pair === 1) foot = new THREE.Vector3(coxaX[1] - 0.03 * Lm, 0, side * 0.56 * Lm * legFactor);
-    else foot = new THREE.Vector3(coxaX[2] - 0.42 * Lm * legFactor, 0, side * 0.46 * Lm * legFactor);
+    // (user 2026-10-31: leafcutters and army ants more compact, like EotU — `legs.splay` brings the feet in under the
+    // body, the walk's stance with them)
+    const spl = m.legs.splay ?? 1;
+    if (pair === 0) foot = new THREE.Vector3(coxaX[0] + 0.26 * Lm * legFactor, 0, side * 0.4 * Lm * legFactor * spl);
+    else if (pair === 1) foot = new THREE.Vector3(coxaX[1] - 0.03 * Lm, 0, side * 0.56 * Lm * legFactor * spl);
+    else foot = new THREE.Vector3(coxaX[2] - 0.42 * Lm * legFactor, 0, side * 0.46 * Lm * legFactor * spl);
     const hdir = foot.clone().sub(trEnd).setY(0).normalize();
     const tarsDir = hdir.clone().multiplyScalar(Math.cos(0.4)).add(new THREE.Vector3(0, -Math.sin(0.4), 0)).normalize();
     // Place the ankle so femur+tibia are ~88% extended along the target direction:
