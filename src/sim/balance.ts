@@ -293,6 +293,13 @@ export const BALANCE = {
    * ahead, to the nearest free slot on that side. The side: more free slots, minus `allyWeight` × the teammates on the
    * way; ties by its id. Walking in a fight or to a marker, it steers round teammates in its way: `avoidLook` × its
    * length ahead, in a cone of `avoidCone` rad, turning up to `avoidTurn` rad.
+   *
+   * **Waiting** (2026-10-31, user note: dozens of ants circling one fight in a spiral): every slot on its foe taken, an ant
+   * waits in a loose crowd anywhere from just inside the ring to `waitBand` × its length beyond it, standing where it
+   * stopped; two waiting teammates keep `waitSpace` × the larger one's length apart (less than a personal space: before,
+   * ants waiting on the same foe kept only their bodies' room and stood shoulder to shoulder round an exact ring), a
+   * waiting ant and a fighting teammate a personal space. A full foe is waited on only when no foe in sight has room, or
+   * when a marker is on it; outnumbering the foes only drops the crowd penalty.
    */
   combat21: {
     windupSec: 0.25,
@@ -322,6 +329,8 @@ export const BALANCE = {
     avoidLook: 2,
     avoidCone: 0.7,
     avoidTurn: 0.9,
+    waitBand: 3,
+    waitSpace: 1,
   },
   /**
    * Mounting (EotU, CHANGE_PLAN §16 step 8): only ants and termites mount. A caste is small (mounts large and huge
