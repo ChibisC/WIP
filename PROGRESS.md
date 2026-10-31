@@ -797,3 +797,24 @@ User spec: project doc `claude/realism/04-spec-ant-attack-and-death-animations.m
 - CPU: the motion controller costs 0.79 ms a frame for 1,040 ants and 2.8 ms for 4,160 (`tools/anim-cost.ts`); the GPU side needs a device.
 - Round-2 review page https://claude.ai/artifact/9jbgV66mmYctu2Jy6HmsPM: 20 clips (round 1 beside round 2 where there was one), six acceptance checks and the rollout decision, stored in its `ratings` collection (B1–B20, E1–E6, D2). The game artifact is republished from this branch (version 19).
 - Waiting for the user's ratings before rollout.
+
+## 2026-10-31 — Overnight run (claude/realism/06-spec-overnight-atta-eciton.md): Lasius + Formica finished first, then Atta, then Eciton
+User order (02:35): finish *Lasius niger* and *Formica rufa* first, then Atta, then Eciton; runs unattended.
+
+**Decisions made without the user**
+- The spec's "other agent" working on Formica/Lasius is this same session (no other session was running): the
+  enhancement layer is applied directly on top of the batch-1 work, in the same files, rather than in separate
+  modules.
+- Reference photos stay study-only (the user's standing rule overrides the spec's "photo-vs-render sheets saved to
+  docs/"): the repo gets **render-only** sheets (`docs/realism/<species>/compare-<unit>.png`: side, top, front, 3/4 in
+  studio / overcast / sunny, macro head, macro jaws open); the photo-vs-render sheets and the blind-review pairs stay
+  in the scratchpad and go to the user in chat as files.
+- The fire queen's eyes follow the batch-1 eye rule (larger eyes set into the head, the user's "eyes bulge" note):
+  her hash was re-baselined; the satin/grey eye material is formicine-only.
+- Blind review: a fresh agent per round, shown photo/render pairs as unlabeled A/B panels in a seeded random
+  order, scores each panel 1–10 and flags "plastic"; the render's score is read from the key.
+
+**Blind review scores (render panel; photos scored 7–9)**
+| Round | F1 side | F2 field 3/4 | F3 head | F4 jaws open | F5 top | F6 face | L1 3/4 | L2 head | L3 side | L4 field |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 3 | 3 | 3 | 3 | 3 | 3 | 4 | 3 | 4 | 4 |
