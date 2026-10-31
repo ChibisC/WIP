@@ -68,6 +68,7 @@ check('two worlds fed the same votes have the same state hash', hashState(a) ===
 
 if (failed) {
   console.log(`\n${failed} speed-vote test(s) FAILED`);
-  process.exit(1);
+  // (as the other tests: no Node types in the build's typecheck)
+  (globalThis as unknown as { process: { exit: (code: number) => never } }).process.exit(1);
 }
 console.log('\nall speed-vote tests passed');
