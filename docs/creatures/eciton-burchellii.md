@@ -78,10 +78,17 @@ claude/army-ants/02-reference-eciton.md. Shapes as numbers (fractions of L):
 | Porter (submajor) | 6.5 mm | .22 / .20 | black | .045 | long narrow slightly curved sickles (.5) | 1.75 |
 | Media | 8 mm | .25 / .25 | pale yellow-tan darkening toward the mouth | .04 | thick curved toothless sickles (.62) | 1.5 |
 | Soldier (major) | 11 mm | .26 / .27, rounded-square (review: about the mesosoma's size, not an egg) | whitish tan on the vertex shading to orange-brown over the frons and clypeus, smooth | pin eyes .05 | 1.45 head lengths: slender black sickles rising from the front corners, sweeping up then hooking down and in, tips free and apart, a small barb near each tip | 1.4 |
-| Queen | 22 mm | .18 / .24, broad and flat | dark red-brown | tiny | short (.32) | .8 |
+| Queen | 22 mm | .14 / .14, small and round (user photos 2026-10-31; was .18 / .24 broad and flat) | red-brown, glossy | tiny | small curved sickles (.5 head lengths) | .62, sturdy, the tibiae and tarsi orange-red |
 
 Colours (sRGB): workers' head and mesosoma a dull black (#1e1c1c / #261c18), legs dark rust (#4a2416) a little paler at
 the tarsi (not blond), gasters a dull rust-amber (#9a5428; the saturated orange read as a grub in review); medias and
-soldiers tan-rust bodies (#6e2e1a, #8a4a28); the queen #5a2418 with dark gaster plates (#3e1c10) and narrow pale
-membranes (#8a5a3a). Surface: semi-glossy over a shallow microreticulation, sparse fine golden hairs, denser on the
+soldiers tan-rust bodies (#6e2e1a, #8a4a28).
+
+**Queen, rebuilt from the user's photos (2026-10-31: Naskrecki's and Kronauer's side views)**: a small round
+red-brown head (#7a3220) with long antennae; a slim, elongate, glossy mesosoma (.21 L long, .12 wide, #6a2a1a); one
+big block of a petiole (.07 L, node .15 L high, 2.6 × as broad) carrying a pair of broad hooked lobes (.085 L) that rise
+and curl back over the front of the gaster, glossy dark (#4e2014) with orange-brown tips (#b0602c); a huge glossy gaster,
+.55 of her length (.27 wide, .28 high), a long cylinder tapering to a blunt tip, of five overlapping tergites
+(`gaster.tergites`), each near black (#24120c) with a soft orange-brown (#9a4e24) on its upper front fading back into the
+dark, a dark seam where it overlaps the next, patches of hair pits, the tip orange-brown (recipe `ECITON_QUEEN`). Surface: semi-glossy over a shallow microreticulation, sparse fine golden hairs, denser on the
 gaster and legs (recipe `ECITON`, src/render/bake/recipes.ts).

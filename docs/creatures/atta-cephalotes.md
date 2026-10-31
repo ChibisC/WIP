@@ -65,21 +65,29 @@ smooth and shining, without A. sexdens's hexagonal microsculpture).
 `attaMandible` in `src/render/anatomy/mandibleSpecs.ts`): broad, flat triangular blades hanging down in front of the
 face, not hooks. The external margin evenly convex from the hinge at the head's front corner to a long curved apical
 tooth; the masticatory margin long and straight from the basal angle (u .24) to the apex, a saw of nearly even, sharp,
-near-black teeth (minim 8, media and soldier 10, major 11); the blade red-brown like the head, darkening to black
-along the toothed margin. Closed, the pair overlaps below the clypeus in a V, the apical teeth crossing; open, two
-toothed blades. Larger castes: broader, thicker, more steeply hanging blades.
+near-black teeth; the blade red-brown like the head, darkening to black along the toothed margin. Closed, the pair
+meets below the clypeus in a V, the apical teeth crossing; open, two toothed blades. Larger castes: broader, thicker,
+more steeply hanging blades. (User, later the same day: the minim's jaws look good — every caste now has its spacing:
+8 teeth and the same small gap between the closed blades, so the saw shows, reach 1.12. The queen's were too long:
+her own spec, more curved, so the blades are about 60 % of the media-shaped jaw on her broad head.)
 
 | Unit | Teeth | Blade width at the basal angle (of the length) | Thickness at the hinge | Hang (hinge / middle / apex, rad, on top of the head's tilt) | Heading (hinge → apex) |
 |---|---|---|---|---|---|
 | Minim | 8 | .36 | .14 | −.15 / −.35 / −.65 | .22 → 1.22 |
-| Media | 10 | .39 | .16 | −.25 / −.45 / −.80 | .20 → 1.25 |
-| Soldier | 10 | .39 | .17 | −.30 / −.50 / −.85 | .30 → 1.30 |
-| Major | 11 | .38 | .16 | −.30 / −.50 / −.82 | .42 → 1.37 |
+| Media | 8 | .39 | .16 | −.25 / −.45 / −.80 | .20 → 1.25 |
+| Soldier | 8 | .39 | .17 | −.30 / −.50 / −.85 | .42 → 1.42 (user: a little long — about 12 % shorter) |
+| Major | 8 | .38 | .16 | −.30 / −.50 / −.82 | .42 → 1.37 |
+| Queen | 8 | .38 | .17 | −.20 / −.40 / −.70 | .50 → 1.65 |
 
 **Spines** (user, 2026-10-31: some were too long): about 40 % shorter than the geometry pass, as fractions of L —
 pronotal / mesonotal / second mesonotal / propodeal, occipital: minim .035 / .028 / – / .035, .035; media .075 / .05 /
-.025 / .06, .08; soldier .06 / .04 / .02 / .05, .045; major .055 / .04 / .018 / .045, .03 (the table above is the
-overnight pass's first estimate).
+.025 / .06, .055 (the user: the media's head spines a little smaller); soldier .06 / .04 / .02 / .05, .045; major .055 / .04 / .018 / .045, .03 (the table above is the
+overnight pass's first estimate). The head (occipital) spines are one cone each (user): broad where they grow out of
+the lobe (base radius .34 of the length, sunk into the head) and tapering evenly to the point — not a rod with a cone.
+
+**Minim skin** (user: fix it a little): recipe `ATTA_MINIM` — the media's tubercles, waves and pits had the same size in
+mm on a body a quarter as long (bubble wrap on the 2 mm minim); the same sculpture at 0.45 the size, less mottled,
+shallower (normal strength .45) with lighter cavities.
 
 **Colour and surface** (photo samples, approximate sRGB): media and soldier rusty orange-brown (#8a4424–#9a5030),
 matte and finely rough with tubercles and short hooked golden hairs; minim paler orange-tan (#b07040); major head

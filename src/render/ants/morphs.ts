@@ -4,7 +4,7 @@
  * noted; colours are linear-ish sRGB hex.
  */
 import type { MandibleSpec } from '../anatomy/mandible';
-import { ECITON_MINOR_JAW, ATTA_MAJOR_JAW, ATTA_MEDIA_JAW, ATTA_MINIM_JAW, ATTA_SOLDIER_JAW, FIRE_MAJOR, FIRE_WORKER, FORMICA_WORKER, LASIUS_WORKER } from '../anatomy/mandibleSpecs';
+import { ECITON_MINOR_JAW, ATTA_QUEEN_JAW, ATTA_MAJOR_JAW, ATTA_MEDIA_JAW, ATTA_MINIM_JAW, ATTA_SOLDIER_JAW, FIRE_MAJOR, FIRE_WORKER, FORMICA_WORKER, LASIUS_WORKER } from '../anatomy/mandibleSpecs';
 
 export type HeadShape = 'round' | 'heart' | 'rect' | 'tri' | 'square';
 export type MandibleType = 'triangular' | 'falcate' | 'massive' | 'small';
@@ -79,6 +79,9 @@ export interface AntMorph {
     subTooth?: number;
     /** lateral thickness multiplier of the waist (army-ant queen: one very broad petiole) */
     thick?: number;
+    /** army-ant queen (user photos): a pair of curved horns on top of the petiole, rising and hooking forward —
+     * length (fraction of L); dark at the base, `color2` at the tips */
+    horns?: number;
   };
   gaster: {
     len: number;
@@ -92,6 +95,9 @@ export interface AntMorph {
     stripeW?: number;
     /** physogastric gaster: the `swell` instance value grows it far more than a full crop does */
     physo?: number;
+    /** army-ant queen (user photos 2026-10-31): `n` overlapping tergites over a long cylinder, each dark with its
+     * front `front` (fraction of the plate) in `color2`, the very tip in `color2` too */
+    tergites?: { n: number; front: number };
     /** formicines: the acidopore's hair ring this much bigger (a sprayer's nozzle shows; default 1) */
     pore?: number;
     /** dark gut contents showing through a pale abdomen (Termants): colour */
@@ -325,7 +331,7 @@ const attaSetae = { color: 0xb88a50, head: 130, meso: 120, gaster: 160, len: [0.
 const attaMedia: AntMorph = {
   key: 'atta_media',
   L: 8,
-  head: { len: 0.3, width: 0.3, height: 0.19, shape: 'heart', notch: 0.22, occSpines: 0.08, groove: 0.14 },
+  head: { len: 0.3, width: 0.3, height: 0.19, shape: 'heart', notch: 0.22, occSpines: 0.055, groove: 0.14 },
   eyes: { size: 0.18, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.3, club: 0, thick: 0.009 },
   mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.7 },
@@ -351,7 +357,7 @@ const attaMinim: AntMorph = {
   // the notch shallower at this size, small occipital spines)
   head: { len: 0.27, width: 0.27, height: 0.18, shape: 'heart', notch: 0.12, occSpines: 0.035, groove: 0.08 },
   eyes: { size: 0.16, pos: 0.6, height: 0.2, ocelli: false },
-  mandible: { type: 'triangular', len: 0.33, teeth: 6, width: 0.55, spec: ATTA_MINIM_JAW, open: 0.7 },
+  mandible: { type: 'triangular', len: 0.33, teeth: 8, width: 0.55, spec: ATTA_MINIM_JAW, open: 0.7 },
   meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.035, meso: 0.028, prop: 0.035 } },
   gaster: { len: 0.3, width: 0.21, height: 0.17, sting: true },
   legs: { hind: 1.05, thick: 0.0175 },
@@ -407,7 +413,7 @@ const attaQueen: AntMorph = {
   head: { len: 0.25, width: 0.31, height: 0.17, shape: 'heart', notch: 0.14, groove: 0.1 },
   eyes: { size: 0.2, pos: 0.6, height: 0.2, ocelli: true },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.2, club: 0, thick: 0.0062 },
-  mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.6 },
+  mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_QUEEN_JAW, open: 0.6 },
   // (review round 2: a massive mesosoma, much taller than the head)
   meso: { len: 0.28, width: 0.18, height: 0.22, queen: true },
   waist: { nodes: 2, len: 0.06, nodeH: 0.06 },
@@ -618,35 +624,36 @@ const ecitonMajor: AntMorph = {
   stance: 0.19,
 };
 
-/** Queen (dichthadiigyne): wingless, one very broad petiole, a long plated gaster that swells with eggs (`swell`). */
+/**
+ * Queen (dichthadiigyne), rebuilt from the user's photos (2026-10-31): a small round reddish-brown head with long
+ * antennae and small sickle jaws, no eyes to speak of; a slim, elongate, glossy mesosoma; one big block of a
+ * petiole carrying two curved horns that rise and hook forward, orange at the tips; and a huge glossy gaster, more
+ * than half her length — a long cylinder of five overlapping dark plates, each orange-brown at its front, tapering
+ * to a blunt tip; sturdy legs, the tibiae and tarsi orange-red.
+ */
 const ecitonQueen: AntMorph = {
   ...ecitonMinor,
   key: 'eciton_queen',
   L: 22,
-  // (review round 1: dichthadiiform — a broad flattened head and mesosoma; short jaws, not a wire loop)
-  head: { len: 0.19, width: 0.3, height: 0.13, shape: 'square', frontMix: 0.3 },
-  eyes: { size: 0.02, pos: 0.5, height: 0.25, ocelli: false, single: true },
-  antenna: { segments: 12, scape: 0.6, funiculus: 0.8, club: 0, thick: 0.007 },
-  mandible: { type: 'falcate', len: 0.32, teeth: 0, width: 0.3, hook: 0.15 },
-  // (review: one broad fused piece, not three bulbs)
-  meso: { len: 0.24, width: 0.25, height: 0.13, smooth: true },
-  // (review round 2: the petiole massive, almost as broad as the gaster)
-  waist: { nodes: 1, len: 0.06, scale: false, nodeH: 0.09, thick: 3.2 },
-  // (review round 1: a huge, broad, rounded dark gaster, glossy plates — not a striped spindle)
-  // (geometry pass: five broad dark plates with narrow membranes between — seven pale bands read as candy stripes)
-  gaster: { len: 0.58, width: 0.36, height: 0.27, sting: true, segs: 5, stripes: 5, stripeW: 0.07, physo: 1 },
-  legs: { hind: 0.8, thick: 0.0095 },
+  head: { len: 0.14, width: 0.14, height: 0.13, shape: 'round' },
+  eyes: { size: 0.012, pos: 0.5, height: 0.25, ocelli: false, single: true },
+  antenna: { segments: 12, scape: 0.6, funiculus: 0.8, club: 0, thick: 0.008 },
+  mandible: { type: 'falcate', len: 0.5, teeth: 0, width: 0.3, hook: 0.2 },
+  meso: { len: 0.21, width: 0.12, height: 0.13, smooth: true },
+  waist: { nodes: 1, len: 0.07, scale: false, nodeH: 0.15, thick: 2.6, horns: 0.085 },
+  gaster: { len: 0.55, width: 0.27, height: 0.28, sting: true, tergites: { n: 5, front: 0.6 }, physo: 1 },
+  legs: { hind: 0.62, thick: 0.014 },
   look: {
     ...EC_DARK,
-    head: L(0x5a2418, 0.4, 0.26, 0.05, 0x7a3a24),
-    meso: L(0x5a2418, 0.42, 0.22, 0.05, 0x7a3a24),
-    waist: L(0x5a2418, 0.42, 0.2, 0.05, 0x7a3a24),
-    gaster: L(0x3e1c10, 0.4, 0.26, 0.06, 0x6a4a34),
-    legs: L(0x6e2e1a, 0.45, 0.14, 0.06, 0x9a5a3a),
-    mandible: L(0x2a1612, 0.36, 0.32, 0, 0x120a08),
+    head: L(0x7a3220, 0.3, 0.45, 0.05, 0x8a3c24),
+    meso: L(0x6a2a1a, 0.3, 0.45, 0.05, 0x7a3420),
+    waist: L(0x4e2014, 0.3, 0.45, 0.05, 0xb0602c),
+    gaster: L(0x24120c, 0.26, 0.55, 0.05, 0x9a4e24),
+    legs: L(0x6a2a18, 0.36, 0.25, 0.05, 0xb0562a),
+    mandible: L(0x3a1810, 0.32, 0.36, 0, 0x140a08),
   },
   hair: 0.3,
-  stance: 0.14,
+  stance: 0.16,
   gait: { lift: 0.25, duty: 0.6 },
   wingScars: false,
 };

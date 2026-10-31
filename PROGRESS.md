@@ -961,3 +961,16 @@ User note: "maybe a factor that makes them move so much is that they all have to
 - **Balance** (user decision: keep it). Creatures that wasted their time walking now bite: in 60 s (seeds 4, 7, 11), six ground beetles v 45 workers kill all 45 (was 21–31) and keep 30–37 % health (18–27 %); the stag beetle v 40 soldiers kills 14–16 (was 0–3: the bug above); the wolf-spider mother kills 38–40 (21–34) but keeps only 44–47 % health (66–75 %). Single small creatures still die in 4–9 s; the tarantula, the mantises and the giant centipede lose more health than before.
 - **Performance**: `tools/climb-stress.ts -- 30 400` 12.9 ms a tick (`main` 13.9 the same hour).
 - **Tests**: `npm test` 680 pass; `tests/combatV21.ts`'s one-sided split is checked at 6 s (the beetle stops a few mm sooner, on this seed the split comes half a second later; seeds 1–9 at 10 s: 14–18 holding, 5–7 on the far side, `main` 4–14).
+
+### 2026-10-31 (afternoon, 2) — Eciton queen rebuilt; Atta queen jaws, head-spine cones, jaw spacing, minim skin (user notes and photos)
+- **Eciton queen** (the user's photos: Naskrecki, Kronauer): a small round head, a slim elongate mesosoma, one big
+  petiole block with a pair of broad hooked lobes curling back over the gaster (orange-brown tips), a huge glossy
+  cylinder of a gaster (.55 L) of five overlapping dark plates, each orange-brown on its upper front, no pale stripes;
+  sturdy legs with orange-red tibiae and tarsi. New: `gaster.tergites`, `waist.horns`, recipe `ECITON_QUEEN`.
+- **Atta**: the queen's jaws were too long (her own, more curved spec, about 60 % of the length); the head spines one
+  cone each (broad base sunk into the lobe, tapering evenly); every caste's jaws with the minim's spacing (the user
+  liked it: 8 teeth, the same small gap when closed); the media's head spines smaller (.055 L); the minim's skin
+  sculpture at its own scale (recipe `ATTA_MINIM`: it looked like bubble wrap).
+- Then (user): the soldier's jaws a little shorter (set more inward, about 12 %); the minim's skin relief softer too
+  (normal strength .45, cavities lighter): fine grain instead of lumps.
+- Morph hashes: only `atta_*` changed (Eciton morphs are not in the hash guard).

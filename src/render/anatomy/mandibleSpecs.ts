@@ -388,14 +388,17 @@ export function attaMandible(o: { teeth: number; color: MandibleSpec['color']; r
   };
 }
 
-/** Minim (garden worker): small, fine blades, orange-brown like the body, 8 teeth. */
+/** Minim (garden worker): small, fine blades, orange-brown like the body, 8 teeth. (user 2026-10-31: the minim's jaws look
+ * good — every caste now has its tooth spacing, 8 teeth, and its small gap between the closed blades, reach 1.12) */
 export const ATTA_MINIM_JAW = attaMandible({ teeth: 8, color: { base: 0x8a4a22, mid: 0x7a401c, tip: 0x2e1408, teeth: 0x140a04, dark: [0.7, 1.0] }, broad: 1.0, thick: 1.1, pitch: [-0.15, -0.35, -0.65], heading: 0.22, curve: 1.0, toothK: 0.9, reach: 1.12, edgeDark: 0.7 });
 /** Media (the leaf cutter): the classic toothed shears, red-brown with black saw edges, 10 teeth. */
-export const ATTA_MEDIA_JAW = attaMandible({ teeth: 10, color: { base: 0x5e2a14, mid: 0x50220f, tip: 0x1c0a05, teeth: 0x0a0504, dark: [0.62, 1.0] }, broad: 1.08, thick: 1.25, pitch: [-0.25, -0.45, -0.8], heading: 0.2, curve: 1.05, toothK: 1.1, reach: 1.16 });
-/** Soldier: heavier, darker blades hanging more steeply. */
-export const ATTA_SOLDIER_JAW = attaMandible({ teeth: 10, color: { base: 0x4a1c0e, mid: 0x3e170b, tip: 0x140705, teeth: 0x080403, dark: [0.58, 1.0] }, broad: 1.08, thick: 1.3, pitch: [-0.3, -0.5, -0.85], heading: 0.3, curve: 1.0, toothK: 1.15, reach: 1.16 });
+export const ATTA_MEDIA_JAW = attaMandible({ teeth: 8, color: { base: 0x5e2a14, mid: 0x50220f, tip: 0x1c0a05, teeth: 0x0a0504, dark: [0.62, 1.0] }, broad: 1.08, thick: 1.25, pitch: [-0.25, -0.45, -0.8], heading: 0.2, curve: 1.05, toothK: 1.0, reach: 1.12 });
+/** Soldier: heavier, darker blades hanging more steeply (user 2026-10-31: a little long — set more inward, about 12 % shorter). */
+export const ATTA_SOLDIER_JAW = attaMandible({ teeth: 8, color: { base: 0x4a1c0e, mid: 0x3e170b, tip: 0x140705, teeth: 0x080403, dark: [0.58, 1.0] }, broad: 1.08, thick: 1.3, pitch: [-0.3, -0.5, -0.85], heading: 0.42, curve: 1.0, toothK: 1.0, reach: 1.12 });
+/** Queen (user 2026-10-31: her jaws were too long): shorter, more curved blades closing under her broad face. */
+export const ATTA_QUEEN_JAW = attaMandible({ teeth: 8, color: { base: 0x4e2010, mid: 0x401a0c, tip: 0x160806, teeth: 0x0a0504, dark: [0.6, 1.0] }, broad: 1.05, thick: 1.3, pitch: [-0.2, -0.4, -0.7], heading: 0.5, curve: 1.15, toothK: 1.0, reach: 1.12 });
 /** Major: massive broad blades, dark red-brown, hanging down in front of the huge head, 11 teeth. */
-export const ATTA_MAJOR_JAW = attaMandible({ teeth: 11, color: { base: 0x4e1e0e, mid: 0x40180b, tip: 0x160806, teeth: 0x0a0504, dark: [0.6, 1.0] }, broad: 1.05, thick: 1.2, pitch: [-0.3, -0.5, -0.82], heading: 0.42, curve: 0.95, toothK: 1.2, reach: 1.16 });
+export const ATTA_MAJOR_JAW = attaMandible({ teeth: 8, color: { base: 0x4e1e0e, mid: 0x40180b, tip: 0x160806, teeth: 0x0a0504, dark: [0.6, 1.0] }, broad: 1.05, thick: 1.2, pitch: [-0.3, -0.5, -0.82], heading: 0.42, curve: 0.95, toothK: 1.05, reach: 1.12 });
 
 /** Army ant worker (Eciton burchellii minor), overnight pass: short toothed clamps — a small triangle with 4–5 teeth, black. */
 export const ECITON_MINOR_JAW = formicineMandible({ teeth: 5, color: { base: 0x2a1a12, mid: 0x221610, tip: 0x120c0a, teeth: 0x080606, dark: [0.6, 1.0] }, reach: 1.12, thick: 1.6, pitch: [-0.08, -0.2, -0.4], edgeDark: 0.6, roll: 0.35, heading: 0.58, curve: 1.3, toothK: 1.2 });

@@ -779,8 +779,14 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       for (const s of [-1, 1]) {
         // (Atta review round 1: on top of each occipital lobe, pointing up and back, slender and sharp)
         const base = m.real && atta ? new THREE.Vector3(hL * 0.16, headCY + hH * 0.34, s * hW * 0.41) : new THREE.Vector3(hL * 0.12, headCY + hH * 0.3, s * hW * 0.32);
-        const tip = base.clone().add((m.real && atta ? new THREE.Vector3(-0.25, 0.75, s * 0.6) : new THREE.Vector3(-0.3, 0.6, s * 0.5)).normalize().multiplyScalar(m.head.occSpines * Lm));
-        const [pp, ii] = tube([base, base.clone().lerp(tip, 0.5), tip], m.real && atta ? [0.016 * Lm, 0.008 * Lm, 0.0008 * Lm] : [0.02 * Lm, 0.01 * Lm, 0.001 * Lm], 5);
+        const dir = (m.real && atta ? new THREE.Vector3(-0.25, 0.75, s * 0.6) : new THREE.Vector3(-0.3, 0.6, s * 0.5)).normalize();
+        const tip = base.clone().addScaledVector(dir, m.head.occSpines * Lm);
+        // (user 2026-10-31: the Atta head spines one cone each, broad where they grow out of the lobe and tapering
+        // evenly to the point — not a rod with a cone on it; the base sunk into the head)
+        const r0 = m.head.occSpines * Lm * 0.34;
+        const [pp, ii] = m.real && atta
+          ? tube([base.clone().addScaledVector(dir, -r0 * 1.1), base, base.clone().lerp(tip, 0.5), tip], [r0 * 1.15, r0, r0 * 0.5, 0.0006 * Lm], 8)
+          : tube([base, base.clone().lerp(tip, 0.5), tip], [0.02 * Lm, 0.01 * Lm, 0.001 * Lm], 5);
         acc.piece(transformPts(pp, headM), ii, PART.HEAD, solid(look.head), look.head);
       }
     }
@@ -1123,7 +1129,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       // formicine scale: thin upright plate, top slightly notched (Lasius)
       const c = new THREE.Vector3(-wL * 0.45, mBottom + mH * 0.28 + nodeH * 0.38, 0);
       // (review round 2: a thin upright scale, narrower than the propodeum — not a disc)
-      const [pp, ii] = ellipsoid(c, new THREE.Vector3(0.025 * Lm * Math.max(1, wk * 0.7), nodeH * 0.55, mW * (m.real && formicine ? 0.3 : 0.42) * Math.max(1, wk * 0.45)), hi ? 12 : 8, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.18));
+      const [pp, ii] = ellipsoid(c, new THREE.Vector3(0.025 * Lm * Math.max(1, wk * 0.7), nodeH * 0.55, mW * (m.real && formicine ? 0.3 : 0.42) * Math.max(1, wk * 0.45)), hi ? (wk > 2 ? 22 : 12) : 8, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.18));
       if (m.key.startsWith('lasius'))
         for (let i = 0; i < pp.length; i += 3) {
           const top = pp[i + 1] - c.y;
@@ -1132,6 +1138,25 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       acc.piece(pp, ii, PART.WAIST, solid(wl), wl);
       const [p2, i2] = tube([new THREE.Vector3(-wL * 0.4, mBottom + mH * 0.26, 0), gasterFront], [0.03 * Lm * wk, 0.035 * Lm * wk], hi ? 8 : 6);
       acc.piece(p2, i2, PART.WAIST, solid(wl), wl);
+      if (m.waist.horns) {
+        // army-ant queen (user photos 2026-10-31): two broad hooked lobes on top of the petiole, rising and curling
+        // back over the front of the gaster, glossy dark at the base and orange-brown at the tips
+        const hl = m.waist.horns * Lm;
+        const top = c.y + nodeH * 0.42;
+        const dark = new THREE.Color(wl.color);
+        const tipC = new THREE.Color(wl.color2 ?? wl.color);
+        for (const s of [-1, 1]) {
+          const b = new THREE.Vector3(c.x - 0.012 * Lm, top - hl * 0.25, s * mW * 0.2 * Math.max(1, wk * 0.45));
+          const pts = [
+            b,
+            b.clone().add(new THREE.Vector3(hl * 0.08, hl * 0.4, s * hl * 0.1)),
+            b.clone().add(new THREE.Vector3(-hl * 0.02, hl * 0.8, s * hl * 0.18)),
+            b.clone().add(new THREE.Vector3(-hl * 0.42, hl * 0.95, s * hl * 0.2)),
+          ];
+          const [hp2, hi2] = tube(pts, [hl * 0.36, hl * 0.24, hl * 0.12, hl * 0.012], hi ? 8 : 5, false, true);
+          acc.piece(hp2, hi2, PART.WAIST, (x: number, y: number) => tmpC.copy(dark).lerp(tipC, ss(0.35, 1.0, (y - b.y) / hl)), wl);
+        }
+      }
     } else {
       // myrmicine: petiole node + postpetiole node
       const W = m.waist;
@@ -1175,24 +1200,42 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // (Eciton geometry pass: the workers' gaster an elongate oval tapering to a point, the first plate long — it read
     // as a ringed grub)
     const ecG = m.real && eciton && !G.physo;
-    const plates = ecG ? [0.52, 0.76, 0.9] : [0.44, 0.63, 0.79, 0.91];
+    // (army-ant queen, user photos: `tergites` overlapping plates over a long cylinder)
+    const TG = G.tergites;
+    const tgB = TG ? Array.from({ length: TG.n - 1 }, (_, q) => 0.06 + (0.84 * (q + 1)) / TG.n) : [];
+    const plates = TG ? tgB : ecG ? [0.52, 0.76, 0.9] : [0.44, 0.63, 0.79, 0.91];
     const gl = look.gaster;
     const bands = G.segs ? Array.from({ length: G.segs - 1 }, (_, q) => 0.1 + (0.85 * (q + 1)) / G.segs!) : [0.27, 0.47, 0.64, 0.79, 0.9];
     const cy = gasterFront.y + gH * 0.08;
     for (let i = 0; i < N; i++) {
       const t = i / (N - 1);
-      let e = Math.pow(Math.sin(Math.PI * Math.min(1, t * 0.85 + 0.03)), 0.62);
-      e *= ecG ? 1 - 0.32 * ss(0.55, 1.0, t) : 1 - 0.18 * ss(0.75, 1.0, t);
+      let e = Math.pow(Math.sin(Math.PI * Math.min(1, t * 0.85 + 0.03)), TG ? 0.3 : 0.62);
+      e *= TG ? 1 - 0.42 * ss(0.62, 1.0, t) : ecG ? 1 - 0.32 * ss(0.55, 1.0, t) : 1 - 0.18 * ss(0.75, 1.0, t);
       let groove = 0;
       if (hi && m.real) {
-        for (const b of plates) if (t > b) groove += (ecG ? 0.014 : 0.028) * Math.exp(-(t - b) / 0.03);
+        for (const b of plates) if (t > b) groove += (ecG ? 0.014 : TG ? 0.04 : 0.028) * Math.exp(-(t - b) / (TG ? 0.022 : 0.03));
       } else if (hi) for (const b of bands) groove += 0.035 * Math.exp(-((t - b) ** 2) / 0.0006);
       const close = Math.pow(Math.min(1, t / 0.07), 0.5);
       const front = 0.32 + 0.68 * close;
       rings.push({ x: -wL - t * gL, y: cy + e * gH * 0.04 - t * t * gH * 0.12, rz: (gW / 2) * e * front * (1 - groove), ry: (gH / 2) * e * front * (1 - groove), n: 2.1 });
     }
     const [p, ind, gmeta] = loft(rings, RAD);
-    const gasterCol = G.segs
+    const gasterCol = TG
+      ? (x: number, y: number) => {
+          // each plate dark, its front (where it slides out from under the plate before) orange-brown; the tip too
+          const t = Math.max(0, Math.min(1, (-wL - x) / gL));
+          const edges = [0, ...tgB, 1];
+          let k = 0;
+          while (k < edges.length - 2 && t > edges[k + 1]) k++;
+          const f = (t - edges[k]) / Math.max(1e-6, edges[k + 1] - edges[k]);
+          // (a soft orange-brown on the upper front of each plate fading back into the dark — not hard stripes)
+          const fr = 1 - ss(0, TG.front, f);
+          const up = Math.max(0, Math.min(1, (y - cy) / (gH * 0.5) * 0.5 + 0.5));
+          tmpC.setHex(gl.color);
+          if (gl.color2 !== undefined) tmpC.lerp(new THREE.Color(gl.color2), Math.max(fr * (k === 0 ? 0.45 : 0.8) * (0.45 + 0.55 * up), ss(0.88, 1.0, t) * 0.8));
+          return tmpC;
+        }
+      : G.segs
       ? (x: number, y: number) => {
           // segment bands (`segs`) and hard plate/membrane stripes on the joints (`stripes`, `stripeW`)
           const u = Math.max(0, Math.min(1, (-wL - x) / gL));
