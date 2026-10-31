@@ -139,6 +139,33 @@ const attaRegions = {
   [REGION.MANDIBLE]: { sculpt: ATTA_MAND, shade: shade(0.8, 0.1, 0, 0.45, 0.35, { coatRough: 0.2, wear: 0.55, dust: 0.08, tipThin: 0.7 }), px: [96, 192] as [number, number] },
 };
 export const ATTA: DetailRecipe = { key: 'atta', regions: attaRegions };
+/** Sculpture at a smaller scale (granules, waves and pits `k` times the size, the pattern repeating sooner). */
+const finer = (sc: Sculpt, k: number, mottle: number): Sculpt => ({
+  ...sc,
+  cavityDark: sc.cavityDark * 0.6,
+  tile: [sc.tile[0] * k, sc.tile[1] * k],
+  ...(sc.granules ? { granules: { cell: sc.granules.cell * k, height: sc.granules.height * k * 0.8 } } : {}),
+  ...(sc.wave ? { wave: { cell: sc.wave.cell * k, amp: sc.wave.amp * k * 0.6 } } : {}),
+  ...(sc.pits ? { pits: { ...sc.pits, r: sc.pits.r * k, depth: sc.pits.depth * k } } : {}),
+  mottle,
+});
+/**
+ * Atta minim (user 2026-10-31: fix its skin a little): the media's tubercles and waves had the same size in mm on a
+ * body a quarter as long, so the 2 mm minim looked like bubble wrap — the same sculpture at 0.45 the size, softer
+ * and less mottled.
+ */
+export const ATTA_MINIM: DetailRecipe = {
+  key: 'atta_minim',
+  regions: {
+    ...attaRegions,
+    // (and softer relief: the lumps still read too strongly at the minim's size)
+    [REGION.HEAD]: { ...attaRegions[REGION.HEAD], sculpt: finer(ATTA_HEAD, 0.45, 0.07), shade: { ...attaRegions[REGION.HEAD].shade, normal: 0.45 } },
+    [REGION.MESO]: { ...attaRegions[REGION.MESO], sculpt: finer(ATTA_MESO, 0.45, 0.08), shade: { ...attaRegions[REGION.MESO].shade, normal: 0.45 } },
+    [REGION.WAIST]: { ...attaRegions[REGION.WAIST], sculpt: finer(ATTA_WAIST, 0.45, 0.07), shade: { ...attaRegions[REGION.WAIST].shade, normal: 0.45 } },
+    [REGION.GASTER]: { ...attaRegions[REGION.GASTER], sculpt: finer(ATTA_GASTER, 0.45, 0.07), shade: { ...attaRegions[REGION.GASTER].shade, normal: 0.5 } },
+    [REGION.LEG]: { ...attaRegions[REGION.LEG], sculpt: finer(ATTA_LEG, 0.6, 0.1) },
+  },
+};
 export const ATTA_MAJOR: DetailRecipe = {
   key: 'atta_major',
   regions: { ...attaRegions, [REGION.HEAD]: { sculpt: ATTA_MAJOR_HEAD, shade: shade(0.8, 0.35, 0.45, 0.2, 0.3, { coatRough: 0.16, wear: 0.4, dust: 0.06, mid: 0.12 }), px: [512, 512] } },
@@ -164,6 +191,17 @@ const ecRegions = {
   [REGION.MANDIBLE]: { sculpt: FIRE_MAND, shade: shade(0.8, 0.1, 0, 0.45, 0.35, { coatRough: 0.14, wear: 0.5, dust: 0.04, tipThin: 0.7 }), px: [96, 192] as [number, number] },
 };
 export const ECITON: DetailRecipe = { key: 'eciton', regions: ecRegions };
+/**
+ * Army-ant queen (user photos 2026-10-31): glossy plates with patches of hair pits, a dark seam where each tergite
+ * overlaps the next (the seams at the plate joints of `gaster.tergites` n 5: antGeometry), no pale margins.
+ */
+export const ECITON_QUEEN: DetailRecipe = {
+  key: 'eciton_queen',
+  regions: {
+    ...ecRegions,
+    [REGION.GASTER]: { sculpt: { ...EC_GASTER_S, pits: { n: 90, r: 0.004, depth: 0.001, pale: 0.18, stub: { len: 0.03, dir: 1, share: 0.8 } }, rough: [-0.06, 0.2] }, shade: shade(0.75, 0.3, 0.35, 0.32, 0.5, { coatRough: 0.1, wear: 0.15, dust: 0.04, mid: 0.08, bands: [0.228, 0.396, 0.564, 0.732], band: [0.009, 0.35, 0, 0.03] }), px: [1024, 512] as [number, number] },
+  },
+};
 
 /** Recipe for an ant morph (null: no baked detail yet, the material stays as before). */
 export function antRecipe(morphKey: string): DetailRecipe | null {
@@ -172,7 +210,9 @@ export function antRecipe(morphKey: string): DetailRecipe | null {
   // (the Gene Thief ant is a Formica — modelled on F. sanguinea: the same microreticulate head and mesosoma, a dull pubescent gaster)
   if (morphKey.startsWith('formica_') || morphKey.startsWith('plagiaria_')) return FORMICA;
   // (overnight pass: the major's head smooth and shining, every other caste matte and tuberculate)
+  if (morphKey === 'atta_minim') return ATTA_MINIM;
   if (morphKey.startsWith('atta_')) return ATTA;
+  if (morphKey === 'eciton_queen') return ECITON_QUEEN;
   if (morphKey.startsWith('eciton_')) return ECITON;
   return null;
 }

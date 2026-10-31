@@ -922,3 +922,16 @@ mesosoma, and the queen's mesosoma reads as three bulbs.
   open two toothed blades. Numbers in `docs/creatures/atta-cephalotes.md` ("Mandibles").
 - **Spines**: every Atta caste's mesosoma and occipital spines about 40 % shorter (the media's had grown to .13 L).
 - Morph hashes: only `atta_*` changed (re-baselined). Photo-vs-render sheet sent to the user in chat (study only).
+
+### 2026-10-31 (afternoon, 2) — Eciton queen rebuilt; Atta queen jaws, head-spine cones, jaw spacing, minim skin (user notes and photos)
+- **Eciton queen** (the user's photos: Naskrecki, Kronauer): a small round head, a slim elongate mesosoma, one big
+  petiole block with a pair of broad hooked lobes curling back over the gaster (orange-brown tips), a huge glossy
+  cylinder of a gaster (.55 L) of five overlapping dark plates, each orange-brown on its upper front, no pale stripes;
+  sturdy legs with orange-red tibiae and tarsi. New: `gaster.tergites`, `waist.horns`, recipe `ECITON_QUEEN`.
+- **Atta**: the queen's jaws were too long (her own, more curved spec, about 60 % of the length); the head spines one
+  cone each (broad base sunk into the lobe, tapering evenly); every caste's jaws with the minim's spacing (the user
+  liked it: 8 teeth, the same small gap when closed); the media's head spines smaller (.055 L); the minim's skin
+  sculpture at its own scale (recipe `ATTA_MINIM`: it looked like bubble wrap).
+- Then (user): the soldier's jaws a little shorter (set more inward, about 12 %); the minim's skin relief softer too
+  (normal strength .45, cavities lighter): fine grain instead of lumps.
+- Morph hashes: only `atta_*` changed (Eciton morphs are not in the hash guard).
