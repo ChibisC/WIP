@@ -828,4 +828,18 @@ narrow petiole scale, rounder gasters, bigger eyes, Lasius greyer; (3→4) the f
 so the closed jaws hang below the clypeus instead of a forward beak, antennal sockets at the front of the frons with
 the scapes rising up and back, the head set against the pronotum (no bare neck), no suture band across the
 mesosoma, larger and lower eyes, satin gasters.
+| 4 | 3 | 3 | 3 | 3 | 3 | 3 | 4 | 3 | 3 | 4 |
+
+**Stopped at the 4-round limit, below the 7/10 target** (best version kept: round 4, the most anatomically correct —
+the reviewers' shape notes shrank each round even where the score didn't move). What still blocks it, in the order
+the reviewers keep naming it:
+1. **Antennae and legs read as stiff, uniform rods** with "joint caps": the antenna is two straight tubes (no curve,
+   no gradual thickening, obconical segments read as bamboo rings); femur/tibia radii vary too little to read at
+   sheet scale; legs held straight and splayed in the lab's rest pose. Needs curved antenna geometry with a smooth
+   taper, softer joints, and a natural rest pose.
+2. **Waxy, uniform cuticle**: no visible pubescence (a fine-hair sheen layer, not baked pits), no translucency at the
+   leg and gaster margins, hard CG shadows. Needs a pubescence/fuzz shading term and thin-part transmission.
+3. **Jaws read as flat striped plates** (no visible tooth row at sheet scale); the head's underside flat.
+4. Presentation: the plain studio renders vs studio photos with soft fill light.
+Suggestions recorded in docs/realism/formica-lasius-suggestions.md.
 
