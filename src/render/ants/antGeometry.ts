@@ -635,8 +635,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     if (m.wingScars) {
       for (const s of [-1, 1]) {
         // (Atta review round 1: the scar read as a black blob — small, a dark brown of the body)
-        const [pp, ii] = ellipsoid(new THREE.Vector3(mL * 0.6, mBottom + mH * 0.62, s * mW * 0.5), m.real ? new THREE.Vector3(0.016 * Lm, 0.008 * Lm, 0.004 * Lm) : new THREE.Vector3(0.025 * Lm, 0.012 * Lm, 0.006 * Lm), hi ? 8 : 6);
-        acc.piece(pp, ii, PART.BODY, () => tmpC.setHex(m.real ? 0x2e1c12 : 0x1a1410), { color: 0x1a1410, rough: 0.5, coat: 0.2, sheen: 0 });
+        const [pp, ii] = ellipsoid(new THREE.Vector3(mL * 0.6, mBottom + mH * 0.62, s * mW * 0.5), m.real && atta ? new THREE.Vector3(0.016 * Lm, 0.008 * Lm, 0.004 * Lm) : new THREE.Vector3(0.025 * Lm, 0.012 * Lm, 0.006 * Lm), hi ? 8 : 6);
+        acc.piece(pp, ii, PART.BODY, () => tmpC.setHex(m.real && atta ? 0x2e1c12 : 0x1a1410), { color: 0x1a1410, rough: 0.5, coat: 0.2, sheen: 0 });
       }
     }
   }
