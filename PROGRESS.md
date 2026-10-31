@@ -895,3 +895,21 @@ ones. **Stopped after 3 rounds (the spec's minimum), below target**; the best ro
 gaster reads as a ringed grub, the soldier's hooks insert under the head instead of at its front corners, blocky
 mesosoma, and the queen's mesosoma reads as three bulbs.
 
+### 2026-10-31 (morning) — Atta and Eciton geometry pass (user: "fix with new geometry to match the reference photos"; Eciton legs too long; the minim's head)
+- Antennae (Atta, Eciton): a bowed scape, slim at the base and clubbed at the elbow, from a socket bulb low on the face
+  beside the clypeus; a funiculus that curls smoothly with gradually thickening segments (they read as stiff rods
+  from the top of the head). Fixed a bug from round 3: the right antennal socket had kept the old position (lopsided
+  antennae on Formica, Lasius and Atta).
+- Legs (Atta, Eciton): a clearly clubbed femur and a slim tibia. Hair no thicker on the big castes (pins).
+- Eciton: legs shortened (user note; hind 1.5 → 1.15 L worker, 1.75 → 1.3 porter, 1.5 → 1.2 media, 1.4 → 1.1 soldier),
+  sturdier femora; one smooth mesosoma profile; the head against the pronotum; the worker gaster an elongate oval with
+  three shallow plates (was a ringed grub); the soldier's sickles inserted at the head's front corners, wide apart,
+  thicker, the tips crossing, a smaller head, a reddish mesosoma; the worker's jaws visible; the queen
+  dichthadiiform — broad head and mesosoma, a gaster as wide as the thorax with five dark plates.
+- Atta: the minim's head heart-shaped like the other castes (user note); longer paired pronotal, two mesonotal pairs
+  and propodeal spines; occipital spines at the lobe corners, visible from the front; jaws longer and crossing, the
+  major's hanging as two long dark toothed blades; a small clypeal plate in the face's colour (the head's front pole
+  read as a black dot); the queen without spines, a bigger head.
+- Blind review after the first half of this pass: Atta 3, 4, 3, 3, 3, 2, 3; Eciton 3, 3, 3, 3, 3, 2 — its shape notes
+  drove the second half (sockets, occipital spines, crossing jaws, the queen, the neck).
+

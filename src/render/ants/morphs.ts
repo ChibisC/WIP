@@ -62,7 +62,7 @@ export interface AntMorph {
     open?: number;
   };
   /** `smooth`: one even arch, no metanotal groove (Saiy-Ants, Termants) */
-  meso: { len: number; width: number; height: number; queen?: boolean; smooth?: boolean; spines?: { pro?: number; meso?: number; prop?: number }; /** worker profile: groove depth (default 0.16), propodeum height (0.62), the waist of the mesosoma seen from above (0.12) */ groove?: number; prop?: number; pinch?: number; /** formicines: the pronotum slopes down into the neck over this much of the length (default: a short steep front) */ neck?: number };
+  meso: { len: number; width: number; height: number; queen?: boolean; smooth?: boolean; spines?: { pro?: number; meso?: number; meso2?: number; prop?: number }; /** worker profile: groove depth (default 0.16), propodeum height (0.62), the waist of the mesosoma seen from above (0.12) */ groove?: number; prop?: number; pinch?: number; /** formicines: the pronotum slopes down into the neck over this much of the length (default: a short steep front) */ neck?: number };
   waist: {
     nodes: 1 | 2;
     len: number;
@@ -329,7 +329,8 @@ const attaMedia: AntMorph = {
   eyes: { size: 0.18, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.3, club: 0, thick: 0.009 },
   mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.7 },
-  meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.09, meso: 0.07, prop: 0.08 } },
+  // (geometry pass, the photos: long paired pronotal spines, two mesonotal pairs, long propodeal spines)
+  meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.13, meso: 0.09, meso2: 0.045, prop: 0.11 } },
   waist: { nodes: 2, len: 0.1, nodeH: 0.08 },
   // (review round 2: a small gaster for the body, not a big round ball)
   gaster: { len: 0.22, width: 0.17, height: 0.14, sting: true },
@@ -345,7 +346,9 @@ const attaMinim: AntMorph = {
   ...attaMedia,
   key: 'atta_minim',
   L: 2,
-  head: { len: 0.27, width: 0.25, height: 0.18, shape: 'round', notch: 0.05 },
+  // (user note 2026-10-31: the minim's head didn't match the other castes — the same heart shape, its lobes lower and
+  // the notch shallower at this size, small occipital spines)
+  head: { len: 0.27, width: 0.27, height: 0.18, shape: 'heart', notch: 0.12, occSpines: 0.05, groove: 0.08 },
   eyes: { size: 0.16, pos: 0.6, height: 0.2, ocelli: false },
   mandible: { type: 'triangular', len: 0.33, teeth: 6, width: 0.55, spec: ATTA_MINIM_JAW, open: 0.7 },
   meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.05, meso: 0.04, prop: 0.05 } },
@@ -366,7 +369,7 @@ const attaSoldier: AntMorph = {
   eyes: { size: 0.15, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.8, funiculus: 1.25, club: 0, thick: 0.0085 },
   mandible: { type: 'massive', len: 0.38, teeth: 8, width: 0.68, spec: ATTA_SOLDIER_JAW, open: 0.6 },
-  meso: { len: 0.28, width: 0.12, height: 0.14, spines: { pro: 0.07, meso: 0.05, prop: 0.06 } },
+  meso: { len: 0.28, width: 0.12, height: 0.14, spines: { pro: 0.1, meso: 0.07, meso2: 0.035, prop: 0.08 } },
   gaster: { len: 0.25, width: 0.18, height: 0.15, sting: true },
   legs: { hind: 1.1, thick: 0.015 },
   look: { ...attaLook, head: L(0x7a3418, 0.48, 0.2, 0.08, 0x5a2410) },
@@ -382,7 +385,7 @@ const attaMajor: AntMorph = {
   eyes: { size: 0.11, pos: 0.64, height: 0.1, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.7, funiculus: 1.2, club: 0, thick: 0.0072 },
   mandible: { type: 'massive', len: 0.36, teeth: 8, width: 0.75, spec: ATTA_MAJOR_JAW, open: 0.55 },
-  meso: { len: 0.25, width: 0.11, height: 0.12, spines: { pro: 0.07, meso: 0.06, prop: 0.06 } },
+  meso: { len: 0.25, width: 0.11, height: 0.12, spines: { pro: 0.09, meso: 0.07, meso2: 0.03, prop: 0.07 } },
   waist: { nodes: 2, len: 0.08, nodeH: 0.07 },
   gaster: { len: 0.22, width: 0.16, height: 0.13, sting: true },
   legs: { hind: 1.0, thick: 0.0135 },
@@ -400,12 +403,12 @@ const attaQueen: AntMorph = {
   key: 'atta_queen',
   L: 21,
   // (Borgmeier: head width 5.2 mm; no occipital tooth)
-  head: { len: 0.22, width: 0.27, height: 0.15, shape: 'heart', notch: 0.12 },
+  head: { len: 0.25, width: 0.31, height: 0.17, shape: 'heart', notch: 0.14, groove: 0.1 },
   eyes: { size: 0.2, pos: 0.6, height: 0.2, ocelli: true },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.2, club: 0, thick: 0.0062 },
   mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.6 },
   // (review round 2: a massive mesosoma, much taller than the head)
-  meso: { len: 0.28, width: 0.18, height: 0.22, queen: true, spines: { pro: 0.03, meso: 0, prop: 0.03 } },
+  meso: { len: 0.28, width: 0.18, height: 0.22, queen: true },
   waist: { nodes: 2, len: 0.06, nodeH: 0.06 },
   // (review round 1: huge and rounded, not a sausage)
   // (review round 3: globular, nearly as tall as long)
@@ -538,12 +541,14 @@ const ecitonMinor: AntMorph = {
   head: { len: 0.2, width: 0.17, height: 0.14, shape: 'round', frontMix: 0.35 },
   eyes: { size: 0.05, pos: 0.55, height: 0.25, ocelli: false, single: true },
   antenna: { segments: 12, scape: 1.05, funiculus: 1.25, club: 0, thick: 0.0115 },
-  mandible: { type: 'triangular', len: 0.3, teeth: 5, width: 0.42, spec: ECITON_MINOR_JAW, open: 0.7 },
-  meso: { len: 0.36, width: 0.105, height: 0.12, groove: 0.06, prop: 0.5 },
+  mandible: { type: 'triangular', len: 0.42, teeth: 5, width: 0.42, spec: ECITON_MINOR_JAW, open: 0.7 },
+  // (geometry pass, review: slender with a smooth convex profile, not stepped blocks)
+  meso: { len: 0.36, width: 0.105, height: 0.12, smooth: true },
   waist: { nodes: 2, len: 0.11, nodeH: 0.08 },
   // (review rounds 1–2: a ringed grub — fewer visible plates, a duller rust)
-  gaster: { len: 0.3, width: 0.17, height: 0.145, sting: true, segs: 3 },
-  legs: { hind: 1.5, thick: 0.0115 },
+  gaster: { len: 0.3, width: 0.17, height: 0.145, sting: true, segs: 2 },
+  // (user note 2026-10-31: the legs were too long — the photos' hind leg is about the body's length)
+  legs: { hind: 1.15, thick: 0.014 },
   look: EC_DARK,
   hair: 0.45,
   // (overnight pass: sparse, fine golden hairs, denser on the gaster and legs)
@@ -562,9 +567,9 @@ const ecitonSubmajor: AntMorph = {
   eyes: { size: 0.045, pos: 0.55, height: 0.25, ocelli: false, single: true },
   antenna: { segments: 12, scape: 1.0, funiculus: 1.2, club: 0, thick: 0.0105 },
   mandible: { type: 'falcate', len: 0.5, teeth: 0, width: 0.16, hook: 0.15 },
-  meso: { len: 0.37, width: 0.105, height: 0.12 },
-  gaster: { len: 0.29, width: 0.165, height: 0.14, sting: true, segs: 3 },
-  legs: { hind: 1.75, thick: 0.0118 },
+  meso: { len: 0.37, width: 0.105, height: 0.12, smooth: true },
+  gaster: { len: 0.29, width: 0.165, height: 0.14, sting: true, segs: 2 },
+  legs: { hind: 1.3, thick: 0.0135 },
   look: { ...EC_DARK, head: L(0x222226, 0.34, 0.3, 0.04, 0x34302e) },
   stance: 0.25,
 };
@@ -578,9 +583,9 @@ const ecitonMedia: AntMorph = {
   eyes: { size: 0.04, pos: 0.52, height: 0.25, ocelli: false, single: true },
   antenna: { segments: 12, scape: 0.9, funiculus: 1.15, club: 0, thick: 0.0095 },
   mandible: { type: 'falcate', len: 0.62, teeth: 0, width: 0.26, hook: 0.35 },
-  meso: { len: 0.34, width: 0.11, height: 0.125 },
-  gaster: { len: 0.28, width: 0.165, height: 0.14, sting: true, segs: 3 },
-  legs: { hind: 1.5, thick: 0.0115 },
+  meso: { len: 0.34, width: 0.11, height: 0.125, smooth: true },
+  gaster: { len: 0.28, width: 0.165, height: 0.14, sting: true, segs: 2 },
+  legs: { hind: 1.2, thick: 0.0135 },
   // (the package's #B09C64 head, a little darker: the game's sun lifted it to white on the surface)
   look: { ...EC_TAN, head: L(0x9e8854, 0.42, 0.14, 0.05, 0x6e5430), mandible: L(0x1a1410, 0.36, 0.32, 0, 0x0a0806) },
   stance: 0.21,
@@ -593,20 +598,21 @@ const ecitonMajor: AntMorph = {
   L: 11,
   // (review round 1: a huge featureless egg — rounded-square, about the mesosoma's size, whitish tan on the vertex
   // shading to orange-brown over the frons and clypeus, pin eyes on the sides)
-  head: { len: 0.24, width: 0.26, height: 0.17, shape: 'square', frontMix: 0.8, sockets: 1 },
+  head: { len: 0.22, width: 0.23, height: 0.17, shape: 'square', frontMix: 0.8, sockets: 1 },
   eyes: { size: 0.08, pos: 0.52, height: 0.15, ocelli: false, single: true },
   antenna: { segments: 12, scape: 0.75, funiculus: 1.05, club: 0, thick: 0.0082 },
-  mandible: { type: 'falcate', len: 1.45, teeth: 0, width: 0.2, hook: 0.7, barb: 1 },
-  meso: { len: 0.3, width: 0.1, height: 0.115 },
-  gaster: { len: 0.27, width: 0.16, height: 0.13, sting: true, segs: 3 },
-  legs: { hind: 1.4, thick: 0.0108 },
+  mandible: { type: 'falcate', len: 1.55, teeth: 0, width: 0.2, hook: 0.9, barb: 1 },
+  meso: { len: 0.3, width: 0.1, height: 0.115, smooth: true },
+  gaster: { len: 0.27, width: 0.16, height: 0.13, sting: true, segs: 2 },
+  legs: { hind: 1.1, thick: 0.0128 },
   look: {
     ...EC_TAN,
     head: L(0xc0aa7a, 0.42, 0.16, 0.08, 0xa0602e), // pale tan vertex → orange-brown frons and clypeus (frontMix)
     mandible: L(0x0e0e10, 0.3, 0.4, 0, 0x060606),
     // (overnight colour check: the photo's soldier mesosoma #3d1e10 — dark brown, not orange; render was #7e4016)
-    meso: L(0x4a2618, 0.48, 0.16, 0.05, 0x5a301c),
-    waist: L(0x4a2618, 0.48, 0.14, 0.05, 0x5a301c),
+    // (geometry-pass review: reddish-brown like the legs — the colour-check photo had it in shadow)
+    meso: L(0x6a3420, 0.48, 0.16, 0.05, 0x7a3e24),
+    waist: L(0x6a3420, 0.48, 0.14, 0.05, 0x7a3e24),
   },
   stance: 0.19,
 };
@@ -617,22 +623,24 @@ const ecitonQueen: AntMorph = {
   key: 'eciton_queen',
   L: 22,
   // (review round 1: dichthadiiform — a broad flattened head and mesosoma; short jaws, not a wire loop)
-  head: { len: 0.18, width: 0.24, height: 0.12, shape: 'square', frontMix: 0.3 },
+  head: { len: 0.19, width: 0.3, height: 0.13, shape: 'square', frontMix: 0.3 },
   eyes: { size: 0.02, pos: 0.5, height: 0.25, ocelli: false, single: true },
   antenna: { segments: 12, scape: 0.6, funiculus: 0.8, club: 0, thick: 0.007 },
   mandible: { type: 'falcate', len: 0.32, teeth: 0, width: 0.3, hook: 0.15 },
-  meso: { len: 0.24, width: 0.16, height: 0.11 },
+  // (review: one broad fused piece, not three bulbs)
+  meso: { len: 0.24, width: 0.25, height: 0.13, smooth: true },
   // (review round 2: the petiole massive, almost as broad as the gaster)
   waist: { nodes: 1, len: 0.06, scale: false, nodeH: 0.09, thick: 3.2 },
   // (review round 1: a huge, broad, rounded dark gaster, glossy plates — not a striped spindle)
-  gaster: { len: 0.55, width: 0.32, height: 0.26, sting: true, segs: 7, stripes: 7, stripeW: 0.14, physo: 1 },
+  // (geometry pass: five broad dark plates with narrow membranes between — seven pale bands read as candy stripes)
+  gaster: { len: 0.58, width: 0.36, height: 0.27, sting: true, segs: 5, stripes: 5, stripeW: 0.07, physo: 1 },
   legs: { hind: 0.8, thick: 0.0095 },
   look: {
     ...EC_DARK,
     head: L(0x5a2418, 0.4, 0.26, 0.05, 0x7a3a24),
     meso: L(0x5a2418, 0.42, 0.22, 0.05, 0x7a3a24),
     waist: L(0x5a2418, 0.42, 0.2, 0.05, 0x7a3a24),
-    gaster: L(0x3e1c10, 0.34, 0.3, 0.06, 0x8a5a3a),
+    gaster: L(0x3e1c10, 0.4, 0.26, 0.06, 0x6a4a34),
     legs: L(0x6e2e1a, 0.45, 0.14, 0.06, 0x9a5a3a),
     mandible: L(0x2a1612, 0.36, 0.32, 0, 0x120a08),
   },
