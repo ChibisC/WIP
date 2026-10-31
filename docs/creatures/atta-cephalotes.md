@@ -96,3 +96,9 @@ area, mandibles near black at the teeth; queen dark chestnut (#5a2a16) with gold
 
 Where the photos disagree: some majors in the photos are A. sexdens/laevigata (dull, densely hairy heads); the model
 follows A. cephalotes (shining head lobes, the hair only as the frontal tufts).
+
+**Legs in the game** (user 2026-10-31: too long, the walk too wide; more compact, like EotU draws them): hind legs
+minim .92, media 1.0, soldier .94, major .86, queen .64 of L (were 1.05 / 1.2 / 1.1 / 1.0 / .7), and the feet 20 % further
+in under the body (`legs.splay` .8). Real medias' legs are longer; this is the game's look.
+
+**Abilities** (DESIGN §3.11b): no sting; the major's automatic taunt (EotU).

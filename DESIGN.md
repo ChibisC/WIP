@@ -455,6 +455,23 @@ The default population limit is 300.
   - The **sun-warmed brood mound** tile speeds brood by 8 / 12 / 16 % per tile by day, a quarter of that at night. In the nest, brood is shown piled on it by day.
   - Thatch and mound bonuses together are capped at +50 %.
 - **Gene Thief:** brood tiles for the castes it borrowed.
+- **Caste abilities** (2026-10-31, the user after Empires of the Undergrowth; `sim/casteAbilities.ts`, numbers in
+  `BALANCE.casteAbility`). Automatic, like EotU's:
+  - **Taunt: leafcutter majors only.** When the major bites while above 30 % health, there is a 30 % chance it taunts.
+    Every enemy ant within 2.5 of its body lengths drops its fight and comes for the major. It stays on the major while
+    the taunt lasts (5 s), even when something else bites it, and doesn't switch to a free foe. Creatures there turn
+    on it too: they target it first and walk to it while it is out of reach. Cooldown 10 s. Render: it rears on its
+    hind legs, fore legs up, head thrown back with the jaws gaping, and stridulates (`ATK.TAUNT`), with a ring across its
+    reach.
+  - **Rage: army-ant soldiers only.** Each kill (an ant or a creature) adds a stack, up to five. Each stack adds 9 % bite
+    damage (+45 % at the cap, EotU's cap) for the soldier and every nestmate within 3 of its lengths; with several
+    soldiers nearby, the strongest counts. One stack fades 8 s after the last kill. Render: a pulse at each kill (the
+    sickles snapping, the head tossing; `ATK.RAGE`) and a red flush on every ant in the aura, deeper as it grows and
+    pulsing at the cap.
+  - **Stings.** Leafcutters have no sting. Army ants sting only every third bite (`sting.every`). Each sting is a
+    little stronger than a fire ant's (worker 1.4 v 1.2 venom/s a stack, porter 1.6, media 1.8, soldier 2.0). Fire
+    ants sting every bite and stack twice as many (12 v 6), so in the same fight they deal about twice the venom and
+    stay the venom specialists. The render shows the quick sting on the stinging bites only.
 
 ### 3.11c New species: Nasute Termites, hell ants, Saiy-Ants, Sickle-Jaw Termites (2026-10-25)
 Three playable, AI-usable colonies, built from the user's design packages (kept in the project "Ant game": `claude/nasute-termites/`, `claude/hell-ants/`, `claude/saiy-ants/`). Every number is in `sim/balance.ts` (`NASUTE`, `BALANCE.snap`, `BALANCE.surge`, the caste rows); visual-only state is derived in the render layer and never feeds back into the sim. Existing species are unchanged: their snapshots and hashes are identical (new optional fields are skipped when undefined, wood only spawns in games with termites).
