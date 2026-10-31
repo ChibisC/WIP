@@ -790,7 +790,8 @@ export class AntRenderer {
         bodyBuf[4] = qB.x * k;
         bodyBuf[5] = qB.y * k;
         bodyBuf[6] = qB.z * k;
-        bodyBuf[7] = atkP.spread * w;
+        // (crushed: the feet pushed out a little as it is pressed down)
+        bodyBuf[7] = atkP.spread * w + M.squash * 0.35;
         bodyBuf[8] = atkP.gYaw * w;
         bodyBuf[9] = stingW;
         bodyBuf[10] = atkP.front * w;

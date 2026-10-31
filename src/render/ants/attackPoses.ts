@@ -217,14 +217,23 @@ const LUNGE_S: Key = { fwd: 0.13, up: -0.02, pitch: -0.11, px: 0.25, headPitch: 
 const CLAMP_W: Key = { yaw: 0.34, side: 0.035, roll: 0.07, headYaw: 0.5, headPitch: 0.12, mand: 1, fwd: -0.03, spread: 0.25 };
 const CLAMP_S: Key = { yaw: -0.14, headYaw: -0.22, fwd: 0.08, headPitch: -0.16, mand: 0, spread: 0.25 };
 const CLAMP_T: Key = { yaw: -0.08, fwd: -0.13, pitch: 0.07, headPitch: -0.06, mand: 0.04, spread: 0.4 };
-/** gripping and stinging (fire ants): the hold between stings and the jab */
-const GRIP: Key = { fwd: 0.06, up: 0.1, pitch: -0.16, px: 0.35, headPitch: -0.2, mand: 0.04, gaster: -1.6, sting: 0.6, spread: 0.32 };
-const JAB: Key = { fwd: 0.07, up: 0.13, pitch: -0.25, px: 0.35, headPitch: -0.24, mand: 0.02, gaster: -2.8, sting: 1, spread: 0.32, gYaw: -0.12 };
-const GRAB: Key = { fwd: 0.09, up: 0.0, pitch: -0.05, headPitch: -0.3, mand: 0.05, spread: 0.2 };
+/**
+ * Fire ant stinging, after the reference footage (user rating B2): from the flagging stance — legs wide, body
+ * raised, gaster up with the sting out — the gaster cocks back, then whips down and forward under the body while
+ * the ant rears on its hind legs, head up and jaws agape; it holds the jab a moment, the gaster pumping, and swings
+ * back up to the flag.
+ */
+const FLAG: Key = { up: 0.06, spread: 0.6, gaster: 1.15, sting: 0.75, headPitch: -0.12, mand: 0.6 };
+const COCK: Key = { up: 0.045, spread: 0.6, pitch: 0.05, px: -0.2, gaster: 1.45, sting: 0.9, headPitch: -0.05, mand: 0.9 };
+const WHIP: Key = { up: 0.12, spread: 0.6, pitch: 0.17, px: -0.3, fwd: 0.03, gaster: -2.7, sting: 1, headPitch: 0.15, mand: 1, front: 0.55 };
+const COCK_Q: Key = { up: 0.03, spread: 0.4, pitch: 0.03, px: -0.2, gaster: 1.3, sting: 0.8, mand: 0.8 };
+const WHIP_Q: Key = { up: 0.09, spread: 0.4, pitch: 0.12, px: -0.3, fwd: 0.03, gaster: -2.4, sting: 1, headPitch: 0.1, mand: 1, front: 0.4 };
 const CRUSH_W: Key = { fwd: -0.05, up: -0.06, headPitch: -0.22, mand: 1, gaster: 0.15, spread: 0.4 };
 const CRUSH_S: Key = { fwd: 0.1, up: -0.07, pitch: -0.08, px: 0.3, headPitch: -0.42, mand: 0, spread: 0.4 };
-const SWING_W: Key = { yaw: 0.26, headYaw: 0.55, headPitch: -0.12, roll: 0.05, mand: 0.85, up: -0.03, spread: 0.32 };
-const SWING_S: Key = { yaw: -0.22, headYaw: -0.45, roll: -0.08, fwd: 0.05, headPitch: -0.2, mand: 0.15, up: -0.03, spread: 0.32 };
+// (user rating B6, "glitchy": a smaller, slower sweep of the great head, with a follow-through)
+const SWING_W: Key = { yaw: 0.2, headYaw: 0.42, headPitch: -0.12, roll: 0.04, mand: 0.85, up: -0.03, spread: 0.32 };
+const SWING_S: Key = { yaw: -0.16, headYaw: -0.32, roll: -0.06, fwd: 0.05, headPitch: -0.2, mand: 0.15, up: -0.03, spread: 0.32 };
+const SWING_F: Key = { yaw: -0.2, headYaw: -0.4, roll: -0.05, fwd: 0.03, headPitch: -0.16, mand: 0.25, up: -0.03, spread: 0.32 };
 
 /**
  * Pose of a planted-feet attack at phase q. `holdIn` / `holdOut`: this sting continues a grip held from the
@@ -266,27 +275,26 @@ export function attackPoseV2(variant: number, q: number, side: number, out: Atta
       return out;
     }
     case ATK.PIVOT_STING: {
-      // grab (or keep the grip) → plant wide, rise on the legs, arch and curl the gaster under, the sting out →
-      // jab forward under the body → hold, the gaster pumping → back to the grip (or let go at the end)
-      const start: Key = holdIn ? GRIP : {};
-      if (!holdIn && q < 0.2) blend({}, GRAB, sm(q / 0.2), side, out);
-      else if (q < STRIKE) blend(holdIn ? GRIP : GRAB, GRIP, holdIn ? 1 : sm((q - 0.2) / (WIND - 0.2)), side, out);
-      else if (q < C) blend(GRIP, JAB, s, side, out);
+      // the sting series: up into the flag (or holding it from the last sting) → cock the gaster back → whip it
+      // under and forward, rearing → hold, pumping → back up to the flag (or down to rest after the last)
+      const sw = strikeEase((q - 0.6) / (C - 0.6));
+      if (q < 0.3) blend(holdIn ? FLAG : {}, FLAG, holdIn ? 1 : sm(q / 0.3), side, out);
+      else if (q < 0.6) blend(FLAG, COCK, sm((q - 0.3) / 0.25), side, out);
+      else if (q < C) blend(COCK, WHIP, sw, side, out);
       else {
         const k = (q - C) / (1 - C);
-        blend(JAB, holdOut ? GRIP : {}, sm((k - 0.25) / 0.75), side, out);
-        out.gaster -= 0.12 * Math.sin(k * 25) * Math.max(0, 1 - k * 2.5);
+        blend(WHIP, holdOut ? FLAG : {}, sm((k - 0.3) / 0.7), side, out);
+        out.gaster -= 0.14 * Math.sin(k * 26) * Math.max(0, 1 - k * 3);
       }
-      if (q < STRIKE) out.gaster += 0.06 * tremble;
-      void start;
+      if (q > 0.5 && q < 0.6) out.gaster += 0.05 * Math.sin(q * 160);
       return out;
     }
     case ATK.QUICK_STING: {
-      // a fast grab, a quick tuck and one jab, release
-      if (q < 0.3) blend({}, GRAB, sm(q / 0.3), side, out);
-      else if (q < STRIKE) blend(GRAB, { ...GRIP, up: 0.03, gaster: -1.5 }, sm((q - 0.45) / (STRIKE - 0.45)), side, out);
-      else if (q < C) blend({ ...GRIP, up: 0.03, gaster: -1.5 }, { ...JAB, up: 0.04, gaster: -2.2 }, s, side, out);
-      else blend({ ...JAB, up: 0.04, gaster: -2.2 }, {}, sm((q - C) / (1 - C)), side, out);
+      // one sting from rest: the gaster up and cocked, a whip under, back down
+      const sw = strikeEase((q - 0.6) / (C - 0.6));
+      if (q < 0.6) blend({}, COCK_Q, sm((q - 0.15) / 0.4), side, out);
+      else if (q < C) blend(COCK_Q, WHIP_Q, sw, side, out);
+      else blend(WHIP_Q, {}, sm(((q - C) / (1 - C) - 0.2) / 0.8), side, out);
       return out;
     }
     case ATK.CRUSH: {
@@ -304,10 +312,15 @@ export function attackPoseV2(variant: number, q: number, side: number, out: Atta
       return out;
     }
     case ATK.HEAD_SWING: {
-      // the major swings its great head sideways into the target, body twisting over braced legs
-      if (q < STRIKE) blend({}, SWING_W, u, side, out);
-      else if (q < C) blend(SWING_W, SWING_S, s, side, out);
-      else blend(SWING_S, {}, sm((q - C) / (1 - C)), side, out);
+      // the major swings its great head sideways into the target, body twisting over braced legs; the head is heavy:
+      // a slower sweep (0.52 → contact) that carries on a little past the hit before it settles
+      if (q < 0.52) blend({}, SWING_W, sm(q / 0.45), side, out);
+      else if (q < C) blend(SWING_W, SWING_S, sm((q - 0.52) / (C - 0.52)), side, out);
+      else {
+        const k = (q - C) / (1 - C);
+        if (k < 0.3) blend(SWING_S, SWING_F, sm(k / 0.3), side, out);
+        else blend(SWING_F, {}, sm((k - 0.3) / 0.7), side, out);
+      }
       return out;
     }
     default:

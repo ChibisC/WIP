@@ -96,7 +96,8 @@ vec3 animP = position;
   // spec 04 (planted-feet species): the threat display (alarm: gaster flagged, user rating A11) and the sting
   // (A4) plant the feet wider and lift the body on straightened legs; the feet stay on the ground
   float stanceW = uPlant > 0.5 && pose == 8 ? poseW : 0.0;
-  float bodyUp = stanceW * uGait.w * 0.06;
+  // (crushed: pressed down onto the ground over its planted feet)
+  float bodyUp = stanceW * uGait.w * 0.06 - bT3.y * uGait.w * 0.08;
   vec3 UP = vec3(0.0, 1.0, 0.0);
   vec3 RIGHT = vec3(0.0, 0.0, 1.0);
   vSurf = aSurf; vLocal = position / uGait.w; vTint = floor((aD.z + 2.0) / 4.0); vColorVar = aD.z - 4.0 * vTint;
@@ -228,12 +229,12 @@ vec3 animP = position;
     // standing up like comb teeth; blind review.)
     float fp = float(pair) - 1.0;
     if (uPlant > 0.5 && bT3.y > 0.0) {
-      // crushed: the legs splayed flat round the body
-      float fw = pair == 0 ? 0.6 : (pair == 1 ? 0.05 : -0.55);
-      yaw = mix(yaw, side * fw, bT3.y);
-      lft = mix(lft, 0.85, bT3.y);
-      knee = mix(knee, 0.12, bT3.y);
-      ankleF = mix(ankleF, 0.3, bT3.y);
+      // crushed (user rating B10: the old flat splay looked unnatural): the legs keep their footing while the body is
+      // pressed down onto the ground between them, so they splay and buckle where they stood; a little curl
+      yaw = mix(yaw, side * (-0.3 * fp), death);
+      lft = mix(lft, -0.6, death);
+      knee = mix(knee, -2.35, death);
+      ankleF = mix(ankleF, 1.2, death);
     } else if (uPlant > 0.5) {
       yaw = mix(yaw, side * (-0.3 * fp), death);
       lft = mix(lft, -0.6, death);
@@ -320,7 +321,7 @@ vec3 animP = position;
   // Body bob at twice the stride frequency; the lift of the threat display and the sting (feet planted).
   animP.y += bob + bodyUp;
   // crushed flat (spec 04: killed under a big creature's jaws or feet)
-  if (bT3.y > 0.0) animP.y *= 1.0 - 0.3 * bT3.y;
+  if (bT3.y > 0.0) animP.y *= 1.0 - 0.12 * bT3.y;
   // Gold form: body lowered slightly (a rushing look).
   if (part < 10) animP.y -= goldA * uGait.w * 0.012;
   objectNormal = N;

@@ -44,7 +44,7 @@ export interface AtkPlan {
   piv: number;
 }
 /** each sting of a series turns the ant this far round its grip (Solenopsis stings in a ring round the bite) */
-const PIV_STEP = 0.3;
+const PIV_STEP = 0.2;
 
 /**
  * Pick the attack for cycle `v.atkN` at phase q (render only; seeded by the ant, so the same fight replays the same).
@@ -659,9 +659,10 @@ export function deathPose(m: Motion2, cause: number, t: number, out: MotionOut):
       return;
     }
     case 4:
+      // pressed flat at once, the legs splaying where they stood, a last twitch
       out.squash = sm(t / 0.1);
-      out.deathLeg = 0.3 * sm(t / 0.2);
-      out.deathRoll = 0.12 * m.deadS * sm(t / 0.2);
+      out.deathLeg = 0.12 * sm(t / 0.3) + 0.08 * Math.sin(t * 21 + sd) * Math.exp(-t * 2.5);
+      out.deathRoll = 0.06 * m.deadS * sm(t / 0.2);
       return;
     case 5: {
       out.deathLeg = clamp(sm(t / 0.7) + 0.3 * Math.sin(t * 24 + sd) * Math.exp(-t * 2.5), 0, 1.12);

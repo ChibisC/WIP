@@ -122,10 +122,13 @@ function attacker(x: number, y: number, h: number, variant: number, gap: number,
       }
     }
     v.atk = (p + ATTACK_CONTACT) % 1;
+    // (the attack's own cycle — its side and count — turns over at its start, q = 0, as game/antViews.ts does; counted
+    // from the contact it flipped sides at the strike: user rating B6, the head swing "glitchy")
+    const cq = Math.floor((t - t0) / gap + ATTACK_CONTACT);
     v.atkVar = variant;
-    v.atkSide = cyc & 1 ? 1 : -1;
+    v.atkSide = cq & 1 ? 1 : -1;
     v.atkGap = gap;
-    v.atkN = Math.max(0, cyc);
+    v.atkN = Math.max(0, cq);
   };
 }
 

@@ -758,8 +758,11 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   // (user rating A14: grip the ant visibly — the antlers clamp past closed while lifting and stay shut through the
   // flick of the toss, opening only as they let it go)
   const tossOpen = v2 && p.state === ST.Strike ? sm01((st - 0.08) / 0.1) * (1 - sm01((st - 0.35) / 0.3)) : toss;
-  let open = p.dead ? 0.25 : Math.max(idle, wind * (v2 ? 0.7 : 0.62) + tremble * 0.025, rear * 0.55, tossOpen * 0.5, idle + 0.35 * jawIdle, 0.12 + 0.3 * pinch) * (1 - lift * 0.85) + lift * (v2 ? -0.07 : 0.02);
-  if (v2 && p.state === ST.Strike && st < 0.08) open = Math.min(open, -0.07); // still clamped through the flick
+  // (user rating B18: closed, the antlers' tips should touch — the model's rest pose is held open, so they turn
+  // in about half a radian further; tools: the tips of a major meet at −0.52)
+  const SHUT = -0.53;
+  let open = p.dead ? 0.25 : Math.max(idle, wind * (v2 ? 0.7 : 0.62) + tremble * 0.025, rear * 0.55, tossOpen * 0.5, idle + 0.35 * jawIdle, 0.12 + 0.3 * pinch) * (1 - lift * 0.85) + lift * (v2 ? SHUT : 0.02);
+  if (v2 && p.state === ST.Strike && st < 0.08) open = Math.min(open, SHUT); // still clamped through the flick
   if (v2 && p.state === ST.Lift) open = open + Math.sin(st * 30) * 0.02; // squeezing the struggling ants
   for (const sd of [-1, 1] as const) {
     // a positive yaw turns +x toward −z: open the left (+z) antler with a negative one; the sway turns both alike
@@ -772,7 +775,9 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   // toss it hung in the air ahead of them)
   {
     const ml = stagMandibleShare(msz / 4) * L;
-    rig.recLocal('jaw', SB.mand.x * L + ml * 0.5, SB.mand.y * L + ml * 0.16, 0);
+    // (where the closed tips meet, so a held ant is pinched between them — user rating B18: it floated between
+    // the blades)
+    rig.recLocal('jaw', SB.mand.x * L + ml * (v2 ? 0.7 : 0.5), SB.mand.y * L + ml * (v2 ? 0.2 : 0.16), 0);
   }
   // antennae: elbowed — a long scape out to the side, the funicle forward, the comb club; waving a little
   for (const sd of [-1, 1]) {
