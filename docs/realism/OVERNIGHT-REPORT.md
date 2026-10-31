@@ -18,8 +18,8 @@ lighting — and those need geometry and shader work rather than another look tw
 |---|---|---|---|---|---|---|
 | Lasius niger | worker, soldier, queen | 4 | 3.5 → 3.5 (L1–L4) | 8–9 | `lasius-niger/compare-*.png` | `lasius-niger/clips/`: walk, 3 attacks, hits, deaths, trophallaxis |
 | Formica rufa | worker, soldier, mortar, rapid, queen | 4 | 3.0 → 3.0 (F1–F6) | 7–9 | `formica-rufa/compare-*.png` | `formica-rufa/clips/`: walk, 3 attacks, hits, deaths, the three sprayers |
-| Atta cephalotes | minim, media, soldier, major, queen | 4 | 2.7 → ATTA_LAST | 9–10 | `atta-cephalotes/compare-*.png` | `atta-cephalotes/clips/`: walk, 3 attacks, hits, deaths, major attacks |
-| Eciton burchellii | worker, porter, media, soldier, queen | 3 | 2.8 → ECITON_LAST | 8–10 | `eciton-burchellii/compare-*.png` | `eciton-burchellii/clips/` (if the overnight recording finished) |
+| Atta cephalotes | minim, media, soldier, major, queen | 4 | 2.7 → 3.7 (round 3, kept) → 3.0 (round 4, harsher reviewer) | 9–10 | `atta-cephalotes/compare-*.png` | `atta-cephalotes/clips/`: walk, 3 attacks, hits, deaths, major attacks |
+| Eciton burchellii | worker, porter, media, soldier, queen | 3 | 2.8 → 3.7 (round 2, kept) → 2.8 (round 3, harsher reviewer) | 8–10 | `eciton-burchellii/compare-*.png` | `eciton-burchellii/clips/` (if the overnight recording finished) |
 
 Round-by-round scores and the fixes between rounds: PROGRESS.md, 2026-10-31.
 
@@ -51,8 +51,10 @@ Round-by-round scores and the fixes between rounds: PROGRESS.md, 2026-10-31.
   sculptured heads and the reviewer read any gloss as plastic or chocolate — the photos won (satin-matte heads).
 - The fire queen's eyes follow the batch-1 eye rule (your "eyes bulge" note); a wing-scar change that had touched the
   approved fire queen was reverted to Atta only. No other species changed (morph hashes checked each commit).
-- Stopped at 4 rounds for Lasius, Formica and Atta (the spec's limit), keeping the latest, most anatomically
-  correct version even where the score didn't move.
+- Stopped at 4 rounds for Lasius, Formica and Atta (the spec's limit) and 3 for Eciton (its minimum, time). Each
+  round used a fresh reviewer, so scores move ±1 with the reviewer (the last one scored every render 2–3); where a
+  change made things worse it was reverted (Atta's sideways scapes read as "stilts", the Eciton queen's pale
+  membranes as "candy stripes") and the best-scoring look was kept.
 
 ## Below 7/10: what blocks it, and the next steps
 Suggestions for each, with effort: `formica-lasius-suggestions.md` (they apply to all four species).
