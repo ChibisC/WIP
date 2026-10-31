@@ -69,6 +69,7 @@ export function separationSystem(w: World, dt: number): void {
     tdy = new Float64Array(n * 2);
     cancel = new Uint8Array(n * 2);
     under = new Uint8Array(n * 2);
+    wt = new Uint8Array(n * 2);
   }
   // per-ant flags (bit 1 takes part, bit 2 movable, 16 fighting, 32 anchored (combat v2.1), 128 standing in a guard line; 64
   // set below: pushed by a fighting ally, a stronger cap) and the largest small radius and fighting length
@@ -85,6 +86,7 @@ export function separationSystem(w: World, dt: number): void {
     // squeezing in under a creature to a slot under its body (small enough to go under): it passes between its
     // teammates' legs, no push between them (combat v2.1)
     under[i] = a.state === AS.Attack && a.tk === 4 && (a.rsv ?? 0) === a.tgt && a.gSlot >= 1 ? 1 : 0;
+    wt[i] = waiting(a) ? 1 : 0;
     // right of way (combat v2.1), and the way to its target (a teammate never pushes it that way)
     prio[i] = anch ? 3 : a.state === AS.Attack && (a.rsv ?? 0) !== 0 && a.rsv === a.tgt ? 2 : fighting(a) ? 1 : 0;
     tdx[i] = 0;
@@ -121,6 +123,7 @@ export function separationSystem(w: World, dt: number): void {
   P.strength = S.strength;
   P.fightStrength = BALANCE.combat2.fightStrength;
   P.ps = PS;
+  P.ws = BALANCE.combat21.waitSpace;
   for (let i = 0; i < n; i++) {
     const fa = flag[i];
     if (!(fa & 1)) continue;
@@ -367,7 +370,7 @@ function queenCb(i: number): boolean {
 }
 
 /** The ant whose neighbours are being visited (one shared callback: no closure per ant). */
-const P = { ants: [] as Ant[], i: 0, a: null as unknown as Ant, fa: 0, ra: 0, big: false, strength: 0, fightStrength: 0, ps: 0, foeK: 0, foeId: 0, team: 0 }; // det-ok: scratch
+const P = { ants: [] as Ant[], i: 0, a: null as unknown as Ant, fa: 0, ra: 0, big: false, strength: 0, fightStrength: 0, ps: 0, ws: 0, foeK: 0, foeId: 0, team: 0 }; // det-ok: scratch
 
 /**
  * The foe whose attack slot an ant holds (Grapple), has reserved while closing in, or is spraying as it closes in:
@@ -406,7 +409,10 @@ function pairCb(j: number): boolean {
   // …and two enemies each holding someone else (separate duels) drift apart too, so neighbouring duels keep ground
   // between them; enemies closing in, or fighting each other, keep only their bodies' radii
   const sameFoe = ally && P.foeK !== 0 && foeKind(po) === P.foeK && foeId(po) === P.foeId;
-  const fight = (fa & fo & 16) !== 0 && (ally ? !sameFoe : pa.state === AS.Grapple && po.state === AS.Grapple && !engaged(pa, po));
+  // (a teammate waiting for a slot: `waitSpace` from another waiting one, a personal space from one fighting — same foe
+  // or not: waiting)
+  const wait = ally && (fa & fo & 16) !== 0 && (wt[i] | wt[j]) !== 0;
+  const fight = wait || ((fa & fo & 16) !== 0 && (ally ? !sameFoe : pa.state === AS.Grapple && po.state === AS.Grapple && !engaged(pa, po)));
   const line = !fight && ally && ((fa | fo) & 128) !== 0 && (fa & 144) !== 0 && (fo & 144) !== 0;
   // (anchored ants never move: the other takes the whole push — combat v2.1)
   let ma = (fa & 2) !== 0;
@@ -423,7 +429,7 @@ function pairCb(j: number): boolean {
   if (P.big === oBig ? po.id <= pa.id : !P.big) return false;
   const dx = po.x - pa.x;
   const dy = po.y - pa.y;
-  const min = fight ? P.ps * Math.max(len[i], len[j]) : (P.ra + ro) * (line ? GUARD.fightRoom : 1);
+  const min = fight ? (wait && wt[i] && wt[j] ? P.ws : P.ps) * Math.max(len[i], len[j]) : (P.ra + ro) * (line ? GUARD.fightRoom : 1);
   const d2 = dx * dx + dy * dy;
   if (d2 >= min * min) return false;
   const d = dhypot(dx, dy);
@@ -438,7 +444,9 @@ function pairCb(j: number): boolean {
     nx = dcos(ang);
     ny = dsin(ang);
   }
-  const push = (min - d) * (fight ? P.fightStrength : P.strength);
+  // (two waiting ants ease apart at the walking strength: a crowd settling, not a fight's spacing)
+  const calm = wait && wt[i] && wt[j];
+  const push = (min - d) * (fight && !calm ? P.fightStrength : P.strength);
   const wa = mass[i];
   const wo = mass[j];
   // share by mass: the lighter ant gives way more
@@ -465,7 +473,7 @@ function pairCb(j: number): boolean {
   pushY[i] += ay;
   pushX[j] += ox;
   pushY[j] += oy;
-  if (fight) {
+  if (fight && !calm) {
     flag[i] |= 64;
     flag[j] |= 64;
   }
@@ -484,6 +492,7 @@ let tdx = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let tdy = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let cancel = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 let under = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
+let wt = new Uint8Array(0); // det-ok: scratch, rebuilt every tick (waiting for a slot)
 
 /** Radius (mm) above which an ant counts as big for the neighbour search. */
 const BIG = 2;
@@ -521,6 +530,17 @@ function antMass(a: Ant): number {
 /** Fighting (closing in, spraying, holding a foe): keeps a personal space from fighting allies. */
 function fighting(a: Ant): boolean {
   return a.state === AS.Attack || a.state === AS.Spray || a.state === AS.Grapple;
+}
+
+/**
+ * Waiting for a free slot (every slot on its foe taken), 2026-10-31 (user note: dozens of ants circling one fight): two
+ * waiting teammates keep `combat21.waitSpace` × the larger one's length (less than a personal space), whatever foe
+ * they wait for; a waiting ant and a teammate fighting keep a personal space even when they are on the same foe (the
+ * crowd stays out of the fight). Before, ants waiting on the same foe kept only their bodies' room and stood shoulder
+ * to shoulder round the ring.
+ */
+function waiting(a: Ant): boolean {
+  return a.state === AS.Attack && (a.waitT ?? 0) > 0;
 }
 
 /** Standing in a guard line / squad place at a marker (guardLine.ts sets the line's own spacing). */

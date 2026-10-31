@@ -673,3 +673,10 @@ Also found: an ant may latch up to 2 × `arriveTol` (0.3 L) inside its hold dist
 3. **Arena creatures**: reach capsule to capsule (`bodyGap`), facing the foe's nearest point from the front of the body.
 4. **An ant holding a creature**: a little way inside its hold distance it steps back between bites (as a little way outside); only over `stepMax` inside is the hold cancelled.
 5. Tools: `tools/fight-motion.ts`; tests `tests/combatV21.ts` (the one-sided split is checked at 6 s); clips; docs.
+
+## 19. Ants circling one foe (user note and screenshot 2026-10-31)
+"Maybe they should have smaller collisions cos now there is a bug where they circle around a single ant like this when they shouldn't." Branch `feature/no-orbit`. Evidence: `tools/orbit-probe.ts` (45 Black garden workers v 6 Red wood workers and 2 soldiers in the arena; each second the ants waiting or going round, those idle while a foe they could attack had room, the most on one foe, how far out the waiters stand, how much they walk).
+
+**Causes.** (1) Focus fire: with our side outnumbering the foes in sight 4 to 1, `findTarget` dropped the crowd penalty *and* let a full foe be chosen, so every ant took the nearest foe and the overflow waited on it while other foes had free slots (seed 7: 57 % of the fighting time idle that way). (2) Waiting: ants waiting on the same foe kept only their bodies' room and were held on an exact ring a personal space out (stepping back on to it whenever pushed past half a body length): with 30 of them, a ring shoulder to shoulder that overflowed into a spiral and kept moving — waiting ants walked 1.6–2 body lengths a second.
+
+**Changes.** Outnumbering drops the crowd penalty only; a full foe is chosen only when no foe in sight has room (or a marker is on it), and then the waiting is spread by the crowd on each. Waiting ants stand anywhere in a band from just inside the ring to `combat21.waitBand` (3) of their lengths beyond it; two waiting teammates keep `combat21.waitSpace` (1) × the larger length apart and ease apart at the walking strength; a waiting ant and a teammate fighting keep a personal space even on the same foe.
