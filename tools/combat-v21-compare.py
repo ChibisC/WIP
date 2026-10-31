@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Side-by-side before / after of the combat v2.1 clips (docs/combat/v2.1/{before,after}/, from
-tests/browser/combat_v21.py): for each clip a still of the last frames (compare_<name>.jpg) and a video with the two
-clips side by side (compare_<name>.mp4), labelled. (The repo keeps the side-by-side videos and the stills; the separate
-"after" videos are not kept: run it on a fresh render.)
+"""Side-by-side before / after of the combat clips — docs/combat/v2.1/{before,after}/ (tests/browser/combat_v21.py) and
+docs/combat/reach/{before,after}/ (tests/browser/melee_reach.py, CHANGE_PLAN §18): for each clip a still of the last
+frames (compare_<name>.jpg) and a video with the two clips side by side (compare_<name>.mp4), labelled. (The repo keeps
+the side-by-side videos and the stills; the separate "after" videos are not kept: run it on a fresh render.)
 
   python3 tools/combat-v21-compare.py docs/combat/v2.1
+  python3 tools/combat-v21-compare.py docs/combat/reach
 """
 import os, sys, subprocess, shutil
 from PIL import Image, ImageDraw, ImageFont
@@ -20,7 +21,15 @@ TITLES = {
     "creature_bites": "a tarantula and a stag beetle biting ants",
     "oneside_beetle": "30 ants charge one beetle from the west",
     "six_creatures": "45 ants v a group of six ground beetles",
+    # melee reach (docs/combat/reach)
+    "stag_ring": "a stag beetle and 40 soldiers",
+    "six_beetles": "45 workers v six ground beetles",
+    "wolf_spider": "a wolf spider and 12 workers",
+    "tarantula_mantis": "a tarantula and a mantis v 40 soldiers",
 }
+REACH = os.path.basename(os.path.normpath(D)) == "reach"
+LB, LA = ("before (reach from the centre)", "after (reach from the outline)") if REACH else ("before (combat v2)", "after (combat v2.1)")
+VB, VA = ("before", "after (reach)") if REACH else ("before (v2)", "after (v2.1)")
 for name, title in TITLES.items():
     a = os.path.join(D, "before", name + ".jpg")
     b = os.path.join(D, "after", name + ".jpg")
@@ -30,8 +39,8 @@ for name, title in TITLES.items():
     w, h = A.size
     sheet = Image.new("RGB", (w * 2, h + 36), (20, 16, 12))
     d = ImageDraw.Draw(sheet)
-    d.text((10, 7), f"before (combat v2) — {title}", fill=(240, 228, 205), font=font)
-    d.text((w + 10, 7), "after (combat v2.1)", fill=(240, 228, 205), font=font)
+    d.text((10, 7), f"{LB} — {title}", fill=(240, 228, 205), font=font)
+    d.text((w + 10, 7), LA, fill=(240, 228, 205), font=font)
     sheet.paste(A, (0, 36))
     sheet.paste(B.resize((w, h)), (w, 36))
     sheet.save(os.path.join(D, f"compare_{name}.jpg"), quality=88)
@@ -40,6 +49,6 @@ for name, title in TITLES.items():
     if shutil.which("ffmpeg") and os.path.exists(va) and os.path.exists(vb):
         draw = lambda txt: f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='{txt}':x=10:y=10:fontsize=20:fontcolor=white:box=1:boxcolor=black@0.5"
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", va, "-i", vb, "-filter_complex",
-                        f"[0:v]{draw('before (v2)')}[l];[1:v]{draw('after (v2.1)')}[r];[l][r]hstack=inputs=2,format=yuv420p",
+                        f"[0:v]{draw(VB)}[l];[1:v]{draw(VA)}[r];[l][r]hstack=inputs=2,format=yuv420p",
                         "-c:v", "libx264", "-preset", "veryfast", "-crf", "30", os.path.join(D, f"compare_{name}.mp4")], check=False)
     print("saved", name)

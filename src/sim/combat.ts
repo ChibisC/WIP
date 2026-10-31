@@ -1180,9 +1180,11 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   const ey = a.y - cr.y;
   const dBody = distToCreatureBody(cr, a.x, a.y);
   const ax0 = Math.max(-b.hl, Math.min(b.hl, ex * c0 + ey * s0));
-  // the body turned into it: a large creature's push — the attack is cancelled and it plants again (attackUpdate walks
-  // it back out to a free place beside the body)
-  if (!under && dBody < off * 0.5) return cancelAttack(w, a);
+  // the body turned well into it (over `stepMax` × its length inside its hold distance): a large creature's push — the
+  // attack is cancelled and it plants again (attackUpdate walks it back out to a free place beside the body). A little
+  // way in (it may latch up to 2 × arriveTol inside), like a little way off: one small step between bites (2026-10-31:
+  // this was half its hold distance, inside the latch window, and some ants latched and cancelled every other tick)
+  if (!under && off - dBody > L * C21.stepMax) return cancelAttack(w, a);
   // it moved off: the hold ends where the ant stands; a little: one small step between bites
   const err = Math.abs(dBody - off);
   if (dBody - off > L * C21.stepMax) return endHold(a);

@@ -647,3 +647,29 @@ Measured on the base (seed 4, 20 s; % of the unit's body length per second, by s
 8. **Numbers** in `BALANCE.combat21`; DESIGN.md §3.8.
 9. **Debug view** `?combatdebug=1` (and in the arena's panel): a pin on anchored units, blocked (red), backing off (an arrow back), the side chosen (an arrow along the ring), the target slot, free / taken slots round each target.
 10. **Tests** `tests/combatV21.ts` (the spec's checklist), the v2 tests that pin the follow and the pause-and-sidestep updated; clips after; stress (400 v 400 + 4 titans); determinism; LAN tests; docs; merge; the artifact (with `feature/realism` combined while it is unmerged).
+
+## 18. Creature melee reach from the body outline (user note 2026-10-31)
+"Maybe a factor that makes them move so much is that they all have too short of a range — how about increasing some of the melee ranges of the creatures in a realistic manner so they don't move too much when fighting." Branch `feature/melee-reach` from `main` (`1ec3f1b`). Evidence: `tools/fight-motion.ts` (every sim system wrapped; each tick's movement of a creature that is fighting, and of every fighting ant, put down to the system and the state that made it; hold endings by cause; `kill` mode: real health), clips `docs/combat/reach/` (`tests/browser/melee_reach.py`).
+
+### 18.1 Findings
+Seed 4, 20 s, 40 Black garden ants (a quarter soldiers) round one creature; % of the creature's length a second:
+
+| creature | walks | turns | bites | ants' grips lost a minute | why |
+|---|---|---|---|---|---|
+| ground beetle | 5.1 | 11°/s | 18 | 1.8 | bite reach from its centre (radius + 3 mm) is short of the ants at its head and tail: it walks at them |
+| rove beetle | 15.4 | 46°/s | 5 | 18.2 | the same, a longer body: it walks while ants hold it (9.7 ticks a second), their holds end |
+| stone centipede | 14.9 | 30°/s | 17 | 4.3 | the same |
+| stag beetle | 2.0 | 9°/s | **1** | **82.5** | walks while its target is over 0.45 L from its centre, but ants planted at its head stand at 0.48 L: it walks into its own attackers and never stops to pinch |
+| mantis | 0 | 28°/s | 4 | 34.9 | strike reach 0.42 L from its middle, short of its own head (0.48 L): only ants beside its forelegs; it swings to track ants and sweeps the holders |
+| tarantula | 7.2 | 34°/s | 7 | 39.5 | a 0.4 L lunge each strike, and walking to crowds |
+| giant centipede | 11.4 | 65°/s | 3 | 5.8 | strikes when an ant is within 0.35 L of its *middle*, then lunges the whole 180 mm body 0.3 L |
+| wolf spider / mother | 122 / 51 | 14 / 25°/s | 19 / 8 | 7.0 / 9.1 | pounces from 16 mm (sprint at 3 × speed) even on ants its front legs could reach, then drags its catch |
+
+Also found: an ant may latch up to 2 × `arriveTol` (0.3 L) inside its hold distance at a creature, but a hold was cancelled once the body was more than half the hold distance (0.21 L) inside it: those ants latched and cancelled every other tick without moving or biting (most of the stag's 82.5). Arena creature-on-creature reach was the two radii from the centres, so long bodies could not reach each other's ends.
+
+### 18.2 Changes
+1. **Reach from the outline** (`BALANCE.creatureReach`, `creatureReachDefault`): per kind the jaw, fang or foreleg reach beyond the body capsule (× its length) and the strike arc each side of its heading, seen from the front of its body (DESIGN §3.8). `inReach` (an ant's centre within reach × L + half the ant's length of the outline), `inStrike` (and in the arc).
+2. **Reach first** (`reachPick`, `standAndFace`): in reach, a creature stands and strikes; an ant in its arc first, then threat, then the one nearest its heading; sticky; retaliation (× 1.3 threat) still wins. An ant in reach outside the arc it turns to (3 rad/s) — never a long body to an ant planted beside it (it would sweep the others off). Only with no ant in reach does it walk. Hunters, the stag's pinch, wolf spiders (an ant in reach is grabbed without the sprint), the tarantula (the strike area is its front legs' reach in front of it, fixed at the wind-up; the body lurches 0.1 L instead of lunging 0.4 L), the giant centipede (the head strikes an ant in its arc, the body does not move; it lunged 0.3 L), the mantis (the raptorial reach past its head; it turns only to ants not holding it), bite landing (`biteSeq`: reach and arc × 1.3), the creature system's and `pickAnt`'s "clinging out of reach" checks.
+3. **Arena creatures**: reach capsule to capsule (`bodyGap`), facing the foe's nearest point from the front of the body.
+4. **An ant holding a creature**: a little way inside its hold distance it steps back between bites (as a little way outside); only over `stepMax` inside is the hold cancelled.
+5. Tools: `tools/fight-motion.ts`; tests `tests/combatV21.ts` (the one-sided split is checked at 6 s); clips; docs.
