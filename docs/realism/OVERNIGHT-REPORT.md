@@ -18,8 +18,8 @@ lighting — and those need geometry and shader work rather than another look tw
 |---|---|---|---|---|---|---|
 | Lasius niger | worker, soldier, queen | 4 | 3.5 → 3.5 (L1–L4) | 8–9 | `lasius-niger/compare-*.png` | `lasius-niger/clips/`: walk, 3 attacks, hits, deaths, trophallaxis |
 | Formica rufa | worker, soldier, mortar, rapid, queen | 4 | 3.0 → 3.0 (F1–F6) | 7–9 | `formica-rufa/compare-*.png` | `formica-rufa/clips/`: walk, 3 attacks, hits, deaths, the three sprayers |
-| Atta cephalotes | minim, media, soldier, major, queen | 4 | 2.7 → 3.7 (round 3, kept) → 3.0 (round 4, harsher reviewer) | 9–10 | `atta-cephalotes/compare-*.png` | `atta-cephalotes/clips/`: walk, 3 attacks, hits, deaths, major attacks |
-| Eciton burchellii | worker, porter, media, soldier, queen | 3 | 2.8 → 3.7 (round 2, kept) → 2.8 (round 3, harsher reviewer) | 8–10 | `eciton-burchellii/compare-*.png` | `eciton-burchellii/clips/` (if the overnight recording finished) |
+| Atta cephalotes | minim, media, soldier, major, queen | 4 | 2.7 → 3.7 (round 3, kept) → 3.0 (round 4, harsher reviewer) | 9–10 | `atta-cephalotes/compare-*.png` | `atta-cephalotes/clips/`: walk, 3 attacks, hits, deaths, the major's scissor crush |
+| Eciton burchellii | worker, porter, media, soldier, queen | 3 | 2.8 → 3.7 (round 2, kept) → 2.8 (round 3, harsher reviewer) | 8–10 | `eciton-burchellii/compare-*.png` | `eciton-burchellii/clips/`: walk, 3 attacks, hits, deaths, the soldier hooking and holding |
 
 Round-by-round scores and the fixes between rounds: PROGRESS.md, 2026-10-31.
 
@@ -67,4 +67,5 @@ Suggestions for each, with effort: `formica-lasius-suggestions.md` (they apply t
 
 ## Published?
 No. The spec allows publishing only when every check passes (the 7/10 review target was not met), so the game
-artifact stays at v19. Tests: all suites pass on the final commit.
+artifact stays at v19. Photo-vs-render sheets (study only) were sent in chat:
+`formica_lasius_final.jpg`, `atta_eciton_final.jpg`. Tests: all suites pass on the final commit.
