@@ -1,7 +1,7 @@
 # Formica rufa — realism rollout (batch 1)
 
 Comparison sheets (render only: the reference photos are study material and never go in the repo) are
-; animation clips are in . Photo-vs-render sheets were sent to the user in chat.
+`compare-<unit>.png`; animation clips are in `clips/`. Photo-vs-render sheets were sent to the user in chat.
 
 ## Numeric colour check (overnight 2026-10-31)
 Median sRGB of a patch on each body part (the brightest 20 % dropped as highlights) in the user's reference
