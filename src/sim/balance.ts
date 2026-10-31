@@ -16,6 +16,17 @@ export interface TierBalance {
 }
 
 export const BALANCE = {
+  /**
+   * Caste abilities (user 2026-10-31, after Empires of the Undergrowth; sim/casteAbilities.ts), automatic:
+   *  taunt — leafcutter majors: on a bite, with more than `minHpFrac` health, a `chance` (EotU 30 %) to make every
+   *    enemy within `radiusL` of its lengths fight it for `durSec` (EotU 4–6 s), every `cooldownSec` (EotU 10 s) at most;
+   *  rage — army-ant soldiers: +`dmgPerStack` bite damage per kill (up to `maxStacks`: +45 %, EotU's cap) for the
+   *    soldier and nestmates within `radiusL` of its lengths; one stack fades every `decaySec` without a kill.
+   */
+  casteAbility: {
+    taunt: { chance: 0.3, minHpFrac: 0.3, radiusL: 2.5, durSec: 5, cooldownSec: 10 },
+    rage: { maxStacks: 5, dmgPerStack: 0.09, radiusL: 3, decaySec: 8 },
+  },
   // ---------------------------------------------------------------- jobs
   /** completion points every dig / build / upgrade / delete job needs (EotU) */
   jobPoints: 6,

@@ -8,6 +8,7 @@ import { victimStruggle } from '../render/termite/material';
 import { bodyHook } from '../sim/slots';
 import { LUNGE_TICKS, isSickle, sickleRampFraction } from '../sim/sickleJaws';
 import { ATTACK_CONTACT } from '../render/ants/attackPoses';
+import { CASTE_FX } from '../sim/casteAbilities';
 import { queenBody, rampFraction } from '../sim/termites';
 import { World } from '../sim/world';
 
@@ -63,6 +64,8 @@ interface AtkRec {
   n: number;
   v: number;
   seen: number;
+  /** army ants: this cycle's bite stings (decided at the cycle's start, from the sim's bite count) */
+  st?: boolean;
 }
 const atkRecs = new Map<number, AtkRec>();
 let atkPrune = 0;
@@ -78,6 +81,35 @@ function meleeOf(w: World, a: Ant, L: number): boolean {
   const r = 'caste' in t ? casteOf(t.caste).length * 0.45 : t.scale * 0.45;
   return Math.hypot(t.x - a.x, t.y - a.y) <= r + L * 0.6;
 }
+/**
+ * Caste abilities (sim/casteAbilities.ts), render: the leafcutter major's taunt display and the army-ant soldier's
+ * rage pulse play as an attack cycle of their own (the sim's timers give the phase); ants fighting in a rage aura flush
+ * red, deeper as it grows, pulsing at the cap (EotU's glow at +45 %).
+ */
+function casteFx(w: World, a: Ant, out: AntView): void {
+  out.special = 0;
+  out.rageGlow = 0;
+  if (a.state === AS.Dead) return;
+  if ((a.tauntFx ?? 0) > 0) {
+    out.special = 1;
+    out.atk = Math.min(0.999, 1 - a.tauntFx! / CASTE_FX.tauntPose);
+    out.atkGap = CASTE_FX.tauntPose;
+    out.atkSide = 1;
+    out.atkSeq = true;
+  } else if ((a.rageFx ?? 0) > 0) {
+    out.special = 2;
+    out.atk = Math.min(0.999, 1 - a.rageFx! / CASTE_FX.ragePulse);
+    out.atkGap = CASTE_FX.ragePulse;
+    out.atkSide = a.id & 1 ? 1 : -1;
+    out.atkSeq = true;
+  }
+  if (w.s.tick - (a.rageTick ?? -9) <= 1 && (a.rageAura ?? 0) > 0) {
+    const R = BALANCE.casteAbility.rage;
+    const k = Math.min(1, a.rageAura! / (R.maxStacks * R.dmgPerStack));
+    out.rageGlow = k >= 0.999 ? 0.75 + 0.2 * Math.sin(w.time * 7 + a.id) : 0.15 + 0.4 * k;
+  }
+}
+
 function meleeAttack(w: World, a: Ant, out: AntView): void {
   const cd = casteOf(a.caste);
   out.atk = undefined;
@@ -97,6 +129,9 @@ function meleeAttack(w: World, a: Ant, out: AntView): void {
     // and the side clamp switches sides
     r.n++;
     r.v = (r.v + (a.id & 1 ? 1 : 2)) % 3;
+    // army ants sting every n-th bite (user 2026-10-31): the coming bite is a sting when the count says so
+    const ev = cd.sting?.every;
+    r.st = !!ev && ((a.stingN ?? 0) + 1) % ev === 0;
   }
   r.q = q;
   out.atk = q;
@@ -105,6 +140,7 @@ function meleeAttack(w: World, a: Ant, out: AntView): void {
   out.atkGap = r.gap;
   out.atkN = r.n;
   out.atkSeq = true;
+  out.stingNext = r.st;
   if (++atkPrune > 4000) {
     atkPrune = 0;
     for (const [id, x] of atkRecs) if (w.s.tick - x.seen > 200) atkRecs.delete(id);
@@ -260,6 +296,7 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
   out.rideSlot = a.rideSlot ?? 0;
   out.rideT = a.rideT ?? 0;
   meleeAttack(w, a, out);
+  casteFx(w, a, out);
   speciesExtras(w, a, out);
   termantLook(w, a, out);
   return out;

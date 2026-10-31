@@ -12,6 +12,9 @@ export type SimEvent =
   | { t: 'acid'; x: number; y: number; tx: number; ty: number; space: number; lob?: boolean; splash?: number }
   | { t: 'acidHit'; x: number; y: number; space: number; splash: number }
   | { t: 'sting'; x: number; y: number; space: number; by?: string }
+  /** caste abilities (sim/casteAbilities.ts): a leafcutter major's taunt (its reach), an army-ant soldier's rage stack */
+  | { t: 'taunt'; x: number; y: number; space: number; radius: number; by: string }
+  | { t: 'rage'; x: number; y: number; space: number; stacks: number; by: string }
   | { t: 'hit'; x: number; y: number; space: number; big: boolean }
   /** `what`: the caste id or creature kind */
   | { t: 'death'; x: number; y: number; space: number; kind: 'ant' | 'creature'; id: number; colony: number; what?: string; cause?: number }

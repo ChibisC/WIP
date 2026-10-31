@@ -13,7 +13,8 @@ import { globalUniforms } from '../render/shaderPatch';
 import { applyLabLight } from './labLight';
 import { blankView, sprayPose } from '../game/antViews';
 import { CREATURES } from '../sim/creatures/kinds';
-import { STAG } from '../sim/balance';
+import { BALANCE, STAG } from '../sim/balance';
+import { CASTE_FX } from '../sim/casteAbilities';
 import type { Creature } from '../sim/types';
 import type { SimEvent } from '../core/events';
 
@@ -49,6 +50,8 @@ interface Clip {
   dur: number;
   ants: Array<{ morph?: string; script: AntScript }>;
   stag?: CrScript;
+  /** positions and camera in mm as given (not scaled to the `ant=` species' size: the castes line-up) */
+  noScale?: boolean;
   /** camera: target (x, y, z mm), direction and distance; `follow` an actor index (its position, smoothed) */
   cam: { tx: number; ty: number; tz: number; dir: [number, number, number]; dist: number; follow?: number; fov?: number };
   /** events at times (slam dust, bites) */
@@ -383,6 +386,65 @@ function clips(): Record<string, Clip> {
       cam: { tx: -0.6, ty: 0.6, tz: 0, dir: [0.15, 0.35, 1], dist: 11, fov: 30 },
     };
   }
+  // ---- caste abilities (user 2026-10-31, after EotU; sim/casteAbilities.ts) and the army ants' stings
+  // the leafcutter major's taunt, twice: it rears, jaws agape, stridulating, and the ring shows its reach
+  const tauntAt = [0.5, 3.0];
+  C.taunt = {
+    dur: 5.4,
+    ants: [
+      {
+        morph: 'fire_major',
+        script: (t, v) => {
+          v.x = 0;
+          v.y = 0;
+          v.heading = 0.5;
+          v.antennaActivity = 1;
+          v.antennaPitch = 0.6;
+          v.mandible = 0.7;
+          for (const t0 of tauntAt) if (t >= t0 && t < t0 + CASTE_FX.tauntPose) specialAt(v, 1, (t - t0) / CASTE_FX.tauntPose, CASTE_FX.tauntPose);
+        },
+      },
+    ],
+    events: tauntAt.map((t) => ({ t: t + 0.3, e: { t: 'taunt', x: 0, y: 0, space: -1, radius: (MORPHS.atta_major?.L ?? 14) * BALANCE.casteAbility.taunt.radiusL, by: 'atta_major' } as SimEvent })),
+    cam: { tx: 0, ty: 1.2, tz: 0, dir: [0.55, 0.55, 1], dist: 16, fov: 30 },
+  };
+  // the army-ant soldier's rage: a kill (a pulse: the sickles snapping, the head tossing) every 1.2 s — five stacks, the
+  // soldier and the workers beside it flushing deeper red, pulsing at the cap
+  const rageAt = [1.0, 2.2, 3.4, 4.6, 5.8];
+  const stacksAt = (t: number) => rageAt.filter((x) => t >= x).length;
+  const glow = (t: number) => {
+    const k = stacksAt(t) / BALANCE.casteAbility.rage.maxStacks;
+    return k <= 0 ? 0 : k >= 0.999 ? 0.75 + 0.2 * Math.sin(t * 7) : 0.15 + 0.4 * k;
+  };
+  const raging = (s: AntScript, soldier: boolean): AntScript => (t, v) => {
+    s(t, v);
+    v.rageGlow = glow(t);
+    if (soldier) for (const t0 of rageAt) if (t >= t0 && t < t0 + CASTE_FX.ragePulse) specialAt(v, 2, (t - t0) / CASTE_FX.ragePulse, CASTE_FX.ragePulse);
+  };
+  C.rage = {
+    dur: 7.4,
+    ants: [
+      C.attack.ants[0],
+      { morph: 'fire_major', script: raging(attacker(-R * 1.25, 0, 0, 0, 1.1, 0.2, bite), true) },
+      { script: raging(attacker(R * 0.55, R * 0.8, -2.2, 0, 0.8, 0.4, bite), false) },
+      { script: raging(attacker(R * 0.55, -R * 0.8, 2.2, 1, 0.8, 0.6, bite), false) },
+    ],
+    cam: { tx: -0.3, ty: 0.6, tz: 0, dir: [0.3, 0.6, 1], dist: 13, fov: 30 },
+  };
+  // army ants sting every third bite: two bites, then the quick sting (the gaster cocked and whipped under)
+  C.sting = {
+    dur: 5.2,
+    ants: [
+      C.atk0.ants[0],
+      {
+        script: ((s: AntScript): AntScript => (t, v) => {
+          s(t, v);
+          v.stingNext = (v.atkN ?? 0) % 3 === 2;
+        })(attacker(-R * 0.62, 0, 0, 0, 0.8, 0.2, bite)),
+      },
+    ],
+    cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.15, 0.35, 1], dist: 9, fov: 30 },
+  };
   // the same attack seen from the default gameplay zoom (readability)
   // (the game's surface camera: 38° field of view, 230 mm away at the default zoom, looking down at about 50°)
   C.attack_game = { ...C.attack, cam: { tx: 0, ty: 0, tz: 0, dir: [0.35, 1, 0.55], dist: 230, fov: 38 } };
@@ -531,9 +593,46 @@ function clips(): Record<string, Clip> {
   return C;
 }
 
+/** A caste ability played as an attack cycle (as game/antViews.ts casteFx): 1 taunt, 2 rage, at phase q. */
+function specialAt(v: AntView, kind: number, q: number, len: number): void {
+  v.special = kind;
+  v.atk = Math.min(0.999, Math.max(0, q));
+  v.atkGap = len;
+  v.atkSide = 1;
+  v.atkSeq = true;
+}
+
+/**
+ * Every caste of a species walking side by side, each in its own lane at its own size (`castes=` a comma list of
+ * morphs, largest last): the legs and the stance compared (user 2026-10-31: compact, as EotU draws them).
+ */
+function lineup(q: URLSearchParams): Clip {
+  const list = (q.get('castes') || 'fire_minor,fire_major').split(',').filter((m) => MORPHS[m]);
+  const Ls = list.map((m) => MORPHS[m].L ?? 3);
+  const maxL = Math.max(...Ls);
+  let y = 0;
+  const lanes: number[] = [];
+  Ls.forEach((L, i) => {
+    if (i) y += (Ls[i - 1] + L) * 0.6;
+    lanes.push(y);
+  });
+  const mid = y / 2;
+  const dur = 6;
+  return {
+    dur,
+    noScale: true,
+    ants: list.map((m, i) => {
+      const L = Ls[i];
+      const v = L * 0.9;
+      return { morph: m, script: pathWalker(-v * (dur - 0.6) * 0.5, lanes[i] - mid, 0, [{ d: 0.3 }, { d: dur - 0.6, v }, { d: 0.3 }]) };
+    }),
+    cam: { tx: 0, ty: maxL * 0.1, tz: 0, dir: [0.1, 1, 0.75], dist: Math.max((y + maxL * 1.5) * 1.35, maxL * 4.5), fov: 30 },
+  };
+}
+
 export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
   animSettings.v2 = q.get('anim') !== '1';
-  const clip = clips()[q.get('clip') || 'walk'];
+  const clip = q.get('clip') === 'lineup' ? lineup(q) : clips()[q.get('clip') || 'walk'];
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
   setBakeRenderer(renderer);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -566,7 +665,7 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
   // the ant's size so they don't overlap (`kS`)
   const ant = q.get('ant') || FIRE;
   const big = q.get('big') || '';
-  const kS = clip.stag ? 1 : (MORPHS[ant]?.L ?? 2.8) / (MORPHS[FIRE].L ?? 2.8);
+  const kS = clip.stag || clip.noScale ? 1 : (MORPHS[ant]?.L ?? 2.8) / (MORPHS[FIRE].L ?? 2.8);
   const actors: Actor[] = clip.ants.map((a, i) => {
     const v = blankView();
     v.id = i + 1;
@@ -593,6 +692,9 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
       a.prev.h = a.cur.heading;
       const keepHp = a.cur.hp;
       a.cur.atk = undefined;
+      a.cur.special = 0;
+      a.cur.rageGlow = 0;
+      a.cur.stingNext = false;
       a.cur.pose = 0;
       a.cur.lift = 0;
       a.cur.flung = false;

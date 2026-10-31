@@ -178,7 +178,7 @@ export function applyAttackBody(p: AttackPose, w: number, L: number, vF: THREE.V
 // ---------------------------------------------------------------------------------------------------------------
 
 /** Attack variants of the planted-feet pass (attackVariant in antMotion.ts picks them per species and cycle). */
-export const ATK = { LUNGE: 0, REAR: 1, CLAMP: 2, PIVOT_STING: 3, QUICK_STING: 4, CRUSH: 5, HEAD_SWING: 6, ACID: 7 } as const;
+export const ATK = { LUNGE: 0, REAR: 1, CLAMP: 2, PIVOT_STING: 3, QUICK_STING: 4, CRUSH: 5, HEAD_SWING: 6, ACID: 7, TAUNT: 8, RAGE: 9 } as const;
 
 type Key = Partial<Omit<AttackPose, never>>;
 const FIELDS = ['fwd', 'pitch', 'yaw', 'roll', 'headPitch', 'headYaw', 'mand', 'gaster', 'sting', 'up', 'side', 'px', 'spread', 'front', 'gYaw'] as const;
@@ -241,6 +241,17 @@ const CRUSH_S: Key = { fwd: 0.1, up: -0.07, pitch: -0.08, px: 0.3, headPitch: -0
 const SWING_W: Key = { yaw: 0.2, headYaw: 0.42, headPitch: -0.12, roll: 0.04, mand: 0.85, up: -0.03, spread: 0.32 };
 const SWING_S: Key = { yaw: -0.16, headYaw: -0.32, roll: -0.06, fwd: 0.05, headPitch: -0.2, mand: 0.15, up: -0.03, spread: 0.32 };
 const SWING_F: Key = { yaw: -0.2, headYaw: -0.4, roll: -0.05, fwd: 0.03, headPitch: -0.16, mand: 0.25, up: -0.03, spread: 0.32 };
+/**
+ * The leafcutter major's taunt (user 2026-10-31, after EotU; the real Atta threat display): it rears on its hind and
+ * middle legs, the fore legs lifted, head thrown up and the great jaws gaping, and stridulates — the gaster pumping
+ * up and down fast (the rasp between the postpetiole and the gaster) — the jaws snapping, then settles.
+ */
+const TAUNT_K: Key = { up: 0.08, pitch: 0.24, px: -0.32, front: 0.85, headPitch: 0.42, mand: 1, gaster: 0.55, spread: 0.5 };
+/**
+ * An army-ant soldier's rage (user 2026-10-31, after EotU): a frenzy at each kill — the sickles snapping open and
+ * shut three times, the head tossing side to side, the body jolting forward over braced legs.
+ */
+const RAGE_K: Key = { up: 0.03, fwd: 0.02, pitch: 0.06, headPitch: 0.2, mand: 1, gaster: 0.3, spread: 0.45 };
 
 /**
  * Pose of a planted-feet attack at phase q. `holdIn` / `holdOut`: this sting continues a grip held from the
@@ -340,6 +351,29 @@ export function attackPoseV2(variant: number, q: number, side: number, out: Atta
         if (k < 0.3) blend(SWING_S, SWING_F, sm(k / 0.3), side, out);
         else blend(SWING_F, {}, sm((k - 0.3) / 0.7), side, out);
       }
+      return out;
+    }
+    case ATK.TAUNT: {
+      // rise into the display (0 → 0.2), hold it stridulating with the jaws snapping (→ 0.82), settle
+      const k = q < 0.2 ? sm(q / 0.2) : q < 0.82 ? 1 : 1 - sm((q - 0.82) / 0.18);
+      blend({}, TAUNT_K, k, side, out);
+      const hold = q > 0.16 && q < 0.86 ? 1 : 0;
+      out.gaster += 0.32 * Math.sin(q * 105) * hold * k;
+      out.mand = Math.max(0, out.mand - 0.45 * Math.max(0, Math.sin(q * 42)) * hold);
+      out.headYaw += 0.12 * Math.sin(q * 13) * hold * k;
+      out.up += 0.006 * Math.sin(q * 105) * hold;
+      return out;
+    }
+    case ATK.RAGE: {
+      // three snaps of the sickles with a toss of the head each way, the body jolting, then settle
+      const k = q < 0.12 ? sm(q / 0.12) : q < 0.85 ? 1 : 1 - sm((q - 0.85) / 0.15);
+      blend({}, RAGE_K, k, side, out);
+      const snap = Math.max(0, Math.sin(q * Math.PI * 6));
+      out.mand = k * (1 - 0.95 * snap);
+      out.headYaw += 0.4 * Math.sin(q * Math.PI * 3) * k;
+      out.headPitch -= 0.18 * snap * k;
+      out.fwd += 0.03 * snap * k;
+      out.roll += 0.05 * Math.sin(q * Math.PI * 3) * k;
       return out;
     }
     default:

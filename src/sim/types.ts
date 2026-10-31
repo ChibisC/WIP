@@ -198,6 +198,21 @@ export interface Ant {
   lastHit?: number;
   /** hint for renderer: pose id */
   pose: number;
+  /** caste abilities (casteAbilities.ts): the leafcutter major's taunt — its cooldown and the pose's time left; on an
+   * ant made to fight a taunting major: who and for how long */
+  tauntCd?: number;
+  tauntFx?: number;
+  tauntBy?: number;
+  tauntT?: number;
+  /** the army-ant soldier's rage: stacks, time since the last kill, the pulse's time left; on any ant: the rage aura
+   * it fights with (bite × 1 + rageAura) and the tick it was set */
+  rage?: number;
+  rageT?: number;
+  rageFx?: number;
+  rageAura?: number;
+  rageTick?: number;
+  /** bites so far (stingers that sting every n-th bite: Eciton) */
+  stingN?: number;
   /** body-relative head yaw toward target */
   look: number;
   /** debuffs: slow (0..1) remaining time */
@@ -667,6 +682,9 @@ export interface Creature {
    * `combat2.threatMax`; each hit adds its damage × (1 + the caste's threat), decaying `threatDecay` a second).
    */
   thr?: number[];
+  /** taunted by a leafcutter major (casteAbilities.ts): it turns on that ant for `tauntT` seconds */
+  tauntBy?: number;
+  tauntT?: number;
 }
 
 export interface Projectile {

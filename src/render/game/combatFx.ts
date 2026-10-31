@@ -285,6 +285,10 @@ export class CombatFx {
       case 'telegraph':
         this.warn(e.x, e.y, e.radius, e.duration, heightAt, e.dir, e.half);
         break;
+      case 'taunt':
+        // a leafcutter major's taunt (sim/casteAbilities.ts): a ring across its reach
+        this.ring(e.x, e.y, e.radius, heightAt);
+        break;
       case 'slam': {
         // a ring of dust thrown out across the slam radius, and a flash of the warning colour
         const h = heightAt(e.x, e.y) + 0.4;
