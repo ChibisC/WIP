@@ -116,6 +116,17 @@ with sync_playwright() as p:
     # in-game chat
     ev(guests[1], "__net.chat('gg so far')")
     check('in-match chat reaches the other players', wait(lambda: 'gg so far' in host.locator('.net-chat').inner_text(), 10))
+    # game speed (user request 2026-10-31): faster only when every player agrees; anyone can bring it back down
+    host.locator('.spd').locator('xpath=..').dispatch_event('click')
+    ok = wait(lambda: all(g.locator('[data-a="speed-yes"]').is_visible() for g in guests), 30)
+    check('asking for 2x shows every other player an Agree button', ok, [g.locator('.net-vote').inner_text() for g in guests])
+    check('the match stays at 1x until they agree', all((ev(pg, '__session.world.s.settings.gameSpeed') or 1) == 1 for pg in pages))
+    for g in guests: g.locator('[data-a="speed-yes"]').dispatch_event('click')
+    ok = wait(lambda: all(ev(pg, '__session.world.s.settings.gameSpeed') == 2 and ev(pg, '__session.loop.speed') > 1.5 for pg in pages), 30)
+    check('when every player agrees, every tab runs at 2x', ok, [ev(pg, '[__session.world.s.settings.gameSpeed, __session.loop.speed]') for pg in pages])
+    host.screenshot(path='shots/mp_speed_2x.jpg', quality=80)
+    ev(guests[0], "__session.setSpeed(1)")
+    check('any player can bring it back to 1x at once', wait(lambda: all((ev(pg, '__session.world.s.settings.gameSpeed') or 1) == 1 for pg in pages), 30))
     # a multiplayer match cannot be paused (user rule): P only explains that
     tp = [ev(pg, '__session.world.s.tick') for pg in pages]
     host.keyboard.press('KeyP')

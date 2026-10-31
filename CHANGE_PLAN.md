@@ -506,3 +506,100 @@ Decisions from the user's answers: both kinds of corpse are timed food; every qu
 
 ### 15.9 Release
 - `npm test`, the species tests, browser checks, the determinism hash, the stress scene; DESIGN / README / PROGRESS; commit; build; publish as a new version of the existing artifact; re-zip `dist`.
+
+## 16. Combat v2 — EotU-style fight spacing, large-creature AI, titan mounting (user spec 2026-10-31)
+Spec: project doc `claude/combat/02-spec-combat-v2.md` (replaces / extends §15 and `claude/combat/01-spec-collision-and-climbing.md`). Branch `feature/combat-v2` (from `main`). Everything below is sim state: deterministic (dmath, `w.rng`, id order, per-tick caches on `World.tickCache`), numbers in `BALANCE.combat2` / `BALANCE.mount`, new optional fields default to 0 (never `undefined`: hash key order, PROGRESS.md 2026-10-25).
+
+### Survey: what there is now (and what the spec changes)
+- **Spacing.**
+  - Body radius 0.224 L (`separation.ts antRadius`). Hit radius 0.45 L.
+  - "Room in a fight" is ×1.9 (`GUARD.fightRoom`) for every pair in fight stance, friend and foe alike, about 0.85 L centre to centre, at the walking strength (0.5) and cap (3 mm/s).
+  - The spec wants a personal-space radius of 1.3–1.6 L between allies in a fight (stronger than walking), and only body radius between enemies who are not fighting each other.
+- **Slots and stopping.**
+  - Ants: fixed limb slots, 3 / 4 for big victims / 8 for queens (`slots.ts`). Creatures: one per 4.5 mm of outline, 6–32 (a ground beetle gets 12; the spec wants 6–10).
+  - Slots are claimed only on latching, so several ants approach the same limb.
+  - Stopping is centre-based (`d ≤ 0.45 (Lv + La)`). The grapple holds at 0.84 × the mean length, so the bodies overlap head to head.
+- **Overflow.** A ring at `reach + 1.3 L` and `findTarget` again every second. That does not prefer targets with free slots, so a waiting ant often re-picks the same one. There is no flanking choice and no "can't reach: pause and reposition".
+- **Targeting.**
+  - Score = d² × ahead × (1 + 0.8 × attackers) / (1 + threat). The crowd penalty is soft, so mobs still form; creature targets get none.
+  - Getting bitten retargets every non-grappling ant, so targets flicker.
+  - No focus-fire order.
+- **Large creatures.**
+  - One solid capsule: nothing goes under, and there are no leg footprints.
+  - No threat table; the target is the crowd-biased nearest.
+  - Splash attacks are centred on the creature, not aimed at clusters. Not every attack is telegraphed.
+  - Riders are never shaken off.
+- **Climbing.**
+  - Any non-royal ant climbs, capped by area room units (stag 111, up to 32 riders).
+  - Rails run foot → knee → one back slot, and slots fill lowest index first, so riders bunch at the rear.
+  - No ratio, ground-force rule, mount bonus, basic-attack-only rule, death on leaving the map, or dismount on noAttack / noClimb.
+  - Nothing in the data marks a creature as huge, only `boss`.
+- **Tests that pin v1 numbers** (to update with the new rules): combat.ts `maxRiders ≥ 24` and `caps.stagBeetle === 32`; arena.ts `riders ≥ 20`; fights.ts `antSlots === 3 && bigAntSlots === 4`.
+
+### Plan (in this order; each step committed with its tests)
+1. **Spacing** (`separation.ts`, `BALANCE.combat2`):
+   - Allies who are both in a fight keep `personalSpace` 1.45 L centre to centre, using the larger ant's length, at a stronger push (`fightStrength` 0.8, cap ×2).
+   - Enemies who are not engaged with each other keep body radius only, so lines can meet.
+   - An attacker and its own target keep exactly the hold distance (step 2).
+   - The guard line's spacing stays as it is; it is already wider.
+2. **Stop at reach, head to head without overlap** (`combat.ts`, `slots.ts`):
+   - The victim's outline is an ellipse: half its length along, its half-width across (ants: 0.5 L × 0.14 L; creatures: the existing capsule).
+   - The hold point is the outline in the slot's direction plus the attacker's front half (0.5 La − its own mandible overlap of 0.08 La). Approach stops there, and the grapple holds there.
+3. **Slots sized by perimeter:**
+   - `n = clamp(floor(perimeter(outline offset by 0.5 La) / (0.28 La × spacing 2.2)), 2, cap)`. A worker on a worker gets about 3, a 16 mm beetle about 8, a 100 mm boss about 24 (`slotsMax` 24). Queens keep a minimum of 8.
+   - Slot positions are spread evenly along the outline.
+   - Slots are **reserved on approach** in a per-tick cache (id order), so two ants never head for the same slot.
+4. **Overflow and duel distribution** (`findTarget`, `waitForSlot`):
+   - Targets with no free slot are skipped unless the ant already holds one there.
+   - The score weights the attacker count heavily (`crowdPenalty` 2.5), so a clash breaks into 1v1 and 2v1 duels.
+   - An ant with no target that has a free slot (a) takes the nearest one within its vision radius; else (b) flanks round the outline to a free slot on the far side, if there is one; else (c) waits on a loose ring at personal-space distance, facing the fight, and steps in when a slot frees (checked every 0.5 s).
+   - **Focus fire** only when a marker sits on an enemy (within 6 mm of it) or when the target is outnumbered 4 to 1 or worse. Those ants ignore the crowd penalty and may take the ring places.
+   - Being bitten retargets an ant only when its current target is out of reach (no more flicker).
+5. **Reposition when blocked:** an attacker that hasn't closed 0.1 L on its hold point in 1 s pauses attacking for 0.5–1 s (`w.rng`), then sidesteps along the ring (seeded side) before it tries again. It no longer shoves forever.
+6. **Under large creatures** (`creatureAI.ts`, `separation.ts`):
+   - Each creature kind gets an underside clearance (fraction of L) and foot points (the climb rails' feet).
+   - Ants shorter than the clearance collide only with foot circles, not the body capsule, so they walk and fight under it.
+   - The body still pushes ants that are taller than the clearance.
+   - Creature slots include points under the body and at the legs.
+7. **Creature threat and splash AI:**
+   - `cr.threat`: a small id/value list, add damage × caste threat, decay 10 %/s.
+   - Retarget only to an ant whose threat is 1.3 times the current target's (stickiness).
+   - Splash attacks (stag clamp / rear, tarantula frenzy / flick, scolopendra whip / constrict, mantis cone) are aimed: the centre or cone direction with the most ground ants in reach (a fixed set of candidate directions, counted in id order). The creature turns toward that cluster first.
+   - It backs off a few mm when surrounded (≥ 10 within 0.6 L) and its hp is below half.
+   - Every splash attack telegraphs its area.
+   - Titans (bosses) get a telegraphed **shake-off** that throws riders down (stag: rear-and-shake; tarantula: roll; scolopendra: thrash), roughly every 20 s once riders ≥ half the cap.
+   - Wolf spiders pounce and drag an ant 1–2 body lengths out of a cluster.
+8. **Mounting rules** (`climbing.ts`, `BALANCE.mount`):
+   - Creature size class: **large** (non-boss climbables) or **huge** (bosses).
+   - Caste mount class from data: small (default), large (≥ 7 mm or flagged: leafcutter mediae/majors, army-ant majors, fire majors, termite major soldiers) or none. Small castes mount large and huge; large castes mount only huge.
+   - Fixed caps: large 8, huge 12. These replace the area room units.
+   - **Ratio:** a colony's riders on a creature are at most 30 % of its ants fighting that creature (riders plus ground attackers). Over the ratio, the longest-mounted rider climbs down first. No ground force, no mounting.
+   - **Mount bonus:** riders ≥ half the cap → +25 % damage taken from everyone.
+   - **While mounted:** basic attack only, no acid or glue; fire ants keep their sting.
+   - **Dismount:** the timer (8 s, then a 6 s cooldown); the creature dies (drop and tumble); it leaves the map (riders die); the marker's no-attack / no-climb order (climb down).
+9. **Placement on the creature** (`tools/climb-data.ts`, `climbData.ts`, `creatureRenderer.mountPose`):
+   - Per creature, author **climbing points** at the feet and lower legs (the existing rails), **weak points** (head–thorax joint, leg bases, thorax–abdomen joint, top of the abdomen, neck) and **mount slots** spaced evenly round the weak points (≥ 1.2 rider lengths apart).
+   - Each rail runs foot → leg → its weak point.
+   - New riders take the free slot farthest from the occupied ones, so riders spread front to back on both sides.
+   - Render: slots oriented to the body surface (belly down, facing the weak point), lifted clear, following the animated frames.
+   - The debug overlay shows climbing points, rails, weak points and occupancy.
+   - Authored for: stag beetle, tarantula, Scolopendra, giant mantis, hogna (the wolf-spider mother), mantis, ground beetle, rove, wolf spider, Lithobius, cutworm.
+10. **UI:**
+    - Health bars and the boss bar show riders / cap and a mount-bonus icon.
+    - Caste cards say "Mounts large and huge creatures" / "huge only" / "cannot mount".
+    - The marker toggles dismount riders.
+11. **Tests and checks:**
+    - Update the v1-pinned numbers.
+    - New tests:
+      - spacing (allies ≥ 0.9 × personal space in a fight; enemies at body radius);
+      - stop-at-reach (no body overlap in grapples, using the outline ellipses);
+      - slot counts by perimeter (worker 2–4, beetle 6–10);
+      - reservation (no two approachers on one slot);
+      - overflow (flank, switch, ring), reposition when blocked;
+      - under-body movement and foot pushes;
+      - threat stickiness and splash aiming at the densest cluster;
+      - mount size rules, caps, 30 % ratio and dismount order, mount bonus, basic-only, dismount conditions;
+      - determinism (replay and restore);
+      - performance: 400 v 400 ants plus 4 titans at full caps, under 15 ms a tick (`tools/stress.ts`, `tools/climb-stress.ts`).
+    - Browser: 60 v 60 before / after screenshots against the reference and `tools/fightspread.ts` numbers; titan riders at default zoom; clips and shots in `docs/combat/v2/`.
+    - Update DESIGN.md §3.8–3.10, README.md and PROGRESS.md.
