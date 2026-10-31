@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vite-node tools/check-determinism.ts && vite-node tests/run-all.ts && vite-node tests/species.ts && vite-node tests/combat.ts && vite-node tests/royals.ts && vite-node tests/sickle.ts && vite-node tests/eciton.ts && vite-node tests/termants.ts && vite-node tests/arena.ts && vite-node tests/fights.ts && vite-node tests/net.ts && vite-node tests/lan.ts && vite-node tests/hexgrid.ts && vite-node tests/maps.ts",
+    "test": "vite-node tools/check-determinism.ts && vite-node tests/run-all.ts && vite-node tests/species.ts && vite-node tests/combat.ts && vite-node tests/royals.ts && vite-node tests/sickle.ts && vite-node tests/eciton.ts && vite-node tests/termants.ts && vite-node tests/arena.ts && vite-node tests/fights.ts && vite-node tests/combatV2.ts && vite-node tests/net.ts && vite-node tests/speedVote.ts && vite-node tests/lan.ts && vite-node tests/hexgrid.ts && vite-node tests/maps.ts",
     "test:determinism": "vite-node tools/determinism.ts --",
     "stress": "vite-node tools/stress.ts --",
     "audio:process": "tools/audio/process.sh",

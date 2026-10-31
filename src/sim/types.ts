@@ -137,6 +137,17 @@ export interface Ant {
   gSlot: number;
   /** seconds spent waiting outside a target whose attack slots are all taken */
   waitT?: number;
+  /**
+   * Combat v2 (CHANGE_PLAN §16): the target whose attack slot this ant has reserved while closing in (its id; 0 none;
+   * the slot is `gSlot`); and the reposition rule: the nearest it has come to its hold point and the seconds since it
+   * last closed in (`blkD`, `blkT`), and the pause to sidestep round the ring (s; the sign is the side), 0 if none.
+   */
+  rsv?: number;
+  /** flanking round the target to a slot on the far side: the way round (+1 / −1), 0 when not flanking */
+  flk?: number;
+  blkD?: number;
+  blkT?: number;
+  repT?: number;
   /** climbing / riding: the creature id (0 = on the ground) */
   rideId?: number;
   /** climbing: 0 walking to the foot of the rail, 1 up, 2 riding, 3 down (1–3: untouchable) */
@@ -603,9 +614,9 @@ export interface Creature {
   /** number of ants grappling it (recomputed each tick) */
   latched: number;
   latchGrip: number;
-  /** ants climbing or riding it, and the room they take (size-class units) (recomputed each tick) */
+  /** ants on it (up a leg, riding or coming down), and the mount slots they hold (bit k = slot k) (recomputed each tick) */
   climbers?: number;
-  climbUnits?: number;
+  rideMask?: number;
   /** boss phase */
   phase: number;
   /** telegraph/wind-up timer */
@@ -629,6 +640,11 @@ export interface Creature {
   data: Record<string, number>;
   /** glued by a Termant soldier's burst: slowed (and formic acid hurts double) until this tick */
   glueT?: number;
+  /**
+   * Threat (combat v2, creatureAI.ts): the ants that hurt it most lately, as pairs [ant id, threat, …] (at most
+   * `combat2.threatMax`; each hit adds its damage × (1 + the caste's threat), decaying `threatDecay` a second).
+   */
+  thr?: number[];
 }
 
 export interface Projectile {
@@ -680,6 +696,13 @@ export interface SimSettings {
   enemyStatMul: number;
   aggression: number;
   foodRespawn: number;
+  /**
+   * Multiplayer game speed (1, 2 or 4; undefined = 1): faster only when every player agrees (`speedVote`). Each
+   * colony's vote, by colony id (0 = none): the speed it asks for or agrees to. Not simulation logic: the clients
+   * run their tick clocks this much faster, all together.
+   */
+  gameSpeed?: number;
+  speedVotes?: number[];
 }
 
 export interface SimState {

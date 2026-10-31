@@ -185,7 +185,8 @@ for (const n of [2, 3, 4]) {
     riders = Math.max(riders, w.s.ants.filter((a) => (a.ridePh ?? 0) >= 1).length);
   }
   const beetle = crs(w, A.teams[1].colony)[0];
-  check('climbing: charging ants swarm up a passive stag beetle and ride it, biting', riders >= 20 && !!beetle && beetle.hp < beetle.maxHp && beetle.v === 0, `${riders} riding at most`);
+  // (combat v2: a titan carries at most 12 riders, and at most 30 % of the 40 attackers ride)
+  check('climbing: charging ants swarm up a passive stag beetle and ride it, biting', riders >= 10 && riders <= BALANCE.mount.capHuge && !!beetle && beetle.hp < beetle.maxHp && beetle.v === 0, `${riders} riding at most`);
 }
 
 // ---- clearing

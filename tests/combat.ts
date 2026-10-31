@@ -13,7 +13,7 @@ import { makeAnt } from '../src/sim/factory';
 import { spawnCreature } from '../src/sim/creatures/creatureAI';
 import { BALANCE } from '../src/sim/balance';
 import { CASTES } from '../src/sim/species';
-import { climbCap, climbRoom, riderUnits } from '../src/sim/creatures/climb';
+import { climbCap } from '../src/sim/creatures/climb';
 import { damageAnt } from '../src/sim/combat';
 import { killAnt } from '../src/sim/antAI';
 import { assignGroup, placeMarker } from '../src/sim/markers';
@@ -35,7 +35,8 @@ const t0 = Date.now();
   check('spinning: fighting ants turn slowly on average (was 953°/s)', b.turnRate * 57.3 < 90, `${(b.turnRate * 57.3).toFixed(0)}°/s`);
   check('separation: few ants overlap in the battle (was 17 pairs a sample)', b.overlapPairs < 11, b.overlapPairs.toFixed(1));
   const r = beetleRing(30, 7);
-  check('slots: 30 ants on a beetle take its 12 slots and do not spin', r.latched === 12 && r.spinners === 0, `${r.latched} latched, ${r.spinners} spun`);
+  // (combat v2: slots by the outline — 8 round a 16 mm ground beetle for a Lasius worker, 4 more under its body)
+  check('slots: 30 ants on a beetle take a limited number of its slots (round it and under it) and do not spin', r.latched >= 6 && r.latched <= r.slots && r.spinners === 0, `${r.latched} latched of ${r.slots} slots, ${r.spinners} spun`);
   check('separation: no two ants on the beetle stacked', r.stacked === 0, `${r.stacked}`);
   const t = tunnelFlow(60, 40, 7);
   check('tunnels: 60 workers squeeze out of a crowded nest', t.out === 60 && t.meanT < 9, `${t.out} out, mean ${t.meanT.toFixed(1)} s`);
@@ -74,6 +75,7 @@ function climbScene(kind: string, n: number, seed = 7, caste = 'lasius_worker'):
   let lastPh = -2;
   let hurt = 0;
   let maxRiders = 0;
+  let mounted = 0;
   for (let t = 0; t < 30 * 20; t++) {
     const before = ants.map((a) => a.hp);
     w.step(0.05);
@@ -94,6 +96,8 @@ function climbScene(kind: string, n: number, seed = 7, caste = 'lasius_worker'):
       }
     }
     maxRiders = Math.max(maxRiders, cr.climbers ?? 0);
+    // on it and staying (up the leg or riding; not those coming down)
+    mounted = Math.max(mounted, ants.filter((a) => a.state === AS.Climb && ((a.ridePh ?? 0) === 1 || (a.ridePh ?? 0) === 2)).length);
   }
   const up = at.ride - at.up;
   const ride = at.down - at.ride;
@@ -102,7 +106,8 @@ function climbScene(kind: string, n: number, seed = 7, caste = 'lasius_worker'):
   check('climbing: up the leg in 1.5 s from where it got on, 8 s riding, 1.5 s down to the foot', Math.abs(up - (1 - t0) * 1.5) < 0.12 && Math.abs(ride - 8) < 0.1 && Math.abs(down - 1.5) < 0.1, `got on at ${t0.toFixed(2)}, up ${up?.toFixed(2)} ride ${ride?.toFixed(2)} down ${down?.toFixed(2)}`);
   check('climbing: then 6 s on the ground before climbing again', at.again !== undefined && at.again - at.off >= 6 - 0.06 && at.again - at.off < 8, `again after ${(at.again - at.off).toFixed(2)} s`);
   check('climbing: riders take no damage from anyone during the climb', hurt === 0, `${hurt}`);
-  check('climbing: every ant of a small party gets on a big creature', maxRiders >= 6, `${maxRiders} of 8`);
+  // (combat v2: at most 30 % of a colony's ants fighting it ride at once — 2 of 8)
+  check('climbing: part of a small party gets on a big creature, the rest fight from the ground', mounted === Math.floor(8 * BALANCE.mount.ratio), `${mounted} of 8 at most (with those coming down: ${maxRiders})`);
 }
 
 {
@@ -116,7 +121,7 @@ function climbScene(kind: string, n: number, seed = 7, caste = 'lasius_worker'):
     maxRiders = Math.max(maxRiders, cr.climbers ?? 0);
     if (t === 12 * 20 - 1) ground = ants.filter((a) => a.state === AS.Grapple || a.state === AS.Attack).length;
   }
-  check('climbing: a stag beetle takes at most its cap of riders; the rest fight on the ground', maxRiders === climbCap(cr) && maxRiders >= 24 && ground > 10, `${maxRiders} riding at most of ${climbCap(cr)}, ${ground} on the ground`);
+  check('climbing: a stag beetle takes at most its cap of riders (12, a titan); the rest fight on the ground', maxRiders === climbCap(cr) && maxRiders === BALANCE.mount.capHuge && ground > 10, `${maxRiders} riding at most of ${climbCap(cr)}, ${ground} on the ground`);
   // direct hits on a rider do nothing; others can't even target it
   const r = ants.find((a) => a.state === AS.Climb && (a.ridePh ?? 0) >= 1);
   if (r) {
@@ -138,7 +143,7 @@ function climbScene(kind: string, n: number, seed = 7, caste = 'lasius_worker'):
 }
 
 {
-  // size classes: bigger ants take more room on a creature's back
+  // mount classes (combat v2): small castes mount large and huge creatures, large castes only huge ones, some never
   const most = (kind: string, caste: string): number => {
     const { w, cr } = climbScene(kind, 12, 7, caste);
     let m = 0;
@@ -149,15 +154,14 @@ function climbScene(kind: string, n: number, seed = 7, caste = 'lasius_worker'):
     }
     return m;
   };
-  const units = ['lasius_worker', 'formica_worker', 'formica_soldier', 'atta_major'].map((c) => riderUnits(CASTES[c].length));
-  check('size classes: a small worker takes 1 unit of room, a Formica worker 2, a Formica soldier 3, an Atta major 4', units.join() === '1,2,3,4', units.join());
-  const beetle = climbScene('groundBeetle', 0).cr;
   const small = most('groundBeetle', 'lasius_worker');
-  const mid = most('groundBeetle', 'formica_worker');
   const big = most('groundBeetle', 'formica_soldier');
-  const huge = most('groundBeetle', 'atta_major');
-  check('climbing: the ground beetle (16 mm) carries at most 3 small workers', small === 3 && climbCap(beetle) === 3, `${small}`);
-  check('size classes: a ground beetle (room 3) carries 3 small workers, 1 Formica worker or soldier, and no Atta major', climbRoom(beetle) === 3 && small === 3 && mid === 1 && big === 1 && huge === 0, `room ${climbRoom(beetle)}: ${small} / ${mid} / ${big} / ${huge}`);
+  const bigOnTitan = most('stagBeetle', 'formica_soldier');
+  const never = most('stagBeetle', 'formica_mortar');
+  check('mount classes: small workers mount a ground beetle (a large creature)', small > 0, `${small}`);
+  check('mount classes: a large caste (Formica soldier, 8.6 mm) does not mount a large creature, but mounts a titan', big === 0 && bigOnTitan > 0, `${big} / ${bigOnTitan}`);
+  check('mount classes: a shooter (Formica mortar) never mounts', never === 0, `${never}`);
+  check('mount classes: the ground beetle (16 mm) has room for few riders at once', climbCap(climbScene('groundBeetle', 0).cr) <= 3 && small <= climbCap(climbScene('groundBeetle', 0).cr), `cap ${climbCap(climbScene('groundBeetle', 0).cr)}`);
 }
 
 {
@@ -172,10 +176,11 @@ function climbScene(kind: string, n: number, seed = 7, caste = 'lasius_worker'):
     hashes.push(hashState(w));
   }
   check('climbing: deterministic (two runs, same state hash)', hashes[0] === hashes[1], hashes.join(' '));
-  // riders follow size: the back's area ÷ the room an ant takes (at most maxRiders)
+  // fixed caps by class (EotU): titans 12, large creatures 8, fewer where the mount slots run out on a small one
   const caps: Record<string, number> = {};
   for (const k of ['groundBeetle', 'rove', 'wolfSpider', 'cutworm', 'mantis', 'lithobius', 'stagBeetle', 'tarantula', 'hogna', 'giantMantis', 'scolopendra']) caps[k] = climbCap(climbScene(k, 0).cr);
-  check('climbing: every large creature and titan can be climbed, riders by size', Object.values(caps).every((n) => n > 0) && caps.groundBeetle <= 3 && caps.wolfSpider <= 3 && caps.mantis > caps.groundBeetle && caps.stagBeetle === BALANCE.climb.maxRiders && caps.cutworm > caps.lithobius, JSON.stringify(caps));
+  const M = BALANCE.mount;
+  check('climbing: every large creature and titan can be mounted; titans 12, large creatures at most 8', Object.values(caps).every((n) => n > 0) && ['stagBeetle', 'tarantula', 'hogna', 'giantMantis', 'scolopendra'].every((k) => caps[k] === M.capHuge) && ['groundBeetle', 'rove', 'wolfSpider', 'cutworm', 'mantis', 'lithobius'].every((k) => caps[k] <= M.capLarge) && caps.mantis === M.capLarge, JSON.stringify(caps));
 }
 
 // ---------------------------------------------------------------- corpses (timed food) and harvest

@@ -1,3 +1,4 @@
+import { casteMount } from '../sim/creatures/climb';
 import { GameSession, casteTint } from '../game/session';
 import { CASTES, SPECIES, SpeciesId } from '../sim/species';
 import { CREATURES } from '../sim/creatures/kinds';
@@ -131,7 +132,7 @@ export class ArenaPanel {
       for (const cd of Object.values(CASTES)) {
         if (cd.species !== this.species || !arenaUnitOk('ant:' + cd.id)) continue;
         const tint = '#' + casteTint(cd.id).multiplyScalar(1.35).getHexString();
-        entry('ant:' + cd.id, antSilhouette(cd.role, tint), cd.name, `${cd.length} mm · ${cd.hp} hp`, `<b>${esc(SPECIES[cd.species].common)} — ${esc(cd.name)}</b>${cd.length} mm · health ${cd.hp} · bite ${cd.bite}${cd.acid ? ' · formic acid' : ''}${cd.sting ? ' · venom sting' : ''}<br>${esc(cd.fact)}<br><i>Click: ${s.arenaCount} for Team ${TEAM_NAMES[s.arenaTeam]}. Shift+click: choose for Place.</i>`);
+        entry('ant:' + cd.id, antSilhouette(cd.role, tint), cd.name, `${cd.length} mm · ${cd.hp} hp`, `<b>${esc(SPECIES[cd.species].common)} — ${esc(cd.name)}</b>${cd.length} mm · health ${cd.hp} · bite ${cd.bite}${cd.acid ? ' · formic acid' : ''}${cd.sting ? ' · venom sting' : ''}<br>${casteMount(cd.id) === 'small' ? 'Mounts large and huge creatures' : casteMount(cd.id) === 'large' ? 'Mounts huge creatures only' : 'Cannot mount creatures'}<br>${esc(cd.fact)}<br><i>Click: ${s.arenaCount} for Team ${TEAM_NAMES[s.arenaTeam]}. Shift+click: choose for Place.</i>`);
       }
     } else {
       for (const k of Object.values(CREATURES)) {

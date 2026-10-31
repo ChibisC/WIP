@@ -58,9 +58,18 @@ const _fx = new THREE.Vector3();
 const _fy = new THREE.Vector3();
 const _c = new THREE.Vector3();
 const _tmp = new THREE.Vector3();
+const _n = new THREE.Vector3();
 const _pts = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
 
 export type GroundFn = (x: number, z: number) => number;
+
+/** Climb debug overlay colours: rails, climbing points (feet), weak points, free and taken mount slots. */
+type Rgb = readonly [number, number, number];
+const DBG_RAIL: Rgb = [0.25, 1, 0.5];
+const DBG_FOOT: Rgb = [1, 1, 1];
+const DBG_WEAK: Rgb = [1, 0.3, 0.9];
+const DBG_FREE: Rgb = [0.25, 0.9, 1];
+const DBG_TAKEN: Rgb = [1, 0.72, 0.2];
 
 export class CreatureRenderer {
   readonly batch = new PrimitiveBatch();
@@ -83,6 +92,7 @@ export class CreatureRenderer {
   climbDebug = false;
   private dbg: THREE.LineSegments | null = null;
   private dbgPos: Float32Array = new Float32Array(0);
+  private dbgCol: Float32Array = new Float32Array(0);
   private dbgN = 0;
 
   constructor(name = 'creatures') {
@@ -280,13 +290,26 @@ export class CreatureRenderer {
     _fx.setFromMatrixColumn(fm, 0).normalize();
     _fy.setFromMatrixColumn(fm, 1).normalize();
     _s.applyMatrix4(fm).addScaledVector(_fy, clear);
+    // the slot's surface normal (belly against the body) and its weak point, on the same (animated) frames
+    const fmW = (rec.full && rec.frames.get(slot.frame)) || body || fm;
+    _n.set(slot.nx ?? 0, slot.ny ?? 1, slot.nz ?? 0).transformDirection(fmW);
     if (ph === 2) {
-      // riding: on the back, facing roughly forward (each slot a little different), swaying with it
-      out.p.copy(_s);
-      out.u.copy(_fy);
-      const yaw = (((v.rideSlot ?? 0) * 2.39996) % 1.4) - 0.7;
-      out.f.copy(_fx).applyAxisAngle(_fy, yaw);
-      out.u.applyAxisAngle(out.f, Math.sin(this.time * 2.3 + v.id) * 0.07);
+      // riding (combat v2): at its mount slot, belly to the surface, lifted clear along the normal, head toward the
+      // weak point it attacks (along the surface), swaying a little with the body
+      const wk = def.weak?.[slot.w ?? -1];
+      out.u.copy(_n);
+      out.p.copy(_s).addScaledVector(_fy, -clear).addScaledVector(_n, clear);
+      if (wk) {
+        const wf = (rec.full && rec.frames.get(wk.frame)) || body || fm;
+        const wr = rec.full && rec.frames.has(wk.frame) ? null : def.frames[wk.frame];
+        _tmp.set((wk.x + (wr ? wr[0] : 0)) * L, (wk.y + (wr ? wr[1] : 0)) * L, (wk.z + (wr ? wr[2] : 0)) * L).applyMatrix4(wf);
+        out.f.copy(_tmp).sub(out.p);
+      } else out.f.set(0, 0, 0);
+      out.f.addScaledVector(_n, -out.f.dot(_n));
+      // at its weak point (or straight above it): face the way the body faces
+      if (out.f.lengthSq() < (L * 0.01) * (L * 0.01)) out.f.copy(_fx).addScaledVector(_n, -_fx.dot(_n));
+      out.f.normalize();
+      out.u.applyAxisAngle(out.f, Math.sin(this.time * 2.3 + v.id) * 0.06);
       out.speed = 0;
       return true;
     }
@@ -335,33 +358,59 @@ export class CreatureRenderer {
     return true;
   }
 
-  /** Debug overlay: each rail (animated leg chain) and riding slot as lines. */
+  /**
+   * Debug overlay (F3 / ?climbdebug=1; combat v2): each climbing point (the foot, a white cross), its rail up the
+   * animated leg (green), the weak points (magenta diamonds) and the mount slots — free in cyan, taken in amber with a
+   * taller mark — each with a tick along its surface normal.
+   */
   private debugRails(cr: Creature, rec: ClimbRec): void {
     const def = CLIMB_DATA[cr.kind];
     const L = cr.scale;
+    const e = L * 0.015;
     for (const r of def.rails) {
       const a = rec.legs.get(r.leg);
       if (!a) continue;
-      for (let j = 3; j > 0; j--) this.dbgLine(a[j * 3], a[j * 3 + 1], a[j * 3 + 2], a[j * 3 - 3], a[j * 3 - 2], a[j * 3 - 1]);
+      for (let j = 3; j > 0; j--) this.dbgLine(a[j * 3], a[j * 3 + 1], a[j * 3 + 2], a[j * 3 - 3], a[j * 3 - 2], a[j * 3 - 1], DBG_RAIL);
+      // the climbing point (foot)
+      this.dbgLine(a[9] - e, a[10], a[11], a[9] + e, a[10], a[11], DBG_FOOT);
+      this.dbgLine(a[9], a[10], a[11] - e, a[9], a[10], a[11] + e, DBG_FOOT);
     }
-    for (const s of def.slots) {
-      const m = rec.frames.get(s.frame);
+    for (const wk of def.weak ?? []) {
+      const m = rec.frames.get(wk.frame);
       if (!m) continue;
-      _s.set(s.x * L, s.y * L, s.z * L).applyMatrix4(m);
-      const e = L * 0.015;
-      this.dbgLine(_s.x - e, _s.y, _s.z, _s.x + e, _s.y, _s.z);
-      this.dbgLine(_s.x, _s.y, _s.z - e, _s.x, _s.y, _s.z + e);
-      this.dbgLine(_s.x, _s.y, _s.z, _s.x, _s.y + e * 2, _s.z);
+      _s.set(wk.x * L, wk.y * L, wk.z * L).applyMatrix4(m);
+      const d = L * 0.02;
+      this.dbgLine(_s.x - d, _s.y, _s.z, _s.x, _s.y + d, _s.z, DBG_WEAK);
+      this.dbgLine(_s.x, _s.y + d, _s.z, _s.x + d, _s.y, _s.z, DBG_WEAK);
+      this.dbgLine(_s.x + d, _s.y, _s.z, _s.x, _s.y - d, _s.z, DBG_WEAK);
+      this.dbgLine(_s.x, _s.y - d, _s.z, _s.x - d, _s.y, _s.z, DBG_WEAK);
     }
+    const taken = cr.rideMask ?? 0;
+    def.slots.forEach((sl, k) => {
+      const m = rec.frames.get(sl.frame);
+      if (!m) return;
+      const on = (taken & (1 << k)) !== 0;
+      const c = on ? DBG_TAKEN : DBG_FREE;
+      _s.set(sl.x * L, sl.y * L, sl.z * L).applyMatrix4(m);
+      _n.set(sl.nx ?? 0, sl.ny ?? 1, sl.nz ?? 0).transformDirection(m);
+      this.dbgLine(_s.x - e, _s.y, _s.z, _s.x + e, _s.y, _s.z, c);
+      this.dbgLine(_s.x, _s.y, _s.z - e, _s.x, _s.y, _s.z + e, c);
+      const h = e * (on ? 4 : 2);
+      this.dbgLine(_s.x, _s.y, _s.z, _s.x + _n.x * h, _s.y + _n.y * h, _s.z + _n.z * h, c);
+    });
   }
 
-  private dbgLine(ax: number, ay: number, az: number, bx: number, by: number, bz: number): void {
+  private dbgLine(ax: number, ay: number, az: number, bx: number, by: number, bz: number, color: Rgb = DBG_RAIL): void {
     if ((this.dbgN + 1) * 6 > this.dbgPos.length) {
       const n = new Float32Array(Math.max(600, this.dbgPos.length * 2));
       n.set(this.dbgPos);
       this.dbgPos = n;
+      const c = new Float32Array(n.length);
+      c.set(this.dbgCol);
+      this.dbgCol = c;
       if (this.dbg) {
         this.dbg.geometry.setAttribute('position', new THREE.BufferAttribute(this.dbgPos, 3));
+        this.dbg.geometry.setAttribute('color', new THREE.BufferAttribute(this.dbgCol, 3));
       }
     }
     const o = this.dbgN * 6;
@@ -372,6 +421,12 @@ export class CreatureRenderer {
     p[o + 3] = bx;
     p[o + 4] = by;
     p[o + 5] = bz;
+    const q = this.dbgCol;
+    for (const k of [0, 3]) {
+      q[o + k] = color[0];
+      q[o + k + 1] = color[1];
+      q[o + k + 2] = color[2];
+    }
     this.dbgN++;
   }
 
@@ -379,8 +434,15 @@ export class CreatureRenderer {
     if (!this.climbDebug && !this.dbg) return;
     if (!this.dbg) {
       const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.BufferAttribute(this.dbgPos.length ? this.dbgPos : (this.dbgPos = new Float32Array(600)), 3));
-      this.dbg = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x40ffd0, depthTest: false, transparent: true, opacity: 0.9 }));
+      if (!this.dbgPos.length) this.dbgPos = new Float32Array(600);
+      if (this.dbgCol.length !== this.dbgPos.length) {
+        const c = new Float32Array(this.dbgPos.length);
+        c.set(this.dbgCol.subarray(0, Math.min(this.dbgCol.length, c.length)));
+        this.dbgCol = c;
+      }
+      g.setAttribute('position', new THREE.BufferAttribute(this.dbgPos, 3));
+      g.setAttribute('color', new THREE.BufferAttribute(this.dbgCol, 3));
+      this.dbg = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false, transparent: true, opacity: 0.9 }));
       this.dbg.renderOrder = 999;
       this.dbg.frustumCulled = false;
       this.dbg.name = 'climbDebug';
@@ -389,7 +451,10 @@ export class CreatureRenderer {
     this.dbg.visible = this.climbDebug;
     const attr = this.dbg.geometry.getAttribute('position') as THREE.BufferAttribute;
     if (attr.array !== this.dbgPos) this.dbg.geometry.setAttribute('position', new THREE.BufferAttribute(this.dbgPos, 3));
+    const cattr = this.dbg.geometry.getAttribute('color') as THREE.BufferAttribute;
+    if (cattr.array !== this.dbgCol) this.dbg.geometry.setAttribute('color', new THREE.BufferAttribute(this.dbgCol, 3));
     (this.dbg.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    (this.dbg.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
     this.dbg.geometry.setDrawRange(0, this.dbgN * 2);
   }
 

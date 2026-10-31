@@ -3,8 +3,8 @@ import { HF_CREATURE } from '../../world/surfaceLayout';
 import { Ant, AS, Creature, SURFACE } from '../types';
 import { casteOf } from '../species';
 import { ARENA, BALANCE, ECITON, TERMANT } from '../balance';
-import { riding } from '../climbing';
-import { riderUnits } from './climb';
+import { enforceMountRatio, riding, throwRiders } from '../climbing';
+import { climbCap } from './climb';
 import { applyVenom, creatureHooks, damageAnt, damageCreature, flingAnt } from '../combat';
 import { STANCE, arenaTeam, stanceOf } from '../arenaState';
 import { killAnt } from '../antAI';
@@ -263,6 +263,186 @@ function telegraph(w: World, cr: Creature, x: number, y: number, radius: number,
   w.events.emit({ t: 'telegraph', x, y, space: cr.space, radius, duration, creature: cr.id, dir: cone?.dir, half: cone?.half });
 }
 
+// ---------------------------------------------------------------------------
+// Combat v2 (CHANGE_PLAN §16 step 7): threat, aimed splash attacks, backing off, shaking riders off
+// ---------------------------------------------------------------------------
+
+const C2 = BALANCE.combat2;
+
+/** An ant hurt it: its threat grows by the damage × (1 + its caste's threat); the weakest entry gives way when full. */
+function addThreat(cr: Creature, a: Ant, dmg: number): void {
+  const v = dmg * (1 + (casteOf(a.caste).threat ?? 0));
+  if (!(v > 0)) return;
+  const t = cr.thr ?? (cr.thr = []);
+  for (let i = 0; i < t.length; i += 2)
+    if (t[i] === a.id) {
+      t[i + 1] += v;
+      return;
+    }
+  if (t.length < C2.threatMax * 2) {
+    t.push(a.id, v);
+    return;
+  }
+  let lo = 0;
+  for (let i = 2; i < t.length; i += 2) if (t[i + 1] < t[lo + 1]) lo = i;
+  if (t[lo + 1] < v) {
+    t[lo] = a.id;
+    t[lo + 1] = v;
+  }
+}
+
+/** Threat fades (`threatDecay` a second); entries of the dead or gone, or nearly forgotten, are dropped. */
+function decayThreat(w: World, cr: Creature, dt: number): void {
+  const t = cr.thr;
+  if (!t || t.length === 0) return;
+  const k = Math.max(0, 1 - C2.threatDecay * dt);
+  let j = 0;
+  for (let i = 0; i < t.length; i += 2) {
+    const a = w.antById.get(t[i]);
+    const v = t[i + 1] * k;
+    if (!a || a.state === AS.Dead || v < 0.05) continue;
+    t[j] = t[i];
+    t[j + 1] = v;
+    j += 2;
+  }
+  t.length = j;
+}
+
+/**
+ * Retaliation (EotU): the ant with the most threat within `reach` of it (not riders: they are untouchable), sticky —
+ * it changes from its current target only for `threatSticky` × that one's threat. Null when nobody with threat is in
+ * reach (then the program picks as before: the nearest, or a cluster).
+ */
+function threatPick(w: World, cr: Creature, reach: number): Ant | null {
+  const t = cr.thr;
+  if (!t || t.length === 0) return null;
+  const team = cr.faction >= 0 ? w.teamOf(cr.faction) : -1;
+  let best: Ant | null = null;
+  let bv = 0;
+  let curV = 0;
+  let cur: Ant | null = null;
+  for (let i = 0; i < t.length; i += 2) {
+    const a = w.antById.get(t[i]);
+    if (!a || a.state === AS.Dead || a.state === AS.Flung || a.space !== cr.space || riding(a)) continue;
+    if (team >= 0 && (a.team ?? a.colony) === team) continue;
+    if (sqd(a.x - cr.x, a.y - cr.y) > reach * reach) continue;
+    if (cr.tk === 3 && a.id === cr.tgt) {
+      cur = a;
+      curV = t[i + 1];
+    }
+    if (t[i + 1] > bv) {
+      bv = t[i + 1];
+      best = a;
+    }
+  }
+  if (cur && best && best !== cur && bv < curV * C2.threatSticky) return cur;
+  return best;
+}
+
+/** Ground ants (not riders, not its own team) round the creature, counted per direction (scratch). */
+const aimCount: number[] = []; // det-ok: scratch, filled and read within one call
+const aimOut = { dir: 0, n: 0 }; // det-ok: scratch result
+
+/**
+ * Aim a splash attack (combat v2): of `combat2.aimDirs` directions round the creature (from its heading), the one
+ * whose cone (`half` rad each side) holds the most ground ants within `reach` — ants counted in id order; ties to the
+ * direction nearest its heading. The creature turns there before it strikes.
+ */
+function aimDir(w: World, cr: Creature, reach: number, half: number): { dir: number; n: number } {
+  const N = C2.aimDirs;
+  aimCount.length = N;
+  for (let k = 0; k < N; k++) aimCount[k] = 0;
+  const team = cr.faction >= 0 ? w.teamOf(cr.faction) : -1;
+  w.antsNear(cr.space, cr.x, cr.y, reach, (a) => {
+    if (a.state === AS.Dead || a.state === AS.Flung || riding(a)) return false;
+    if (team >= 0 && (a.team ?? a.colony) === team) return false;
+    const ang = datan2(a.y - cr.y, a.x - cr.x);
+    for (let k = 0; k < N; k++) if (Math.abs(angleTo(cr.h + (k * TAU) / N, ang)) <= half) aimCount[k]++;
+    return false;
+  });
+  let best = 0;
+  // ties to the direction nearest its heading: 0, 1, N−1, 2, N−2, …
+  for (let s = 1; s < N; s++) {
+    const k = s % 2 ? (s + 1) / 2 : N - s / 2;
+    if (aimCount[k] > aimCount[best]) best = k;
+  }
+  aimOut.dir = cr.h + (best * TAU) / N;
+  aimOut.n = aimCount[best];
+  return aimOut;
+}
+
+/**
+ * Surrounded and hurt (`surroundN` ground ants within `surroundR` × its length, under `backOffHp` of its health):
+ * it backs off `backOffLen` × its length from the crowd over half a second (not turning round), then fights on.
+ * Returns true while it is backing off.
+ */
+function backOff(w: World, cr: Creature, k: CreatureKind, dt: number): boolean {
+  if ((cr.data.backT ?? 0) > 0) {
+    cr.data.backT = Math.max(0, (cr.data.backT ?? 0) - dt);
+    const step = ((C2.backOffLen * k.length) / 0.5) * dt;
+    const h = cr.data.backH ?? cr.h;
+    const nx = cr.x + dcos(h) * step;
+    const ny = cr.y + dsin(h) * step;
+    if (walkable(w, cr, nx, ny)) {
+      cr.x = nx;
+      cr.y = ny;
+      cr.v = step / Math.max(dt, 1e-3);
+    } else cr.v = 0;
+    return true;
+  }
+  if ((cr.data.backCd ?? 0) > 0) {
+    cr.data.backCd = Math.max(0, (cr.data.backCd ?? 0) - dt);
+    return false;
+  }
+  if (hurtFrac(cr) >= C2.backOffHp) return false;
+  let n = 0;
+  let sx = 0;
+  let sy = 0;
+  const team = cr.faction >= 0 ? w.teamOf(cr.faction) : -1;
+  w.antsNear(cr.space, cr.x, cr.y, k.length * C2.surroundR, (a) => {
+    if (a.state === AS.Dead || riding(a) || (team >= 0 && (a.team ?? a.colony) === team)) return false;
+    n++;
+    sx += a.x;
+    sy += a.y;
+    return false;
+  });
+  if (n < C2.surroundN) return false;
+  cr.data.backH = datan2(cr.y - sy / n, cr.x - sx / n);
+  cr.data.backT = 0.5;
+  cr.data.backCd = 5;
+  return true;
+}
+
+/**
+ * A titan's shake-off (combat v2): once riders are `shakeAtFrac` of its cap, at most every `shakeEverySec`, it
+ * telegraphs (`shakeWind` s, in the pose `state`: the stag beetle rears and shakes, the tarantula and the wolf-spider
+ * mother rear up, the giant centipede thrashes, the giant mantis flares its wings) and throws every rider down.
+ * Returns true while it is shaking.
+ */
+function riderShake(w: World, cr: Creature, dt: number, state: number): boolean {
+  if (cr.data.shake) {
+    cr.v = 0;
+    if (cr.data.shake === 1 && cr.st >= C2.shakeWind) {
+      cr.data.shake = 2;
+      const n = throwRiders(w, cr, 1.4);
+      w.events.emit({ t: 'slam', x: cr.x, y: cr.y, space: cr.space, radius: cr.scale * 0.6, power: Math.min(1, 0.3 + n * 0.06) });
+    }
+    if (cr.st >= C2.shakeWind + 0.5) {
+      cr.data.shake = 0;
+      cr.data.shakeCd = C2.shakeEverySec;
+      setState(cr, CS.Chase);
+    }
+    return true;
+  }
+  cr.data.shakeCd = Math.max(0, (cr.data.shakeCd ?? C2.shakeEverySec * 0.5) - dt);
+  const cap = climbCap(cr);
+  if (cap <= 0 || cr.data.shakeCd > 0 || (cr.climbers ?? 0) < Math.max(1, Math.ceil(cap * C2.shakeAtFrac - 1e-9))) return false;
+  setState(cr, state);
+  cr.data.shake = 1;
+  telegraph(w, cr, cr.x, cr.y, cr.scale * 0.6, C2.shakeWind);
+  return true;
+}
+
 /** A held prey ant: kept in the creature's jaws, drained, then killed. */
 function holdPrey(w: World, cr: Creature, k: CreatureKind, dt: number, reach: number): boolean {
   const a = cr.tgt ? w.antById.get(cr.tgt) : undefined;
@@ -369,10 +549,17 @@ function hunter(w: World, cr: Creature, k: CreatureKind, dt: number, opts: { bit
     shakeOff(w, cr, 1, 1);
     cr.cd2 = 1.6;
   }
+  if (cr.state !== CS.WindUp && backOff(w, cr, k, dt)) return;
   const reach = creatureRadius(cr) + 3;
   const target = cr.tgt ? w.antById.get(cr.tgt) : undefined;
   let a: Ant | null = target && target.state !== AS.Dead && target.space === cr.space ? target : null;
-  if (!a || cr.st > 12) {
+  // retaliation: the ant with the most threat close by (sticky), else the nearest as before
+  const th = cr.state !== CS.WindUp ? threatPick(w, cr, reach + k.length * 0.5) : null;
+  if (th && th !== a) {
+    a = th;
+    cr.tgt = th.id;
+    cr.tk = 3;
+  } else if (!a || cr.st > 12) {
     // isolated ants are picked first
     a = pickAnt(w, cr, cr.x, cr.y, k.sense * (k.nocturnal ? 0.7 + 0.4 * w.s.night : 1), (o, d2) => d2 * (1 + 0.25 * Math.min(6, o.alarm * 6)));
     cr.tgt = a ? a.id : 0;
@@ -446,8 +633,21 @@ function stalker(w: World, cr: Creature, k: CreatureKind, dt: number, frenzy = 1
   }
   if (cr.state === CS.Eat) {
     cr.v = 0;
+    // it drags its catch out of the crowd first (backing away with it in its jaws)
+    if ((cr.data.drag ?? 0) > 0) {
+      const step = Math.min(cr.data.drag ?? 0, k.speed * 0.6 * dt);
+      const nx = cr.x - dcos(cr.h) * step;
+      const ny = cr.y - dsin(cr.h) * step;
+      if (walkable(w, cr, nx, ny)) {
+        cr.x = nx;
+        cr.y = ny;
+        cr.v = step / Math.max(dt, 1e-3);
+        cr.data.drag = (cr.data.drag ?? 0) - step;
+      } else cr.data.drag = 0;
+    }
     if (!holdPrey(w, cr, k, dt, creatureRadius(cr) * 0.9) || cr.st > 3.5 || cr.latched >= 3) {
       cr.tgt = 0;
+      cr.data.drag = 0;
       setState(cr, CS.Wander);
     }
     return;
@@ -462,6 +662,8 @@ function stalker(w: World, cr: Creature, k: CreatureKind, dt: number, frenzy = 1
         if (a.state !== AS.Dead) {
           cr.tgt = a.id;
           cr.tk = 3;
+          // drag it out of the cluster (combat v2)
+          cr.data.drag = C2.dragLen * k.length;
           setState(cr, CS.Eat);
           return;
         }
@@ -471,7 +673,8 @@ function stalker(w: World, cr: Creature, k: CreatureKind, dt: number, frenzy = 1
     }
     return;
   }
-  const a = pickAnt(w, cr, cr.x, cr.y, k.sense);
+  if (cr.state !== CS.WindUp && backOff(w, cr, k, dt)) return;
+  const a = threatPick(w, cr, creatureRadius(cr) + 16) ?? pickAnt(w, cr, cr.x, cr.y, k.sense);
   if (a) {
     const d = dhypot(a.x - cr.x, a.y - cr.y);
     const face = datan2(a.y - cr.y, a.x - cr.x);
@@ -516,6 +719,8 @@ function stalker(w: World, cr: Creature, k: CreatureKind, dt: number, frenzy = 1
 function mantis(w: World, cr: Creature, k: CreatureKind, dt: number, opts: { boss?: boolean } = {}): void {
   const reach = k.length * 0.42;
   const half = opts.boss ? 0.65 : 0.45;
+  // the giant mantis flares its wings and throws its riders off (combat v2)
+  if (opts.boss && cr.state !== CS.Flee && riderShake(w, cr, dt, CS.Display)) return;
   if (k.fleeAt > 0 && hurtFrac(cr) < k.fleeAt && cr.state !== CS.Flee) setState(cr, CS.Flee);
   if (cr.state === CS.Flee) {
     // walks off, then flies away
@@ -605,13 +810,16 @@ function mantis(w: World, cr: Creature, k: CreatureKind, dt: number, opts: { bos
       return;
     }
   }
-  // lurk: sway, turn slowly to track the nearest ant, strike when it comes in reach
+  // lurk: sway, turn slowly to track the ant with the most threat (else the nearest) — or, with several in reach, the
+  // thickest of them (the strike's cone is aimed: combat v2) — and strike when it comes in reach
   setState(cr, cr.state === CS.Strike ? CS.Lurk : cr.state === CS.Wander ? CS.Wander : CS.Lurk);
-  const a = pickAnt(w, cr, cr.x, cr.y, k.sense);
+  const a = threatPick(w, cr, reach + 3) ?? pickAnt(w, cr, cr.x, cr.y, k.sense);
   if (a) {
     const d = dhypot(a.x - cr.x, a.y - cr.y);
-    const face = datan2(a.y - cr.y, a.x - cr.x);
-    faceAnt(cr, a, dt, 1.125);
+    const aim = aimDir(w, cr, reach + 3, half);
+    const face = aim.n >= 2 ? aim.dir : datan2(a.y - cr.y, a.x - cr.x);
+    if (aim.n >= 2) turnCreature(cr, aim.dir, dt, 1.125);
+    else faceAnt(cr, a, dt, 1.125);
     cr.v = 0;
     if (d < reach && Math.abs(angleTo(cr.h, face)) < half && cr.cd <= 0) {
       setState(cr, CS.WindUp);
@@ -706,6 +914,9 @@ function bossRoam(w: World, cr: Creature, k: CreatureKind, dt: number, speedMul 
 function stag(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   const p = bossPhase(w, cr, ['Advance', 'Grab and toss', 'Enraged: rear-up crush'], [0.75, 0.4]);
   const L = k.length;
+  // rears and shakes its riders off (combat v2)
+  if (riderShake(w, cr, dt, CS.Rear)) return;
+  if (cr.state !== CS.WindUp && cr.state !== CS.Rear && backOff(w, cr, k, dt)) return;
   if (cr.state === CS.WindUp) {
     cr.v = 0;
     if (cr.st >= 0.9) {
@@ -746,7 +957,8 @@ function stag(w: World, cr: Creature, k: CreatureKind, dt: number): void {
     telegraph(w, cr, cr.x, cr.y, L * 0.55, 1.2);
     return;
   }
-  const a = pickAnt(w, cr, cr.x, cr.y, k.sense, (o, d2) => d2 / (1 + crowd(w, cr, o)));
+  // one target (the bite): the ant with the most threat in reach, else the nearest in a crowd
+  const a = threatPick(w, cr, L * 0.6) ?? pickAnt(w, cr, cr.x, cr.y, k.sense, (o, d2) => d2 / (1 + crowd(w, cr, o)));
   if (!a) {
     setState(cr, CS.Wander);
     bossRoam(w, cr, k, dt);
@@ -754,12 +966,19 @@ function stag(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   }
   const d = dhypot(a.x - cr.x, a.y - cr.y);
   setState(cr, CS.Chase);
+  // the clamp (a splash in front) is aimed at the thickest crowd: it turns there first
+  const aim = p >= 1 && cr.cd2 <= 0 && d < L * 0.6 ? aimDir(w, cr, L * 0.62, 0.9) : null;
+  if (aim && aim.n >= 2 && Math.abs(angleTo(cr.h, aim.dir)) > 0.3) {
+    cr.v = 0;
+    turnCreature(cr, aim.dir, dt, 2.5);
+    return;
+  }
   if (d > L * 0.45) walkTo(w, cr, k, a.x, a.y, 1, dt, 2.5);
   else {
     cr.v = 0;
     faceAnt(cr, a, dt, 2.25);
   }
-  if (p >= 1 && cr.cd2 <= 0 && d < L * 0.6) {
+  if (aim) {
     setState(cr, CS.WindUp);
     telegraph(w, cr, cr.x + dcos(cr.h) * L * 0.3, cr.y + dsin(cr.h) * L * 0.3, L * 0.32, 0.9, { dir: cr.h, half: 0.9 });
     return;
@@ -789,6 +1008,9 @@ function tarantula(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   const p = bossPhase(w, cr, ['Threat and lunge', 'Urticating hairs', 'Frenzy'], [0.66, 0.33]);
   const L = k.length;
   const frenzy = p >= 2 ? 2 : 1;
+  // rears up and shakes its riders off (combat v2)
+  if (riderShake(w, cr, dt, CS.Rear)) return;
+  if (cr.state !== CS.WindUp && cr.state !== CS.Pounce && cr.state !== CS.Flick && backOff(w, cr, k, dt)) return;
   if (cr.state === CS.WindUp) {
     // threat posture: front legs and palps raised, fangs shown
     cr.v = 0;
@@ -814,6 +1036,8 @@ function tarantula(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   }
   if (cr.state === CS.Flick) {
     cr.v = 0;
+    // turning its rear to the thickest of the swarm while it rubs the hairs loose
+    if (cr.st < 1) turnCreature(cr, cr.data.aimH ?? cr.h, dt, 4);
     if (cr.st >= 1 && !cr.data.flicked) {
       cr.data.flicked = 1;
       // a cloud of barbed hairs behind it: ants are slowed and stung
@@ -835,13 +1059,14 @@ function tarantula(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   }
   cr.data.flickT = (cr.data.flickT ?? 0) - dt;
   if (p >= 1 && cr.data.flickT <= 0 && cr.latched + countNear(w, cr, L * 0.6) >= 5) {
-    // turns its rear to the swarm and rubs the abdomen with a hind leg
-    cr.h += Math.PI;
+    // turns its rear to the thickest of the swarm (aimed: combat v2) and rubs the abdomen with a hind leg
+    const aim = aimDir(w, cr, L * 0.8, 0.8);
+    cr.data.aimH = aim.dir + Math.PI;
     setState(cr, CS.Flick);
-    telegraph(w, cr, cr.x - dcos(cr.h) * L * 0.4, cr.y - dsin(cr.h) * L * 0.4, L * 0.5, 1);
+    telegraph(w, cr, cr.x + dcos(aim.dir) * L * 0.4, cr.y + dsin(aim.dir) * L * 0.4, L * 0.5, 1);
     return;
   }
-  const a = pickAnt(w, cr, cr.x, cr.y, k.sense, (o, d2) => d2 / (1 + crowd(w, cr, o)));
+  const a = threatPick(w, cr, L * 0.6) ?? pickAnt(w, cr, cr.x, cr.y, k.sense, (o, d2) => d2 / (1 + crowd(w, cr, o)));
   if (!a) {
     setState(cr, CS.Wander);
     bossRoam(w, cr, k, dt, 0.7);
@@ -851,9 +1076,14 @@ function tarantula(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   const face = datan2(a.y - cr.y, a.x - cr.x);
   setState(cr, CS.Chase);
   if (d < L * 0.6 && cr.cd <= 0) {
-    if (!onBody(cr, a)) cr.h = face;
+    // the lunge lands among the most ants in front (aimed: combat v2), else on its target
+    const aim = aimDir(w, cr, L * 0.6, 0.5);
+    const dir = aim.n >= 2 ? aim.dir : face;
+    if (aim.n >= 2 || !onBody(cr, a)) cr.h = dir;
     setState(cr, CS.WindUp);
-    telegraph(w, cr, cr.x + dcos(face) * L * 0.5, cr.y + dsin(face) * L * 0.5, L * 0.22, 0.8 / frenzy);
+    telegraph(w, cr, cr.x + dcos(dir) * L * 0.5, cr.y + dsin(dir) * L * 0.5, L * 0.22, 0.8 / frenzy);
+    // in the frenzy the lunge also throws everything round it: that area is shown too
+    if (frenzy > 1) telegraph(w, cr, cr.x, cr.y, L * 0.45, 0.8 / frenzy);
     return;
   }
   // slow deliberate walk with pauses
@@ -878,6 +1108,9 @@ function scolopendra(w: World, cr: Creature, k: CreatureKind, dt: number): void 
   const p = bossPhase(w, cr, ['Coil and strike', 'Body whip', 'Frenzy: constrict'], [0.66, 0.35]);
   const L = k.length;
   const fast = p >= 2 ? 1.3 : 1;
+  // thrashes its riders off (combat v2)
+  if (riderShake(w, cr, dt, CS.Whip)) return;
+  if (cr.state !== CS.Coil && cr.state !== CS.Pounce && cr.state !== CS.Whip && cr.state !== CS.Rear && backOff(w, cr, k, dt)) return;
   if (cr.state === CS.Coil) {
     // head rises and draws back
     cr.v = 0;
@@ -901,6 +1134,8 @@ function scolopendra(w: World, cr: Creature, k: CreatureKind, dt: number): void 
   }
   if (cr.state === CS.Whip) {
     cr.v = 0;
+    // swinging its rear round toward the thickest of the swarm during the wind-up (aimed: combat v2)
+    if (cr.st < 0.6) turnCreature(cr, cr.data.aimH ?? cr.h, dt, 3);
     if (cr.st >= 0.6 && !cr.data.whipped) {
       cr.data.whipped = 1;
       // the rear half lashes sideways: everything beside and behind is swept away
@@ -931,12 +1166,14 @@ function scolopendra(w: World, cr: Creature, k: CreatureKind, dt: number): void 
     return;
   }
   if (p >= 1 && cr.cd2 <= 0 && cr.latched + countNear(w, cr, L * 0.4) >= 6) {
+    const aim = aimDir(w, cr, L * 0.5, 1.0);
+    cr.data.aimH = aim.dir + Math.PI;
     setState(cr, CS.Whip);
-    telegraph(w, cr, cr.x, cr.y, L * 0.5, 0.6, { dir: cr.h + Math.PI, half: 1.9 });
+    telegraph(w, cr, cr.x, cr.y, L * 0.5, 0.6, { dir: aim.dir, half: 1.9 });
     return;
   }
   cr.data.coilT = (cr.data.coilT ?? 0) - dt;
-  const a = pickAnt(w, cr, cr.x, cr.y, k.sense, (o, d2) => d2 / (1 + crowd(w, cr, o)));
+  const a = threatPick(w, cr, L * 0.4) ?? pickAnt(w, cr, cr.x, cr.y, k.sense, (o, d2) => d2 / (1 + crowd(w, cr, o)));
   if (p >= 2 && a && cr.data.coilT <= 0 && crowd(w, cr, a) >= 6 && dhypot(a.x - cr.x, a.y - cr.y) < L * 0.2) {
     setState(cr, CS.Rear);
     telegraph(w, cr, cr.x, cr.y, L * 0.18, 0.5);
@@ -969,6 +1206,8 @@ function hogna(w: World, cr: Creature, k: CreatureKind, dt: number): void {
     cr.data.brood2 = 1;
     scatterSpiderlings(w, cr, 6);
   }
+  // rears up and shakes her riders off (combat v2)
+  if (riderShake(w, cr, dt, CS.Rear)) return;
   if (cr.latched >= 6 && cr.cd2 <= 0) {
     shakeOff(w, cr, 3, 1.6);
     cr.cd2 = 2.5;
@@ -1146,9 +1385,11 @@ export function creatureSystem(w: World, dt: number): void {
     cr.latched = 0;
     cr.latchGrip = 0;
   }
+  // the mount ratio (combat v2): with too few of a colony's ants left fighting from the ground, riders climb down
+  enforceMountRatio(w);
   for (const cr of w.s.creatures) {
     cr.climbers = 0;
-    cr.climbUnits = 0;
+    if ((cr.rideMask ?? 0) !== 0) cr.rideMask = 0;
   }
   for (const a of w.s.ants) {
     if (a.state === AS.Climb) {
@@ -1156,7 +1397,8 @@ export function creatureSystem(w: World, dt: number): void {
       const cr = (a.ridePh ?? 0) >= 1 ? w.creatureById.get(a.rideId ?? 0) : undefined;
       if (cr) {
         cr.climbers = (cr.climbers ?? 0) + 1;
-        cr.climbUnits = (cr.climbUnits ?? 0) + riderUnits(casteOf(a.caste).length);
+        // mount slots taken (the climb debug overlay draws them)
+        cr.rideMask = (cr.rideMask ?? 0) | (1 << (a.rideSlot ?? 0));
         // army ants on its back pin it as surely as ants holding its legs
         if (casteOf(a.caste).species === 'eciton') ecPins.set(cr.id, (ecPins.get(cr.id) ?? 0) + 1);
       }
@@ -1187,6 +1429,7 @@ export function creatureSystem(w: World, dt: number): void {
       continue;
     }
     cr.st += dt;
+    decayThreat(w, cr, dt);
     if (cr.cd > 0) cr.cd -= dt;
     if (cr.cd2 > 0) cr.cd2 -= dt;
     if (cr.slowT > 0) cr.slowT -= dt;
@@ -1292,8 +1535,10 @@ export function registerCreatureHooks(): void {
   };
   creatureHooks.radius = (cr) => creatureRadius(cr);
   bodyHook.body = creatureBody;
-  creatureHooks.onDamaged = (w, cr) => {
+  creatureHooks.onDamaged = (w, cr, from, dmg) => {
     cr.data.hitT = 4;
+    // threat (combat v2): it remembers who hurts it most
+    if (from) addThreat(cr, from, dmg);
   };
 }
 

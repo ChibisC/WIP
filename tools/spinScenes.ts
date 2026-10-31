@@ -14,6 +14,7 @@ import { makeAnt } from '../src/sim/factory';
 import { casteOf } from '../src/sim/species';
 import { spawnCreature } from '../src/sim/creatures/creatureAI';
 import { World } from '../src/sim/world';
+import { creatureSlotCount } from '../src/sim/slots';
 
 export function openGround(w: World, span = 120): { x: number; y: number } {
   for (let k = 0; k < 900; k++) {
@@ -104,7 +105,7 @@ export function battleStats(n = 50, seconds = 25, seed = 7): { spinners: number;
   return { spinners, turnRate: (turn / Math.max(1, turnN)) * 20, overlapPairs: overlapPairs / Math.max(1, samples), fighters: hist.size, spinStates };
 }
 
-export function beetleRing(n = 30, seed = 7): { latched: number; ringErr: number; spinners: number; stacked: number } {
+export function beetleRing(n = 30, seed = 7): { latched: number; ringErr: number; spinners: number; stacked: number; slots: number } {
   const w = createWorld({ seed, style: 'meadow', width: 640, depth: 640, food: 1, colonies: [{ species: 'lasius', player: true, ai: false }], settings: { creatures: 0 } }, new EventBus());
   w.s.creatures.length = 0;
   const p = openGround(w);
@@ -145,10 +146,12 @@ export function beetleRing(n = 30, seed = 7): { latched: number; ringErr: number
     }
   const latched = ants.filter((a) => a.state === AS.Grapple && a.gId === cr.id).length;
   let stacked = 0;
-  const alive = ants.filter((a) => a.state !== AS.Dead);
+  // (riders are up on its back, above the ants under it: not a stack)
+  const alive = ants.filter((a) => a.state !== AS.Dead && !(a.state === AS.Climb && (a.ridePh ?? 0) >= 1));
   for (let i = 0; i < alive.length; i++) for (let j = i + 1; j < alive.length; j++) if (Math.hypot(alive[i].x - alive[j].x, alive[i].y - alive[j].y) < 1.0) stacked++;
   const ringErr = 0;
-  return { latched, ringErr, spinners, stacked };
+  const L = casteOf('lasius_worker').length;
+  return { latched, ringErr, spinners, stacked, slots: creatureSlotCount(cr, L) + creatureSlotCount(cr, L, true) };
 }
 
 /**

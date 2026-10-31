@@ -210,6 +210,9 @@ function startGame(): void {
       new DebugOverlay(s, ui);
     }
     load.remove();
+    // the climb debug overlay and hitboxes from the URL, as for the other games
+    if (q.get('climbdebug')) s.setClimbDebug(true);
+    if (q.get('hitboxes')) s.setHitboxes(true);
     if (!q.get('shot') && q.get('worker') !== '0') s.useWorker();
     if (q.get('shot')) {
       let vt = performance.now();

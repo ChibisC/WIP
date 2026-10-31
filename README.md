@@ -82,7 +82,11 @@ You start with a queen, her seven-tile chamber and three small **nanitic** worke
 
 **Marker orders.** Under each column in the marker panel (the five markers and Home, for the nest-job groups), three toggles give its groups standing orders: **no attacking** (they go after no enemy and only bite back when bitten), **no gathering** (they pick nothing up and hold the marker in a guard line) and **no climbing** (they fight big creatures from the ground). A red, struck-through icon means the order is on.
 
-**Fighting.** Fighters wait at a marker in a **guard line** — rows across it, a body's room apart, facing the nearest enemy (or away from the nest). Attackers take a free slot round their target (its legs, or a place along a creature's body), hold it and face it; extras wait just outside and look for a foe nobody has taken yet. Fighters keep a body's room from each other, and creatures keep apart too. **Kings** (termites, Termants) cannot be attacked, bite weakly and die with their queen. **Large creatures and titans can be climbed:** an ant runs up a leg, rides the back for 8 s biting (untouchable all the while), climbs down and can climb again 6 s later. How many fit depends on sizes: a ground beetle takes three small workers, a stag beetle dozens, and bigger ants take more room. The small bar over a climbed creature shows room taken / room.
+**Fighting** (EotU-style, combat v2). Fighters wait at a marker in a **guard line** — rows across it, a body's room apart, facing the nearest enemy (or away from the nest). When armies meet, the clash breaks into many small, separate duels with ground between them: only a few ants can fight one target at once (room round its body: three on a worker its own size, more on bigger targets), each attacker stops at mandible reach facing its foe (no bodies piling on top of each other), and the rest go for a foe nobody has yet, walk round to a free place on the far side, or wait in a loose ring and step in when a place frees. Fighting nestmates keep a little room from each other. An ant that cannot reach its foe pauses and sidesteps instead of shoving. To make them gang up on one target, put a marker on it. Small ants walk and fight **under large creatures**. **Kings** (termites, Termants) cannot be attacked, bite weakly and die with their queen.
+
+**Large creatures** remember who hurts them most and turn on them; their stomps, sweeps and clamps are aimed at the thickest crowd and shown on the ground before they land, and they back off when surrounded and hurt. Wolf spiders drag a single ant out of a group.
+
+**Mounting** (as in EotU). Ants and termites can **mount large creatures and titans**: an ant runs up a leg to a weak point (the neck, the waist, a leg joint, the top of the abdomen), rides there for 8 s biting (untouchable all the while; fire ants also sting), climbs down and can go again 6 s later. Small ants mount large and huge creatures, big castes only titans, and shooters never (the caste card says which). A titan takes up to 12 riders and a large creature up to 8 (fewer on small ones); no more than 30 % of the ants fighting a creature ride it, so a ground force must keep fighting below. With half its riders on, the creature takes 25 % more damage (✦ on its health bar, which also shows riders / cap). Titans telegraph a shake-off that throws their riders down; a creature that leaves the map takes its riders with it.
 
 **Entrances.** Each nest starts with one entrance: a short tunnel rising from the nest floor to a hole on the surface, shaped the way that species really builds it (a crumbly crater for black garden ants, a thatched dome for wood ants, a carton nest with covered galleries for nasute termites, and so on). Digging never opens a hole by itself: the two marked extra-entrance spots in your nest are the only places a new one can go, and each surfaces on one of your site's two dry spots. An entrance lets about 10 ants through a second, so a busy one queues; plug an extra one with the Delete tool to close a way in. A fallen colony's entrances cave in over a minute.
 
@@ -116,7 +120,7 @@ You start with a queen, her seven-tile chamber and three small **nanitic** worke
 | Right-click a marker | Lift it |
 | Tab | Surface ⇄ last underground area |
 | Shift + 1 – 6 / area tabs | Show underground area 1–6 |
-| F3 | Debug overlay (frame rate, simulation tick time, network; draws the creatures' climb rails and riding slots) |
+| F3 | Debug overlay (frame rate, simulation tick time, network; draws the creatures' climbing points, rails, weak points and mount slots, free and taken) |
 | Enter | Chat (multiplayer) |
 | N | Next open underground area |
 | G · U · Delete | Dig · Upgrade · Delete tools |
@@ -175,13 +179,15 @@ npx vite-node tools/fightspread.ts -- ant:lasius_soldier 24 ant:formica_soldier 
 npx vite-node tests/arena.ts                                        # battle arena: 2/3/4 teams, no economy, spawning, ants v ants, creatures v creatures, own team spared, stances, climbing a passive titan, clearing, replay and restore, 600-unit tick time
 npx vite-node tools/termite-royal-data.ts                           # regenerate sim/termiteRoyalData.ts after a termite model kit change
 npx vite-node tests/combat.ts                                       # no spinning, slots, separation, climbing, corpses, harvest, queens, king, eggs, AI nests
+npx vite-node tests/combatV2.ts                                     # combat v2: spacing, stop at reach, slots by outline, reservation, overflow, duels, no snapping, repositioning, under-body, threat, aimed splashes, shake-off, mounting rules
+npx vite-node tools/duels.ts -- ant:lasius_worker 60 ant:fire_soldier 60 20   # how a 60 v 60 clash breaks into duels (clusters, overlap)
 npx vite-node tools/spin-check.ts                                   # 50 v 50 spinning, 30 ants on a beetle, tunnel flow
-npx vite-node tools/climb-stress.ts -- 40                           # 4 titans with riders + 1,000 ants: tick time with and without climbing
+npx vite-node tools/climb-stress.ts -- 40 400                       # 4 titans with full riders + a 400 v 400 clash: tick time with and without mounting
 npx vite-node tools/chain-check.ts                                  # centipede / caterpillar bodies: neck and joint bends, body vs hitbox
 npx vite-node tools/sickle-guard.ts -- 24 12 5                       # the sickle-jaw guard line along the workers' route
 npx vite-node tools/eciton-raid.ts -- 40 8 5 8 120 5 1               # army-ant raid numbers: front, pulses, lanes, porters, posts, bridge, plugs [puddle=1]
 npx vite-node tools/morph-hash.ts -- check tests/data/morph-hashes.json   # ant model geometry unchanged (save <file> for a new baseline)
-npx vite-node tools/climb-data.ts                                   # re-author the climb rails and riding slots from the creature models
+npx vite-node tools/climb-data.ts                                   # re-author climbing points, rails, weak points and mount slots from the creature models
 npx vite-node tools/termite-income.ts -- 3 8                        # termite wood vs ant food income per worker-minute
 npx vite-node tools/nasute-duel.ts                                  # one nasute vs one Lasius soldier, by seconds of head start
 npm run test:determinism -- 20                                      # 20 min of a 4-colony game, run twice + once from a snapshot
@@ -191,6 +197,8 @@ tests/browser/with_server.sh python3 tests/browser/mp_local.py      # 3 tabs + A
 tests/browser/with_server.sh python3 tests/browser/mp_finish.py     # 2 tabs: a match played to the end (surrender, results)
 tests/browser/with_server.sh python3 tests/browser/worker.py        # also replay.py, stress.py, determinism.py
 tests/browser/with_server.sh python3 tests/browser/species_renders.py  # new species in the lab; also species_battle.py, species_fx.py, attack_renders.py (the three melee attacks)
+tests/browser/with_server.sh python3 tests/browser/combat_v2.py docs/combat/v2   # 60 v 60 clash shots (LABEL=before against the base), titan riders, shake-off, clip
+python3 tools/combat-v2-sheets.py docs/combat/v2   # before / after sheets of those shots (and the renders to JPEG)
 tests/browser/with_server.sh python3 tests/browser/climb_renders.py    # ants and termites climbing and riding creatures; also royals_renders.py (queens, king, eggs), termite_royals_v21.py (kit v2.1 royals: top/side/front/¾, far zoom, egg pull)
 tests/browser/with_server.sh python3 tests/browser/sickle_renders.py  # Sickle-Jaw castes in the lab, a grab-and-squirt, a battle, a free squirt, the nest, leaf litter
 tests/browser/with_server.sh python3 tests/browser/eciton_renders.py  # the five army-ant models and four poses, a raid at close and far zoom, posts, a bridge, a plug

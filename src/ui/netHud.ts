@@ -40,6 +40,13 @@ export class NetHud {
   muted = false;
   private raf = 0;
 
+  /** game speed vote: who asked, Agree / No (sim/commands.ts speedVote) */
+  private vote = document.createElement('div');
+  private voteText = document.createElement('span');
+  private voteYes = document.createElement('button');
+  private voteNo = document.createElement('button');
+  private voteKey = '';
+
   /** LAN host: the Players button (reconnect a player with a new code) */
   private playersBtn = document.createElement('button');
   private reconnectBtn = document.createElement('button');
@@ -80,7 +87,20 @@ export class NetHud {
     this.playersBtn.dataset.a = 'players';
     this.playersBtn.textContent = 'Players';
     this.playersBtn.onclick = () => this.playersPanel();
-    this.root.append(this.banner, this.chatLog, this.chatInput, this.muteBtn);
+    this.vote.className = 'net-banner net-vote pnl';
+    this.vote.dataset.a = 'speed-vote';
+    this.voteYes.className = 'go';
+    this.voteYes.dataset.a = 'speed-yes';
+    this.voteNo.className = 'chip';
+    this.voteNo.dataset.a = 'speed-no';
+    this.voteYes.onclick = () => {
+      const p = (s.world.s.settings.speedVotes ?? []).find((v) => v > 0);
+      if (p) s.setSpeed(p);
+    };
+    // "no", or withdraw one's own request: vote the current speed
+    this.voteNo.onclick = () => s.issue({ type: 'speedVote', speed: s.gameSpeed() });
+    this.vote.append(this.voteText, this.voteYes, this.voteNo);
+    this.root.append(this.banner, this.vote, this.chatLog, this.chatInput, this.muteBtn);
     if (s.net?.isHost && s.net.transport.lan && lan.reconnect) this.root.append(this.playersBtn);
     parent.appendChild(this.root);
     s.onChat = (from, text) => this.line(from, text);
@@ -145,6 +165,7 @@ export class NetHud {
       drop = net.isHost;
     }
     if (this.bannerText.textContent !== banner) this.bannerText.textContent = banner;
+    this.speedVote();
     this.banner.classList.toggle('show', !!banner);
     this.dropBtn.style.display = drop ? '' : 'none';
     this.reconnectBtn.style.display = drop && net.transport.lan && this.lan.reconnect ? '' : 'none';
@@ -162,6 +183,36 @@ export class NetHud {
       this.outShown = true;
       const allies = this.s.world.s.colonies.some((c) => c.alive && c.id !== this.s.player.id && c.team === this.s.player.team);
       this.showPanel('out', () => `<h2>Your queen is gone</h2><p>Your colony is out of the match. ${allies ? 'Your team plays on: if it wins, you win with it.' : 'The others play on'}; you can watch to the end.</p><div class="opt-row"><button class="go" data-a="close">Keep watching</button><button class="chip" data-a="leave">Back to the menu</button></div>`);
+    }
+  }
+
+  /** The game-speed vote in progress: who asked, who still has to agree; Agree / No for this player. */
+  private speedVote(): void {
+    const w = this.s.world;
+    const votes = w.s.settings.speedVotes ?? [];
+    const asked = votes.find((v) => v > 0) ?? 0;
+    const me = this.s.player.id;
+    let text = '';
+    let yes = false;
+    if (asked) {
+      const voters = w.s.colonies.filter((c) => c.alive && c.player && !c.ai);
+      const agreed = voters.filter((c) => votes[c.id] === asked).map((c) => this.name(c.id));
+      const waiting = voters.filter((c) => votes[c.id] !== asked).map((c) => this.name(c.id));
+      if (votes[me] === asked) text = `You asked to play at ${asked}×. Waiting for ${waiting.join(', ')} to agree…`;
+      else {
+        text = `${agreed.join(', ')} ${agreed.length > 1 ? 'want' : 'wants'} to play at ${asked}×. Every player has to agree.`;
+        yes = this.s.player.alive;
+      }
+    }
+    const key = `${text}|${yes}`;
+    if (key !== this.voteKey) {
+      this.voteKey = key;
+      this.voteText.textContent = text;
+      this.voteYes.textContent = `Agree: ${asked}×`;
+      this.voteYes.style.display = yes ? '' : 'none';
+      this.voteNo.textContent = yes ? 'No' : 'Cancel';
+      this.voteNo.style.display = text && this.s.player.alive ? '' : 'none';
+      this.vote.classList.toggle('show', !!text);
     }
   }
 
