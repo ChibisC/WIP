@@ -28,6 +28,8 @@ import type { SimEvent } from '../core/events';
  * `__anim.t` for tests/browser/anim_clips.py.
  */
 
+import { MORPHS } from '../render/ants/morphs';
+
 const TICK = 0.05;
 const FIRE = 'fire_minor';
 const STAG_L = CREATURES.stagBeetle?.length ?? 100;
@@ -516,10 +518,15 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
     normal: (_x: number, _y: number, out: THREE.Vector3) => out.set(0, 1, 0),
     forward: (h: number, out: THREE.Vector3) => out.set(Math.cos(h), 0, Math.sin(h)),
   };
+  // the rollout: any species in the fire ant's clips (`ant=` the worker, `big=` the major's part), the scene scaled to
+  // the ant's size so they don't overlap (`kS`)
+  const ant = q.get('ant') || FIRE;
+  const big = q.get('big') || '';
+  const kS = clip.stag ? 1 : (MORPHS[ant]?.L ?? 2.8) / (MORPHS[FIRE].L ?? 2.8);
   const actors: Actor[] = clip.ants.map((a, i) => {
     const v = blankView();
     v.id = i + 1;
-    v.morph = a.morph ?? FIRE;
+    v.morph = a.morph === 'fire_major' && big ? big : (a.morph ?? ant);
     v.antennaActivity = 0.3;
     v.hp = 40;
     a.script(0, v);
@@ -550,6 +557,11 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
       a.cur.dead = false;
       a.cur.hp = keepHp;
       a.script(T, a.cur);
+      if (kS !== 1) {
+        a.cur.x *= kS;
+        a.cur.y *= kS;
+        a.cur.lift *= kS;
+      }
       a.cur.px = a.prev.x;
       a.cur.py = a.prev.y;
       a.cur.pheading = a.prev.h;
@@ -569,7 +581,7 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
   };
   // camera (`cdist=` overrides the clip's distance: the same scene at another zoom)
   // (`ctx` / `ctz` move the camera's target: a close look at one actor)
-  const C = { ...clip.cam, dist: Number(q.get('cdist') || clip.cam.dist), tx: Number(q.get('ctx') ?? clip.cam.tx), tz: Number(q.get('ctz') ?? clip.cam.tz) };
+  const C = { ...clip.cam, dist: Number(q.get('cdist') || clip.cam.dist * kS), tx: Number(q.get('ctx') ?? clip.cam.tx * kS), ty: clip.cam.ty * kS, tz: Number(q.get('ctz') ?? clip.cam.tz * kS) };
   const cam = new THREE.PerspectiveCamera(C.fov ?? 30, window.innerWidth / window.innerHeight, C.dist * 0.02, C.dist * 60);
   const dir = new THREE.Vector3(...C.dir).normalize();
   const target = new THREE.Vector3(C.tx, C.ty, C.tz);

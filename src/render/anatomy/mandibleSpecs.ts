@@ -245,3 +245,32 @@ export function stagMandible(size: number): MandibleSpec {
 
 /** A stag male's mandible length against its body length (mandibles included): ~⅓ in majors, about the head's length in minors. */
 export const stagMandibleShare = (size: number): number => 0.075 + 0.265 * Math.max(0, Math.min(1, size));
+
+/**
+ * Rollout (spec 03/04): a formicine worker's triangular mandible (Lasius, Formica, the formicine queens): the fire
+ * ant worker's plate, with a longer straight masticatory margin carrying `teeth` teeth from the apical one (the
+ * apex) down to the basal angle, larger and smaller alternating and shrinking toward the base (Formicinae: 7–9
+ * teeth), and the species' colours.
+ */
+export function formicineMandible(o: { teeth: number; color: MandibleSpec['color']; reach?: number; broad?: number }): MandibleSpec {
+  const n = Math.max(1, o.teeth - 1);
+  const teeth = [];
+  for (let k = 0; k < n; k++) {
+    const f = k / Math.max(1, n - 1);
+    // from just behind the apex (u 0.9) to the basal angle (u 0.5)
+    teeth.push({ u: 0.9 - 0.4 * f, size: (0.034 - 0.014 * f) * (k % 2 ? 0.75 : 1), base: 0.042, lean: 0.32 - 0.1 * f });
+  }
+  const b = o.broad ?? 1;
+  return {
+    ...FIRE_WORKER,
+    inner: FIRE_WORKER.inner.map(([u, v]) => [u, v * b] as [number, number]),
+    teeth,
+    color: o.color,
+    reach: o.reach ?? 1.12,
+  };
+}
+
+/** Black garden ant (Lasius niger): dark brown jaws, a little paler and redder along the masticatory margin, the teeth black (docs/creatures/lasius-niger.md). */
+export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x3a2618, mid: 0x4a2e1a, tip: 0x241610, teeth: 0x0c0806, dark: [0.78, 1.0] } });
+/** Red wood ant (Formica rufa): reddish-brown jaws darkening to black at the teeth (docs/creatures/formica-rufa.md). */
+export const FORMICA_WORKER = formicineMandible({ teeth: 8, color: { base: 0x7a3a1c, mid: 0x6a3018, tip: 0x2a140a, teeth: 0x0e0705, dark: [0.72, 1.0] }, broad: 1.05 });

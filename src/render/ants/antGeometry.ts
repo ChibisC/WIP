@@ -685,8 +685,10 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       if (gDepth > 0 && y > headCY) ny -= Math.exp(-(z * z) / (hW * hW * 0.006)) * hH * gDepth * (1 - t * 0.7);
       return [nx, ny, z];
     });
-    const headCol = grad(look.head, (x, y) => {
-      if (m.key.startsWith('formica')) return ss(0.15, 0.95, x / hL) * 0.6 + ss(0.05, -0.4, (y - headCY) / hH) * 0.7;
+    const headCol = grad(look.head, (x, y, z) => {
+      // (rollout, AntWiki F. rufa: the clypeus, genae, the sides behind the eyes and the underside red; the frons and
+      // vertex dark brown to black, the red grading into the dark without a sharp border)
+      if (m.key.startsWith('formica') || m.key.startsWith('plagiaria')) return (m.real ? ss(0.5, 0.97, x / hL) * 0.85 + ss(0.32, 0.47, Math.abs(z) / hW) * 0.55 : ss(0.15, 0.95, x / hL) * 0.6) + ss(0.05, -0.4, (y - headCY) / hH) * 0.7;
       if (m.head.frontMix !== undefined) return (m.real ? Math.min(1, ss(0.3, 0.86, x / hL) + 0.35 * ss(0.5, 0.95, x / hL) * ss(0.05, -0.35, (y - headCY) / hH)) : ss(0.55, 1.0, x / hL)) * m.head.frontMix; // (realism: the face darkens gradually into the jaws, the lower front most)
       return ss(0.5, 1.0, x / hL) * 0.5;
     });
@@ -752,7 +754,10 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const eyeZ = (hW / 2) * headWidthAt(eyeT) * 0.93 * (smoothEye ? 0.9 : 1);
     if (!m.eyes.none) for (const s of [-1, 1]) {
       const c = new THREE.Vector3(eyeT * hL, headCY + (hH / 2) * m.eyes.height, s * eyeZ);
-      const r = m.eyes.single ? new THREE.Vector3(eyeR, eyeR, eyeR * 0.8) : new THREE.Vector3(eyeR * 1.15, eyeR * 0.95, eyeR * (m.real ? 0.78 : 0.6));
+      // (rollout, user note: the eyes bulged out too much — an ant's eye is a low dome on the head's side; the bigger
+      // the eye, the flatter: the fire ant's small eye keeps its 0.78, a Formica's large one sits nearly flush)
+      const bulge = m.real ? Math.min(0.78, Math.max(0.36, 0.78 - (m.eyes.size - 0.15) * 3.2)) : 0.6;
+      const r = m.eyes.single ? new THREE.Vector3(eyeR, eyeR, eyeR * 0.8) : new THREE.Vector3(eyeR * (m.eyes.oval ?? 1.15), eyeR * 0.95, eyeR * bulge);
       const [pp, ii] = ellipsoid(c, r, hi ? (m.real ? 24 : 18) : 8);
       // realism v2: a bulging, glossy dome (the facets too fine to read except as a faint grain)
       const eyeLook: PartLook = smoothEye ? { color: 0, rough: 0.12, coat: 1, sheen: 0 } : m.real ? { color: 0x0b0806, rough: 0.16, coat: 0.7, sheen: 0 } : { color: 0x0b0806, rough: 0.32, coat: 0.15, sheen: 0 };

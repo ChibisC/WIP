@@ -4,7 +4,7 @@
  * noted; colours are linear-ish sRGB hex.
  */
 import type { MandibleSpec } from '../anatomy/mandible';
-import { FIRE_MAJOR, FIRE_WORKER } from '../anatomy/mandibleSpecs';
+import { FIRE_MAJOR, FIRE_WORKER, FORMICA_WORKER, LASIUS_WORKER } from '../anatomy/mandibleSpecs';
 
 export type HeadShape = 'round' | 'heart' | 'rect' | 'tri' | 'square';
 export type MandibleType = 'triangular' | 'falcate' | 'massive' | 'small';
@@ -41,7 +41,7 @@ export interface AntMorph {
     pore?: { len: number; r: number; up: number };
   };
   /** `none`: eyeless (termite soldiers, Termant soldiers) */
-  eyes: { size: number; pos: number; height: number; ocelli: boolean; single?: boolean; none?: boolean };
+  eyes: { size: number; pos: number; height: number; ocelli: boolean; single?: boolean; none?: boolean; /** length ÷ height of the eye (default 1.15) */ oval?: number };
   /** `bead`: funiculus segments swell toward the tip (moniliform, termite-like; LOD0) */
   antenna: { segments: number; scape: number; funiculus: number; club: number; thick: number; bead?: number };
   mandible: {
@@ -131,7 +131,8 @@ const lasiusWorker: AntMorph = {
   head: { len: 0.23, width: 0.21, height: 0.15, shape: 'rect' },
   eyes: { size: 0.22, pos: 0.52, height: 0.15, ocelli: false },
   antenna: { segments: 12, scape: 1.0, funiculus: 1.25, club: 0, thick: 0.013 },
-  mandible: { type: 'triangular', len: 0.42, teeth: 8, width: 0.55 },
+  // rollout batch 1: the formicine jaw generator (8 teeth, closing neatly in front of the clypeus)
+  mandible: { type: 'triangular', len: 0.42, teeth: 8, width: 0.55, spec: LASIUS_WORKER, open: 0.7 },
   meso: { len: 0.32, width: 0.13, height: 0.13 },
   waist: { nodes: 1, len: 0.05, scale: true, nodeH: 0.11 },
   gaster: { len: 0.4, width: 0.22, height: 0.18, sting: false },
@@ -142,10 +143,14 @@ const lasiusWorker: AntMorph = {
     waist: L(0x271c14, 0.56, 0.08, 0.14),
     gaster: L(0x18120e, 0.5, 0.12, 0.32),
     legs: L(0x2a2018, 0.56, 0.06, 0.15, 0x56422f),
-    antenna: L(0x281e16, 0.56, 0.06, 0.15, 0x46352a),
+    // (scapes lighter, yellowish brown; mandibles and knees too: AntWiki, Wilson 1955, Borowiec & Salata 2022)
+    antenna: L(0x4a3826, 0.56, 0.06, 0.15, 0x3a2c20),
     mandible: L(0x2e2016, 0.55, 0.12, 0.0),
   },
   hair: 0.6,
+  // erect hairs on the gaster (and scapes and tibiae, diagnostic); fine, pale greyish, short
+  setae: { color: 0x8a7c6c, head: 22, meso: 16, gaster: 90, len: [0.012, 0.05] },
+  real: true,
   stance: 0.13,
 };
 
@@ -156,7 +161,7 @@ const lasiusSoldier: AntMorph = {
   L: 4.9,
   head: { len: 0.25, width: 0.245, height: 0.165, shape: 'rect' },
   eyes: { size: 0.2, pos: 0.52, height: 0.15, ocelli: false },
-  mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.62 },
+  mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.62, spec: LASIUS_WORKER, open: 0.7 },
   meso: { len: 0.31, width: 0.14, height: 0.14 },
   legs: { hind: 0.93, thick: 0.0165 },
 };
@@ -183,9 +188,10 @@ const formicaWorker: AntMorph = {
   key: 'formica_worker',
   L: 7,
   head: { len: 0.24, width: 0.22, height: 0.15, shape: 'tri' },
-  eyes: { size: 0.3, pos: 0.48, height: 0.25, ocelli: true },
+  // elongate oval, ~0.27 of the head's length (AntWiki: Borowiec & Salata 2022)
+  eyes: { size: 0.27, pos: 0.48, height: 0.25, ocelli: true, oval: 1.3 },
   antenna: { segments: 12, scape: 1.15, funiculus: 1.2, club: 0, thick: 0.0115 },
-  mandible: { type: 'triangular', len: 0.4, teeth: 8, width: 0.6 },
+  mandible: { type: 'triangular', len: 0.4, teeth: 8, width: 0.6, spec: FORMICA_WORKER, open: 0.7 },
   meso: { len: 0.34, width: 0.12, height: 0.13 },
   waist: { nodes: 1, len: 0.05, scale: true, nodeH: 0.12 },
   gaster: { len: 0.37, width: 0.21, height: 0.17, sting: false },
@@ -200,6 +206,9 @@ const formicaWorker: AntMorph = {
     mandible: L(0x52281a, 0.45, 0.25, 0),
   },
   hair: 0.35,
+  // sparse erect hairs (rufa is hairier than polyctena): head, pronotum, gaster
+  setae: { color: 0xb09a80, head: 18, meso: 14, gaster: 40, len: [0.015, 0.07] },
+  real: true,
   stance: 0.15,
 };
 
@@ -223,7 +232,7 @@ const formicaSoldier: AntMorph = {
   L: 8.6,
   head: { len: 0.27, width: 0.275, height: 0.17, shape: 'tri' },
   eyes: { size: 0.26, pos: 0.48, height: 0.25, ocelli: true },
-  mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.7 },
+  mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.7, spec: FORMICA_WORKER, open: 0.7 },
   meso: { len: 0.33, width: 0.145, height: 0.15 },
   gaster: { len: 0.35, width: 0.22, height: 0.18, sting: false },
   legs: { hind: 1.02, thick: 0.0158 },

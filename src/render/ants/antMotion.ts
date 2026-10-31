@@ -24,7 +24,7 @@ import { ATK } from './attackPoses';
  */
 
 /** Which morphs use the pass (the pilot: the tropical fire ant; the rollout widens this). */
-export const ANIM_V2_PREFIXES = ['fire_'];
+export const ANIM_V2_PREFIXES = ['fire_', 'lasius_', 'formica_', 'plagiaria_'];
 /** Lab switch: false shows the old motion (before/after clips). */
 export const animSettings = { v2: true };
 export const animV2 = (morph: string): boolean => animSettings.v2 && ANIM_V2_PREFIXES.some((p) => morph.startsWith(p));
@@ -66,6 +66,11 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
       const swing = (k: number) => k > 0 && hs(k, 3) < 0.35;
       out.variant = swing(n) && !swing(n - 1) ? ATK.HEAD_SWING : ATK.CRUSH;
     }
+    return out;
+  }
+  // formicines (rollout batch 1): a lunge bite, a clamp and tug, and biting then spraying formic acid
+  if (morph.startsWith('lasius_') || morph.startsWith('formica_') || morph.startsWith('plagiaria_')) {
+    out.variant = [ATK.LUNGE, ATK.ACID, ATK.CLAMP][av];
     return out;
   }
   if (!morph.startsWith('fire_')) {

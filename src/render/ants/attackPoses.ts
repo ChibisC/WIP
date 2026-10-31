@@ -178,7 +178,7 @@ export function applyAttackBody(p: AttackPose, w: number, L: number, vF: THREE.V
 // ---------------------------------------------------------------------------------------------------------------
 
 /** Attack variants of the planted-feet pass (attackVariant in antMotion.ts picks them per species and cycle). */
-export const ATK = { LUNGE: 0, REAR: 1, CLAMP: 2, PIVOT_STING: 3, QUICK_STING: 4, CRUSH: 5, HEAD_SWING: 6 } as const;
+export const ATK = { LUNGE: 0, REAR: 1, CLAMP: 2, PIVOT_STING: 3, QUICK_STING: 4, CRUSH: 5, HEAD_SWING: 6, ACID: 7 } as const;
 
 type Key = Partial<Omit<AttackPose, never>>;
 const FIELDS = ['fwd', 'pitch', 'yaw', 'roll', 'headPitch', 'headYaw', 'mand', 'gaster', 'sting', 'up', 'side', 'px', 'spread', 'front', 'gYaw'] as const;
@@ -226,6 +226,13 @@ const CLAMP_T: Key = { yaw: -0.08, fwd: -0.13, pitch: 0.07, headPitch: -0.06, ma
 const FLAG: Key = { up: 0.06, spread: 0.6, gaster: 1.15, sting: 0.75, headPitch: -0.12, mand: 0.6 };
 const COCK: Key = { up: 0.045, spread: 0.6, pitch: 0.05, px: -0.2, gaster: 1.45, sting: 0.9, headPitch: -0.05, mand: 0.9 };
 const WHIP: Key = { up: 0.12, spread: 0.6, pitch: 0.17, px: -0.3, fwd: 0.03, gaster: -2.7, sting: 1, headPitch: 0.15, mand: 1, front: 0.55 };
+/**
+ * Formicines (Lasius, Formica; rollout batch 1): biting first, then bending the gaster forward between the legs to
+ * spray formic acid from the acidopore at the enemy in front — the body raised on its legs and tipped nose-up so the
+ * gaster tip points forward under the head; a quick pump of the gaster is the spray.
+ */
+const ACID_W: Key = { up: 0.06, pitch: 0.07, px: -0.3, fwd: -0.03, gaster: -2.15, headPitch: 0.12, mand: 0.9, spread: 0.35 };
+const ACID_S: Key = { up: 0.07, pitch: 0.09, px: -0.3, fwd: 0.02, gaster: -2.5, headPitch: 0.18, mand: 1, spread: 0.35 };
 const COCK_Q: Key = { up: 0.03, spread: 0.4, pitch: 0.03, px: -0.2, gaster: 1.3, sting: 0.8, mand: 0.8 };
 const WHIP_Q: Key = { up: 0.09, spread: 0.4, pitch: 0.12, px: -0.3, fwd: 0.03, gaster: -2.4, sting: 1, headPitch: 0.1, mand: 1, front: 0.4 };
 const CRUSH_W: Key = { fwd: -0.05, up: -0.06, headPitch: -0.22, mand: 1, gaster: 0.15, spread: 0.4 };
@@ -295,6 +302,18 @@ export function attackPoseV2(variant: number, q: number, side: number, out: Atta
       if (q < 0.6) blend({}, COCK_Q, sm((q - 0.15) / 0.4), side, out);
       else if (q < C) blend(COCK_Q, WHIP_Q, sw, side, out);
       else blend(WHIP_Q, {}, sm(((q - C) / (1 - C) - 0.2) / 0.8), side, out);
+      return out;
+    }
+    case ATK.ACID: {
+      // curl the gaster forward under the body, rising nose-up → a sharp pump forward (the spray) → hold, the gaster
+      // twitching as it empties → settle
+      if (q < 0.6) blend({}, ACID_W, sm(q / 0.5), side, out);
+      else if (q < C) blend(ACID_W, ACID_S, strikeEase((q - 0.6) / (C - 0.6)), side, out);
+      else {
+        const k = (q - C) / (1 - C);
+        blend(ACID_S, {}, sm((k - 0.35) / 0.65), side, out);
+        out.gaster -= 0.1 * Math.sin(k * 30) * Math.max(0, 1 - k * 3);
+      }
       return out;
     }
     case ATK.CRUSH: {
