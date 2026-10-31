@@ -6,7 +6,7 @@ page errors or shader warnings.
 
 Run: tests/browser/with_server.sh python3 tests/browser/combat_v2.py docs/combat/v2
      LABEL=before BASE=http://127.0.0.1:5174/ python3 tests/browser/combat_v2.py docs/combat/v2   (base checkout)
-     ONLY=<name part>; CLIP=0 skips the clip
+     ONLY=<name part>; CLIP=0 skips the clip; RINGS=0: the clash with the team rings hidden, closer (both labels)
 """
 import os, sys, time, subprocess, shutil
 from playwright.sync_api import sync_playwright
@@ -17,6 +17,7 @@ LABEL = os.environ.get("LABEL", "after")
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "..", "..", "docs", "combat", "v2")
 ONLY = os.environ.get("ONLY", "")
 CLIP = os.environ.get("CLIP", "1") != "0"
+RINGS = os.environ.get("RINGS", "1") != "0"
 os.makedirs(OUT, exist_ok=True)
 res = []
 
@@ -45,6 +46,9 @@ def page(ctx, teams, size=(1280, 760), debug=False):
     t0 = time.time()
     while time.time() - t0 < 300 and not pg.evaluate("window.__ready===true"):
         time.sleep(0.5)
+    # (the arena start did not read ?climbdebug before this branch: switch the overlay on directly as well)
+    if debug:
+        pg.evaluate("window.__session.setClimbDebug(true)")
     return pg, errs
 
 
@@ -67,8 +71,13 @@ with sync_playwright() as p:
         for at in (10, 12, 14, 16):
             pg.evaluate(f"window.__session.loop.advance({(at - t) * 20})")
             t = at
-            shot(pg, f"clash60_{LABEL}_{at}s_default", {"d": 230, "p": 0, "fight": True})
-            shot(pg, f"clash60_{LABEL}_{at}s_close", {"d": 110, "p": 0.1, "fight": True})
+            if RINGS:
+                shot(pg, f"clash60_{LABEL}_{at}s_default", {"d": 230, "p": 0, "fight": True})
+                shot(pg, f"clash60_{LABEL}_{at}s_close", {"d": 110, "p": 0.1, "fight": True})
+            else:
+                # the arena's team rings hidden, closer: the bodies themselves
+                pg.evaluate("() => { for (const c of window.__session.teamRings.group.children) c.visible = false; }")
+                shot(pg, f"clash60_{LABEL}_{at}s_norings", {"d": 75, "p": 0.25, "fight": True})
         st = pg.evaluate(STATS)
         res.append(f"{'PASS' if not errs else 'FAIL'}  clash60 {LABEL}: {st} {errs[:2]}")
         print(res[-1], flush=True)

@@ -198,6 +198,7 @@ tests/browser/with_server.sh python3 tests/browser/mp_finish.py     # 2 tabs: a 
 tests/browser/with_server.sh python3 tests/browser/worker.py        # also replay.py, stress.py, determinism.py
 tests/browser/with_server.sh python3 tests/browser/species_renders.py  # new species in the lab; also species_battle.py, species_fx.py, attack_renders.py (the three melee attacks)
 tests/browser/with_server.sh python3 tests/browser/combat_v2.py docs/combat/v2   # 60 v 60 clash shots (LABEL=before against the base), titan riders, shake-off, clip
+python3 tools/combat-v2-sheets.py docs/combat/v2   # before / after sheets of those shots (and the renders to JPEG)
 tests/browser/with_server.sh python3 tests/browser/climb_renders.py    # ants and termites climbing and riding creatures; also royals_renders.py (queens, king, eggs), termite_royals_v21.py (kit v2.1 royals: top/side/front/¾, far zoom, egg pull)
 tests/browser/with_server.sh python3 tests/browser/sickle_renders.py  # Sickle-Jaw castes in the lab, a grab-and-squirt, a battle, a free squirt, the nest, leaf litter
 tests/browser/with_server.sh python3 tests/browser/eciton_renders.py  # the five army-ant models and four poses, a raid at close and far zoom, posts, a bridge, a plug
