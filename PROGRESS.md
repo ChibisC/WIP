@@ -996,3 +996,21 @@ stay worth it; then: leafcutter (and army-ant) legs too long and their walk too 
   stings; fire ants still deal more venom; only the major taunts, with its chance, reach, cooldown and health floor;
   taunted ants stay on it; creatures are taunted; only the soldier rages, up to +45 %, nestmates near it only, fading;
   determinism.
+
+### 2026-10-31 (evening) — The user's ratings of the four-species page, and the fixes (round 2)
+Ratings (page McDp2hQQ1DNfZeScW6nmXG, `ratings` collection): 40 of 42 clips scored, mostly 9–10. The army ants' and
+wood ants' basics were 10 throughout. Notes, and what was done:
+- A1 (small ants look too fast): the lab clips walked the leafcutter media at 2.5× its game speed; walks and
+  line-ups now play at each caste's speed in the game (the user chose this over slowing the game).
+- Jaws too long: A3 leafcutter media −15 %; F5/F7/F9 wood-ant soldier −18 % (`FORMICA_SOLDIER_JAW`; the worker's were
+  fine); L1 garden-ant worker −12 % and soldier −18 % (`LASIUS_SOLDIER_JAW`). The garden-ant queen uses the worker's.
+- A5, A6, F7, L7, L8 (head, jaws or gaster in the ground): the renderer finds the lowest of the jaw tips, the chin and
+  the gaster tip as posed. The body rises over its planted feet until they clear the ground by 1.5 % of its length.
+- A7 (taunt): the fore legs are held up and still. The leafcutter antenna sockets were inside the head: they move
+  forward onto the face, and the scapes lie along the head's surface.
+- E6: the army-ant soldier's sickles are a crescent from above, clawing in like a stag beetle's.
+- E7: the rage is an emissive red glow from within the mesosoma, waist and gaster; the legs and head keep their colour.
+- F6: the sprayers rear up as in EotU: the body tilts up over the hind legs, the fore legs lift and the gaster curls
+  forward under it (`AntView.front`, `pivX`).
+- L6: no trophallaxis pose for garden ants.
+- Not yet published (the user is still checking): no merge into `main` and no game artifact version.
