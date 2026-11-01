@@ -196,13 +196,14 @@ export const CASTES: Record<string, CasteDef> = {
     armor: 0, carry: 0.8, grip: 0.5, mass: 0.3, forage: true, dig: true, nurse: true, garden: true,
     cost: 2, devTime: 0.6, pop: 0.5, cocoon: false, fact: 'Atta minims ride on carried leaves to guard against parasitic phorid flies.',
   }),
+  // (user 2026-11-01: the leafcutter castes named by size — Minim, Worker, Media, Major; the unit ids stay)
   atta_media: C({
-    id: 'atta_media', species: 'atta', name: 'Media', role: 'worker', morph: 'atta_media', length: 8, speed: 17, hp: 22, bite: 3, attackInterval: 1,
+    id: 'atta_media', species: 'atta', name: 'Worker', role: 'worker', morph: 'atta_media', length: 8, speed: 17, hp: 22, bite: 3, attackInterval: 1,
     armor: 1, carry: 3, grip: 2, mass: 2.2, forage: true, dig: true, nurse: true, cutLeaves: true,
     cost: 8, devTime: 1, pop: 1, cocoon: false, fact: 'Leafcutters cut leaf fragments sized to their body and carry them upright over their heads.',
   }),
   atta_soldier: C({
-    id: 'atta_soldier', species: 'atta', name: 'Soldier', role: 'soldier', morph: 'atta_soldier', length: 10.5, speed: 16, hp: 62, bite: 7, attackInterval: 1.0,
+    id: 'atta_soldier', species: 'atta', name: 'Media', role: 'soldier', morph: 'atta_soldier', length: 10.5, speed: 16, hp: 62, bite: 7, attackInterval: 1.0,
     armor: 2, carry: 3, grip: 3, mass: 3, forage: true, dig: true, nurse: false, threat: 0.5,
     cost: 16, devTime: 1.3, pop: 1, cocoon: false,
     fact: 'Atta workers come in a continuous range of sizes; mid-sized workers patrol the foraging trails and attack intruders.',

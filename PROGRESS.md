@@ -1062,3 +1062,9 @@ wood ants' basics were 10 throughout. Notes, and what was done:
   (major's a little larger), glossy near-black; the queen's keep their place, darker. The median ocellus lower on the
   face (t .71), larger, a deep amber-brown glossy lens — darker than the head, not the photo's flash-bright amber.
 - Morph hashes re-baselined for atta_*. 650 tests pass.
+
+### 2026-11-01 (evening, 2) — Leafcutter castes named by size; the Media lighter than the major
+- User: "change the classes for leafcutters to minum, worker, media, then major respectively from size order, and make
+  soldier (now media) color a slightly lighter at least than the major". Display names: `atta_media` → Worker,
+  `atta_soldier` → Media (ids, roles and stats unchanged). Colours darken with size: the Media keeps the worker's body
+  with a head between the worker's and the major's; the major's body a little darker chestnut.

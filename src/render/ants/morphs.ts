@@ -385,7 +385,10 @@ const attaSoldier: AntMorph = {
   meso: { len: 0.28, width: 0.12, height: 0.14, spines: { pro: 0.06, meso: 0.04, meso2: 0.02, prop: 0.05 } },
   gaster: { len: 0.25, width: 0.18, height: 0.15, sting: true },
   legs: { hind: 0.94, thick: 0.015, splay: 0.8 },
-  look: { ...attaLook, head: L(0x7a3418, 0.48, 0.2, 0.08, 0x5a2410) },
+  // (user 2026-11-01: this caste is now the Media — "make soldier (now media) color a slightly lighter at least than
+  // the major": the castes darken with size — minim, worker, Media, major)
+  // (its body the worker's; the head between the worker's and the major's — the major's body is the darker one)
+  look: { ...attaLook, head: L(0x8e4826, 0.5, 0.18, 0.08, 0x6c3418) },
 };
 
 /** Atta major: a disproportionately huge, deeply lobed head — smooth and shining (A. cephalotes) — with short blunt occipital spines and heavy shears. */
@@ -407,7 +410,8 @@ const attaMajor: AntMorph = {
   // (review round 1: mirror-glossy read as chocolate — a satin shine over the smooth cuticle)
   // (review rounds 1–2: any gloss read as plastic or chocolate — the user's major photos are matte and sculptured; the
   // photos win over the key's "shining")
-  look: { ...attaLook, head: L(0x7a3018, 0.58, 0.12, 0.1, 0x5c2a16) },
+  // (darker chestnut all over than the Media, user 2026-11-01)
+  look: { ...attaLook, head: L(0x7a3018, 0.58, 0.12, 0.1, 0x5c2a16), meso: L(0x6c3626, 0.66, 0.06, 0.12, 0x522818), waist: L(0x5a2614, 0.66, 0.06, 0.1), gaster: L(0x542414, 0.62, 0.08, 0.16, 0x421e10), legs: L(0x542616, 0.6, 0.06, 0.1, 0x461f12) },
   setae: { ...attaSetae, color: 0xa0502a, head: 70, len: [0.006, 0.026] },
   stance: 0.14,
 };
