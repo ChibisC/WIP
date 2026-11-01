@@ -167,9 +167,9 @@ function clips(): Record<string, Clip> {
       dur: 7,
       ants: (
         [
-          ['formica_worker', 'jet', 1.8, -11],
+          ['formica_worker', 'jet', 1.8, -6.5],
           ['formica_mortar', 'lob', 2.4, 0],
-          ['formica_rapid', 'rapid', 0.45, 11],
+          ['formica_rapid', 'rapid', 0.45, 6.5],
         ] as const
       ).map(([morph, kind, period, x]) => ({
         morph,
@@ -183,10 +183,13 @@ function clips(): Record<string, Clip> {
           v.lift = 0;
           if (t < 0.6) return;
           const st = (t - 0.6) % period;
-          if (st < (kind === 'rapid' ? 0.1 : kind === 'lob' ? 0.85 : 0.9)) sprayPose(v, kind === 'jet' ? undefined : kind, st, MORPHS[morph].L);
+          // (the Rapid Sprayer holds its rear between its shots: user rating F6, round 2)
+          if (kind === 'rapid') sprayPose(v, kind, st, MORPHS[morph].L, t - 0.6 > 0.1);
+          else if (st < (kind === 'lob' ? 0.85 : 0.9)) sprayPose(v, kind === 'jet' ? undefined : kind, st, MORPHS[morph].L);
         }) as AntScript,
       })),
-      cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.12, 0.3, 1], dist: 16, fov: 30 },
+      // (all three in view: the worker, the Mortar and the Rapid Sprayer side by side)
+      cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.12, 0.4, 1], dist: 20, fov: 30 },
     },
     // (overnight spec 3.4) trophallaxis: two workers face to face, mouthparts touching, as antViews' Troph pose
     troph: {

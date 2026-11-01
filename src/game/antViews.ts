@@ -241,9 +241,13 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
       out.gaster = cd.sting ? -0.4 : 0.35;
       out.headPitch = -0.15;
       break;
-    case AS.Spray:
-      sprayPose(out, cd.acid?.kind, a.st, cd.length);
+    case AS.Spray: {
+      // (user rating F6, round 2: the Rapid Sprayer holds its rear between shots while it keeps firing)
+      const held = cd.acid?.kind === 'rapid' && w.time - (rapidShot.get(a.id) ?? -9) < 1;
+      if (cd.acid?.kind === 'rapid') rapidShot.set(a.id, w.time);
+      sprayPose(out, cd.acid?.kind, a.st, cd.length, held);
       break;
+    }
     case AS.Dig:
       out.mandible = 0.4 + Math.max(0, Math.sin(w.time * 16 + a.id)) * 0.55;
       out.headPitch = -0.4;
@@ -290,6 +294,8 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
     if (out.pose === POSE.NONE) out.pose = POSE.ALARM;
   }
   if (a.pose === POSE.STING) out.gaster = -0.9;
+  // a Rapid Sprayer between its shots (back in the attack state for a moment): still reared up, aiming
+  if (cd.acid?.kind === 'rapid' && a.state === AS.Attack && a.v < cd.speed * 0.2 && w.time - (rapidShot.get(a.id) ?? -9) < 1) sprayPose(out, 'rapid', 1, cd.length, true);
   armyAnt(w, a, out);
   out.glue = a.state === AS.Dead ? 0 : glueOf(w, a);
   // on a creature (climbing.ts): the renderer puts it on the animated leg or back
@@ -324,9 +330,13 @@ function termantLook(w: World, a: Ant, out: AntView): void {
  * shot: the Mortar rears and its legs soak up a big recoil after the lob; the Rapid Sprayer's spurts are quick small
  * pulses. Shared with the animation lab's `spray` clip.
  */
-export function sprayPose(out: Pick<AntView, 'gaster' | 'pitch' | 'lift' | 'mandible' | 'antennaPitch' | 'front' | 'pivX'>, kind: string | undefined, st: number, len: number): void {
+/** Render only: when each Rapid Sprayer last fired (sim time): it holds its rear between shots. */
+const rapidShot = new Map<number, number>();
+
+export function sprayPose(out: Pick<AntView, 'gaster' | 'pitch' | 'lift' | 'mandible' | 'antennaPitch' | 'front' | 'pivX'>, kind: string | undefined, st: number, len: number, hold = false): void {
   const wind = kind === 'rapid' ? 0.05 : kind === 'lob' ? 0.5 : 0.45;
-  const c = Math.min(1, st / wind);
+  // `hold`: already reared (a Rapid Sprayer firing again): no wind-up from the ground
+  const c = hold ? 1 : Math.min(1, st / wind);
   const curl = c * c * (3 - 2 * c);
   const after = st - wind;
   const kick = after > 0 ? Math.exp(-after * (kind === 'rapid' ? 40 : 9)) * Math.min(1, after * 60) : 0;
@@ -335,7 +345,8 @@ export function sprayPose(out: Pick<AntView, 'gaster' | 'pitch' | 'lift' | 'mand
   out.gaster = -1.1 - 1.3 * curl + kick * (kind === 'lob' ? 0.55 : 0.25);
   out.pitch = (kind === 'rapid' ? 0.34 : 0.42) * curl + kick * (kind === 'lob' ? 0.12 : 0.04);
   out.pivX = -0.28;
-  out.front = curl;
+  // (round 2: the fore feet stay on the ground — the legs reach down to them)
+  out.front = 0;
   out.lift = Math.max(out.lift, kick * len * (kind === 'lob' ? 0.03 : 0.01));
   out.mandible = 0.6;
   out.antennaPitch = 0.4;

@@ -1018,13 +1018,17 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   }
 
   // ---------- antennae ----------
-  const scapeLen = m.antenna.scape * hL;
-  const funLen = m.antenna.funiculus * scapeLen;
+  // (user 2026-11-01: every leafcutter's antennae natural for its head's size) Atta: the scape grows more slowly than
+  // the head (SL ≈ 1.15 HW^0.62 mm — a minim's scapes reach far past its little head, a media's about its head's
+  // width, a major's barely clear the side of its great head); the funiculus 1.2 × the scape
+  const attaSL = m.real && atta ? 1.15 * Math.pow(m.head.width * Lm, 0.62) : 0;
+  const scapeLen = attaSL || m.antenna.scape * hL;
+  const funLen = attaSL ? attaSL * 1.2 : m.antenna.funiculus * scapeLen;
   const antThick = m.antenna.thick * Lm;
   const elbows: THREE.Vector3[] = [];
   // (user rating A7: on the leafcutter major the antennae started inside its great head — the sockets sat inside the
-  // head and the scapes ran through it) Atta: each socket moves forward onto the face, and the scape is laid along
-  // the head's surface (as in the scrobe), so it shows over its whole length
+  // head and the scapes ran through it) Atta: each socket moves forward onto the face; where the scape would still
+  // pass through the head it is lifted just clear of the surface
   const hugHead = m.real && atta;
   const headInv = hugHead ? headM.clone().invert() : null;
   const headYc = (t: number) => headCY - ss(0.55, 1, t) * hH * 0.1;
@@ -1065,7 +1069,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // Scape: forward-outward-up; funiculus: forward-outward-down (elbowed).
     // (review round 2: a formicine's scapes rise up and back from sockets near the midline, then the funiculus bends
     // forward — they read as rods sticking out of the face's sides when set forward-outward)
-    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && atta ? new THREE.Vector3(-0.62, 0.32, 0.72 * s).normalize() : m.real && eciton ? new THREE.Vector3(0.15, 0.5, 0.85 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
+    // (Atta: free of the head — out from under the frontal lobe, sweeping out, back and up, the elbow beside the head)
+    const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && atta ? new THREE.Vector3(-0.4, 0.38, 0.83 * s).normalize() : m.real && eciton ? new THREE.Vector3(0.15, 0.5, 0.85 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
     const elbow = onHead(sock.clone().addScaledVector(scDir, scapeLen), antThick * 1.2);
     elbows.push(elbow);
     const scMid = sock.clone().lerp(elbow, 0.5).add(new THREE.Vector3(0, scapeLen * 0.04, 0));
