@@ -198,6 +198,13 @@ export function dhypot3(x: number, y: number, z: number): number {
 }
 
 /** x² (the `**` operator is implementation-approximated like Math.pow). */
+/** A deterministic 0..1 hash of two integers, for looks that must not draw from the sim's random stream. */
+export function hash01(a: number, b: number): number {
+  let h = Math.imul(a | 0, 374761393) ^ Math.imul(b | 0, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
 export function sq(x: number): number {
   return x * x;
 }

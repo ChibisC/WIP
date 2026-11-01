@@ -1150,3 +1150,19 @@ wood ants' basics were 10 throughout. Notes, and what was done:
     (not mid-bite), jaws shut, the closer the room the more.
 - The under-pass, combat v2/v2.1, army-ant, caste-ability, antenna and realism tests pass; under-pass browser scenes
   re-run on the merged build.
+
+### 2026-11-01 (evening, 4) — No more drilled lines: fighters gather in a loose, milling crowd
+- User: "fix up the lining up thing in battle arena cos that isnt natural for insects". The guard line (since
+  2026-10-25: rows across the marker, every ant facing the same way) is now a crowd (`sim/guardLine.ts`, `GUARD` in
+  balance.ts). Applies everywhere the guard line did (every arena unit; fighters at surface markers elsewhere):
+  - places spread like a sunflower head's seeds — no rows or columns — squashed 1.35 × wider than deep, front edge on
+    the marker; each ant a body and a half × its own length from its neighbours, small ones in the middle and the big
+    ones round the edge (a crowd spaced for its majors scattered the minors);
+  - each place nudged by the ant's own amount, each ant facing the front ± 0.5 rad with a slow sway, and every ~8 s
+    (each on its own clock) it shifts to a new spot nearby — about a quarter of the crowd moves in 20 s;
+  - a charge (the marker on the enemy) spreads 2.8 × wider than deep — a broad, ragged front that breaks into many
+    small fights (60 v 60: 17.5 fights a sample, 22 % in groups of ≤ 4 — the rows gave about the same);
+  - arena spawns: the spiral nudged off its points, each unit facing its own way ± 0.55 rad.
+  - All hashed from ids and ticks (`dmath.hash01`), no draws from the sim's random stream; determinism checks pass.
+- tests/fights.ts: the row checks replaced by crowd checks (wider than deep but no long line; faces the front on the
+  whole; facing spread > 0.15 rad; uneven gaps; nobody on top of anybody; it mills, the crowd stays put).

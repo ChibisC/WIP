@@ -4,33 +4,41 @@ import { casteOf } from './species';
 import { BALANCE, GUARD } from './balance';
 import { angleDiff, goToSurfacePoint, steerTo, turnToward } from './movement';
 import { creatureHooks, friendlyCreature } from './combat';
-import { datan2, dcos, dhypot, dsin, sq } from './dmath';
+import { datan2, dcos, dhypot, dsin, hash01, sq } from './dmath';
 import { arenaOf } from './arenaState';
 import { underOrder } from './markers';
 
 /**
  * Guard line (user note 2026-10-25: fighters stood "too compact … like they are fighting in a guard line like
- * EotU"). The fighters at a surface marker — every unit in the battle arena; elsewhere the castes that do not gather
- * (the rest forage the marker) — stand in a line across the marker facing its front, instead of milling in a crowd:
+ * EotU"; 2026-11-01: "fix up the lining up thing in battle arena cos that isnt natural for insects"). The fighters at
+ * a surface marker — every unit in the battle arena; elsewhere the castes that do not gather (the rest forage the
+ * marker) — gather in a loose crowd at the marker, facing its front, a body's room apart:
  *
- *  - rows of `perRow` ants (about √(n × `rowShape`), at least `perRowMin`), `spacing` × the largest body in the line
- *    apart, the rows `rowSpacing` × that behind one another and staggered by half a place;
- *  - places by id order (w.s.ants is in id order), centred on the marker; the front row stands on the marker;
+ *  - places spread like seeds in a sunflower head (no rows, no columns), each ant `spacing` × its own body from its
+ *    neighbours (the small in the middle, the big round the edge), the spread squashed `aspect` × wider across the
+ *    front than deep; its front edge on the marker;
+ *  - each place pushed off by the ant's own amount (`jitterAcross`, `jitterBack` × the spacing), each ant facing the
+ *    front give or take `faceSpread` and swaying a little, and every `shuffleSec` or so (each on its own clock) it
+ *    picks a new spot nearby — a milling crowd rather than a drilled line. All hashed from ids and ticks: no draws
+ *    from the sim's random stream;
+ *  - places by body size, then id (w.s.ants is in id order);
  *  - the front faces the nearest enemy within `threatMm` of the marker (looked for every `faceEverySec`), and keeps
  *    that facing after the enemy is gone (no turning about once a fight is won); a new front must differ by
- *    `faceTurnRad` before the line wheels round. With no enemy ever seen it faces away from the nest (arena: the
- *    centre of the field). The facing is marker state (`MarkerSlot.face`), so it is in snapshots.
+ *    `faceTurnRad` before the crowd turns. With no enemy ever seen it faces away from the nest (arena: the centre of
+ *    the field). The facing is marker state (`MarkerSlot.face`), so it is in snapshots.
  *  - an ant walks back to its place only when pushed `leaveBodyLengths` off it, and stops `arriveBodyLengths` from
  *    it, so standing ants are not set off by every nudge. A place on rock or water falls back to the marker.
  *
- * Fights start from the line as before (combat preempts this) and the fighters come back to their places after.
+ * Fights start from the crowd as before (combat preempts this) and the fighters come back to their places after.
  */
 
 interface Line {
+  /** smallest body first, then by id */
   ids: number[];
-  /** spacing (mm) */
-  s: number;
-  perRow: number;
+  /** each one's room: `spacing` × its body length (mm) */
+  room: number[];
+  /** the crowd's area so far: Σ room² up to and including each one */
+  cum: number[];
   ux: number;
   uy: number;
 }
@@ -60,17 +68,22 @@ function lineOf(w: World, c: Colony, mi: number): Line {
   if (L) return L;
   const m = c.markers[mi];
   const ids: number[] = [];
-  let big = 0;
+  const lenOf = new Map<number, number>(); // det-ok: per-call scratch
   for (const o of w.s.ants) {
     if (o.colony !== c.id || o.marker !== mi || o.task !== 'marker' || o.state === AS.Dead || o.space !== m.space || !inGuardLine(w, o)) continue;
     ids.push(o.id);
-    big = Math.max(big, casteOf(o.caste).length);
+    lenOf.set(o.id, casteOf(o.caste).length);
   }
-  const n = Math.max(1, ids.length);
-  const perRow = Math.max(GUARD.perRowMin, Math.ceil(Math.sqrt(n * GUARD.rowShape)));
   updateFace(w, c, mi, ids);
+  // the small ones in the middle, the big ones round the edge — each kind at its own spacing (a crowd spaced for
+  // its majors would scatter the minors)
+  ids.sort((p, q) => lenOf.get(p)! - lenOf.get(q)! || p - q);
+  const room = ids.map((id) => lenOf.get(id)! * GUARD.spacing);
+  const cum: number[] = [];
+  let acc = 0;
+  for (const r of room) cum.push((acc += r * r));
   const f = m.face ?? 0;
-  L = { ids, s: big * GUARD.spacing, perRow: Math.min(perRow, n), ux: dcos(f), uy: dsin(f) };
+  L = { ids, room, cum, ux: dcos(f), uy: dsin(f) };
   lines.set(key, L);
   return L;
 }
@@ -134,22 +147,33 @@ function updateFace(w: World, c: Colony, mi: number, ids: number[]): void {
 
 const out = { x: 0, y: 0, h: 0 }; // det-ok: scratch
 
-/** This ant's place in its marker's guard line (null when it has none). */
+/** This ant's place in its marker's crowd (null when it has none). */
 export function guardSlot(w: World, a: Ant, c: Colony, mi: number): { x: number; y: number; h: number } | null {
   const L = lineOf(w, c, mi);
   const k = L.ids.indexOf(a.id);
   if (k < 0) return null;
   const m = c.markers[mi];
-  const row = Math.floor(k / L.perRow);
-  const inRow = Math.min(L.perRow, L.ids.length - row * L.perRow);
-  const col = k - row * L.perRow;
-  const across = (col - (inRow - 1) / 2 + (row % 2 ? 0.5 : 0)) * L.s;
-  // a charge (the marker on the enemy): the front row stands off short of it, and the fight starts from the line
-  const back = row * L.s * (GUARD.rowSpacing / GUARD.spacing) + (m.onFoe ? L.s * GUARD.standOff : 0);
+  // its own shuffle clock (ticks: integer, the same on every machine)
+  const per = Math.max(1, Math.round(GUARD.shuffleSec * BALANCE.tickHz));
+  const ep = Math.floor((w.s.tick + Math.floor(hash01(a.id, 1) * per)) / per);
+  const s = L.room[k];
+  const jx = (hash01(a.id, ep * 4 + 2) - 0.5) * 2 * GUARD.jitterAcross * s;
+  const jy = (hash01(a.id, ep * 4 + 3) - 0.5) * 2 * GUARD.jitterBack * s;
+  // a sunflower spread, each ant given its room's area (π·r² over the crowd so far ≈ the √3/2·s² each of close
+  // packing), turned by the marker's own angle
+  const AREA = 0.88 / Math.PI;
+  const r = Math.sqrt((L.cum[k] - 0.5 * s * s) * AREA);
+  const R = Math.sqrt(L.cum[L.cum.length - 1] * AREA);
+  const th = k * 2.39996 + hash01(c.id * 64 + mi, 7) * 6.2832;
+  // (a charge spreads into a broad, ragged front, as a swarm does when it meets the enemy)
+  const asp = m.onFoe ? GUARD.chargeAspect : GUARD.aspect;
+  const across = dcos(th) * r * asp + jx;
+  // a charge (the marker on the enemy): the front edge stands off short of it, and the fight starts from the crowd
+  const back = (dsin(th) * r + R) / asp + jy + (m.onFoe ? L.room[L.room.length - 1] * GUARD.standOff : 0);
   // across the front: (−uy, ux)
   out.x = m.x - L.uy * across - L.ux * back;
   out.y = m.y + L.ux * across - L.uy * back;
-  out.h = datan2(L.uy, L.ux);
+  out.h = datan2(L.uy, L.ux) + (hash01(a.id, ep * 4 + 4) - 0.5) * 2 * GUARD.faceSpread + GUARD.sway * dsin(w.time * 0.8 + (a.id % 97));
   if (!w.walkable(m.space, out.x, out.y)) {
     out.x = m.x;
     out.y = m.y;

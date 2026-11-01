@@ -846,23 +846,30 @@ export const TERMANT = {
 } as const;
 
 /**
- * Guard line (sim/guardLine.ts; user note 2026-10-25: fighters were "too compact"): the fighters at a surface
- * marker stand in rows across it facing the front. Places `spacing` × the largest body in the line apart, rows
- * `rowSpacing` × it behind one another; `perRow` = max(`perRowMin`, ⌈√(n × `rowShape`)⌉) (20 ants: 2 rows of 10).
- * The front faces the nearest enemy within `threatMm`, looked for every `faceEverySec`, turning only for a change
- * over `faceTurnRad`. An ant goes back to its place when pushed `leaveBodyLengths` off it and stops
- * `arriveBodyLengths` from it.
+ * Guard line (sim/guardLine.ts; user notes 2026-10-25: fighters were "too compact"; 2026-11-01: lined up isn't
+ * natural for insects): the fighters at a surface marker gather in a loose crowd at it facing the front. Places
+ * about `spacing` × each one's body apart (the small in the middle, the big round the edge), spread like a sunflower's
+ * seeds and squashed `aspect` × wider across the front than deep. The front faces the nearest enemy within `threatMm`, looked for every `faceEverySec`,
+ * turning only for a change over `faceTurnRad`. An ant goes back to its place when pushed `leaveBodyLengths` off it
+ * and stops `arriveBodyLengths` from it.
  */
 export const GUARD = {
-  spacing: 1.35,
-  rowSpacing: 1.25,
-  perRowMin: 4,
-  rowShape: 5,
+  spacing: 1.5,
+  aspect: 1.35,
+  // a charge (the marker on the enemy) spreads wider: a broad, ragged front breaks into many small fights
+  chargeAspect: 2.8,
   threatMm: 120,
   faceEverySec: 1,
   faceTurnRad: 0.5,
   leaveBodyLengths: 0.6,
   arriveBodyLengths: 0.15,
+  // (user 2026-11-01: lined up isn't natural for insects) a milling crowd: each place pushed off its spot by up to
+  // these shares of the spacing, the facing spread and sway (rad), a new spot every so often (s)
+  jitterAcross: 0.25,
+  jitterBack: 0.25,
+  faceSpread: 0.5,
+  sway: 0.12,
+  shuffleSec: 8,
   /**
    * Ants in a fight (closing in, spraying, holding a foe, standing in a line) keep `fightRoom` × the usual
    * separation radius apart, friend or foe, unless one holds the other (separation.ts); an ant choosing a foe

@@ -7,7 +7,7 @@ import { spawnCreature } from './creatures/creatureAI';
 import { makeAnt } from './factory';
 import { applyLevel } from './tiles';
 import { assignGroup, placeMarker } from './markers';
-import { datan2, dcos, dhypot, dsin, sq } from './dmath';
+import { datan2, dcos, dhypot, dsin, hash01, sq } from './dmath';
 import { ArenaState, ArenaTeam, STANCE, arenaOf } from './arenaState';
 
 /**
@@ -120,18 +120,23 @@ export function arenaSpawn(w: World, team: number, unit: string, n: number, leve
   const c = w.colony(T.colony)!;
   const chamber = c.tiles.find((t) => t.type === 'queen');
   let made = 0;
-  // a sunflower spiral, skipping water, walls and the map edge
+  // a sunflower spiral, skipping water, walls and the map edge — each one nudged off it and facing its own way
+  // (user 2026-11-01: lined up isn't natural for insects); the nudges hash the tick and the place, never the rng
+  const seed = w.s.tick * 131 + team * 17 + made;
   for (let i = 0; made < n && i < n * 4; i++) {
     const r = i === 0 ? 0 : gap * Math.sqrt(i) * 0.95;
     const a = i * 2.39996;
-    const x = ox + dcos(a) * r;
-    const y = oy + dsin(a) * r;
+    const jr = (hash01(seed, i * 3) - 0.5) * gap * 0.55;
+    const ja = (hash01(seed, i * 3 + 1) - 0.5) * 2 * Math.PI;
+    const x = ox + dcos(a) * r + dcos(ja) * jr;
+    const y = oy + dsin(a) * r + dsin(ja) * jr;
+    const hi = h + (hash01(seed, i * 3 + 2) - 0.5) * 1.1;
     if (!w.terrain.inBounds(x, y, 8) || !w.walkable(SURFACE, x, y)) continue;
     if (cr) {
       const k = CREATURES[unit.slice(3)];
       const o = spawnCreature(w, k.id, SURFACE, x, y);
       o.faction = T.colony;
-      o.h = o.ph = h;
+      o.h = o.ph = hi;
       o.homeX = x;
       o.homeY = y;
       o.maxHp *= BALANCE.levelHp[L - 1];
@@ -139,7 +144,7 @@ export function arenaSpawn(w: World, team: number, unit: string, n: number, leve
       o.data.power = BALANCE.levelDamage[L - 1];
       o.data.level = L;
     } else {
-      const a2 = makeAnt(w, T.colony, canonCaste(unit.slice(4)), SURFACE, x, y, h);
+      const a2 = makeAnt(w, T.colony, canonCaste(unit.slice(4)), SURFACE, x, y, hi);
       applyLevel(a2, L);
       a2.age = 1;
       if (chamber) a2.tile = chamber.q;

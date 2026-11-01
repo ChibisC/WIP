@@ -102,11 +102,14 @@ for (const unit of ['ant:lasius_soldier', 'ant:nasute_soldier', 'ant:rhy_soldier
   const rev = [...last.values()].reduce((x, s) => x + s.rev, 0) / mine.length / 12;
   const jumps = [...last.values()].reduce((x, s) => x + s.jump, 0);
   check(`${unit.slice(4)}: after its foes are dead it walks back calmly — no zigzag, no lurches`, rev < 0.15 && jumps === 0, `${rev.toFixed(2)} heading reversals a second per ant (it was ~1.6), ${jumps} ticks with a jump`);
+  // (a crowd since 2026-11-01: the back of it is a few bodies further to walk — give the slowest, the termites, 3 s)
+  run(w, 20 * 3);
   const nn = nnBodyLengths(w, 0);
-  check(`${unit.slice(4)}: back at its marker it stands in a guard line, a body's room apart`, mine.filter((a) => a.state === AS.Rally).length >= mine.length * 0.8 && median(nn) >= GUARD.spacing * 0.85, `${mine.filter((a) => a.state === AS.Rally).length}/${mine.length} in place, nearest teammate ${median(nn).toFixed(2)} body lengths (median)`);
+  // (loose since 2026-11-01: each place nudged off its row, so the nearest teammate is a little under the spacing)
+  check(`${unit.slice(4)}: back at its marker it stands in a guard line, a body's room apart`, mine.filter((a) => a.state === AS.Rally).length >= mine.length * 0.8 && median(nn) >= 1.05, `${mine.filter((a) => a.state === AS.Rally).length}/${mine.length} in place, nearest teammate ${median(nn).toFixed(2)} body lengths (median)`);
 }
 
-// ---- the guard line: rows across the marker, facing the front
+// ---- the guard line: a loose crowd at the marker, facing the front (rows until 2026-11-01)
 {
   const { w, cmd } = arena();
   const A = arenaOf(w)!;
@@ -123,10 +126,28 @@ for (const unit of ['ant:lasius_soldier', 'ant:nasute_soldier', 'ant:rhy_soldier
   const wide = Math.max(...across) - Math.min(...across);
   const depth = Math.max(...deep) - Math.min(...deep);
   const toCentre = Math.atan2(A.cy - m.y, A.cx - m.x);
-  const facing = u.filter((a) => Math.abs(Math.atan2(Math.sin(a.h - f), Math.cos(a.h - f))) < 0.35).length;
-  check('guard line: the team stands in rows across its marker, much wider than deep', wide > depth * 2.5 && u.every((a) => a.state === AS.Rally), `${wide.toFixed(0)} mm wide, ${depth.toFixed(0)} mm deep`);
-  check('guard line: it faces the front (the field centre before any foe is seen), every ant the same way', Math.abs(Math.atan2(Math.sin(toCentre - f), Math.cos(toCentre - f))) < 0.1 && facing === u.length, `${facing}/${u.length} facing the front`);
-  check('guard line: places a body\'s room apart', Math.min(...nnBodyLengths(w, 0)) >= GUARD.spacing * 0.8, `closest pair ${Math.min(...nnBodyLengths(w, 0)).toFixed(2)} body lengths`);
+  const off = u.map((a) => Math.atan2(Math.sin(a.h - f), Math.cos(a.h - f)));
+  const lim = GUARD.faceSpread + GUARD.sway + 0.15;
+  const meanOff = off.reduce((x, y) => x + y, 0) / off.length;
+  const sdOff = Math.sqrt(off.reduce((x, y) => x + (y - meanOff) ** 2, 0) / off.length);
+  const inPlace = u.filter((a) => a.state === AS.Rally).length;
+  check('guard line: the team gathers in a crowd at its marker, a little wider than deep (no long line)', wide > depth * 1.1 && wide < depth * 2.2 && inPlace >= u.length * 0.85, `${wide.toFixed(0)} mm wide, ${depth.toFixed(0)} mm deep; ${inPlace}/${u.length} standing`);
+  check('guard line: it faces the front on the whole (the field centre before any foe is seen)', Math.abs(Math.atan2(Math.sin(toCentre - f), Math.cos(toCentre - f))) < 0.1 && Math.abs(meanOff) < 0.2 && off.every((o) => Math.abs(o) < lim), `front ${(toCentre - f).toFixed(2)} rad off the centre; mean facing ${meanOff.toFixed(2)} rad off it, widest ${Math.max(...off.map(Math.abs)).toFixed(2)}`);
+  // (user 2026-11-01: "fix up the lining up thing in battle arena cos that isnt natural for insects")
+  check('guard line: not drilled — each ant faces its own way', sdOff > 0.15, `facing spread ${sdOff.toFixed(2)} rad (a drilled line: 0)`);
+  const nnG = nnBodyLengths(w, 0);
+  const nnMean = nnG.reduce((x, y) => x + y, 0) / nnG.length;
+  const nnCv = Math.sqrt(nnG.reduce((x, y) => x + (y - nnMean) ** 2, 0) / nnG.length) / nnMean;
+  check('guard line: not drilled — uneven gaps, as a crowd stands', nnCv > 0.08, `nearest-teammate gaps vary by ${(nnCv * 100).toFixed(0)} % (a grid: ~0 %)`);
+  check('guard line: nobody on top of anybody', Math.min(...nnG) >= 0.5, `closest pair ${Math.min(...nnG).toFixed(2)} body lengths`);
+  // it mills: over 20 s some ants shift to a new spot nearby, most stand, and the crowd keeps its place
+  const before = new Map(u.map((a) => [a.id, { x: a.x, y: a.y }]));
+  const len0 = casteOf(u[0].caste).length;
+  run(w, 20 * 20);
+  const shifted = u.filter((a) => Math.hypot(a.x - before.get(a.id)!.x, a.y - before.get(a.id)!.y) > len0 * 0.5).length;
+  const cx = u.reduce((x, a) => x + a.x, 0) / u.length - [...before.values()].reduce((x, p) => x + p.x, 0) / u.length;
+  const cy = u.reduce((x, a) => x + a.y, 0) / u.length - [...before.values()].reduce((x, p) => x + p.y, 0) / u.length;
+  check('guard line: it mills — some ants shift about, the crowd stays put', shifted >= u.length * 0.15 && shifted <= u.length * 0.95 && Math.hypot(cx, cy) < len0, `${shifted}/${u.length} moved over half a body in 20 s; the crowd's centre moved ${Math.hypot(cx, cy).toFixed(1)} mm`);
   // a foe appears off to one side: the line wheels round to face it
   cmd({ type: 'arenaStance', team: 1, stance: STANCE.PASSIVE });
   const side = { x: m.x + Math.cos(f + Math.PI / 2) * 90, y: m.y + Math.sin(f + Math.PI / 2) * 90 };
