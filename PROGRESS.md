@@ -1062,3 +1062,75 @@ User spec: project doc `claude/combat/04-spec-height-and-underpass.md`. Branch `
 - **Changed by the model data:** creatures are lower than combat v2 assumed — a ground beetle's middle is 0.74 mm (v2 1.36): Lasius workers no longer fight from under it (seeds 1–9 at 6 s: 5–11 holding, `main` 6–14; both sides held on every seed); wolf spiders, rove beetles and stone centipedes likewise; titans keep their under rings. `tests/combatV21.ts`'s one-sided split checks the split (both sides, the thinner a third).
 - **Performance:** `tools/climb-stress.ts -- 30 400` 15.7 / 16.1 ms a tick (`main` 15.5 in between), mounting off 12.5 / 12.2 (12.6). Found on the way: the new `Ant` fields written only when first used gave ants many V8 object shapes and slowed everything that reads ants (18–20 ms); `makeAnt` sets them to 0. Quick per-caste checks before working out slot positions keep the sharing search cheap.
 - **Tests:** `tests/underpass.ts` (in `npm test`).
+
+### 2026-10-31 (evening) — The user's ratings of the four-species page, and the fixes (round 2)
+Ratings (page McDp2hQQ1DNfZeScW6nmXG, `ratings` collection): 40 of 42 clips scored, mostly 9–10. The army ants' and
+wood ants' basics were 10 throughout. Notes, and what was done:
+- A1 (small ants look too fast): the lab clips walked the leafcutter media at 2.5× its game speed; walks and
+  line-ups now play at each caste's speed in the game (the user chose this over slowing the game).
+- Jaws too long: A3 leafcutter media −15 %; F5/F7/F9 wood-ant soldier −18 % (`FORMICA_SOLDIER_JAW`; the worker's were
+  fine); L1 garden-ant worker −12 % and soldier −18 % (`LASIUS_SOLDIER_JAW`). The garden-ant queen uses the worker's.
+- A5, A6, F7, L7, L8 (head, jaws or gaster in the ground): the renderer finds the lowest of the jaw tips, the chin and
+  the gaster tip as posed. The body rises over its planted feet until they clear the ground by 1.5 % of its length.
+- A7 (taunt): the fore legs are held up and still. The leafcutter antenna sockets were inside the head: they move
+  forward onto the face, and the scapes lie along the head's surface.
+- E6: the army-ant soldier's sickles are a crescent from above, clawing in like a stag beetle's.
+- E7: the rage is an emissive red glow from within the mesosoma, waist and gaster; the legs and head keep their colour.
+- F6: the sprayers rear up as in EotU: the body tilts up over the hind legs, the fore legs lift and the gaster curls
+  forward under it (`AntView.front`, `pivX`).
+- L6: no trophallaxis pose for garden ants.
+- Not yet published (the user is still checking): no merge into `main` and no game artifact version.
+
+### 2026-11-01 — Leafcutter antennae per head size; sprayers' front feet (round 3)
+- User: "for all atta, fix their antannae as they all need to look naturally depending on the size of each ant sizes
+  head." The round-2 scapes lay painted along the head. Now the Atta scape length follows head width allometrically
+  (`1.15 · (head width)^0.62`; funiculus 1.2 × scape). Real Atta scapes grow much more slowly than the head, so the minim
+  keeps long antennae and the soldier, major and queen get short ones in proportion. The sockets sit on the face below
+  the frontal lobes. The scapes stand free and are only pushed out of the head where they would cut into it
+  (`antGeometry.ts`).
+- F6, round-2 score 7 ("make front legs still touch the ground at least … make rapid fire hold pose when shooting"):
+  the spray pose keeps the fore legs down (`front = 0`) while the body tilts up and the gaster curls under. The Rapid
+  Sprayer holds the pose while it fired within the last second (`rapidShot` in `antViews.ts`), in the game and in the
+  lab clip.
+- Morph hashes re-baselined for `atta_*`. 620 tests pass. The rating page carries round 3: before and after for A1–A10
+  and F6, plus head close-ups of all five Atta castes (A11).
+- Still not published: no merge into `main` and no new game artifact version until the user says so.
+
+### 2026-11-01 (later) — Leafcutter antennae clear of the head in every animation; eyes (round 4)
+- User: "leafcutters anttanae look fine, its just in the animations all of them are clipping inside their respective
+  leafcutter ants head. fix the antannae animation for all of them. also take a closer look". Close-ups (new lab
+  camera: `follow=`, `crel=1`, `cdir=`, `cfwd=`, `cty=`) showed it in every walk, idle and attack. The shared antenna
+  motion assumes a forward-pointing scape: its spread and pitch swung the leafcutters' backward-lying scapes back and in,
+  through the head. The antenna-grooming idle also lifted a fore leg up through the big head.
+- Fix (leafcutters only: `rig.antHug`, shader `uAntHug`): the scape swings forward and out at the socket, then rises in
+  its new vertical plane; raised antennae also come forward. The funiculus rides on the moved elbow and keeps pointing
+  ahead (`ANT_FUN_FOLLOW` .35 of the swing). A limit tests seven points along the scape (`ANT_TEST`) and the funiculus
+  against the head's cross-sections (`antHeadIn`, limits `thr` from the rest pose) and keeps the largest share of the
+  move that stays outside. The downward pitch is capped at −0.4 rad. Grooming: the fore leg reaches low along the cheek.
+  `tests/antennae.ts` replays the move over every antenna vertex of all five castes at both LODs.
+- User: "give the army ant models their dot eyes like in the reference photos and the atta's their third eye like in
+  the photos … as well as the lasius and wood ants if you havent already":
+  - Eciton: a convex glossy black lens high on each side of the head on every caste (AntWiki: "a single large and convex
+    ommatidium"), set on the surface along its normal (`headSurfAt`); the queen a small one ("with eyes but no ocelli").
+  - Atta: the median ocellus from the user's photo of a major — an amber lens high on the frons — on the major and the
+    soldier, seated on the head's loft by a ray (`headRay`); the minim and media have none, the queen keeps three.
+  - Formica and Lasius: their three ocelli were present but too small to read; now a little larger and glassier.
+- Morph hashes re-baselined for atta_major, atta_soldier, formica_*, lasius_* (nothing else changed).
+- Still not published: no merge into `main` and no new game artifact version until the user says so.
+
+### 2026-11-01 (evening) — Leafcutter eyes placed and coloured from the photos (A11 note)
+- User (A11, 6/10): "fix the placement of the eyes, and it should be a darker color than the color of the ant.
+  reasearch on their placement"; then "source images show them brighter in color but in irl they are slightly darker".
+- The face photos (media specimen, the user's major): the compound eyes are glossy black, at the face's edge just above
+  the antennal sockets, bulging from the outline; the major's median ocellus about a fifth of the way down the face.
+  Ours had matte blue-grey eyes (lighter than the head) set high and back, and a bright amber ocellus near the crown.
+- Now: worker eyes forward and lower (pos .72–.77, just above socket height), set out to the face's edge so they bulge
+  (major's a little larger), glossy near-black; the queen's keep their place, darker. The median ocellus lower on the
+  face (t .71), larger, a deep amber-brown glossy lens — darker than the head, not the photo's flash-bright amber.
+- Morph hashes re-baselined for atta_*. 650 tests pass.
+
+### 2026-11-01 (evening, 2) — Leafcutter castes named by size; the Media lighter than the major
+- User: "change the classes for leafcutters to minum, worker, media, then major respectively from size order, and make
+  soldier (now media) color a slightly lighter at least than the major". Display names: `atta_media` → Worker,
+  `atta_soldier` → Media (ids, roles and stats unchanged). Colours darken with size: the Media keeps the worker's body
+  with a head between the worker's and the major's; the major's body a little darker chestnut.

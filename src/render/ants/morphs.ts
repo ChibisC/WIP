@@ -4,7 +4,7 @@
  * noted; colours are linear-ish sRGB hex.
  */
 import type { MandibleSpec } from '../anatomy/mandible';
-import { ECITON_MINOR_JAW, ATTA_QUEEN_JAW, ATTA_MAJOR_JAW, ATTA_MEDIA_JAW, ATTA_MINIM_JAW, ATTA_SOLDIER_JAW, FIRE_MAJOR, FIRE_WORKER, FORMICA_WORKER, LASIUS_WORKER } from '../anatomy/mandibleSpecs';
+import { ECITON_MINOR_JAW, ATTA_QUEEN_JAW, ATTA_MAJOR_JAW, ATTA_MEDIA_JAW, ATTA_MINIM_JAW, ATTA_SOLDIER_JAW, FIRE_MAJOR, FIRE_WORKER, FORMICA_WORKER, LASIUS_WORKER, LASIUS_SOLDIER_JAW, FORMICA_SOLDIER_JAW } from '../anatomy/mandibleSpecs';
 
 export type HeadShape = 'round' | 'heart' | 'rect' | 'tri' | 'square';
 export type MandibleType = 'triangular' | 'falcate' | 'massive' | 'small';
@@ -187,7 +187,7 @@ const lasiusSoldier: AntMorph = {
   L: 4.9,
   head: { len: 0.25, width: 0.245, height: 0.165, shape: 'rect' },
   eyes: { size: 0.2, pos: 0.52, height: 0.15, ocelli: true },
-  mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.62, spec: LASIUS_WORKER, open: 0.7 },
+  mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.62, spec: LASIUS_SOLDIER_JAW, open: 0.7 },
   meso: { len: 0.31, width: 0.14, height: 0.14, neck: 0.075 },
   legs: { hind: 0.84, thick: 0.019 },
 };
@@ -276,7 +276,7 @@ const formicaSoldier: AntMorph = {
   L: 8.6,
   head: { len: 0.27, width: 0.28, height: 0.19, shape: 'rect' },
   eyes: { size: 0.26, pos: 0.48, height: 0.25, ocelli: true },
-  mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.7, spec: FORMICA_WORKER, open: 0.7 },
+  mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.7, spec: FORMICA_SOLDIER_JAW, open: 0.7 },
   meso: { len: 0.33, width: 0.145, height: 0.15, neck: 0.075 },
   gaster: { len: 0.35, width: 0.22, height: 0.18, sting: false },
   legs: { hind: 0.9, thick: 0.0195 },
@@ -333,7 +333,8 @@ const attaMedia: AntMorph = {
   key: 'atta_media',
   L: 8,
   head: { len: 0.3, width: 0.3, height: 0.19, shape: 'heart', notch: 0.22, occSpines: 0.055, groove: 0.14 },
-  eyes: { size: 0.18, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
+  // (user rating A11, 2026-11-01: "fix the placement of the eyes" — the photos: at the face's edge, just above the antennal sockets, well forward of where they were)
+  eyes: { size: 0.18, pos: 0.74, height: 0.04, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.3, club: 0, thick: 0.009 },
   mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.7 },
   // (user 2026-10-31: leafcutter and army-ant legs too long and the walk too wide-legged — more compact, like EotU:
@@ -359,7 +360,8 @@ const attaMinim: AntMorph = {
   // (user note 2026-10-31: the minim's head didn't match the other castes — the same heart shape, its lobes lower and
   // the notch shallower at this size, small occipital spines)
   head: { len: 0.27, width: 0.27, height: 0.18, shape: 'heart', notch: 0.12, occSpines: 0.035, groove: 0.08 },
-  eyes: { size: 0.16, pos: 0.6, height: 0.2, ocelli: false },
+  // (user rating A11, 2026-11-01: "fix the placement of the eyes" — the photos: at the face's edge, just above the antennal sockets, well forward of where they were)
+  eyes: { size: 0.16, pos: 0.72, height: 0.1, ocelli: false },
   mandible: { type: 'triangular', len: 0.33, teeth: 8, width: 0.55, spec: ATTA_MINIM_JAW, open: 0.7 },
   meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.035, meso: 0.028, prop: 0.035 } },
   gaster: { len: 0.3, width: 0.21, height: 0.17, sting: true },
@@ -376,13 +378,17 @@ const attaSoldier: AntMorph = {
   key: 'atta_soldier',
   L: 10.5,
   head: { len: 0.33, width: 0.36, height: 0.2, shape: 'heart', notch: 0.22, occSpines: 0.045, groove: 0.14 },
-  eyes: { size: 0.15, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
+  // (user rating A11, 2026-11-01: "fix the placement of the eyes" — the photos: at the face's edge, just above the antennal sockets, well forward of where they were)
+  eyes: { size: 0.15, pos: 0.75, height: 0.02, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.8, funiculus: 1.25, club: 0, thick: 0.0085 },
   mandible: { type: 'massive', len: 0.38, teeth: 8, width: 0.68, spec: ATTA_SOLDIER_JAW, open: 0.6 },
   meso: { len: 0.28, width: 0.12, height: 0.14, spines: { pro: 0.06, meso: 0.04, meso2: 0.02, prop: 0.05 } },
   gaster: { len: 0.25, width: 0.18, height: 0.15, sting: true },
   legs: { hind: 0.94, thick: 0.015, splay: 0.8 },
-  look: { ...attaLook, head: L(0x7a3418, 0.48, 0.2, 0.08, 0x5a2410) },
+  // (user 2026-11-01: this caste is now the Media — "make soldier (now media) color a slightly lighter at least than
+  // the major": the castes darken with size — minim, worker, Media, major)
+  // (its body the worker's; the head between the worker's and the major's — the major's body is the darker one)
+  look: { ...attaLook, head: L(0x8e4826, 0.5, 0.18, 0.08, 0x6c3418) },
 };
 
 /** Atta major: a disproportionately huge, deeply lobed head — smooth and shining (A. cephalotes) — with short blunt occipital spines and heavy shears. */
@@ -392,7 +398,8 @@ const attaMajor: AntMorph = {
   L: 14,
   // (the photos: two big rounded lobes split by a deep median groove)
   head: { len: 0.4, width: 0.44, height: 0.24, shape: 'heart', notch: 0.3, occSpines: 0.03, groove: 0.2 },
-  eyes: { size: 0.11, pos: 0.64, height: 0.1, ocelli: false, oval: 1.25 },
+  // (user rating A11, 2026-11-01: "fix the placement of the eyes" — the photos: at the face's edge, just above the antennal sockets, well forward of where they were)
+  eyes: { size: 0.125, pos: 0.77, height: 0.0, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.7, funiculus: 1.2, club: 0, thick: 0.0072 },
   mandible: { type: 'massive', len: 0.36, teeth: 8, width: 0.75, spec: ATTA_MAJOR_JAW, open: 0.55 },
   meso: { len: 0.25, width: 0.11, height: 0.12, spines: { pro: 0.055, meso: 0.04, meso2: 0.018, prop: 0.045 } },
@@ -403,7 +410,8 @@ const attaMajor: AntMorph = {
   // (review round 1: mirror-glossy read as chocolate — a satin shine over the smooth cuticle)
   // (review rounds 1–2: any gloss read as plastic or chocolate — the user's major photos are matte and sculptured; the
   // photos win over the key's "shining")
-  look: { ...attaLook, head: L(0x7a3018, 0.58, 0.12, 0.1, 0x5c2a16) },
+  // (darker chestnut all over than the Media, user 2026-11-01)
+  look: { ...attaLook, head: L(0x7a3018, 0.58, 0.12, 0.1, 0x5c2a16), meso: L(0x6c3626, 0.66, 0.06, 0.12, 0x522818), waist: L(0x5a2614, 0.66, 0.06, 0.1), gaster: L(0x542414, 0.62, 0.08, 0.16, 0x421e10), legs: L(0x542616, 0.6, 0.06, 0.1, 0x461f12) },
   setae: { ...attaSetae, color: 0xa0502a, head: 70, len: [0.006, 0.026] },
   stance: 0.14,
 };
@@ -549,7 +557,8 @@ const ecitonMinor: AntMorph = {
   key: 'eciton_minor',
   L: 4,
   head: { len: 0.2, width: 0.17, height: 0.14, shape: 'round', frontMix: 0.35 },
-  eyes: { size: 0.05, pos: 0.55, height: 0.25, ocelli: false, single: true },
+  // (user 2026-11-01, the photos: one convex, glossy black lens high on each side of the head — a dot eye)
+  eyes: { size: 0.075, pos: 0.48, height: 0.5, ocelli: false, single: true },
   antenna: { segments: 12, scape: 1.05, funiculus: 1.25, club: 0, thick: 0.0115 },
   mandible: { type: 'triangular', len: 0.42, teeth: 5, width: 0.42, spec: ECITON_MINOR_JAW, open: 0.7 },
   // (geometry pass, review: slender with a smooth convex profile, not stepped blocks)
@@ -574,7 +583,7 @@ const ecitonSubmajor: AntMorph = {
   key: 'eciton_submajor',
   L: 6.5,
   head: { len: 0.22, width: 0.2, height: 0.15, shape: 'rect', frontMix: 0.35 },
-  eyes: { size: 0.045, pos: 0.55, height: 0.25, ocelli: false, single: true },
+  eyes: { size: 0.07, pos: 0.48, height: 0.5, ocelli: false, single: true },
   antenna: { segments: 12, scape: 1.0, funiculus: 1.2, club: 0, thick: 0.0105 },
   mandible: { type: 'falcate', len: 0.5, teeth: 0, width: 0.16, hook: 0.15 },
   meso: { len: 0.37, width: 0.105, height: 0.12, smooth: true },
@@ -590,7 +599,7 @@ const ecitonMedia: AntMorph = {
   key: 'eciton_media',
   L: 8,
   head: { len: 0.25, width: 0.25, height: 0.17, shape: 'round', frontMix: 0.7 },
-  eyes: { size: 0.04, pos: 0.52, height: 0.25, ocelli: false, single: true },
+  eyes: { size: 0.065, pos: 0.48, height: 0.5, ocelli: false, single: true },
   antenna: { segments: 12, scape: 0.9, funiculus: 1.15, club: 0, thick: 0.0095 },
   mandible: { type: 'falcate', len: 0.62, teeth: 0, width: 0.26, hook: 0.35 },
   meso: { len: 0.34, width: 0.11, height: 0.125, smooth: true },
@@ -609,7 +618,7 @@ const ecitonMajor: AntMorph = {
   // (review round 1: a huge featureless egg — rounded-square, about the mesosoma's size, whitish tan on the vertex
   // shading to orange-brown over the frons and clypeus, pin eyes on the sides)
   head: { len: 0.22, width: 0.23, height: 0.17, shape: 'square', frontMix: 0.8, sockets: 1 },
-  eyes: { size: 0.08, pos: 0.52, height: 0.15, ocelli: false, single: true },
+  eyes: { size: 0.055, pos: 0.48, height: 0.5, ocelli: false, single: true },
   antenna: { segments: 12, scape: 0.75, funiculus: 1.05, club: 0, thick: 0.0082 },
   mandible: { type: 'falcate', len: 1.55, teeth: 0, width: 0.2, hook: 0.9, barb: 1 },
   meso: { len: 0.3, width: 0.1, height: 0.115, smooth: true },
@@ -639,7 +648,8 @@ const ecitonQueen: AntMorph = {
   key: 'eciton_queen',
   L: 22,
   head: { len: 0.14, width: 0.14, height: 0.13, shape: 'round' },
-  eyes: { size: 0.012, pos: 0.5, height: 0.25, ocelli: false, single: true },
+  // (the queen has eyes too — AntWiki: "with eyes but no ocelli" — a small dot)
+  eyes: { size: 0.03, pos: 0.5, height: 0.45, ocelli: false, single: true },
   antenna: { segments: 12, scape: 0.6, funiculus: 0.8, club: 0, thick: 0.008 },
   mandible: { type: 'falcate', len: 0.5, teeth: 0, width: 0.3, hook: 0.2 },
   meso: { len: 0.21, width: 0.12, height: 0.13, smooth: true },

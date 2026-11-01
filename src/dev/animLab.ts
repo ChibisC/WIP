@@ -15,6 +15,7 @@ import { blankView, sprayPose } from '../game/antViews';
 import { CREATURES } from '../sim/creatures/kinds';
 import { BALANCE, STAG } from '../sim/balance';
 import { CASTE_FX } from '../sim/casteAbilities';
+import { CASTES } from '../sim/species';
 import type { Creature } from '../sim/types';
 import type { SimEvent } from '../core/events';
 
@@ -148,7 +149,9 @@ function clips(): Record<string, Clip> {
     // a worker walks, curves, stops, turns in place and stands (idles begin)
     walk: {
       dur: 8,
-      ants: [{ script: pathWalker(-14, 0, 0, [{ d: 1.4, v: 15 }, { d: 1.4, v: 12, turn: 1.4 }, { d: 0.4, v: 5 }, { d: 0.3, v: 0 }, { d: 1.3, turn: 2.4 }, { d: 3.2 }]) }],
+      // (user rating A1: the clip walked a leafcutter media 2.5 × faster than the game: at `walkK` × the fire ant's
+      // pace, the species' own walking speed in the game)
+      ants: [{ script: pathWalker(-14 * Math.min(1, walkK), 0, 0, [{ d: 1.4, v: 15 * walkK }, { d: 1.4, v: 12 * walkK, turn: 1.4 }, { d: 0.4, v: 5 * walkK }, { d: 0.3, v: 0 }, { d: 1.3, turn: 2.4 }, { d: 3.2 }]) }],
       cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.15, 0.6, 1], dist: 11, follow: 0, fov: 30 },
     },
     // turning in place both ways
@@ -164,9 +167,9 @@ function clips(): Record<string, Clip> {
       dur: 7,
       ants: (
         [
-          ['formica_worker', 'jet', 1.8, -11],
+          ['formica_worker', 'jet', 1.8, -6.5],
           ['formica_mortar', 'lob', 2.4, 0],
-          ['formica_rapid', 'rapid', 0.45, 11],
+          ['formica_rapid', 'rapid', 0.45, 6.5],
         ] as const
       ).map(([morph, kind, period, x]) => ({
         morph,
@@ -180,10 +183,13 @@ function clips(): Record<string, Clip> {
           v.lift = 0;
           if (t < 0.6) return;
           const st = (t - 0.6) % period;
-          if (st < (kind === 'rapid' ? 0.1 : kind === 'lob' ? 0.85 : 0.9)) sprayPose(v, kind === 'jet' ? undefined : kind, st, MORPHS[morph].L);
+          // (the Rapid Sprayer holds its rear between its shots: user rating F6, round 2)
+          if (kind === 'rapid') sprayPose(v, kind, st, MORPHS[morph].L, t - 0.6 > 0.1);
+          else if (st < (kind === 'lob' ? 0.85 : 0.9)) sprayPose(v, kind === 'jet' ? undefined : kind, st, MORPHS[morph].L);
         }) as AntScript,
       })),
-      cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.12, 0.3, 1], dist: 16, fov: 30 },
+      // (all three in view: the worker, the Mortar and the Rapid Sprayer side by side)
+      cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.12, 0.4, 1], dist: 20, fov: 30 },
     },
     // (overnight spec 3.4) trophallaxis: two workers face to face, mouthparts touching, as antViews' Troph pose
     troph: {
@@ -593,6 +599,13 @@ function clips(): Record<string, Clip> {
   return C;
 }
 
+/** The walk clip's pace against the fire ant's (set per page from the species' speed in the game). */
+let walkK = 1; // det-ok: dev lab only
+/** A morph's walking speed in the game (mm/s): its caste's, if it has one. */
+function gameSpeed(morph: string): number | undefined {
+  return Object.values(CASTES).find((c) => c.morph === morph)?.speed;
+}
+
 /** A caste ability played as an attack cycle (as game/antViews.ts casteFx): 1 taunt, 2 rage, at phase q. */
 function specialAt(v: AntView, kind: number, q: number, len: number): void {
   v.special = kind;
@@ -623,7 +636,8 @@ function lineup(q: URLSearchParams): Clip {
     noScale: true,
     ants: list.map((m, i) => {
       const L = Ls[i];
-      const v = L * 0.9;
+      // walking at its own speed in the game
+      const v = gameSpeed(m) ?? L * 0.9;
       return { morph: m, script: pathWalker(-v * (dur - 0.6) * 0.5, lanes[i] - mid, 0, [{ d: 0.3 }, { d: dur - 0.6, v }, { d: 0.3 }]) };
     }),
     cam: { tx: 0, ty: maxL * 0.1, tz: 0, dir: [0.1, 1, 0.75], dist: Math.max((y + maxL * 1.5) * 1.35, maxL * 4.5), fov: 30 },
@@ -632,6 +646,12 @@ function lineup(q: URLSearchParams): Clip {
 
 export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
   animSettings.v2 = q.get('anim') !== '1';
+  // the walk at the species' own speed in the game (the clips' paces are the fire ant's, scaled to the ant's size)
+  {
+    const a = q.get('ant') || FIRE;
+    const kS0 = (MORPHS[a]?.L ?? 2.8) / (MORPHS[FIRE].L ?? 2.8);
+    walkK = (gameSpeed(a) ?? 15 * kS0) / (15 * kS0);
+  }
   const clip = q.get('clip') === 'lineup' ? lineup(q) : clips()[q.get('clip') || 'walk'];
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
   setBakeRenderer(renderer);
@@ -697,6 +717,8 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
       a.cur.stingNext = false;
       a.cur.pose = 0;
       a.cur.lift = 0;
+      a.cur.front = 0;
+      a.cur.pivX = 0;
       a.cur.flung = false;
       a.cur.heldCr = 0;
       a.cur.roll = 0;
@@ -727,7 +749,14 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
   };
   // camera (`cdist=` overrides the clip's distance: the same scene at another zoom)
   // (`ctx` / `ctz` move the camera's target: a close look at one actor)
-  const C = { ...clip.cam, dist: Number(q.get('cdist') || clip.cam.dist * kS), tx: Number(q.get('ctx') ?? clip.cam.tx * kS), ty: clip.cam.ty * kS, tz: Number(q.get('ctz') ?? clip.cam.tz * kS) };
+  const C = { ...clip.cam, dist: Number(q.get('cdist') || clip.cam.dist * kS), tx: Number(q.get('ctx') ?? clip.cam.tx * kS), ty: Number(q.get('cty') ?? clip.cam.ty * kS), tz: Number(q.get('ctz') ?? clip.cam.tz * kS) };
+  // a close look at one actor's head (`follow=` its index, `crel=1`: `cdir=` in its own frame — x ahead, y up, z to its
+  // right — and `cfwd=` the target that far ahead of its centre), e.g. the antennae against the head in every clip
+  if (q.get('follow') !== null) C.follow = Number(q.get('follow'));
+  if (q.get('cdir')) C.dir = q.get('cdir')!.split(',').map(Number) as [number, number, number];
+  const crel = q.get('crel') === '1' && C.follow !== undefined && C.follow >= 0;
+  const cfwd = Number(q.get('cfwd') || 0);
+  const relDir = new THREE.Vector3(...C.dir).normalize();
   const cam = new THREE.PerspectiveCamera(C.fov ?? 30, window.innerWidth / window.innerHeight, C.dist * 0.02, C.dist * 60);
   const dir = new THREE.Vector3(...C.dir).normalize();
   const target = new THREE.Vector3(C.tx, C.ty, C.tz);
@@ -776,8 +805,20 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
     if (C.follow !== undefined) {
       const fx0 = C.follow < 0 && stag ? stag.px + (stag.x - stag.px) * alpha : actors[C.follow] ? actors[C.follow].cur.px + (actors[C.follow].cur.x - actors[C.follow].cur.px) * alpha : 0;
       const fz0 = C.follow < 0 && stag ? stag.py + (stag.y - stag.py) * alpha : actors[C.follow] ? actors[C.follow].cur.py + (actors[C.follow].cur.y - actors[C.follow].cur.py) * alpha : 0;
-      target.x += (fx0 - target.x) * (t === 0 ? 1 : 1 - Math.exp(-dt * 6));
-      target.z += (fz0 - target.z) * (t === 0 ? 1 : 1 - Math.exp(-dt * 6));
+      if (crel) {
+        // locked to the actor: its heading turns the view and the target sits on its head
+        const a = actors[C.follow ?? 0]!.cur;
+        let dh = a.heading - a.pheading;
+        dh -= Math.PI * 2 * Math.round(dh / (Math.PI * 2));
+        const h = a.pheading + dh * alpha;
+        const ch = Math.cos(h), sh = Math.sin(h);
+        target.set(fx0 + ch * cfwd, C.ty, fz0 + sh * cfwd);
+        // ant frame (x ahead, z right) → world (ahead = (cos h, 0, sin h), right = (−sin h, 0, cos h))
+        dir.set(relDir.x * ch - relDir.z * sh, relDir.y, relDir.x * sh + relDir.z * ch).normalize();
+      } else {
+        target.x += (fx0 - target.x) * (t === 0 ? 1 : 1 - Math.exp(-dt * 6));
+        target.z += (fz0 - target.z) * (t === 0 ? 1 : 1 - Math.exp(-dt * 6));
+      }
     }
     placeCam();
     if (shake > 0.01) {
