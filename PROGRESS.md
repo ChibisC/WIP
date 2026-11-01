@@ -1051,3 +1051,14 @@ wood ants' basics were 10 throughout. Notes, and what was done:
   - Formica and Lasius: their three ocelli were present but too small to read; now a little larger and glassier.
 - Morph hashes re-baselined for atta_major, atta_soldier, formica_*, lasius_* (nothing else changed).
 - Still not published: no merge into `main` and no new game artifact version until the user says so.
+
+### 2026-11-01 (evening) — Leafcutter eyes placed and coloured from the photos (A11 note)
+- User (A11, 6/10): "fix the placement of the eyes, and it should be a darker color than the color of the ant.
+  reasearch on their placement"; then "source images show them brighter in color but in irl they are slightly darker".
+- The face photos (media specimen, the user's major): the compound eyes are glossy black, at the face's edge just above
+  the antennal sockets, bulging from the outline; the major's median ocellus about a fifth of the way down the face.
+  Ours had matte blue-grey eyes (lighter than the head) set high and back, and a bright amber ocellus near the crown.
+- Now: worker eyes forward and lower (pos .72–.77, just above socket height), set out to the face's edge so they bulge
+  (major's a little larger), glossy near-black; the queen's keep their place, darker. The median ocellus lower on the
+  face (t .71), larger, a deep amber-brown glossy lens — darker than the head, not the photo's flash-bright amber.
+- Morph hashes re-baselined for atta_*. 650 tests pass.

@@ -883,7 +883,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     const eyeR = (m.eyes.size * hL) / 2;
     // `eyes.smooth`: a smooth, glossy, near-black eye set flush (faint facets in the shader: flag 3)
     const smoothEye = !!(m.eyes as { smooth?: boolean }).smooth;
-    const eyeZ = (hW / 2) * headWidthAt(eyeT) * 0.93 * (smoothEye ? 0.9 : 1);
+    // (user rating A11: the leafcutters' eyes bulge out of the face's edge, as in the photos)
+    const eyeZ = (hW / 2) * headWidthAt(eyeT) * (m.real && atta ? 0.985 : 0.93) * (smoothEye ? 0.9 : 1);
     // (user 2026-11-01: "give the army ant models their dot eyes like in the reference photos") Eciton's eye is a
     // single convex lens (AntWiki: "a single large and convex ommatidium"): a glossy black dome set on the surface high
     // on each side of the head, facing out along the head's normal there — not a bead sunk into its side
@@ -907,8 +908,9 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       // realism v2: a bulging, glossy dome (the facets too fine to read except as a faint grain)
       // (rollout, the user's photos: the formicines' larger eyes are a satin grey-black, not glass beads)
       // (overnight review round 1: the formicines' eyes a matte, faceted grey — not glossy black beads)
-      const eyeLook: PartLook = smoothEye ? { color: 0, rough: 0.12, coat: 1, sheen: 0 } : m.real ? (formicine || atta ? { color: 0x5a5650, rough: 0.5, coat: 0.12, sheen: 0.15 } : { color: 0x0b0806, rough: 0.16, coat: 0.7, sheen: 0 }) : { color: 0x0b0806, rough: 0.32, coat: 0.15, sheen: 0 };
-      acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(smoothEye ? 0x161c1a : m.eyes.single ? 0x2a1a10 : (formicine || atta) && m.real ? 0x4c4844 : 0x0d0a08), eyeLook, smoothEye ? 3 : m.eyes.single ? 0 : 1);
+      // (user rating A11: the leafcutters' eyes darker than the ant — the photos: glossy black with a faceted sheen)
+      const eyeLook: PartLook = smoothEye ? { color: 0, rough: 0.12, coat: 1, sheen: 0 } : m.real && atta ? { color: 0x100e0d, rough: 0.3, coat: 0.45, sheen: 0.08 } : m.real ? (formicine ? { color: 0x5a5650, rough: 0.5, coat: 0.12, sheen: 0.15 } : { color: 0x0b0806, rough: 0.16, coat: 0.7, sheen: 0 }) : { color: 0x0b0806, rough: 0.32, coat: 0.15, sheen: 0 };
+      acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(smoothEye ? 0x161c1a : m.eyes.single ? 0x2a1a10 : atta && m.real ? 0x141211 : formicine && m.real ? 0x4c4844 : 0x0d0a08), eyeLook, smoothEye ? 3 : m.eyes.single ? 0 : 1);
     }
     if (m.eyes.ocelli && hi) {
       for (const [ox, oz] of [
@@ -935,16 +937,19 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // (user 2026-11-01, the photo of an A. cephalotes major's face: "the atta's their third eye like in the photos")
     // the big leafcutter workers carry a single median ocellus — an amber lens high on the middle of the frons, in the
     // median groove; the soldier's smaller; the minim and media have none and the queen keeps her three
-    const medOc = m.real && atta ? (m.key === 'atta_major' ? 0.021 : m.key === 'atta_soldier' ? 0.015 : 0) : 0;
+    const medOc = m.real && atta ? (m.key === 'atta_major' ? 0.028 : m.key === 'atta_soldier' ? 0.02 : 0) : 0;
     if (medOc > 0 && hi) {
       // (onto the loft itself: a ray down the midline — the coarse loft stands higher there than its rings' formula)
-      const hit = headRay(new THREE.Vector3(0.64 * hL, hH * 4, 0), new THREE.Vector3(0, -1, 0));
+      // (user rating A11: lower — in the photo a fifth of the way down the face from the top of the head to the jaws)
+      const hit = headRay(new THREE.Vector3(0.71 * hL, hH * 4, 0), new THREE.Vector3(0, -1, 0));
       if (hit) {
         const [top, nrm] = hit;
         const r = medOc * hW;
         const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), nrm);
         const [pp, ii] = ellipsoid(top.clone().addScaledVector(nrm, -r * 0.3), new THREE.Vector3(r, r * 0.72, r), 14, q);
-        acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(0xc9832c), { color: 0, rough: 0.07, coat: 1, sheen: 0 });
+        // (user rating A11: "a darker color than the color of the ant"; "source images show them brighter in color but
+        // in irl they are slightly darker" — the photo's flash makes it bright amber: a deep amber-brown glossy lens)
+        acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(0x52300f), { color: 0x3a200a, rough: 0.05, coat: 1, sheen: 0 });
       }
     }
     // (realism: near the front, close to the midline just behind the clypeus, as in Solenopsis — photo fire_07)

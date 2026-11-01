@@ -333,7 +333,8 @@ const attaMedia: AntMorph = {
   key: 'atta_media',
   L: 8,
   head: { len: 0.3, width: 0.3, height: 0.19, shape: 'heart', notch: 0.22, occSpines: 0.055, groove: 0.14 },
-  eyes: { size: 0.18, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
+  // (user rating A11, 2026-11-01: "fix the placement of the eyes" — the photos: at the face's edge, just above the antennal sockets, well forward of where they were)
+  eyes: { size: 0.18, pos: 0.74, height: 0.04, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.95, funiculus: 1.3, club: 0, thick: 0.009 },
   mandible: { type: 'triangular', len: 0.36, teeth: 8, width: 0.6, spec: ATTA_MEDIA_JAW, open: 0.7 },
   // (user 2026-10-31: leafcutter and army-ant legs too long and the walk too wide-legged — more compact, like EotU:
@@ -359,7 +360,8 @@ const attaMinim: AntMorph = {
   // (user note 2026-10-31: the minim's head didn't match the other castes — the same heart shape, its lobes lower and
   // the notch shallower at this size, small occipital spines)
   head: { len: 0.27, width: 0.27, height: 0.18, shape: 'heart', notch: 0.12, occSpines: 0.035, groove: 0.08 },
-  eyes: { size: 0.16, pos: 0.6, height: 0.2, ocelli: false },
+  // (user rating A11, 2026-11-01: "fix the placement of the eyes" — the photos: at the face's edge, just above the antennal sockets, well forward of where they were)
+  eyes: { size: 0.16, pos: 0.72, height: 0.1, ocelli: false },
   mandible: { type: 'triangular', len: 0.33, teeth: 8, width: 0.55, spec: ATTA_MINIM_JAW, open: 0.7 },
   meso: { len: 0.3, width: 0.13, height: 0.14, spines: { pro: 0.035, meso: 0.028, prop: 0.035 } },
   gaster: { len: 0.3, width: 0.21, height: 0.17, sting: true },
@@ -376,7 +378,8 @@ const attaSoldier: AntMorph = {
   key: 'atta_soldier',
   L: 10.5,
   head: { len: 0.33, width: 0.36, height: 0.2, shape: 'heart', notch: 0.22, occSpines: 0.045, groove: 0.14 },
-  eyes: { size: 0.15, pos: 0.6, height: 0.12, ocelli: false, oval: 1.25 },
+  // (user rating A11, 2026-11-01: "fix the placement of the eyes" — the photos: at the face's edge, just above the antennal sockets, well forward of where they were)
+  eyes: { size: 0.15, pos: 0.75, height: 0.02, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.8, funiculus: 1.25, club: 0, thick: 0.0085 },
   mandible: { type: 'massive', len: 0.38, teeth: 8, width: 0.68, spec: ATTA_SOLDIER_JAW, open: 0.6 },
   meso: { len: 0.28, width: 0.12, height: 0.14, spines: { pro: 0.06, meso: 0.04, meso2: 0.02, prop: 0.05 } },
@@ -392,7 +395,8 @@ const attaMajor: AntMorph = {
   L: 14,
   // (the photos: two big rounded lobes split by a deep median groove)
   head: { len: 0.4, width: 0.44, height: 0.24, shape: 'heart', notch: 0.3, occSpines: 0.03, groove: 0.2 },
-  eyes: { size: 0.11, pos: 0.64, height: 0.1, ocelli: false, oval: 1.25 },
+  // (user rating A11, 2026-11-01: "fix the placement of the eyes" — the photos: at the face's edge, just above the antennal sockets, well forward of where they were)
+  eyes: { size: 0.125, pos: 0.77, height: 0.0, ocelli: false, oval: 1.25 },
   antenna: { segments: 11, scape: 0.7, funiculus: 1.2, club: 0, thick: 0.0072 },
   mandible: { type: 'massive', len: 0.36, teeth: 8, width: 0.75, spec: ATTA_MAJOR_JAW, open: 0.55 },
   meso: { len: 0.25, width: 0.11, height: 0.12, spines: { pro: 0.055, meso: 0.04, meso2: 0.018, prop: 0.045 } },
