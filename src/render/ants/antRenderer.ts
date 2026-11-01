@@ -102,6 +102,10 @@ export interface AntView {
   special?: number;
   rageGlow?: number;
   stingNext?: boolean;
+  /** fore legs raised 0..1 and the body's pitch pivot along it (fraction of L; − behind the middle): a sprayer
+   *  rearing up (user rating F6, as EotU's) */
+  front?: number;
+  pivX?: number;
   /** dead: what killed it (sim HIT.*: the render picks the death), and a corpse's drying 0..1 (its gloss fades) */
   cause?: number;
   dry?: number;
@@ -398,6 +402,32 @@ export interface AntSpaceAdapter {
  * Instanced, GPU-animated ant rendering with three LODs:
  *   lod0 full anatomy (close/observe), lod1 medium, imp = top-down impostor.
  */
+const _lp = new THREE.Vector3();
+/**
+ * The lowest point (y, object units) of the jaw tips, the chin, the mouth and the gaster tip once the head is pitched
+ * by `hp` about the neck, the gaster by `gp` about its pivot (as the shader does) and the body turned by `q` (before
+ * the body's own shift).
+ */
+function lowestPosed(rig: AntRig, hp: number, gp: number, q: THREE.Quaternion): number {
+  let low = Infinity;
+  const ch = Math.cos(hp);
+  const sh = Math.sin(hp);
+  for (const p of [rig.jawTip ?? rig.mouth, rig.chin ?? rig.mouth, rig.mouth]) {
+    const dx = p.x - rig.neck.x;
+    const dy = p.y - rig.neck.y;
+    _lp.set(rig.neck.x + dx * ch - dy * sh, rig.neck.y + dx * sh + dy * ch, p.z).applyQuaternion(q);
+    low = Math.min(low, _lp.y);
+  }
+  const cg = Math.cos(-gp);
+  const sg = Math.sin(-gp);
+  const g = rig.gasterTip;
+  const P = rig.gasterPivot;
+  const gx = g.x - P.x;
+  const gy = g.y - P.y;
+  _lp.set(P.x + gx * cg - gy * sg, P.y + gx * sg + gy * cg, 0).applyQuaternion(q);
+  return Math.min(low, _lp.y);
+}
+
 export class AntRenderer {
   group = new THREE.Group();
   private buckets = new Map<string, Bucket>();
@@ -783,8 +813,12 @@ export class AntRenderer {
         qB.multiply(qT.setFromAxisAngle(AX_X, atkP.roll * w + M.roll + s.roll));
         vT.set(atkP.fwd * w * Lr + M.fwd / scale, atkP.up * w * Lr, atkP.side * w * Lr + M.side / scale);
         // turned about a pivot at the body's height (along the body by the pose's px), not about the ground point
-        vPiv.set(atkP.px * w * Lr, rig.stance, 0);
+        vPiv.set(atkP.px * w * Lr + (v.pivX ?? 0) * Lr, rig.stance, 0);
         vT.add(vPiv).sub(vPiv.applyQuaternion(qB));
+        // (user ratings A5, A6, F7, L7, L8: attacks and rears sank the jaws, the head or the gaster into the ground)
+        // the lowest of the jaw tips, the chin and the gaster tip as posed — head and gaster turned, the body pitched —
+        // stays 1.5 % of the body length above the ground: the body rises over its planted feet, the legs straighten
+        vT.y += Math.max(0, Lr * 0.015 - lowestPosed(rig, hp, gp, qB) - vT.y);
         if (qB.w < 0) qB.set(-qB.x, -qB.y, -qB.z, -qB.w);
         const ang = 2 * Math.acos(Math.min(1, qB.w));
         const sh = Math.sin(ang / 2);
@@ -800,7 +834,7 @@ export class AntRenderer {
         bodyBuf[7] = atkP.spread * w + M.squash * 0.35;
         bodyBuf[8] = atkP.gYaw * w;
         bodyBuf[9] = stingW;
-        bodyBuf[10] = atkP.front * w;
+        bodyBuf[10] = Math.max(atkP.front * w, v.front ?? 0);
         bodyBuf[11] = M.decap;
         bodyBuf[12] = v.dry ?? 0;
         bodyBuf[13] = M.squash;
@@ -890,7 +924,9 @@ export class AntRenderer {
       at.a.setXYZW(n, s.phase, s.amp, hy, hp);
       at.b.setXYZW(n, mo, act * 0.3 + (v.antennaPitch > 0.5 ? 0.6 : 0) + (M ? M.antSpread : 0), s.ap, s.wave);
       // pose id + 0.99 × its weight; the hit flash
-      at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, M ? Math.max(M.flash, v.rageGlow ?? 0) : 0);
+      // (the rage glow rides in the same channel: + 2 × its level 0..10 — user rating E7: a glow in the body, not the
+      // whole ant turned red)
+      at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, (M ? M.flash : 0) + 2 * Math.round(Math.min(1, Math.max(0, v.rageGlow ?? 0)) * 10));
       // colour variation −1..1, plus 4 × the Termant tint code (decoded in the shader); the planted feet's stance sweep
       at.d.setXYZW(n, M ? M.deathLeg : s.death, M ? M.Dh : 0, Math.max(-1, Math.min(1, v.colorVar)) + 4 * (v.tint ?? 0), s.pph);
       // gold × ripple direction, the planted feet's turn per stance, exhausted, hair sway

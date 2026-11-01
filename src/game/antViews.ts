@@ -204,6 +204,8 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
   }
   out.roll = a.stun > 0 ? Math.sin(w.time * 18 + a.id) * 0.25 : 0;
   out.pitch = 0;
+  out.front = 0;
+  out.pivX = 0;
   out.selected = a.id === selected;
   out.pose = a.pose;
   out.headYaw = a.look * 0.6;
@@ -257,6 +259,8 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
       out.roll = Math.sin(w.time * 0.9 + a.id) * 0.06;
       break;
     case AS.Troph:
+      // (user rating L6: garden ants don't need the trophallaxis pose — they just stand and antennate)
+      if (cd.species === 'lasius') break;
       // (overnight spec 3.4) face to face, mouthparts touching: the jaws parted, the head nodding gently as
       // the drop passes, antennae stroking the partner's head
       out.mandible = 0.55;
@@ -320,14 +324,18 @@ function termantLook(w: World, a: Ant, out: AntView): void {
  * shot: the Mortar rears and its legs soak up a big recoil after the lob; the Rapid Sprayer's spurts are quick small
  * pulses. Shared with the animation lab's `spray` clip.
  */
-export function sprayPose(out: Pick<AntView, 'gaster' | 'pitch' | 'lift' | 'mandible' | 'antennaPitch'>, kind: string | undefined, st: number, len: number): void {
+export function sprayPose(out: Pick<AntView, 'gaster' | 'pitch' | 'lift' | 'mandible' | 'antennaPitch' | 'front' | 'pivX'>, kind: string | undefined, st: number, len: number): void {
   const wind = kind === 'rapid' ? 0.05 : kind === 'lob' ? 0.5 : 0.45;
   const c = Math.min(1, st / wind);
   const curl = c * c * (3 - 2 * c);
   const after = st - wind;
   const kick = after > 0 ? Math.exp(-after * (kind === 'rapid' ? 40 : 9)) * Math.min(1, after * 60) : 0;
-  out.gaster = -0.9 - 1.2 * curl + kick * (kind === 'lob' ? 0.55 : 0.25);
-  out.pitch = -0.12 + (kind === 'lob' ? 0.16 : 0.06) * curl + kick * (kind === 'lob' ? 0.14 : 0.04);
+  // (user rating F6: rear up as EotU's sprayers do — the body tilted well up over the hind legs, the fore legs lifted
+  // off the ground, the gaster curled forward under it to aim; the renderer keeps the gaster tip off the ground)
+  out.gaster = -1.1 - 1.3 * curl + kick * (kind === 'lob' ? 0.55 : 0.25);
+  out.pitch = (kind === 'rapid' ? 0.34 : 0.42) * curl + kick * (kind === 'lob' ? 0.12 : 0.04);
+  out.pivX = -0.28;
+  out.front = curl;
   out.lift = Math.max(out.lift, kick * len * (kind === 'lob' ? 0.03 : 0.01));
   out.mandible = 0.6;
   out.antennaPitch = 0.4;
@@ -687,6 +695,8 @@ export function corpseToView(f: Food, out: AntView, space: number, morph: string
   }
   out.roll = 0;
   out.pitch = 0;
+  out.front = 0;
+  out.pivX = 0;
   out.selected = false;
   out.pose = 0;
   out.headYaw = 0;
@@ -730,6 +740,8 @@ export function termiteBroodToView(b: Brood, out: AntView, space: number): AntVi
   out.lift = 0;
   out.roll = 0;
   out.pitch = 0;
+  out.front = 0;
+  out.pivX = 0;
   out.selected = false;
   out.pose = 0;
   out.glue = 0;

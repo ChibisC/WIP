@@ -246,7 +246,8 @@ const SWING_F: Key = { yaw: -0.2, headYaw: -0.4, roll: -0.05, fwd: 0.03, headPit
  * middle legs, the fore legs lifted, head thrown up and the great jaws gaping, and stridulates — the gaster pumping
  * up and down fast (the rasp between the postpetiole and the gaster) — the jaws snapping, then settles.
  */
-const TAUNT_K: Key = { up: 0.08, pitch: 0.24, px: -0.32, front: 0.85, headPitch: 0.42, mand: 1, gaster: 0.55, spread: 0.5 };
+// (user rating A7: the fore legs twitched — held fully up and still, the body no longer bobbing under them)
+const TAUNT_K: Key = { up: 0.08, pitch: 0.24, px: -0.32, front: 1, headPitch: 0.42, mand: 1, gaster: 0.55, spread: 0.5 };
 /**
  * An army-ant soldier's rage (user 2026-10-31, after EotU): a frenzy at each kill — the sickles snapping open and
  * shut three times, the head tossing side to side, the body jolting forward over braced legs.
@@ -358,10 +359,9 @@ export function attackPoseV2(variant: number, q: number, side: number, out: Atta
       const k = q < 0.2 ? sm(q / 0.2) : q < 0.82 ? 1 : 1 - sm((q - 0.82) / 0.18);
       blend({}, TAUNT_K, k, side, out);
       const hold = q > 0.16 && q < 0.86 ? 1 : 0;
-      out.gaster += 0.32 * Math.sin(q * 105) * hold * k;
-      out.mand = Math.max(0, out.mand - 0.45 * Math.max(0, Math.sin(q * 42)) * hold);
-      out.headYaw += 0.12 * Math.sin(q * 13) * hold * k;
-      out.up += 0.006 * Math.sin(q * 105) * hold;
+      out.gaster += 0.24 * Math.sin(q * 70) * hold * k;
+      out.mand = Math.max(0, out.mand - 0.4 * Math.max(0, Math.sin(q * 28)) * hold);
+      out.headYaw += 0.1 * Math.sin(q * 9) * hold * k;
       return out;
     }
     case ATK.RAGE: {

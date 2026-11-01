@@ -15,6 +15,7 @@ import { blankView, sprayPose } from '../game/antViews';
 import { CREATURES } from '../sim/creatures/kinds';
 import { BALANCE, STAG } from '../sim/balance';
 import { CASTE_FX } from '../sim/casteAbilities';
+import { CASTES } from '../sim/species';
 import type { Creature } from '../sim/types';
 import type { SimEvent } from '../core/events';
 
@@ -148,7 +149,9 @@ function clips(): Record<string, Clip> {
     // a worker walks, curves, stops, turns in place and stands (idles begin)
     walk: {
       dur: 8,
-      ants: [{ script: pathWalker(-14, 0, 0, [{ d: 1.4, v: 15 }, { d: 1.4, v: 12, turn: 1.4 }, { d: 0.4, v: 5 }, { d: 0.3, v: 0 }, { d: 1.3, turn: 2.4 }, { d: 3.2 }]) }],
+      // (user rating A1: the clip walked a leafcutter media 2.5 × faster than the game: at `walkK` × the fire ant's
+      // pace, the species' own walking speed in the game)
+      ants: [{ script: pathWalker(-14 * Math.min(1, walkK), 0, 0, [{ d: 1.4, v: 15 * walkK }, { d: 1.4, v: 12 * walkK, turn: 1.4 }, { d: 0.4, v: 5 * walkK }, { d: 0.3, v: 0 }, { d: 1.3, turn: 2.4 }, { d: 3.2 }]) }],
       cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.15, 0.6, 1], dist: 11, follow: 0, fov: 30 },
     },
     // turning in place both ways
@@ -593,6 +596,13 @@ function clips(): Record<string, Clip> {
   return C;
 }
 
+/** The walk clip's pace against the fire ant's (set per page from the species' speed in the game). */
+let walkK = 1; // det-ok: dev lab only
+/** A morph's walking speed in the game (mm/s): its caste's, if it has one. */
+function gameSpeed(morph: string): number | undefined {
+  return Object.values(CASTES).find((c) => c.morph === morph)?.speed;
+}
+
 /** A caste ability played as an attack cycle (as game/antViews.ts casteFx): 1 taunt, 2 rage, at phase q. */
 function specialAt(v: AntView, kind: number, q: number, len: number): void {
   v.special = kind;
@@ -623,7 +633,8 @@ function lineup(q: URLSearchParams): Clip {
     noScale: true,
     ants: list.map((m, i) => {
       const L = Ls[i];
-      const v = L * 0.9;
+      // walking at its own speed in the game
+      const v = gameSpeed(m) ?? L * 0.9;
       return { morph: m, script: pathWalker(-v * (dur - 0.6) * 0.5, lanes[i] - mid, 0, [{ d: 0.3 }, { d: dur - 0.6, v }, { d: 0.3 }]) };
     }),
     cam: { tx: 0, ty: maxL * 0.1, tz: 0, dir: [0.1, 1, 0.75], dist: Math.max((y + maxL * 1.5) * 1.35, maxL * 4.5), fov: 30 },
@@ -632,6 +643,12 @@ function lineup(q: URLSearchParams): Clip {
 
 export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
   animSettings.v2 = q.get('anim') !== '1';
+  // the walk at the species' own speed in the game (the clips' paces are the fire ant's, scaled to the ant's size)
+  {
+    const a = q.get('ant') || FIRE;
+    const kS0 = (MORPHS[a]?.L ?? 2.8) / (MORPHS[FIRE].L ?? 2.8);
+    walkK = (gameSpeed(a) ?? 15 * kS0) / (15 * kS0);
+  }
   const clip = q.get('clip') === 'lineup' ? lineup(q) : clips()[q.get('clip') || 'walk'];
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
   setBakeRenderer(renderer);
@@ -697,6 +714,8 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
       a.cur.stingNext = false;
       a.cur.pose = 0;
       a.cur.lift = 0;
+      a.cur.front = 0;
+      a.cur.pivX = 0;
       a.cur.flung = false;
       a.cur.heldCr = 0;
       a.cur.roll = 0;

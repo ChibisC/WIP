@@ -309,12 +309,17 @@ export function formicineMandible(o: { teeth: number; color: MandibleSpec['color
 // ant's — the photos)
 // (user note: they didn't look like the photos — closed, Lasius jaws are a broad, thick, rounded muzzle in front of the
 // head, curving down like a beak, orange-brown and paler than the head, only the cutting edge darker)
-export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x5e3c26, mid: 0x684228, tip: 0x3c2414, teeth: 0x1a0e06, dark: [0.75, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.9, pitch: [-0.1, -0.26, -0.5], edgeDark: 0.55, roll: 0.55, heading: 0.6 });
+// (user rating L1: slightly too long — set in a little more, reach 1.06: about 12 % shorter)
+export const LASIUS_WORKER = formicineMandible({ teeth: 8, color: { base: 0x5e3c26, mid: 0x684228, tip: 0x3c2414, teeth: 0x1a0e06, dark: [0.75, 1.0] }, reach: 1.06, broad: 1.15, thick: 1.9, pitch: [-0.1, -0.26, -0.5], edgeDark: 0.55, roll: 0.55, heading: 0.66 });
+/** Lasius soldier (user ratings: the soldier classes' jaws too long): the worker's, set in more — about 18 % shorter. */
+export const LASIUS_SOLDIER_JAW = formicineMandible({ teeth: 8, color: { base: 0x5e3c26, mid: 0x684228, tip: 0x3c2414, teeth: 0x1a0e06, dark: [0.75, 1.0] }, reach: 1.04, broad: 1.15, thick: 1.9, pitch: [-0.1, -0.26, -0.5], edgeDark: 0.55, roll: 0.55, heading: 0.72 });
 /** Red wood ant (Formica rufa): reddish-brown jaws darkening to black at the teeth (docs/creatures/formica-rufa.md). */
 // (the user's photos: red-orange jaws, near black at the teeth)
 // (user note and photos: closed, a pointed beak projecting forward and down from the head, red-orange and paler than
 // the face; open, two big curved red blades with dark tips and teeth)
 export const FORMICA_WORKER = formicineMandible({ teeth: 8, color: { base: 0x5a2618, mid: 0x502214, tip: 0x2e140c, teeth: 0x100604, dark: [0.66, 1.0] }, reach: 1.14, broad: 1.15, thick: 1.85, pitch: [-0.12, -0.3, -0.56], edgeDark: 0.65, roll: 0.6, heading: 0.6 });
+/** Formica soldier (user ratings F5, F7, F9: the worker's are fine, the soldier's too long): set in more, about 18 % shorter. */
+export const FORMICA_SOLDIER_JAW = formicineMandible({ teeth: 8, color: { base: 0x5a2618, mid: 0x502214, tip: 0x2e140c, teeth: 0x100604, dark: [0.66, 1.0] }, reach: 1.04, broad: 1.15, thick: 1.85, pitch: [-0.12, -0.3, -0.56], edgeDark: 0.65, roll: 0.6, heading: 0.72 });
 
 /**
  * Leafcutter (Atta cephalotes) jaws, rebuilt from the reference photos (user, 2026-10-31: "the attas mandibles dont
@@ -391,8 +396,9 @@ export function attaMandible(o: { teeth: number; color: MandibleSpec['color']; r
 /** Minim (garden worker): small, fine blades, orange-brown like the body, 8 teeth. (user 2026-10-31: the minim's jaws look
  * good — every caste now has its tooth spacing, 8 teeth, and its small gap between the closed blades, reach 1.12) */
 export const ATTA_MINIM_JAW = attaMandible({ teeth: 8, color: { base: 0x8a4a22, mid: 0x7a401c, tip: 0x2e1408, teeth: 0x140a04, dark: [0.7, 1.0] }, broad: 1.0, thick: 1.1, pitch: [-0.15, -0.35, -0.65], heading: 0.22, curve: 1.0, toothK: 0.9, reach: 1.12, edgeDark: 0.7 });
-/** Media (the leaf cutter): the classic toothed shears, red-brown with black saw edges, 10 teeth. */
-export const ATTA_MEDIA_JAW = attaMandible({ teeth: 8, color: { base: 0x5e2a14, mid: 0x50220f, tip: 0x1c0a05, teeth: 0x0a0504, dark: [0.62, 1.0] }, broad: 1.08, thick: 1.25, pitch: [-0.25, -0.45, -0.8], heading: 0.2, curve: 1.05, toothK: 1.0, reach: 1.12 });
+/** Media (the leaf cutter): the classic toothed shears, red-brown with black saw edges. (user rating A3: too long —
+ * set in more, about 15 % shorter, the same gap when closed) */
+export const ATTA_MEDIA_JAW = attaMandible({ teeth: 8, color: { base: 0x5e2a14, mid: 0x50220f, tip: 0x1c0a05, teeth: 0x0a0504, dark: [0.62, 1.0] }, broad: 1.08, thick: 1.25, pitch: [-0.25, -0.45, -0.8], heading: 0.32, curve: 1.05, toothK: 1.0, reach: 1.12 });
 /** Soldier: heavier, darker blades hanging more steeply (user 2026-10-31: a little long — set more inward, about 12 % shorter). */
 export const ATTA_SOLDIER_JAW = attaMandible({ teeth: 8, color: { base: 0x4a1c0e, mid: 0x3e170b, tip: 0x140705, teeth: 0x080403, dark: [0.58, 1.0] }, broad: 1.08, thick: 1.3, pitch: [-0.3, -0.5, -0.85], heading: 0.42, curve: 1.0, toothK: 1.0, reach: 1.12 });
 /** Queen (user 2026-10-31: her jaws were too long): shorter, more curved blades closing under her broad face. */

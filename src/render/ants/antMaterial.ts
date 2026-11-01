@@ -50,6 +50,7 @@ uniform float uPlant; // animation pass: feet planted by an analytic IK (pilot s
 // The planted feet are solved in the body frame against targets fixed in the ground frame, so the body lunges,
 // rises, leans and twists over feet that stay where they are.
 uniform sampler2D uBodyTex; uniform float uBodyOn;
+varying float vRage;
 varying float vDry;
 uniform float uRealV; // realism morphs (the sting rests retracted)
 varying float vHit;
@@ -90,7 +91,8 @@ vec3 animP = position;
   // aE.x packs the gold amount and the ripple direction in its sign; aE.y is the turn per stance (planted feet)
   float goldA = abs(aE.x), exh = aE.z;
   vGold = vec4(goldA, aE.x < 0.0 ? -1.0 : 1.0, aE.z, aE.w);
-  vHit = aC.w;
+  // the hit flash, and the army-ant soldier's rage glow riding on it (+ 2 × its level 0..10)
+  { float rq = floor(aC.w * 0.5); vHit = aC.w - 2.0 * rq; vRage = rq * 0.1; }
   // body bob at twice the stride frequency (the planted feet allow for it)
   float bob = amp * uGait.w * 0.006 * cos(phase * 12.566);
   // spec 04 (planted-feet species): the threat display (alarm: gaster flagged, user rating A11) and the sting
@@ -331,6 +333,7 @@ vec3 animP = position;
 const FRAG_HEADER = /* glsl */ `
 varying vec4 vSurf; varying vec3 vLocal; varying float vColorVar; varying float vTint; varying vec4 vGold; uniform float uGoldTime;
 varying float vHit;
+varying float vRage;
 varying float vDry;
 uniform float uReal;
 uniform float uMask;
@@ -447,6 +450,10 @@ export function antPatch(): ShaderPatch {
            float ht = hairTip();
            totalEmissiveRadiance += goldM * ht * ht * vec3(1.0, 0.9, 0.6) * 0.1;
            totalEmissiveRadiance += vHit * vec3(0.55, 0.14, 0.06) * 0.12;
+           // rage (user rating E7): a red glow from within the mesosoma, waist and gaster — the legs and head keep
+           // their colour
+           int rpart = int(vPartF + 0.5);
+           if (vRage > 0.0 && (rpart == 0 || rpart == 8 || rpart == 9)) totalEmissiveRadiance += vRage * vec3(0.85, 0.05, 0.02) * (0.28 + 0.25 * pow(1.0 - abs(dot(normalize(vViewPosition), normalize(normal))), 1.5));
          }`,
       ],
       [

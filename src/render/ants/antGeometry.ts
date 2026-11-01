@@ -67,6 +67,9 @@ export interface AntRig {
   headTip: THREE.Vector3;
   gasterTip: THREE.Vector3;
   mouth: THREE.Vector3;
+  /** the lowest jaw tip and the head's chin at rest (render: an attack never sinks them into the ground) */
+  jawTip?: THREE.Vector3;
+  chin?: THREE.Vector3;
   /** walk-cycle lift / duty overrides (morph `gait`) and the physogastry factor (`gaster.physo`) */
   gaitLift?: number;
   gaitDuty?: number;
@@ -939,7 +942,9 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
         const ecR = m.real && m.key.startsWith('eciton_');
         const fwd = mandLen * (0.82 * Math.sin(Math.min(t, 0.8) / 0.8 * Math.PI * 0.42) + (t > 0.8 ? (t - 0.8) * 0.4 : 0)) - hk * mandLen * 0.3 * jj * jj;
         const hook = Math.pow(t, 3.2);
-        const inn = ecR ? -mandLen * 0.1 * Math.sin(t * Math.PI) + hook * inwardToMid * 0.8 * (1 + hk * 0.2) : (-mandLen * 0.06 * Math.sin(t * Math.PI) + hook * (inwardToMid * 1.15 + mandLen * 0.12)) * (1 + hk * 0.55);
+        // (user rating E6: claw in more, like the stag beetle's — seen from above a crescent: bowed out from the base,
+        // sweeping back in, the tips just crossing in front of the head)
+        const inn = ecR ? -mandLen * 0.2 * Math.sin(t * Math.PI) + Math.pow(t, 1.6) * inwardToMid * (1.02 + hk * 0.1) : (-mandLen * 0.06 * Math.sin(t * Math.PI) + hook * (inwardToMid * 1.15 + mandLen * 0.12)) * (1 + hk * 0.55);
         pts.push(new THREE.Vector3(fwd, ecR ? Math.sin(Math.min(1, t / 0.75) * Math.PI) * mandLen * 0.14 - ss(0.7, 1, t) * mandLen * 0.16 : -t * t * mandLen * 0.04 + Math.sin(t * Math.PI) * mandLen * 0.05, -s * inn));
         rad.push(mandLen * ((ecR ? 0.058 : 0.05) * (1 - t) + 0.007));
       }
@@ -1017,13 +1022,51 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const funLen = m.antenna.funiculus * scapeLen;
   const antThick = m.antenna.thick * Lm;
   const elbows: THREE.Vector3[] = [];
+  // (user rating A7: on the leafcutter major the antennae started inside its great head — the sockets sat inside the
+  // head and the scapes ran through it) Atta: each socket moves forward onto the face, and the scape is laid along
+  // the head's surface (as in the scrobe), so it shows over its whole length
+  const hugHead = m.real && atta;
+  const headInv = hugHead ? headM.clone().invert() : null;
+  const headYc = (t: number) => headCY - ss(0.55, 1, t) * hH * 0.1;
+  const headRy = (t: number) =>
+    (hH / 2) * (0.6 + 0.4 * Math.sin(Math.PI * Math.min(1, 0.1 + t * 0.92))) * (m.mandible.type === 'massive' ? 1 - 0.22 * ss(0.62, 1, t) : 1) * Math.max(0.15, Math.pow(Math.min(1, t / 0.13), 0.32) * Math.pow(Math.min(1, (1 - t) / 0.07), 0.45));
+  /** how far inside the head's cross-section a head-local point is (< 1 inside) */
+  const insideHead = (q: THREE.Vector3) => {
+    const t = q.x / hL;
+    if (t <= 0.02 || t >= 0.995) return 9;
+    const rz = (hW / 2) * headWidthAt(t);
+    return ((q.y - headYc(t)) / headRy(t)) ** 2 + (q.z / rz) ** 2;
+  };
+  /** a point pushed out of the head onto its surface (plus `off` of its own thickness), sideways in its cross-section */
+  const onHead = (p0: THREE.Vector3, off: number) => {
+    if (!headInv) return p0;
+    const q = p0.clone().applyMatrix4(headInv);
+    const e = insideHead(q);
+    const t = q.x / hL;
+    if (e >= 1 || e === 9) return p0;
+    const k = 1 / Math.sqrt(Math.max(1e-6, e));
+    const yc = headYc(t);
+    const dy = (q.y - yc) * k;
+    const dz = q.z * k;
+    const d = Math.hypot(dy, dz) || 1;
+    q.set(q.x, yc + dy + (dy / d) * off, dz + (dz / d) * off);
+    return q.applyMatrix4(headM);
+  };
   for (const s of [-1, 1]) {
-    const sock = s < 0 ? socketL : socketR;
+    let sock = s < 0 ? socketL : socketR;
+    if (headInv) {
+      // forward along the head until the socket is on the face
+      const q = sock.clone().applyMatrix4(headInv);
+      while (q.x < hL * 0.995 && insideHead(q) < 1) q.x += hL * 0.005;
+      sock = q.applyMatrix4(headM);
+      if (s < 0) socketL = sock;
+      else socketR = sock;
+    }
     // Scape: forward-outward-up; funiculus: forward-outward-down (elbowed).
     // (review round 2: a formicine's scapes rise up and back from sockets near the midline, then the funiculus bends
     // forward — they read as rods sticking out of the face's sides when set forward-outward)
     const scDir = m.real && formicine ? new THREE.Vector3(-0.12, 0.72, 0.6 * s).normalize() : m.real && atta ? new THREE.Vector3(-0.62, 0.32, 0.72 * s).normalize() : m.real && eciton ? new THREE.Vector3(0.15, 0.5, 0.85 * s).normalize() : new THREE.Vector3(0.72, 0.14, 0.68 * s).normalize();
-    const elbow = sock.clone().addScaledVector(scDir, scapeLen);
+    const elbow = onHead(sock.clone().addScaledVector(scDir, scapeLen), antThick * 1.2);
     elbows.push(elbow);
     const scMid = sock.clone().lerp(elbow, 0.5).add(new THREE.Vector3(0, scapeLen * 0.04, 0));
     if (curvy && hi) {
@@ -1034,7 +1077,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       const rad: number[] = [];
       for (let k = 0; k <= 7; k++) {
         const t = k / 7;
-        pts.push(sock.clone().lerp(elbow, t).addScaledVector(bow, Math.sin(Math.PI * t) * scapeLen * 0.08));
+        pts.push(onHead(sock.clone().lerp(elbow, t).addScaledVector(bow, Math.sin(Math.PI * t) * scapeLen * 0.08), antThick * 1.1));
         rad.push(antThick * (0.5 + 0.3 * t + 0.35 * ss(0.7, 1, t)));
       }
       const [p1, i1, m1] = tube(pts, rad, 9, true, true);
@@ -1345,6 +1388,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     headTip: new THREE.Vector3(),
     gasterTip,
     mouth: hp(hL * 1.02, headCY - hH * 0.15, 0),
+    jawTip: mandTips.reduce((a, b) => (b.y < a.y ? b : a)).clone(),
+    chin: hp(hL * 0.82, headCY - hH * 0.47, 0),
   };
   // how far each mandible swings open at full gape (the generator's species set their own)
   if (m.mandible.open !== undefined) (rig as AntRig & { mandOpen?: number }).mandOpen = m.mandible.open;
@@ -1544,7 +1589,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   rig.foot?.forEach(shift);
   rig.knee.forEach(shift);
   rig.ankle.forEach(shift);
-  [rig.neck, rig.mandL, rig.mandR, rig.antL, rig.antR, rig.elbL, rig.elbR, rig.gasterPivot, rig.waistPivot, rig.headTip, rig.gasterTip, rig.mouth, (rig as AntRig & { crest: THREE.Vector3 }).crest].forEach(shift);
+  [rig.neck, rig.mandL, rig.mandR, rig.antL, rig.antR, rig.elbL, rig.elbR, rig.gasterPivot, rig.waistPivot, rig.headTip, rig.gasterTip, rig.mouth, rig.jawTip!, rig.chin!, (rig as AntRig & { crest: THREE.Vector3 }).crest].forEach(shift);
   if (rig.foot) plantHomes(rig);
   // army ants: high-stepping gait, the queen's physogastry, and where a porter's load hangs under the body
   if (m.gait) {

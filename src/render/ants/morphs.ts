@@ -4,7 +4,7 @@
  * noted; colours are linear-ish sRGB hex.
  */
 import type { MandibleSpec } from '../anatomy/mandible';
-import { ECITON_MINOR_JAW, ATTA_QUEEN_JAW, ATTA_MAJOR_JAW, ATTA_MEDIA_JAW, ATTA_MINIM_JAW, ATTA_SOLDIER_JAW, FIRE_MAJOR, FIRE_WORKER, FORMICA_WORKER, LASIUS_WORKER } from '../anatomy/mandibleSpecs';
+import { ECITON_MINOR_JAW, ATTA_QUEEN_JAW, ATTA_MAJOR_JAW, ATTA_MEDIA_JAW, ATTA_MINIM_JAW, ATTA_SOLDIER_JAW, FIRE_MAJOR, FIRE_WORKER, FORMICA_WORKER, LASIUS_WORKER, LASIUS_SOLDIER_JAW, FORMICA_SOLDIER_JAW } from '../anatomy/mandibleSpecs';
 
 export type HeadShape = 'round' | 'heart' | 'rect' | 'tri' | 'square';
 export type MandibleType = 'triangular' | 'falcate' | 'massive' | 'small';
@@ -187,7 +187,7 @@ const lasiusSoldier: AntMorph = {
   L: 4.9,
   head: { len: 0.25, width: 0.245, height: 0.165, shape: 'rect' },
   eyes: { size: 0.2, pos: 0.52, height: 0.15, ocelli: true },
-  mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.62, spec: LASIUS_WORKER, open: 0.7 },
+  mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.62, spec: LASIUS_SOLDIER_JAW, open: 0.7 },
   meso: { len: 0.31, width: 0.14, height: 0.14, neck: 0.075 },
   legs: { hind: 0.84, thick: 0.019 },
 };
@@ -276,7 +276,7 @@ const formicaSoldier: AntMorph = {
   L: 8.6,
   head: { len: 0.27, width: 0.28, height: 0.19, shape: 'rect' },
   eyes: { size: 0.26, pos: 0.48, height: 0.25, ocelli: true },
-  mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.7, spec: FORMICA_WORKER, open: 0.7 },
+  mandible: { type: 'triangular', len: 0.46, teeth: 8, width: 0.7, spec: FORMICA_SOLDIER_JAW, open: 0.7 },
   meso: { len: 0.33, width: 0.145, height: 0.15, neck: 0.075 },
   gaster: { len: 0.35, width: 0.22, height: 0.18, sting: false },
   legs: { hind: 0.9, thick: 0.0195 },
