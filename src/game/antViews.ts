@@ -11,6 +11,7 @@ import { ATTACK_CONTACT } from '../render/ants/attackPoses';
 import { CASTE_FX } from '../sim/casteAbilities';
 import { queenBody, rampFraction } from '../sim/termites';
 import { World } from '../sim/world';
+import { antClear, antHeights, antNeed, creatureClear, creatureHeights, zoneAt } from '../sim/underpass';
 
 /** Surface holes of every area (rebuilt once per sim tick) for the scurry-in fade. */
 let holeTick = -1;
@@ -309,7 +310,42 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
   casteFx(w, a, out);
   speciesExtras(w, a, out);
   termantLook(w, a, out);
+  underPosture(w, a, out);
   return out;
+}
+
+const UCLR = [0, 0, 0];
+/**
+ * Combat v2.2 (spec §5, handed to the realism branch; user 2026-11-01 "make sure the models also work with the combat
+ * rework"): an ant standing under a taller unit keeps lower where the room above it is close — antennae swept down and
+ * back, head lowered (not mid-bite), jaws shut — so nothing pokes into the belly over it. Render only: the sim's fit
+ * test (sim/underpass.ts) already keeps a 10 % margin over its height.
+ */
+function underPosture(w: World, a: Ant, out: AntView): void {
+  const u = a.udr ?? 0;
+  if (!u || a.state === AS.Dead) return;
+  let clear: number;
+  if (u > 0) {
+    const b = w.antById.get(u);
+    if (!b) return;
+    antClear(b, UCLR);
+    clear = UCLR[zoneAt(antHeights(b.caste), casteOf(b.caste).length, b.x, b.y, b.h, a.x, a.y)];
+  } else {
+    const cr = w.creatureById.get(-u);
+    if (!cr) return;
+    creatureClear(cr, UCLR);
+    clear = UCLR[zoneAt(creatureHeights(cr.kind), cr.scale, cr.x, cr.y, cr.h, a.x, a.y)];
+  }
+  const need = antNeed(a);
+  // 0 with a quarter of its height to spare, 1 when it only just fits
+  const tight = Math.max(0, Math.min(1, 1 - (clear - need) / (need * 0.25)));
+  if (tight <= 0) return;
+  out.antennaPitch = Math.min(out.antennaPitch, -0.9 * tight);
+  out.antennaActivity = Math.min(out.antennaActivity, 1 - 0.6 * tight);
+  if (a.state !== AS.Attack && a.state !== AS.Grapple) {
+    out.headPitch = Math.min(out.headPitch, -0.3 * tight);
+    out.mandible = Math.min(out.mandible, 0.3 * (1 - tight));
+  }
 }
 
 /** Termants (render only): ants of a stolen caste carry a faint amber tint (the team ring is drawn as for every unit). */

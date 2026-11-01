@@ -413,7 +413,9 @@ const attaMajor: AntMorph = {
   // (darker chestnut all over than the Media, user 2026-11-01)
   look: { ...attaLook, head: L(0x7a3018, 0.58, 0.12, 0.1, 0x5c2a16), meso: L(0x6c3626, 0.66, 0.06, 0.12, 0x522818), waist: L(0x5a2614, 0.66, 0.06, 0.1), gaster: L(0x542414, 0.62, 0.08, 0.16, 0x421e10), legs: L(0x542616, 0.6, 0.06, 0.1, 0x461f12) },
   setae: { ...attaSetae, color: 0xa0502a, head: 70, len: [0.006, 0.026] },
-  stance: 0.14,
+  // (combat v2.2 check, user 2026-11-01: "make sure the models also work with the combat rework" — standing, its
+  // jaws went 0.2 mm into the ground; its big head is held up off the ground on long legs)
+  stance: 0.165,
 };
 
 const attaQueen: AntMorph = {
@@ -590,7 +592,9 @@ const ecitonSubmajor: AntMorph = {
   gaster: { len: 0.29, width: 0.165, height: 0.14, sting: true, segs: 2 },
   legs: { hind: 1.12, thick: 0.0135, splay: 0.8 },
   look: { ...EC_DARK, head: L(0x222226, 0.34, 0.3, 0.04, 0x34302e) },
-  stance: 0.25,
+  // (combat v2.2: a worker must fit under a porter — real porters stand high to carry prey slung under the body;
+  // the belly was 1.55 mm, a worker needs 1.69)
+  stance: 0.278,
 };
 
 /** Media: pale-yellow head darker toward the mouth, medium thick curved mandibles. */
@@ -607,7 +611,8 @@ const ecitonMedia: AntMorph = {
   legs: { hind: 1.04, thick: 0.0135, splay: 0.8 },
   // (the package's #B09C64 head, a little darker: the game's sun lifted it to white on the surface)
   look: { ...EC_TAN, head: L(0x9e8854, 0.42, 0.14, 0.05, 0x6e5430), mandible: L(0x1a1410, 0.36, 0.32, 0, 0x0a0806) },
-  stance: 0.21,
+  // (combat v2.2: a worker fits under the media too, as the spec expects — 1.58 mm, needs 1.69)
+  stance: 0.228,
 };
 
 /** Soldier (major): big cream head with dark antennal sockets, long black ice-tong fishhook mandibles with barbed points. */

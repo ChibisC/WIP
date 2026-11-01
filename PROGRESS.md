@@ -1134,3 +1134,19 @@ wood ants' basics were 10 throughout. Notes, and what was done:
   soldier (now media) color a slightly lighter at least than the major". Display names: `atta_media` → Worker,
   `atta_soldier` → Media (ids, roles and stats unchanged). Colours darken with size: the Media keeps the worker's body
   with a head between the worker's and the major's; the major's body a little darker chestnut.
+
+### 2026-11-01 (evening, 3) — The realism models against the combat rework (combat v2–v2.2)
+- User: "make sure the models also work with the combat rework i did with another agent". Merged `feature/realism`
+  into `art/realism-main` (main + realism), regenerated `src/sim/heightData.ts`, then checked the models against the
+  under-pass spec's expectations (handoff 05-underpass, notes 3 and 4):
+  - The Atta major's jaws went 0.2 mm into the ground standing (front clearance 0.00): its stance .14 → .165, the big
+    head held up off the ground as the spec describes (jaws 0.15 mm clear).
+  - An Eciton worker (needs 1.69 mm) did not fit under a porter (1.55) or a media (1.58): their stances .25 → .278 and
+    .21 → .228 (real porters stand high to carry prey slung under the body). Now the worker fits under the porter,
+    media, soldier and queen; the porter under the soldier's head only where the queen allows (as before).
+  - Kept: the Atta worker (old "media", needs 3.22 mm) does not pass under the major (1.99 → 2.4 mm): it would take a
+    major standing ~60 % higher. Minims pass under every bigger caste.
+  - Posture under a taller unit (spec §5, render): `underPosture` in `game/antViews.ts` — antennae down, head lowered
+    (not mid-bite), jaws shut, the closer the room the more.
+- The under-pass, combat v2/v2.1, army-ant, caste-ability, antenna and realism tests pass; under-pass browser scenes
+  re-run on the merged build.
