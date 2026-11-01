@@ -549,7 +549,8 @@ const ecitonMinor: AntMorph = {
   key: 'eciton_minor',
   L: 4,
   head: { len: 0.2, width: 0.17, height: 0.14, shape: 'round', frontMix: 0.35 },
-  eyes: { size: 0.05, pos: 0.55, height: 0.25, ocelli: false, single: true },
+  // (user 2026-11-01, the photos: one convex, glossy black lens high on each side of the head — a dot eye)
+  eyes: { size: 0.075, pos: 0.48, height: 0.5, ocelli: false, single: true },
   antenna: { segments: 12, scape: 1.05, funiculus: 1.25, club: 0, thick: 0.0115 },
   mandible: { type: 'triangular', len: 0.42, teeth: 5, width: 0.42, spec: ECITON_MINOR_JAW, open: 0.7 },
   // (geometry pass, review: slender with a smooth convex profile, not stepped blocks)
@@ -574,7 +575,7 @@ const ecitonSubmajor: AntMorph = {
   key: 'eciton_submajor',
   L: 6.5,
   head: { len: 0.22, width: 0.2, height: 0.15, shape: 'rect', frontMix: 0.35 },
-  eyes: { size: 0.045, pos: 0.55, height: 0.25, ocelli: false, single: true },
+  eyes: { size: 0.07, pos: 0.48, height: 0.5, ocelli: false, single: true },
   antenna: { segments: 12, scape: 1.0, funiculus: 1.2, club: 0, thick: 0.0105 },
   mandible: { type: 'falcate', len: 0.5, teeth: 0, width: 0.16, hook: 0.15 },
   meso: { len: 0.37, width: 0.105, height: 0.12, smooth: true },
@@ -590,7 +591,7 @@ const ecitonMedia: AntMorph = {
   key: 'eciton_media',
   L: 8,
   head: { len: 0.25, width: 0.25, height: 0.17, shape: 'round', frontMix: 0.7 },
-  eyes: { size: 0.04, pos: 0.52, height: 0.25, ocelli: false, single: true },
+  eyes: { size: 0.065, pos: 0.48, height: 0.5, ocelli: false, single: true },
   antenna: { segments: 12, scape: 0.9, funiculus: 1.15, club: 0, thick: 0.0095 },
   mandible: { type: 'falcate', len: 0.62, teeth: 0, width: 0.26, hook: 0.35 },
   meso: { len: 0.34, width: 0.11, height: 0.125, smooth: true },
@@ -609,7 +610,7 @@ const ecitonMajor: AntMorph = {
   // (review round 1: a huge featureless egg — rounded-square, about the mesosoma's size, whitish tan on the vertex
   // shading to orange-brown over the frons and clypeus, pin eyes on the sides)
   head: { len: 0.22, width: 0.23, height: 0.17, shape: 'square', frontMix: 0.8, sockets: 1 },
-  eyes: { size: 0.08, pos: 0.52, height: 0.15, ocelli: false, single: true },
+  eyes: { size: 0.055, pos: 0.48, height: 0.5, ocelli: false, single: true },
   antenna: { segments: 12, scape: 0.75, funiculus: 1.05, club: 0, thick: 0.0082 },
   mandible: { type: 'falcate', len: 1.55, teeth: 0, width: 0.2, hook: 0.9, barb: 1 },
   meso: { len: 0.3, width: 0.1, height: 0.115, smooth: true },
@@ -639,7 +640,8 @@ const ecitonQueen: AntMorph = {
   key: 'eciton_queen',
   L: 22,
   head: { len: 0.14, width: 0.14, height: 0.13, shape: 'round' },
-  eyes: { size: 0.012, pos: 0.5, height: 0.25, ocelli: false, single: true },
+  // (the queen has eyes too — AntWiki: "with eyes but no ocelli" — a small dot)
+  eyes: { size: 0.03, pos: 0.5, height: 0.45, ocelli: false, single: true },
   antenna: { segments: 12, scape: 0.6, funiculus: 0.8, club: 0, thick: 0.008 },
   mandible: { type: 'falcate', len: 0.5, teeth: 0, width: 0.3, hook: 0.2 },
   meso: { len: 0.21, width: 0.12, height: 0.13, smooth: true },

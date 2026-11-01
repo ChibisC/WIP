@@ -690,6 +690,37 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const headRestPitch = m.real && formicine ? -0.36 : m.real && atta ? -0.3 : -0.12;
   const headM = new THREE.Matrix4().compose(neck, new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), headRestPitch), new THREE.Vector3(1, 1, 1));
   const hp = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).applyMatrix4(headM);
+  /** the head's loft (head-local points and triangles), for setting small parts exactly onto its surface */
+  let headLoft: { p: number[]; ind: number[] } | null = null;
+  /** where a head-local ray first meets the head's loft, and that triangle's outward normal (Möller–Trumbore) */
+  const headRay = (o: THREE.Vector3, d: THREE.Vector3): [THREE.Vector3, THREE.Vector3] | null => {
+    if (!headLoft) return null;
+    const { p: P, ind: I } = headLoft;
+    let best = Infinity;
+    let hit: [THREE.Vector3, THREE.Vector3] | null = null;
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), h = new THREE.Vector3(), sv = new THREE.Vector3(), qv = new THREE.Vector3();
+    for (let i = 0; i < I.length; i += 3) {
+      a.fromArray(P, I[i] * 3); b.fromArray(P, I[i + 1] * 3); c.fromArray(P, I[i + 2] * 3);
+      e1.subVectors(b, a); e2.subVectors(c, a); h.crossVectors(d, e2);
+      const det = e1.dot(h);
+      if (Math.abs(det) < 1e-12) continue;
+      const f = 1 / det;
+      sv.subVectors(o, a);
+      const u = f * sv.dot(h);
+      if (u < 0 || u > 1) continue;
+      qv.crossVectors(sv, e1);
+      const v = f * d.dot(qv);
+      if (v < 0 || u + v > 1) continue;
+      const t = f * e2.dot(qv);
+      if (t > 1e-6 && t < best) {
+        best = t;
+        const n = new THREE.Vector3().crossVectors(e1, e2).normalize();
+        if (n.dot(d) > 0) n.negate();
+        hit = [o.clone().addScaledVector(d, t), n];
+      }
+    }
+    return hit;
+  };
   let socketL = new THREE.Vector3();
   let socketR = new THREE.Vector3();
   let mandPivL = new THREE.Vector3();
@@ -707,6 +738,25 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // (overnight review round 1: the formicine head ends in a broad clypeus, not a bullet's nose)
     const close = Math.pow(Math.min(1, t / 0.13), 0.32) * (formicine ? Math.pow(Math.min(1, (1 - t) / 0.05), 0.28) : Math.pow(Math.min(1, (1 - t) / 0.07), 0.45));
     return w * Math.max(0.12, close);
+  };
+  /** (realism morphs) the head's cross-section at t along it: centre height and half-height (the loft's rings) */
+  const headYc = (t: number) => headCY - ss(0.55, 1, t) * hH * 0.1;
+  const headRy = (t: number) =>
+    (hH / 2) * (0.6 + 0.4 * Math.sin(Math.PI * Math.min(1, 0.1 + t * 0.92))) * (m.mandible.type === 'massive' ? 1 - 0.22 * ss(0.62, 1, t) : 1) * Math.max(0.15, Math.pow(Math.min(1, t / 0.13), 0.32) * Math.pow(Math.min(1, (1 - t) / 0.07), 0.45));
+  /**
+   * (realism morphs) a point on the head's surface at t along it and `h` (−1 … 1) of the way up its side, on side s,
+   * with the outward normal (head-local) — for setting the small eyes and ocelli into the surface
+   */
+  const headSurfAt = (t: number, h: number, s: number): [THREE.Vector3, THREE.Vector3] => {
+    const n = 2.1;
+    const yc = headYc(t);
+    const ry = headRy(t);
+    const rz = (hW / 2) * headWidthAt(t);
+    const zf = Math.pow(Math.max(0, 1 - Math.pow(Math.abs(h), n)), 1 / n);
+    const p = new THREE.Vector3(t * hL, yc + h * ry, s * zf * rz);
+    // (the gradient of |y/ry|^n + |z/rz|^n; the head's taper along x is small and left out)
+    const nrm = new THREE.Vector3(0, (Math.sign(h) * Math.pow(Math.abs(h), n - 1)) / ry, (s * Math.pow(zf, n - 1)) / rz).normalize();
+    return [p, nrm];
   };
   {
     const rings: Ring[] = [];
@@ -735,6 +785,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       if (gDepth > 0 && y > headCY) ny -= Math.exp(-(z * z) / (hW * hW * 0.006)) * hH * gDepth * (1 - t * 0.7);
       return [nx, ny, z];
     });
+    headLoft = { p, ind };
     const headCol = grad(look.head, (x, y, z) => {
       // (rollout, AntWiki F. rufa: the clypeus, genae, the sides behind the eyes and the underside red; the frons and
       // vertex dark brown to black, the red grading into the dark without a sharp border)
@@ -833,7 +884,16 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // `eyes.smooth`: a smooth, glossy, near-black eye set flush (faint facets in the shader: flag 3)
     const smoothEye = !!(m.eyes as { smooth?: boolean }).smooth;
     const eyeZ = (hW / 2) * headWidthAt(eyeT) * 0.93 * (smoothEye ? 0.9 : 1);
-    if (!m.eyes.none) for (const s of [-1, 1]) {
+    // (user 2026-11-01: "give the army ant models their dot eyes like in the reference photos") Eciton's eye is a
+    // single convex lens (AntWiki: "a single large and convex ommatidium"): a glossy black dome set on the surface high
+    // on each side of the head, facing out along the head's normal there — not a bead sunk into its side
+    if (!m.eyes.none && m.eyes.single && m.real) for (const s of [-1, 1]) {
+      const [p0, nrm] = headSurfAt(eyeT, m.eyes.height, s);
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), nrm);
+      const [pp, ii] = ellipsoid(p0.clone().addScaledVector(nrm, -eyeR * 0.3), new THREE.Vector3(eyeR, eyeR, eyeR * 0.8), hi ? 18 : 8, q);
+      acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(0x0e0a08), { color: 0x050403, rough: 0.1, coat: 1, sheen: 0 }, 0);
+    }
+    else if (!m.eyes.none) for (const s of [-1, 1]) {
       // (rollout, the user's photos: the eye sits in the head's outline, only its low dome standing proud — set the
       // larger eyes of the realism morphs in by part of their depth)
       // (review round 2: the formicines' big eyes read as small beads when set in this deep)
@@ -858,8 +918,33 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       ]) {
         const c = new THREE.Vector3(hL * ox, headCY + hH * 0.47, hW * oz);
         // (rollout, the user's photos: the ocelli are tiny glints set into the vertex, not beads on it)
+        // (user 2026-11-01: the garden and wood ants' ocelli should read — "as well as the lasius and wood ants": a
+        // little larger and standing a touch proud, still small glassy lenses; F. rufa's three are distinct, L. niger's
+        // smaller)
+        const fl = m.real && (m.key.startsWith('formica') || m.key.startsWith('lasius'));
+        if (fl) {
+          const oR = m.key.startsWith('formica') ? 0.0085 : 0.0075;
+          const [pp, ii] = ellipsoid(c.clone().setY(c.y - 0.0008 * Lm), new THREE.Vector3(oR * Lm, oR * 0.62 * Lm, oR * Lm), 10);
+          acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(0x1c140c), { color: 0, rough: 0.06, coat: 1, sheen: 0 });
+          continue;
+        }
         const [pp, ii] = ellipsoid(m.real ? c.clone().setY(c.y - 0.002 * Lm) : c, m.real ? new THREE.Vector3(0.0065 * Lm, 0.0035 * Lm, 0.0065 * Lm) : new THREE.Vector3(0.012 * Lm, 0.008 * Lm, 0.012 * Lm), 8);
         acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(0x120c08), { color: 0, rough: 0.1, coat: 1, sheen: 0 });
+      }
+    }
+    // (user 2026-11-01, the photo of an A. cephalotes major's face: "the atta's their third eye like in the photos")
+    // the big leafcutter workers carry a single median ocellus — an amber lens high on the middle of the frons, in the
+    // median groove; the soldier's smaller; the minim and media have none and the queen keeps her three
+    const medOc = m.real && atta ? (m.key === 'atta_major' ? 0.021 : m.key === 'atta_soldier' ? 0.015 : 0) : 0;
+    if (medOc > 0 && hi) {
+      // (onto the loft itself: a ray down the midline — the coarse loft stands higher there than its rings' formula)
+      const hit = headRay(new THREE.Vector3(0.64 * hL, hH * 4, 0), new THREE.Vector3(0, -1, 0));
+      if (hit) {
+        const [top, nrm] = hit;
+        const r = medOc * hW;
+        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), nrm);
+        const [pp, ii] = ellipsoid(top.clone().addScaledVector(nrm, -r * 0.3), new THREE.Vector3(r, r * 0.72, r), 14, q);
+        acc.piece(transformPts(pp, headM), ii, PART.HEAD, () => tmpC.setHex(0xc9832c), { color: 0, rough: 0.07, coat: 1, sheen: 0 });
       }
     }
     // (realism: near the front, close to the midline just behind the clypeus, as in Solenopsis — photo fire_07)
@@ -1056,9 +1141,6 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   // pass through the head it is lifted just clear of the surface
   const hugHead = m.real && atta;
   const headInv = hugHead ? headM.clone().invert() : null;
-  const headYc = (t: number) => headCY - ss(0.55, 1, t) * hH * 0.1;
-  const headRy = (t: number) =>
-    (hH / 2) * (0.6 + 0.4 * Math.sin(Math.PI * Math.min(1, 0.1 + t * 0.92))) * (m.mandible.type === 'massive' ? 1 - 0.22 * ss(0.62, 1, t) : 1) * Math.max(0.15, Math.pow(Math.min(1, t / 0.13), 0.32) * Math.pow(Math.min(1, (1 - t) / 0.07), 0.45));
   /** how far inside the head's cross-section a head-local point is (< 1 inside) */
   const insideHead = (q: THREE.Vector3) => {
     const t = q.x / hL;

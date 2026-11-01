@@ -1029,3 +1029,25 @@ wood ants' basics were 10 throughout. Notes, and what was done:
 - Morph hashes re-baselined for `atta_*`. 620 tests pass. The rating page carries round 3: before and after for A1–A10
   and F6, plus head close-ups of all five Atta castes (A11).
 - Still not published: no merge into `main` and no new game artifact version until the user says so.
+
+### 2026-11-01 (later) — Leafcutter antennae clear of the head in every animation; eyes (round 4)
+- User: "leafcutters anttanae look fine, its just in the animations all of them are clipping inside their respective
+  leafcutter ants head. fix the antannae animation for all of them. also take a closer look". Close-ups (new lab
+  camera: `follow=`, `crel=1`, `cdir=`, `cfwd=`, `cty=`) showed it in every walk, idle and attack. The shared antenna
+  motion assumes a forward-pointing scape: its spread and pitch swung the leafcutters' backward-lying scapes back and in,
+  through the head. The antenna-grooming idle also lifted a fore leg up through the big head.
+- Fix (leafcutters only: `rig.antHug`, shader `uAntHug`): the scape swings forward and out at the socket, then rises in
+  its new vertical plane; raised antennae also come forward. The funiculus rides on the moved elbow and keeps pointing
+  ahead (`ANT_FUN_FOLLOW` .35 of the swing). A limit tests seven points along the scape (`ANT_TEST`) and the funiculus
+  against the head's cross-sections (`antHeadIn`, limits `thr` from the rest pose) and keeps the largest share of the
+  move that stays outside. The downward pitch is capped at −0.4 rad. Grooming: the fore leg reaches low along the cheek.
+  `tests/antennae.ts` replays the move over every antenna vertex of all five castes at both LODs.
+- User: "give the army ant models their dot eyes like in the reference photos and the atta's their third eye like in
+  the photos … as well as the lasius and wood ants if you havent already":
+  - Eciton: a convex glossy black lens high on each side of the head on every caste (AntWiki: "a single large and convex
+    ommatidium"), set on the surface along its normal (`headSurfAt`); the queen a small one ("with eyes but no ocelli").
+  - Atta: the median ocellus from the user's photo of a major — an amber lens high on the frons — on the major and the
+    soldier, seated on the head's loft by a ray (`headRay`); the minim and media have none, the queen keeps three.
+  - Formica and Lasius: their three ocelli were present but too small to read; now a little larger and glassier.
+- Morph hashes re-baselined for atta_major, atta_soldier, formica_*, lasius_* (nothing else changed).
+- Still not published: no merge into `main` and no new game artifact version until the user says so.
