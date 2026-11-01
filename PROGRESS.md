@@ -1014,3 +1014,18 @@ wood ants' basics were 10 throughout. Notes, and what was done:
   forward under it (`AntView.front`, `pivX`).
 - L6: no trophallaxis pose for garden ants.
 - Not yet published (the user is still checking): no merge into `main` and no game artifact version.
+
+### 2026-11-01 — Leafcutter antennae per head size; sprayers' front feet (round 3)
+- User: "for all atta, fix their antannae as they all need to look naturally depending on the size of each ant sizes
+  head." The round-2 scapes lay painted along the head. Now the Atta scape length follows head width allometrically
+  (`1.15 · (head width)^0.62`; funiculus 1.2 × scape). Real Atta scapes grow much more slowly than the head, so the minim
+  keeps long antennae and the soldier, major and queen get short ones in proportion. The sockets sit on the face below
+  the frontal lobes. The scapes stand free and are only pushed out of the head where they would cut into it
+  (`antGeometry.ts`).
+- F6, round-2 score 7 ("make front legs still touch the ground at least … make rapid fire hold pose when shooting"):
+  the spray pose keeps the fore legs down (`front = 0`) while the body tilts up and the gaster curls under. The Rapid
+  Sprayer holds the pose while it fired within the last second (`rapidShot` in `antViews.ts`), in the game and in the
+  lab clip.
+- Morph hashes re-baselined for `atta_*`. 620 tests pass. The rating page carries round 3: before and after for A1–A10
+  and F6, plus head close-ups of all five Atta castes (A11).
+- Still not published: no merge into `main` and no new game artifact version until the user says so.
