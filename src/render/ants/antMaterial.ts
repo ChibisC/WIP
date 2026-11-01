@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { addPatch, patchDapple, NOISE_GLSL, ShaderPatch, globalUniforms } from '../shaderPatch';
-import { AntRig } from './antGeometry';
+import { AntRig, ANT_TEST, ANT_FUN_FOLLOW } from './antGeometry';
 import { GLUE_COLOR } from '../termite/castes';
 import { TERMANT } from '../../sim/balance';
 import { bakeDetail } from '../bake/detailBake';
@@ -65,6 +65,41 @@ const float APIM = 3.14159265;
 vec3 rotA(vec3 v, vec3 a, float ang){ float c=cos(ang), s=sin(ang); return v*c + cross(a,v)*s + a*dot(a,v)*(1.0-c); }
 void rotP(inout vec3 p, inout vec3 n, vec3 piv, vec3 a, float ang){ p = piv + rotA(p - piv, a, ang); n = rotA(n, a, ang); }
 float wrapA(float x){ return x - 6.2831853 * floor((x + 3.14159265) / 6.2831853); }
+// Leafcutters (user 2026-11-01: the antennae clipped into the head in every animation): the head's cross-sections
+// (rig.antHug) and each funiculus's middle and tip at rest (left middle, left tip, right middle, right tip)
+uniform float uAntHug; uniform mat4 uHeadInv; uniform float uHeadL; uniform vec3 uHeadProf[24]; uniform vec3 uFunPts[4];
+// each test point's limit (rig.antHug.thr: left 0–8, right 9–17 — along the scape at ANT_TEST, then funiculus middle, tip)
+uniform float uAntThr[18];
+/** how far inside the head a rest-frame point is (< 1 inside; the head's loft is a superellipse, n 2.1) */
+float headIn(vec3 p){
+  vec3 q = (uHeadInv * vec4(p, 1.0)).xyz;
+  float t = q.x / uHeadL;
+  if (t <= 0.02 || t >= 0.995) return 9.0;
+  float f = t * 23.0; int i = int(floor(f)); float a = f - float(i);
+  vec3 pr = mix(uHeadProf[i], uHeadProf[min(i + 1, 23)], a);
+  return pow(abs(q.y - pr.y) / pr.z, 2.1) + pow(abs(q.z) / pr.x, 2.1);
+}
+/** the axis that raises the scape once it has been swung by sA about the vertical (its own vertical plane) */
+vec3 antPitchAx(vec3 sd, float sA){ return normalize(cross(rotA(sd, vec3(0.0, 1.0, 0.0), sA), vec3(0.0, 1.0, 0.0))); }
+/** where the elbow goes when the scape is swung by sA about the vertical and raised by pA in its new vertical plane */
+vec3 antElbow(vec3 sock, vec3 elb, vec3 sd, float pA, float sA){
+  return sock + rotA(rotA(elb - sock, vec3(0.0, 1.0, 0.0), sA), antPitchAx(sd, sA), pA);
+}
+/** a rest-frame antenna point moved as the shader moves it: a scape point swung and raised at the socket; a funiculus
+ * point carried on the moved elbow, bent there by eA and turned only ANT_FUN_FOLLOW of the scape's swing (the ant
+ * steers it at the elbow: it keeps pointing ahead, not round into the face as the scape comes forward) */
+vec3 antMove(vec3 p, bool fun, vec3 sock, vec3 elb, vec3 fAx, float eA, vec3 sd, float pA, float sA){
+  if (fun) return antElbow(sock, elb, sd, pA, sA) + rotA(rotA(p - elb, fAx, eA), vec3(0.0, 1.0, 0.0), ${ANT_FUN_FOLLOW.toFixed(2)} * sA);
+  return sock + rotA(rotA(p - sock, vec3(0.0, 1.0, 0.0), sA), antPitchAx(sd, sA), pA);
+}
+/** does the antenna, moved by k × its angles, bring any test point nearer the head than its limit? */
+bool antHits(float k, int o, vec3 sock, vec3 elb, vec3 fm, vec3 ft, vec3 fAx, float eA, vec3 sd, float pA, float sA){
+  float fr[${ANT_TEST.length}] = float[${ANT_TEST.length}](${ANT_TEST.map((f) => f.toFixed(3)).join(', ')});
+  for (int j = 0; j < ${ANT_TEST.length}; j++)
+    if (headIn(antMove(mix(sock, elb, fr[j]), false, sock, elb, fAx, k * eA, sd, k * pA, k * sA)) < uAntThr[o + j]) return true;
+  if (headIn(antMove(fm, true, sock, elb, fAx, k * eA, sd, k * pA, k * sA)) < uAntThr[o + ${ANT_TEST.length}]) return true;
+  return headIn(antMove(ft, true, sock, elb, fAx, k * eA, sd, k * pA, k * sA)) < uAntThr[o + ${ANT_TEST.length + 1}];
+}
 `;
 
 const ANIM_BODY = /* glsl */ `
@@ -179,10 +214,19 @@ vec3 animP = position;
         // (planted-feet species: the leg comes up beside the head, not through it — user rating A1: the femur
         // swung in front of the face; the tibia folds back so the strigil meets the antenna at the side)
         bool pl = uPlant > 0.5;
+        if (uAntHug > 0.5) {
+          // leafcutters (user 2026-11-01: the grooming leg came up through the big head): their funiculus hangs beside
+          // the jaws, so the fore leg reaches low, forward and out in front of the face to it — never up over the head
+          yaw = mix(yaw, side * (0.42 + 0.08 * stroke), poseW);
+          lft = mix(lft, 0.08 + 0.06 * stroke, poseW);
+          knee = mix(knee, -0.95 + 0.2 * stroke, poseW);
+          ankleF = mix(ankleF, 0.5, poseW);
+        } else {
         yaw = mix(yaw, side * ((pl ? 0.72 : 1.05) + (pl ? 0.1 : 0.18) * stroke), poseW);
         lft = mix(lft, (pl ? 0.9 : 1.05) + (pl ? 0.14 : 0.2) * stroke, poseW);
         knee = mix(knee, (pl ? -1.85 : -1.5) + 0.25 * stroke, poseW);
         ankleF = mix(ankleF, 0.7, poseW);
+        }
       } else {
         yaw = mix(yaw, side * 0.15, poseW);
       }
@@ -272,6 +316,45 @@ vec3 animP = position;
       float sweep = sin(wv) * 0.22;
       float tap = max(0.0, sin(wv * 1.7)) * 0.35;
       float curl = death * 1.2;
+      if (uAntHug > 0.5) {
+        // Leafcutters: the scape lies back along the head from a socket on the face, so the moves are made in the
+        // antenna's own frame — spread swings it forward and out (away from the head), pitch raises it in its own
+        // vertical plane, the funiculus bends in its own — and limited where they would carry it into the head
+        // (user 2026-11-01). At rest it lies against the head; it may come back to that, never through it.
+        vec3 sock = left ? uAntL : uAntR;
+        vec3 elb = left ? uElbL : uElbR;
+        vec3 fm = left ? uFunPts[0] : uFunPts[2];
+        vec3 ft = left ? uFunPts[1] : uFunPts[3];
+        vec3 sd = normalize(elb - sock);
+        vec3 fd = normalize(ft - elb);
+        vec3 fAx = normalize(cross(fd, UP));
+        float eA = -tap + aPitchI * 0.35 - curl - exh * 0.55 + goldA * 0.25;
+        // (lowered no further than the scape's base can follow under the frontal lobe without sinking into the face)
+        float pA = max(aPitchI * 0.45 - death * 0.5, -0.4);
+        // (alive: carried a little forward of the rest pose, as a walking leafcutter holds them, and swept about it;
+        // raised antennae come forward too — an alert leafcutter holds them up and ahead, not laid back over the head)
+        float fwd = (0.2 + aSpread * 0.4 + max(aPitchI, 0.0) * 0.55 + sweep) * (1.0 - death);
+        float sA = fwd * (left ? -1.0 : 1.0);
+        int o = left ? 0 : ${ANT_TEST.length + 2};
+        float k = 1.0;
+        if (antHits(1.0, o, sock, elb, fm, ft, fAx, eA, sd, pA, sA)) {
+          // the largest share of this move that keeps every test point outside its limit (rest, k = 0, always does)
+          float lo = 0.0, hi = 1.0;
+          for (int it = 0; it < 6; it++) {
+            float mid = 0.5 * (lo + hi);
+            if (antHits(mid, o, sock, elb, fm, ft, fAx, eA, sd, pA, sA)) hi = mid; else lo = mid;
+          }
+          k = lo;
+        }
+        if (part == 5 || part == 7) {
+          rotP(animP, N, elb, fAx, k * eA);
+          rotP(animP, N, elb, UP, ${ANT_FUN_FOLLOW.toFixed(2)} * k * sA);
+          animP += antElbow(sock, elb, sd, k * pA, k * sA) - elb;
+        } else {
+          rotP(animP, N, sock, UP, k * sA);
+          rotP(animP, N, sock, antPitchAx(sd, k * sA), k * pA);
+        }
+      } else {
       if (part == 5 || part == 7) {
         rotP(animP, N, left ? uElbL : uElbR, RIGHT, -tap + aPitchI * 0.35 - curl - exh * 0.55 + goldA * 0.25);
       }
@@ -279,6 +362,7 @@ vec3 animP = position;
       float spreadA = (aSpread * 0.45 + sweep) * (left ? 1.0 : -1.0);
       rotP(animP, N, sock, RIGHT, aPitchI * 0.45 - death * 0.5);
       rotP(animP, N, sock, UP, spreadA);
+      }
     }
     // Head yaw/pitch carries mandibles and antennae.
     rotP(animP, N, uNeck, RIGHT, hPitch - death * 0.3);
@@ -573,6 +657,13 @@ export function rigUniforms(rig: AntRig): Record<string, THREE.IUniform> {
     uMandSwing: { value: x.mandSwing ?? 0.95 },
     uMandOpen: { value: x.mandOpen ?? 0.95 },
     uCrest: { value: x.crest ?? new THREE.Vector3() },
+    // leafcutters: the antenna limit (the head's shape; rig.antHug)
+    uAntHug: { value: rig.antHug ? 1 : 0 },
+    uHeadInv: { value: rig.antHug?.headInv ?? new THREE.Matrix4() },
+    uHeadL: { value: rig.antHug?.hL ?? 1 },
+    uHeadProf: { value: rig.antHug?.prof ?? Array.from({ length: 24 }, () => new THREE.Vector3(1, 0, 1)) },
+    uFunPts: { value: rig.antHug?.fun ?? Array.from({ length: 4 }, () => new THREE.Vector3()) },
+    uAntThr: { value: rig.antHug?.thr ?? new Array((ANT_TEST.length + 2) * 2).fill(9) },
     uGoldTime: globalUniforms.uTime,
     uReal: { value: 0 },
     uMask: labMask,

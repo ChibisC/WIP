@@ -78,6 +78,29 @@ export interface AntRig {
   carryUnder?: THREE.Vector3;
   /** soft abdomen jiggle (Termants: `gaster.soft`) */
   soft?: number;
+  /**
+   * Leafcutters (user 2026-11-01: the antennae clipped into the head in every animation): the head's shape for the
+   * shader's antenna limit — object → head-local (x 0 at the neck … `hL` at the front), the cross-section along it
+   * (24 samples t = i / 23: half-width, centre height, half-height) and each funiculus's middle and tip at rest
+   */
+  antHug?: { headInv: THREE.Matrix4; hL: number; prof: THREE.Vector3[]; fun: THREE.Vector3[]; thr: number[] };
+}
+
+/** where along each scape the shader tests the antenna against the head (then the funiculus's middle and tip) */
+export const ANT_TEST = [0.15, 0.22, 0.3, 0.45, 0.6, 0.8, 1.0] as const;
+/** how much of the scape's swing the funiculus follows (the rest it is steered back at the elbow) */
+export const ANT_FUN_FOLLOW = 0.35;
+/** a test point may come no nearer the head than this (the head's own measure: 1 on its surface, r^2.1) */
+export const ANT_MARGIN = 1.14;
+/** how far inside the head a rest-frame point is, as the shader measures it (`headIn`: < 1 inside) */
+export function antHeadIn(h: NonNullable<AntRig['antHug']>, p: THREE.Vector3): number {
+  const q = p.clone().applyMatrix4(h.headInv);
+  const t = q.x / h.hL;
+  if (t <= 0.02 || t >= 0.995) return 9;
+  const f = t * 23;
+  const i = Math.floor(f);
+  const pr = h.prof[i].clone().lerp(h.prof[Math.min(i + 1, 23)], f - i);
+  return Math.pow(Math.abs(q.y - pr.y) / pr.z, 2.1) + Math.pow(Math.abs(q.z) / pr.x, 2.1);
 }
 
 export interface BuiltAnt {
@@ -1026,6 +1049,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const funLen = attaSL ? attaSL * 1.2 : m.antenna.funiculus * scapeLen;
   const antThick = m.antenna.thick * Lm;
   const elbows: THREE.Vector3[] = [];
+  /** each funiculus's middle and tip at rest (left middle, left tip, right middle, right tip) */
+  const funPts: THREE.Vector3[] = [];
   // (user rating A7: on the leafcutter major the antennae started inside its great head — the sockets sat inside the
   // head and the scapes ran through it) Atta: each socket moves forward onto the face; where the scape would still
   // pass through the head it is lifted just clear of the surface
@@ -1147,7 +1172,9 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
           acc.piece(pp, ii, funPart, () => col, look.antenna);
         }
         cur = cur.addScaledVector(d, segL);
+        if (i === Math.floor(nseg / 2)) funPts.push(cur.clone());
       }
+      funPts.push(cur.clone());
     } else {
       const pts: THREE.Vector3[] = [elbow.clone()];
       const rad: number[] = [antThick * 0.8];
@@ -1159,8 +1186,22 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       }
       const [pp, ii, fm] = tube(pts, rad, 5, true, true);
       acc.piece(pp, ii, funPart, funColor, look.antenna, 0, undefined, detOf(fm, REGION.ANTENNA));
+      funPts.push(pts[2].clone(), pts[4].clone());
     }
     void funColor;
+  }
+  // (user 2026-11-01: "in the animations all of them are clipping inside their respective leafcutter ants head") the
+  // head's cross-sections for the shader's antenna limit (the same model the scapes were laid against at rest)
+  let antHug: AntRig['antHug'];
+  if (hugHead && headInv && funPts.length === 4) {
+    const prof = Array.from({ length: 24 }, (_, i) => new THREE.Vector3((hW / 2) * headWidthAt(i / 23), headYc(i / 23), headRy(i / 23)));
+    antHug = { headInv: headInv.clone(), hL, prof, fun: funPts.map((p) => p.clone()), thr: [] };
+    // each test point's limit: no deeper than at rest, nor within the margin of the surface (the shader's ANT_TEST)
+    for (const [k, s] of [[0, -1], [1, 1]] as const) {
+      const sock = s < 0 ? socketL : socketR;
+      for (const f of ANT_TEST) antHug.thr.push(Math.min(ANT_MARGIN, antHeadIn(antHug, sock.clone().lerp(elbows[k], f))));
+      antHug.thr.push(Math.min(ANT_MARGIN, antHeadIn(antHug, funPts[k * 2])), Math.min(ANT_MARGIN, antHeadIn(antHug, funPts[k * 2 + 1])));
+    }
   }
 
   // ---------- waist ----------
@@ -1395,6 +1436,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     mouth: hp(hL * 1.02, headCY - hH * 0.15, 0),
     jawTip: mandTips.reduce((a, b) => (b.y < a.y ? b : a)).clone(),
     chin: hp(hL * 0.82, headCY - hH * 0.47, 0),
+    antHug,
   };
   // how far each mandible swings open at full gape (the generator's species set their own)
   if (m.mandible.open !== undefined) (rig as AntRig & { mandOpen?: number }).mandOpen = m.mandible.open;
@@ -1595,6 +1637,11 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   rig.knee.forEach(shift);
   rig.ankle.forEach(shift);
   [rig.neck, rig.mandL, rig.mandR, rig.antL, rig.antR, rig.elbL, rig.elbR, rig.gasterPivot, rig.waistPivot, rig.headTip, rig.gasterTip, rig.mouth, rig.jawTip!, rig.chin!, (rig as AntRig & { crest: THREE.Vector3 }).crest].forEach(shift);
+  if (rig.antHug) {
+    // (the centred object → head-local: undo the shift, then into the head's frame)
+    rig.antHug.headInv.multiply(new THREE.Matrix4().makeTranslation(cx, 0, 0));
+    rig.antHug.fun.forEach(shift);
+  }
   if (rig.foot) plantHomes(rig);
   // army ants: high-stepping gait, the queen's physogastry, and where a porter's load hangs under the body
   if (m.gait) {

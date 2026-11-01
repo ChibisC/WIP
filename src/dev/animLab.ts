@@ -749,7 +749,14 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
   };
   // camera (`cdist=` overrides the clip's distance: the same scene at another zoom)
   // (`ctx` / `ctz` move the camera's target: a close look at one actor)
-  const C = { ...clip.cam, dist: Number(q.get('cdist') || clip.cam.dist * kS), tx: Number(q.get('ctx') ?? clip.cam.tx * kS), ty: clip.cam.ty * kS, tz: Number(q.get('ctz') ?? clip.cam.tz * kS) };
+  const C = { ...clip.cam, dist: Number(q.get('cdist') || clip.cam.dist * kS), tx: Number(q.get('ctx') ?? clip.cam.tx * kS), ty: Number(q.get('cty') ?? clip.cam.ty * kS), tz: Number(q.get('ctz') ?? clip.cam.tz * kS) };
+  // a close look at one actor's head (`follow=` its index, `crel=1`: `cdir=` in its own frame — x ahead, y up, z to its
+  // right — and `cfwd=` the target that far ahead of its centre), e.g. the antennae against the head in every clip
+  if (q.get('follow') !== null) C.follow = Number(q.get('follow'));
+  if (q.get('cdir')) C.dir = q.get('cdir')!.split(',').map(Number) as [number, number, number];
+  const crel = q.get('crel') === '1' && C.follow !== undefined && C.follow >= 0;
+  const cfwd = Number(q.get('cfwd') || 0);
+  const relDir = new THREE.Vector3(...C.dir).normalize();
   const cam = new THREE.PerspectiveCamera(C.fov ?? 30, window.innerWidth / window.innerHeight, C.dist * 0.02, C.dist * 60);
   const dir = new THREE.Vector3(...C.dir).normalize();
   const target = new THREE.Vector3(C.tx, C.ty, C.tz);
@@ -798,8 +805,20 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
     if (C.follow !== undefined) {
       const fx0 = C.follow < 0 && stag ? stag.px + (stag.x - stag.px) * alpha : actors[C.follow] ? actors[C.follow].cur.px + (actors[C.follow].cur.x - actors[C.follow].cur.px) * alpha : 0;
       const fz0 = C.follow < 0 && stag ? stag.py + (stag.y - stag.py) * alpha : actors[C.follow] ? actors[C.follow].cur.py + (actors[C.follow].cur.y - actors[C.follow].cur.py) * alpha : 0;
-      target.x += (fx0 - target.x) * (t === 0 ? 1 : 1 - Math.exp(-dt * 6));
-      target.z += (fz0 - target.z) * (t === 0 ? 1 : 1 - Math.exp(-dt * 6));
+      if (crel) {
+        // locked to the actor: its heading turns the view and the target sits on its head
+        const a = actors[C.follow ?? 0]!.cur;
+        let dh = a.heading - a.pheading;
+        dh -= Math.PI * 2 * Math.round(dh / (Math.PI * 2));
+        const h = a.pheading + dh * alpha;
+        const ch = Math.cos(h), sh = Math.sin(h);
+        target.set(fx0 + ch * cfwd, C.ty, fz0 + sh * cfwd);
+        // ant frame (x ahead, z right) → world (ahead = (cos h, 0, sin h), right = (−sin h, 0, cos h))
+        dir.set(relDir.x * ch - relDir.z * sh, relDir.y, relDir.x * sh + relDir.z * ch).normalize();
+      } else {
+        target.x += (fx0 - target.x) * (t === 0 ? 1 : 1 - Math.exp(-dt * 6));
+        target.z += (fz0 - target.z) * (t === 0 ? 1 : 1 - Math.exp(-dt * 6));
+      }
     }
     placeCam();
     if (shake > 0.01) {
