@@ -9,6 +9,10 @@ Spec: `claude/realism/08-spec-hell-ants-nasute-termites.md` (in the project). Pl
 - `../nasutitermes/`: sheets per nasute unit, and `clips/` (termites, royals).
 - The repo holds render‑only images. Photo‑vs‑render sheets went to the user in chat; the reference photos are for study only.
 
+## User notes during the run (2026-11-02, 10:30)
+- **Hell ant legs:** the legs were "so compact", so they are now 1.25× longer and set as wide as the other ants' (about half a body length on each side; before it was about a fifth). The body is carried higher, and the ants walk and idle with the other ants' planted‑feet animation. The clips and sheets show the new legs. The review rounds were scored on the older, compact legs.
+- **Nothing through the ground:** every hell ant and termite clip was filmed at ground level (anim lab `cdir=0,0.04,1`): walk, snap, impale, the three attacks, deaths, the termite states and the royals. Nothing dips below the ground. The snap's cocked jaws used to swing into the ground, so the head now rises as they cock. Corpses still sink away after drying, as every ant's do.
+
 ## Blind review: render scores per round (0–10; real photos mixed in scored 8.5–9.5)
 
 | Unit | R1 side / close | R2 | R3 | R4 |
