@@ -1292,3 +1292,59 @@ wood ants' basics were 10 throughout. Notes, and what was done:
   5 px above the unit; the fill lighter along its top (vertex shading); a hit leaves a pale trail of the health just
   lost, which waits 0.35 s and drains at 0.8 of the bar a second; chevrons 7 px with a thin dark edge, 3 px left of the
   bar. Tests: 3 px thick near and far; the trail appears and drains.
+
+### 2026-11-01 (night, 3) — One wide underground entrance per nest, three surface holes per anthill (CHANGE_PLAN §21)
+User spec 22:47 (project doc `claude/maps/04-spec-one-wide-entrance-three-holes.md`); decisions: a 7-hex flower, the
+three holes share it, always open. Branch `feature/one-entrance` from `main` (`fc6f58a`). DESIGN §3.12/§3.12b.
+- **Underground:** every nest's one entrance is a hex and its six neighbours at its edge, over the end of the passage
+  from the queen (every species alike; the fire ants' long tunnel is gone), all dug, no tiles on it, highway speed
+  (`NestGrid.flowers`, `flowerEdges`; `entrances.ts flowerOver/digFlower`). Its floor is one wide ramp up its spine,
+  pale worn soil, darkening at its top edge, one broad soft daylight shaft (moonlight at night) across its upper middle,
+  the species' bits round its rim. Arrivals come out on its three top hexes by a hash of id and tick (no RNG draw);
+  leavers go up through them; home guards and termite majors hold its inner edge.
+- **Removed:** extra-entrance spots and shafts (and their dashed rings, the shader rim), entrance digs (and
+  `entranceDigWorkers`), `surfaceFor`, plugging (`setEntranceShut`, `shut`/`work`), the colony AI's extra entrance,
+  the Dig/Delete special cases and tips, the Free Play goal "Open a second entrance" (now: upgrade a brood tile to level
+  II). The `entrance` command (wire 23) is rejected but still parses; `BUILD_ID` `ud-mp-6`.
+- **Surface:** `Colony.entrances` is the anthill's three holes, each with its own credit (10 a second, burst 4) and a
+  traffic count `n`, all with the flower as underground end. Placement: a site's main and two extra spots; elsewhere
+  three points `ENTRANCE.holeR` (16–26 mm by species) round the colony centre, 120° apart, on walkable ground,
+  `holeGap` (16 mm) apart. Leaving: the hole nearest the ant's marker (along its shared surface field), food or foe,
+  else by id; while it is busy, another not much farther on its way (`switchMm` 14 + `switchFrac` 0.25 of the way), in
+  turn by id. Coming in: the nearest, or another with room within 14 mm. Enemies use any hole. A fallen colony's three
+  holes cave in over 60 s. The refuse spot is beside the anthill between its first two holes.
+- **Saves:** version 3; `upgradeWorldEntrances` (World constructor, and `restoreWorld` after the binary snapshot's grids)
+  drops extra entrances and spots, widens the main tunnel's top into the flower, moves tiles off it (or refunds them)
+  and logs it, rebuilds the holes. Idempotent.
+- **Looks:** each species' anthill centred between its holes (crater, thatch dome, bare mound with refuse dump,
+  fire-ant dome with holes at its edge, bivouac with three gaps, a stump with a root to each hole, carton nest with
+  openings at its base, three collars in litter, the hell ants' minimal ring); loose-soil craters fade into the ground;
+  no grass through anthills. Minimap: a crown at each anthill's centre and a dot per hole; one arrow on the flower.
+  Tooltip on a hole or the flower: area, owner, open/caving in, ants through each hole in the last 10 s.
+- **Tests:** new `tests/entrances.ts` (the old entrance checks in `tests/run-all.ts` removed; maps tests check three
+  holes per site; `tools/entrance-check.ts` updated). Every species' flower; 50 seeded matches never make another
+  entrance; three valid holes on the five maps, the formicarium and the arena; holes chosen by destination, home by
+  the nearest, arrivals spread over three hexes; a crowd of 60 leaves through all three holes in ~3.3 s (one hole:
+  ~6.3 s); raiders use all three holes and arrive on the flower's top; guards at its inner edge; collapse; old saves
+  (JSON and binary). Re-chosen: the army-ant bridge scene seed 6 → 10 (seeds 1–24: 1, 3, 10, 15, 22, 23 bridge; 10
+  also plugs), the raiders start at the route's hole; the sickle guard line seed 25 → 27 (the straight line measured
+  from the route's own hole; on 25 the crowd from the far holes walked its first stretch outside the line); the sickle
+  size-limit target is a true dummy (no bite back, pinned in place: the new random draws had the leafcutter soldier
+  decapitate the soldier within a second); the builder-growth check averages seeds 7–9 (7–11: 22, 21, 26, 24, 24).
+  Found on the way: the suite runner skipped `tests/run-all.ts` (its pattern had no `-`); its "hex radius" check
+  predated the 1.25 × hexes and now expects 6 × `NEST_HEX_SCALE`.
+- **Screenshot review fixes:** the fire-ant dome was built after its holes, so it covered them: the domes are now built
+  first and the anthill rebuilt when one grows, its lumps and clods keep off the holes, and the holes sit about 0.75 of
+  its radius out; hell-ant and sickle-jaw litter thinned (the user removed fallen leaves for visibility on 2026-11-01).
+  Shots: `docs/maps/entrances-v2/` (`tests/browser/entrances_v2.py`); the 2026-10-26 shots in `docs/maps/entrances/`
+  (extra entrances, plugs) removed.
+- **Checks:** `npm ci`, `npm test` (24 suites), determinism (60 files clean), `npm run build`; `tools/height-data.ts`
+  and `tools/climb-data.ts` regenerate unchanged. 10-colony tick time (`tools/map-perf.ts -- 90`): Meadow Pond 3.30 ms
+  avg / p95 7.5 (`main` 3.45 / 7.0), Forest Floor 2.56 / 5.3 (2.62 / 5.3). LAN two tabs (`tests/browser/lan.py`
+  ONLY=two): hashes match, no desync; one UI check ("asking for 2x shows the other player an Agree button") failed once
+  while the full suite ran beside it — not looked into further (speed-vote UI, untouched here).
+- **Merge (claude/handoff/00-MERGE-RULE.md):** `origin/main` had nothing new (still `fc6f58a`); `feature/story` is
+  work in progress (not merged; it branches from `fc6f58a` and touches `session.ts`, `mapGen.ts` and the termants —
+  it will need this merge); the older feature branches are already in `main` in other forms. Removed as replaced:
+  extra entrances, spots, shafts, entrance digs, plugging, the AI's extra entrance, the old entrance tests and
+  screenshots.

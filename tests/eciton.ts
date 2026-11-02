@@ -107,7 +107,9 @@ function open(w: World): { x: number; y: number } {
 // ---- living bridge and pothole plugs
 // (2026-11-01, evening: the scene's puddle now lies on the trail itself and is small enough to span — it was put on the
 // straight line to the marker and bridged only where the flow cells cut its edge, which with pebbles and twigs blocking,
-// and no fallen leaves, the trail missed on most seeds; on the trail, seeds 1, 6 and 9 bridge it, 6 also plugs its dips)
+// and no fallen leaves, the trail missed on most seeds; on the trail, seeds 1, 6 and 9 bridge it, 6 also plugs its dips.
+// Seed 10 since the one-entrance rework, 2026-11-01: the anthill's holes moved in round its centre and the raid starts at
+// the one nearest it; of seeds 1–24, 1, 3, 10, 15, 22 and 23 bridge the puddle, 10 also plugs its dips)
 {
   let doneAt = -1;
   let released = -1;
@@ -117,7 +119,7 @@ function open(w: World): { x: number; y: number } {
     medias: 5,
     majors: 8,
     seconds: 110,
-    seed: 6,
+    seed: 10,
     puddle: true,
     onSecond: (w, t) => {
       const c = w.colony(0)!;

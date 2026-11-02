@@ -1,4 +1,3 @@
-import { designateSpot, extraCount, spotBlocked } from './entrances';
 import { World } from './world';
 import { AphidCluster, AS, Colony, SURFACE, TileType } from './types';
 import { CASTES, basicCaste, casteOf, isTermiteSpecies, tierOf } from './species';
@@ -8,7 +7,7 @@ import { MAX_TILE_LEVEL, buildableTiles, canPlaceTile, hatchCost, markUpgrade, p
 import { JOB, listJobs } from './jobs';
 import { assignGroup, markerRadius, placeMarker, removeMarker } from './markers';
 import { creatureHooks } from './combat';
-import { BALANCE, ECITON, ENTRANCE, NASUTE, SICKLE } from './balance';
+import { BALANCE, ECITON, NASUTE, SICKLE } from './balance';
 import { groupCounts } from './tiles';
 import { dhypot, dsin, sq } from './dmath';
 import { edible } from './diet';
@@ -282,7 +281,7 @@ function planChamber(w: World, c: Colony, b: BuildBrain, home: number, need: Nee
   const nearEnt = new Set<number>();
   for (const e of ents) for (const n of g.neighbors(e)) if (n >= 0 && !g.isEntrance(n)) nearEnt.add(n);
   const ok = (q: number, hs: number[]) => {
-    if (hs.length !== size || hs.some((h) => !g.isHexDiggable(h) || g.isEntrance(h) || nearEnt.has(h) || g.spotIndex(h) >= 0)) return false;
+    if (hs.length !== size || hs.some((h) => !g.isHexDiggable(h) || g.isEntrance(h) || nearEnt.has(h))) return false;
     // carved out of solid soil, with a wall of soil all round (the tunnel will cut through it)
     for (const h of hs) for (const n of g.neighbors(h)) if (n < 0 || g.isHexDug(n)) return false;
     for (const t of c.tiles) if (hs.includes(t.q)) return false;
@@ -312,8 +311,11 @@ function planChamber(w: World, c: Colony, b: BuildBrain, home: number, need: Nee
   // (a tunnel may open into the founding ring or a passage, never into another chamber)
   const blocked = new Set<number>();
   for (const ch of b.chambers ?? []) for (const h of disc(g, ch.q, chR(ch))) blocked.add(h);
+  // every candidate's tunnel (the nearest by score first); the best of score + tunnel length wins
   const prev = new Int32Array(N);
-  for (const cand of cands.slice(0, 16)) {
+  let pick: { q: number; path: number[]; s: number } | null = null;
+  for (const cand of cands.slice(0, A.planTries)) {
+    if (pick && cand.s >= pick.s) break; // (a tunnel only adds: nothing later can beat it)
     const best = cand.q;
     // tunnel: breadth-first from the room's rim through soil to the dug nest (not through other rooms or past an entrance)
     const room = new Set(disc(g, best, r));
@@ -334,7 +336,7 @@ function planChamber(w: World, c: Colony, b: BuildBrain, home: number, need: Nee
           hit = n;
           break;
         }
-        if (!g.isHexDiggable(n) || g.isEntrance(n) || nearEnt.has(n) || g.spotIndex(n) >= 0) continue;
+        if (!g.isHexDiggable(n) || g.isEntrance(n) || nearEnt.has(n)) continue;
         prev[n] = q;
         queue.push(n);
       }
@@ -343,10 +345,13 @@ function planChamber(w: World, c: Colony, b: BuildBrain, home: number, need: Nee
     const path: number[] = [];
     for (let q = prev[hit]; q >= 0 && !room.has(q); q = prev[q]) path.push(q);
     if (path.length < 1 || path.length > A.tunnelMax) continue; // a tunnel, with a wall of soil beside it
-    (b.chambers ?? (b.chambers = [])).push(need.type === 'brood' ? { q: best, r, type: 'brood', caste: need.caste } : { q: best, r, type: need.type });
-    for (const q of path) if (!tunnels.includes(q)) tunnels.push(q);
-    return true;
+    const s = cand.s + path.length * A.tunnelWeight;
+    if (!pick || s < pick.s) pick = { q: best, path, s };
   }
+  if (!pick) return false;
+  (b.chambers ?? (b.chambers = [])).push(need.type === 'brood' ? { q: pick.q, r, type: 'brood', caste: need.caste } : { q: pick.q, r, type: need.type });
+  for (const q of pick.path) if (!tunnels.includes(q)) tunnels.push(q);
+  return true;
   return false;
 }
 
@@ -401,15 +406,14 @@ export function buildTick(w: World, c: Colony, dt: number): void {
   const wantDesig = Math.max(3, Math.min(16, 3 + Math.floor(workers / 5)));
   const todo = planned(g, b).filter((q) => g.isHexDiggable(q));
   if (!todo.length && b.need) {
-    if (planChamber(w, c, b, home, b.need)) b.need = null;
-    else if (b.need.type === 'food' && storeChambers(b) >= A.maxStoreChambers) b.need = null; // stores: upgrade instead
+    // no place for that chamber (the nest is crowded there): try the others for a while
+    if (!planChamber(w, c, b, home, b.need)) (b.skip ??= {})[needKey(b.need)] = w.s.time + A.planRetry;
+    b.need = null;
   }
   if (g.designatedCount < wantDesig) {
-    const plan = digOrder(g, b).filter((q) => !g.hexDesig[q] && g.spotIndex(q) < 0);
+    const plan = digOrder(g, b).filter((q) => !g.hexDesig[q]);
     for (const q of plan.slice(0, wantDesig - g.designatedCount)) designateDig(w, c, q, true);
   }
-  // A bigger colony digs one extra entrance (the same rules as the player: a marked spot, at most ENTRANCE.maxExtra).
-  aiEntrance(w, c, g);
 
   // 2. Building: one tile per think, in its own room. When the rooms for a tile are (nearly) full, the next chamber is
   //    planned for it (`need`); stores past two chambers are upgraded instead.
@@ -424,9 +428,14 @@ export function buildTick(w: World, c: Colony, dt: number): void {
  * Note a room shortage for the next chamber (the first one noted wins: stores, specials, brood in that order). Stores
  * past `maxStoreChambers` are not a shortage: they are upgraded instead.
  */
-function noteNeed(b: BuildBrain, need: Need): void {
+function noteNeed(w: World, b: BuildBrain, need: Need): void {
   if (need.type === 'food' && storeChambers(b) >= BALANCE.aiBuild.maxStoreChambers) return;
+  if ((b.skip?.[needKey(need)] ?? 0) > w.s.time) return;
   if (!b.need) b.need = need;
+}
+
+function needKey(n: Need): string {
+  return n.caste ? `${n.type}:${n.caste}` : n.type;
 }
 
 function buildOne(w: World, c: Colony, b: BuildBrain, g: NestGrid, home: number, occupied: Set<number>, unbuilt: number): boolean {
@@ -450,11 +459,11 @@ function buildOne(w: World, c: Colony, b: BuildBrain, g: NestGrid, home: number,
   const tryPlace = (type: TileType, caste?: string): boolean => {
     if (place(w, c, b, home, occupied, type, caste)) {
       const r = roomLeft(type, caste);
-      if (r.free + r.coming <= A.nearlyFull) noteNeed(b, { type, caste });
+      if (r.free + r.coming <= A.nearlyFull) noteNeed(w, b, { type, caste });
       return true;
     }
     const r = roomLeft(type, caste);
-    if (!r.coming) noteNeed(b, { type, caste });
+    if (!r.coming) noteNeed(w, b, { type, caste });
     return false;
   };
   // a) more storage when nearly full (once both store chambers are full, store upgrades take over)
@@ -497,7 +506,7 @@ function buildOne(w: World, c: Colony, b: BuildBrain, g: NestGrid, home: number,
   const top = ranked[0];
   // the most-needed caste's rooms: plan its next chamber ahead when they are nearly full
   const topRoom = roomLeft('brood', top.cs);
-  if (topRoom.free + topRoom.coming <= A.nearlyFull) noteNeed(b, { type: 'brood', caste: top.cs });
+  if (topRoom.free + topRoom.coming <= A.nearlyFull) noteNeed(w, b, { type: 'brood', caste: top.cs });
   const pick = food >= need(top.cs) ? top : top.gap >= 2 ? null : ranked.find((r) => r.gap > -1 && food >= need(r.cs));
   if (!pick) return false;
   return tryPlace('brood', pick.cs);
@@ -862,44 +871,4 @@ export function forageTick(w: World, c: Colony, dt: number): void {
       else if (!out && g.marker === FORAGE_MARKER) assignGroup(w, c, g.id, -1);
     }
   }
-}
-
-/**
- * Rival colonies open an extra entrance once they are big enough (ENTRANCE.aiExtraAt ants per extra):
- * the marked spot nearest the dug nest, reached by the shortest passage through soil (ordinary digs),
- * then the spot itself (an entrance dig). Nothing happens while one is under way.
- */
-function aiEntrance(w: World, c: Colony, g: NestGrid): void {
-  if (!g.spots.length || extraCount(c) >= ENTRANCE.maxExtra) return;
-  if (c.living < ENTRANCE.aiExtraAt * (extraCount(c) + 1)) return;
-  if (g.spots.some((sp) => sp.some((q) => g.hexDesig[q]))) return; // one at a time
-  const N = g.cols * g.rows;
-  const prev = new Int32Array(N).fill(-2);
-  const queue: number[] = [];
-  for (let q = 0; q < N; q++)
-    if (g.isHexDug(q) && !g.isEntrance(q)) {
-      prev[q] = -1;
-      queue.push(q);
-    }
-  // breadth-first from the dug floor through soil to the first spot hex reached
-  let hit = -1;
-  for (let i = 0; i < queue.length && hit < 0; i++) {
-    const q = queue[i];
-    for (const n of g.neighbors(q)) {
-      if (n < 0 || prev[n] !== -2) continue;
-      if (g.spotIndex(n) >= 0) {
-        prev[n] = q;
-        hit = n;
-        break;
-      }
-      if (!g.isHexDiggable(n) || g.isEntrance(n)) continue;
-      prev[n] = q;
-      queue.push(n);
-    }
-  }
-  if (hit < 0) return;
-  const si = g.spotIndex(hit);
-  if (spotBlocked(w, c, si)) return;
-  for (let q = prev[hit]; q >= 0 && !g.isHexDug(q); q = prev[q]) designateDig(w, c, q, true);
-  designateSpot(w, c, si, true);
 }

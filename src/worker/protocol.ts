@@ -30,9 +30,8 @@ export interface GridDelta {
   designated?: Uint8Array;
   designatedCount?: number;
   entrances?: number[];
-  shafts?: number[];
   tunnels?: number[][];
-  spots?: number[][];
+  flowers?: number[][];
   desigVersion?: number;
 }
 

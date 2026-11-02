@@ -1,6 +1,6 @@
 import { climbTick, climbUpdate } from './climbing';
 import { World } from './world';
-import { canLeave, usableMask } from './entrances';
+import { canLeave, entranceInner, entranceTop, refuseSpot, usableMask } from './entrances';
 import { Ant, AS, Brood, Carry, Colony, Food, POSE, SURFACE, TileType, colonyOfSpace, nestSpace, snapping } from './types';
 import { casteOf, CASTES } from './species';
 import { NestGrid } from '../world/nestGrid';
@@ -163,12 +163,13 @@ function digTarget(g: NestGrid, a: Ant): { q: number; from: number } | null {
   return best;
 }
 
-/** Spoil is carried up the entrance ramps and dumped outside. */
+/** Spoil is carried up the entrance's ramp and dumped outside. */
 function dumpField(w: World, c: Colony): Float32Array | null {
   const flow = w.flow(c.id);
   const g = w.nest(c.id);
   if (!flow || !g) return null;
-  return flow.field('dump', () => c.entrances.flatMap((e) => (canLeave(e) ? hexCoreCells(g, e.q, 0.45) : [])), c.entrances.length + 32 * usableMask(c.entrances, true));
+  const open = c.entrances.some(canLeave);
+  return flow.field('dump', () => (open ? entranceTop(g).flatMap((q) => hexCoreCells(g, q, 0.45)) : []), c.entrances.length + 32 * usableMask(c.entrances, true));
 }
 
 /** Move along a direction without changing the facing (walking backwards with soil). */
@@ -1065,18 +1066,16 @@ function haulCorpse(w: World, a: Ant, c: Colony, dt: number): void {
   goOut(w, a, dt);
 }
 
-/** Carry a corpse to a refuse spot away from the entrance (outside). */
+/** Carry a corpse to the anthill's refuse spot, beside it between two holes (outside). */
 function haulCorpseOutside(w: World, a: Ant, c: Colony, dt: number): void {
-  const e = c.entrances[0];
-  if (!e) {
+  if (!c.entrances.length) {
     dropCorpse(w, a);
     return;
   }
-  const ang = datan2(e.sy - c.ny, e.sx - c.nx) + 0.9;
-  const tx = e.sx + dcos(ang) * 30;
-  const ty = e.sy + dsin(ang) * 30;
-  if (steerTo(w, a, tx, ty, dt) < 4) dropCorpse(w, a);
+  const r = refuseSpot(c, refTmp);
+  if (steerTo(w, a, r.x, r.y, dt) < 4) dropCorpse(w, a);
 }
+const refTmp = { x: 0, y: 0 };
 
 function dropCorpse(w: World, a: Ant): void {
   const f = w.foodById.get(a.carryId);
@@ -1137,18 +1136,16 @@ function guard(w: World, a: Ant, c: Colony, dt: number): void {
   if (a.state !== AS.Guard || a.st > 14 + (a.id % 7)) {
     const g = w.nest(c.id)!;
     const queenT = c.tiles.find((t) => t.type === 'queen');
-    const e = c.entrances[a.id % Math.max(1, c.entrances.length)];
+    // (the inner edge of the entrance: the flower's hexes nearest the nest — its one chokepoint)
+    const inner = entranceInner(g);
     let r = w.rng.next();
     // termite majors hold the entrance chokes (their nasutes keep patrolling behind them)
     if (casteOf(a.caste).termite === 'major') r = 1;
     let p: { x: number; y: number };
     if (r < 0.45 && a.tile >= 0 && tileAt(c, a.tile)) p = tilePoint(w, c, a.tile, 0.8);
     else if (r < 0.75 && queenT) p = tilePoint(w, c, queenT.q, 0.9);
-    else if (e) {
-      // just inside the ramp: a neighbouring dug hex
-      const nb = g.neighbors(e.q).filter((n) => n >= 0 && g.isHexDug(n));
-      p = tilePoint(w, c, nb.length ? nb[a.id % nb.length] : e.q, 0.7);
-    } else p = { x: a.x, y: a.y };
+    else if (inner.length) p = tilePoint(w, c, inner[a.id % inner.length], 0.7);
+    else p = { x: a.x, y: a.y };
     a.tx = p.x;
     a.ty = p.y;
     enterState(a, AS.Guard);

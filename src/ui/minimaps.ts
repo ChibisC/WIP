@@ -176,26 +176,13 @@ export class Minimaps {
         ctx.stroke();
       }
     }
-    // ramps up to the surface: arrows (grey when plugged or fallen in); your extra-entrance spots as dashed rings
+    // the way up to the surface: one arrow on the entrance (a nest's wide flower, a cave's tunnel; grey once caved in)
     const ents = w.entrancesOf(space);
     g.entrances.forEach((q, i) => {
       g.hexCenter(q, p);
-      const e = ents[i];
-      this.arrow(ctx, p.x * k, p.y * k, Math.max(4, g.R * k * 0.9), true, e && (e.shut || e.fall) ? '#8a8a8a' : '#e8f0ff');
+      const wide = (g.flowers[i]?.length ?? 0) > 1;
+      this.arrow(ctx, p.x * k, p.y * k, Math.max(4, g.R * k * (wide ? 1.7 : 0.9)), true, ents.some((e) => e.fall) ? '#8a8a8a' : '#e8f0ff');
     });
-    if (c?.player && c.id === s.player.id) {
-      ctx.save();
-      ctx.setLineDash([2, 2]);
-      ctx.strokeStyle = 'rgba(232,220,180,0.8)';
-      ctx.lineWidth = 1;
-      for (const sp of g.spots) {
-        g.hexCenter(sp[0], p);
-        ctx.beginPath();
-        ctx.arc(p.x * k, p.y * k, Math.max(3, g.R * k * 0.8), 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
     // food, then ants: yours pale, allies blue, enemies red; creatures as rings
     // (only food your colony can gather is shown in food colours; the rest is a dim grey)
     for (const f of w.s.food) {
@@ -347,7 +334,8 @@ export class Minimaps {
       ctx.arc(cr.x * kx, cr.y * kz, 2.5, 0, Math.PI * 2);
       ctx.fill();
     }
-    // every area's entrances in its colour: a crown for a nest with a living queen, an arrow down otherwise
+    // every area in its colour: an anthill as its queen's crown at its centre with a small dot on each of its three holes
+    // (EotU-style); a cave, or a fallen nest, as an arrow down
     ctx.font = `${Math.round(S / 17)}px "Marcellus SC", Georgia, serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -355,18 +343,33 @@ export class Minimaps {
     for (const tab of s.areaTabs()) {
       const col = tab.alive ? tab.color : '#777';
       const nest = tab.owner >= 0 && tab.alive;
-      for (const e of w.entrancesOf(tab.space)) {
-        const x = e.sx * kx;
-        const y = e.sy * kz;
-        const ec = e.shut || e.fall ? '#777' : col;
-        if (nest) this.crown(ctx, x, y, r, ec);
-        else this.arrow(ctx, x, y, r, false, ec);
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#000';
-        ctx.strokeText(String(tab.number), x + r * 1.7, y - r * 0.9);
-        ctx.fillStyle = col;
-        ctx.fillText(String(tab.number), x + r * 1.7, y - r * 0.9);
+      const ents = w.entrancesOf(tab.space);
+      if (!ents.length) continue;
+      let cx = 0;
+      let cy = 0;
+      for (const e of ents) {
+        cx += (e.sx * kx) / ents.length;
+        cy += (e.sy * kz) / ents.length;
       }
+      const ec = ents.some((e) => e.fall) ? '#777' : col;
+      if (ents.length > 1)
+        for (const e of ents) {
+          ctx.fillStyle = '#000';
+          ctx.beginPath();
+          ctx.arc(e.sx * kx, e.sy * kz, Math.max(1.6, r * 0.42), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = ec;
+          ctx.beginPath();
+          ctx.arc(e.sx * kx, e.sy * kz, Math.max(1.1, r * 0.3), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      if (nest) this.crown(ctx, cx, cy, r, ec);
+      else this.arrow(ctx, cx, cy, r, false, ec);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#000';
+      ctx.strokeText(String(tab.number), cx + r * 1.7, cy - r * 0.9);
+      ctx.fillStyle = col;
+      ctx.fillText(String(tab.number), cx + r * 1.7, cy - r * 0.9);
     }
     this.drawMarkers(ctx, SURFACE, kx, kz, S);
     if (s.view.space === 'surface') this.drawFrame(ctx, kx, kz);

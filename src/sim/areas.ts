@@ -189,7 +189,7 @@ export function createCave(w: World, o: CaveOptions): number {
     g.softenHex(q);
     g.completeHex(q);
   }
-  g.addEntrance(path.slice(-ENTRANCE.tunnelLen).reverse());
+  g.addEntrance(path.slice(-ENTRANCE.caveTunnelLen).reverse());
   w.addGrid(space, g);
   const def: CaveDef = { space, name: o.name, kind: o.kind, entrances: [makeEntrance(entQ, o.at.x, o.at.y, w.time)], nx: o.at.x, ny: o.at.y + 20 };
   w.s.caves.push(def);

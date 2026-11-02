@@ -34,8 +34,6 @@ export const BALANCE = {
   workRate: [2, 4, 6],
   /** workers allowed on one soil hex (EotU) */
   digWorkersPerHex: 2,
-  /** workers allowed on an entrance dig (EotU) */
-  entranceDigWorkers: 7,
   /** how far (mm, × marker radius) a marker-group worker looks for nest jobs */
   markerJobReach: 1.6,
 
@@ -520,8 +518,12 @@ export const BALANCE = {
     /** soil between a new chamber's rim and the other rooms' rims: at least, and to the nearest room at most (hexes) */
     rimGapMin: 2,
     rimGapMax: 5,
-    /** longest tunnel to a new chamber (hexes) */
+    /** longest tunnel to a new chamber (hexes); each hex of tunnel counts this much against a place; places tried */
     tunnelMax: 6,
+    tunnelWeight: 0.6,
+    planTries: 80,
+    /** a chamber that found no place is not tried again for this long (s): the others go first */
+    planRetry: 60,
     /** at most this many food store chambers, within storeNearEntrance hexes (rim) of the entrance */
     maxStoreChambers: 2,
     storeNearEntrance: 8,
@@ -1078,25 +1080,51 @@ export const FLOOD = {
   swimMmS: 7,
 };
 
-/** Nest entrances (sim/entrances.ts; claude/maps/02-spec-nest-entrances, DESIGN.md "Entrances"). */
+/**
+ * Nest entrances (sim/entrances.ts; claude/maps/02-spec-nest-entrances, user spec 2026-11-01 "one wide underground
+ * entrance, three surface holes per anthill"; DESIGN.md "Entrances"). Each nest has one entrance: a 7-hex flower at the
+ * nest's edge underground, and three holes in its anthill on the surface, all leading into it, always open.
+ */
 export const ENTRANCE = {
-  /** extra entrances a colony may dig beside its main one (each site has this many surface spots) */
-  maxExtra: 2,
-  /** hexes in an entrance tunnel, from the ramp under the hole down to the nest floor */
-  tunnelLen: 3,
-  /** extra-entrance spots lie this many hexes from the queen's hex */
-  spotMin: 8,
-  spotMax: 13,
-  /** ants through one entrance per second, in and out together (a chokepoint: busy holes queue) */
+  /** surface holes per anthill */
+  holes: 3,
+  /** maps without anthill sites: the holes lie this far (mm) from the colony's centre, 120° apart, by species */
+  holeR: {
+    lasius: 18,
+    formica: 22,
+    atta: 26,
+    solenopsis: 20,
+    eciton: 20,
+    plagiaria: 18,
+    hell: 16,
+    aurimyrmex: 18,
+    termant: 18,
+    nasute: 18,
+    sickle: 16,
+  } as Record<string, number>,
+  /** holeR for a species not listed (authored sites put their holes about 22 mm out) */
+  holeRDefault: 18,
+  /** two holes of an anthill are at least this far apart (mm; the map validator and the fallback placement) */
+  holeGap: 16,
+  /**
+   * an ant waiting for a hole (no credit) takes another hole of the same anthill that has credit when that one is at most
+   * this much farther on its way (mm)
+   */
+  switchMm: 14,
+  /** … plus this fraction of its way (a crowd bound far off spreads over all three holes) */
+  switchFrac: 0.25,
+  /** ants through one hole per second, in and out together (each hole has its own credit) */
   passPerS: 10,
-  /** ants that may pass at once after a quiet spell */
+  /** ants that may pass a hole at once after a quiet spell */
   burst: 4,
-  /** seconds to plug an extra entrance with soil, or to open it again */
-  closeS: 4,
-  /** seconds for a fallen colony's entrances to cave in */
+  /** seconds for a fallen colony's holes and flower to cave in */
   collapseS: 60,
-  /** tunnel hexes move ants like a level I highway */
+  /** entrance hexes move ants like a level I highway */
   tunnelSpeed: 1.1,
-  /** rival AI colonies dig an extra entrance per this many living ants (at most maxExtra) */
-  aiExtraAt: 60,
+  /** creature caves keep a tunnel of this many hexes rising to their one hole */
+  caveTunnelLen: 3,
+  /** traffic shown in a hole's tooltip: ants through it over this many seconds */
+  trafficS: 10,
+  /** the refuse spot lies this far (mm) beyond the anthill's holes, between its first two */
+  refuseMm: 24,
 };

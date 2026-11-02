@@ -25,7 +25,7 @@ import { AreaInfo, areaOpen, areasFor, teamPresence } from '../sim/areas';
 import { CASTES, SPECIES, canonCaste, isTermiteSpecies } from '../sim/species';
 import { canPlaceTile, canUpgrade, groupWouldJoin, hatchCost, neighbourPoints, tileAt, tileCost, TILE_INFO, upgradeNeed, upgradePoints } from '../sim/tiles';
 import { BALANCE, ENTRANCE, FLOOD } from '../sim/balance';
-import { spotBlocked } from '../sim/entrances';
+import { anthillCentre } from '../sim/entrances';
 import { entranceAt, markerRadius } from '../sim/markers';
 import { abilityOf } from '../sim/abilities';
 import { Command, CommandBody } from '../sim/commands';
@@ -128,10 +128,11 @@ export class GameSession {
   hoverMsg = '';
   /** hover info for the ghost: cost and group it would join */
   ghostInfo = '';
-  /** the entrance under the cursor on the surface (cursor tip) */
+  /** the entrance under the cursor — a hole on the surface or a nest's flower (cursor tip) */
   entranceTip = '';
-  /** the current Dig stroke started on an extra-entrance spot (only then does it mark spots) */
-  private paintSpot = false;
+  /** each area's ants through each hole so far, sampled once a second for the traffic in the entrance tip */
+  private holeLog = new Map<number, Array<{ t: number; n: number[] }>>();
+  private holeLogT = -Infinity;
   /** tile info overlay: levels, upgrade points, incubation rings */
   tileOverlay = false;
   /** with the Upgrade tool: points each neighbour of the hovered tile gives */
@@ -205,6 +206,11 @@ export class GameSession {
     this.view = new GameView(canvas, this.input);
     this.view.setQuality(quality);
     const w = this.world;
+    // (no grass through the anthills: each one's holes and the ground round them)
+    this.view.grassClear = w.s.colonies.map((c) => {
+      const m = anthillCentre(c.entrances, { x: 0, y: 0 });
+      return { x: m.x, y: m.y, r: Math.max(...c.entrances.map((e) => Math.hypot(e.sx - m.x, e.sy - m.y))) * 1.7 + 6 };
+    });
     this.view.setTerrain(w.terrain);
     // Every underground area gets its own stage; the player's nest comes first (area 1).
     for (const a of areasFor(w, this.player.id)) {
@@ -288,11 +294,12 @@ export class GameSession {
     this.bindInput();
     // Start looking at the player's nest entrance on the surface, and at the queen
     // (or, in a cave, the middle of the cavern) in each area.
-    const e0 = this.player.entrances[0];
+    // (the anthill's centre, between its three holes)
+    const e0 = anthillCentre(this.player.entrances, { x: 0, y: 0 });
     const arena = arenaOf(w);
     // the battle arena: the whole field in view
     if (arena) this.view.surfaceRig.jumpTo(arena.cx, arena.cy, 330);
-    else this.view.surfaceRig.jumpTo(e0.sx, e0.sy, 230);
+    else this.view.surfaceRig.jumpTo(e0.x, e0.y, 230);
     for (const [space, nv] of this.nests) {
       const g = w.nestOf(space)!;
       const p = this.areaFocus(space);
@@ -644,36 +651,12 @@ export class GameSession {
       this.painting = true;
       this.paintDone.clear();
       this.paintOn = this.tool === 'dig' ? !g.hexDesig[q] : true;
-      this.paintSpot = g.spotIndex(q) >= 0;
     }
     if (!this.painting || this.paintDone.has(q)) return;
     this.paintDone.add(q);
-    // Every change is a command; the checks here only choose what to send and what to say.
-    const ti = g.tunnelIndex(q);
-    if (ti === 0 && phase === 'start' && this.tool === 'remove') {
-      this.onEvent?.({ t: 'message', text: 'The main entrance cannot be closed', kind: 'warn' });
-      return;
-    }
-    if (ti > 0 && phase === 'start' && (this.tool === 'dig' || this.tool === 'remove')) {
-      // an extra entrance: Remove plugs it with soil, Dig opens a plugged one again (the main one never closes)
-      const e = c.entrances[ti];
-      if (e && !e.fall) {
-        const close = this.tool === 'remove';
-        if (close === !!e.shut && !(e.work ?? 0)) this.onEvent?.({ t: 'message', text: close ? 'This entrance is already closed' : 'This entrance is open', kind: 'warn' });
-        else this.issue({ type: 'entrance', i: ti, close });
-      }
-      return;
-    }
+    // Every change is a command; the checks here only choose what to send and what to say. (Each nest has one entrance,
+    // always open: Dig and Remove do nothing special at it.)
     if (this.tool === 'dig') {
-      // a drag never sweeps up an extra-entrance spot by accident: start the stroke on the spot to dig it
-      if (g.spotIndex(q) >= 0 && !this.paintSpot) return;
-      if (g.spotIndex(q) >= 0 && phase === 'start' && this.paintOn) {
-        const why = spotBlocked(w, c, g.spotIndex(q));
-        if (why) {
-          this.onEvent?.({ t: 'message', text: why, kind: 'warn' });
-          return;
-        }
-      }
       if (!g.isHexDug(q) && g.isHexDiggable(q)) this.issue({ type: 'dig', q, on: this.paintOn }, phase !== 'start');
     } else if (this.tool === 'tile') {
       const ex = tileAt(c, q) ?? (this.pendingTileAt(q) ? { built: false } : undefined);
@@ -963,7 +946,8 @@ export class GameSession {
         { text: 'Dig out 40 hexes of nest', done: g.dugHexCount() >= 40, progress: `${g.dugHexCount()}/40` },
         { text: 'Gather 500 food', done: c.stats.food >= 500, progress: `${Math.floor(c.stats.food)}/500` },
         { text: 'Build 4 brood groups', done: groups >= 4, progress: `${groups}/4` },
-        { text: 'Open a second entrance', done: c.entrances.length >= 2, progress: `${c.entrances.length}/2` },
+        // (2026-11-01: was "Open a second entrance" — each nest has one entrance now)
+        { text: 'Upgrade a brood tile to level II', done: c.tiles.some((t) => t.type === 'brood' && t.level >= 2), progress: `${c.tiles.some((t) => t.type === 'brood' && t.level >= 2) ? 1 : 0}/1` },
       ],
     };
   }
@@ -1165,7 +1149,7 @@ export class GameSession {
       let best: { x: number; y: number } | null = null;
       let bd = Infinity;
       for (const e of c.entrances) {
-        if (e.shut || (e.fall ?? 0) > 0) continue;
+        if ((e.fall ?? 0) > 0) continue;
         const q = space === SURFACE ? { x: e.sx, y: e.sy } : g!.hexCenter(e.q);
         const d = Math.hypot(q.x - p.x, q.y - p.y);
         if (d < bd) {
@@ -1318,29 +1302,66 @@ export class GameSession {
     return true;
   }
 
-  /** A few times a second: what the entrance under the cursor on the surface is (owner, area, state, crowd). */
+  /** Once a second (game time): each area's ants through each hole so far (`Entrance.n`), for the traffic in the tip. */
+  private sampleHoles(): void {
+    const w = this.world;
+    if (w.time - this.holeLogT < 1 && w.time >= this.holeLogT) return;
+    this.holeLogT = w.time;
+    for (const space of w.undergroundSpaces()) {
+      let log = this.holeLog.get(space);
+      if (!log) this.holeLog.set(space, (log = []));
+      log.push({ t: w.time, n: w.entrancesOf(space).map((e) => e.n ?? 0) });
+      while (log.length > 2 && log[1].t <= w.time - ENTRANCE.trafficS) log.shift();
+    }
+  }
+
+  /** Ants through each hole of an area over the last ENTRANCE.trafficS seconds (in and out). */
+  private holeTraffic(space: number): number[] {
+    const ents = this.world.entrancesOf(space);
+    const old = this.holeLog.get(space)?.[0];
+    return ents.map((e, i) => Math.max(0, (e.n ?? 0) - (old?.n[i] ?? e.n ?? 0)));
+  }
+
+  /**
+   * A few times a second: what the entrance under the cursor is — a hole on the surface, or a nest's flower underground —
+   * its area and owner, whether it is caving in, and the traffic through each of its holes.
+   */
   private updateEntranceTip(): void {
+    this.sampleHoles();
     if (this.frameNo % 6 !== 0) return;
     this.entranceTip = '';
-    if (this.view.space !== 'surface' || this.view.observing || (this.tool !== 'none' && this.tool !== 'marker')) return;
-    const sp = this.view.pickSurface(this.input.mouseX, this.input.mouseY);
-    if (!sp) return;
+    if (this.view.observing || (this.tool !== 'none' && this.tool !== 'marker')) return;
     const w = this.world;
-    for (const tab of this.areaTabs()) {
-      const ents = w.entrancesOf(tab.space);
-      for (let i = 0; i < ents.length; i++) {
-        const e = ents[i];
-        if (Math.hypot(e.sx - sp.x, e.sy - sp.z) > 5) continue;
-        const state = e.fall ? 'caving in' : e.work ? (e.shut ? 'being opened' : 'being plugged') : e.shut ? 'closed' : 'open';
-        let crowd = 0;
-        for (const a of w.s.ants) if (a.space === SURFACE && a.state !== AS.Dead && Math.abs(a.x - e.sx) < 6 && Math.abs(a.y - e.sy) < 6) crowd++;
-        const kind = tab.owner >= 0 ? (i === 0 ? 'main entrance' : 'extra entrance') : 'entrance';
-        // hell ants are extinct: nothing survives of their nests, so their entrance is a reconstruction
-        const recon = tab.owner >= 0 && w.colony(tab.owner)?.species === 'hell' ? ' (reconstruction)' : '';
-        this.entranceTip = `Area ${tab.number} · ${tab.name} · ${kind}${recon} · ${state}${crowd ? ` · ${crowd} ant${crowd > 1 ? 's' : ''} at the hole` : ''}`;
-        return;
+    let space = -1;
+    let hole = -1;
+    if (this.view.space === 'surface') {
+      const sp = this.view.pickSurface(this.input.mouseX, this.input.mouseY);
+      if (!sp) return;
+      for (const tab of this.areaTabs()) {
+        const ents = w.entrancesOf(tab.space);
+        for (let i = 0; i < ents.length && space < 0; i++)
+          if (Math.hypot(ents[i].sx - sp.x, ents[i].sy - sp.z) <= 5) {
+            space = tab.space;
+            hole = i;
+          }
+        if (space >= 0) break;
       }
+    } else {
+      const g = w.nestOf(this.viewedArea);
+      const np = this.view.pickNest(this.input.mouseX, this.input.mouseY);
+      if (!g || !np) return;
+      if (g.tunnelIndex(g.hexAt(np.x, np.y)) >= 0) space = this.viewedArea;
     }
+    const tab = space >= 0 ? this.areaTab(space) : undefined;
+    if (!tab) return;
+    const ents = w.entrancesOf(space);
+    const state = ents.some((e) => e.fall) ? 'caving in' : 'open';
+    const traffic = this.holeTraffic(space);
+    // hell ants are extinct: nothing survives of their nests, so their anthill is a reconstruction
+    const recon = tab.owner >= 0 && w.colony(tab.owner)?.species === 'hell' ? ' (reconstruction)' : '';
+    const what = ents.length > 1 ? (hole >= 0 ? `anthill hole ${hole + 1} of ${ents.length}` : 'entrance') : 'entrance';
+    const through = ents.length > 1 ? `ants through its holes (last ${ENTRANCE.trafficS} s): ${traffic.map((n, i) => (i === hole ? `[${n}]` : `${n}`)).join(' · ')}` : `${traffic[0] ?? 0} ants through it (last ${ENTRANCE.trafficS} s)`;
+    this.entranceTip = `Area ${tab.number} · ${tab.name} · ${what}${recon} · ${state} · ${through}`;
   }
 
   private updateHover(): void {
@@ -1372,17 +1393,7 @@ export class GameSession {
     let ok = true;
     if (this.tool === 'dig') {
       ok = g.isHexDiggable(q);
-      const sp = g.spotIndex(q);
-      const ti = g.tunnelIndex(q);
-      const e = ti > 0 ? c.entrances[ti] : undefined;
-      if (e) {
-        ok = !!e.shut && !e.fall;
-        this.ghostInfo = e.fall ? 'This entrance has caved in' : e.work ? 'Being worked on…' : e.shut ? 'Open this entrance again (workers dig the plug out)' : 'An open entrance';
-      } else if (ok && sp >= 0) {
-        const why = spotBlocked(this.world, c, sp);
-        ok = !why || !!g.hexDesig[q];
-        this.ghostInfo = g.hexDesig[q] ? 'Entrance dig marked · click again to cancel' : why ?? 'Extra entrance spot: dig it out to open a new entrance to the surface (entrance dig, up to 7 workers)';
-      } else if (ok) this.ghostInfo = g.hexDesig[q] ? 'Marked for digging · click again to cancel' : 'Mark for digging · workers excavate it (6 points)';
+      if (ok) this.ghostInfo = g.hexDesig[q] ? 'Marked for digging · click again to cancel' : 'Mark for digging · workers excavate it (6 points)';
     } else if (this.tool === 'upgrade') {
       const t = tileAt(c, q);
       ok = !!t && t.built && !canUpgrade(this.world, c, t);
@@ -1395,11 +1406,7 @@ export class GameSession {
       } else this.hoverMsg = t ? 'Build this tile first' : `${CLICK} a tile to upgrade it`;
     } else if (this.tool === 'remove') {
       const t = tileAt(c, q);
-      const ti = g.tunnelIndex(q);
-      const e = ti > 0 ? c.entrances[ti] : undefined;
-      ok = (!!t && t.type !== 'queen') || !!g.hexDesig[q] || (!!e && !e.shut && !e.fall);
-      if (ti === 0) this.ghostInfo = 'The main entrance cannot be closed';
-      else if (e) this.ghostInfo = e.fall ? 'This entrance has caved in' : e.work ? 'Being worked on…' : e.shut ? 'Closed · use Dig to open it again' : `Close this entrance: workers plug it with soil (${ENTRANCE.closeS} s)`;
+      ok = (!!t && t.type !== 'queen') || !!g.hexDesig[q];
       if (t && t.type !== 'queen') {
         const refund = Math.round(tileCost(c, t.type, t.caste) * BALANCE.refund);
         this.ghostInfo = !t.built ? 'Cancel this planned tile' : t.pend === 2 ? 'Marked for deletion · click again to cancel' : t.level > 1 ? `Downgrade to level ${t.level - 1} · refund ${refund} food as seeds` : `Remove tile · refund ${refund} food as seeds${t.type === 'brood' ? ' · its ant dies' : ''}`;

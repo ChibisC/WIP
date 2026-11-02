@@ -71,11 +71,11 @@ be deterministic and change the simulation only through commands.** That means:
   * surface: `(x, y)` maps to world `(x, terrainHeight(x, y), y)` (y = world z);
   * nest: `(x, y)` maps to world `(x, nestFloorHeight(x, y), y)` in the nest
     scene. Undug soil is a raised plateau; ants only walk on the dug floor.
-* Nest **entrances** are ramps in the nest plane that climb out of view toward the
-  surface; each links to a surface hole. Ants walk into a ramp and emerge from the
-  matching hole (and the reverse). Hidden **shaft sites** in the soil open a new
-  surface entrance when the player digs into them (an *entrance dig*: up to 7
-  workers, lowest dig priority).
+* Each nest has **one entrance**: a wide 7-hex "flower" in the nest plane whose floor
+  climbs out of view toward the surface, joined to the queen's chamber by a passage. On
+  the surface the colony's anthill has **three holes**, all leading into it (3.12b). Ants
+  walk up the flower and come out of one of the holes (and the reverse). Digging never
+  makes another entrance (since 2026-11-01).
 * The nest hex grid's radius scales with the species (≈ 3 workers wide; see 3.7),
   so ants stay at real size while tile counts are the same for every species.
 
@@ -99,7 +99,7 @@ numeric id, never by object reference.
 | `brood` | id, colony, stage (egg/larva/pupa), caste, **tile it is raised on**, progress, fed, position (nest), carrier |
 | `creatures` | id, kind, pos, heading, hp, AI state, latched ant ids, phase (bosses), territory |
 | `food` | id, kind (insect, seed, fruit, honeydew, leaf, corpse), amount, mass, space, pos, carriers |
-| `nests` | per colony `NestGrid` (hex soil, dig designation, fine walk raster, entrance and shaft sites) |
+| `nests` | per colony `NestGrid` (hex soil, dig designation, fine walk raster, its entrance: flower hexes and ramp spine) |
 | `phero` | surface pheromone grid: per-colony trail channel, shared alarm channel |
 | `waves`, `mode` | scripted encounter state, objectives, timers |
 
@@ -144,7 +144,7 @@ rally, defend, attack, grapple, climb, flee, enterNest, exitNest, dead`
 **Nest jobs (Revision 2, `sim/jobs.ts`).**
 - All nest work is done physically by **workers**; soldiers never take nest jobs.
 - Each colony keeps a **job board**. Job types, in strict priority order:
-  1. **Dig**: a marked soil hex. Up to 2 workers per hex, or up to 7 on an entrance dig, which is always the lowest-priority dig.
+  1. **Dig**: a marked soil hex. Up to 2 workers per hex.
   2. **Build**: a planned tile. Upgrade and delete jobs are build jobs too. One worker each.
   3. **Spawn**: pull an egg from the tip of the queen's abdomen and carry it to a brood tile. One worker each.
 - **Points.** Every dig, build, upgrade or delete job needs **6 completion points**. A worker adds **2 / 4 / 6 points per second** at tile level 1 / 2 / 3 (nanitics count as level 1). A thin progress ring shows over a hex while it is being worked.
@@ -462,7 +462,7 @@ The default population limit is 300.
 - **Black garden ant (Lasius):** tends aphids on the surface; root-aphid pastures in the nest trickle honeydew.
 - **Red wood ant (Formica):** acid (opener sprays; mortar and rapid sprayers). Thatch stores warm the nest, so brood grows faster.
 - **Leafcutter (Atta):** cuts leaves, with minims riding on them as hitchhikers. Fungus gardens turn the leaves into food.
-- **Tropical fire ant (Solenopsis):** venom. A mound with no central entrance: the nest's tunnel surfaces about 70 mm away, and the mound is drawn on the surface as a dome of worked soil that grows with the colony; ants walk over it.
+- **Tropical fire ant (Solenopsis):** venom. A mound with no central opening: the dome of worked soil (drawn on the surface, growing with the colony; ants walk over it) has the anthill's three small holes at its edge (since 2026-11-01; before, a single tunnel surfaced about 70 mm away).
   - The **sun-warmed brood mound** tile speeds brood by 8 / 12 / 16 % per tile by day, a quarter of that at night. In the nest, brood is shown piled on it by day.
   - Thatch and mound bonuses together are capped at +50 %.
 - **Gene Thief:** brood tiles for the castes it borrowed.
@@ -514,7 +514,7 @@ Three playable, AI-usable colonies, built from the user's design packages (kept 
   - `total(n) = (s·n + (c − s)·n² / 2R) / H` for n ≤ R, then `+ c·(n − R) / H`, with s = 2, c = 20 HP/s, R = 120 ticks (6 s), H = 20. Tests: 66 HP after 6 s, 146 after 10 s, 32 for 3 s + 0.4 s gap + 1 s, 23 for a 0.6 s gap.
   - Line of sight is a ray march over the walkable map (the game had no LOS system).
   - Keep distance: with an enemy closer than 1.5 body lengths and a friendly major within 6, it steps back behind the major; otherwise it holds and keeps firing.
-- **Major soldier.** Charge (× 1.6 for up to 1.5 s when the target is within 4 body lengths but out of reach, cooldown 4 s); ram with normal, armour-respecting damage; glue burst on contact (root 1 s, half on targets ≥ 8 mass / 20 mm, cooldown 6 s, no re-root for 2 s after a hold); drumming alarm when hurt or engaging (12 body lengths, 8 s, cooldown 3 s): alerted idle soldiers go to the alarm, ants on a player's marker keep their orders. At home majors hold the entrance chokes.
+- **Major soldier.** Charge (× 1.6 for up to 1.5 s when the target is within 4 body lengths but out of reach, cooldown 4 s); ram with normal, armour-respecting damage; glue burst on contact (root 1 s, half on targets ≥ 8 mass / 20 mm, cooldown 6 s, no re-root for 2 s after a hold); drumming alarm when hurt or engaging (12 body lengths, 8 s, cooldown 3 s): alerted idle soldiers go to the alarm, ants on a player's marker keep their orders. At home majors hold the entrance choke: the inner edge of the nest's flower (3.12b).
 - **Workers fight and soldiers gather like ants** (the user's note, 2026-10-25): workers attack like ant workers (no more last-resort-only bites, no falling back on the alarm), and nasute and major soldiers forage at a marker on food like ant soldiers (carry 2 / 3). With nothing to do in the nest they groom the queen or a larva, or feed a soldier, the king or the queen for 2–4 s (no economic effect).
 - **Markers** (the game's five markers are generic: a group goes where its marker is and works / fights there):
 
@@ -623,7 +623,7 @@ From the user's package `claude/termyrms/` (2026-10-25). An ant–termite hybrid
 - Each area has a **number (1–6) and a colour**. Home is 1; the others are numbered in the order they appear in the level.
 
 **Entrances**
-- Areas connect to the surface **only through nest entrances**. Each entrance has a surface side and an underground ramp.
+- Areas connect to the surface **only through entrances** (3.12b). A colony's nest has one, a wide 7-hex flower with three holes in the anthill above; a creature cave or lair keeps its single tunnel and hole (decision 2026-11-01: the one-entrance rework leaves caves as they were; they share the code — `entranceTop`, `entranceInner`, the exit field — through a tunnel's top and bottom).
 - Anything that walks into an entrance is moved to the matching spot on the other map, with a short scurry-in fade on both sides.
 
 **Control and survival**
@@ -643,18 +643,33 @@ From the user's package `claude/termyrms/` (2026-10-25). An ant–termite hybrid
 - No route home: once a second, an ant whose colony has fallen, which is outside with no entrance home, or which is underground with no path to any exit loses health so that it dies after `BALANCE.lostDeathTime` (30 s).
 - Scurry fade: on the surface an ant shrinks and sinks as it reaches a hole; underground it grows in from the ramp for 0.45 s after arriving.
 
-### 3.12b Entrances (`sim/entrances.ts`; claude/maps/02-spec-nest-entrances, 2026-10-26)
-**Before (survey).** An entrance was a single ramp hex (`NestGrid.entrances`) and a surface point (`Colony.entrances`). Each nest was created with three hidden `shafts` 8–13 hexes from the queen (random picks); digging into one silently opened a new entrance (`checkNewEntrances`). The surface end came from the authored site's next entrance hex or `nestToSurface` (nest offset × 0.6, unchecked on maps without sites). Ants switched spaces at a hole instantly (a short render fade). Only fire ants had a surface mound; other species had a hole decal and spoil crumbs.
+### 3.12b Entrances (`sim/entrances.ts`; claude/maps/02-spec-nest-entrances 2026-10-26; one-entrance rework 2026-11-01)
+**History.** 2026-10-26: one main entrance (a 3-hex tunnel) plus up to two extra entrances the player dug out of marked spots, plugged and reopened. 2026-11-01 (user spec "One Wide Underground Entrance per Nest, Three Surface Holes per Anthill", decisions: a 7-hex flower; the three holes share it; always open): extra entrances, spots, shafts, entrance digs, plugging and the `entrance` command are gone. Kept from the first spec: species surface models, the validator, throughput, invasion, collapse, markers, the transition fade.
 
-**Now.**
-- **Tunnels.** Every entrance is a tunnel of `ENTRANCE.tunnelLen` (3) hexes, top first (`NestGrid.tunnels`, aligned with `entrances`); the main one is the end of the passage from the queen's chamber. `isEntrance(q)` covers the whole tunnel, so tiles stay off it; its hexes move ants like a level I highway (`tunnelSpeed`). The renderer grades a ramp along the tunnel (`NestTerrain.heightAt`), so ants walk up to the hole.
-- **No surprise holes.** No hidden shafts. Each nest gets `ENTRANCE.maxExtra` (2) marked **extra-entrance spots** (`NestGrid.spots`: undug 3-hex tunnels, `shafts` holds their tops), chosen without random numbers: 8–13 hexes from the queen, pointing the way the site's two extra surface spots lie from its centre (±120° from the main tunnel on maps without sites), clear of the main tunnel and each other. They are drawn on the soil (dashed rim, pale ring at the top) for the owner only. The ordinary **Dig tool** on a spot marks its whole tunnel (user decision 2026-10-26: no separate tool); a drag only marks a spot if the stroke starts on it. Spot hexes are entrance digs (priority after ordinary digs, up to 7 workers). When every hex of a spot is dug, it opens: its surface end is the free extra spot of the colony's site that best matches its direction (`surfaceFor`), never a raw projection; without sites, the projection moved to the nearest walkable ground. Digging anywhere else never opens an entrance. The map validator checks every site's extra spots (dry, in the site's footprint or ring, outside flood zones, reachable).
-- **Throughput.** Each entrance lets `ENTRANCE.passPerS` (10) ants through a second, in and out together, with a burst of 4 (`passEntrance`, lazy credit from the sim clock). Ants that find no credit wait facing the hole on the surface, or at the top of the tunnel underground; ants are updated in id order, so who waits is deterministic.
-- **Closing.** Command `entrance` (wire id 23) plugs an extra entrance with soil or opens it again after `ENTRANCE.closeS` (4 s); asking for the opposite mid-way cancels. The main entrance never closes. In the nest, the **Delete** tool on an extra entrance closes it and the **Dig** tool on a closed one reopens it. Closed entrances drop out of every path field and nearest-entrance choice (indices stay stable). Removing an entrance entirely is not offered (the nest raster only ever goes from soil to air).
-- **Collapse.** A fallen colony's entrances cave in over `ENTRANCE.collapseS` (60 s): nobody goes in at once; ants can still climb out until it has fallen in.
-- **Saves.** Older saves: tunnels are rebuilt along the dug corridor behind each top; shafts become spots (grown toward the nest's middle), trimmed to the allowance; entrances the player had already opened stay open, even beyond two; entrances gain the new fields in a fixed order (canonical snapshots). The worker sends `tunnels` and `spots` with every grid delta.
-- **Surface models** (`render/game/entranceModels.ts`, notes in `docs/creatures/entrances.md`): per species a crater, collar or lip round a black opening that sinks below the rim, plus nest structures where the species has one (wood-ant thatch dome with holes in its flanks, nasute carton nest with covered galleries, Gilded Ant stump with frass, army-ant bivouac of linked bodies, leafcutter refuse dump). Plugged holes fill with fresh soil; collapsing ones flatten and grey. Their heights add to the fire-ant domes' (`SurfaceMounds.height`), so ants walk over rims and domes. Meshes rebuild only when an entrance appears, grows a size step, closes or caves in.
-- **Minimap.** Plugged or fallen entrances are grey on both maps; your spots are dashed rings on the nest map.
+**Underground: one wide entrance.**
+- Each colony's nest has exactly one entrance: a hex and its six neighbours (`NestGrid.flowers[0]`, centre first; `entrances = [centre]`), all dug at founding. `createColony` walks the passage north from the queen's hex (every species alike) and centres the flower on its second-last hex whose neighbours all lie inside the grid (`flowerOver`), so its top edge sits where the old tunnel's top did; the ring round it stays soil except for the passage. `tunnels[0]` is its **spine** — the top hex (farthest from the queen), the centre, the inner hex — the line the floor ramps along. `flowerEdges(0)`: `top`, the three hexes farthest out (ants arrive and leave there), and `inner`, the three nearest the nest.
+- `isEntrance` covers all seven: no tiles; ants move on them at `ENTRANCE.tunnelSpeed` (a level I highway). Digging anywhere never makes an entrance, for the player or the AI; Dig and Delete do nothing special there.
+- **Look.** `NestTerrain.heightAt` ramps the flower as one wide slope (flat 1.75 R either side of the spine, fading over 0.75 R) rising to the surface at its top edge; the floor shader treats it as one opening (pale loose soil worn along the middle, fading into the floor at its rim, its top edge darkening toward the surface) with one soft shaft of daylight (moonlight at night) across its upper middle (`uEnt`, `uEntR`); the species' bits (thatch, leaf scraps, carton flakes, frass, worked soil) lie round its rim (`tileDecor`); a wide light shaft hangs over it. A fallen-in entrance is capped with soil over all seven hexes.
+- **Arriving.** An ant coming down any hole appears on one of the three top hexes, picked by a hash of its id and the tick (not the simulation's random numbers), at a hashed point inside it, facing down into the nest. **Leaving:** the exit field leads to the three top hexes' cores; an ant on one of them climbs out (`tryExit`).
+- **Defenders** (home guards, and termite majors, who all hold the choke) post on its inner-edge hexes, spread by id (`entranceInner`).
+
+**Surface: three holes per anthill.**
+- `Colony.entrances` holds the anthill's three holes (`ENTRANCE.holes`): one `Entrance` record per hole, all with the flower's centre as `q`, each with its own throughput credit (`cr`, `crT`), cave-in `fall` and traffic count `n`. `entrancesOf(space)` returns them for a nest (one per hole; a cave's single hole).
+- **Placement** (`holeSpots`, no random numbers): an authored map — the colony site's main entrance spot and its two extra spots (`SiteHexes.entrances[0]`, `extras`; the authored ones or two dry hexes on the inner ring about 120° either side). Elsewhere (generated maps, the formicarium, the arena) — three points `ENTRANCE.holeR[species]` (16–26 mm) from the colony's centre, 120° apart, the first toward the flower's side, each moved to the nearest walkable ground and kept `ENTRANCE.holeGap` (16 mm) from the others. The map validator checks that every site has its three holes, dry, off water, walls and flood zones, reachable by land, and at least `holeGap` apart.
+- **Leaving** (`exitHole`): the hole nearest where the ant is going — its marker (distance along the marker's shared surface field `mk:<colony>:<i>`, the one its walk there uses; straight distance when the field reaches no hole), the food, ant or creature it is after (straight distance) — else one by its id. While that hole has no credit it takes another of the anthill's with credit not much farther on its way (`switchMm` 14 + `switchFrac` 0.25 of the way; any for an ant going nowhere in particular), in turn by id, so a crowd spreads over all three; otherwise it waits in the flower, facing up.
+- **Coming in** (`holeIn`; home, raiders, visitors): the nearest open hole; while it is busy, another with credit at most `switchMm` farther. Enemies and creatures may go down any hole and arrive in the flower — the nest's one chokepoint, wider than before.
+- **Throughput**: each hole lets `ENTRANCE.passPerS` (10) ants through a second, in and out together, with a burst of `ENTRANCE.burst` (4), so an anthill moves three times one hole's traffic (a crowd of 60 leaves in about half the time it took through one hole: `tests/entrances.ts`).
+- **Always open.** Nothing plugs a hole. A fallen colony's three holes (and its flower) cave in over `ENTRANCE.collapseS` (60 s): nobody goes in at once; ants can climb out until they have fallen in.
+- **Markers**: a marker dropped within `ENTRANCE_SNAP` (12 mm) of any hole of another area means "this entrance": it goes down to the flower's centre (`entranceAt`). One placed in the flower is a marker in that nest.
+- **Refuse**: the dead and waste go to `refuseSpot` — beside the anthill, `ENTRANCE.refuseMm` beyond its holes, between the first two (the leafcutters' dump is drawn there).
+
+**Commands, saves, multiplayer.**
+- `entrance` (wire id 23) stays in the codec so old replays parse, and is always rejected ("Entrances are always open"); `speedVote` keeps 24. `BUILD_ID` is `ud-mp-6`: older builds cannot join.
+- Save version 3. `upgradeWorldEntrances` (World constructor; again in `restoreWorld` once a binary snapshot's grids are attached) is idempotent: an older nest's extra entrances, spots and shafts are dropped (their dug hexes stay plain dug floor); the flower goes over the old main tunnel as a new nest's goes over its passage, its 7 hexes dug; a tile on one of them moves to the nearest free dug hex (or its cost is refunded) and the load log says so; ants and food stay where they are (the old tunnels stay dug); the three holes are rebuilt from the site or the fallback, keeping the old main hole's credit and cave-in. `normalizeEntrance` drops `shut` and `work` and adds `n` in a fixed order (canonical snapshots). The worker sends `entrances`, `tunnels` and `flowers` with each grid delta.
+
+**Surface models** (`render/game/entranceModels.ts`, notes in `docs/creatures/entrances.md`): one structure per colony centred between its three holes, which are alike (no main/extra sizes): black garden ants and Plagiaria — a low crater of crumbly soil pellets, the holes in its rampart (a flat stone over one); Termants — the same, carton-reinforced, carton collars in each throat; red wood ants — the thatch dome, holes in its flanks, worn trails out past each; leafcutters — a wide bare-soil mound with three big craters, leaf fragments and trails leading in, the refuse dump beside it; fire ants — the worked-soil dome (`render/game/mounds.ts`, now centred over the holes) with three small holes at its edge; army ants — the bivouac with three gaps in its skirt (the ants stream in and out of them); hell ants — three small neat holes on a minimal soil ring in leaf litter (a reconstruction); Gilded Ants — the stump with a root running out to each hole, frass below; nasute termites — the carton nest with three openings at its base, gallery tubes leading away between them; sickle-jaw termites — three small openings with soil collars in the litter. Craters and mounds of loose soil fade into the ground at their edge; grass does not grow through anthills. Meshes rebuild only when the anthill grows a size step or caves in.
+
+**Minimap and UI.** Surface: a queen crown in the colony's colour at each anthill's centre, a dot on each of its three holes (caves and fallen nests: an arrow). Nest: one arrow on the flower. Hovering a hole or the flower: area, owner, open or caving in, and the ants through each hole over the last `ENTRANCE.trafficS` (10) s (`Entrance.n`, sampled by the session).
 
 ### 3.13 Battle arena (`sim/arena.ts`, `sim/arenaState.ts`, `ui/arenaPanel.ts`; 2026-10-25)
 The user asked for an arena "like the EotU battle arena" for 2, 3 or 4 teams, also to make the creature-climbing mechanic easier to test.
@@ -779,8 +794,8 @@ bronze/gold borders, small-caps serif headers). Layout follows the reference:
 * **Minimaps** (bottom-left): the selected underground area and the surface, side by side.
   - Click either to move the camera there, switching maps if needed. The current view is drawn as a frame.
   - Icons:
-    - entrance arrows;
-    - on the surface, queen icons at entrances, coloured by area;
+    - an entrance arrow (in a nest, on its flower);
+    - on the surface, a queen crown at each anthill's centre with a dot on each of its three holes, coloured by area (caves: an arrow);
     - dots for food, enemies, your ants and markers.
 * **Marker panel** (bottom-centre): six columns, home (hex icon) and markers I–V (numeral headers in marker colours).
   - Each column shows current/max ants and a list of **control-group cards**: caste icon, living/max (e.g. "19/19"), role badge and tile-level pips.

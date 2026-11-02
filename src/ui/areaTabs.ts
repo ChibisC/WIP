@@ -41,7 +41,7 @@ export class AreaTabs {
     const who = sp ? `${esc(sp.common)} — <i>${esc(sp.scientific)}</i><br>` : '';
     const key = `<span class="k">F${t.number}</span>`;
     if (t.kind === 'home') return `<b>Area 1 · Your nest</b>${who}Always open. Click to look underground ${key}.`;
-    const state = t.open ? `${t.ants} of your ants${t.kind === 'allied' ? ' and allies' : ''} inside. Click to look ${key}.` : 'No ants in this area.<br>Place a marker on its entrance on the surface to send a group in.';
+    const state = t.open ? `${t.ants} of your ants${t.kind === 'allied' ? ' and allies' : ''} inside. Click to look ${key}.` : 'No ants in this area.<br>Place a marker on one of its entrance holes on the surface to send a group in.';
     return `<b>Area ${t.number} · ${esc(t.name)}</b>${who}${t.alive ? '' : 'Fallen. '}${state}`;
   }
 
