@@ -196,6 +196,10 @@ Pose evalPose(float st, float cyc, float T, float leg, float seed) {
   float side = leg < 2.5 ? -1.0 : 1.0;
   float k0 = 0.55 / aL; // gentle downward curve of the antenna
   vec4 po = rigT(RC_POSE); float hr = po.x; float gape = po.z;
+  // realism rework (nasute castes only): melee variant and side from setMelee (aAnim2.x, .y in BITE / RAM)
+  bool realC = rigT(RC_REAL).x > 0.5;
+  float mv = realC ? floor(aAnim2.x + 0.5) : 0.0;
+  float ms = aAnim2.y >= 0.0 ? 1.0 : -1.0;
 
   // ---- IDLE (also the base for most states): head raised, antennae forward and sweeping ----
   P.antL = vec3(0.14 + 0.12 * sin(t * 1.7), -0.04 + 0.06 * sin(t * 2.3 + 1.0), k0);
@@ -264,19 +268,83 @@ Pose evalPose(float st, float cyc, float T, float leg, float seed) {
     P.antL = vec3(0.42 + 0.12 * sin(t * 2.6), 0.05 + 0.08 * sin(t * 3.3), k0 * 0.8);
     P.antR = vec3(0.42 + 0.12 * sin(t * 2.9 + 1.3), 0.05 + 0.08 * sin(t * 3.1 + 0.7), k0 * 0.8);
     P.abd.z = 1.0 - 0.015 * recoil;
+    if (realC) {
+      // (user rating 2026-11-02, G4: more movement) braced on its legs, the soldier sways its aim when not squirting;
+      // each squirt jolts the body back a little, squeezes the abdomen and dips the head; the antennae flick
+      float sway = (1.0 - firing) * 0.12 * sin(t * 1.3);
+      P.head.x = clamp(P.head.x + sway, -AIM_YAW, AIM_YAW);
+      // the body slides back along the ground; the legs swing forward by the same amount so the feet stay put
+      P.bodyOff.x = -0.014 * L * recoil;
+      P.abd.z = 1.0 - 0.05 * recoil;
+      if (leg >= 0.0) P.leg = vec4((pair < 0.5 ? 0.22 : (pair > 1.5 ? -0.2 : 0.02)) + 0.047 * recoil, 0.1, 0.04, 0.0);
+      P.antL.y += 0.12 * recoil; P.antR.y += 0.12 * recoil;
+    }
+  } else if (isState(st, 7.0) && realC && mv > 0.5) { // RAM variants (major, realism rework): 1 head swing, 2 rear and crush
+    float c = TAU * cyc;
+    if (mv < 1.5) {
+      // braced wide, the great head swung across in a bash, one side then the other
+      float sw = sin(c);
+      float bash = pow(abs(sw), 3.0);
+      P.head = vec3(0.45 * sw * ms, -0.18 + 0.1 * bash, 0.012 * L * bash);
+      if (leg >= 0.0) P.leg = vec4(pair < 0.5 ? 0.24 : (pair > 1.5 ? -0.24 : 0.0), 0.0, 0.0, 0.0);
+    } else {
+      // rear up on the hind legs (head high, front legs lifting), then crash down onto the foe head first
+      float f2 = fract(cyc + 0.4); // contact (cycle 0.25) lands at 0.65, mid-crash
+      float up = smoothstep(0.0, 0.55, f2) * (1.0 - smoothstep(0.6, 0.72, f2));
+      float hit = smoothstep(0.6, 0.7, f2) * (1.0 - smoothstep(0.8, 1.0, f2));
+      // the pitch turns about the body pivot; lifting the body by 0.32 L sin(pitch) keeps the hind feet on the ground
+      float pt = 0.14 * up;
+      P.bodyRot.y = pt;
+      P.bodyOff.y = 0.32 * L * sin(pt);
+      P.bodyOff.x = 0.03 * L * hit;
+      P.head = vec3(0.0, hr + 0.25 * up - 0.38 * hit, 0.02 * L * hit);
+      if (leg >= 0.0) P.leg = vec4((pair < 0.5 ? 0.25 * up : (pair > 1.5 ? -0.2 : -0.05)) - 0.1 * hit, pair < 0.5 ? 0.35 * up : 0.0, pair < 0.5 ? -0.4 * up : 0.0, 0.0);
+    }
+    P.antL = vec3(0.5, 0.15, k0 * 0.5); P.antR = P.antL;
   } else if (isState(st, 7.0)) { // RAM (major)
     float c = TAU * cyc; float lunge = pow(max(0.0, sin(c)), 3.0);
     P.bodyOff.x = 0.07 * L * lunge; P.bodyOff.y = -0.03 * bh;
     P.head = vec3(0.0, -0.28 + 0.4 * lunge, 0.02 * L * lunge);
     P.bodyRot.y = -0.04 + 0.05 * lunge;
     if (leg >= 0.0) P.leg = vec4((pair < 0.5 ? 0.1 : (pair > 1.5 ? -0.22 : -0.05)) * (0.4 + lunge), 0.06, 0.08 * lunge, 0.0);
+    if (realC) { // feet planted (realism rework): no crouch or pitch; the legs swing back as the body lunges
+      P.bodyOff.y = 0.0; P.bodyRot.y = 0.0;
+      if (leg >= 0.0) P.leg = vec4((pair < 0.5 ? 0.14 : (pair > 1.5 ? -0.14 : 0.0)) - 0.23 * lunge, 0.0, 0.0, 0.0);
+    }
     P.antL = vec3(0.55, 0.15, k0 * 0.5); P.antR = P.antL;
   } else if (isState(st, 8.0)) { // ALARM (major): vertical head jerking
     float j = sin(TAU * 6.0 * uTermiteTime + seed * 3.0);
     float jerk = sign(j) * sqrt(abs(j));
     P.head = vec3(0.0, hr + 0.05 + 0.22 * jerk, 0.0);
     P.bodyOff.y = 0.006 * L * jerk; P.bodyRot.y = 0.05 * jerk;
+    if (realC) {
+      // (user rating 2026-11-02, N6: "keep the feet planted when the drumming happens") the body stays put on braced
+      // legs; only the head drums down against the ground and back
+      P.bodyOff.y = 0.0; P.bodyRot.y = 0.0;
+      P.head = vec3(0.0, hr - 0.06 + 0.24 * jerk, 0.0);
+      if (leg >= 0.0) P.leg = vec4(pair < 0.5 ? 0.12 : (pair > 1.5 ? -0.12 : 0.0), 0.0, 0.0, 0.0);
+    }
     P.antL = vec3(0.4, 0.2 + 0.05 * jerk, k0 * 0.4); P.antR = P.antL;
+  } else if (isState(st, 9.0) && realC && mv > 0.5) { // BITE variants (realism rework): 1 grab and tug, 2 nibbling flurry
+    float c = TAU * cyc; float f = fract(cyc);
+    if (mv < 1.5) {
+      // lunge and clamp, then haul back braced on the legs, the head twisting
+      float grab = smoothstep(0.0, 0.3, f) * (1.0 - smoothstep(0.3, 0.45, f));
+      float tug = smoothstep(0.35, 0.55, f) * (1.0 - smoothstep(0.8, 1.0, f));
+      float d = 0.04 * L * grab - 0.05 * L * tug;
+      P.bodyOff.x = d;
+      P.head = vec3(0.12 * tug * ms * sin(t * 14.0), -0.08 + 0.12 * tug, 0.03 * L * grab);
+      P.mand = mix(0.55, 0.02, smoothstep(0.2, 0.32, f));
+      if (leg >= 0.0) P.leg = vec4((pair < 0.5 ? 0.18 * tug : (pair > 1.5 ? -0.16 * tug : 0.0)) - d / (0.3 * L), 0.0, 0.0, 0.0);
+    } else {
+      // three quick nips a cycle, the jaws snapping open and shut, the body still
+      float nip = pow(max(0.0, sin(c * 3.0 - 3.14159)), 2.0); // a nip peaks on the attack's contact (f = 0.25)
+      P.head = vec3(0.06 * ms * sin(c * 1.5), -0.12 + 0.06 * nip, 0.03 * L * nip);
+      P.mand = 0.55 * (1.0 - nip) + 0.02;
+      P.bodyOff.x = 0.008 * L * nip;
+      if (leg >= 0.0) P.leg = vec4(0.06 * (pair < 0.5 ? 1.0 : -0.5) - 0.008 * L * nip / (0.3 * L), 0.0, 0.0, 0.0);
+    }
+    P.antL = vec3(0.45, 0.1, k0 * 0.6); P.antR = P.antL;
   } else if (isState(st, 9.0)) { // BITE
     float c = TAU * cyc; float snap = pow(max(0.0, sin(c)), 2.0);
     P.head = vec3(0.0, -0.1 + 0.05 * snap, 0.04 * L * snap);
@@ -284,6 +352,7 @@ Pose evalPose(float st, float cyc, float T, float leg, float seed) {
     P.bodyOff.x = 0.035 * L * snap;
     P.antL = vec3(0.45, 0.1, k0 * 0.6); P.antR = P.antL;
     if (leg >= 0.0) P.leg = vec4(pair > 1.5 ? -0.12 * snap : 0.06 * snap, 0.0, 0.0, 0.0);
+    if (realC && leg >= 0.0) P.leg = vec4(-0.117 * snap, 0.0, 0.0, 0.0); // feet planted as the body leans in
   } else if (isState(st, 10.0)) { // DEATH: legs curl, body deflates, head droops
     float e = smoothstep(0.0, 1.0, clamp(T, 0.0, 1.0));
     P.leg = mix(P.leg, vec4((pair < 0.5 ? -0.25 : (pair > 1.5 ? 0.3 : 0.0)), 0.95, -1.55, -0.7), e);

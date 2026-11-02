@@ -434,6 +434,32 @@ function lowestHead(rig: AntRig, hp: number, q: THREE.Quaternion): number {
   return low;
 }
 
+/**
+ * Hell ants (vertical scythes): the lowest point of the left blade (`rig.mandPts`, built closed) opened by `mo` about
+ * its hinge, as the shader swings it, then pitched with the head by `hp` and turned by `q`.
+ */
+function lowestJaw(rig: AntRig, hp: number, mo: number, q: THREE.Quaternion): number {
+  const x = rig as AntRig & { mandPts?: THREE.Vector3[]; mandSwing?: number; mandL?: THREE.Vector3 };
+  if (!x.mandPts || !x.mandL) return Infinity;
+  const a = -mo * (x.mandSwing ?? 0);
+  const ca = Math.cos(a);
+  const sa = Math.sin(a);
+  const ch = Math.cos(hp);
+  const sh = Math.sin(hp);
+  let low = Infinity;
+  for (const p of x.mandPts) {
+    const hx = p.x - x.mandL.x;
+    const hy = p.y - x.mandL.y;
+    const ox = x.mandL.x + hx * ca - hy * sa;
+    const oy = x.mandL.y + hx * sa + hy * ca;
+    const dx = ox - rig.neck.x;
+    const dy = oy - rig.neck.y;
+    _lp.set(rig.neck.x + dx * ch - dy * sh, rig.neck.y + dx * sh + dy * ch, p.z).applyQuaternion(q);
+    low = Math.min(low, _lp.y);
+  }
+  return low;
+}
+
 /** The gaster's part of `lowestPosed`. */
 function lowestGaster(rig: AntRig, gp: number, q: THREE.Quaternion): number {
   const cg = Math.cos(-gp);
@@ -709,11 +735,13 @@ export class AntRenderer {
           if (s.av === 3 && !s.ahi && q0 < 0.2 && q1 >= 0.2) sfx = ANIM_SFX.GRIP;
           else if (s.av === 4 && q0 < 0.3 && q1 >= 0.3) sfx = ANIM_SFX.GRIP;
           else if (s.av === 5 && q0 < 0.7 && q1 >= 0.7) sfx = ANIM_SFX.CRUNCH;
-          else if ((s.av === ATK.SNAP || s.av === ATK.IMPALE) && q0 < ATTACK_CONTACT && q1 >= ATTACK_CONTACT) {
-            // hell ants: the trap fires — a click and a puff of dust kicked up under the head
+          else if ((s.av ?? 0) >= ATK.SNAP && (s.av ?? 0) <= ATK.EXECUTE_P && q0 < ATTACK_CONTACT && q1 >= ATTACK_CONTACT) {
+            // hell ants: the trap fires — a click and a puff of dust kicked up under the head (heavier for the slam,
+            // the impale and the finisher; the chomp's bites are in the air)
             sfx = ANIM_SFX.SNAP;
             const d = rig.mouth.x * scale;
-            animHooks.fx?.(x + Math.cos(h) * d, y + Math.sin(h) * d, this.space, rig.length * scale * (s.av === ATK.IMPALE ? 0.32 : 0.22));
+            const big = s.av === ATK.IMPALE || s.av === ATK.SLAM || s.av === ATK.EXECUTE_P;
+            if (s.av !== ATK.CHOMP) animHooks.fx?.(x + Math.cos(h) * d, y + Math.sin(h) * d, this.space, rig.length * scale * (big ? 0.32 : 0.22));
           }
         }
         if (sfx && animHooks.emit) animHooks.emit(sfx, x, y, this.space, v.cause ?? 0, v.morph);
@@ -872,6 +900,9 @@ export class AntRenderer {
           const gd = lowestGaster(rig, gp + 0.05, qB) > lowestGaster(rig, gp - 0.05, qB) ? 0.08 : -0.08;
           for (let i = 0; i < 6 && lowestGaster(rig, gp, qB) < floor; i++) gp += gd;
         }
+        // (hell ants, user note 2026-11-02 "make sure animations dont phase through the ground"): the open scythes swing
+        // down and forward — the head rises until the lowest point of the posed blades is clear of the ground
+        if ((rig as { mandPts?: unknown }).mandPts) for (let i = 0; i < 14 && lowestJaw(rig, hp, mo, qB) + vT.y < Lr * 0.02; i++) hp += 0.05;
         // (user ratings A5, A6, F7, L7, L8: attacks and rears sank the jaws, the head or the gaster into the ground)
         // the lowest of the jaw tips, the chin and the gaster tip as posed — head and gaster turned, the body pitched —
         // stays 1.5 % of the body length above the ground: the body rises over its planted feet, the legs straighten

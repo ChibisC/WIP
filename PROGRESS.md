@@ -1556,3 +1556,19 @@ away and just waits for worker to build it. if you dont have enough food you can
 - The helper's review rounds ended with the container it ran in (its last pushed commit is b010a9a); the comparison sheets
   were study-only and never in the repo. A fresh render of both story maps was compared with the user's photos in chat.
 - Merge: clean (no conflicts); all 28 suites, the determinism check and the build pass.
+
+## 2026-11-02 (afternoon) — The user's ratings: hell ant attacks and finisher, termite melee (CHANGE_PLAN §22.6)
+From the review page (`docs/realism/hell-nasute/README.md`, round 1 of the user's ratings):
+- Hell ants: the jaws gape much wider (`openExtra` 1.45) and work open and shut; three attacks (`ATK.SNAP`, `ATK.CHOMP`,
+  `ATK.SLAM`), never the same twice running; the renderer raises the head until the open jaw blades clear the ground.
+- The finisher (a gameplay change the user asked for): a grapple bite on a foe at 25 % health or less (never a queen or
+  king) reaches round its neck (`ATK.EXECUTE` / the soldier's `ATK.EXECUTE_P`); user note 12:39: the foe is lifted into
+  the air by the neck for `BALANCE.snap.finisherLift` (1 s) — the hell ant's `ATK.LIFT`, the foe kicking (`execHeld`) —
+  then its head is cut off (`HIT.EXEC`, death 9: the body drops from the jaws). Sim: `combat.startExecution`,
+  `hellAnts` hold with `exec`, `executeAnt`. Tests (`tests/species.ts`): no lift above a quarter; at a quarter lifted,
+  held and stunned for the lift, then decapitated; the render views; never a queen.
+- Nasute termites (sickle-jaws unchanged): three melee attacks per caste in the kit shader (workers: snap, grab and tug,
+  nibbling flurry; majors: lunge, head swing, rear and crush) with the feet planted; the major drums the alarm with its
+  feet planted (N6); the soldier sways its aim and recoils with each squirt.
+- Anim lab: `finisher` (the lift and the cut), `tfight` (the workers' three bites and the soldier), `tram` (the majors'
+  three rams and the alarm). Clips in `docs/realism/hell-ants/clips/` and `docs/realism/nasutitermes/clips/`.

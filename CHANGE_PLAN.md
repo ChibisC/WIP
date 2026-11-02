@@ -821,3 +821,25 @@ feature branches into this branch (combine both sides; never drop another agent'
 replaced (keep save migrations), run `npm ci`, `npm test`, the determinism check and the build, regenerate the
 height and climb data, re-baseline only the hell ant hashes, merge into `main`, push, and write a handoff update
 (what was merged, how conflicts were resolved, what was removed). Merge `origin/main` in along the way whenever it moves.
+
+### 22.6 The user's ratings, round 1 (review page, 2026-11-02 afternoon)
+Scores: hell ants 9–10 for the looks (the amber 10, the lineup 10), the attacks 7–8; the nasutes 8–9. Asked for:
+- **H8 / H9 — the jaws:** open much wider when attacking (`hellMorphs` `openExtra` 0.55 → 1.45) and open and close
+  through the attack. The renderer keeps the wide-open jaws off the ground (`lowestJaw`: the head is raised until the
+  jaw blades clear it).
+- **H10 — three attacks:** `ATK.SNAP` (the vertical snap), `ATK.CHOMP` (a lunge with the jaws working open and shut),
+  `ATK.SLAM` (rear, hold, slam the head down, hit-stop). The game never plays the same one twice running.
+- **H7 — the finisher, a gameplay change the user asked for:** a hell ant's grapple bite on a foe at
+  `BALANCE.snap.finisherHp` (25 %) of its health or less (never a queen or king) — the jaws reach round the neck
+  (`ATK.EXECUTE`, the soldier's `ATK.EXECUTE_P` with the paddle) and close. **User note 12:39:** the foe is then lifted
+  into the air: `combat.startExecution` → `AS.Hold` with `exec` (hellAnts.ts) holds it up by the neck in front of the
+  jaws for `finisherLift` s (stunned, pulled in over 0.3 s, facing the hell ant), then `executeAnt` kills it with
+  `HIT.EXEC` (9). Render: the hell ant's `ATK.LIFT` (head and front raised, shaking the foe, the jaws part, the shear);
+  the foe's `execHeld` (head up at the jaws, body hanging nose-up, kicking); death 9: the head comes off in the air,
+  the body drops. Ant field `exec` is set on hell ants only (older saves: undefined).
+- **N6 — the alarm:** the major drums with its feet planted (no body bob or pitch; only the head).
+- **G4 — more attack motion for every creature:** the nasute melee in the kit shader, gated by `real` (sickle-jaws
+  unchanged): workers' BITE 0 snap, 1 grab and tug, 2 nibbling flurry; majors' RAM 0 lunge, 1 head swing, 2 rear and
+  crush; `TermiteInstances.setMelee` picks it. The body moves with the legs compensating so the feet stay put
+  (termiteLayer no longer slides the whole nasute body). The soldier sways its aim and each squirt jolts it back,
+  squeezes the abdomen and dips the head.

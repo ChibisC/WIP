@@ -235,7 +235,7 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
     }
   }
   // ---------- mandibles (scythes hinged at the bottom of the head) ----------
-  const md = i.mandible, mandTips = [], hingePts = [];
+  const md = i.mandible, mandTips = [], hingePts = [], mandPts = [];
   let closeAng = 0;
   {
     // Rest-pose shape (matches reference 4), then rotate up about the hinge until the tips
@@ -272,6 +272,8 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
         hellTube(n, [root, root.clone().addScaledVector(inner, md.tooth * H).addScaledVector(tn, md.tooth * 0.5 * H)], [rad[k] * 0.6, 0.004 * H], S(5, 4, 3), part, () => C.mandTip ?? C.legDark, lk.mandible, false, true, 1, 0, REGION.MANDIBLE);
       }
       mandTips.push(pts[N - 1]); hingePts.push(h);
+      // (the renderer keeps the open scythes off the ground: points along the closed blade)
+      if (sd < 0) for (let k = 0; k <= 6; k++) mandPts.push(pts[Math.round((k / 6) * (N - 1))].clone());
     }
   }
   // ---------- antennae: 12 segments — a long club-ended scape, then an 11-segment funiculus in one even curve ----------
@@ -457,7 +459,7 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
   const out = {
     ...rig, neck: w.clone(), mandL: hingePts[0].clone(), mandR: hingePts[1].clone(), antL: sockets[0].clone(), antR: sockets[1].clone(), elbL: elbows[0].clone(), elbR: elbows[1].clone(),
     gasterPivot: gp.clone(), waistPivot: wp.clone(), length: 0, stride: 0, stance: base, q0: 0.34, headTip: new HV(headTipX, w.y, 0), gasterTip: gTip.clone(), mouth,
-    mandVert: 1, mandSwing: closeAng + md.openExtra, mandRest: closeAng / (closeAng + md.openExtra), hold, holdDir, hornTip: hornTip.clone(), gaitLift: i.gait?.lift ?? 0.3, gaitDuty: i.gait?.duty ?? 0.55,
+    mandVert: 1, mandSwing: closeAng + md.openExtra, mandRest: closeAng / (closeAng + md.openExtra), hold, holdDir, hornTip: hornTip.clone(), gaitLift: i.gait?.lift ?? 0.3, gaitDuty: i.gait?.duty ?? 0.55, mandPts,
   };
   out.length = out.headTip.x - out.gasterTip.x;
   out.stride = (2 * out.q0 * (reach / 6)) / 0.55;
@@ -466,6 +468,7 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
   const sh = (v) => v.set(v.x - mid, v.y, v.z);
   out.coxa.forEach(sh), out.knee.forEach(sh), out.ankle.forEach(sh), out.foot.forEach(sh);
   [out.neck, out.mandL, out.mandR, out.antL, out.antR, out.elbL, out.elbR, out.gasterPivot, out.waistPivot, out.headTip, out.gasterTip, out.mouth, out.hold, out.hornTip].forEach(sh);
+  out.mandPts.forEach(sh);
   geo.computeBoundingSphere();
   // (realism rework: the planted-feet animation — each foot's neutral place for the shader's leg IK)
   plantHomes(out);
