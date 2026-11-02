@@ -1,4 +1,4 @@
-import { GameSession, casteTint } from '../game/session';
+import { GameSession } from '../game/session';
 import { AS, SURFACE, colonyOfSpace } from '../sim/types';
 import { SOIL_AIR, SOIL_STONE } from '../world/nestGrid';
 import { edible } from '../sim/diet';
@@ -8,6 +8,7 @@ import { el, esc, shield } from './dom';
 import { AreaTabs } from './areaTabs';
 import { TOUCH } from '../core/device';
 import { ICONS } from './icons';
+import { casteLook } from '../render/casteLook';
 
 const TILE_RGB: Record<string, string> = { queen: '#9fb2c8', food: '#7a9a3a', fungus: '#e2dccc', aphid: '#a89870', thatch: '#9a7040', mound: '#c09058', carton: '#b08a58' };
 
@@ -167,7 +168,7 @@ export class Minimaps {
     for (const t of c?.tiles ?? []) {
       g.hexCenter(t.q, p);
       const gr = groupById(c!, t.group);
-      ctx.fillStyle = t.type === 'brood' && t.caste ? '#' + casteTint(t.caste).multiplyScalar(1.3).getHexString() : (TILE_RGB[t.type] ?? '#888');
+      ctx.fillStyle = t.type === 'brood' && t.caste ? casteLook(t.caste).css : (TILE_RGB[t.type] ?? '#888');
       hex(p.x * k, p.y * k, g.R * k * 0.92);
       ctx.fill();
       if (gr && gr.marker >= 0 && c!.player) {

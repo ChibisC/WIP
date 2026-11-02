@@ -1438,6 +1438,38 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
 - Tests: `tests/termants.ts` (wood into the food store, leaves into the food store, an old wood store converted, carton
   walls paid from food, the AI plans a wall with the food).
 
+### 2026-11-02 — Underground textures realism pass; nest hexes 1.10×; a look of its own for every caste
+User notes: 2026-11-01 23:55 "use this realism prompt to fix the underground textures as well" (no prompt file came
+with it: the realism pipeline of `claude/realism/01–02` was used); 2026-11-02 01:15 "1.25x size it too big, maybe make
+it slightly smaler for underground hex", then "nvm just do 1.10x size". Branch `feature/underground-realism` from
+`main` (`18bf3d4`); `origin/main` (`f79ebd1`, Gene Thief termite soldiers) merged in. Notes:
+`docs/realism/underground.md`; shots `docs/realism/underground/` (`tests/browser/underground_realism.py`).
+- **Hex size:** `NEST_HEX_SCALE` 1.25 → 1.10 (`hexRadiusFor`); saves keep the size they were made with; protocol
+  `ud-mp-7`. Every suite passed with the smaller nests except the size check itself (`tests/notes1101.ts`, updated).
+- **Soil, render only** (`render/nest/nestTerrain.ts`, `render/environment.ts`): sand grains at real scale in four
+  mineral colours (glassy quartz tops), a neutral silt-clay matrix with greyer and redder patches, crumb structure
+  softened where ants walk and along paler worn paths, diggers' pellets, soil crumbs and a few angular stones with
+  contact shadows (most along the walls), damp patches; crumbly walls with mandible scrapes and rare roots; grains in
+  the soil top; the queen's chamber smoothed pale silt (was a blue silk mat), brood tiles the soil washed with the
+  caste colour, the food store an olive-stained floor; softer, slightly irregular group outlines; the nest key light
+  warm white (was orange) and the light pools less orange; termite floors keep more grain and relief.
+- **Blind reviews** (fresh agent, before/after shuffled as A/B, 1–10): round 2 — new preferred 8/8, "could it be a
+  macro photo" 4.25 vs ~2; round 3 — 10/10, 4.9 vs 2.0. Remaining after round 3 (addressed in round 4): flat-looking
+  tiles, printed outlines, single-colour floors, felt-like termite floors.
+- **Caste looks** (user note 10:40: "make every unit tile (both ants and termites and future ones) have different
+  colors and textures so they can be identifiable and different (also their UI color and look for pheromone markers
+  and building so they can be distinct from each other)"; 11:04 "make the textures look more natural realistic and
+  insect like, they can use different colors just use more cleaner ones"). New `render/casteLook.ts`: twelve clean,
+  clearly different colours × ten natural, insect-made textures in relief (brood pockets, cuticle striations, soil
+  pellets, rugose wrinkles, imbricate scales, silk fibres, wax comb, wing veins, termite carton, cocoons; the first
+  pass's geometric stripes, chevrons, spokes and diamonds and its grainy colour were replaced the same morning). Within a species no colour or texture repeats; no two castes anywhere share both; castes added
+  later get a free pair automatically. The brood tiles use it (floor shader `castePat`; the texture number rides in the
+  tint texture's alpha; replaces the soil wash of the realism pass), and so does the UI: build panel tile buttons,
+  Castes tab and Genome rows and the marker panel's group cards show a small hex of the tile (drawn by the same
+  texture code, `castePatternAt`) with a dark ant on top (cards also get a top edge in the caste colour); the nest minimap and top-bar figures use the colour.
+  `casteTint` now returns the caste colour. Test `tests/casteLooks.ts`; renders `docs/realism/caste-tiles/`
+  (`tests/browser/caste_tiles.py`, sheet `caste_sheet.py`).
+
 
 ## 2026-11-02 — Realism rework: hell ants and nasute termites (CHANGE_PLAN §22)
 User spec `claude/realism/08-spec-hell-ants-nasute-termites.md`. Looks and animation only: every unit id, stat, ability

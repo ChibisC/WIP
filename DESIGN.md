@@ -77,7 +77,10 @@ be deterministic and change the simulation only through commands.** That means:
   walk up the flower and come out of one of the holes (and the reverse). Digging never
   makes another entrance (since 2026-11-01).
 * The nest hex grid's radius scales with the species (≈ 3 workers wide; see 3.7),
-  so ants stay at real size while tile counts are the same for every species.
+  so ants stay at real size while tile counts are the same for every species: R =
+  1.5 × the basic worker's length × `NEST_HEX_SCALE`, within 5–11 mm × it (`hexRadiusFor`;
+  the scale was 1.25 from 2026-11-01, **1.10** since 2026-11-02 at the user's request).
+  A save keeps the hex size it was made with.
 
 ## 3. Simulation core
 
@@ -728,14 +731,18 @@ Style switches to replace (`MapStyle`, `terrain.ts:5`): `terrain.ts` (relief, co
 
 * Two scenes, both seen from above with the same top-down camera rig: **surface**
   (sun, hemisphere light, fog, dappled canopy light, grass, litter props) and
-  **nest** (warm low-angle golden key light, pooled light over dug floor, deep
-  shadow in undug soil). Each has its own colour grade. The transition is a
+  **nest** (a warm-white low-angle key light, 0xffdcb4 — orange until the 2026-11-02
+  realism pass —, pooled light over dug floor, deep shadow in undug soil). Each has its own colour grade. The transition is a
   camera dive into the entrance hole and down the ramp.
 * **Nest terrain** (`render/nest/`): a chunked heightfield built from a signed
   distance field of the dug raster (blurred for organic contours): undug soil is
   a raised, dark, crumbly plateau; tunnel walls slope and round down to a
-  sunken packed-earth floor with pebble drifts along wall bases, root fibres
-  and debris. Baked cavity occlusion + SSAO darken wall feet; a blurred
+  sunken packed-earth floor. Since the realism pass (2026-11-02,
+  `docs/realism/underground.md`) the soil is drawn at the ants' scale: sand grains
+  (0.2–0.5 mm; quartz, feldspar, dark and iron-stained grains) in a neutral brown
+  silt-clay matrix, ~1 mm crumbs softened where ants walk, the diggers' pellets and soil
+  crumbs and stones with contact shadows along the wall feet, damp darker patches; walls
+  are crumbly compacted soil with mandible scrapes and the odd root. Baked cavity occlusion + SSAO darken wall feet; a blurred
   "openness" light map makes warm light pool in open areas and fall off down
   tunnels. Dust motes drift in the air.
   - **Buried stones** (undiggable hexes; user note 2026-10-25: hard to tell from
@@ -744,11 +751,12 @@ Style switches to replace (`MapStyle`, `terrain.ts:5`): `terrain.ts` (relief, co
     the warm key light so they read as neutral grey, and kept at least 62 % lit
     in the dark far from the dug area, where diggable soil fades to near black.
 * **Tile floors**: drawn in the floor shader from a per-hex data texture (type,
-  caste colour, level, group outline colour). Original procedural looks: queen
-  = pale blue-grey silk mat; worker brood = ochre cell pits; soldier brood =
-  red-brown ridged cells; major = dark crimson large pits; minim = pale orange;
-  food storage = mossy green with stored morsels and honeydew beads; fungus
-  garden = spongy white comb. Group outlines are drawn on hex edges bordering
+  caste colour, level, group outline colour). Since the realism pass they are the soil
+  first: queen = the floor plastered with smoothed pale silt (grains showing; was a
+  silk mat); brood = the soil stained with the caste's own colour and pressed with its own texture (see
+  **Caste looks** in §6);
+  food storage = the floor stained olive, honeydew beads; fungus garden = spongy white
+  comb; the stored food and the brood lie on them (`tileDecor`). Group outlines are drawn on hex edges bordering
   another group, coloured by the assigned marker. Placement ghost hex, grid
   overlay and active-tile particles (spores over fungus, shimmer over brood).
 * Post-processing (quality dependent): GTAO ambient occlusion, gentle bloom,
@@ -935,6 +943,25 @@ Every caste is a `CasteDef`: stats, morph, abilities and a **tier** (worker / so
 Equal-food battles (`tools/equal.ts`, `tools/battle.ts`) were used to tune these: soldiers beat their own species' workers for the same food, majors beat soldiers, and the wood ants' tanks + shooters beat most equal-food armies while shooters alone lose to swarms.
 
 Every caste a colony can raise has its own **brood tile type**, and a colony's build panel lists exactly those tiles. Each species also has a **nanitic** caste (a small first-brood worker) raised only on queen tiles. The Gene Thief colony gets a brood tile type for each borrowed caste. Caste mix is decided by which brood tiles the player places; there is no ratio slider.
+
+**Caste looks** (user note 2026-11-02: "make every unit tile (both ants and termites and future ones) have different
+colors and textures so they can be identifiable and different (also their UI color and look for pheromone markers and
+building so they can be distinct from each other)"; then 11:04 "make the textures look more natural realistic and
+insect like, they can use different colors just use more cleaner ones"). Each caste's brood tile has a clean colour
+from a palette of twelve clearly different hues (amber, rust, crimson, rose, violet, indigo, sky, teal, green, lime,
+bone, lavender; every pair at least ΔE 20 apart) and one of ten natural, insect-made textures worked into it: brood
+pockets, cuticle striations, packed soil pellets, wrinkled (rugose) ridges, overlapping (imbricate) scales, silk
+fibres, wax comb, a wing-vein network, layered termite carton, rows of cocoons. They are drawn as relief (ridges catch
+the light, hollows shade, the raised parts have a waxy sheen; silk the most), with only a trace of the soil's grain
+under the colour. The castes of one species never share a colour or a texture, and no two castes
+anywhere share both, so a Gene Thief or Termant nest full of stolen castes still tells them apart. The table is
+`render/casteLook.ts`; a caste with no entry (a new species or caste) gets the first free pair from a spot set by its
+name, unlike its own species in colour and texture. Nanitics look like their species' worker; queens and kings have no
+brood tiles. The same look is used everywhere the caste appears: the tile (floor shader `castePat`, the texture number
+in the tint texture's alpha), the build panel's tile buttons, Castes tab and Genome rows (a small hex of the tile with
+a dark ant on top, drawn by the same texture code), the marker panel's group cards (the same badge, and a top edge in the
+caste colour), the nest minimap and the top bar's worker and soldier figures (in the caste colour). `tests/casteLooks.ts` checks it; renders in
+`docs/realism/caste-tiles/`.
 
 ## 7. Performance plan
 

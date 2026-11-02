@@ -61,13 +61,13 @@ export interface NestGridData extends NestGridParams {
 /** Hex radius for a species: tiles are about three workers wide. */
 export function hexRadiusFor(workerLength: number): number {
   // (user 2026-11-01: "make undergrowth hex tiles larger for slightly more space" — × 1.25, the same tile count, so the
-  // whole nest grows with them)
+  // whole nest grows with them; 2026-11-02: "1.25x size it too big, maybe make it slightly smaler" … "just do 1.10x size")
   const k = NEST_HEX_SCALE;
   return Math.min(11 * k, Math.max(5 * k, workerLength * 1.5 * k));
 }
 
 /** Nest hex tiles' size over the original (1.5 × a worker's length, 5–11 mm). */
-export const NEST_HEX_SCALE = 1.25;
+export const NEST_HEX_SCALE = 1.1;
 
 /**
  * The floor plan of one colony's nest: a horizontal plane of soil seen from
