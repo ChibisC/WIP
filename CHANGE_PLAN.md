@@ -775,3 +775,10 @@ the queen photos. All study-only: render-only sheets in the repo, photo-vs-rende
 - `npm test`, determinism. Docs (`hell-ant.md`, `nasutitermes.md`, DESIGN, README, PROGRESS with every round's
   scores), a handoff update and a report; sheets and clips to the user; **wait for approval** before merging into
   `main` and publishing a new version of the game artifact.
+
+### 21.5 Merge rule (user note 2026-11-02 00:39; project doc `claude/handoff/00-MERGE-RULE.md`)
+When the work is done: fetch, read the newest handoff updates, merge the latest `origin/main` and any finished
+feature branches into this branch (combine both sides; never drop another agent's work), delete work that has been
+replaced (keep save migrations), run `npm ci`, `npm test`, the determinism check and the build, regenerate the
+height and climb data, re-baseline only the hell ant hashes, merge into `main`, push, and write a handoff update
+(what was merged, how conflicts were resolved, what was removed). Merge `origin/main` in along the way whenever it moves.
