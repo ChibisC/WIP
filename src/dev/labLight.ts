@@ -249,7 +249,7 @@ function mixGround(ground: THREE.Mesh, span: number): void {
 }
 
 /**
- * Amber specimen mode (realism rework, CHANGE_PLAN §21.2; render only): `?amber=1` sets the subject inside a polished
+ * Amber specimen mode (realism rework, CHANGE_PLAN §22.2; render only): `?amber=1` sets the subject inside a polished
  * block of amber on a light table — a rounded slab of warm, transmissive resin (ior 1.54, absorbing toward orange),
  * a scatter of small air bubbles and dark plant debris, lit from below and behind as amber pieces are photographed.
  * Nothing here reaches the game.

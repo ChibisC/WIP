@@ -17,7 +17,6 @@ import { World } from './world';
 import { Colony, SURFACE, TileType } from './types';
 import { assignGroup, placeMarker, recallAll, removeMarker, MARKER_ORDERS, MarkerOrder, setMarkerOrder } from './markers';
 import { designateDig } from './colony';
-import { setEntranceShut } from './entrances';
 import { markDelete, markUpgrade, placeTile, TILE_INFO } from './tiles';
 import { forgetCaste, setCorpsePriority } from './termants';
 import { useAbility } from './abilities';
@@ -62,7 +61,10 @@ export type CommandBody =
   | { type: 'markerOrder'; i: number; order: MarkerOrder; on: boolean }
   /** host only: let the AI drive a player's colony (a dropped player) or hand it back */
   | { type: 'setControl'; colony: number; human: boolean }
-  /** plug extra entrance i with soil (close) or open it again; asking the opposite mid-way cancels (sim/entrances.ts) */
+  /**
+   * (gone: plugged an extra entrance with soil or opened it again. Each nest has one entrance whose holes are always open
+   * since the one-entrance rework, 2026-11-01; kept on the wire so old replays still parse, and always rejected)
+   */
   | { type: 'entrance'; i: number; close: boolean }
   /** multiplayer game speed: ask for or agree to 2× / 4× (every player must), or go back down at once; the current
    *  speed while a faster one is asked for is a "no" */
@@ -235,8 +237,7 @@ export function applyCommand(w: World, cmd: Command): string | null {
       else return 'bad setting';
       return null;
     case 'entrance':
-      if (!Number.isInteger(cmd.i) || cmd.i < 0 || cmd.i >= c.entrances.length) return 'no such entrance';
-      return setEntranceShut(w, c, cmd.i, !!cmd.close);
+      return 'Entrances are always open';
     case 'speedVote':
       return speedVote(w, c, cmd.speed);
     case 'surrender': {

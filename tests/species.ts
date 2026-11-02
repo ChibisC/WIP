@@ -12,7 +12,7 @@ import { makeAnt, makeFood } from '../src/sim/factory';
 import { damageAnt } from '../src/sim/combat';
 import { killAnt } from '../src/sim/antAI';
 import { BALANCE, NASUTE } from '../src/sim/balance';
-import { CASTES, SPECIES, casteOf } from '../src/sim/species';
+import { BORROWABLE, CASTES, SPECIES, casteOf } from '../src/sim/species';
 import { rampTotal, lineOfSight } from '../src/sim/termites';
 import { surgeGroup } from '../src/sim/surge';
 import { hashState } from '../src/sim/snapshot';
@@ -607,6 +607,21 @@ check('Saiy-Ants display name comes from one config value', SPECIES.aurimyrmex.c
   const a = mk();
   const b = mk();
   check('determinism: termites, hell ants, Saiy-Ants and Lasius — identical hashes after 3 sim minutes', hashState(a) === hashState(b), hashState(a));
+}
+
+// ---------------------------------------------------------------- Gene Thief: termite soldiers are borrowable (user note 2026-11-02)
+{
+  const termiteSoldiers = ['nasute_soldier', 'nasute_major', 'rhy_soldier'];
+  check('Gene Thief can borrow the termite soldier castes, but not termite workers or royals', termiteSoldiers.every((id) => BORROWABLE.includes(id)) && ['nasute_worker', 'rhy_worker', 'nasute_king', 'nasute_queen', 'rhy_king', 'rhy_queen'].every((id) => !BORROWABLE.includes(id)), BORROWABLE.filter((id) => CASTES[id].termite).join());
+  const mk = () => {
+    const w = createWorld({ seed: 47, style: 'meadow', width: 700, depth: 700, food: 1.2, colonies: [{ species: 'plagiaria', player: false, ai: true, borrowed: termiteSoldiers, developed: 1 }, { species: 'lasius', player: false, ai: true }], settings: { creatures: 0 } }, new EventBus());
+    run(w, 20 * 60 * 6);
+    return w;
+  };
+  const a = mk();
+  const thief = a.s.colonies[0];
+  check('a developed Gene Thief AI with the three termite soldiers has them as castes and raises at least one', termiteSoldiers.every((id) => thief.castes.includes(id)) && a.s.ants.some((x) => x.colony === thief.id && termiteSoldiers.includes(x.caste)), a.s.ants.filter((x) => x.colony === thief.id && termiteSoldiers.includes(x.caste)).map((x) => x.caste).join());
+  check('determinism: a Gene Thief raising termite soldiers — identical hashes after 6 sim minutes', hashState(a) === hashState(mk()), hashState(a));
 }
 
 console.log(failed ? `${failed} FAILED` : 'all species tests passed');

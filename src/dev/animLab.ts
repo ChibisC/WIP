@@ -235,7 +235,7 @@ function clips(): Record<string, Clip> {
       ],
       cam: { tx: 0, ty: 0.3, tz: 0, dir: [0.3, 0.85, 0.6], dist: 11, fov: 30 },
     },
-    // realism rework (CHANGE_PLAN §21.3): the nasute castes' animations side by side, each with its kit state —
+    // realism rework (CHANGE_PLAN §22.3): the nasute castes' animations side by side, each with its kit state —
     // a worker chewing, two in trophallaxis, a soldier gluing a fire ant (the stringy glue in pulses, the ant
     // glued and struggling), the major charging then drumming the alarm, a worker dying; all breathing
     termites: {

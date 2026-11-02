@@ -83,7 +83,7 @@ export class MarkerPanel {
       head.dataset.tip =
         i < 0
           ? '<b>Home</b>Groups here stay in the nest. Workers dig, build and carry eggs to the brood tiles; soldiers guard the tunnels. Home workers do not go out for food: send a group to a marker for that.'
-          : `<b>Marker ${MARKER_NAMES[i]}</b>Click, then click the ground in the nest or on the surface to place it (<span class="k">${i + 1}</span>). On an area's entrance it sends the group down into that area. Double-click or press <span class="k">Space</span> to jump to it. Right-click a placed marker to lift it.<br>Drag group cards here to send them.`;
+          : `<b>Marker ${MARKER_NAMES[i]}</b>Click, then click the ground in the nest or on the surface to place it (<span class="k">${i + 1}</span>). On one of an area's entrance holes it sends the group down into that area. Double-click or press <span class="k">Space</span> to jump to it. Right-click a placed marker to lift it.<br>Drag group cards here to send them.`;
       if (i >= 0) {
         head.addEventListener('click', (e) => {
           e.stopPropagation();

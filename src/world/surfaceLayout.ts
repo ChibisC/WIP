@@ -40,9 +40,9 @@ export interface SiteHexes {
   ring: number[];
   entrances: number[];
   /**
-   * Surface spots for up to two extra entrances (docs/maps/design.md; claude/maps/02-spec-nest-entrances):
-   * the authored ones, else two dry hexes on the inner edge of the site's ring, about 120° either
-   * side of the main entrance.
+   * The anthill's two other holes (with `entrances[0]`, its three; user spec 2026-11-01, docs/maps/design.md):
+   * the authored ones, else two dry hexes on the inner edge of the site's ring, about 120° either side of
+   * the main one.
    */
   extras: number[];
 }
@@ -113,7 +113,7 @@ export class SurfaceLayout {
         if (this.site[q] < 0) this.site[q] = i;
       }
       for (const q of entrances) this.flags[q] |= HF_ENTRANCE;
-      // extra entrance spots: authored ones after the first, else picked on the ring
+      // the anthill's other two holes: authored ones after the first, else picked on the ring
       let extras = entrances.slice(1, 3);
       const main = entrances.slice(0, 1);
       if (extras.length < 2 && main.length) {

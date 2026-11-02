@@ -173,7 +173,7 @@ export interface CasteParams {
   clypeus?: number;
   /** abdomen outline: 'plump' (default), 'oval' (rounded egg) or 'long' (long slim cigar) */
   abdShape?: 'plump' | 'oval' | 'long';
-  // ---- realism rework 2026-11-02 (CHANGE_PLAN §21.3): the nasute castes only, so the sickle-jaws are unchanged ----
+  // ---- realism rework 2026-11-02 (CHANGE_PLAN §22.3): the nasute castes only, so the sickle-jaws are unchanged ----
   /**
    * soft-cuticle realism: breathing (abdomen pulse amplitude), wet glint (clearcoat strength on the soft cuticle),
    * eggs seen through the queen's membrane (0..1); also turns on the irregular gut, sunken segment membranes and
@@ -216,7 +216,7 @@ const ROYAL_COLORS: CastePalette = {
   wingScale: '#24160C',
 };
 
-// realism rework 2026-11-02 (CHANGE_PLAN §21.3; nasutitermes.md §11): every nasute caste has `real` (soft-cuticle realism)
+// realism rework 2026-11-02 (CHANGE_PLAN §22.3; nasutitermes.md §11): every nasute caste has `real` (soft-cuticle realism)
 // and more fine hairs at the tergite margins (6–10 per tergite in the specimens); the sickle-jaw castes do not
 export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
   nasute: {

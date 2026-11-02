@@ -128,7 +128,7 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
       if (camKind === 'top') cam.up.set(1, 0, 0);
       cam.lookAt(target);
       const sun = env.sun;
-      // realism (CHANGE_PLAN §21): with ?light= the termites get the same lighting presets, macro ground and lens as the ants
+      // realism (CHANGE_PLAN §22): with ?light= the termites get the same lighting presets, macro ground and lens as the ants
       const lit = q.get('light') !== null;
       if (lit) {
         applyLabLight(renderer, scene, env, cam, target, span, q, ground);

@@ -1,4 +1,4 @@
-"""Realism rework for hell ants and nasute termites (CHANGE_PLAN §21): lab renders per unit, view and light.
+"""Realism rework for hell ants and nasute termites (CHANGE_PLAN §22): lab renders per unit, view and light.
 
   tests/browser/with_server.sh python3 tests/browser/hell_nasute_realism.py <out dir>
 

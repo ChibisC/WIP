@@ -447,7 +447,7 @@ export class Menus {
         el(
           'p',
           '',
-          'The numbered tabs on the left are the level’s underground areas: <b>1</b> is your nest; others are enemy and allied nests and neutral caves. A tab opens only while your ants (or allies) are inside. To go in, place a marker on the area’s <b>entrance on the surface</b> (marked with its number on the surface map); once your ants are inside you can open its tab and place markers within it. Ants cut off from their queen weaken and die.',
+          'The numbered tabs on the left are the level’s underground areas: <b>1</b> is your nest; others are enemy and allied nests and neutral caves. A tab opens only while your ants (or allies) are inside. Each nest has one wide entrance underground, reached by the three holes of its anthill on the surface. To go in, place a marker on one of the area’s <b>entrance holes on the surface</b> (marked with its number on the surface map); once your ants are inside you can open its tab and place markers within it. Ants cut off from their queen weaken and die.',
         ),
       );
       m.appendChild(el('h3', '', 'Controls'));

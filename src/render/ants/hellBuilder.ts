@@ -34,7 +34,7 @@ function hellSpline(pts, n) {
 }
 
 // Per-vertex colours: piece() asks for one colour per vertex, in vertex order.
-// (realism rework, CHANGE_PLAN §21: every piece carries its baked-detail coordinates — `reg` a detailBake REGION)
+// (realism rework, CHANGE_PLAN §22: every piece carries its baked-detail coordinates — `reg` a detailBake REGION)
 function hellPieceRGB(n, pos, idx, part, cols, surf, surfW = 0, det = undefined) {
   let k = 0;
   n.piece(pos, idx, part, () => tmpC.copy(cols[Math.min(k++, cols.length - 1)]), surf, surfW, undefined, det);

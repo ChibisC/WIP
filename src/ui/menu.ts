@@ -1,4 +1,4 @@
-import { SPECIES, SpeciesId, BORROWABLE, CASTES } from '../sim/species';
+import { SPECIES, SpeciesId, BORROWABLE, CASTES, borrowName } from '../sim/species';
 import type { MapId } from '../maps/types';
 import { MAPS, PLAYABLE_MAPS } from '../maps';
 import { mapPreview } from './mapPreview';
@@ -79,10 +79,10 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       choice.species === 'plagiaria'
         ? `<h2>Borrowed castes <span class="dim">(any number — each needs its own room tile)</span></h2><div class="opt-row">${BORROWABLE.map((id) => {
             const c = CASTES[id];
-            return `<button class="chip ${choice.borrowed.includes(id) ? 'on' : ''}" data-borrow="${id}">${SPECIES[c.species].common.replace(' Ant', '')} ${c.name}</button>`;
+            return `<button class="chip ${choice.borrowed.includes(id) ? 'on' : ''}" data-borrow="${id}">${borrowName(id)}</button>`;
           }).join('')}</div>`
         : '';
-    const casteName = (id: string) => `${SPECIES[CASTES[id].species].common.replace(' Ant', '')} ${CASTES[id].name}`;
+    const casteName = borrowName;
     const teamLabel: Array<[AiTeam, string]> = [['own', 'Own team'], ['ally', 'Your ally'], [2, 'Team 2'], [3, 'Team 3'], [4, 'Team 4']];
     const aiRows = choice.ais
       .map((ai, i) => {

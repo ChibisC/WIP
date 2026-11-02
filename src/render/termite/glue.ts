@@ -46,7 +46,7 @@ export interface GlueStreamOptions {
   /** viscous wobble of the jet (fraction of its radius) */
   wobble: number;
   /**
-   * realism rework (CHANGE_PLAN §21.3): 0..1 stringy glue — the squirts as beads on a thin thread that stays
+   * realism rework (CHANGE_PLAN §22.3): 0..1 stringy glue — the squirts as beads on a thin thread that stays
    * between them (a viscous terpenoid secretion), not separate blobs; 0 keeps the old stream exactly
    */
   stringy: number;

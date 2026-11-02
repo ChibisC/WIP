@@ -24,7 +24,7 @@ The title screen has **Single-player** and **Multiplayer**.
 
 ### Multiplayer and invite links
 1. **Create game** gives you a six-letter room code and an invite link (`…/?room=ABCDEF`). Press **Copy link** and send it.
-2. Friends open the link and land in the lobby. Each player picks a name, species, colour and team, then clicks **Ready**. A **Gene Thief** player also picks the castes it steals (any of the 21 borrowable castes; each needs its own room tile).
+2. Friends open the link and land in the lobby. Each player picks a name, species, colour and team, then clicks **Ready**. A **Gene Thief** player also picks the castes it steals (any of the 24 borrowable castes, the termite soldiers included; each needs its own room tile).
 3. The host can set each of the eight slots to Open, Closed or AI (and pick an AI's species, team and, for a Gene Thief AI, its castes), move anyone to another team, pick the map from the map cards (everyone sees the choice), and set the seed, food, floods and population cap.
    - **Teams:** Red, Blue, Green, Gold or no team. Teammates never fight each other, start on neighbouring colony sites, and win together when theirs is the last team with a living queen. Everyone on one team cannot start.
 
@@ -88,20 +88,20 @@ You start with a queen, her seven-tile chamber and three small **nanitic** worke
 
 **Mounting** (as in EotU). Ants and termites can **mount large creatures and titans**: an ant runs up a leg to a weak point (the neck, the waist, a leg joint, the top of the abdomen), rides there for 8 s biting (untouchable all the while; fire ants also sting), climbs down and can go again 6 s later. Small ants mount large and huge creatures, big castes only titans, and shooters never (the caste card says which). A titan takes up to 12 riders and a large creature up to 8 (fewer on small ones); no more than 30 % of the ants fighting a creature ride it, so a ground force must keep fighting below. With half its riders on, the creature takes 25 % more damage (✦ on its health bar, which also shows riders / cap). Titans telegraph a shake-off that throws their riders down; a creature that leaves the map takes its riders with it.
 
-**Entrances.** Each nest starts with one entrance: a short tunnel rising from the nest floor to a hole on the surface, shaped the way that species really builds it (a crumbly crater for black garden ants, a thatched dome for wood ants, a carton nest with covered galleries for nasute termites, and so on). Digging never opens a hole by itself: the two marked extra-entrance spots in your nest are the only places a new one can go, and each surfaces on one of your site's two dry spots. An entrance lets about 10 ants through a second, so a busy one queues; plug an extra one with the Delete tool to close a way in. A fallen colony's entrances cave in over a minute.
+**Entrances.** Each nest has one wide entrance: seven hexes at the edge of the nest whose floor slopes up to the surface, lit by a shaft of daylight. Above it, the colony's anthill has three holes, all leading into it, always open. The anthill is built the way that species really builds it (a low crater of crumbly soil for black garden ants, a thatched dome for wood ants, a carton nest with covered galleries for nasute termites, and so on). Ants leave by the hole facing where they are going and come home by the nearest; each hole lets about 10 ants through a second, so a crowd spreads over all three. Digging never makes another entrance. A fallen colony's holes cave in over a minute.
 
-**Underground areas.** The numbered tabs on top of the minimaps are the level's underground areas: 1 is your nest, the others are enemy and allied nests and neutral caves. A tab opens only while your ants (or allies) are inside. To go in, drop a marker on the area's entrance on the surface (the surface map shows every entrance with its number and colour). Once your ants are inside, open the tab and place markers within the area. Ants cut off from their queen weaken and die within 30 s.
+**Underground areas.** The numbered tabs on top of the minimaps are the level's underground areas: 1 is your nest, the others are enemy and allied nests and neutral caves. A tab opens only while your ants (or allies) are inside. To go in, drop a marker on any of the area's entrance holes on the surface (the surface map shows each anthill as a crown in its colour, with its number and a dot on each hole). Once your ants are inside, open the tab and place markers within the area. Ants cut off from their queen weaken and die within 30 s.
 
 ### Build panel tools
 | Tool | What it does |
 |---|---|
-| Dig (G) | Mark soil hexes; workers dig them (6 points each; 2 workers per hex, 7 on an entrance dig). Click a marked hex again to cancel. Click one of your two **extra-entrance spots** (dashed rim, pale ring on the soil) to dig out a new entrance; click a closed entrance to open it again. |
+| Dig (G) | Mark soil hexes; workers dig them (6 points each; 2 workers per hex). Click a marked hex again to cancel. |
 | Brood tiles | One per caste. Placed on dug floor as a ghost; a worker builds it and the food is paid on completion. Touching tiles of one kind form a chamber, which is one group card. |
 | Food Storage | Holds 10 / 40 / 100 food by level. |
 | Highway | Packed-earth floor: +10 / 20 / 25 % speed by level (other built tiles slow ants by 35 %). |
 | Species tiles | Fungus garden (leafcutters), root-aphid pasture (black garden ants), thatch (wood ants), sun-warmed brood mound (fire ants), carton wall (Termants: paid in wood, blocks enemies until chewed through). |
 | Upgrade (U) | Mark a tile for upgrade. Needs 6 points for level 2 and 12 for level 3 from its neighbours (same kind: its level; soil: 1; highway: its level). Costs the build cost. Hover shows each neighbour's points. |
-| Delete (Delete) | Downgrades one level first; at level 1 removes the tile (its ant dies) and refunds two-thirds of the cost as seeds, which workers carry to storage. On an extra entrance, plugs it with soil (4 s); the main entrance never closes. |
+| Delete (Delete) | Downgrades one level first; at level 1 removes the tile (its ant dies) and refunds two-thirds of the cost as seeds, which workers carry to storage. |
 
 ### Camera
 | Input | Action |
@@ -154,7 +154,7 @@ The pause menu has graphics quality, interface size, edge scrolling and the sand
 | Tropical fire ant (*Solenopsis geminata*) | worker, soldier, major |
 | Leafcutter ant (*Atta cephalotes*) | minim, media, soldier, major |
 | Army ant (*Eciton burchellii*) | worker, porter (carries prey under its body, leads team carries), media (escorts the porters), soldier (hooked jaws; guards the raid trail once there are 3 or more), wingless queen. Raids sweep the marker area as a pulsing swarm front; three-lane trails, living bridges over water, pothole plugs. They eat only **insects and corpses**. |
-| Gene Thief (*Formica plagiaria*, fictional) | its own worker plus castes borrowed from any species |
+| Gene Thief (*Formica plagiaria*, fictional) | its own worker plus castes borrowed from any species, termite soldiers included |
 | Nasute Termites (*Nasutitermes corniger*) — termites, not ants | worker (two sizes), nasute soldier (ramping glue stream), major soldier (charge, glue hold, drumming alarm); a king guards the royal chamber. They eat only **wood**. |
 | Hell ants (Haidomyrmecinae, extinct) | worker (snaps small prey up against its horn and pins it), soldier (impales it on its paddle) |
 | Saiy-Ants (*Aurimyrmex fulgurans*, fictional) | worker, soldier: bites only (no acid); flash gold in a fight (or by the group's **Gold Surge** button) for more speed and damage, then tire |

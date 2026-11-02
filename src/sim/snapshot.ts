@@ -14,6 +14,7 @@
  * `hashState` (FNV-1a 64 over the bytes) is the desync check. `restoreWorld`
  * rebuilds a running World from the bytes, for reconnects and replays.
  */
+import { upgradeWorldEntrances } from './entrances';
 import { EventBus } from '../core/events';
 import { NestGrid, NestGridSnap } from '../world/nestGrid';
 import { World } from './world';
@@ -401,6 +402,8 @@ export function restoreWorld(bytes: Uint8Array, events: EventBus): World {
   s.nests = {};
   const w = new World(s, events);
   for (const [space, d] of root.grids) w.addGrid(space, NestGrid.fromSnap(d));
+  // (saves from before the one-entrance rework: the World constructor had no grids to upgrade them with)
+  upgradeWorldEntrances(w);
   w.phero.ensureColonies(root.trail.length);
   for (let i = 0; i < root.trail.length; i++) w.phero.trail[i].set(root.trail[i]);
   w.phero.alarm.set(root.alarm);

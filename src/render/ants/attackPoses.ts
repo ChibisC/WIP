@@ -254,7 +254,7 @@ const TAUNT_K: Key = { up: 0.08, pitch: 0.24, px: -0.32, front: 1, headPitch: 0.
  */
 const RAGE_K: Key = { up: 0.03, fwd: 0.02, pitch: 0.06, headPitch: 0.2, mand: 1, gaster: 0.3, spread: 0.45 };
 /**
- * Hell ants (realism rework, CHANGE_PLAN §21.2): the vertical trap. The jaws cock wide and down, the head low over the
+ * Hell ants (realism rework, CHANGE_PLAN §22.2): the vertical trap. The jaws cock wide and down, the head low over the
  * prey and trembling with tension; the snap is near-instant (the last 2.5 % of the wind-up), the head jerking up with
  * the recoil; a hit-stop holds the contact a moment; then the prey is lifted against the horn (worker, queen) or the
  * paddle driven down and pulled free (the soldier's impale). Never a sideways swing of the jaws or the head.
