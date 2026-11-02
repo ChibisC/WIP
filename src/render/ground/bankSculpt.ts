@@ -55,11 +55,11 @@ function cubicHeight(t: Terrain, x: number, y: number): number {
 
 /** Style tuning: ledge spacing (mm), ledge depth (mm), crumb (mm), lip overhang (mm). */
 const STYLE: Record<number, { sp: number; ledge: number; crumb: number; lip: number }> = {
-  1: { sp: 2.6, ledge: 0.7, crumb: 0.55, lip: 1.5 }, // soil bank
-  2: { sp: 4.2, ledge: 1.4, crumb: 0.35, lip: 1.0 }, // rock ledge
-  3: { sp: 3.0, ledge: 0.5, crumb: 0.6, lip: 1.8 }, // root wall
-  4: { sp: 2.0, ledge: 0.25, crumb: 0.3, lip: 0.6 }, // sand bank
-  5: { sp: 1.6, ledge: 0.3, crumb: 0.2, lip: 0.8 }, // clay cut
+  1: { sp: 3.4, ledge: 1.3, crumb: 0.9, lip: 2.4 }, // soil bank
+  2: { sp: 5.0, ledge: 2.2, crumb: 0.5, lip: 1.6 }, // rock ledge
+  3: { sp: 3.6, ledge: 0.9, crumb: 1.0, lip: 2.8 }, // root wall
+  4: { sp: 2.4, ledge: 0.45, crumb: 0.45, lip: 0.9 }, // sand bank
+  5: { sp: 2.0, ledge: 0.6, crumb: 0.35, lip: 1.2 }, // clay cut
 };
 
 export function buildBankSculpt(t: Terrain, f: GroundFields): THREE.BufferGeometry | null {
@@ -177,8 +177,12 @@ export function buildBankSculpt(t: Terrain, f: GroundFields): THREE.BufferGeomet
         const fp = ph - Math.floor(ph);
         const saw = fp < 0.72 ? fp / 0.72 : (1 - fp) / 0.28;
         let out = (saw - 0.5) * st.ledge;
-        // lumps and hollows
+        // lumps and hollows, and broader scallops where bits of the face have slumped away
         out += (fbm3(x * 0.45, h * 0.45, y * 0.45) - 0.5) * 2 * st.crumb;
+        out += (fbm3(along * 0.09, h * 0.07, 4.2) - 0.5) * 2.2 * st.crumb;
+        // runnels: rain-cut grooves down the face
+        const rn = vnoise3(along * 0.22, 1.3, 7.7);
+        out -= Math.max(0, (rn - 0.72) / 0.28) * 1.2 * Math.sin(Math.PI * Math.min(1, Math.max(0, fr))) * st.crumb;
         // the lip overhangs the face below; the foot spills out
         const lip = Math.max(0, (fr - 0.78) / 0.22);
         out += lip * lip * st.lip * (0.6 + 0.8 * vnoise3(along * 0.25, 5.3, 1.7));

@@ -19,14 +19,18 @@ from PIL import Image
 from playwright.sync_api import sync_playwright
 
 BASE = os.environ.get("BASE", "http://127.0.0.1:5181/")
-MAPS = os.environ.get("MAPS", "testTerrace,meadowPond,forestFloor,riverbank,rainforest,savanna").split(",")
+OVERCAST_MAPS = [m for m in os.environ.get("OVERCAST_MAPS", "").split(",") if m]
+MAPS = os.environ.get("MAPS", "testTerrace,gardenBelow,fireBanks,meadowPond,forestFloor,riverbank,rainforest,savanna").split(",")
+# the spots measured per map, in order of priority (SPOTS limits them)
+SPOTS = os.environ.get("SPOTS", "soil,moss,sand,litter,wet,bankTop,bankFoot,ramp").split(",")
+SPOTMAX = int(os.environ.get("SPOTMAX", "8"))
 TAG = os.environ.get("TAG", "now")
 PRESETS = os.environ.get("PRESETS", "map,overcast").split(",")
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 OUTDIR = os.path.join(ROOT, "docs", "maps", "realism")
 OUT = os.environ.get("OUT", os.path.join(OUTDIR, f"visibility-{TAG}.json"))
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"]
-W, H = 1280, 760
+W, H = int(os.environ.get("W", "1280")), int(os.environ.get("H", "760"))
 os.makedirs(OUTDIR, exist_ok=True)
 
 ANTS = ["lasius_worker", "termant_worker", "fire_minor", "formica_worker", "termant_soldier", "fire_major"]
@@ -164,8 +168,12 @@ with sync_playwright() as pw:
             print("page errors", errs[:3], flush=True)
         pg.evaluate("window.__session.loop.paused = true")
         spots = pg.evaluate(FIND, None)
+        spots = {k: spots[k] for k in SPOTS if k in spots}
+        spots = dict(list(spots.items())[:SPOTMAX])
         print(f"{M}: loaded in {time.time() - t0:.0f} s, spots {list(spots)}", flush=True)
         for preset in PRESETS:
+            if preset == "overcast" and OVERCAST_MAPS and M not in OVERCAST_MAPS:
+                continue
             if preset == "overcast":
                 pg.evaluate("() => { const v = window.__session.view; v.storm = 1; v.stormShown = 1; }")
             for name, (x, y) in spots.items():

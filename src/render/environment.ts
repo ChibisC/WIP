@@ -38,8 +38,14 @@ export interface SurfaceLights {
   sunDir: THREE.Vector3;
 }
 
+/** The default surface sun (from the west-south-west, about 50° up). */
+export const DEFAULT_SUN_DIR = new THREE.Vector3(-0.55, 0.78, 0.32).normalize();
+/** The surface sun of the last surface built (a map's mood moves it: render/mapBiomes.ts applyBiomeLight). */
+export let surfaceSunDir: THREE.Vector3 | null = null;
+
 export function createSurfaceEnvironment(renderer: THREE.WebGLRenderer, scene: THREE.Scene, night = false): SurfaceLights {
-  const sunDir = new THREE.Vector3(-0.55, 0.78, 0.32).normalize();
+  const sunDir = DEFAULT_SUN_DIR.clone();
+  if (!night) surfaceSunDir = sunDir;
   const top = night ? new THREE.Color(0.02, 0.03, 0.07) : new THREE.Color(0.5, 0.62, 0.78);
   const horizon = night ? new THREE.Color(0.06, 0.07, 0.1) : new THREE.Color(0.85, 0.84, 0.76);
   const ground = night ? new THREE.Color(0.02, 0.02, 0.02) : new THREE.Color(0.22, 0.24, 0.12);

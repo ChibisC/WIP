@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { currentMood } from './mapBiomes';
 import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
@@ -115,14 +116,16 @@ const DOF_FRAG = /* glsl */ `
 precision highp float;
 varying vec2 vUv;
 uniform sampler2D tColor; uniform sampler2D tDepth; uniform vec2 resolution;
-uniform float focusDist; uniform float dofStrength; uniform float dofOn; uniform float uTilt;
+uniform float focusDist; uniform float dofStrength; uniform float dofOn; uniform float uTilt; uniform float uHaze; uniform vec3 uHazeColor;
 uniform float exposure, saturation, contrast, warmth, vignette, grain; uniform vec3 lift; uniform vec3 gain;
 ${DEPTH_HELPERS}
 float coc(vec2 uv){
   float z = linDepth(texture2D(tDepth, uv).x);
-  float c = abs(z - focusDist) / max(focusDist, 1e-3);
+  // a lens focused at focusDist: the blur grows with the depth difference (in front of the focus faster than behind),
+  // plus a little of the tilt-shift fall-off toward the top and bottom (slight: a macro lens, not a miniature)
+  float c = abs(z - focusDist) / max(min(z, focusDist) * 1.6, 1e-3);
   float tilt = abs(uv.y - 0.5) * 2.0;
-  c = max(c*1.4, smoothstep(0.35, 1.0, tilt) * uTilt);
+  c = max(c, smoothstep(0.55, 1.0, tilt) * uTilt * 0.45);
   return clamp(c, 0.0, 1.0);
 }
 void main(){
@@ -146,6 +149,12 @@ void main(){
       }
       col = acc / wsum;
     }
+  }
+  // distance haze (a map's mood: heat haze over the sand), in linear HDR before the grade
+  if (uHaze > 0.0) {
+    float zh = linDepth(texture2D(tDepth, vUv).x);
+    float hz = uHaze * (1.0 - exp(-zh / 900.0));
+    col = mix(col, uHazeColor * 2.2, hz);
   }
   // Colour grade in linear HDR
   col *= exposure;
@@ -248,6 +257,8 @@ export class PostPipeline {
         saturation: { value: 1 },
         contrast: { value: 1 },
         warmth: { value: 0 },
+        uHaze: { value: 0 },
+        uHazeColor: { value: new THREE.Color(1, 1, 1) },
         vignette: { value: 0.3 },
         grain: { value: 0 },
         lift: { value: new THREE.Color() },
@@ -321,10 +332,14 @@ export class PostPipeline {
     u.dofOn.value = s.dof ? 1 : 0;
     u.dofStrength.value = s.dofStrength;
     u.uTilt.value = this.tilt;
-    u.exposure.value = g.exposure;
-    u.saturation.value = g.saturation;
-    u.contrast.value = g.contrast;
-    u.warmth.value = g.warmth;
+    // the map's mood over the view's grade (render/mapBiomes.ts MAP_MOOD)
+    const md = currentMood.mood;
+    u.exposure.value = g.exposure * (md?.exposure ?? 1);
+    u.saturation.value = g.saturation * (md?.saturation ?? 1);
+    u.contrast.value = g.contrast * (md?.contrast ?? 1);
+    u.warmth.value = g.warmth + (md?.warmth ?? 0);
+    u.uHaze.value = md?.haze ?? 0;
+    (u.uHazeColor.value as THREE.Color).setHex(md?.hazeColor ?? 0xffffff).convertSRGBToLinear();
     u.vignette.value = g.vignette;
     u.grain.value = g.grain ?? 0;
     (u.lift.value as THREE.Color).copy(g.lift);
@@ -334,7 +349,7 @@ export class PostPipeline {
     this.quad.render(r);
 
     if (s.bloom) {
-      this.bloomPass.strength = s.bloomStrength;
+      this.bloomPass.strength = s.bloomStrength + (currentMood.mood?.bloom ?? 0);
       this.bloomPass.render(r, this.hdrRT, this.hdrRT, 0, false);
     }
     this.outputPass.renderToScreen = true;

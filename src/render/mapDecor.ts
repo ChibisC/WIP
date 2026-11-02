@@ -9,6 +9,9 @@ import { branchGeometry, stoneGeometry } from './props';
 import { BIOME_DRESS, BiomeDress, buttressGeometry, leafRaft, litter, moundGeometry, mushroomCluster, nearWater, rootMatGeometry, trunkGeometry } from './mapBiomes';
 import { patchDapple } from './shaderPatch';
 import { textures } from './textures';
+import { buildBankDressing } from './ground/bankDressing';
+import { GL, bakedSurfacePatch, thinLightPatch } from './ground/surfacePatch';
+import { groundFields } from './terrainMesh';
 
 /**
  * Render-only dressing for an authored map (docs/maps/design.md §6): the walls drawn as rocks
@@ -18,6 +21,13 @@ import { textures } from './textures';
  * Nothing here touches the simulation; placement is seeded from the map id so every player sees
  * the same scene.
  */
+
+/** The highest water level on an authored map (rocks below it plus a band are wet), or none. */
+function waterTop(map: MapDef): number | undefined {
+  let top = -9999;
+  for (const w of map.water) top = Math.max(top, w.level);
+  return top > -9000 ? top : undefined;
+}
 
 /** A grass or reed clump for the Grass mesh. */
 export interface DecorClump {
@@ -363,6 +373,12 @@ export class MapDecor {
     this.walkways(map, terrain, tex);
     this.stillWater(map, rng, dress);
     this.meadow(map, rng, ground, tex, dress);
+    // the layered ground's banks: roots, pebbles in the face, the spill at the foot, grass along the lip
+    if (terrain.layers) {
+      const bd = buildBankDressing(terrain, groundFields(terrain));
+      if (bd.mesh) this.group.add(bd.mesh);
+      this.clumps.push(...bd.clumps);
+    }
   }
 
   private walls(map: MapDef, ground: (x: number, z: number) => number, tex: ReturnType<typeof textures>): void {
@@ -419,6 +435,8 @@ export class MapDecor {
     if (rockGeos.length) {
       const mat = new THREE.MeshStandardMaterial({ map: tex.stone.map, normalMap: tex.stone.normal, normalScale: new THREE.Vector2(1.2, 1.2), roughness: 0.88, vertexColors: true });
       patchDapple(mat);
+      // weathered stone at true scale from the baked ground layers (pits, bedding, lichen); wet only by water
+      bakedSurfacePatch(mat, { layer: GL.ROCK, relief: 1, keepMap: 0, waterLevel: waterTop(map), wetBand: 4 });
       const m = new THREE.Mesh(mergeGeometries(rockGeos), mat);
       m.castShadow = m.receiveShadow = true;
       m.name = 'mapRocks';
@@ -684,6 +702,7 @@ export class MapDecor {
     if (peb.length) {
       const stoneMat = new THREE.MeshStandardMaterial({ map: tex.stone.map, normalMap: tex.stone.normal, roughness: 0.8, metalness: 0 });
       patchDapple(stoneMat);
+      bakedSurfacePatch(stoneMat, { layer: GL.ROCK, relief: 0.8, keepMap: 0, waterLevel: waterTop(map), wetBand: 3 });
       const variants = [0, 1, 2, 3].map((i) => stoneGeometry(400 + i, 2, 0.35, 0.62));
       const per: Array<Array<[number, number, number]>> = [[], [], [], []];
       peb.forEach((p, i) => per[i % 4].push(p));
@@ -735,6 +754,7 @@ export class MapDecor {
     if (fl.length) {
       const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, side: THREE.DoubleSide });
       patchDapple(mat);
+      thinLightPatch(mat, 0.5);
       const m = new THREE.Mesh(mergeGeometries(fl), mat);
       m.castShadow = true;
       m.receiveShadow = true;

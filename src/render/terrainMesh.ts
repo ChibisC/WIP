@@ -4,10 +4,11 @@ import { fbm2 } from '../core/rng';
 import { addPatch, patchDapple } from './shaderPatch';
 import { textures } from './textures';
 import { bakeRendererNow } from './bake/detailBake';
-import { GL, GL_COUNT, GL_TILE, bakeGround } from './ground/groundBake';
+import { GL, GL_COUNT, GL_RELIEF, GL_TILE, bakeGround } from './ground/groundBake';
 import { RAMP_SIDE, nearestOnPath } from '../world/layers';
 import { inShape } from '../world/mapShapes';
 import { buildBankSculpt } from './ground/bankSculpt';
+import { setMapMood } from './mapBiomes';
 
 /** Size of one legacy texture tile in mm (the uv the tangent frame follows). */
 const TILE = 70;
@@ -59,8 +60,13 @@ export class TerrainMesh {
     uZoneWet: { value: new THREE.Vector4(0, 0, 0, 0) },
     uStormWet: { value: 0 },
     uDew: { value: 0 },
+    uRelief: { value: GL_RELIEF.slice() },
     uDetailFade: { value: 1 },
-    uBand: { value: new THREE.Vector2(0.03, 0.3) },
+    /** 0..1: how much the gameplay-zoom ground calms its ant-sized contrast (user rule: units stay readable) */
+    uReadable: { value: 1 },
+    /** damp moss on the wet margins of water (0 on sandy and dry biomes) */
+    uDampMoss: { value: 1 },
+    uBand: { value: new THREE.Vector2(0.05, 0.22) },
     uFaceDefault: { value: GL.BANK_SOIL as number },
   };
   /** wetness left in each flood zone after it drains (0..1) and when it was last flooded (s, performance clock) */
@@ -127,8 +133,10 @@ export class TerrainMesh {
     else if (biome === 'formicarium') u.uChan.value.set(GL.TRAIL, GL.MOSS, GL.SAND, GL.HUMUS);
     else u.uChan.value.set(GL.LOAM, GL.SWARD, GL.SAND, GL.HUMUS);
     u.uFaceDefault.value = biome === 'savanna' || biome === 'riverbank' ? GL.BANK_SAND : GL.BANK_SOIL;
+    u.uDampMoss.value = biome === 'savanna' || biome === 'formicarium' ? 0 : biome === 'riverbank' ? 0.5 : 1;
     // the story maps' moods (render only): the garden the morning after rain (dew), the riverbank hot and bright
     const id = t.map?.id;
+    setMapMood(id);
     u.uDew.value = id === 'gardenBelow' ? 1 : 0;
     this.stormWet = id === 'gardenBelow' ? 0.35 : 0;
   }
@@ -492,6 +500,9 @@ function groundPatch(gu: TerrainMesh['groundUniforms'], ou: TerrainMesh['overlay
     fragment: [
       ['#include <map_fragment>', '#include <map_fragment>\n GS gs = groundShade(); diffuseColor.rgb *= gs.alb;'],
       ['#include <roughnessmap_fragment>', 'float roughnessFactor = gs.rough;'],
+      // dry, porous ground shadows its own grazing sheen (no wet-cobble look); a water film brings it back
+      ['#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n material.specularF90 = mix(0.25, 1.0, gs.wet); material.specularColor *= mix(0.55, 1.0, gs.wet);'],
+      ['directLight.color *= _dapple;', 'directLight.color *= _dapple * gs.sunVis;'],
       ['#include <normal_fragment_maps>', 'normal = normalize((viewMatrix * vec4(gs.nW, 0.0)).xyz);'],
       [
         '#include <emissivemap_fragment>',
@@ -516,18 +527,19 @@ precision highp sampler2DArray;
 varying vec4 vCover; varying vec4 vG1; varying vec4 vG2; varying vec3 vNW;
 uniform sampler2DArray tGA, tGN;
 uniform sampler2D tNoise, uPhero, uDesign;
-uniform vec4 uChan; uniform float uInvTile[${GL_COUNT}];
-uniform vec4 uZoneWet; uniform float uStormWet, uDew, uDetailFade; uniform vec2 uBand; uniform float uFaceDefault;
+uniform vec4 uChan; uniform float uInvTile[${GL_COUNT}]; uniform float uRelief[${GL_COUNT}];
+uniform vec4 uZoneWet; uniform float uStormWet, uDew, uDetailFade, uReadable, uDampMoss; uniform vec2 uBand; uniform float uFaceDefault;
 uniform float uPheroOn; uniform vec3 uPheroColor; uniform vec2 uMapSize;
 
-struct GS { vec3 alb; float rough; vec3 nW; vec3 glint; };
-struct LS { vec3 alb; float rough; vec2 n; float h; float cav; vec3 mean; };
+struct GS { vec3 alb; float rough; vec3 nW; vec3 glint; float sunVis; float wet; };
+struct LS { vec3 alb; float rough; vec2 n; float h; float cav; vec3 mean; vec2 uvD; float aD; };
 
 vec2 gHash(vec2 p) { p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
 vec3 gDecode(vec3 c) { return pow(c, vec3(2.2)); }
 vec2 gRot(vec2 v, float a) { float c = cos(a), s = sin(a); return vec2(c * v.x - s * v.y, s * v.x + c * v.y); }
 
-// one layer, sampled with stochastic tiling: three randomly offset and rotated taps over a triangle grid, blended by height
+// one layer, sampled with stochastic tiling: three randomly offset and rotated taps over a triangle grid, blended by
+// height (the dominant tap's uv and angle are kept for the self-shadow march)
 LS gLayer(float L, vec2 uv, vec2 dx, vec2 dy, bool rotate) {
   vec2 q = uv * 2.6;
   vec2 sk = vec2(q.x - 0.57735027 * q.y, 1.15470054 * q.y);
@@ -546,7 +558,7 @@ LS gLayer(float L, vec2 uv, vec2 dx, vec2 dy, bool rotate) {
   vec4 N2 = textureGrad(tGN, vec3(u2, L), gRot(dx, a2), gRot(dy, a2));
   vec4 N3 = textureGrad(tGN, vec3(u3, L), gRot(dx, a3), gRot(dy, a3));
   vec3 wh = w * (vec3(N1.b, N2.b, N3.b) + 0.35);
-  wh = pow(wh, vec3(5.0)); wh /= max(dot(wh, vec3(1.0)), 1e-5);
+  wh = pow(wh, vec3(6.0)); wh /= max(dot(wh, vec3(1.0)), 1e-5);
   LS s;
   s.alb = gDecode(A1.rgb * wh.x + A2.rgb * wh.y + A3.rgb * wh.z);
   s.rough = A1.a * wh.x + A2.a * wh.y + A3.a * wh.z;
@@ -555,6 +567,9 @@ LS gLayer(float L, vec2 uv, vec2 dx, vec2 dy, bool rotate) {
   s.h = N1.b * wh.x + N2.b * wh.y + N3.b * wh.z;
   s.cav = N1.a * wh.x + N2.a * wh.y + N3.a * wh.z;
   s.mean = gDecode(textureLod(tGA, vec3(0.5, 0.5, L), 12.0).rgb);
+  if (wh.x >= wh.y && wh.x >= wh.z) { s.uvD = u1; s.aD = a1; }
+  else if (wh.y >= wh.z) { s.uvD = u2; s.aD = a2; }
+  else { s.uvD = u3; s.aD = a3; }
   return s;
 }
 
@@ -565,6 +580,8 @@ GS groundShade() {
   vec3 dPx = dFdx(P), dPy = dFdy(P);
   float dCam = distance(cameraPosition, P);
   float fade = smoothstep(140.0, 900.0, dCam) * uDetailFade;
+  // gameplay zoom: calm the ant-sized contrast (crumb shadows, dark voids) so units read against the ground
+  float read = smoothstep(90.0, 240.0, dCam) * uReadable;
   float wetStatic = vG1.x;
   int zi = int(vG2.x + 0.5) - 1;
   float zoneWet = zi == 0 ? uZoneWet.x : zi == 1 ? uZoneWet.y : zi == 2 ? uZoneWet.z : zi == 3 ? uZoneWet.w : 0.0;
@@ -577,27 +594,42 @@ GS groundShade() {
   float sandy = cw.z;
   float mud = smoothstep(0.55, 0.95, wetStatic) * (1.0 - sandy * 0.7) * (1.0 - trail);
   cw *= 1.0 - mud;
-  float W[7]; float Ls[7];
+  // damp moss on the shady wet margin of water (not on sand), where the ground stays wet but not flooded
+  float dampMoss = smoothstep(0.18, 0.4, wetStatic) * (1.0 - smoothstep(0.55, 0.8, wetStatic)) * (1.0 - sandy) * (1.0 - trail) * uDampMoss;
+  cw *= 1.0 - dampMoss * 0.7;
+  float W[8]; float Ls[8];
   W[0] = cw.x; Ls[0] = uChan.x; W[1] = cw.y; Ls[1] = uChan.y; W[2] = cw.z; Ls[2] = uChan.z; W[3] = cw.w; Ls[3] = uChan.w;
-  W[4] = gravel; Ls[4] = ${GL.GRAVEL}.0; W[5] = mud; Ls[5] = ${GL.MUD}.0; W[6] = trail; Ls[6] = ${GL.TRAIL}.0;
+  W[4] = gravel; Ls[4] = ${GL.GRAVEL}.0; W[5] = mud; Ls[5] = ${GL.MUD}.0; W[6] = trail; Ls[6] = sandy > 0.45 ? uChan.z : ${GL.TRAIL}.0;  // a sand slide wears to packed sand
+  W[7] = dampMoss * 0.8; Ls[7] = ${GL.MOSS}.0;
+  // the three heaviest layers only (the rest are below the height blend's reach anyway)
+  float wa = 0.02, wb = 0.02, wc = 0.02; float la = -1.0, lb = -1.0, lc = -1.0;
+  for (int i = 0; i < 8; i++) {
+    float w = W[i]; float l = Ls[i];
+    if (w > wa) { wc = wb; lc = lb; wb = wa; lb = la; wa = w; la = l; }
+    else if (w > wb) { wc = wb; lc = lb; wb = w; lb = l; }
+    else if (w > wc) { wc = w; lc = l; }
+  }
   vec3 alb = vec3(0.0); vec3 mean = vec3(0.0); float rough = 0.0; vec2 nrm = vec2(0.0); float cav = 0.0; float tot = 0.0;
-  float best = -1.0;
-  LS S[7];
-  float sc[7];
-  for (int i = 0; i < 7; i++) {
-    sc[i] = -1.0;
-    if (W[i] < 0.02) continue;
-    float it = uInvTile[int(Ls[i])];
-    S[i] = gLayer(Ls[i], P.xz * it, dPx.xz * it, dPy.xz * it, true);
-    sc[i] = W[i] + S[i].h * 0.55;
-    best = max(best, sc[i]);
-  }
-  for (int i = 0; i < 7; i++) {
-    if (sc[i] < 0.0) continue;
-    float w = max(sc[i] - (best - 0.28), 0.0);
-    alb += S[i].alb * w; mean += S[i].mean * w; rough += S[i].rough * w; nrm += S[i].n * w; cav += S[i].cav * w; tot += w;
-  }
+  LS A, B, C;
+  float sa = -1.0, sb = -1.0, sc_ = -1.0;
+  if (la >= 0.0) { float it = uInvTile[int(la)]; A = gLayer(la, P.xz * it, dPx.xz * it, dPy.xz * it, true); sa = wa + A.h * 0.55; }
+  if (lb >= 0.0) { float it = uInvTile[int(lb)]; B = gLayer(lb, P.xz * it, dPx.xz * it, dPy.xz * it, true); sb = wb + B.h * 0.55; }
+  if (lc >= 0.0) { float it = uInvTile[int(lc)]; C = gLayer(lc, P.xz * it, dPx.xz * it, dPy.xz * it, true); sc_ = wc + C.h * 0.55; }
+  float best = max(sa, max(sb, sc_));
+  float ka = sa < 0.0 ? 0.0 : max(sa - (best - 0.28), 0.0);
+  float kb = sb < 0.0 ? 0.0 : max(sb - (best - 0.28), 0.0);
+  float kc = sc_ < 0.0 ? 0.0 : max(sc_ - (best - 0.28), 0.0);
+  tot = ka + kb + kc;
+  float domL = 0.0; vec2 domUv = vec2(0.0); float domA = 0.0; float domH = 0.0;
   if (tot < 1e-4) { alb = vec3(0.12, 0.09, 0.07); mean = alb; rough = 0.9; cav = 1.0; tot = 1.0; }
+  else {
+    if (ka > 0.0) { alb += A.alb * ka; mean += A.mean * ka; rough += A.rough * ka; nrm += A.n * ka; cav += A.cav * ka; }
+    if (kb > 0.0) { alb += B.alb * kb; mean += B.mean * kb; rough += B.rough * kb; nrm += B.n * kb; cav += B.cav * kb; }
+    if (kc > 0.0) { alb += C.alb * kc; mean += C.mean * kc; rough += C.rough * kc; nrm += C.n * kc; cav += C.cav * kc; }
+    if (ka >= kb && ka >= kc) { domL = la; domUv = A.uvD; domA = A.aD; domH = A.h; }
+    else if (kb >= kc) { domL = lb; domUv = B.uvD; domA = B.aD; domH = B.h; }
+    else { domL = lc; domUv = C.uvD; domA = C.aD; domH = C.h; }
+  }
   alb /= tot; mean /= tot; rough /= tot; nrm /= tot; cav /= tot;
 
   // ---- bank faces: steep ground shows the bank's own face, projected across it (strata run level)
@@ -606,7 +638,7 @@ GS groundShade() {
   vec3 nWorld;
   vec3 T0 = normalize(vec3(1.0, 0.0, 0.0) - N * N.x);
   vec3 B0 = normalize(cross(T0, N));
-  float relief = 1.0 - fade * 0.6;
+  float relief = (1.0 - fade * 0.6) * (1.0 - read * 0.3);
   relief *= 1.0 - wet * 0.45;
   nWorld = normalize(T0 * nrm.x * relief + B0 * nrm.y * relief + N);
   if (faceW > 0.01) {
@@ -623,43 +655,88 @@ GS groundShade() {
     nWorld = normalize(mix(nWorld, nf, faceW));
   }
 
+  // ---- the sun's light through the ground's own relief: crumbs and pebbles shade the ground beside them (close zoom
+  // only; a march toward the sun through the dominant layer's height)
+  float sunVis = 1.0;
+#if NUM_DIR_LIGHTS > 0
+  if (dCam < 220.0 && faceW < 0.5) {
+    vec3 sunW = normalize((vec4(directionalLights[0].direction, 0.0) * viewMatrix).xyz);
+    vec2 sxz = sunW.xz;
+    float sl = length(sxz);
+    if (sl > 0.05 && sunW.y > 0.05) {
+      int Li = int(domL + 0.5);
+      float it = uInvTile[Li];
+      float rel = uRelief[Li];
+      vec2 dir = gRot(sxz / sl, domA) * it;     // 1 mm toward the sun, in the tap's uv
+      float tanE = sunW.y / sl;
+      float h0 = domH * rel;
+      float occ = 0.0;
+      for (int k = 1; k <= 8; k++) {
+        float d = float(k) * float(k) * 0.07;   // 0.07 … 4.5 mm
+        float hk = textureLod(tGN, vec3(domUv + dir * d, domL), 0.0).b * rel;
+        occ = max(occ, (hk - h0 - d * tanE) / (0.25 + d * 0.3));
+      }
+      sunVis = 1.0 - clamp(occ, 0.0, 1.0) * (1.0 - smoothstep(120.0, 220.0, dCam)) * (1.0 - wet * 0.3);
+    }
+  }
+#endif
+
   // ---- light baked into the ground: hollows, the foot of banks; the lip drier, crumbs spilled at the foot
-  alb *= mix(1.0, cav, 0.55);
+  alb *= mix(1.0, cav, 0.6 * (1.0 - read * 0.5));
   float ao = vG1.y;
   alb *= mix(0.62, 1.0, ao);
-  alb *= 1.0 + vG2.z * 0.1 - vG2.w * 0.08;
-  // two scales of colour drift (no two patches of ground alike)
+  // the lip: flat ground beside it dries first (paler); on the face itself the top band is the dark, root-filled
+  // topsoil; crumbs spilled at the foot
+  alb *= 1.0 + vG2.z * 0.1 * (1.0 - faceW) - vG2.z * 0.28 * faceW - vG2.w * 0.08;
+  // two scales of colour drift (no two patches of ground alike): damper and drier patches, warmer and greyer
   float macro = texture2D(tNoise, P.xz / 900.0).g;
   float macro2 = texture2D(tNoise, P.xz / 260.0 + 0.37).r;
-  alb *= 0.86 + macro * 0.22 + (macro2 - 0.5) * 0.12;
+  float macro3 = texture2D(tNoise, P.xz / 95.0 + 0.71).b;
+  float drift = 0.86 + macro * 0.22 + (macro2 - 0.5) * 0.14 + (macro3 - 0.5) * 0.08;
+  alb *= drift; mean *= drift;
   alb = mix(alb, alb * vec3(1.04, 1.0, 0.94), smoothstep(0.4, 0.7, macro2) * 0.5);
-  // detail fades toward the layer's mean with distance (units stay readable at gameplay zoom)
-  alb = mix(alb, mean * (0.86 + macro * 0.22), fade * 0.5);
+  // detail fades toward the layer's mean with distance; at gameplay zoom the micro-contrast is calmed a little
+  alb = mix(alb, mean, fade * 0.5 + read * 0.22);
 
-  // ---- wetness: darker, glossier, its bumps filled in
+  // ---- the strand line: where the water last reached, a band of dark organic flecks, grit and dried foam
+  float strand = smoothstep(0.38, 0.48, wetStatic) * (1.0 - smoothstep(0.58, 0.7, wetStatic));
+  if (strand > 0.01) {
+    vec2 sq = P.xz * 1.6;
+    vec2 sh = gHash(floor(sq) + 17.0);
+    float fl = smoothstep(0.32, 0.12, length(fract(sq) - 0.5 - (sh - 0.5) * 0.5)) * step(0.62, sh.x);
+    alb = mix(alb, sh.y > 0.8 ? vec3(0.55, 0.53, 0.48) : vec3(0.035, 0.028, 0.02), fl * strand * (1.0 - fade));
+  }
+
+  // ---- wetness: darker, a little more saturated, glossier, its bumps filled in
   float porous = 1.0 - faceW * 0.3;
+  float wl = dot(alb, vec3(0.2126, 0.7152, 0.0722));
+  alb = mix(alb, mix(vec3(wl), alb, 1.15), wet * 0.6);
   alb *= mix(1.0, 0.56, wet * porous);
+  mean *= mix(1.0, 0.56, wet * porous);
   rough = mix(rough, 0.16 + 0.2 * (1.0 - cav), wet * 0.85);
   nWorld = normalize(mix(nWorld, N, wet * 0.35));
 
-  // ---- the value band: ground never so dark or so bright that ants and creatures melt into it
+  // ---- the value band: the ground's local mean is kept between uBand.x and uBand.y (linear) so dark and rust-coloured
+  // units never melt into it; the detail around the mean keeps its contrast, only the deepest voids are lifted
+  float lm = dot(mean, vec3(0.2126, 0.7152, 0.0722));
+  float k = lm < uBand.x ? uBand.x / max(lm, 1e-4) : lm > uBand.y ? uBand.y / lm : 1.0;
+  alb *= mix(1.0, k, 0.85);
   float l = dot(alb, vec3(0.2126, 0.7152, 0.0722));
-  if (l < uBand.x) alb *= mix(1.0, uBand.x / max(l, 1e-4), 0.75);
-  else if (l > uBand.y) alb *= mix(1.0, uBand.y / l, 0.6);
+  if (l < uBand.x * 0.35) alb *= mix(1.0, uBand.x * 0.35 / max(l, 1e-4), 0.6);
 
   // ---- dew on the morning maps: tiny glints on grass and moss
   vec3 glint = vec3(0.0);
   if (uDew > 0.0) {
     vec2 cell = floor(P.xz * 3.0);
     vec2 hh = gHash(cell + 3.7);
-    float grassy = vCover.y * (1.0 - wetStatic);
+    float grassy = vCover.y * (1.0 - wetStatic) * (1.0 - faceW);
     float dot_ = step(0.985, hh.x) * smoothstep(0.35, 0.0, length(fract(P.xz * 3.0) - 0.5 - (hh - 0.5) * 0.4));
     float tw = 0.6 + 0.4 * sin(uTime * 2.0 + hh.y * 40.0 + dot(cameraPosition, vec3(0.05)));
     glint = vec3(0.9, 0.95, 1.0) * dot_ * tw * grassy * uDew * (1.0 - fade) * 0.35;
     rough = mix(rough, 0.45, grassy * uDew * 0.4);
   }
   GS g;
-  g.alb = alb; g.rough = clamp(rough, 0.08, 1.0); g.nW = nWorld; g.glint = glint;
+  g.alb = alb; g.rough = clamp(rough, 0.08, 1.0); g.nW = nWorld; g.glint = glint; g.sunVis = sunVis; g.wet = wet;
   return g;
 }
 `;
