@@ -25,22 +25,21 @@ and rearranged so the three holes read as one nest:
 | Nasute termite | The lobed carton nest over the middle, its three openings at its base, gallery tubes running off between them. |
 | Sickle-jaw termite | Three small soil collars in the leaf litter (no extra foraging holes: three holes, one nest). |
 
-The table below is the original study (2026-10-26), when each colony had a main entrance and up to two extra
-ones.
+What the real nests look like (the study behind the looks above; 2026-10-26):
 
-| Species (game) | What the real entrance looks like | Model |
-|---|---|---|
-| Black garden ant, *Lasius niger* | Small round holes, often several, each ringed by a low crater ("volcano") of fine, crumbly soil pellets that workers carry up and drop at the rim; nests are also common under a flat stone or paving slab, with the hole at its edge. | Hole r 1.6 mm; pellet crater (rim 2.1 × hole, 1.5 mm high, apron 5.5 ×); 110 pellets; the first extra entrance has a flat stone over one side. |
-| Red wood ant, *Formica rufa* | A large dome thatched with pine needles, twigs and plant bits over a soil core; the entrance holes open in its sides and near the base; a worn, bare ring of ground at the foot, with trails radiating out to trees. | One thatched dome per nest over the site centre (radius ≥ 1.3 × the farthest hole, 16–30 mm, 0.42 × as high), 250–600 needles and twigs lying on it, holes with a small lip in its flanks; five darker trails from the foot. |
-| Leafcutter ant, *Atta cephalotes* | Wide crater mounds of bare, loose excavated soil (often reddish or yellowish subsoil) with big entrance holes; cleared trails lead in with leaf fragments being carried; a separate pale refuse dump of spent fungus and dead ants outside. | Hole r 3.2 mm; wide crater of loose orange-brown soil (3.2 mm rim, apron 6.5 ×), 160 clods; green leaf fragments along the trail direction; a pale crumbly refuse dump 30 mm from the main hole (where corpses are dropped). |
-| Tropical fire ant, *Solenopsis geminata* | Low irregular mounds or craters of worked granular soil in open sunny ground, up to ~60 cm across and 30 cm high in the wild, with no obvious central opening: workers come and go through many small holes and foraging tunnels at the edges (up to ~20 per nest). | The existing granular dome over the nest (`mounds.ts`) stays; each entrance is a small hole (r 1.2 mm) with a low granular collar away from the dome. |
-| Army ant, *Eciton burchellii* | No dug nest: the bivouac, a living mass of hundreds of thousands of workers linked by their legs and bodies round the queen and brood (about a metre across), hung under a log or between buttress roots; it dissolves into raid columns each morning. The mass itself is the entrance. | A heap of 260–760 linked worker bodies (with leg links) over the main hole; ants walk onto it and vanish inside. |
-| Gene Thief Ant (*Formica plagiaria*, fictional; modelled on *F. sanguinea*) | *F. sanguinea* nests in soil under stones, stumps and at the base of plants, with small earth mounds mixed with plant debris. | A low pellet crater with a few plant slivers. |
-| Hell ant (Haidomyrmecinae, extinct; **reconstruction**) | Nothing survives of their nests (all known from Cretaceous amber). The model assumes a small ground-nesting hunter in leaf litter. | A neat round hole (r 1.4 mm) with a minimal soil rim among a few fallen leaf pieces. Stated as a reconstruction in game. |
-| Gilded / Saiy-Ants (*Aurimyrmex*, fictional, carpenter-ant-like) | Carpenter ants (*Camponotus*) excavate galleries in decaying wood (stumps, roots, logs) and push out coarse pale frass: wood shavings mixed with insect parts, piling below the openings. | A rotting stump (bark sides, flared roots, pale crumbling top) beside the main hole; pale sawdust frass spilling out round every hole. |
-| Gene-Thief Termants (*Chimaeromyrmex*, fictional hybrid) | Hybrid of an ant's soil crater and a termite's carton. | A soil crater whose crest is plastered with dark, papery carton flakes. |
-| Nasute termites, *Nasutitermes corniger* | Dark brown carton nests (chewed wood and faeces bound with saliva) with a lumpy surface and lobes, small ones near spherical; covered foraging galleries (shelter tubes about one soldier length wide) run from the nest along the ground and up trunks. | A lobed dark carton mound round the main hole (carton material), three lumpy covered gallery tubes running off along the ground. |
-| Sickle-jaw termites, *Rhynchotermes perarmatus* | Nest underground or shallow and epigeic in forest leaf litter; most species forage on the surface in the open, mainly on litter. Openings are inconspicuous. | A tiny soil turret (r 1.1 mm hole, 1.1 mm collar) in leaf litter, with four smaller foraging holes and their collars scattered nearby. |
+| Species (game) | What the real entrance looks like |
+|---|---|
+| Black garden ant, *Lasius niger* | Small round holes, often several, each ringed by a low crater ("volcano") of fine, crumbly soil pellets that workers carry up and drop at the rim; nests are also common under a flat stone or paving slab, with the hole at its edge. |
+| Red wood ant, *Formica rufa* | A large dome thatched with pine needles, twigs and plant bits over a soil core; the entrance holes open in its sides and near the base; a worn, bare ring of ground at the foot, with trails radiating out to trees. |
+| Leafcutter ant, *Atta cephalotes* | Wide crater mounds of bare, loose excavated soil (often reddish or yellowish subsoil) with big entrance holes; cleared trails lead in with leaf fragments being carried; a separate pale refuse dump of spent fungus and dead ants outside. |
+| Tropical fire ant, *Solenopsis geminata* | Low irregular mounds or craters of worked granular soil in open sunny ground, up to ~60 cm across and 30 cm high in the wild, with no obvious central opening: workers come and go through many small holes and foraging tunnels at the edges (up to ~20 per nest). |
+| Army ant, *Eciton burchellii* | No dug nest: the bivouac, a living mass of hundreds of thousands of workers linked by their legs and bodies round the queen and brood (about a metre across), hung under a log or between buttress roots; it dissolves into raid columns each morning. The mass itself is the entrance. |
+| Gene Thief Ant (*Formica plagiaria*, fictional; modelled on *F. sanguinea*) | *F. sanguinea* nests in soil under stones, stumps and at the base of plants, with small earth mounds mixed with plant debris. |
+| Hell ant (Haidomyrmecinae, extinct; **reconstruction**) | Nothing survives of their nests (all known from Cretaceous amber). The model assumes a small ground-nesting hunter in leaf litter. |
+| Gilded / Saiy-Ants (*Aurimyrmex*, fictional, carpenter-ant-like) | Carpenter ants (*Camponotus*) excavate galleries in decaying wood (stumps, roots, logs) and push out coarse pale frass: wood shavings mixed with insect parts, piling below the openings. |
+| Gene-Thief Termants (*Chimaeromyrmex*, fictional hybrid) | Hybrid of an ant's soil crater and a termite's carton. |
+| Nasute termites, *Nasutitermes corniger* | Dark brown carton nests (chewed wood and faeces bound with saliva) with a lumpy surface and lobes, small ones near spherical; covered foraging galleries (shelter tubes about one soldier length wide) run from the nest along the ground and up trunks. |
+| Sickle-jaw termites, *Rhynchotermes perarmatus* | Nest underground or shallow and epigeic in forest leaf litter; most species forage on the surface in the open, mainly on litter. Openings are inconspicuous. |
 
 ## Underground (all species)
 Since 2026-11-01 the nest's one entrance is a wide 7-hex "flower" at the nest's edge: its floor slopes up
@@ -49,7 +48,7 @@ along the middle, the species' bits (soil pellets; needles for wood ants, leaf s
 flakes for nasutes and Termants, frass for Gilded Ants, worked soil for fire ants) round its rim where the
 walls flare out, and one broad soft shaft of daylight (cool white by day, faint blue moonlight at night)
 falling across it. A fallen colony's entrance is capped with fresh dark soil over all seven hexes and has no
-light. (Before: a tunnel of three hexes per entrance.) Creature caves keep their three-hex tunnel.
+light. Creature caves keep their three-hex tunnel.
 
 ## Sources
 - *Solenopsis geminata*: [Wikipedia](https://en.wikipedia.org/wiki/Solenopsis_geminata) (mounds or craters up to 2 ft across and 12 in tall, up to ~20 entrance holes, open sunny soil).

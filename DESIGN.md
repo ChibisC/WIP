@@ -144,7 +144,7 @@ rally, defend, attack, grapple, climb, flee, enterNest, exitNest, dead`
 **Nest jobs (Revision 2, `sim/jobs.ts`).**
 - All nest work is done physically by **workers**; soldiers never take nest jobs.
 - Each colony keeps a **job board**. Job types, in strict priority order:
-  1. **Dig**: a marked soil hex. Up to 2 workers per hex. (The entrance dig of extra entrances is gone with them, 2026-11-01.)
+  1. **Dig**: a marked soil hex. Up to 2 workers per hex.
   2. **Build**: a planned tile. Upgrade and delete jobs are build jobs too. One worker each.
   3. **Spawn**: pull an egg from the tip of the queen's abdomen and carry it to a brood tile. One worker each.
 - **Points.** Every dig, build, upgrade or delete job needs **6 completion points**. A worker adds **2 / 4 / 6 points per second** at tile level 1 / 2 / 3 (nanitics count as level 1). A thin progress ring shows over a hex while it is being worked.

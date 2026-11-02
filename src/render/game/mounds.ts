@@ -25,10 +25,18 @@ interface Mound {
   mesh: THREE.Mesh | null;
   /** radius the mesh was built for */
   builtR: number;
+  /** the anthill's holes (x, y pairs): no lumps or clods over them */
+  holes: number[];
 }
 
 const RINGS = 14;
 const SEG = 40;
+
+/** Is (x, y) within d mm of one of the dome's holes? */
+function nearHole(m: Mound, x: number, y: number, d: number): boolean {
+  for (let i = 0; i < m.holes.length; i += 2) if ((x - m.holes[i]) ** 2 + (y - m.holes[i + 1]) ** 2 < d * d) return true;
+  return false;
+}
 
 export class SurfaceMounds {
   readonly group = new THREE.Group();
@@ -90,8 +98,12 @@ export class SurfaceMounds {
   }
 
   update(w: World, ground: (x: number, y: number) => number): void {
+    // (the domes first: an anthill's holes sit on its dome, so they are rebuilt with it)
+    if (this.frame++ % 30 === 0) this.updateDomes(w, ground);
     this.entrances.update(w, (x, y) => ground(x, y) + this.domeHeight(x, y));
-    if (this.frame++ % 30 !== 0) return;
+  }
+
+  private updateDomes(w: World, ground: (x: number, y: number) => number): void {
     const seen = new Set<number>();
     for (const c of w.s.colonies) {
       if (c.species !== 'solenopsis' || !c.alive || !w.nest(c.id)) continue;
@@ -100,12 +112,14 @@ export class SurfaceMounds {
       // the dome over the nest, its three small holes at its edge (no opening in the middle: user spec 2026-11-01)
       const s = anthillCentre(c.entrances, { x: 0, y: 0 });
       const far = Math.max(...c.entrances.map((e) => Math.hypot(e.sx - s.x, e.sy - s.y)));
-      const r = Math.max(far * 1.08, 15 + Math.min(16, Math.sqrt(Math.max(0, c.living)) * 1.7));
+      // (the holes low on its flank, where they show: about 0.75 of its radius out)
+      const r = Math.max(far * 1.32, 15 + Math.min(16, Math.sqrt(Math.max(0, c.living)) * 1.7));
       let m = this.mounds.find((x) => x.colony === c.id);
       if (!m) {
-        m = { colony: c.id, x: s.x, y: s.y, r, h: r * 0.3, mesh: null, builtR: 0 };
+        m = { colony: c.id, x: s.x, y: s.y, r, h: r * 0.3, mesh: null, builtR: 0, holes: [] };
         this.mounds.push(m);
       }
+      m.holes = c.entrances.flatMap((e) => [e.sx, e.sy]);
       m.x = s.x;
       m.y = s.y;
       m.r = r;
@@ -114,6 +128,7 @@ export class SurfaceMounds {
       if (Math.abs(m.builtR - r) > 0.8) {
         this.build(m, ground);
         this.scatter(ground);
+        this.entrances.rebuild(c.id);
       }
     }
     for (let i = this.mounds.length - 1; i >= 0; i--) {
@@ -140,6 +155,7 @@ export class SurfaceMounds {
         const x = m.x + Math.cos(a) * d;
         const y = m.y + Math.sin(a) * d;
         const sz = rng.range(0.6, 1.6) * (1 - 0.4 * (d / m.r));
+        if (nearHole(m, x, y, 4.5)) continue;
         this.p.set(x, ground(x, y) + this.height(x, y) + sz * 0.15, y);
         this.e.set(rng.range(0, 6), rng.range(0, 6), rng.range(0, 6));
         this.q.setFromEuler(this.e);
@@ -172,7 +188,7 @@ export class SurfaceMounds {
         const y = m.y + Math.sin(a) * rr * wob;
         // granular surface: small bumps of worked soil, fading out at the rim; dry and paler on top
         const k = 1 - rr / (m.r * 1.04);
-        const bump = (rng.next() - 0.5) * 0.6 * Math.min(1, k * 4);
+        const bump = (rng.next() - 0.5) * 0.6 * Math.min(1, k * 4) * (nearHole(m, x, y, 5) ? 0 : 1);
         pos.push(x, ground(x, y) + this.height(x, y) + bump + 0.05, y);
         const blotch = 0.5 + 0.5 * Math.sin(x * 0.35 + Math.sin(y * 0.27) * 2) * Math.sin(y * 0.31 + Math.sin(x * 0.23) * 2);
         c.setHSL(0.075, 0.38, 0.22 + 0.07 * blotch + 0.08 * k + 0.02 * rng.next(), THREE.SRGBColorSpace);

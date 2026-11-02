@@ -202,6 +202,13 @@ export class SurfaceEntrances {
     return !this.holes.length && !this.masses.length;
   }
 
+  /** Rebuild a colony's anthill on the next update (the ground under it changed: a fire-ant dome grew). */
+  rebuild(colony: number): void {
+    const b = this.built.get('c' + colony);
+    if (b) b.sig = '';
+    this.frame = 0;
+  }
+
   update(w: World, ground: (x: number, y: number) => number): void {
     if (this.frame++ % 30 !== 0) return;
     const seen = new Set<string>();
@@ -347,10 +354,10 @@ export class SurfaceEntrances {
       const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: 0.45 * (1 - 0.6 * fallC), k: 1, seed: c.id * 31 + 6, ring: far / R };
       b.masses.push(m);
       craterGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed, h / m.h), true));
-      details.push(...leafBits(ctr.x, ctr.y, R * 1.8, 30, rng, (x, y) => ground(x, y) + massHeight(m, x, y), [0x5a3e22, 0x7a5430, 0x4a321c, 0x6a4a2a, 0x8a6236], [2, 4.2], far * 0.2));
+      details.push(...leafBits(ctr.x, ctr.y, R * 1.8, 14, rng, (x, y) => ground(x, y) + massHeight(m, x, y), [0x5a3e22, 0x7a5430, 0x4a321c, 0x6a4a2a, 0x8a6236], [2, 4.2], far * 0.2));
     } else if (look === 'sickle') {
       // three small openings with soil collars in the leaf litter
-      details.push(...leafBits(ctr.x, ctr.y, far * 1.9, 26, rng, ground, [0x7a5a30, 0x5e4426, 0x9a7038], [1.4, 2.8], 0));
+      details.push(...leafBits(ctr.x, ctr.y, far * 1.9, 12, rng, ground, [0x7a5a30, 0x5e4426, 0x9a7038], [1.4, 2.8], 0));
     }
     const under = (x: number, y: number) => {
       let h = ground(x, y);
