@@ -4,6 +4,7 @@ import { AS, Food, SURFACE } from '../../sim/types';
 import { casteOf } from '../../sim/species';
 import { ECITON } from '../../sim/balance';
 import { InstancedPool } from './instancedPool';
+import type { JawHold } from '../ants/antRenderer';
 import { appleGeometry, beetleGeometry, berryGeometry, crumbGeometry, cricketGeometry, dropletGeometry, flyGeometry, leafFragGeometry, mothGeometry, seedGeometry, woodGeometry } from './foodModels';
 import { patchDapple } from '../shaderPatch';
 import { buildLeafLitterGeometry, createLeafLitterMaterial } from '../termite/soil';
@@ -105,7 +106,12 @@ export class FoodRenderer {
   /** creature carcasses still drawn by the creature renderer (their food item is not drawn twice) */
   private carcass = new Set<number>();
 
-  update(w: World, space: number, alpha: number, map: SpaceMapper): void {
+  /**
+   * `hold`: where a carrier's jaws are drawn this frame (AntRenderer.holdOf) — a load in the jaws is drawn there, so it
+   * moves with the head (2026-11-01, 21:48: carried food lagged a tick behind the ant). Without it, a load is placed
+   * ahead of the carrier's drawn (interpolated) position.
+   */
+  update(w: World, space: number, alpha: number, map: SpaceMapper, hold?: (id: number) => JawHold | null): void {
     for (const p of this.pools.values()) p.begin();
     const carcass = this.carcass;
     carcass.clear();
@@ -125,13 +131,21 @@ export class FoodRenderer {
         // a termite worker holds its fragment in the model kit's own carry pose (soldiers' meshes have no
         // carried items, so their loads are drawn here like an ant's)
         if (casteOf(carrier.caste).termite === 'worker') continue;
-        const L = casteOf(carrier.caste).length;
+        const cc = casteOf(carrier.caste);
+        const L = cc.length;
+        // the carrier as drawn: its interpolated position and heading (the sim's load point is a tick behind it)
+        const ax = carrier.px + (carrier.x - carrier.px) * alpha;
+        const ay = carrier.py + (carrier.y - carrier.py) * alpha;
+        let dh = carrier.h - carrier.ph;
+        dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+        const ah = carrier.ph + dh * alpha;
+        const jaw = cc.porter && key !== 'leaf' ? null : (hold?.(carrier.id) ?? null);
         // hell ants clamp food up against the horn (the mandible–horn socket)
-        lift = L * (casteOf(carrier.caste).snap ? 0.38 : 0.2);
-        if (casteOf(carrier.caste).porter && key !== 'leaf') {
+        lift = L * (cc.snap ? 0.38 : 0.2);
+        if (cc.porter && key !== 'leaf') {
           // army-ant porter: slung under the body (the sim puts it at the carry-under point), long axis along the ant
-          map.pos(x, y, L * ECITON.porter.underLift, this.p);
-          map.quat(f.h, this.q);
+          map.pos(ax + Math.cos(ah) * L * ECITON.porter.underFwd, ay + Math.sin(ah) * L * ECITON.porter.underFwd, L * ECITON.porter.underLift, this.p);
+          map.quat(ah, this.q);
           scale = Math.min(f.size, L * ECITON.porter.underMaxSize);
           this.s.set(scale, scale, scale);
           this.m.compose(this.p, this.q, this.s);
@@ -141,10 +155,15 @@ export class FoodRenderer {
           continue;
         }
         if (key === 'leaf') {
-          // carried upright over the head
+          // carried upright over the head, its edge in the jaws
           scale = L * 1.15;
-          map.pos(x - Math.cos(f.h) * L * 0.25, y - Math.sin(f.h) * L * 0.25, L * 0.32, this.p);
-          map.quat(f.h + Math.PI / 2, this.q);
+          if (jaw) {
+            map.up(this.up);
+            this.p.set(jaw.x, jaw.y, jaw.z).addScaledVector(this.up, L * 0.18);
+            this.p.x -= jaw.fx * L * 0.25;
+            this.p.z -= jaw.fz * L * 0.25;
+          } else map.pos(ax + Math.cos(ah) * L * 0.3, ay + Math.sin(ah) * L * 0.3, L * 0.32, this.p);
+          map.quat(ah + Math.PI / 2, this.q);
           map.up(this.up);
           this.q2.setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0);
           // stand the fragment up: rotate so its plane is vertical, tilted back slightly
@@ -156,6 +175,21 @@ export class FoodRenderer {
           continue;
         }
         scale = Math.min(f.size, L * 0.6);
+        // in the jaws as drawn (hell ants: up against the horn)
+        map.quat(ah, this.q);
+        if (jaw) {
+          this.p.set(jaw.x, jaw.y, jaw.z);
+          if (cc.snap) {
+            map.up(this.up);
+            this.p.addScaledVector(this.up, L * 0.16);
+          }
+        } else map.pos(ax + Math.cos(ah) * L * 0.55, ay + Math.sin(ah) * L * 0.55, lift, this.p);
+        this.s.set(scale, scale, scale);
+        this.m.compose(this.p, this.q, this.s);
+        let cc2: THREE.Color | undefined;
+        if (key === 'crumb') cc2 = this.c.setHex(CRUMB_COL[f.from] ?? CRUMB_COL[f.kind] ?? 0x5a4030);
+        pool.add(this.m, cc2);
+        continue;
       } else if (f.amount < f.max && (key === 'fly' || key === 'cricket' || key === 'grasshopper' || key === 'moth' || key === 'beetle' || key === 'berry' || key === 'apple')) {
         // partly eaten items shrink
         scale = f.size * (0.45 + 0.55 * Math.sqrt(Math.max(0, f.amount / f.max)));

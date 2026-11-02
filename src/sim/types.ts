@@ -175,6 +175,8 @@ export interface Ant {
   avs?: number;
   /** ticks left following an obstacle's edge before turning back toward its goal (movement.ts) */
   avT?: number;
+  /** a forager that stopped for a dropped load on its way to a food source: the source, to go back to after (antAI.ts) */
+  fsrc?: number;
   /** bites in its current hold (combat.ts: a fighter takes turns with teammates pressing for its foe) */
   bN?: number;
   /** taking turns: seconds left of its turn out of the fight (stepping back, then pressing in; no place reserved), signed by
@@ -373,6 +375,8 @@ export interface Food {
   age: number;
   /** Termants: a piece bitten off a corpse remembers what it was (`from` of the corpse) and the gene samples it carries */
   gsrc?: string;
+  /** dropped by an ant on its way (a fight, an order): 1 — foragers passing by pick it up again (colony.ts dropCarried) */
+  loose?: number;
   gene?: number;
 }
 

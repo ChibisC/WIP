@@ -91,6 +91,7 @@ export function makeAnt(w: World, colony: number, caste: string, space: number, 
     avT: 0,
     bN: 0,
     rotT: 0,
+    fsrc: 0,
   };
   // Species extras, only on the castes that use them (other species' records stay as they were).
   if (c.termite) {

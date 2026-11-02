@@ -157,6 +157,7 @@ Tests (`tests/underpass.ts`, in `npm test`; `main`'s models):
 
 ## 8. Visibility and control
 - An ant under a taller unit (`Ant.udr`) is outlined through it: its body's outline at half its height, in its team's colour (the arena's team colours; elsewhere green yours, blue an ally's, red a foe's), drawn over everything (`render/game/underOutline.ts`; on the surface and in the nests).
+  **Removed 2026-11-01** (user: "remove the outline for creatures under creatures"): an ant under a taller unit is now simply hidden by it.
 - Clicking picks the unit nearest the cursor; clicking the same spot again (within 6 px) picks the next one there, round and round (`GameSession.pickAnt`).
 - Health: the creature health bars are screen-space labels (never hidden by a body); ants show theirs in the info card. Nothing to offset. There is no box select in this game (EotU-style: orders are markers, not unit selection).
 - Posture: an ant under another lowers its antennae and head where the room is close (`underPosture` in `game/antViews.ts`) and crouches as far as it needs (§9; `AntView.crouch`, eased in the renderer, the head and gaster tipped up just enough to stay off the ground).

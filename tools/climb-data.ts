@@ -25,6 +25,9 @@ import { Rig, ClimbRec } from '../src/render/creatures/rig';
 import { BUILDERS, CHAINS, CrPose } from '../src/render/creatures/builders';
 import { CREATURES } from '../src/sim/creatures/kinds';
 import { BALANCE } from '../src/sim/balance';
+import * as THREE from 'three';
+import { partGeometry } from '../src/render/creatures/primitives';
+import { SB, STAG_REF, registerStagParts } from '../src/render/creatures/stagBeetle';
 
 /** A body part as an ellipsoid in a body frame (fractions of L): centre and semi-axes. */
 interface Part {
@@ -76,7 +79,67 @@ function chainWeak(n: number, from: number, to: number): WeakSpec[] {
   return out;
 }
 
-const KINDS: Record<string, { legs: (name: string) => boolean; parts: Part[]; weak: WeakSpec[]; legBases: boolean }> = {
+/**
+ * Hand-placed mount slots on a sculpted model (user 2026-11-01, 21:36: "make the climbing positions of creatures on the
+ * stag beetle look more appealing and realistic"): each rider sits on the model's own surface (found by casting down
+ * onto its meshes, the normal from the surface's slope there) and faces a joint or edge an ant would really bite —
+ * where the ellipsoid slots left riders floating a few millimetres over the shell or hanging in the air beside it.
+ */
+interface Mounts {
+  weak: Array<{ name: string; frame: string; x: number; y: number; z: number }>;
+  slots: Array<{ frame: string; x: number; z: number; w: number }>;
+  surface: (frame: string, x: number, z: number) => number;
+}
+
+/**
+ * The stag beetle: pairs of riders at the head–pronotum joint, on the head behind the eyes (facing the antenna bases),
+ * on the pronotum's side margins (heads over the edge, at the front legs), at the pronotum–elytra joint, out on the
+ * elytra's side margins and at the apex where the abdomen shows. Head riders sit on the head's own frame (`head`,
+ * recorded by the model) and ride its pitch and toss.
+ */
+function stagMounts(): Mounts {
+  registerStagParts();
+  const mesh = (n: string) => {
+    const m = new THREE.Mesh(partGeometry(n), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    m.updateMatrixWorld();
+    return m;
+  };
+  const body = ['stag_elytra', 'stag_pronotum', 'stag_under'].map(mesh);
+  const head = [mesh('stag_head4')];
+  const rc = new THREE.Raycaster();
+  const surface = (frame: string, x: number, z: number): number => {
+    rc.set(new THREE.Vector3(x * STAG_REF, 100, z * STAG_REF), new THREE.Vector3(0, -1, 0));
+    const hit = rc.intersectObjects(frame === 'head' ? head : body, false)[0];
+    if (!hit) throw new Error(`stagBeetle: no ${frame} surface at ${x}, ${z}`);
+    return hit.point.y / STAG_REF;
+  };
+  const m = (side: number) => ({ y: SB.pronotum.top * 0.7, z: side * SB.pronotum.half * 1.02 });
+  const e = (side: number) => ({ y: SB.belly + 0.04, z: side * SB.elytra.half * 1.0 });
+  const weak: Mounts['weak'] = [
+    { name: 'neck', frame: 'body', x: SB.neck.x, y: SB.neck.y + 0.012, z: 0 },
+    { name: 'pronotum–elytra', frame: 'body', x: SB.elytra.x1 - 0.012, y: 0.165, z: 0 },
+    { name: 'L antenna base', frame: 'head', x: SB.ant.x, y: SB.ant.y, z: SB.ant.z },
+    { name: 'R antenna base', frame: 'head', x: SB.ant.x, y: SB.ant.y, z: -SB.ant.z },
+    { name: 'L pronotum margin', frame: 'body', x: -0.03, ...m(1) },
+    { name: 'R pronotum margin', frame: 'body', x: -0.03, ...m(-1) },
+    { name: 'L elytral margin', frame: 'body', x: -0.25, ...e(1) },
+    { name: 'R elytral margin', frame: 'body', x: -0.25, ...e(-1) },
+    { name: 'abdomen tip', frame: 'body', x: SB.elytra.x0 + 0.005, y: SB.belly + 0.05, z: 0 },
+  ];
+  const slots: Mounts['slots'] = [];
+  const pair = (frame: string, x: number, z: number, wl: number, wr: number) => {
+    slots.push({ frame, x, z, w: wl }, { frame, x, z: -z, w: wr });
+  };
+  pair('body', 0.022, 0.05, 0, 0);
+  pair('body', -0.115, 0.042, 1, 1);
+  pair('head', 0.095, 0.075, 2, 3);
+  pair('body', -0.035, 0.088, 4, 5);
+  pair('body', -0.235, 0.092, 6, 7);
+  pair('body', -0.395, 0.048, 8, 8);
+  return { weak, slots, surface };
+}
+
+const KINDS: Record<string, { legs: (name: string) => boolean; parts: Part[]; weak: WeakSpec[]; legBases: boolean; mounts?: () => Mounts }> = {
   groundBeetle: {
     legs: () => true,
     parts: [part('body', -0.16, 0.13, 0.285, 0.088, 0.19), part('body', 0.17, 0.135, 0.095, 0.07, 0.15)],
@@ -96,6 +159,7 @@ const KINDS: Record<string, { legs: (name: string) => boolean; parts: Part[]; we
     parts: [part('body', -0.275, 0.14, 0.19, 0.065, 0.142), part('body', -0.02, 0.14, 0.075, 0.05, 0.138), part('body', 0.125, 0.118, 0.08, 0.036, 0.15)],
     weak: [{ name: 'thorax–abdomen', frame: 'body', x: -0.09 }, { name: 'abdomen', frame: 'body', x: -0.3 }, { name: 'neck', frame: 'body', x: 0.06 }, { name: 'pronotum', frame: 'body', x: -0.02 }],
     legBases: true,
+    mounts: stagMounts,
   },
   wolfSpider: { legs: () => true, parts: spiderParts(1), weak: spiderWeak, legBases: true },
   tarantula: { legs: () => true, parts: spiderParts(1.08), weak: spiderWeak, legBases: true },
@@ -237,6 +301,45 @@ for (const [kind, def] of Object.entries(KINDS)) {
     const pts: number[] = [];
     for (const j of [3, 2, 1, 0]) pts.push(r4(a[j * 3] / L), r4(a[j * 3 + 1] / L), r4(a[j * 3 + 2] / L));
     rails.push({ leg: name, pts });
+  }
+  // hand-placed on the sculpted model (stagMounts): its own weak points and slots, on its surface
+  if (def.mounts) {
+    const mt = def.mounts();
+    const wk = mt.weak.map((w) => {
+      const f = frameAt(w.frame);
+      return { ...w, world: [w.x + f[0], w.y + f[1], w.z + f[2]] as P3 };
+    });
+    const eps = 0.004;
+    const sl = mt.slots.map((c) => {
+      const y = mt.surface(c.frame, c.x, c.z);
+      const dx = (mt.surface(c.frame, c.x + eps, c.z) - mt.surface(c.frame, c.x - eps, c.z)) / (2 * eps);
+      const dz = (mt.surface(c.frame, c.x, c.z + eps) - mt.surface(c.frame, c.x, c.z - eps)) / (2 * eps);
+      const f = frameAt(c.frame);
+      return { ...c, y, n: norm([-dx, 1, -dz]), world: [c.x + f[0], y + f[1], c.z + f[2]] as P3 };
+    });
+    for (let i = 0; i < sl.length; i++)
+      for (let j = i + 1; j < sl.length; j++) if (len(sub(sl[i].world, sl[j].world)) < gap - 1e-9) throw new Error(`${kind}: slots ${i} and ${j} closer than ${(gap * L).toFixed(1)} mm`);
+    const frames = new Set<string>(['body', ...sl.map((c) => c.frame), ...wk.map((w) => w.frame)]);
+    const frameStr = [...frames]
+      .sort()
+      .map((f) => {
+        const p = frameAt(f);
+        return `${f}: [${r4(p[0])}, ${r4(p[1])}, ${r4(p[2])}]`;
+      });
+    sizes.push(`${kind.padEnd(12)} ${String(L).padStart(3)} mm ${k.boss ? 'huge ' : 'large'}: ${rails.length} climbing points, ${wk.length} weak points, ${sl.length} mount slots (cap ${Math.min(cap, sl.length)}), hand-placed on the model`);
+    out.push(`  ${kind}: {
+    rails: [
+${rails.map((r) => `      { leg: '${r.leg}', pts: [${r.pts.join(', ')}] },`).join('\n')}
+    ],
+    frames: { ${frameStr.join(', ')} },
+    weak: [
+${wk.map((w) => `      { name: '${w.name}', frame: '${w.frame}', x: ${r4(w.x)}, y: ${r4(w.y)}, z: ${r4(w.z)} },`).join('\n')}
+    ],
+    slots: [
+${sl.map((c) => `      { frame: '${c.frame}', x: ${r4(c.x)}, y: ${r4(c.y)}, z: ${r4(c.z)}, nx: ${r4(c.n[0])}, ny: ${r4(c.n[1])}, nz: ${r4(c.n[2])}, w: ${c.w} },`).join('\n')}
+    ],
+  },`);
+    continue;
   }
   // weak points: authored ones on the body, then the leg bases (hips)
   const weak: Array<{ name: string; frame: string; pos: P3; world: P3 }> = [];

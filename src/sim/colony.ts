@@ -616,6 +616,17 @@ export function dropCarried(w: World, a: Ant): void {
       f.space = a.space;
       f.x = a.x + dcos(a.h) * 1.5;
       f.y = a.y + dsin(a.h) * 1.5;
+      // (not onto a pebble or a twig, where no one could reach it: at the ant's feet then)
+      if (!w.walkable(a.space, f.x, f.y)) {
+        f.x = a.x;
+        f.y = a.y;
+      }
+      // (drawn where it falls, not sliding there from the jaws)
+      f.px = f.x;
+      f.py = f.y;
+      // (user 2026-11-01, 21:48: "dropped food can be picked back up cos it looks like they cant be") a dropped load is
+      // picked up by the next forager to pass (antAI.ts searchAndCollect), even off its marker's area
+      if (f.kind !== 'corpse') f.loose = 1;
     }
   }
   a.carry = Carry.None;

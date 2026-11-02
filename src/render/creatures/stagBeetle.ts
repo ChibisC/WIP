@@ -743,6 +743,8 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
   mloc.makeTranslation(-SB.neck.x * L, -SB.neck.y * L, 0);
   head.multiply(mloc);
   rig.sub = head;
+  // (riders on the head ride its pitch and toss: climbData's `head` frame)
+  rig.recLocal('head', 0, 0, 0);
   // male size (allometry, quarters; the game's boss is a major male): the head narrows and the antlers shrink with it
   const msz = Math.round(Math.max(0, Math.min(1, p.data.msize ?? 1)) * 4);
   const hk = stagHeadHalf(msz / 4) / SB.head.half;

@@ -442,11 +442,31 @@ function lowestGaster(rig: AntRig, gp: number, q: THREE.Quaternion): number {
   return _lp.y;
 }
 
+/** Where an ant's jaws hold its load this frame (world), and its head's forward (AntRenderer.holdOf). */
+export interface JawHold {
+  x: number;
+  y: number;
+  z: number;
+  fx: number;
+  fy: number;
+  fz: number;
+  frame: number;
+}
+const _jp = new THREE.Vector3();
+const _jf = new THREE.Vector3();
+
 export class AntRenderer {
   group = new THREE.Group();
   private buckets = new Map<string, Bucket>();
   private anim = new Map<number, AnimState>();
   private frame = 0;
+  /**
+   * Carried loads (render only): where each carrying ant's jaws are this frame — the posed head (its pitch and yaw
+   * about the neck) on the drawn body — so the food renderer draws the load in the jaws as they move (user 2026-11-01,
+   * 21:48: "fix how food is in ant mouths as it looks laggy"; it was drawn at the sim's point ahead of the ant, a tick
+   * behind the drawn ant and blind to the head's motion).
+   */
+  private holds = new Map<number, JawHold>();
   private impostorMats = new Map<string, THREE.MeshStandardMaterial>();
   private impostorGeo: THREE.BufferGeometry;
   shadows = true;
@@ -921,6 +941,7 @@ export class AntRenderer {
       }
       vS.setScalar(scale);
       tmpM.compose(vP, tmpQ, vS);
+      if (v.carrying && !v.carryUnder && !v.dead) this.recordHold(v.id, rig, hp, hy);
 
       // Cull + LOD by projected size
       sphere.center.copy(vP);
@@ -988,6 +1009,39 @@ export class AntRenderer {
     this.termites?.end();
     // Forget animation state of ants not seen for a while.
     if (this.frame % 120 === 0) for (const [id, s] of this.anim) if (this.frame - s.seen > 240) this.anim.delete(id);
+  }
+
+  /** The jaw hold of `id` drawn this frame (or null: not carrying, or not drawn). */
+  holdOf(id: number): JawHold | null {
+    const h = this.holds.get(id);
+    return h && h.frame === this.frame ? h : null;
+  }
+
+  /** The point between the closed jaw tips on the posed head (pitch about the neck, then yaw), in the world (tmpM). */
+  private recordHold(id: number, rig: AntRig, hp: number, hy: number): void {
+    const jt = rig.jawTip;
+    const mx = jt ? rig.mouth.x + (jt.x - rig.mouth.x) * 0.7 : rig.mouth.x;
+    const my = jt ? (rig.mouth.y + jt.y) / 2 : rig.mouth.y;
+    const dx = mx - rig.neck.x;
+    const dy = my - rig.neck.y;
+    const cp = Math.cos(hp);
+    const sp = Math.sin(hp);
+    const cy = Math.cos(hy);
+    const sy = Math.sin(hy);
+    const x1 = dx * cp - dy * sp;
+    const y1 = dx * sp + dy * cp;
+    _jp.set(rig.neck.x + x1 * cy, rig.neck.y + y1, rig.neck.z - x1 * sy).applyMatrix4(tmpM);
+    _jf.set(cp * cy, sp, -cp * sy).transformDirection(tmpM);
+    let h = this.holds.get(id);
+    if (!h) this.holds.set(id, (h = { x: 0, y: 0, z: 0, fx: 1, fy: 0, fz: 0, frame: 0 }));
+    h.x = _jp.x;
+    h.y = _jp.y;
+    h.z = _jp.z;
+    h.fx = _jf.x;
+    h.fy = _jf.y;
+    h.fz = _jf.z;
+    h.frame = this.frame;
+    if (this.frame % 240 === 0) for (const [k, o] of this.holds) if (this.frame - o.frame > 60) this.holds.delete(k);
   }
 
   /** Approximate world position of an ant's mandible tips (for carried items). */

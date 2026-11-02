@@ -677,6 +677,15 @@ function searchAndCollect(w: World, a: Ant, c: Colony, dt: number, area: { x: nu
       a.tk = 0;
       enterState(a, AS.Scout);
     } else {
+      // a dropped load close by on the way to a source: that first (and back to the source after)
+      if (a.state === AS.ToFood && !f.loose && w.s.tick % 4 === a.id % 4) {
+        const l = looseNear(w, a, c, SENSE * 0.75);
+        if (l) {
+          a.fsrc = f.id;
+          a.tgt = l.id;
+          return;
+        }
+      }
       if (a.state === AS.ToFood) {
         // Deadwood is chewed from a slot round its edge, so several termites can work one log.
         if (isWoodSource(f)) {
@@ -722,18 +731,22 @@ function searchAndCollect(w: World, a: Ant, c: Colony, dt: number, area: { x: nu
       if (f.kind === 'corpse' && w.teamOf(f.colony) === (a.team ?? a.colony)) return false; // only enemies take the dead
       if (f.colony === -2) return false; // the refuse heap is avoided (hygiene)
       if (f.kind === 'leaf' && !cd.cutLeaves) return false;
-      if (area && sq(f.x - area.x) + sq(f.y - area.y) > sq(area.r * 1.6)) return false;
+      // (a dropped load right by the ant is picked up wherever it lies, off its marker's area too: 2026-11-01, 21:48)
+      const dropped = !!f.loose && d2 <= SENSE * SENSE;
+      if (area && !dropped && sq(f.x - area.x) + sq(f.y - area.y) > sq(area.r * 1.6)) return false;
       // Food is found by its odour: bigger, juicier items are noticed from further away.
       const r = SENSE + f.size * (f.kind === 'seed' ? 0.8 : f.kind === 'wood' ? 1.0 : 1.6);
       if (d2 > r * r) return false;
-      // Termants fetch corpses whose genes they still lack first
-      const k = f.kind === 'corpse' && genesWanted(c, f.from) ? d2 * 0.25 : d2;
+      // Termants fetch corpses whose genes they still lack first; a dropped load before anything farther
+      const k = f.kind === 'corpse' && genesWanted(c, f.from) ? d2 * 0.25 : dropped ? d2 * 0.5 : d2;
       if (k < bd) {
         bd = k;
         best = f;
       }
     });
     if (best) {
+      // (a dropped load on the way back to a remembered source: the source after it)
+      if ((best as Food).loose && a.tgt && a.tk === 9) a.fsrc = a.tgt;
       a.tgt = (best as Food).id;
       a.tk = 1;
       enterState(a, AS.ToFood);
@@ -798,6 +811,23 @@ function searchAndCollect(w: World, a: Ant, c: Colony, dt: number, area: { x: nu
   wander(w, a, dt, 1.2, bias);
 }
 
+/** The nearest dropped load (Food.loose) this forager may pick up within `r` mm, or null. */
+function looseNear(w: World, a: Ant, c: Colony, r: number): Food | null {
+  const cd = casteOf(a.caste);
+  let best: Food | null = null;
+  let bd = r * r;
+  w.foodNear(a.x, a.y, r, (f, d2) => {
+    if (!f.loose || f.amount <= 0 || f.heldBy !== 0 || f.space !== a.space || f.colony === -2 || !edible(c, f)) return false;
+    if (f.kind === 'leaf' && !cd.cutLeaves) return false;
+    if (d2 < bd) {
+      bd = d2;
+      best = f;
+    }
+    return false;
+  });
+  return best;
+}
+
 /** How much one ant takes from a food source: its caste's carry × its level (harvest; no co-op hauling). */
 export function carryCap(a: Ant): number {
   return casteOf(a.caste).carry * BALANCE.levelCarry[Math.max(0, Math.min(2, (a.level || 1) - 1))];
@@ -842,6 +872,14 @@ function collect(w: World, a: Ant, c: Colony, f: Food, dt: number): void {
     a.tgt = 0;
     a.tk = 0;
     a.lost = 0.2; // source exhausted: weak trail
+    // a dropped load picked up on the way to a source: back to the source after delivering it
+    const src = a.fsrc ? w.foodById.get(a.fsrc) : undefined;
+    if (src && src.amount > 0) {
+      a.tgt = src.id;
+      a.tk = 9;
+      a.lost = 1;
+    }
+    a.fsrc = 0;
     enterState(a, AS.Return);
     return;
   }

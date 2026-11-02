@@ -8,7 +8,6 @@ import { AntRenderer, AntSpaceAdapter, AntView } from '../render/ants/antRendere
 import { edible } from '../sim/diet';
 import { HitboxOverlay } from './hitboxOverlay';
 import { CombatDebugOverlay } from './combatDebugOverlay';
-import { UnderOutline } from '../render/game/underOutline';
 import { CreatureRenderer } from '../render/creatures/creatureRenderer';
 import { climbCap } from '../sim/creatures/climb';
 import { mountBonus } from '../sim/combat';
@@ -43,6 +42,7 @@ import { bindingsOf, settings } from './profile';
 import { antToView, blankView, corpseToView } from './antViews';
 import { NestView, casteTint } from './nestView';
 import { TeamRings } from '../render/game/teamRings';
+import { HealthBars } from '../render/game/healthBars';
 import { arenaOf } from '../sim/arenaState';
 import { TEAM_NAMES } from '../sim/arena';
 
@@ -154,8 +154,8 @@ export class GameSession {
   private surfCreatures = new CreatureRenderer('surfaceCreatures');
   /** battle arena: a ring in the team colour under every unit */
   private teamRings = new TeamRings();
-  /** combat v2.2: outlines of ants standing under a taller unit, drawn through it (render/game/underOutline.ts) */
-  private surfUnder = new UnderOutline('surfaceUnderOutline');
+  /** health bars and level chevrons over hurt or inspected units (user 2026-11-01, 21:36) */
+  private surfBars = new HealthBars('surfaceHealthBars');
   /** debug overlay: the sim's hitboxes (F3, or ?hitboxes=1; game/hitboxOverlay.ts) */
   private surfHit = new HitboxOverlay('surfaceHitboxes');
   hitboxes = false;
@@ -220,7 +220,7 @@ export class GameSession {
     this.surfAnts = new AntRenderer(this.view.renderer, 'surfaceAnts');
     this.surfAnts.lodScale = this.view.preset.lodScale;
     this.surfAnts.space = SURFACE;
-    this.view.surfaceScene.add(this.teamRings.group, this.surfUnder.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfTrail.group, this.surfFx.group);
+    this.view.surfaceScene.add(this.teamRings.group, this.surfBars.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfTrail.group, this.surfFx.group);
     // Pheromone overlay texture.
     const ph = w.phero;
     this.pheroData = new Uint8Array(ph.w * ph.h * 4);
@@ -1475,8 +1475,8 @@ export class GameSession {
       const owner = w.colony(colonyOfSpace(v.activeNest)) ?? null;
       if (nv) nv.overlay = this.tileOverlay;
       if (nv) nv.update(w, owner, this.player, cam, alpha, realDt, vh, v.observing ? v.observeRig.distance * 3 : v.nestRig.distance, sel, v.time, shown, this.pendingHexes());
+      if (nv) nv.bars.update(w, v.activeNest, alpha, cam, vh, (x, y, l, o) => nv.map.pos(x, y, l, o), this.player, this.inspect);
       if (nv) nv.trail.update(sel, this.trailEnds(sel, v.activeNest, shown), (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.distance, v.time);
-      if (nv) nv.under.update(w, v.activeNest, alpha, (x, y) => nv.stage.terrain.heightAt(x, y), this.player.id);
       if (nv) nv.hit.update(w, v.activeNest, this.hitboxes, (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.goal.x, v.nestRig.goal.z, v.nestRig.distance * 2);
     } else {
       const views = this.views;
@@ -1507,8 +1507,8 @@ export class GameSession {
       };
       this.surfAnts.update(list, alpha, realDt, cam, this.surfAdapter, vh);
       this.teamRings.update(w, alpha, this.surfHeight);
-      this.surfUnder.update(w, SURFACE, alpha, this.surfHeight, this.player.id);
-      this.surfFood.update(w, SURFACE, alpha, this.surfMap);
+      this.surfFood.update(w, SURFACE, alpha, this.surfMap, (id) => this.surfAnts.holdOf(id));
+      this.surfBars.update(w, SURFACE, alpha, cam, vh, (x, y, l, o) => this.surfMap.pos(x, y, l, o), this.player, this.inspect);
       this.surfDecor.update(w, this.foodView, (f) => edible(this.player, f));
       if (this.sim.kind === 'worker') {
         const o = this.sim.takeOverlay();

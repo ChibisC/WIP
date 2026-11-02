@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { GameView, NestStage } from '../render/view';
 import { AntRenderer, AntSpaceAdapter, AntView } from '../render/ants/antRenderer';
-import { UnderOutline } from '../render/game/underOutline';
 import { HitboxOverlay } from './hitboxOverlay';
 import { CreatureRenderer } from '../render/creatures/creatureRenderer';
+import { HealthBars } from '../render/game/healthBars';
 import { FoodRenderer, SpaceMapper } from '../render/game/foodRenderer';
 import { BroodRenderer } from '../render/game/broodRenderer';
 import { TileDecor } from '../render/nest/tileDecor';
@@ -41,8 +41,6 @@ export class NestView {
   readonly creatures: CreatureRenderer;
   /** debug overlay: the sim's hitboxes */
   readonly hit: HitboxOverlay;
-  /** combat v2.2: outlines of ants standing under a taller unit (render/game/underOutline.ts) */
-  readonly under: UnderOutline;
   readonly brood = new BroodRenderer();
   readonly decor: TileDecor;
   readonly markers = new WorldMarkers();
@@ -55,6 +53,8 @@ export class NestView {
   private ringItems: RingItem[] = [];
   readonly adapter: AntSpaceAdapter;
   readonly map: SpaceMapper;
+  /** health bars and level chevrons over hurt or inspected units (user 2026-11-01, 21:36) */
+  readonly bars: HealthBars;
   private floorHeight: (x: number, z: number) => number;
   private hexKey = '';
   private views: AntView[] = [];
@@ -73,8 +73,8 @@ export class NestView {
     this.decor = new TileDecor(nt);
     this.creatures = new CreatureRenderer('areaCreatures' + space);
     this.hit = new HitboxOverlay('areaHitboxes' + space);
-    this.under = new UnderOutline('areaUnderOutline' + space);
-    stage.scene.add(this.hit.group, this.under.group, this.ants.group, this.creatures.group, this.food.group, this.brood.group, this.decor.group, this.markers.group, this.trail.group, this.fx.group, this.rings.mesh);
+    this.bars = new HealthBars('areaHealthBars' + space);
+    stage.scene.add(this.bars.group, this.hit.group, this.ants.group, this.creatures.group, this.food.group, this.brood.group, this.decor.group, this.markers.group, this.trail.group, this.fx.group, this.rings.mesh);
     // The nest is a plane: ants walk flat on the floor (and up the entrance ramps), never up the walls (user 2026-11-01).
     this.adapter = {
       toWorld: (x, y, out) => out.set(x, nt.floorAt(x, y), y),
@@ -158,7 +158,7 @@ export class NestView {
       return !!cr && this.creatures.mountPose(cr, v, a, out);
     };
     this.ants.update(list, alpha, dt, cam, this.adapter, viewportH);
-    this.food.update(w, this.space, alpha, this.map);
+    this.food.update(w, this.space, alpha, this.map, (id) => this.ants.holdOf(id));
     if (owner) {
       this.brood.update(w, owner.id, this.map, alpha);
       this.decor.update(w, owner);

@@ -1,0 +1,208 @@
+import * as THREE from 'three';
+import { World } from '../../sim/world';
+import { AS, Colony } from '../../sim/types';
+import { casteOf } from '../../sim/species';
+import { antHeights, creatureHeights } from '../../sim/underpass';
+import { creatureKind } from '../../sim/creatures/kinds';
+import { arenaOf } from '../../sim/arenaState';
+import { TEAM_COLORS } from './teamRings';
+
+/** Bar fills away from the battle arena: yours, an ally's, a foe's, a wild creature's. */
+const MINE = new THREE.Color('#62d35c');
+const ALLY = new THREE.Color('#5aa2f0');
+const FOE = new THREE.Color('#e5483c');
+const WILD = new THREE.Color('#e39a2f');
+const BACK = new THREE.Color('#140f0b');
+const GOLD = new THREE.Color('#f0c24a');
+const GOLD_EDGE = new THREE.Color('#3a2a0e');
+/** smallest bar on screen (px wide); its height is `ASPECT` of its width */
+const MIN_PX = 26;
+const ASPECT = 0.16;
+
+/**
+ * Health bars and level marks over every unit (user 2026-11-01, 21:36: "give health bars to all creatures and level
+ * symbols like eotu"; render only). A bar shows over an ant, a termite or a creature once it has been hurt, and over
+ * the unit being inspected: its fill the side's colour (the arena's team colour; elsewhere green yours, blue an ally's,
+ * red a foe's, amber a wild creature's) over a dark back, as wide as the unit (at least `MIN_PX` on screen), facing the
+ * camera, over everything. A level II unit has a gold chevron beside the bar, a level III one two (our own mark, not
+ * EotU's art). Units up on a creature, held in jaws, or dead have none.
+ */
+export class HealthBars {
+  readonly group = new THREE.Group();
+  private back: THREE.InstancedMesh;
+  private fill: THREE.InstancedMesh;
+  private chev: THREE.InstancedMesh;
+  private chevBack: THREE.InstancedMesh;
+  private cap = 0;
+  private chevCap = 0;
+  private quad = new THREE.PlaneGeometry(1, 1).translate(0.5, 0, 0);
+  private chevGeo = chevronGeometry();
+  private mat = new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
+  private m = new THREE.Matrix4();
+  private p = new THREE.Vector3();
+  private s = new THREE.Vector3();
+  private right = new THREE.Vector3();
+  private up = new THREE.Vector3();
+  private cols = TEAM_COLORS.map((c) => new THREE.Color(c));
+  private tmp = new THREE.Color();
+
+  constructor(name = 'healthBars') {
+    this.group.name = name;
+    this.back = this.make(null, this.quad, 64, 998);
+    this.fill = this.make(null, this.quad, 64, 999);
+    this.chev = this.make(null, this.chevGeo, 32, 1001);
+    this.chevBack = this.make(null, this.chevGeo, 32, 1000);
+    this.cap = 64;
+    this.chevCap = 32;
+  }
+
+  private make(old: THREE.InstancedMesh | null, geo: THREE.BufferGeometry, cap: number, order: number): THREE.InstancedMesh {
+    if (old) {
+      this.group.remove(old);
+      old.dispose();
+    }
+    const m = new THREE.InstancedMesh(geo, this.mat, cap);
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    m.setColorAt(0, BACK);
+    m.frustumCulled = false;
+    m.renderOrder = order;
+    m.count = 0;
+    this.group.add(m);
+    return m;
+  }
+
+  /**
+   * `pos`: the world point of plane coords lifted `lift` mm off the ground; `selected`: the unit being inspected
+   * (kind 'ant' or 'creature' and its id).
+   */
+  update(
+    w: World,
+    space: number,
+    alpha: number,
+    cam: THREE.PerspectiveCamera,
+    viewportH: number,
+    pos: (x: number, y: number, lift: number, out: THREE.Vector3) => void,
+    player: Colony,
+    selected: { kind: 'ant' | 'creature'; id: number } | null,
+  ): void {
+    this.right.set(1, 0, 0).applyQuaternion(cam.quaternion);
+    this.up.set(0, 1, 0).applyQuaternion(cam.quaternion);
+    const pxPerMmAt1 = viewportH / (2 * Math.tan((cam.fov * Math.PI) / 360));
+    const A = arenaOf(w);
+    const team = new Map<number, number>();
+    if (A) A.teams.forEach((t, i) => team.set(t.colony, i));
+    const myTeam = w.teamOf(player.id);
+    let n = 0;
+    let nc = 0;
+    const colourOf = (colony: number, wild: boolean): THREE.Color => {
+      if (wild) return WILD;
+      const t = team.get(colony);
+      if (t !== undefined) return this.cols[t % this.cols.length];
+      if (colony === player.id) return MINE;
+      return w.teamOf(colony) === myTeam ? ALLY : FOE;
+    };
+    const put = (x: number, y: number, lift: number, L: number, frac: number, col: THREE.Color, level: number) => {
+      pos(x, y, lift, this.p);
+      const dist = Math.max(1, cam.position.distanceTo(this.p));
+      const W = Math.max(L * 0.9, (MIN_PX * dist) / pxPerMmAt1);
+      const H = W * ASPECT;
+      if (n >= this.cap) {
+        this.cap *= 2;
+        this.back = this.make(this.back, this.quad, this.cap, 998);
+        this.fill = this.make(this.fill, this.quad, this.cap, 999);
+      }
+      // the back a little larger than the fill all round (a dark rim)
+      const rim = H * 0.18;
+      this.m.makeBasis(this.right, this.up, this.s.crossVectors(this.right, this.up));
+      this.m.scale(this.s.set(W + rim * 2, H + rim * 2, 1));
+      this.m.setPosition(this.p.x - this.right.x * (W / 2 + rim), this.p.y - this.right.y * (W / 2 + rim), this.p.z - this.right.z * (W / 2 + rim));
+      this.back.setMatrixAt(n, this.m);
+      this.back.setColorAt(n, BACK);
+      this.m.makeBasis(this.right, this.up, this.s.crossVectors(this.right, this.up));
+      this.m.scale(this.s.set(Math.max(1e-4, W * frac), H, 1));
+      this.m.setPosition(this.p.x - this.right.x * (W / 2), this.p.y - this.right.y * (W / 2), this.p.z - this.right.z * (W / 2));
+      this.fill.setMatrixAt(n, this.m);
+      // (dimmer as it empties: a last sliver still reads as the side's colour)
+      this.fill.setColorAt(n, this.tmp.copy(col).multiplyScalar(0.75 + 0.25 * frac));
+      n++;
+      // level marks: chevrons left of the bar, one above the other
+      for (let k = 0; k < level - 1; k++) {
+        if (nc >= this.chevCap) {
+          this.chevCap *= 2;
+          this.chev = this.make(this.chev, this.chevGeo, this.chevCap, 1001);
+          this.chevBack = this.make(this.chevBack, this.chevGeo, this.chevCap, 1000);
+        }
+        const c = H * 2.4;
+        const cx = -(W / 2 + rim + c * 0.62);
+        const cy = (k - (level - 2) / 2) * c * 0.48;
+        const px = this.p.x + this.right.x * cx + this.up.x * cy;
+        const py = this.p.y + this.right.y * cx + this.up.y * cy;
+        const pz = this.p.z + this.right.z * cx + this.up.z * cy;
+        this.m.makeBasis(this.right, this.up, this.s.crossVectors(this.right, this.up));
+        this.m.scale(this.s.set(c * 1.28, c * 1.28, 1));
+        this.m.setPosition(px, py - this.up.y * c * 0.04, pz);
+        this.chevBack.setMatrixAt(nc, this.m);
+        this.chevBack.setColorAt(nc, GOLD_EDGE);
+        this.m.makeBasis(this.right, this.up, this.s.crossVectors(this.right, this.up));
+        this.m.scale(this.s.set(c, c, 1));
+        this.m.setPosition(px, py, pz);
+        this.chev.setMatrixAt(nc, this.m);
+        this.chev.setColorAt(nc, GOLD);
+        nc++;
+      }
+    };
+    for (const a of w.s.ants) {
+      if (a.space !== space || a.state === AS.Dead) continue;
+      // up on a creature or held in jaws: drawn where the sim does not put it
+      if (a.state === AS.Climb && (a.ridePh ?? 0) >= 1) continue;
+      if (a.heldBy) continue;
+      const sel = selected?.kind === 'ant' && selected.id === a.id;
+      const lvl = Math.max(1, Math.min(3, a.level || 1));
+      if (!(a.hp < a.maxHp - 1e-6) && !sel) continue;
+      const cd = casteOf(a.caste);
+      const L = cd.length * (1 + 0.12 * (a.sizeVar ?? 0));
+      const x = a.px + (a.x - a.px) * alpha;
+      const y = a.py + (a.y - a.py) * alpha;
+      put(x, y, L * (antHeights(a.caste).h + 0.32), L, Math.max(0, Math.min(1, a.hp / a.maxHp)), colourOf(a.colony, false), lvl);
+    }
+    for (const cr of w.s.creatures) {
+      if (cr.space !== space || cr.dead) continue;
+      const sel = selected?.kind === 'creature' && selected.id === cr.id;
+      if (!(cr.hp < cr.maxHp - 1e-6) && !sel) continue;
+      const L = cr.scale || creatureKind(cr.kind)?.length || 10;
+      const x = cr.px + (cr.x - cr.px) * alpha;
+      const y = cr.py + (cr.y - cr.py) * alpha;
+      const lvl = Math.max(1, Math.min(3, Number(cr.data.level) || 1));
+      put(x, y, L * (creatureHeights(cr.kind).h + 0.12), L * 0.6, Math.max(0, Math.min(1, cr.hp / cr.maxHp)), colourOf(cr.faction, cr.faction < 0), lvl);
+    }
+    for (const [mesh, k] of [
+      [this.back, n],
+      [this.fill, n],
+      [this.chev, nc],
+      [this.chevBack, nc],
+    ] as const) {
+      mesh.count = k;
+      if (k > 0) {
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      }
+    }
+  }
+}
+
+/** A rank chevron (^), 1 wide and about 0.8 high, centred: two arms meeting at the top. */
+function chevronGeometry(): THREE.BufferGeometry {
+  const pts = [
+    // left arm, right arm (outer top edge, inner bottom edge)
+    [-0.5, -0.12, 0, 0.38, 0, 0.08, -0.5, -0.42],
+    [0, 0.38, 0.5, -0.12, 0.5, -0.42, 0, 0.08],
+  ];
+  const v: number[] = [];
+  for (const q of pts) {
+    const [ax, ay, bx, by, cx, cy, dx, dy] = q;
+    v.push(ax, ay, 0, bx, by, 0, cx, cy, 0, ax, ay, 0, cx, cy, 0, dx, dy, 0);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  return g;
+}

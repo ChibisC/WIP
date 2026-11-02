@@ -318,7 +318,8 @@ export class CreatureRenderer {
       // weak point it attacks (along the surface), swaying a little with the body
       const wk = def.weak?.[slot.w ?? -1];
       out.u.copy(_n);
-      out.p.copy(_s).addScaledVector(_fy, -clear).addScaledVector(_n, clear);
+      // (feet on the shell: the slots lie on the model's surface — 2026-11-01, 21:36 — so only a hair's lift)
+      out.p.copy(_s).addScaledVector(_fy, -clear).addScaledVector(_n, 0.04 + L * 0.0012);
       if (wk) {
         const wf = (rec.full && rec.frames.get(wk.frame)) || body || fm;
         const wr = rec.full && rec.frames.has(wk.frame) ? null : def.frames[wk.frame];
