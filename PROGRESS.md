@@ -1246,3 +1246,35 @@ wood ants' basics were 10 throughout. Notes, and what was done:
 - Tests: `tests/notes1101.ts` (pressing: none over 2.5 lengths back, none still; turns; places filled; round an Atta
   major too; shared out over three foes; no leaves); `tests/combatV2.ts` overflow checks moved to pressing; `tools/press-probe.ts`,
   `tools/press-run.ts`.
+
+### 2026-11-01 (night) — Health bars and level chevrons; no under-outline; stag beetle riders; food in the jaws; no sticks
+- User 21:36: "give health bars to all creatures and level symbols like eotu, remove the outline for creatures under
+  creatures, and make the climbing positions of creatures on the stag beetle look more appealing and realistic";
+  21:48: "also fix how food is in ant mouths as it looks laggy. also dropped food can be picked back up co sit looks like
+  they cant be"; 22:00: "remove obstacle sticks on the ground cos they give bugs … not trunks just sticks"; 22:04: "titans
+  creatures dont need a healthbar cos it already shows at the top screen anyway". Answers: bars when hurt (and over the
+  unit being inspected); every unit; gold chevrons by the bar (II one, III two); remove the outline.
+- **Health bars** (`render/game/healthBars.ts`, surface and nests): a slim bar over every hurt or inspected ant, termite
+  and creature — the side's colour (arena team colour; green yours, blue an ally's, red a foe's, amber a wild
+  creature's) over a dark rim, as wide as the unit and at least 26 px on screen, facing the camera, over everything.
+  Level II: one gold chevron beside it, level III: two (our own mark). None over riders, held ants, the dead, or titans.
+- **Under-outline removed** (`render/game/underOutline.ts` deleted): an ant under a taller unit is simply hidden by it.
+- **Stag beetle riders** (`tools/climb-data.ts stagMounts`, regenerated `climbData.ts`): the ellipsoid slots left riders
+  4 mm over the pronotum and abdomen and four hanging in the air beside the body. Now 12 hand-placed slots, in pairs, on
+  the sculpted model's own surface (cast down onto its meshes, the normal from the surface's slope): at the head–pronotum
+  joint, on the head behind the eyes facing the antenna bases (on a new `head` frame the model records: they ride its
+  pitch and toss), on the pronotum's side margins, at the pronotum–elytra joint, out on the elytral margins, and at the
+  apex. Riders sit 0.16 mm off the shell (was 0.7).
+- **Food in the jaws** (`antRenderer.ts holdOf`, `foodRenderer.ts`): a carried load is drawn at the point between the
+  closed jaw tips on the drawn head — the head's pitch and yaw about the neck, on the drawn body — instead of the sim's
+  point ahead of the ant (a tick behind it, and blind to the head). Leaves stand up from the jaws; porters' loads follow
+  the drawn body.
+- **Dropped food** (`colony.ts dropCarried`, `antAI.ts`): a dropped load is marked `loose`; a forager passing within
+  16 mm picks it up even off its marker's area (marker foragers ignored anything outside it — the dropped load lay on
+  the trail for good), one heading to a source stops for it first, and either goes back to its source after
+  (`fsrc`). It is never dropped onto a pebble, and is drawn where it falls.
+- **No sticks** (twigs) on generated or authored maps: drawn from their generators and dropped (everything after lies
+  where it did). Fallen logs stay.
+- Tests: `tests/notes1101night.ts` (bars over hurt and inspected units, none over titans; chevrons; no outline; every
+  beetle slot on the shell, mirrored, head riders on the head; dropped load picked up in 0.9 s off the marker's area;
+  never onto a pebble; no sticks, logs kept).

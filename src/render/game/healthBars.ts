@@ -18,14 +18,16 @@ const GOLD_EDGE = new THREE.Color('#3a2a0e');
 /** smallest bar on screen (px wide); its height is `ASPECT` of its width */
 const MIN_PX = 26;
 const ASPECT = 0.16;
+const MAX_H_MM = 1.6;
 
 /**
  * Health bars and level marks over every unit (user 2026-11-01, 21:36: "give health bars to all creatures and level
  * symbols like eotu"; render only). A bar shows over an ant, a termite or a creature once it has been hurt, and over
  * the unit being inspected: its fill the side's colour (the arena's team colour; elsewhere green yours, blue an ally's,
- * red a foe's, amber a wild creature's) over a dark back, as wide as the unit (at least `MIN_PX` on screen), facing the
+ * red a foe's, amber a wild creature's) over a dark back, as wide as the unit (at least `MIN_PX` on screen; slim), facing the
  * camera, over everything. A level II unit has a gold chevron beside the bar, a level III one two (our own mark, not
- * EotU's art). Units up on a creature, held in jaws, or dead have none.
+ * EotU's art). Units up on a creature, held in jaws, or dead have none, nor titans (the bosses: their bar is across the
+ * top of the screen).
  */
 export class HealthBars {
   readonly group = new THREE.Group();
@@ -104,8 +106,10 @@ export class HealthBars {
     const put = (x: number, y: number, lift: number, L: number, frac: number, col: THREE.Color, level: number) => {
       pos(x, y, lift, this.p);
       const dist = Math.max(1, cam.position.distanceTo(this.p));
-      const W = Math.max(L * 0.9, (MIN_PX * dist) / pxPerMmAt1);
-      const H = W * ASPECT;
+      const px = dist / pxPerMmAt1;
+      const W = Math.max(L * 0.9, MIN_PX * px);
+      // (a slim bar: at most `MAX_H_MM` thick unless that is under 4 px on screen — a boss's bar is long, not fat)
+      const H = Math.max(4 * px, Math.min(W * ASPECT, MAX_H_MM));
       if (n >= this.cap) {
         this.cap *= 2;
         this.back = this.make(this.back, this.quad, this.cap, 998);
@@ -167,13 +171,15 @@ export class HealthBars {
     }
     for (const cr of w.s.creatures) {
       if (cr.space !== space || cr.dead) continue;
+      // (titans — the bosses — have their bar across the top of the screen already: 22:04)
+      if (creatureKind(cr.kind)?.boss) continue;
       const sel = selected?.kind === 'creature' && selected.id === cr.id;
       if (!(cr.hp < cr.maxHp - 1e-6) && !sel) continue;
       const L = cr.scale || creatureKind(cr.kind)?.length || 10;
       const x = cr.px + (cr.x - cr.px) * alpha;
       const y = cr.py + (cr.y - cr.py) * alpha;
       const lvl = Math.max(1, Math.min(3, Number(cr.data.level) || 1));
-      put(x, y, L * (creatureHeights(cr.kind).h + 0.12), L * 0.6, Math.max(0, Math.min(1, cr.hp / cr.maxHp)), colourOf(cr.faction, cr.faction < 0), lvl);
+      put(x, y, L * (creatureHeights(cr.kind).h + 0.12), L * 0.45, Math.max(0, Math.min(1, cr.hp / cr.maxHp)), colourOf(cr.faction, cr.faction < 0), lvl);
     }
     for (const [mesh, k] of [
       [this.back, n],

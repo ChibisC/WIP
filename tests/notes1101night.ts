@@ -1,12 +1,11 @@
 /**
- * The user's notes of 2026-11-01 (21:36, 21:48): health bars and level chevrons over every unit, no outline through a
- * unit for the ants under it, riders on the stag beetle sitting on its shell at joints and edges, carried food drawn in
- * the jaws, dropped food picked up again.
+ * The user's notes of 2026-11-01 (21:36, 21:48, 22:00): health bars and level chevrons over every unit, no outline
+ * through a unit for the ants under it, riders on the stag beetle sitting on its shell at joints and edges, carried food
+ * drawn in the jaws, dropped food picked up again, no sticks on the ground.
  *
  *   npx vite-node tests/notes1101night.ts
  */
 import * as THREE from 'three';
-import { existsSync } from 'node:fs';
 import { EventBus } from '../src/core/events';
 import { createWorld } from '../src/sim/mapGen';
 import { World } from '../src/sim/world';
@@ -19,6 +18,8 @@ import { HealthBars } from '../src/render/game/healthBars';
 import { partGeometry } from '../src/render/creatures/primitives';
 import { STAG_REF, registerStagParts } from '../src/render/creatures/stagBeetle';
 import { spawnCreature } from '../src/sim/creatures/creatureAI';
+import { Terrain, defaultTerrainParams, mapTerrainParams } from '../src/world/terrain';
+import { PLAYABLE_MAPS } from '../src/maps';
 
 let failed = 0;
 function check(name: string, ok: boolean, detail = ''): void {
@@ -65,10 +66,16 @@ function world(seed = 5): World {
   check('level marks: one chevron for level II, two for level III, none for level I', counts[2] === 3 && counts[3] === 3, `${counts[2]} chevrons`);
   bars.update(w, SURFACE, 1, cam, 640, pos, c, { kind: 'ant', id: whole.id });
   check('health bars: … and over the unit being inspected', (bars.group.children[0] as THREE.InstancedMesh).count === 4);
+  // (22:04: "titans creatures dont need a healthbar cos it already shows at the top screen anyway")
+  const boss = spawnCreature(w, 'stagBeetle', SURFACE, e.sx + 140, e.sy)!;
+  boss.hp = boss.maxHp * 0.5;
+  bars.update(w, SURFACE, 1, cam, 640, pos, c, null);
+  check('health bars: none over a titan (its bar is at the top of the screen)', (bars.group.children[0] as THREE.InstancedMesh).count === 3);
 }
 
-// ---- the outline drawn through a unit for the ants under it is gone
-check('no outline through a unit for the ants under it', !existsSync(new URL('../src/render/game/underOutline.ts', import.meta.url)));
+// ---- the outline drawn through a unit for the ants under it is gone (render/game/underOutline.ts deleted)
+const outlines = import.meta.glob('../src/render/game/underOutline.ts');
+check('no outline through a unit for the ants under it', Object.keys(outlines).length === 0);
 
 // ---- riders on the stag beetle: on its shell, at joints and edges
 {
@@ -138,6 +145,15 @@ check('no outline through a unit for the ants under it', !existsSync(new URL('..
   T.blocked[Math.round(by / T.res) * T.nx + Math.round((bx + 1.5) / T.res)] = 1;
   dropCarried(w2, b);
   check('dropped food: never onto a pebble or a twig (out of reach)', !T.isBlocked(bx + 1.5, by) || (w2.walkable(SURFACE, f2.x, f2.y) && f2.loose === 1 && f2.x === b.x), `res ${T.res} mm, dropped ${(f2.x - b.x).toFixed(1)} mm ahead`);
+}
+
+// ---- no sticks on the ground (22:00: "remove obstacle sticks on the ground cos they give bugs … not trunks just sticks")
+{
+  const gen = (['meadow', 'forest', 'riverbank', 'sandy'] as const).map((st) => new Terrain(defaultTerrainParams(7, st as never, 700, 700)));
+  const sticks = gen.reduce((n, t) => n + t.props.filter((p) => p.kind === 'twig').length, 0);
+  const logs = gen.reduce((n, t) => n + t.props.filter((p) => p.kind === 'log').length, 0);
+  const mapSticks = PLAYABLE_MAPS.reduce((n, id) => n + new Terrain(mapTerrainParams(5, id)).mapObs.filter((o) => o.kind === 'twig').length, 0);
+  check('no sticks on the ground (generated or authored maps); fallen logs stay', sticks === 0 && mapSticks === 0 && logs > 0, `${sticks} + ${mapSticks} sticks, ${logs} logs`);
 }
 
 console.log(failed ? `${failed} FAILED in ${((Date.now() - t0) / 1000).toFixed(1)}s` : `all 2026-11-01 night note tests passed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);

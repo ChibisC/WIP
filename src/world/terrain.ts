@@ -314,10 +314,14 @@ export class Terrain {
     add('pebble', Math.round(area * 34 * dens), (p) => (p.scale = 0.5 + dpow(rng.next(), 3) * 4.5));
     this.props = this.props.filter((p, i) => i < before || p.kind !== 'pebble' || (i - before) % 3 === 0);
     add('rock', Math.round(area * 0.1 * dens), (p) => (p.scale = rng.range(10, 26)));
+    // no sticks (user 2026-11-01, 22:00: "remove obstacle sticks on the ground cos they give bugs … not trunks just
+    // sticks"): drawn from the generator and dropped, so everything after them lies where it did; logs stay
+    const noTwigs = this.props.length;
     add('twig', Math.round(area * (style === 'forest' ? 1.4 : style === 'sandy' ? 0.2 : 0.55) * dens), (p) => {
       p.scale = rng.range(1.2, 3.4);
       p.len = rng.range(30, 140);
     });
+    this.props.length = noTwigs;
     // (user 2026-11-01, evening: "remove all the leaves on the ground for all maps cos it blocks visual gameplay") no
     // fallen leaves; they are still drawn from the generator, so everything placed after them lies where it did
     const leafCount = style === 'forest' ? 6 : style === 'sandy' ? 0.3 : style === 'formicarium' ? 0.6 : 2.2;

@@ -6,7 +6,7 @@ import { HF_ENTRANCE, HF_SITE, HF_SITE_RING } from './surfaceLayout';
 import type { Terrain } from './terrain';
 
 /**
- * The small obstacles lying about an authored map — pebbles, twigs, fungi and fern clumps — placed once from the
+ * The small obstacles lying about an authored map — pebbles, fungi and fern clumps (no sticks since 2026-11-01) — placed once from the
  * map id, so the simulation and the renderer agree on them (user 2026-11-01: "ants should only be flat on the ground
  * and not … walk over rocks (they walk around it) … this also applies to sticks and other obstacles"). The terrain
  * blocks them (ants and creatures walk round); render/mapDecor.ts and render/mapBiomes.ts draw them. Grass and
@@ -24,7 +24,7 @@ export interface BiomeDress {
   pebbles: number;
   /** wildflower drifts per dm² */
   flowers: number;
-  /** twigs per dm² */
+  /** twigs per dm² (drawn from the generator and dropped since 2026-11-01, 22:00: no sticks on the ground) */
   twigs: number;
   /** small fungus clusters per dm² */
   fungi: number;
@@ -150,17 +150,15 @@ export function mapObstacles(t: Terrain, map: MapDef): MapObstacle[] {
       if (free(x, z, 3, sc * 1.1)) pebble(x, z, sc);
     }
   }
-  // twigs
+  // no sticks (user 2026-11-01, 22:00: "remove obstacle sticks on the ground cos they give bugs … not trunks just
+  // sticks"): their draws stay, so the fungi and ferns after them lie where they did
   for (let i = 0; i < area * d.twigs; i++) {
-    const x = rng.range(0, W);
-    const z = rng.range(0, D);
-    const len = rng.range(30, 120);
-    const rad = rng.range(1.0, 2.6);
-    const yaw = rng.range(0, 6.28);
-    const seed = rng.int(0, 1 << 20);
-    const o: MapObstacle = { kind: 'twig', x, y: z, s: rad, len, yaw, seed, r: rad * 1.2 };
-    // (the whole twig: every point of it clear)
-    if (free(x, z, 6, len * 0.5 + rad) && twigLine(o, 8).every(([px, pz]) => free(px, pz, 6, rad * 2))) out.push(o);
+    rng.range(0, W);
+    rng.range(0, D);
+    rng.range(30, 120);
+    rng.range(1.0, 2.6);
+    rng.range(0, 6.28);
+    rng.int(0, 1 << 20);
   }
   // fungi (each cap of a small cluster) and fern clumps (their base)
   for (let i = 0; i < area * d.fungi; i++) {
