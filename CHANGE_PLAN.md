@@ -698,3 +698,80 @@ User spec: project doc `claude/combat/04-spec-height-and-underpass.md` ("Unit He
 - Creatures are lower than combat v2 assumed: a ground beetle's middle is 0.74 mm (v2 1.36), so Lasius workers no longer fight from under it; wolf spiders, rove beetles and stone centipedes likewise; titans unchanged.
 - Fights against creatures gain little (v2's slots were already per attacker size and allies on one foe never kept a personal space); the gain is in walking (no detours round big teammates, no shoves) and in small ants under tall enemy ants.
 - Performance: lazily added `Ant` fields gave the ants many more V8 object shapes (everything reading ants ~20 % slower); `makeAnt` sets them to 0.
+
+## 21. Realism rework — hell ants and nasute termites (user spec 2026-11-02)
+User spec: project doc `claude/realism/08-spec-hell-ants-nasute-termites.md`. Branch `feature/realism-hell-nasute` from `main`
+(`fc6f58a`). Looks and animation only: every unit id, stat, ability and behaviour stays. References: the user's photos
+(2026-11-02: 11 hell ant images — micro-CT head, amber head and drawing of *Linguamyrmex*, the *Ceratomyrmex*-with-prey
+fossil, a winged queen in amber, *Odontomachus* and *Myrmecia* analogues, paleoart; 12 *Nasutitermes* images — live
+workers and soldiers, specimens, the alate head and wings, two royal chambers), plus the earlier *N. corniger* photos and
+the queen photos. All study-only: render-only sheets in the repo, photo-vs-render sheets to the user in chat.
+
+### 21.1 The last run's blockers, built in from the start (spec §2)
+1. **Antennae and legs.** Hell ants: 12 segments, elbowed, the scape ≈ the head length, a smooth spline with a gentle
+   taper, droop and a slight curl at the tip; segment joints only as faint waists. Termites: straight beaded chains
+   with a gentle curve, varied per individual. Legs: club femora (≥1.6× the tibia's girth), slim tibiae, soft knee
+   membranes, separate tarsomeres and claws; rest pose with the knees lower, tarsi under the body, small left/right
+   asymmetry.
+2. **Surfaces.** Hell ants get a baked detail recipe (they had none): satin microsculpture, a little more gloss on the
+   gaster, finely sculptured head and horn; sparse fine curved hairs through the realism setae path; a pubescence
+   sheen term driven by the setae density; transmission on thin parts. Termites (kit shader, nasute rows only): a
+   warm forward-scattering term, an irregular per-individual gut, tergite plates with stretching membranes, a fine
+   broken "wet" glint, fine pale hairs, the hard dark soldier head against the soft body, a taut queen membrane with
+   faint eggs inside.
+3. **Lighting.** Every review render in the overcast and forest-shade presets (sunny as a third), soft environment
+   light, the macro ground with contact shadows, mild depth of field. The lab's termite path gets the same lab
+   lighting the ants have.
+4. **Jaws.** Hell ant scythes with darker edges and tips, the soldier's teeth near the tips and the blade grooves,
+   large enough to read on a sheet; termite point mandibles dark-tipped.
+5. **Reviews.** A fixed rubric (shape, surface, colour, lighting, hairs, "could this be a macro photo?", 1–10 each),
+   real photos mixed in unlabeled, and 2–3 calibration anchors with known scores (earlier renders) in every round.
+
+### 21.2 Hell ants (render/ants/hellBuilder.ts, hellMorphs.ts, bake/recipes.ts)
+- Shape numbers in `docs/creatures/hell-ant.md` §7 (head lengths), from the fossils (micro-CT and amber photos,
+  the *Linguamyrmex* drawing) before any geometry change.
+- Worker (*Ceratomyrmex*): the long curved horn rising up and forward from between the antennal sockets to a spoon
+  tip; the underside setae row; four long trigger hairs (two a side) where the closed jaw tips rest; scythe jaws that
+  reach the horn tip and move only vertically; head angled down.
+- Soldier (*Linguamyrmex*): the flattened clypeal paddle with a dark, hard (not chrome) tip; grooved, toothed blades.
+- Queen (*Haidomyrmex*): bulkier mesosoma with the wing-muscle plates and wing scars, smaller eyes, a longer scape,
+  serrated jaws, a sturdier shorter horn. Ocelli: the spec asks for three; the fossil record wins (the alate
+  *H. cerberus* queen has none, docs/creatures/hell-ant.md) — none, noted in the report.
+- Body: slender mesosoma, single-node petiole, oval gaster with the deep first constriction and the sting.
+- Nanitic, brood (eggs, larvae, cocoons) and corpses follow the shared builders; checked on the sheets.
+- **Amber mode** (`?amber=1` in the ant lab, render-only): the model in a clear amber block with tint, small bubbles
+  and slight blur, posed and framed like a fossil photo, for silhouette checks.
+- Animation (`antMotion` / `attackPoses`, render-only): add the hell castes to the realism animation set (planted
+  feet, blends, deaths); hunting walk (slower, pauses, body low, head down, jaws cocked open, wide antenna sweeps),
+  normal walk faster with the jaws half closed; the snap (legs planted wide, jaws flick up in 1–2 frames, a tiny
+  hit-stop and dust puff, head rocks back, the gaster curls forward to sting), the soldier's impale (longer crouched
+  wind-up, heavier recoil), carrying clamped vertically, idles (grooming the horn and trigger hairs, antenna cleaning,
+  slow head scans), deaths by cause with the jaws dropping open. Never a sideways jaw motion.
+
+### 21.3 Nasute termites (render/termite/*, nasute castes only)
+- A per-caste realism flag in the kit's rig texture; every new shader term is gated on it, so the sickle-jaw rows
+  (and the Termant/other users of the kit) render exactly as before (pixel-compared).
+- Geometry (nasute castes): beaded antennae (14 / 13 / 15) with a gentle curve; club femora, tarsomeres and claws;
+  fine body hairs at LOD0; the six head setae on the nasute (an *N. corniger* ID feature); the major's bigger, darker
+  head with a short thick nasus; the presoldier pale and untanned; the royals fix kept.
+- Shader: forward scattering and warm transmission in the abdomen, legs and antennae; the irregular gut (darker core,
+  soft edges, per individual); membranes that stretch and compress with the abdomen; a broken wet glint; the glue as a
+  glossy, transmissive, stringy material whose threads stretch and snap.
+- Animation: short quick steps with the abdomen lagging; antennae tapping the ground ahead; breathing pulse; the
+  queen's waves (kept); the glue attack planted, aimed and pulsing with recoil (match the ramp); the major's charge,
+  head-butt and point-blank glue, and alarm drumming as rapid head-banging on the ground; workers chewing, carrying,
+  trophallaxis and grooming; glued victims struggling with legs pulling free; deaths (legs fold, the body sags, the
+  gut darkens; glue deaths stuck in place).
+
+### 21.4 Review, checks and finish
+- Sheets per unit (side, top, front, 3/4, macro) in overcast / forest / sunny → `docs/realism/<species>/` (render
+  only); mandible/horn and nasus close-ups; amber-mode sheets; photo-vs-render sheets to the user in chat.
+- Blind review rounds (fresh agent, rubric, anchors, photos mixed in): at least 3 per unit, up to 6; target 7/10;
+  below that, keep the best version and report what blocks it.
+- Clips in `docs/realism/<species>/clips/`.
+- Combat data: `npx vite-node tools/height-data.ts` after model changes; underpass, anchoring, mounting, melee
+  reach tests. Model hashes: only `hell_*` re-baselined; sickle-jaw and every other species unchanged.
+- Performance: triangle counts, `tools/anim-cost.ts`; frame-rate checks with 1000+ units go to the user's device.
+- `npm test`, determinism. Docs (`hell-ant.md`, `nasutitermes.md`, DESIGN, README, PROGRESS with every round's
+  scores), a handoff update and a report; sheets and clips to the user; **wait for approval** before merging into
+  `main` and publishing a new version of the game artifact.
