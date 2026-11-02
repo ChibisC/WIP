@@ -1437,3 +1437,17 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
   store turns into food on the next second. The story's "gather wood" goal counts wood carried in (`stats.wood`).
 - Tests: `tests/termants.ts` (wood into the food store, leaves into the food store, an old wood store converted, carton
   walls paid from food, the AI plans a wall with the food).
+
+### 2026-11-02 — Finding the way up and down the slopes (layered ground)
+- User 12:08: "because of slopes some ant AI is failing to properly pathfind their way up or down a slope, can you give
+  unit AI more intelligence to go around the map up or down a slope". Flow-field walks already went round by the
+  ramps; what failed was everything that steers straight: chases, the last stretch to a point or a hole, a creature's
+  walk. On testTerrace (`tools/slope-probe.ts`) an ant steered at a point just over the terrace bank never got there
+  (85–120 mm short after 60 s), nor up out of the hollow; a hunting ground beetle pressed against the bank below its prey.
+- Now `steerTo`/`steerAvoid` (movement.ts) and creatures' `walkTo` go round by the ramps whenever the straight line
+  crosses a cliff (`Terrain.cliffAt`, `crossesCliff`), down a shared surface field to the target's 24 mm cell
+  (`LAYERS.routeCell`): up and down the bank in about 22 s, out of the hollow in 16–18 s. Marker squads count an ant
+  inside the circle but over a bank as not there yet (it walks round instead of wandering into the bank). Target choice
+  scores a foe over a bank 9× farther (`LAYERS.crossBankScore`), so fights start on the ant's own side. Flat maps are
+  unchanged (`crossesCliff` is false without layers).
+- Tests: `tests/story.ts` (steering over a bank up, down and out of the hollow arrives; the crossing is seen).

@@ -1321,7 +1321,7 @@ function marker(w: World, a: Ant, c: Colony, dt: number): void {
     const d = dhypot(m.x - a.x, m.y - a.y);
     if (a.space !== SURFACE) goToNestPoint(w, a, null, m.x, m.y, dt, 1);
     else if (holdGuardLine(w, a, c, a.marker, dt)) return;
-    else if (d > radius) {
+    else if (d > radius || w.terrain.crossesCliff(a.x, a.y, m.x, m.y)) {
       goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${a.marker}`, 1, true);
       a.alarm = Math.max(a.alarm, 0.15);
     } else wander(w, a, dt, 1, { h: datan2(m.y - a.y, m.x - a.x), k: d / radius }, 0.6);
@@ -1367,7 +1367,8 @@ function marker(w: World, a: Ant, c: Colony, dt: number): void {
   if (a.space === SURFACE && inGuardLine(w, a) && (trailTraffic(w, a, c, a.marker, dt) || holdGuardLine(w, a, c, a.marker, dt))) return;
   // Fighters (and workers in a nest): mill around the marker, ready to fight.
   const d = dhypot(m.x - a.x, m.y - a.y);
-  if (d > radius) {
+  // (layered ground: inside the marker's circle but over a bank from it is not there yet — round by the ramps)
+  if (d > radius || (a.space === SURFACE && w.terrain.crossesCliff(a.x, a.y, m.x, m.y))) {
     if (a.space === SURFACE) goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${a.marker}`, 1, true);
     else goToNestPoint(w, a, null, m.x, m.y, dt, 1);
     a.alarm = Math.max(a.alarm, 0.15);

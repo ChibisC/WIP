@@ -3,7 +3,7 @@ import { tauntOf } from '../casteAbilities';
 import { HF_CREATURE } from '../../world/surfaceLayout';
 import { Ant, AS, Creature, SURFACE } from '../types';
 import { casteOf } from '../species';
-import { ARENA, BALANCE, ECITON, STAG, TERMANT } from '../balance';
+import { ARENA, BALANCE, ECITON, STAG, TERMANT, LAYERS } from '../balance';
 import { enforceMountRatio, riding, throwRiders } from '../climbing';
 import { climbCap } from './climb';
 import { applyVenom, cancelAttack, creatureHooks, damageAnt, damageCreature, flingAnt, gripAnt } from '../combat';
@@ -156,6 +156,7 @@ function holdMul(cr: Creature, k: CreatureKind): number {
 }
 
 /** Turn toward a point and walk; returns the remaining distance. */
+const routeTmp = { x: 0, y: 0 }; // det-ok: scratch vector, overwritten before every read
 function walkTo(w: World, cr: Creature, k: CreatureKind, tx: number, ty: number, speedMul: number, dt: number, turnRate = 5): number {
   const dx = tx - cr.x;
   const dy = ty - cr.y;
@@ -164,7 +165,14 @@ function walkTo(w: World, cr: Creature, k: CreatureKind, tx: number, ty: number,
     cr.v = 0;
     return d;
   }
-  const want = datan2(dy, dx);
+  let want = datan2(dy, dx);
+  // layered ground: over a bank only by the ramps — down the shared surface field to the target's cell (user
+  // 2026-11-02 12:08: units must find their way up and down the slopes)
+  if (cr.space === SURFACE && w.terrain.layers && d > 4 && w.terrain.crossesCliff(cr.x, cr.y, tx, ty)) {
+    const q = LAYERS.routeCell;
+    const f = w.surfFlow.field(`bank:${Math.round(tx / q)}:${Math.round(ty / q)}`, 0, [{ x: tx, y: ty }]);
+    if (w.surfFlow.dir(f, cr.x, cr.y, routeTmp)) want = datan2(routeTmp.y, routeTmp.x);
+  }
   const diff = angleTo(cr.h, want);
   cr.h += Math.max(-turnRate * dt, Math.min(turnRate * dt, diff));
   // glued by a termite major or pinned in a hell ant's jaws: it can turn and bite, not walk

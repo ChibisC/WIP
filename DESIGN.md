@@ -917,6 +917,12 @@ medals per level and a campaign save (castes kept, slots, journal) that never to
 `LAYERS.step` (34 mm) per level; their banks are cliffs that block like walls, and ramps are the only way between levels
 (≤ 25°, ≥ 40 mm wide, checked by the validator with layer reachability, dry and flooded). The two story maps use it; the
 five skirmish maps are unchanged so far (their rework is the layered-maps spec's own job).
+Finding the way (user 2026-11-02 12:08): flow fields already route over the ramps; anything that steers straight —
+a chase (`steerTo`, `steerAvoid`), the last stretch to a point or home, a creature's `walkTo` — goes round by the ramps
+when the straight line crosses a cliff (`Terrain.crossesCliff`), down a shared surface field to the target's
+`LAYERS.routeCell` (24 mm) cell. An ant inside its marker's circle but over a bank from it walks round to it; a foe over
+a bank scores `LAYERS.crossBankScore` (9×) farther in target choice. Flat maps are untouched (`crossesCliff` is false).
+`tools/slope-probe.ts` measures it on testTerrace.
 
 ### Caste/tile model
 Every caste is a `CasteDef`: stats, morph, abilities and a **tier** (worker / soldier / heavy). Costs are **per caste** in `BALANCE.castes` (user note 2026-10-24): every worker caste costs 10 to build, and hatch cost and grow time scale with strength (castes not listed fall back to their tier).
