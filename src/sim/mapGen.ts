@@ -1,3 +1,5 @@
+import { spawnCreature } from './creatures/creatureAI';
+import { startTitanRaid, titanRaidSystem } from './creatures/titanDig';
 import { separationSystem } from './separation';
 import { casteAbilitySystem } from './casteAbilities';
 import { EventBus } from '../core/events';
@@ -63,6 +65,8 @@ export interface GameSetup {
   settings?: Partial<SimState['settings']>;
   /** single-player mission script (sim/missions.ts) */
   mission?: MissionId;
+  /** dev and browser shots: a titan of this kind starts beside the player's anthill and digs straight in (titanDig.ts) */
+  devTitanRaid?: string;
   /** a story level (sim/story): the difficulty and the stolen castes brought in (the level is `mission`) */
   story?: { difficulty: Difficulty; loadout: string[] };
   /** sandbox game: the sandbox commands (spawn, fill stores, toggles) are allowed */
@@ -131,6 +135,8 @@ export function registerSystems(w: World): void {
     { name: 'invasion', fn: (ww) => invasionCheck(ww), every: 20 },
     { name: 'lost', fn: lostRouteSystem, every: 20 },
     { name: 'creatures', fn: creatureSystem },
+    // titans digging into nests: skirmish raids, breach repairs (sim/creatures/titanDig.ts)
+    { name: 'titanRaids', fn: (ww) => titanRaidSystem(ww), every: 20 },
     { name: 'separation', fn: separationSystem, every: 2 },
     { name: 'ecology', fn: ecologySystem, every: 20 },
     { name: 'mission', fn: missionSystem, every: 20 },
@@ -183,6 +189,16 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
   });
   if (setup.mission) startMission(w, setup.mission, w.s.colonies.find((c) => c.player)?.id ?? 0);
   if (setup.mission && setup.story) initStory(w, missionOf(w)!, setup.mission as 'garden' | 'fireBanks', setup.story.difficulty, setup.story.loadout);
+  if (setup.devTitanRaid) {
+    const p = w.s.colonies.find((c) => c.player);
+    const e = p?.entrances[0];
+    if (p && e) {
+      const a = datan2(e.sy - p.ny, e.sx - p.nx);
+      w.terrain.clearArea(e.sx - 70, e.sy - 70, e.sx + 70, e.sy + 70);
+      const cr = spawnCreature(w, setup.devTitanRaid, SURFACE, e.sx + dcos(a) * 70, e.sy + dsin(a) * 70);
+      startTitanRaid(w, cr, p.id, 0);
+    }
+  }
   if (setup.sandbox) w.s.mode.sandbox = true;
   if (setup.arena) setupArena(w);
 

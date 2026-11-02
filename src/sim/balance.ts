@@ -1076,6 +1076,39 @@ export const ENTRANCE = {
  * Layered ground (claude/maps/05-spec-layered-maps.md; world/layers.ts, docs/maps/layers.md): terraces one `step` above
  * the other, their banks too steep to walk, joined by ramps no steeper than `rampMaxSlope`.
  */
+/**
+ * Titans dig into nests (claude/creatures/01-spec-digging-titans.md, user 2026-11-02; the game's own twist: in EotU titans
+ * never enter nests). A titan digs one surface hole wider (`holeWork` ÷ its `dig.speed` seconds; slowed to `hitSlow` of
+ * its pace for `staggerSec` after any hit, set back `heavyBack` of the work by a hit of `heavyFrac` of its health or more;
+ * it gives up below `giveUpHealth`), then walks into the nest at `undergroundSpeed` × its speed: every soil or stone hex
+ * its body touches (its body radius + `breakMargin` mm) opens at once. It leaves below `fleeHealth`, after `maxStay` s,
+ * or once the queen is dead. The breach (the widened hole) is repaired by the colony over `repairSec` s once the titan
+ * is gone. Skirmish ("Titans raid nests", on by default): after `peaceMin` minutes, a titan raids at most every
+ * `raidCooldown` minutes (a `raidChance` a minute once off cooldown), a colony within `raidRange` mm (weighted by its
+ * ants and food), at most `maxRaiding` titans at once; the colony is warned `warnSec` s before the titan reaches the hole.
+ */
+export const TITAN_DIG = {
+  holeWork: 40,
+  hitSlow: 0.45,
+  staggerSec: 1.2,
+  heavyFrac: 0.06,
+  heavyBack: 0.15,
+  giveUpHealth: 0.35,
+  undergroundSpeed: 0.8,
+  breakMargin: 1.5,
+  fleeHealth: 0.25,
+  maxStay: 180,
+  repairSec: 120,
+  peaceMin: 12,
+  raidCooldown: 8,
+  raidChance: 0.35,
+  raidRange: 700,
+  maxRaiding: 1,
+  warnSec: 25,
+  /** the widened hole's radius as drawn (mm; render only — the breach is still the colony's hole) */
+  breachHoleMm: 10,
+};
+
 export const LAYERS = {
   /**
    * Straight steering (a chase, the last stretch to a point) that would cross a bank goes round by the ramps instead,

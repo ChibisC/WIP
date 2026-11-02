@@ -114,7 +114,7 @@ function reachable(g: NestGrid, from: number): Set<number> {
   check('the Dig tool does nothing at the entrance (its hexes are dug)', cmd({ type: 'dig', q: g.flowers[0][1], on: true }) !== null && !g.hexDesig[g.flowers[0][1]]);
   check('the entrance command is rejected (holes are always open)', cmd({ type: 'entrance', i: 1, close: true }) !== null && cmd({ type: 'entrance', i: 0, close: false }) !== null && JSON.stringify(c.entrances) === holes);
   check('… but still parses on the wire (old replays)', decodeCommandLog(encodeCommandLog([{ type: 'entrance', i: 1, close: true, tick: 3, player: 0, seq: 1 } as Command]))[0].type === 'entrance');
-  check('the net protocol is bumped (mixed versions cannot join)', BUILD_ID === 'ud-mp-7');
+  check('the net protocol is bumped (mixed versions cannot join)', BUILD_ID >= 'ud-mp-7'); // (ud-mp-8: titans raid nests, 2026-11-02)
 }
 
 // ---------------------------------------------------------------- three holes on every map

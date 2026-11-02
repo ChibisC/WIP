@@ -1,3 +1,4 @@
+import { RAID, endTitanRaid, startTitanRaid } from '../creatures/titanDig';
 import type { World } from '../world';
 import { AS, Ant, Colony, Creature, POSE, SURFACE } from '../types';
 import { creatureKind } from '../creatures/kinds';
@@ -234,7 +235,12 @@ function enterCue(w: World, st: StoryState, sc: StoryScene): void {
       return;
     } else if ('charge' in cue) act.mode = 2;
     else if ('flee' in cue) act.mode = 1;
-    else return; // a cue that takes time
+    else if ('digInto' in cue) {
+      // titans dig into the nest (they never give up: a story script); the cue waits until they are in
+      const col = cue.digInto === 'player' ? (w.s.colonies.find((c) => c.player)?.id ?? 0) : (st.rivals[cue.digInto] ?? -1);
+      for (const e of members(w, act)) if (!('caste' in e)) startTitanRaid(w, e as Creature, col, cue.hole ?? -1, true);
+      return;
+    } else return; // a cue that takes time
     sc.cue++;
   }
 }
@@ -310,6 +316,7 @@ export function directorTick(w: World, st: StoryState, stage: number, stageT: nu
       if (act.spawned) setFlag(st, `gone:${act.name}`);
       continue;
     } else if (act.kind === 2) done = true;
+    else if ('digInto' in cue) done = alive.every((e) => 'caste' in e || ((e as Creature).data.rph ?? 0) >= RAID.Inside || !((e as Creature).data.raid ?? 0));
     else if ('guard' in cue) done = cue.s !== undefined && sc.t >= cue.s;
     else if ('patrol' in cue && cue.loops === undefined) done = sc.t >= (cue.s ?? 1e9);
     else if (!walking(cue) && ('holdAt' in cue || 'anim' in cue || 'wander' in cue || 'follow' in cue)) done = sc.t >= (cue as { s: number }).s;
@@ -345,6 +352,13 @@ export function directorTick(w: World, st: StoryState, stage: number, stageT: nu
 }
 
 /** Force a rival colony's war AI to march on the player now (an action). */
+/** A titan actor raiding a nest walks back out and leaves (story action `endRaid`, e.g. at dawn). */
+export function endActorRaid(w: World, st: StoryState, actor: string): void {
+  const ai = actorIndex(st, actor);
+  if (ai < 0) return;
+  for (const e of members(w, st.actors[ai])) if (!('caste' in e)) endTitanRaid(w, e as Creature);
+}
+
 export function forceRaid(w: World, st: StoryState, rival: string): void {
   const c = w.colony(st.rivals[rival] ?? -1);
   const p = w.s.colonies.find((o) => o.player);

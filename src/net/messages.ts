@@ -17,7 +17,7 @@ import type { MapId } from '../maps/types';
  * (6: one entrance per nest, three holes per anthill; the `entrance` command is rejected — 2026-11-01. 7: nest hexes
  * 1.10 × instead of 1.25 × — 2026-11-02)
  */
-export const BUILD_ID = 'ud-mp-7';
+export const BUILD_ID = 'ud-mp-8';
 
 /** A lobby slot (players 0–3; the slot number is the colony id). */
 export interface Slot {
@@ -46,6 +46,8 @@ export interface LobbySettings {
   map?: MapId;
   /** storms flood the authored map's low ground (off by default) */
   floods?: boolean;
+  /** titans now and then dig into a nest (on unless false) */
+  titanRaids?: boolean;
   seed: number;
   /** starting food multiplier on the map */
   food: number;

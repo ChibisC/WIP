@@ -75,7 +75,12 @@ export type Cue =
   /** set a story flag (captions, objectives, other scenes and the camera wait on flags) */
   | { flag: string }
   /** hand back to the normal AI */
-  | { release: true };
+  | { release: true }
+  /**
+   * a titan digs into a colony's nest (sim/creatures/titanDig.ts): `into` a rival's key or 'player'; by hole `hole` (else the
+   * nearest); done once it is inside (or its raid ended). It never gives up digging; `endRaid` sends it out.
+   */
+  | { digInto: string; hole?: number; flag?: string; timeout?: number };
 
 /** A sequence of cues for one or more actors (each member walks it; group cues finish when the living members do). */
 export interface Scene {
@@ -134,6 +139,8 @@ export type Action =
   | { do: 'shot'; shot: Shot | 'flight' }
   | { do: 'music'; mood: 'calm' | 'tense' | 'swarm' | 'assault' }
   | { do: 'raid'; rival: string }
+  /** a titan raiding a nest (digInto) walks back out and leaves (dawn) */
+  | { do: 'endRaid'; actor: string }
   /** a gameplay tip (a note, not narration): key into the text file (`tip.<key>`) */
   | { do: 'tip'; key: string };
 

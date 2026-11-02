@@ -447,6 +447,14 @@ export interface Entrance {
   fall?: number;
   /** ants through this hole so far, either way (its traffic, for the tooltip) */
   n?: number;
+  /**
+   * A titan dug this hole wider (titanDig.ts; claude/creatures/01-spec-digging-titans.md): 1 while it is a breach (any titan
+   * walks in without digging), 0 or absent once repaired. `breachBy` the titan in it now (0 none); `repair` 0 → 1 as the
+   * colony rebuilds the rim once no titan uses it. It stays the colony's hole throughout (ants pass as before).
+   */
+  breach?: number;
+  breachBy?: number;
+  repair?: number;
 }
 
 /** One of the five pheromone markers (I–V). */
@@ -763,6 +771,8 @@ export interface SimSettings {
   creatures?: number;
   /** authored maps: storms flood the map's flood zones (off unless the match turns it on) */
   floods?: boolean;
+  /** skirmish and multiplayer: titans now and then dig into a nest (titanDig.ts); undefined = on, false = never */
+  titanRaids?: boolean;
   queenDeathLoses: boolean;
   fog: boolean;
   autoWaves: boolean;

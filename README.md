@@ -32,7 +32,7 @@ The title screen has **Story**, **Single-player** and **Multiplayer**.
 ### Multiplayer and invite links
 1. **Create game** gives you a six-letter room code and an invite link (`…/?room=ABCDEF`). Press **Copy link** and send it.
 2. Friends open the link and land in the lobby. Each player picks a name, species, colour and team, then clicks **Ready**. A **Gene Thief** player also picks the castes it steals (any of the 24 borrowable castes, the termite soldiers included; each needs its own room tile).
-3. The host can set each of the eight slots to Open, Closed or AI (and pick an AI's species, team and, for a Gene Thief AI, its castes), move anyone to another team, pick the map from the map cards (everyone sees the choice), and set the seed, food, floods and population cap.
+3. The host can set each of the eight slots to Open, Closed or AI (and pick an AI's species, team and, for a Gene Thief AI, its castes), move anyone to another team, pick the map from the map cards (everyone sees the choice), and set the seed, food, floods, whether titans raid nests (on by default: now and then a titan digs one of a colony's holes wider and walks into its nest, breaking the ground it touches) and population cap.
    - **Teams:** Red, Blue, Green, Gold or no team. Teammates never fight each other, start on neighbouring colony sites, and win together when theirs is the last team with a living queen. Everyone on one team cannot start.
 
    ![A lobby with teams, a Gene Thief and the map cards](docs/multiplayer/teams-lobby-host.png)
@@ -181,6 +181,7 @@ npx vite-node tests/sickle.ts                                       # Sickle-Jaw
 npx vite-node tests/eciton.ts                                       # army ants: castes and old ids, diet, swarm front, lanes, porters, Soldier posts, bridges, plugs, hook, pinning, models unchanged, determinism
 npx vite-node tests/story.ts                                        # story mode and layered ground: rename, banks and ramps, both story maps, setup by difficulty and loadout, the director's scenes, every objective type, bonus and medals, a caste missed, the campaign save, determinism
 npx vite-node tools/playtest-story.ts -- garden normal 50 7          # a story level played headless by the colony AI plus a scripted player (level, difficulty, minutes, seed, loadout)
+npx vite-node tests/titans.ts                                       # titans digging into nests (hole, breach, breaking ground, raids)
 npx vite-node tools/caste-table.ts                                   # every caste's numbers (-- creatures: the creatures')
 npx vite-node tools/balance-matrix.ts -- refs 300                     # equal-food fights v a reference caste (refw / refs / refm / creatures; docs/balance/castes.md)
 npx vite-node tools/balance-tune.ts -- lasius_soldier 300 atta_soldier # the stat scale at which a caste ties the reference

@@ -1520,3 +1520,22 @@ and behaviour unchanged. Report: `docs/realism/hell-nasute/README.md`; rubric: `
   scores a foe over a bank 9× farther (`LAYERS.crossBankScore`), so fights start on the ant's own side. Flat maps are
   unchanged (`crossesCliff` is false without layers).
 - Tests: `tests/story.ts` (steering over a bank up, down and out of the hollow arrives; the crossing is seen).
+
+### 2026-11-02 — Titans dig into nests
+- User spec `claude/creatures/01-spec-digging-titans.md` (the game's own twist: in EotU titans never enter nests).
+  Plan: `CHANGE_PLAN.md` §23. Design: DESIGN.md §3.10 "Titans dig into nests".
+- `sim/creatures/titanDig.ts`: a raiding titan walks to one of the colony's three holes (warning `TITAN_DIG.warnSec`
+  before), digs it wider (`holeWork` ÷ its dig speed: the tarantula 25 s, the wolf spider mother 27 s, the giant
+  centipede 40 s, the stag beetle 67 s undefended; every hit staggers it to 45 % pace, a heavy one knocks work back, it
+  gives up below 35 % health), then walks into the nest and straight through the ground to the queen: every soil or
+  stone hex its body touches opens at once (`NestGrid.breakHex`), built tiles never break. It bites what is in reach,
+  leaves below 25 % health, after 3 minutes or once the queen is dead; the breach (a wide raw crater) is repaired over 2
+  minutes. The giant mantis never digs.
+- Skirmish and multiplayer: "Titans raid nests" (on by default) in the single-player menu and the lobby; after 12
+  minutes, now and then a titan off its 8-minute cooldown raids a colony within 70 cm (weighted by ants and food), one at
+  a time. Protocol `ud-mp-8`. Story: director cue `digInto` and action `endRaid`.
+- Client: a warning toast that jumps the camera to the hole when clicked, the area tab alert, a rumble and digging
+  shake, soil thrown out at the hole and clods underground, sounds, each digging style's pose.
+- Tests: `tests/titans.ts` (in `npm test`): dig time, warning, breach, walking in, soil and stone breaking, tiles kept,
+  reaching the queen, leaving, stagger and set-back, giving up, story raids, repair, the toggle, peace period, the cap,
+  the mantis, determinism. Clips: `tests/browser/titan_dig.py` → `docs/creatures/digging/`.

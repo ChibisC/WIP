@@ -411,6 +411,24 @@ into a ball when attacked), colony (termites). Predators hold territory and
 flee below a health threshold. Bosses run scripted phases with telegraphed
 attacks (wind-up pose + ground marker before each big attack).
 
+**Titans dig into nests** (2026-11-02, `sim/creatures/titanDig.ts`, claude/creatures/01-spec-digging-titans.md; the
+game's own twist — in Empires of the Undergrowth titans never enter nests). Diggers carry `dig: { can, speed, style }`
+(tarantula and wolf spider mother rake, fast; giant centipede squeezes, medium; stag beetle bulldozes, slow; the giant
+mantis never digs). A raid: walk to one of the colony's three holes (the colony is warned `TITAN_DIG.warnSec` before:
+a toast that jumps the camera there, a rumble and a sound), dig it wider (`holeWork` ÷ speed s; any hit staggers it to
+`hitSlow` of its pace for `staggerSec`, a hit of `heavyFrac` of its health knocks back `heavyBack` of the work; below
+`giveUpHealth` it gives up — not in story raids), then walk into the nest through the flower and straight through the
+ground: every soil or stone hex its body touches opens at once (`NestGrid.breakHex`: stone too; logged like any dig, so
+flow fields extend). Built tiles stand on dug floor and never break. It bites what is in reach (standing still), heads
+for the queen (then brood, stores), and walks back out below `fleeHealth`, after `maxStay`, once the queen is dead, or
+when a story ends the raid; killed inside, its carcass stays in the nest. The hole stays a breach (drawn as a wide raw
+crater; any titan walks in without digging) until the colony repairs it over `repairSec`. Skirmish and multiplayer:
+"Titans raid nests" in the lobby (on by default, `settings.titanRaids`; protocol `ud-mp-8`): after `peaceMin`, a titan
+off its `raidCooldown` raids with a `raidChance` a minute a colony within `raidRange` (weighted by ants and food, never
+one already raided), at most `maxRaiding` at once. Story levels start raids with the director cue `digInto` and end them
+with the action `endRaid`. AI colonies defend as against any hostile creature at their holes or inside. Dev:
+`?titanRaid=<kind>`; clips `tests/browser/titan_dig.py` → `docs/creatures/digging/`.
+
 **Rendering** (`render/creatures/`, Phase 11):
 - Every creature is built each frame from three shared instanced primitives: ellipsoids (segments, heads, eyes), tapered tubes (legs, antennae, jaws) and cones (fangs, claws, spines). Each instance has its own colour and surface (roughness, gloss, and a pattern drawn in the shape's own coordinates: segment rings, hair, elytra striae, speckle, wing veins, Scolopendra rear bands, the antlion's funnel). So the whole bestiary is three draw calls per scene.
 - `builders.ts` holds one body plan per kind, from the reference notes in `docs/creatures/` (proportions as fractions of body length). `rig.ts` poses them: a base frame tilted to the ground, two-bone IK legs with tarsi along the ground, and tripod, tetrapod and wave gaits.

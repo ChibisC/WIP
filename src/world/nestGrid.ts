@@ -419,6 +419,31 @@ export class NestGrid extends HexLayout {
     return false;
   }
 
+  /**
+   * A titan's body breaks a hex open at once (titanDig.ts): soil and stone alike (titans ignore the undiggable rule), every
+   * cell of it to air (logged like any dig, so flow fields extend). Returns whether anything broke.
+   */
+  breakHex(q: number): boolean {
+    if (q < 0 || this.hexSoil[q] === SOIL_AIR) return false;
+    for (const c of this.hexCells[q]) {
+      if (this.soil[c] === SOIL_AIR) continue;
+      // (stone cells: let carve take them by marking them soil first — the raster still only goes solid → air)
+      if (this.soil[c] === SOIL_STONE) this.soil[c] = 1;
+      this.carve(c % this.w, Math.floor(c / this.w));
+    }
+    if (this.hexDesig[q]) {
+      this.hexDesig[q] = 0;
+      this.designatedCount--;
+      for (const c of this.hexCells[q]) this.designated[c] = 0;
+    }
+    this.hexSoil[q] = SOIL_AIR;
+    this.hexWork[q] = 0;
+    this.version++;
+    this.stateVersion++;
+    this.desigVersion++;
+    return true;
+  }
+
   /** Instantly excavate a hex (level setup / sandbox). */
   completeHex(q: number): void {
     if (q < 0 || this.hexSoil[q] === SOIL_STONE) return;

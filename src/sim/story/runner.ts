@@ -7,7 +7,7 @@ import { shapeBox } from '../../world/mapShapes';
 import type { GameSetup } from '../mapGen';
 import type { MissionGoal, MissionState } from '../missions';
 import { StoryState, actorIndex, hasFlag, setFlag, storyOf } from './state';
-import { directorTick, forceRaid, levelOf, members, spawnActor, wherePt } from './director';
+import { directorTick, endActorRaid, forceRaid, levelOf, members, spawnActor, wherePt } from './director';
 import { StageBase, stageGoals } from './objectives';
 import type { Action, Difficulty, StoryLevelDef, TimedAction } from './types';
 import { storyLevel } from '../../story/levels';
@@ -132,6 +132,9 @@ function act(w: World, st: StoryState, a: Action): void {
       return;
     case 'raid':
       forceRaid(w, st, a.rival);
+      return;
+    case 'endRaid':
+      endActorRaid(w, st, a.actor);
       return;
     case 'tip': {
       const text = storyText(`tip.${a.key}`);

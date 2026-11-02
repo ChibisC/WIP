@@ -361,13 +361,16 @@ export class LobbyView {
         ? `<div class="opt-row"><span class="dim">Floods:</span><button class="chip ${!st.floods ? 'on' : ''}" data-a="floods" data-v="0">Off</button><button class="chip ${st.floods ? 'on' : ''}" data-a="floods" data-v="1">On: storms flood the low ground now and then</button></div>`
         : `<p class="dim">Floods ${st.floods ? 'on' : 'off'}.</p>`
       : '';
+    const titans = host
+      ? `<div class="opt-row"><span class="dim">Titans raid nests:</span><button class="chip ${st.titanRaids !== false ? 'on' : ''}" data-a="titans" data-v="1">On: now and then a titan digs into a nest</button><button class="chip ${st.titanRaids === false ? 'on' : ''}" data-a="titans" data-v="0">Off</button></div>`
+      : `<p class="dim">Titans raid nests: ${st.titanRaids !== false ? 'on' : 'off'}.</p>`;
     const settings = host
-      ? `${mapCards}${floods}<div class="lb-settings">
+      ? `${mapCards}${floods}${titans}<div class="lb-settings">
           <label>Seed <input class="mp-input small" data-f="seed" value="${st.seed}"></label>
           <label>Food <select data-f="food">${[0.6, 1.2, 2].map((f) => `<option value="${f}" ${f === st.food ? 'selected' : ''}>${f === 0.6 ? 'Scarce' : f === 1.2 ? 'Normal' : 'Plenty'}</option>`).join('')}</select></label>
           <label>Population cap <select data-f="pop">${[150, 300, 500].map((p) => `<option value="${p}" ${p === st.popLimit ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
         </div>`
-      : `${mapCards}${floods}<p class="dim">Seed ${st.seed} · food ${st.food === 0.6 ? 'scarce' : st.food === 1.2 ? 'normal' : 'plenty'} · population cap ${st.popLimit} · no pausing · speed 1×</p>`;
+      : `${mapCards}${floods}${titans}<p class="dim">Seed ${st.seed} · food ${st.food === 0.6 ? 'scarce' : st.food === 1.2 ? 'normal' : 'plenty'} · population cap ${st.popLimit} · no pausing · speed 1×</p>`;
     const me = L.slots[L.you];
     const blocker = host ? L.startBlocker() : '';
     const chat = L.chat
@@ -451,6 +454,7 @@ export class LobbyView {
       if (i === L.you) L.setMine({ borrowed: got });
       else L.setSlot(i, { borrowed: got });
     } else if (a === 'floods') L.setSettings({ floods: b.dataset.v === '1' });
+    else if (a === 'titans') L.setSettings({ titanRaids: b.dataset.v === '1' });
     else if (b.dataset.map && L.isHost) L.setSettings({ map: b.dataset.map as MapId, style: 'meadow' });
   }
 

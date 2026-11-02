@@ -34,6 +34,8 @@ export interface MenuChoice {
   map?: MapId;
   /** storms flood the authored map's low ground (off by default) */
   floods?: boolean;
+  /** titans now and then dig into a nest (on unless false; claude/creatures/01-spec-digging-titans.md) */
+  titanRaids?: boolean;
   /** 'auto' follows the frame rate, starting from high */
   quality: Quality | 'auto';
   /** battle arena: 2–4 teams */
@@ -107,6 +109,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       const m = MAPS[id]!;
       return `<button class="map-card ${choice.map === id ? 'on' : ''}" data-map="${id}"><span class="map-thumb" data-thumb="${id}"></span><b>${m.name}</b><i>${(m.width / 1000).toFixed(1)} × ${(m.depth / 1000).toFixed(1)} m${m.floods.length ? ' · floods' : ''}</i></button>`;
     }).join('')}</div>`;
+    const titans = `<div class="opt-row"><span class="dim">Titans raid nests:</span><button class="chip ${choice.titanRaids !== false ? 'on' : ''}" data-titans="1">On: now and then a titan digs into a nest</button><button class="chip ${choice.titanRaids === false ? 'on' : ''}" data-titans="0">Off</button></div>`;
     const md = choice.map ? MAPS[choice.map] : undefined;
     const mapNote = md
       ? `<p class="dim">${md.blurb} ${(md.width / 1000).toFixed(1)} × ${(md.depth / 1000).toFixed(1)} m, ten colony sites.</p>` +
@@ -143,7 +146,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
            <h2>Colony</h2><div class="species-grid">${sp}</div>${borrow}`
         : `<h2>Colony</h2><div class="species-grid">${sp}</div>${borrow}
            <h2>AI colonies</h2>${rivals}
-           <h2>Map</h2>${map}${mapNote}`;
+           <h2>Map</h2>${map}${mapNote}${titans}`;
     const go = choice.mode === 'story' ? 'Open the island map' : choice.mode === 'mission' ? `Start ${MISSIONS[choice.mission].title}` : choice.mode === 'sandbox' ? 'Open the sandbox' : choice.mode === 'arena' ? 'Open the arena' : 'Found the colony';
     root.innerHTML = `<div class="menu-card">
       <h1>UNDERGROUND DOMINION</h1>
@@ -206,6 +209,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       delete choice.map;
     } else if (d.map) choice.map = d.map as MapId;
     else if (d.floods) choice.floods = d.floods === '1';
+    else if (d.titans) choice.titanRaids = d.titans === '1';
     else if (d.q) choice.quality = d.q as Quality | 'auto';
     else if (t.classList.contains('go')) {
       if (t.disabled) return;
