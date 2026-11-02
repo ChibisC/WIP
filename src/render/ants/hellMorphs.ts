@@ -19,7 +19,7 @@ const HELL_SURF = {
   hornTip: { rough: 0.18, coat: 0.95, sheen: 0.05 }, hair: { rough: 0.6, coat: 0.1, sheen: 0.15 },
 };
 const HELL_BASE = {
-  builder: "hell", units: 5.5, stance: 0.8,
+  builder: "hell", units: 5.5, stance: 1.15,
   look: { colors: HELL_COLORS, ...HELL_SURF },
   meso: { len: 2.0, h: 0.72, w: 0.6 },
   neck: 0.2, neckY: 0.5,
@@ -33,10 +33,13 @@ const HELL_BASE = {
   antenna: { scapeAng: 1.5, splay: 0.22, scape: 1.05, r: 0.045, funiStart: 0.2, funiBend: 1.5, funi: 3.0 },
   petiole: 0.5, node: { h: 0.32 },
   gaster: { len: 1.85, h: 1.0, w: 0.95, tilt: 0.08, constrict: 0.2, at: 0.3 },
+  // (user 2026-11-02: "their legs are pretty long … look so compact; make them walk like the other ants" — the legs
+  // 1.25× longer and the feet set out as wide as the other ants' (about half a body length either side; they were a
+  // fifth), the body carried higher on them)
   legs: { thick: 0.062, pairs: [
-    { cx: 0.82, coxaDir: [0.5, -0.6, 0.6], coxa: 0.3, foot: [1.45, 1.0], tarsus: 0.85, femur: 1.05, tibia: 1.0 },
-    { cx: 0.52, coxaDir: [0.1, -0.6, 0.8], coxa: 0.3, foot: [0.1, 1.5], tarsus: 0.95, femur: 1.2, tibia: 1.2 },
-    { cx: 0.2, coxaDir: [-0.4, -0.6, 0.6], coxa: 0.32, foot: [-2.3, 1.25], tarsus: 1.2, femur: 1.45, tibia: 1.5 },
+    { cx: 0.82, coxaDir: [0.5, -0.6, 0.6], coxa: 0.3, foot: [2.0, 2.6], tarsus: 1.05, femur: 1.3, tibia: 1.25 },
+    { cx: 0.52, coxaDir: [0.1, -0.6, 0.8], coxa: 0.3, foot: [-0.1, 3.5], tarsus: 1.2, femur: 1.5, tibia: 1.5 },
+    { cx: 0.2, coxaDir: [-0.4, -0.6, 0.6], coxa: 0.32, foot: [-2.7, 2.9], tarsus: 1.5, femur: 1.8, tibia: 1.85 },
   ] },
   gait: { lift: 0.34, duty: 0.55 },
 };
@@ -61,7 +64,7 @@ const HELL_QUEEN = { ...HELL_BASE, key: "hell_queen", L: 7.6,
   trigger: { count: 2, len: 0.8, ang: 0.35 },
   gaster: { len: 2.3, h: 1.15, w: 1.1, tilt: 0.1, constrict: 0.17, at: 0.28 },
   legs: { ...HELL_BASE.legs, thick: 0.058 },
-  stance: 0.72,
+  stance: 1.05,
 };
 export const HELL_MORPHS = { hell_worker: HELL_WORKER, hell_soldier: HELL_SOLDIER, hell_queen: HELL_QUEEN };
 // ===== END HELL ANT MORPHS v2 =====

@@ -808,6 +808,9 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
   };
   // camera (`cdist=` overrides the clip's distance: the same scene at another zoom)
   // (`ctx` / `ctz` move the camera's target: a close look at one actor)
+  // (`cdir=x,y,z` the camera's direction: e.g. 0,0.03,1 at ground level, to see anything going through the ground)
+  const cdir = (q.get('cdir') || '').split(',').map(Number);
+  if (cdir.length === 3 && cdir.every((v) => Number.isFinite(v))) clip.cam.dir = cdir as [number, number, number];
   const C = { ...clip.cam, dist: Number(q.get('cdist') || clip.cam.dist * kS), tx: Number(q.get('ctx') ?? clip.cam.tx * kS), ty: Number(q.get('cty') ?? clip.cam.ty * kS), tz: Number(q.get('ctz') ?? clip.cam.tz * kS) };
   // a close look at one actor's head (`follow=` its index, `crel=1`: `cdir=` in its own frame — x ahead, y up, z to its
   // right — and `cfwd=` the target that far ahead of its centre), e.g. the antennae against the head in every clip
