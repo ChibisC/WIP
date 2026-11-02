@@ -51,6 +51,8 @@ export function antSpeed(w: World, a: Ant): number {
   }
   // Carabid-style night bonus not for ants; ants slow slightly at night.
   v *= 1 - w.s.night * 0.15;
+  // layered ground: a little slower walking up a ramp (LAYERS.upSpeed)
+  if (a.space === SURFACE && w.terrain.layers) v *= w.terrain.slopeSpeed(a.x, a.y, dcos(a.h), dsin(a.h));
   return v;
 }
 

@@ -1044,3 +1044,28 @@ export const ENTRANCE = {
   /** rival AI colonies dig an extra entrance per this many living ants (at most maxExtra) */
   aiExtraAt: 60,
 };
+
+/**
+ * Layered ground (claude/maps/05-spec-layered-maps.md; world/layers.ts, docs/maps/layers.md): terraces one `step` above
+ * the other, their banks too steep to walk, joined by ramps no steeper than `rampMaxSlope`.
+ */
+export const LAYERS = {
+  /** height of one level (mm): about 8–9 worker lengths */
+  step: 34,
+  /** horizontal width of a bank (mm): 34 mm over 12 is about 70° */
+  bankW: 12,
+  /** the bank's outline wanders this far (mm) either side of the authored shape, over features of `jitterScale` mm */
+  bankJitter: 5,
+  jitterScale: 70,
+  /** a ramp's sides blend into the ground beside it over this many mm */
+  rampSide: 8,
+  /** the steepest ground ants and creatures walk (tan of the slope: 0.75 ≈ 37°); steeper bank and ramp-side ground blocks */
+  maxWalkSlope: 0.75,
+  /** the validator's limits for ramps: slope along the path (tan 25°), width (mm) */
+  rampMaxSlope: 0.47,
+  rampMinWidth: 40,
+  /** ants walking up a ramp go at this share of their speed (down: full speed) */
+  upSpeed: 0.85,
+  /** optional damage bonus for fighting from higher ground (off: EotU has none) */
+  highGroundBonus: 0,
+};
