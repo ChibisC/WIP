@@ -1159,15 +1159,19 @@ export const FLOOD = {
 /**
  * Kings — the Termants' and the termites' (sim/kings.ts; user note 2026-11-02): no nest duties; each walks round the queen
  * inside her chamber (the queen's tiles) and fights intruders there. A new waypoint every `legS` s, `stepRad` further
- * round her (`jitterRad` either way), all the way round and back; the ring's radius is `ringQ` × her length + `ringK` ×
- * his; he walks at `speed` × his own and, waiting, grooms her `groomShare` of the time.
+ * round her (`jitterRad` either way), all the way round and back; the ring is an ellipse `ringAlong` × her length along
+ * her and `ringSide` × sideways, + `ringK` × his length (a termite queen: `termiteGap` off her long body); he walks at
+ * `speed` × his own and, waiting, grooms her `groomShare` of the time.
  */
 export const KING = {
   legS: 9,
   stepRad: 0.75,
   jitterRad: 0.3,
-  ringQ: 0.55,
-  ringK: 0.7,
+  ringAlong: 0.5,
+  ringSide: 0.22,
+  ringK: 0.45,
+  /** termite queens (a long body): the ring keeps this far off her side (mm) */
+  termiteGap: 2.4,
   speed: 0.55,
   arrive: 0.8,
   groomShare: 0.3,

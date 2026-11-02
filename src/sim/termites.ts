@@ -1,7 +1,7 @@
 import { World } from './world';
 import { kingWander } from './kings';
 import { Ant, AS, Colony, POSE, SURFACE, nestSpace } from './types';
-import { BALANCE, NASUTE, SICKLE } from './balance';
+import { BALANCE, KING, NASUTE, SICKLE } from './balance';
 import { casteOf } from './species';
 import { damageAnt, damageCreature, creatureHooks, friendlyCreature, isEnemyAnt } from './combat';
 import { killAnt, goToNestPoint, foodAt } from './antAI';
@@ -313,7 +313,7 @@ function kingTick(w: World, a: Ant, c: Colony, dt: number): boolean {
     return true;
   }
   // he walks round her in the royal chamber (user note 2026-11-02: no nest duties; kings.ts), clear of her long body
-  if (kingWander(w, a, c, q, dt, false, (x, y) => distToQueenBody(q, x, y) > cd.length * 0.45)) return true;
+  if (kingWander(w, a, c, q, dt, false, (x, y) => distToQueenBody(q, x, y) > 1, (ang) => gapRadius(q, ang, KING.termiteGap))) return true;
   // (nowhere to walk: his old place at her side)
   kingSpot(w, q, a.caste, spot);
   if (a.state !== AS.Idle) {
@@ -332,6 +332,20 @@ function kingTick(w: World, a: Ant, c: Colony, dt: number): boolean {
 }
 
 const spot = { x: 0, y: 0, h: 0 }; // det-ok: scratch
+
+/** How far from her centre, at this angle, a point is `gap` mm off the queen's body (bisection along the ray). */
+function gapRadius(q: Ant, ang: number, gap: number): number {
+  let lo = 0;
+  let hi = 80;
+  const c = dcos(ang);
+  const s = dsin(ang);
+  for (let i = 0; i < 18; i++) {
+    const m = (lo + hi) / 2;
+    if (distToQueenBody(q, q.x + c * m, q.y + s * m) < gap) lo = m;
+    else hi = m;
+  }
+  return hi;
+}
 
 // ---------------------------------------------------------------------------
 // Royals (model kit v2.1): the queen's body and egg point, the king's place

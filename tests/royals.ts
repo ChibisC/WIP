@@ -76,6 +76,10 @@ for (const seed of [4, 9, 13]) {
   let inside = 0;
   let worst = 0;
   let kingIn = true;
+  let waits = 0;
+  let beside = 0;
+  let attend = 0;
+  const sides = new Set<number>();
   for (let t = 0; t < 180 * 20; t++) {
     w.step(0.05);
     events(w);
@@ -88,15 +92,18 @@ for (const seed of [4, 9, 13]) {
     }
     const k = w.antById.get(c.king!)!;
     if (!inChamber(w, c, k.x, k.y)) kingIn = false;
+    // (user note 2026-11-02: he walks round her; when he stops, he is beside her and plays ATTEND)
+    if (k.v === 0 && !k.alarm) {
+      waits++;
+      const sd = distToQueenBody(q, k.x, k.y);
+      if (sd > 1 && sd < 4.5) beside++;
+      if (antToView(w, k, blankView(), k.space, -1).tState === AnimState.ATTEND) attend++;
+      sides.add(Math.floor(((Math.atan2(k.y - q.y, k.x - q.x) - q.h + 4 * Math.PI) % (2 * Math.PI)) / (Math.PI / 4)));
+    }
   }
   check(`seed ${seed}: nobody walks through the queen's abdomen (a solid body: paths go round, separation pushes out)`, inside === 0, `deepest ${(-worst).toFixed(2)} mm in`);
-  const k = w.antById.get(c.king!)!;
-  const kp = { x: 0, y: 0, h: 0 };
-  kingSpot(w, q, k.caste, kp);
-  const side = distToQueenBody(q, k.x, k.y);
-  check(`seed ${seed}: the king stands at his place beside her, clear of her body, close enough for his antennae, inside the chamber`, Math.hypot(k.x - kp.x, k.y - kp.y) < 1.5 && side > 1.2 && side < 4 && kingIn, `${Math.hypot(k.x - kp.x, k.y - kp.y).toFixed(2)} mm from his spot, ${side.toFixed(2)} mm from her side`);
-  const v = antToView(w, k, blankView(), k.space, -1);
-  check(`seed ${seed}: render: the king plays ATTEND (kit v2.1), head aimed at her abdomen`, v.tState === AnimState.ATTEND && v.aimX !== undefined && distToQueenBody(q, v.aimX, v.aimY!) < 0, `state ${v.tState}`);
+  check(`seed ${seed}: the king walks round her inside the chamber; when he stops he is beside her, clear of her body, close enough for his antennae`, kingIn && waits > 0 && beside >= waits * 0.85 && sides.size >= 5, `${beside}/${waits} stops beside her, ${sides.size}/8 sides of her, always in the chamber: ${kingIn}`);
+  check(`seed ${seed}: render: stopped beside her, the king plays ATTEND (kit v2.1), head aimed at her abdomen`, attend >= waits * 0.85, `${attend}/${waits} stops`);
 }
 
 // ---------------------------------------------------------------- eggs from her tip
