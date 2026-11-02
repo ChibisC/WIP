@@ -13,6 +13,16 @@ Spec: `claude/realism/08-spec-hell-ants-nasute-termites.md` (in the project). Pl
 - **Hell ant legs:** the legs were "so compact", so they are now 1.25× longer and set as wide as the other ants' (about half a body length on each side; before it was about a fifth). The body is carried higher, and the ants walk and idle with the other ants' planted‑feet animation. The clips and sheets show the new legs. The review rounds were scored on the older, compact legs.
 - **Nothing through the ground:** every hell ant and termite clip was filmed at ground level (anim lab `cdir=0,0.04,1`): walk, snap, impale, the three attacks, deaths, the termite states and the royals. Nothing dips below the ground. The snap's cocked jaws used to swing into the ground, so the head now rises as they cock. Corpses still sink away after drying, as every ant's do.
 
+## The user's ratings (review page, 2026-11-02 afternoon)
+Round 1 of the user's own ratings (the review page): the hell ant models 9–10 (the amber 10, the lineup 10), their
+attacks 7–8; the nasutes 8–9. Asked for and done in round 2 (CHANGE_PLAN §22.6):
+- **Hell ants:** jaws that open much wider and open and close through the attack; three attacks (the snap — the
+  soldier's paddle impale —, the chomp, the slam); the finisher on a foe at 25 % health: the jaws round its neck,
+  the foe lifted into the air and shaken for a second (user note 12:39), then its head cut off (a game rule, tested).
+- **Nasute termites:** three melee attacks for the workers and the majors with the feet planted; the major drums with
+  its feet planted; the soldier moves as it glues. Sickle-jaws unchanged.
+- Clips: `../hell-ants/clips/finisher_*`, `attack_*`, `snap_*`; `../nasutitermes/clips/tfight_*`, `tram_*`.
+
 ## Blind review: render scores per round (0–10; real photos mixed in scored 8.5–9.5)
 
 | Unit | R1 side / close | R2 | R3 | R4 |
