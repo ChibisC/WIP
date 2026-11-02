@@ -23,7 +23,7 @@ export interface AllyScene {
   raidA: Ant[];
 }
 
-export function allyInvasion(o: { seed?: number; settle?: number; band?: number; caste?: string; human?: boolean; bothInvaded?: boolean; developed?: number } = {}): AllyScene {
+export function allyInvasion(o: { seed?: number; settle?: number; band?: number; caste?: string; human?: boolean; bothInvaded?: boolean; developed?: number; at?: 'queen' | 'entrance' } = {}): AllyScene {
   const w = createWorld(
     {
       seed: o.seed ?? 5,
@@ -48,10 +48,13 @@ export function allyInvasion(o: { seed?: number; settle?: number; band?: number;
   const R = w.s.colonies[2];
   for (let i = 0; i < 20 * (o.settle ?? 20); i++) w.step(0.05);
   const band = (into: Colony, n: number): Ant[] => {
+    // by the queen (default), or just inside the nest's entrance
     const q = w.antById.get(into.queen)!;
+    const e = w.nest(into.id)!.hexCenter(into.entrances[0].q);
+    const at = o.at === 'entrance' ? { x: e.x, y: e.y - 14 } : { x: q.x, y: q.y };
     const out: Ant[] = [];
     for (let i = 0; i < n; i++) {
-      const a = makeAnt(w, R.id, o.caste ?? 'formica_soldier', nestSpace(into.id), q.x + ((i % 4) - 1.5) * 3, q.y + 14 + Math.floor(i / 4) * 3, -Math.PI / 2);
+      const a = makeAnt(w, R.id, o.caste ?? 'formica_soldier', nestSpace(into.id), at.x + ((i % 4) - 1.5) * 3, at.y + 14 + Math.floor(i / 4) * 3, -Math.PI / 2);
       a.task = 'guard';
       a.alarm = 1;
       a.age = 1;

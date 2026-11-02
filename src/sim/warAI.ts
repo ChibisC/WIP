@@ -276,7 +276,7 @@ function couldJoin(w: World, c: Colony, o: Colony): boolean {
 /** The gathering point for a raid on t: gatherDist short of its nearest hole, on the side the raider comes from. */
 function gatherPoint(w: World, c: Colony, t: Colony): WarBrain['gather'] {
   const A = BALANCE.aiAllies;
-  if (!w.s.colonies.some((o) => couldJoin(w, c, o))) return undefined;
+  if (!A.help || !w.s.colonies.some((o) => couldJoin(w, c, o))) return undefined;
   const ox = c.entrances[0]?.sx ?? c.nx;
   const oy = c.entrances[0]?.sy ?? c.ny;
   let e = t.entrances[0];
@@ -290,7 +290,7 @@ function gatherPoint(w: World, c: Colony, t: Colony): WarBrain['gather'] {
 /** Join an AI ally's young raid: the same target, the leader's gathering point. */
 function joinRaid(w: World, c: Colony, n: number): boolean {
   const A = BALANCE.aiAllies;
-  if (n < A.joinMinFighters || threat(w, c)) return false;
+  if (!A.help || n < A.joinMinFighters || threat(w, c)) return false;
   for (const o of w.s.colonies) {
     const ob = o.aiWar;
     if (o.id === c.id || !o.alive || o.team !== c.team || !ob || ob.target < 0 || ob.joined !== o.id || ob.age > A.joinWindow) continue;
@@ -549,6 +549,7 @@ function steerHelp(w: World, c: Colony, o: Colony, d: AllyDanger): void {
 /** Every 2 s: keep helping (or stop), or pick an ally to help. */
 export function allyTick(w: World, c: Colony, dt: number): void {
   const A = BALANCE.aiAllies;
+  if (!A.help) return;
   const s = allyBrain(c);
   s.t -= dt;
   if (s.t > 0) return;

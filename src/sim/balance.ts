@@ -550,6 +550,8 @@ export const BALANCE = {
   },
   /** AI colonies with allies (CHANGE_PLAN §22, user spec claude/ai/01-spec-ai-allies-chambers.md) */
   aiAllies: {
+    /** the ally brain and joint raids on (off: AI allies leave each other alone, as before; tools/ecology-teams.ts) */
+    help: true,
     /** seconds between the ally brain's decisions */
     every: 2,
     /**
