@@ -15,8 +15,11 @@ export type DamageType = 'bite' | 'acid' | 'sting' | 'pure';
  */
 export const SPECIES_DISPLAY_NAME: Partial<Record<SpeciesId, string>> = {
   aurimyrmex: 'Saiy-Ants',
-  /** the user's name for the ant–termite hybrid (the brief said "Termyrms"); fallback "Chimera Ants" */
-  termant: 'Termants',
+  /**
+   * the user's name for the ant–termite hybrid (the brief said "Termyrms"; "Termants" until 2026-11-01, renamed for the
+   * story campaign, claude/story/02-spec); the internal id stays `termant`; fallback "Chimera Ants"
+   */
+  termant: 'Gene-Thief Termants',
 };
 export const SAIY_FALLBACK_NAME = 'Gilded Ants';
 export const TERMANT_FALLBACK_NAME = 'Chimera Ants';

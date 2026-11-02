@@ -81,7 +81,7 @@ const t0 = Date.now();
   check("founding: the chamber is one commandable group", new Set(queenT.map((t) => t.group)).size === 1);
   check("chamber tiles cannot be built", !!canPlaceTile(w, c, 'queen', q0));
   check("chamber tiles cannot be removed or upgraded", !!markDelete(w, c, queenT[3].q) && !!canUpgrade(w, c, queenT[3]));
-  check('hex radius scaled to the species', Math.abs(g.R - 6) < 0.01, `R=${g.R}`);
+  check('hex radius scaled to the species (×1.25, user 2026-11-01)', Math.abs(g.R - 7.5) < 0.01, `R=${g.R}`);
 
   // placement rules
   const undug = (() => {
