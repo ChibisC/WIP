@@ -1366,3 +1366,39 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
 - Docs: README (lobby line, species table), `docs/multiplayer.md` §Gene Thief. The Termants' `STOLEN_CASTES` already
   had the nasute and sickle-jaw soldiers; unchanged.
 
+
+## 2026-11-02 — Realism rework: hell ants and nasute termites (CHANGE_PLAN §22)
+User spec `claude/realism/08-spec-hell-ants-nasute-termites.md`. Looks and animation only: every unit id, stat, ability
+and behaviour unchanged. Report: `docs/realism/hell-nasute/README.md`; rubric: `docs/realism/hell-nasute/RUBRIC.md`.
+- Research: shape numbers per unit in `docs/creatures/hell-ant.md` §7 and `docs/creatures/nasutitermes.md` §11 (the
+  user's 24 study photos and the papers), written before the geometry changed.
+- Hell ants: the `HELL` baked-detail recipe; every piece carries detail coordinates; 12-segment antennae through a spline;
+  club femora, slim tibiae, spurs 1-2-2, tarsomeres, claws, a soft knee; erect setae and a fine pubescence; four trigger
+  hairs (two on the queen); dark jaws; bronze faceted eyes; the horn's setae irregular; no ocelli on the queen (the fossil
+  record wins over the spec). User notes (10:30): the legs 1.25× longer and set as wide as the other ants', the body
+  higher; walk and idle with the other ants' planted-feet animation. Melee `ATK.SNAP` / `ATK.IMPALE` with a hit-stop, a
+  click and a puff of dust; nothing sideways. Ground check: every clip filmed at ground level (`cdir=0,0.04,1`): nothing
+  goes through the ground (corpses still sink away after drying, as every ant's do). Amber specimen lab mode.
+- Nasute termites (nasute castes only; sickle-jaw identical: hashes and 12 pixel-identical renders): `real` per caste
+  (rig column `REAL`): lobed gut under the cuticle, sunken membranes, mottled wrinkled soft cuticle, wet glint, deeper
+  subsurface light, barrel antennal articles and round legs at LOD0, more fine setae, breathing, stronger queen waves,
+  eggs seen through her membrane, her plates as dark islands; stringy glue (`NASUTE_GLUE`); palettes nudged to the photos.
+- Lab: `?light=` for termites, `?contact=1` contact shadows, `?amber=1`; anim lab clips `termites`, `royals`, `snap`
+  and `cdir=`. Renders: `tests/browser/hell_nasute_realism.py`; sheets: `tools/hell-nasute-sheets.py`.
+- Blind review, four rounds (fresh reviewer each, anchors 3 / 4 / 9, photos mixed in scoring 8.5–9.5):
+  - R1 mean 3.3. Tells: one glossy plastic per part; tube legs and faceted bead antennae; no contact shadows; the horn
+    setae a white comb; the queen an orange balloon; the king's white seams; the gut a smear.
+    Fixed: deeper hell sculpture, less clearcoat; round legs, no ball joints; irregular horn setae; round termite legs
+    and antennae; soft-cuticle mottle and wrinkles; a defined gut; darker king membranes; a paler queen with larger
+    plates; lab contact shadows and a finer ground.
+  - R2 mean 3.25. Tells: tubes and bead chains; one specular blob; a few white spike hairs; the queen's identical discs;
+    flat decal eyes; the gut painted on. Fixed: hell pubescence and more leg setae, bulging bronze eyes; barrel antennal
+    articles; the gut fading to the rim under the segment margins; queen plates as dark islands, rolls of varied tone.
+  - R3 mean 3.7 (hell close-ups 4). Tells: tubes and beads; vinyl cuticle, no translucency; white pin hairs and white
+    seams. Fixed: soldier palette less saturated, seams near the body colour, lower albedo with warm translucent edges,
+    gold hairs, wider queen plates.
+  - R4 mean 3.45 (the reviewer ±0.5). Same three tells. The 7/10 target was not reached; what is left needs heavier tools
+    (README of the report).
+- Checks: `tsc`, determinism (60 files clean), morph hashes (only the hell ants changed; re-baselined), termite kit
+  hashes (only the nasute castes changed), `sim/heightData.ts` regenerated (taller hell ants; no new underpasses),
+  climb data unchanged.
