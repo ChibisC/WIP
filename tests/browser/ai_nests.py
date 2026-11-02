@@ -41,7 +41,7 @@ with sync_playwright() as p:
     pg.on("console", lambda m: errs.append(m.text) if ("THREE.WebGLProgram" in m.text or (m.type == "error" and "fonts" not in m.text and "ERR_" not in m.text)) else None)
     t0 = time.time()
     # you (a Black garden colony, standing in) and the AI colonies; no wild creatures and no wars, so the nests just grow
-    pg.goto(BASE + f"?play=1&shot=1&noui=1&q=medium&seed=4&creatures=0&map=meadowPond&species=lasius&rival={','.join(RIVALS)}&ticks=40", wait_until="load")
+    pg.goto(BASE + f"?play=1&shot=1&noui=1&reveal=1&q=medium&seed=4&creatures=0&map=meadowPond&species=lasius&rival={','.join(RIVALS)}&ticks=40", wait_until="load")
     while time.time() - t0 < 900 and not pg.evaluate("window.__ready===true"):
         time.sleep(0.5)
     note(f"loaded in {time.time() - t0:.0f} s")

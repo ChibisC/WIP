@@ -1402,5 +1402,9 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
 
   With the brain on, the Black garden and Fire ant colonies lasted longer in every seed, and the Red wood colony came
   through two games it lost or barely survived without it (in the third it fell half a minute sooner); help started 2–7 times a game; every help was one start and one stop (no flip-flopping); stops were "done",
-  "fallen", "outmatched" and "home". The first version (before lost causes were left alone) did worse: helpers died in
+  "fallen", "outmatched" and "home". A mirror line-up (Black garden + Red wood on both sides), seeds 1–2: seed 1, off
+  — both Black garden colonies fell at about 10.5 min (wild creatures), on — one of them came through (204 ants at the
+  end); seed 2, off — everyone alive at 45 min, on — team 1 raided team 2's Red wood colony together and took it at
+  16 min (its ally went to help and fell back, outmatched). Allies with the brain are more decisive both ways.
+  The first version (before lost causes were left alone) did worse: helpers died in
   hopeless fights and the helper fell sooner than with the brain off.
