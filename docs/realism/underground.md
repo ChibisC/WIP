@@ -28,8 +28,10 @@ baked occlusion, no flat CG patterns, review against before shots). Render-only:
   with contact shadows; damp patches darker and less rough; occlusion at the wall foot.
 - Walls: lighter so their texture reads; mandible scrape grooves in patches; grains; roots; damp.
 - Soil top: the same grains, dark gaps between clods.
-- Tiles: the queen's chamber is smoothed pale silt (cool grey, still distinct); brood tiles are soil washed with the
-  caste colour, pockets pressed into it; the food store is a swept olive-stained floor; softer cell bevels. Group
+- Tiles: the queen's chamber is smoothed pale silt (cool grey, still distinct); the food store is a swept olive-stained
+  floor; softer cell bevels. Brood tiles were the soil washed with the caste colour until the user's notes of 10:40 and
+  11:04 gave every caste a clean colour and a natural texture of its own (DESIGN.md §6 "Caste looks",
+  `render/casteLook.ts`, renders in `docs/realism/caste-tiles/`). Group
   outlines, the grid, ghosts and dig marks are unchanged.
 - Light: the nest's key light is a warm white (0xffdcb4, was orange 0xffc27a) and the light pools are less orange, so
   soils keep their own colours; stones are less blue-biased to match.
@@ -38,6 +40,10 @@ baked occlusion, no flat CG patterns, review against before shots). Render-only:
   round blue-grey pebbles; crumbly walls (fewer, rarer roots; no fibrous scrape streaks); the queen's and food tiles
   keep the floor's grain under their silt and stain; thinner group outlines; a little soil shows in the dark beyond
   the dug floor (the darkness floor 0.12 → 0.17).
+- Round 4 (after the second blind review): greyer and redder patches and paler worn paths in the floor, so it is not
+  one colour; sickle-jaw and nasute floors keep more grain and relief (they read as felt); the queen's tile shows the
+  floor's crumbs; slightly irregular group outlines. After shots re-taken for the black garden and red wood ants (the
+  rest of `after_*` are round 3; the renders differ only in those floor details).
 
 ## Review
 Before/after renders (render-only) in `docs/realism/underground/` (`tests/browser/underground_realism.py`, TAG=before
@@ -50,6 +56,8 @@ and "could this be a macro photo of a real ant nest in soil?"):
 - Round 2 (8 pairs): the new render preferred in 8 of 8; photo-likeness 4.25 vs about 2. Remaining: tiles read as
   flat slabs with printed outlines; spotlight pools falling to black; leftover warm tint on some brood floors;
   round blue-grey pebbles; fibrous walls.
+- Round 3 (10 pairs): the new render preferred in 10 of 10; photo-likeness 4.9 vs 2.0. Remaining: tiles still flat,
+  outlines still printed, single-colour floors, felt-like termite floors (round 4 above).
 
 
 ## Sources
