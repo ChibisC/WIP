@@ -302,6 +302,8 @@ export function addAmber(scene: THREE.Scene, env: SurfaceLights, target: THREE.V
   for (let k = 0; k < 26; k++) {
     const d = new THREE.Mesh(new THREE.TetrahedronGeometry(span * (0.003 + 0.007 * rnd()), 0), debrisMat);
     d.position.copy(inside(0.92));
+    // (the sheets: specks over the animal read as glitches — the debris keeps clear of the subject)
+    if (Math.abs(d.position.x - target.x) < span * 0.6 && d.position.y < span * 0.75 && Math.abs(d.position.z - target.z) < span * 0.35) continue;
     d.scale.set(1, 0.3 + rnd() * 0.5, 0.6 + rnd());
     d.rotation.set(rnd() * 6, rnd() * 6, rnd() * 6);
     scene.add(d);
