@@ -241,6 +241,39 @@ const antsOf = (S: ReturnType<typeof allyInvasion>, filter: (a: (typeof S.w.s.an
   check("help: an AI ally helps the human player's nest the same way, and says so", helped && msgs.some((m) => m.includes('coming to help')), msgs.filter((m) => m.includes('ally')).join(' | '));
 }
 {
+  // a lost cause: a huge band in a human ally's nest, more than the helper could ever match; the human calls for help
+  const S = allyInvasion({ band: 90, developed: 70, human: true });
+  const msgs: string[] = [];
+  S.w.events.onAny((e) => {
+    if (e.t === 'message' && e.colony === S.B.id) msgs.push(e.text);
+  });
+  applyCommand(S.w, { type: 'callHelp', tick: S.w.s.tick, player: S.B.id, seq: 0 } as never);
+  let helped = false;
+  for (let t = 0; t < 20 * 30; t++) {
+    S.w.step(0.05);
+    S.w.events.drain();
+    if ((S.A.aiAlly?.ally ?? -1) >= 0 || helpGroupsOut(S) > 0) helped = true;
+  }
+  const d = allyDanger(S.w, S.B);
+  check("help: a lost cause gets no help (the helper keeps its fighters), and a human caller is told why", !helped && msgs.filter((m) => m.includes("can't spare")).length === 1, `danger ${d.score.toFixed(0)}, enemy ${d.enemy.toFixed(0)} v defence ${d.defence.toFixed(0)}; ${msgs.join(' | ')}`);
+}
+{
+  // help under way when the enemy grows far beyond it: the helpers fall back instead of dying with the ally
+  const S = allyInvasion({ band: 20, developed: 70 });
+  let t = 0;
+  for (; t < 20 * 60 && (S.A.aiAlly?.ally ?? -1) < 0; t++) S.w.step(0.05);
+  const helping = S.A.aiAlly?.ally ?? -1;
+  const q = S.w.antById.get(S.B.queen)!;
+  for (let i = 0; i < 90; i++) {
+    const a = makeAnt(S.w, S.R.id, 'formica_soldier', nestSpace(S.B.id), q.x + ((i % 6) - 2.5) * 3, q.y + 20 + Math.floor(i / 6) * 3, -Math.PI / 2);
+    a.task = 'guard';
+    a.alarm = 1;
+  }
+  S.w.reindex();
+  for (let k = 0; k < 20 * 4; k++) S.w.step(0.05);
+  check('help: when the attack grows far beyond what help can hold, the helpers fall back', helping === S.B.id && (S.A.aiAlly?.ally ?? -1) < 0 && S.A.aiAlly?.why === 'outmatched' && helpGroupsOut(S) === 0, `helping ${helping} → ${S.A.aiAlly?.ally} (${S.A.aiAlly?.why})`);
+}
+{
   // the call for help: a command, raises the danger for allies while it lasts
   const S = allyInvasion({ band: 2, developed: 70, at: 'entrance', caste: 'formica_worker', human: true });
   const before = allyDanger(S.w, S.B).score;

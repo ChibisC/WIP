@@ -32,6 +32,8 @@ export interface MenuChoice {
   map?: MapId;
   /** storms flood the authored map's low ground (off by default) */
   floods?: boolean;
+  /** AI colonies' level (CHANGE_PLAN §22): 0 Easy, 1 Normal (default), 2 Hard, 3 Brutal */
+  aiLevel?: number;
   /** 'auto' follows the frame rate, starting from high */
   quality: Quality | 'auto';
   /** battle arena: 2–4 teams */
@@ -96,7 +98,12 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
           <div class="opt-row">${spChips}</div><div class="opt-row">${teamChips}</div>${thief}</div>`;
       })
       .join('');
-    const rivals = `${aiRows || `<p class="dim">${choice.mode === 'sandbox' ? 'No AI colonies: the meadow is yours.' : 'Add at least one AI colony.'}</p>`}<div class="opt-row">${choice.ais.length < MAX_AI ? '<button class="chip" data-aiadd="1">+ Add an AI colony</button>' : ''}<span class="dim">${choice.ais.length} of ${MAX_AI} · you are on Team 1; colonies on your team are allies</span></div>`;
+    // AI level (CHANGE_PLAN §22): how soon AI colonies dig 19-hex chambers and upgrade their tiles
+    const lvNames = ['Easy', 'Normal', 'Hard', 'Brutal'];
+    const lvTips = ['builds small chambers and upgrades late and little', 'the standard rival', 'big chambers and upgrades sooner', 'big chambers and upgrades soonest, more at once'];
+    const lv = choice.aiLevel ?? 1;
+    const levelRow = choice.ais.length ? `<div class="opt-row"><span class="dim">AI level:</span>${lvNames.map((n, i) => `<button class="chip ${lv === i ? 'on' : ''}" data-ailevel="${i}" data-tip="<b>${n}</b>AI colonies: ${lvTips[i]}.">${n}</button>`).join('')}</div>` : '';
+    const rivals = `${aiRows || `<p class="dim">${choice.mode === 'sandbox' ? 'No AI colonies: the meadow is yours.' : 'Add at least one AI colony.'}</p>`}<div class="opt-row">${choice.ais.length < MAX_AI ? '<button class="chip" data-aiadd="1">+ Add an AI colony</button>' : ''}<span class="dim">${choice.ais.length} of ${MAX_AI} · you are on Team 1; colonies on your team are allies (they come to help when your nest is in danger)</span></div>${levelRow}`;
     // the five authored maps (the old random styles stay in the code for missions, tests and old saves)
     if (!choice.map) choice.map = PLAYABLE_MAPS[0];
     const map = `<div class="map-grid">${PLAYABLE_MAPS.map((id) => {
@@ -201,6 +208,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       delete choice.map;
     } else if (d.map) choice.map = d.map as MapId;
     else if (d.floods) choice.floods = d.floods === '1';
+    else if (d.ailevel) choice.aiLevel = Number(d.ailevel);
     else if (d.q) choice.quality = d.q as Quality | 'auto';
     else if (t.classList.contains('go')) {
       if (t.disabled) return;

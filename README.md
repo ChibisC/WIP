@@ -26,7 +26,7 @@ The title screen has **Single-player** and **Multiplayer**.
 1. **Create game** gives you a six-letter room code and an invite link (`…/?room=ABCDEF`). Press **Copy link** and send it.
 2. Friends open the link and land in the lobby. Each player picks a name, species, colour and team, then clicks **Ready**. A **Gene Thief** player also picks the castes it steals (any of the 21 borrowable castes; each needs its own room tile).
 3. The host can set each of the eight slots to Open, Closed or AI (and pick an AI's species, team and, for a Gene Thief AI, its castes), move anyone to another team, pick the map from the map cards (everyone sees the choice), and set the seed, food, floods and population cap.
-   - **Teams:** Red, Blue, Green, Gold or no team. Teammates never fight each other, start on neighbouring colony sites, and win together when theirs is the last team with a living queen. Everyone on one team cannot start.
+   - **Teams:** Red, Blue, Green, Gold or no team. Teammates never fight each other, start on neighbouring colony sites (the map cards show each team's sites), help each other when an AI is on the team, and win together when theirs is the last team with a living queen. Everyone on one team cannot start.
 
    ![A lobby with teams, a Gene Thief and the map cards](docs/multiplayer/teams-lobby-host.png)
 4. The host starts the match once everyone is ready.
@@ -179,6 +179,7 @@ npx vite-node tools/anim-cost.ts -- 1040                            # the animat
 # &cdist= / &ctx= / &ctz= move the camera; tests/browser/anim_clips.py records clips (docs/realism/combat/)
 # any species in the lab: &ant=<morph>&big=<morph> (e.g. &ant=atta_media&big=atta_major); clip=spray (Formica's three sprayers), troph (Lasius)
 # realism sheets and clips per species: docs/realism/<species>/ (render only); the overnight report: docs/realism/OVERNIGHT-REPORT.md
+npx vite-node tests/aiAllies.ts                                     # AI with allies: team placement on the five maps, 7/19-hex one-type chambers, stores, highways, upgrades, the ally brain (help, guard, recall, lost causes, call for help), joint raids, determinism
 npx vite-node tests/fights.ts                                       # guard line, room in a fight, foes shared out, creatures apart, calm after a fight, marker orders (no attacking / gathering / climbing)
 npx vite-node tools/postfight.ts -- ant:lasius_soldier 20           # what fighters do once their foes are dead (zigzags, stop-start, states)
 npx vite-node tools/fightspread.ts -- ant:lasius_soldier 24 ant:formica_soldier 24   # how spread out a melee is, second by second
@@ -219,12 +220,17 @@ tests/browser/with_server.sh python3 tests/browser/sickle_renders.py  # Sickle-J
 tests/browser/with_server.sh python3 tests/browser/eciton_renders.py  # the five army-ant models and four poses, a raid at close and far zoom, posts, a bridge, a plug
 tests/browser/with_server.sh python3 tests/browser/mobile.py        # iPhone / iPad emulation: compact layout, touch gestures, tap / long press, build drawer, maps, tooltips, arena
 tests/browser/with_server.sh python3 tests/browser/termant_renders.py # the four Termant castes, the stolen-caste tint, stolen ants in the game, the queen and king, a carton wall, the Genome tab
-npx vite-node tools/econ.ts -- lasius 24 7 1 1                      # AI economy over N minutes [seed foodMul creaturesMul]
+npx vite-node tools/econ.ts -- lasius 24 7 1 1                      # AI economy and nest shape over N minutes [seed foodMul creaturesMul aiLevel]
 npx vite-node tools/ecology.ts -- 20 1.5                            # creature balance: 4 colonies with wild creatures
+npx vite-node tools/ecology-teams.ts -- 45 1 1 meadowPond 1 mixed   # a 2v2 of AI colonies [seed help(0/1) map creatures lineup(mixed/mirror/swap)]
+npx vite-node tools/ally-probe.ts -- 120 14                         # the ally brain at work in a staged invasion [seconds band human bothInvaded seed developed]
+npx vite-node tools/team-sites.ts                                   # every map's team placements (land routes, limits) → docs/maps/team-sites.md
+tests/browser/with_server.sh python3 tests/browser/ai_nests.py      # AI nests from above at 10/30/45 min → docs/ai/chambers/ (and sheet.jpg)
+tests/browser/with_server.sh python3 tests/browser/ai_help.py       # clip: an AI ally's soldiers come to your nest's rescue → docs/ai/allies_help.mp4
 npx vite-node tools/battle.ts -- formica_soldier:2,formica_rapid:2 fire_minor:16 60
 npx vite-node tools/equal.ts -- fire_major fire_soldier 150         # how many of each the same food buys
 python3 tools/crsheet.py out.jpg "wolfSpider|wolf spider;mantis|mantis|state=11"   # creature model sheet (?scene=crlab)
 ```
 Sound: `?scene=sounds` is the sound board (every sound with its takes, file or stand-in, and a soundscape mixer). `docs/audio/` has the sound list for gathering recordings, the attributions and how the audio works. `npm run audio:process` turns recordings in `audio-src/recordings/` into game files.
 
-Dev URLs: `?scene=crlab&kinds=stagBeetle,tarantula` (creature viewer: `state`, `st`, `walk`, `dead`, `eaten`, `cam`), `?play=1&spawn=wolfSpider:2,mantis` (creatures beside your entrance; add `&rival=formica&battle=lasius_soldier:14&climbdebug=1` to watch them climbed; `&hitboxes=1` draws every hitbox, as F3 does; `&combatdebug=1` the combat debug view: anchored, blocked, backing off, going round, slots), `?stress=1`, `?scene=determinism`, `?netsim=lat,jit,loss`, `?delay=N`, `?worker=0`.
+Dev URLs: `?scene=crlab&kinds=stagBeetle,tarantula` (creature viewer: `state`, `st`, `walk`, `dead`, `eaten`, `cam`), `?play=1&spawn=wolfSpider:2,mantis` (creatures beside your entrance; add `&rival=formica&battle=lasius_soldier:14&climbdebug=1` to watch them climbed; `&hitboxes=1` draws every hitbox, as F3 does; `&combatdebug=1` the combat debug view: anchored, blocked, backing off, going round, slots), `?play=1&allies=lasius&rival=formica&developed=70` (an AI ally and a rival, everyone well grown; `&ailevel=0..3` the AI level), `?stress=1`, `?scene=determinism`, `?netsim=lat,jit,loss`, `?delay=N`, `?worker=0`.

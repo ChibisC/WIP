@@ -128,7 +128,12 @@ function startGame(): void {
         caves,
         food: 1.2,
         // floods only on an authored map, and only when the player turned them on (off by default)
-        settings: { creatures: q.get('creatures') ? Number(q.get('creatures')) : 1, ...((c.floods || q.get('floods')) && c.map && !mission ? { floods: true } : {}) },
+        settings: {
+          creatures: q.get('creatures') ? Number(q.get('creatures')) : 1,
+          ...((c.floods || q.get('floods')) && c.map && !mission ? { floods: true } : {}),
+          // AI level (CHANGE_PLAN §22): the menu's choice, or ?ailevel=0..3
+          ...(q.get('ailevel') || (c.aiLevel !== undefined && c.aiLevel !== 1) ? { aiLevel: q.get('ailevel') ? Number(q.get('ailevel')) : c.aiLevel } : {}),
+        },
         mission: mission?.id,
         sandbox: c.mode === 'sandbox',
         ...(c.map && !mission ? { map: c.map, siteSet: q.get('sites') ? Number(q.get('sites')) : undefined } : {}),
@@ -232,7 +237,11 @@ function startGame(): void {
     setTimeout(() => ((window as unknown as { __ready: boolean }).__ready = true), 800);
   };
   if (q.get('play')) {
-    launch({ teams: Number(q.get('teams') || 2), mode: (q.get('mode') as MenuChoice['mode']) || (q.get('mission') ? 'mission' : 'skirmish'), mission: (q.get('mission') as MenuChoice['mission']) || 'meadow', species: (q.get('species') as MenuChoice['species']) || 'lasius', borrowed: (q.get('borrow') || 'formica_mortar,fire_major').split(','), ais: (q.get('rival') || '').split(',').filter(Boolean).map((sp) => ({ species: sp as MenuChoice['species'], borrowed: [], team: 'own' as const })), style: (q.get('style') as MenuChoice['style']) || (q.get('mode') === 'arena' ? 'formicarium' : 'meadow'), map: (q.get('map') as MenuChoice['map']) || undefined, quality: (q.get('q') as MenuChoice['quality']) || 'high' });
+    launch({ teams: Number(q.get('teams') || 2), mode: (q.get('mode') as MenuChoice['mode']) || (q.get('mission') ? 'mission' : 'skirmish'), mission: (q.get('mission') as MenuChoice['mission']) || 'meadow', species: (q.get('species') as MenuChoice['species']) || 'lasius', borrowed: (q.get('borrow') || 'formica_mortar,fire_major').split(','), ais: [
+        ...(q.get('rival') || '').split(',').filter(Boolean).map((sp) => ({ species: sp as MenuChoice['species'], borrowed: [], team: 'own' as const })),
+        // ?allies=: AI colonies on your team (CHANGE_PLAN §22)
+        ...(q.get('allies') || '').split(',').filter(Boolean).map((sp) => ({ species: sp as MenuChoice['species'], borrowed: [], team: 'ally' as const })),
+      ], style: (q.get('style') as MenuChoice['style']) || (q.get('mode') === 'arena' ? 'formicarium' : 'meadow'), map: (q.get('map') as MenuChoice['map']) || undefined, quality: (q.get('q') as MenuChoice['quality']) || 'high' });
     return;
   }
   const title = () => showTitle(ui, () => showMenu(ui, launch), () => mpMenu(), (bytes) => watchReplay(bytes), { slot: (sl) => void loadSlot(sl), file: (b) => void loadGame(b) });

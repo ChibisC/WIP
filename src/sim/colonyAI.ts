@@ -352,7 +352,6 @@ function planChamber(w: World, c: Colony, b: BuildBrain, home: number, need: Nee
   (b.chambers ?? (b.chambers = [])).push(need.type === 'brood' ? { q: pick.q, r, type: 'brood', caste: need.caste } : { q: pick.q, r, type: need.type });
   for (const q of pick.path) if (!tunnels.includes(q)) tunnels.push(q);
   return true;
-  return false;
 }
 
 function isFighter(cs: string): boolean {

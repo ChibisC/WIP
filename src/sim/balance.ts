@@ -587,6 +587,14 @@ export const BALANCE = {
     homeGuardShare: 0.3,
     homeGuardMin: 3,
     assistOvermatch: 1.3,
+    /**
+     * a lost cause is left alone: no help when what it can spare + the ally's defenders would still be under this ×
+     * the attackers' weight (assistMinOddsQueen with the ally's queen in danger); help under way falls back when the
+     * helpers + defenders drop under assistQuitOdds × the attackers (they would only die with the ally)
+     */
+    assistMinOdds: 0.8,
+    assistMinOddsQueen: 0.5,
+    assistQuitOdds: 0.5,
     /** stop helping: clear (danger under clearDanger) for clearFor s, losses over assistMaxLoss of those sent, or after
      * assistMaxTime s; then a cooldown (s) */
     clearDanger: 150,

@@ -2,13 +2,16 @@
  * Teams of AI colonies (CHANGE_PLAN §22): a 2v2 of AI colonies on an authored map (placed by team, world/teamSites.ts)
  * for N minutes, with the ally brain on or off. Prints each colony's ants, deaths and kills, and its ally brain (help
  * started, why the last stopped) every 5 minutes, and who is alive at the end.
- *   npx vite-node tools/ecology-teams.ts -- [minutes=45] [seed=1] [help=1] [map=meadowPond] [creatures=1]
+ * Lineups: `mixed` Black garden + Red wood v Fire ant + Leafcutter (the leafcutters are much the strongest), `mirror`
+ * Black garden + Red wood on both sides, `swap` Black garden + Leafcutter v Red wood + Fire ant.
+ *   npx vite-node tools/ecology-teams.ts -- [minutes=45] [seed=1] [help=1] [map=meadowPond] [creatures=1] [lineup=mixed]
  */
 import { EventBus } from '../src/core/events';
 import { createWorld } from '../src/sim/mapGen';
 import { BALANCE } from '../src/sim/balance';
 import { AS } from '../src/sim/types';
 import { MapId } from '../src/maps/types';
+import { SpeciesId, SPECIES } from '../src/sim/species';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const minutes = Number(args[0] ?? 45);
@@ -16,6 +19,9 @@ const seed = Number(args[1] ?? 1);
 BALANCE.aiAllies.help = (args[2] ?? '1') !== '0';
 const map = (args[3] ?? 'meadowPond') as MapId;
 const crMul = Number(args[4] ?? 1);
+const lineup = args[5] ?? 'mixed';
+const SIDES: Record<string, SpeciesId[]> = { mixed: ['lasius', 'formica', 'solenopsis', 'atta'], mirror: ['lasius', 'formica', 'lasius', 'formica'], swap: ['lasius', 'atta', 'formica', 'solenopsis'] };
+const sp = SIDES[lineup] ?? SIDES.mixed;
 const w = createWorld(
   {
     seed,
@@ -25,22 +31,25 @@ const w = createWorld(
     map,
     food: 1.2,
     colonies: [
-      { species: 'lasius', player: true, ai: true, team: 0, developed: 6, startWorkers: 14, name: 'Black garden (team 1)' },
-      { species: 'formica', player: false, ai: true, team: 0, developed: 6, startWorkers: 14, name: 'Red wood (team 1)' },
-      { species: 'solenopsis', player: false, ai: true, team: 1, developed: 6, startWorkers: 14, name: 'Fire ant (team 2)' },
-      { species: 'atta', player: false, ai: true, team: 1, developed: 6, startWorkers: 14, name: 'Leafcutter (team 2)' },
+      ...sp.map((species, k) => ({ species, player: k === 0, ai: true, team: k < 2 ? 0 : 1, developed: 6, startWorkers: 14, name: `${SPECIES[species]?.name ?? species} (team ${k < 2 ? 1 : 2})` })),
     ],
     settings: { creatures: crMul },
   },
   new EventBus(),
 );
 let helps = 0;
+const fell: number[] = w.s.colonies.map(() => -1);
+const starts: number[] = w.s.colonies.map(() => 0);
+const stops: Array<Record<string, number>> = w.s.colonies.map(() => ({}));
 for (let m = 1; m <= minutes; m++) {
   for (let i = 0; i < 1200; i++) {
     const before = w.s.colonies.map((c) => c.aiAlly?.ally ?? -1);
     w.step(0.05);
     w.s.colonies.forEach((c, k) => {
-      if (before[k] < 0 && (c.aiAlly?.ally ?? -1) >= 0) helps++;
+      const now = c.aiAlly?.ally ?? -1;
+      if (before[k] < 0 && now >= 0) (helps++, starts[k]++);
+      if (before[k] >= 0 && now < 0 && c.aiAlly?.why) stops[k][c.aiAlly.why] = (stops[k][c.aiAlly.why] ?? 0) + 1;
+      if (!c.alive && fell[k] < 0) fell[k] = w.s.time / 60;
     });
   }
   w.events.drain();
@@ -54,4 +63,7 @@ for (let m = 1; m <= minutes; m++) {
   console.log(`${String(m).padStart(3)} min  ${cols.join(' | ')}`);
 }
 const alive = w.s.colonies.map((c) => (c.alive ? 1 : 0));
-console.log(`end: help ${BALANCE.aiAllies.help ? 'on' : 'off'}, seed ${seed}, alive ${alive.join('')} (team 1: ${alive[0] + alive[1]}/2, team 2: ${alive[2] + alive[3]}/2), help started ${helps} times`);
+w.s.colonies.forEach((c, k) =>
+  console.log(`  ${c.name.padEnd(28)} ${c.alive ? 'alive' : `fell at ${fell[k].toFixed(1)} min`}, ants ${c.living}, died ${c.stats.died}, kills ${c.stats.kills}, helped ${starts[k]}× ${Object.entries(stops[k]).map(([why, n]) => `${why} ${n}`).join(', ')}${c.aiAlly ? `, flips ${c.aiAlly.flips}` : ''}`),
+);
+console.log(`end: ${lineup}, help ${BALANCE.aiAllies.help ? 'on' : 'off'}, seed ${seed}, alive ${alive.join('')} (team 1: ${alive[0] + alive[1]}/2, team 2: ${alive[2] + alive[3]}/2), help started ${helps} times`);

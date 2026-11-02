@@ -485,30 +485,38 @@ function groupsByTile(c: Colony): Map<number, number> {
   return m;
 }
 
-/** Living ants of the groups out helping (marker V). */
-function helpers(w: World, c: Colony): { n: number; inside: number; space: number } {
+/**
+ * Living ants of the groups out helping (marker V): how many, how many inside the ally's nest, and the weight of those
+ * still on their way (not yet in the ally's nest or near its holes, so not in its `defence`).
+ */
+function helpers(w: World, c: Colony): { n: number; inside: number; space: number; coming: number } {
   const s = allyBrain(c);
-  const space = s.ally >= 0 ? nestSpace(s.ally) : -1;
+  const o = s.ally >= 0 ? w.colony(s.ally) : undefined;
+  const space = o ? nestSpace(o.id) : -1;
   const groups = new Set(c.groups.filter((g) => g.marker === HELP).map((g) => g.id));
   const groupOf = groupsByTile(c);
+  const near = BALANCE.aiAllies.nearRadius;
   let n = 0;
   let inside = 0;
+  let coming = 0;
   for (const a of w.s.ants) {
     if (a.colony !== c.id || a.state === AS.Dead || a.tile < 0 || !groups.has(groupOf.get(a.tile) ?? -1)) continue;
     n++;
     if (a.space === space) inside++;
+    else if (!(a.space === SURFACE && o && o.entrances.some((e) => sq(a.x - e.sx) + sq(a.y - e.sy) < near * near))) coming += weight(a.caste);
   }
-  return { n, inside, space };
+  return { n, inside, space, coming };
 }
 
 /** Stop helping: the groups walk home, the marker is lifted, a cooldown; a human ally is told why. */
-function stopHelp(w: World, c: Colony, why: 'home' | 'done' | 'fallen' | 'losses' | 'time'): void {
+function stopHelp(w: World, c: Colony, why: 'home' | 'done' | 'fallen' | 'losses' | 'outmatched' | 'time'): void {
   const s = allyBrain(c);
   const o = w.colony(s.ally);
   callHome(w, c, HELP);
   if (o && o.player && o.alive && why === 'home') w.events.emit({ t: 'message', text: `Your ally's soldiers went home to defend their own nest.`, kind: 'warn', colony: o.id });
   else if (o && o.player && o.alive && why === 'done') w.events.emit({ t: 'message', text: `Your ally's soldiers are going home: the danger has passed.`, kind: 'info', colony: o.id });
   else if (o && o.player && o.alive && why === 'losses') w.events.emit({ t: 'message', text: `Your ally's soldiers fell back: they lost too many.`, kind: 'warn', colony: o.id });
+  else if (o && o.player && o.alive && why === 'outmatched') w.events.emit({ t: 'message', text: `Your ally's soldiers fell back: the enemy is too strong for them.`, kind: 'warn', colony: o.id });
   else if (o && o.player && o.alive && why === 'time') w.events.emit({ t: 'message', text: `Your ally's soldiers are going home.`, kind: 'info', colony: o.id });
   s.why = why;
   s.block = why === 'done' || why === 'fallen' ? -1 : s.ally;
@@ -573,6 +581,8 @@ export function allyTick(w: World, c: Colony, dt: number): void {
     if (d.foe >= 0) ((s.foe = d.foe), (s.foeT = w.s.time));
     const h = helpers(w, c);
     if (s.sent > 0 && h.n < s.sent * (1 - A.assistMaxLoss)) return stopHelp(w, c, 'losses');
+    // the enemy has grown far beyond what help and defenders can hold: fall back rather than die with the ally
+    if (d.enemy > 0 && d.defence + h.coming < A.assistQuitOdds * d.enemy) return stopHelp(w, c, 'outmatched');
     if (w.s.time - s.since > A.assistMaxTime) return stopHelp(w, c, 'time');
     if (d.score < A.clearDanger || d.enemy <= 0) {
       s.clearT += step;
@@ -624,6 +634,15 @@ export function allyTick(w: World, c: Colony, dt: number): void {
     sentN += g.n;
   }
   if (!go.length) return;
+  // a lost cause: even all it can spare would leave the ally's side well short of the attackers
+  if (sent + pick.d.defence < (pick.d.queen ? A.assistMinOddsQueen : A.assistMinOdds) * pick.d.enemy) {
+    const call = pick.o.helpCall ?? 0;
+    if (pick.o.player && call > w.s.time && s.told !== call) {
+      s.told = call;
+      w.events.emit({ t: 'message', text: `Your ally can't spare enough soldiers to help against an attack this strong.`, kind: 'warn', colony: pick.o.id });
+    }
+    return;
+  }
   for (const id of go) assignGroup(w, c, id, HELP);
   s.ally = pick.o.id;
   s.since = w.s.time;

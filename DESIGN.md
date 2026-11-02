@@ -420,23 +420,28 @@ attacks (wind-up pose + ground marker before each big attack).
 ### 3.11 Rival AI (`sim/colonyAI.ts` builder and forager, `sim/warAI.ts` war)
 Rival colonies run the full simulation with the same tiles, groups and markers.
 
-**Builder brain (done).** It runs every 2 s for each colony with `ai: true`:
-- **Dig (EotU-style chambers, 2026-10-25).** When the free floor in its rooms runs low, it plans a **7-hex chamber** (a centre and its six neighbours, like the queen's chamber) in solid soil 4–7 hexes from the other rooms, walled off by a hex of soil and joined to the nest by a **1–4 hex tunnel**; brood chambers by default, a **store chamber** for food tiles when stores lag. It keeps 3–16 of the planned hexes designated, tunnels first. Tunnels stay clear of tiles; brood goes in brood chambers and stores in store chambers, so each room becomes one group.
-- **Build**, at most one tile per think, in this order:
-  1. a food store when food is ≥ 80 % of capacity;
-  2. species specials up to their share: aphid pastures 1 per 10 brood tiles, thatch 1 per 9, fire-ant brood mounds 1 per 8, fungus gardens 1 + leaf-workers ÷ 6;
-  3. a brood tile for the caste furthest below the species mix.
+**Placement with allies (CHANGE_PLAN §22, `world/teamSites.ts`; user spec `claude/ai/01-spec-ai-allies-chambers.md`, 2026-11-02).** When no colony brings its own `at`, `createWorld` asks `pickTeamSites(layout, teams)` for the sites; it returns null (the old order: the balanced set for the colony count, rotated by the seed) unless some team has two or more colonies.
+- **Land routes.** `siteRoutes` measures every pair of the map's 10 sites by a breadth-first walk over the surface hex layout (ground and walkways, from main entrance hex to main entrance hex) × the hex step; water and walls are gone round. Cached per layout.
+- **Team shape.** Teams of two or more, largest first (ties by their first colony), then the colonies alone: `2v2`, `2v1v1`, `3v3`…
+- **Authored sets first.** A map may list `teamSets[shape]` (every map has `2v2`, `2v1`, `3v1`, `2v2v2`, `2v1v1`, `3v3`); a set that passes the hard limits is used as it stands.
+- **Otherwise an exhaustive search**: every way to choose the teams' site groups among the 10 sites (each team's sites as a set; singles last), scored `violations × 10⁶ + allies' routes (wAlly) + unfairness (wFair: the spread of the teams' food and middle routes, the smaller side's food route × smallSideFood in an uneven match) − nearest enemy (wEnemy)`; the first best in index order wins (strict `<`), so every client agrees. Hard limits: each ally's route to its nearest teammate ≤ `allyMaxRoute` × the map's width, each colony's route to its nearest enemy ≥ `enemyMinRoute`. Within a team, colonies take its sites in slot order (the seed does not move them).
+- **Validator and tools.** `tools/validate-maps.ts` checks each `teamSets` entry's structure and prints its routes and any limit broken; `tools/team-sites.ts` prints every map's placements (and `docs/maps/team-sites.md` holds them with sketches). Known: on Meadow Pond and Rainforest the 2v2v2 cannot meet both limits (the best placement is used and the validator reports it).
+- **Lobby.** The map cards ring each team's sites (yours green, others in the team colours, colonies alone grey) and dim the sites nobody uses (`ui/mapPreview.ts`).
 
-  Stores and specials are planned one at a time: a plan only helps once it is built, and piling plans up used to stall Formica and Atta colonies at their starting size.
-- **Brood rules.**
-  - Fighters wait until there are 12 workers, as in real incipient colonies.
-  - It saves up for a caste that is ≥ 2 tiles behind; otherwise it takes the best affordable one.
-  - It only builds when the colony can also pay to raise the ant, at most one tile is still empty, and brood is not backed up beyond what the nurses can handle.
-- **Groups.** They grow to 8 tiles; new groups start one hex away so the colony has several commandable groups.
+**Builder brain (EotU-style chambers, rewritten 2026-11-02).** It runs every 2 s for each colony with `ai: true`. Numbers in `BALANCE.aiBuild`.
+- **Chambers.** Every room is a **7-hex rosette** (radius 1) or a **19-hex hexagon** (radius 2) of one tile type — one caste's brood, food stores or one special — filled from the centre outward (the inner tiles collect the most upgrade points). The founding ring round the queen's chamber is the first worker room. 19-hex chambers come from **mid game** (`chamber19From`: 45 ants and 10 min) for the colony's main castes (≥ `mainShare` of the mix: workers, its main fighter) and for leafcutter fungus; a second store chamber is a 19 once the colony is big (`bigColony`).
+- **Dig.** When a tile's rooms are nearly full, the next chamber is planned for it (`need`; stores before specials before brood): solid soil with `rimGapMin`–`rimGapMax` hexes of soil to the other rooms, never beside the entrance flower, joined by the shortest tunnel (≤ `tunnelMax` hexes, through soil only, never through another room; it may open into the founding ring or the passage). Candidates are scored by distance (to the queen; stores to the entrance) and tunnel length × `tunnelWeight`, ties by a hash of the hex. A need with no place is skipped for `planRetry` s so the others go on. It designates 3–16 hexes at a time in dig order (breadth-first out from the dug floor, so diggers never wait behind solid soil).
+- **Stores.** At most `maxStoreChambers` (2) store chambers, within `storeNearEntrance` hexes of the entrance (foragers unload quickly); past them, food tiles are upgraded instead (stores rank high in upgrades once both are full). No more store tiles past `foodCapMax`.
+- **Build**, at most one tile per think: a store when food ≥ `storeFull` of capacity; species specials up to their share (aphid pastures 1 per 10 brood tiles, thatch 1 per 9, fire-ant brood mounds 1 per 8, fungus gardens 1 + leaf-workers ÷ 6); a brood tile for the caste furthest below the mix. Fighters wait for 12 workers; it saves for a caste ≥ 2 tiles behind; it builds only when it can pay for the ant too, at most one tile is empty and the nurses can keep up.
+- **Highways** on the tunnels and the passage (never on the entrance, in a room or in the queen's chamber), from `highwayFrom` ants with `highwayReserve` food left: the passage from the entrance and the store tunnels first, then the 19s' mouths. They speed the traffic and give the rooms' rim tiles their upgrade points.
+- **Upgrades** from mid game (`upgradeFrom`: 12 min, 50 ants, 60 food; × the AI level), one job per think, at most `upgradesInFlight` waiting, none while invaded. Brood comes first: it keeps `upgradeReserve` + the larvae's food + the dearest brood tile and its ant. Only tiles with the points (no wasted orders), 19-hex chambers first (their middles reach level III; a 7's ring stops at II), most points first; fighters first while defending or raiding, stores once both store chambers are full, then workers, fighters, specials, highways.
+- **AI level** (`settings.aiLevel`, the menu's AI level chips or `?ailevel=`: 0 Easy, 1 Normal, 2 Hard, 3 Brutal): × `levelFrom` on the mid-game thresholds (Easy later, Brutal sooner) and × `levelInFlight` on the upgrade jobs.
+- **Groups** follow the rooms: a group is connected same-type tiles, and chambers are walled apart by soil and hold one type each, so each chamber is one commandable group (a 19 can hold up to 19 tiles; the old cap of 8 is gone).
+- Replaced (2026-11-02): 7-hex chambers only, bare tunnels, groups of 8, no upgrades.
 
-`tools/econ.ts` runs this brain on one colony for N minutes and prints growth.
+`tools/econ.ts` runs this brain on one colony for N minutes and prints growth and the nest's shape (chambers 7/19, tiles by level, highways); `tests/browser/ai_nests.py` renders AI nests at 10/30/45 min (`docs/ai/chambers/`).
 
-**Measured growth** (900 mm map, steady play; before Revision 2 — with EotU foraging through markers and soldier castes, Lasius reached 98 and red wood ants 60 at 24 min):
+**Measured growth** (900 mm map, steady play; before Revision 2 — with EotU foraging through markers and soldier castes, Lasius reached 98 and red wood ants 60 at 24 min; for the 2026-11-02 builder see PROGRESS):
 
 | Species | 10 min | 20 min | 30 min |
 |---|---|---|---|
@@ -455,8 +460,21 @@ The default population limit is 300.
 - **Raid.** After the opening peace (8 min), with at least 10 fighters, it picks the rival with the weakest defence for its distance. Fighting weight is health × damage rate, acid included. It raids when its own weight is 1.8 × the target's, divided by `settings.aggression`. Marker III goes on the target queen and follows her; the fighter groups go.
 - **Call off.** The raid ends when the rival has fallen, when 60 % of the fighters it set out with are dead, or after 4 min. Then there is a 150 s cooldown (half after a win).
 - Workers keep foraging on marker I and the queen's group stays home.
-- `tools/ecology.ts` runs four AI colonies. Typically the strongest raids the weakest from about 8 min; a well-grown colony can beat off a raid.
-- The tuning lives in `BALANCE.aiWar`.
+- **Joint raids** (2026-11-02). A new raid records `joined` (the leader) and a **gather point** `gatherDist` mm short of the target's holes on the way from home. Marker III waits there until `gatherShare` of each joined colony's sent fighters are within `gatherR` (or `gatherMax` s pass); then the leader sets `go` and everyone's marker moves onto the target queen, so they arrive together. An AI ally at peace with at least `joinMinFighters` fighters joins a teammate's raid younger than `joinWindow` s on the same target.
+- **Shared targets.** An enemy seen attacking any teammate within `foeMemory` s scores × `sharedTargetMul` when picking a raid target, so the team hits it first.
+- No new raid while the colony is helping an ally.
+- `tools/ecology.ts` runs four AI colonies; `tools/ecology-teams.ts` a 2v2 on Meadow Pond with the ally brain on or off. Typically the strongest raids the weakest from about 8 min; a well-grown colony can beat off a raid.
+- The tuning lives in `BALANCE.aiWar` (joint raids and shared targets in `BALANCE.aiAllies`).
+
+**Ally brain (2026-11-02, `warAI.ts` `allyTick`; called first in `warTick`, every `every` = 2 s).** Numbers in `BALANCE.aiAllies`.
+- **Danger** (`allyDanger`): the enemies' fighting weight at an ally (health × damage rate; creatures by health × bite rate × `creatureWeight`) × where they are — by its queen `locQueen` (within `queenRadius`), deep in its nest `locDeep`, at its entrance flower `locEntrance`, at its holes `locSiege`, near them on the surface `locNear` — minus its defenders' weight, plus its losses a second × `lossWeight`; × `queenMul` when its queen is hurt below `queenHurt` or enemies are by her. A human ally's **call for help** (command `callHelp`, the ✋ button by the markers; only with allies) lasts `callHelpSec` s: its danger × `callBoost`, at least `callMin`.
+- **Whether.** Never while threatened at home (enemies in the nest or at the holes) or defending; never an ally whose defenders already have `allyWinningRatio` × the attackers' weight, or under `assistMinDanger`; never one farther than `assistMaxTravel` s by land route unless its queen is in danger. Several allies: the highest danger ÷ travel time.
+- **How many.** Whole fighter groups, enough that help + the ally's defenders reach `assistOvermatch` × the attackers' weight, keeping a home guard of `homeGuardShare` of the weight (and at least `homeGuardMin` fighters). They go to **marker V** (help).
+- **Where.** While the enemy is inside the ally's nest, marker V goes on the ally's hole nearest us (it snaps down to the entrance flower); once `insideShare` of the helpers are inside, it moves onto the threat. Enemies on the surface: straight to the threat.
+- **Raids give way** when the ally's danger is over `raidValue`, its queen is in danger, or the raid is on the very enemy attacking it; otherwise the raid goes on and nobody is sent.
+- **Stop** (marker V lifted, the groups go home): at once when threatened at home; after `clearFor` s under `clearDanger`; when `assistMaxLoss` of those sent are dead; after `assistMaxTime`; or when the ally falls. Then a `cooldown`; and an ally helped and left (home, losses, time) is not helped again until its danger has cleared once, so it never flip-flops.
+- **Messages** to a human ally: soldiers coming, going home (the danger has passed / to defend their own nest / they lost too many).
+- `help: false` turns all this and joint raids off (AI allies leave each other alone, as before). `tools/ally-probe.ts` prints the brain at work in a staged invasion (`tools/allyScenes.ts`); `tests/aiAllies.ts` checks it.
 
 ### 3.11b Species specials (Phase 12)
 - **Black garden ant (Lasius):** tends aphids on the surface; root-aphid pastures in the nest trickle honeydew.
