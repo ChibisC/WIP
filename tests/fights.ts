@@ -284,6 +284,9 @@ for (const noGather of [true, false]) {
   const e = c.entrances[0];
   const mx = e.sx + 60;
   const my = e.sy;
+  // (open ground from the entrance to the marker: on this seed a 32 cm log lies across the way, and with it the group's
+  // walk out swung with every change to the small obstacles round it — 2026-11-01, night: no sticks)
+  w.terrain.clearArea(e.sx - 20, e.sy - 50, mx + 50, my + 50);
   for (let i = 0; i < 6; i++) makeFood(w, 'seed', SURFACE, mx + (i % 3) * 4 - 4, my + Math.floor(i / 3) * 4 - 2, 1);
   for (let i = 0; i < 8; i++) makeAnt(w, 0, 'lasius_worker', SURFACE, e.sx + 4 + i, e.sy + 3, 0);
   w.reindex();

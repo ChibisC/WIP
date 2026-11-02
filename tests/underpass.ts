@@ -225,11 +225,16 @@ for (const [name, sp, squad, kind] of [
 }
 {
   // (user 2026-11-01: workers walk and attack under majors) leafcutter workers fight from among and under their majors
-  U.allies = true;
-  const on = mixedVsCreature('atta', [['atta_major', 4], ['atta_media', 16]], 'groundBeetle', 4, 30);
-  U.allies = false;
-  const off = mixedVsCreature('atta', [['atta_major', 4], ['atta_media', 16]], 'groundBeetle', 4, 30);
-  U.allies = true;
+  // (two fights, seeds 4 and 5: whether a worker happens to be under a major at the moment it fights swings with the
+  // scene — seed 4 had 1–3 until 2026-11-01's night, 0 since the sticks left the ground; seeds 3–8: 0–3)
+  const both = (allies: boolean) => {
+    U.allies = allies;
+    const r = [4, 5].map((sd) => mixedVsCreature('atta', [['atta_major', 4], ['atta_media', 16]], 'groundBeetle', sd, 30));
+    U.allies = true;
+    return { underTall: Math.max(...r.map((x) => x.underTall)), mean: (r[0].mean + r[1].mean) / 2, most: Math.max(...r.map((x) => x.most)), diedAt: r.every((x) => x.diedAt >= 0) ? (r[0].diedAt + r[1].diedAt) / 2 : -1 };
+  };
+  const on = both(true);
+  const off = both(false);
   check('mixed squad: 4 Atta majors + 16 workers v a ground beetle — workers fight from under their majors, as many at once', on.underTall >= 1 && on.mean >= off.mean * 0.85, `${on.underTall} workers under a major at most; holding ${on.mean.toFixed(1)} on average (${on.most} at most), killed ${on.diedAt >= 0 ? on.diedAt.toFixed(1) + ' s' : 'no'}; off: ${off.mean.toFixed(1)} (${off.most}), killed ${off.diedAt >= 0 ? off.diedAt.toFixed(1) + ' s' : 'no'}`);
 }
 

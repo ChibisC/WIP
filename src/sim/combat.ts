@@ -633,7 +633,9 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   const range = acid ? acid.range * abilityMods(c).acidRange * (a.level >= 3 && acid.kind === 'opener' ? BALANCE.perkAcidRange : 1) : 0;
   // Formicines spray acid when ready: workers as they close in (then bite),
   // shooters from range, again and again.
-  if (acid && a.cd2 <= 0 && d < range + t.r && (shooter || d > t.r + cd.length * 0.3)) {
+  // (not in the step back of its turn out of the fight: it sprayed from its place, on top of the ant that took it)
+  const steppingBack = Math.abs(a.rotT ?? 0) > BALANCE.combat21.rotSec - BALANCE.combat21.rotBackSec;
+  if (acid && a.cd2 <= 0 && d < range + t.r && (shooter || d > t.r + cd.length * 0.3) && !steppingBack) {
     a.state = AS.Spray;
     a.st = 0;
     return true;

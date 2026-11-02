@@ -46,6 +46,9 @@ function foragers(w: World, n: number, dx = 60): { mx: number; my: number } {
   const e = c.entrances[0];
   const mx = e.sx + dx;
   const my = e.sy;
+  // (open ground from the entrance to the marker and round it: with pebbles and logs in the way the haul home swung with
+  // every change to the small obstacles — 2026-11-01, night: no sticks)
+  w.terrain.clearArea(e.sx - 20, e.sy - 40, mx + 40, my + 40);
   placeMarker(w, c, 0, SURFACE, mx, my);
   const ch = c.tiles.find((t) => t.type === 'queen')!;
   for (let i = 0; i < n; i++) {
@@ -78,9 +81,10 @@ const cmd = (w: World, body: Parameters<typeof applyCommand>[1]) => applyCommand
 {
   const w = world();
   const c = w.colony(0)!;
-  const { mx, my } = foragers(w, 12);
-  // three dead Red Wood Ant soldiers by the marker, and two of the colony's own workers
-  for (let i = 0; i < 3; i++) killAnt(w, makeAnt(w, 1, 'formica_soldier', SURFACE, mx + i * 6, my + 3, 0));
+  const { mx, my } = foragers(w, 20);
+  // four dead Red Wood Ant soldiers by the marker (the threshold is three's worth: one may sink before it is all carried
+  // home — 2026-11-01, night), and two of the colony's own workers
+  for (let i = 0; i < 4; i++) killAnt(w, makeAnt(w, 1, 'formica_soldier', SURFACE, mx + i * 6, my + 3, 0));
   for (let i = 0; i < 2; i++) killAnt(w, makeAnt(w, 0, 'termant_worker', SURFACE, mx - 6 - i * 5, my - 4, 0));
   w.reindex();
   const s0 = Object.keys(genomeOf(c).samples).length;

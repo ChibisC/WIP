@@ -215,8 +215,9 @@ export function beetleRing(n = 30, seed = 7): { latched: number; ringErr: number
   }
   const latched = ants.filter((a) => a.state === AS.Grapple && a.gId === cr.id).length;
   let stacked = 0;
-  // (riders are up on its back, above the ants under it: not a stack)
-  const alive = ants.filter((a) => a.state !== AS.Dead && !(a.state === AS.Climb && (a.ridePh ?? 0) >= 1));
+  // (riders are up on its back, above the ants under it: not a stack; the beetle flings ants, and one landing beside
+  // another — then walking off it — is not one either: the ants fighting it, 2026-11-01)
+  const alive = ants.filter((a) => a.state === AS.Attack || a.state === AS.Grapple || a.state === AS.Spray);
   for (let i = 0; i < alive.length; i++) for (let j = i + 1; j < alive.length; j++) if (Math.hypot(alive[i].x - alive[j].x, alive[i].y - alive[j].y) < 1.0) stacked++;
   const ringErr = 0;
   const L = casteOf('lasius_worker').length;

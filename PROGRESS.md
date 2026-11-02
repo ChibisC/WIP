@@ -1275,6 +1275,13 @@ wood ants' basics were 10 throughout. Notes, and what was done:
   (`fsrc`). It is never dropped onto a pebble, and is drawn where it falls.
 - **No sticks** (twigs) on generated or authored maps: drawn from their generators and dropped (everything after lies
   where it did). Fallen logs stay.
+- A fighter taking its turn out no longer sprays acid from its place in the step back (a Lasius worker sprayed on top of
+  the ant that took its place).
 - Tests: `tests/notes1101night.ts` (bars over hurt and inspected units, none over titans; chevrons; no outline; every
   beetle slot on the shell, mirrored, head riders on the head; dropped load picked up in 0.9 s off the marker's area;
-  never onto a pebble; no sticks, logs kept).
+  never onto a pebble; no sticks, logs kept). Scenes that swung with the sticks gone (their blocked cells change the
+  random draws of everything placed after them): the no-gathering and Termant forager scenes get open ground from the
+  entrance to the marker (a 32 cm log lay across one); the gene-sample scene 4 corpses and 20 foragers (a corpse sank
+  before it was all carried home); the beetle-stack check counts the ants fighting it (a flung ant lands where it
+  lands); a rider may wait past its 6 s for a place (30 % of a party rides); the mixed-squad under-pass check is two
+  fights (seeds 4 and 5; seeds 3–8 give 0–3 workers under a major).

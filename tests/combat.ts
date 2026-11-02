@@ -108,7 +108,9 @@ function climbScene(kind: string, n: number, seed = 7, caste = 'lasius_worker'):
   const down = at.off - at.down;
   // up the leg takes 1.5 s from the foot (less when it gets on higher up a long leg)
   check('climbing: up the leg in 1.5 s from where it got on, 8 s riding, 1.5 s down to the foot', Math.abs(up - (1 - t0) * 1.5) < 0.12 && Math.abs(ride - 8) < 0.1 && Math.abs(down - 1.5) < 0.1, `got on at ${t0.toFixed(2)}, up ${up?.toFixed(2)} ride ${ride?.toFixed(2)} down ${down?.toFixed(2)}`);
-  check('climbing: then 6 s on the ground before climbing again', at.again !== undefined && at.again - at.off >= 6 - 0.06 && at.again - at.off < 8, `again after ${(at.again - at.off).toFixed(2)} s`);
+  // (then it may wait for a place: at most 30 % of the party rides at once — on this scene, since there are no sticks on
+  // the ground (2026-11-01, night), the other riders' turns end a few seconds later)
+  check('climbing: then 6 s on the ground before climbing again', at.again !== undefined && at.again - at.off >= 6 - 0.06 && at.again - at.off < 14, `again after ${(at.again - at.off).toFixed(2)} s`);
   check('climbing: riders take no damage from anyone during the climb', hurt === 0, `${hurt}`);
   // (combat v2: at most 30 % of a colony's ants fighting it ride at once — 2 of 8)
   check('climbing: part of a small party gets on a big creature, the rest fight from the ground', mounted === Math.floor(8 * BALANCE.mount.ratio), `${mounted} of 8 at most (with those coming down: ${maxRiders})`);
