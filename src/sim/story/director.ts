@@ -537,8 +537,10 @@ export function directAnt(w: World, a: Ant, c: Colony, dt: number): boolean {
   if ('leave' in cue) {
     let p: Pt;
     if (cue.leave === 'nest') {
+      // home by the nearest of the anthill's three holes
       const col = w.colony(a.colony);
-      const e = col?.entrances[0];
+      let e = col?.entrances[0];
+      for (const x of col?.entrances ?? []) if (e && dhypot(x.sx - a.x, x.sy - a.y) < dhypot(e.sx - a.x, e.sy - a.y)) e = x;
       p = e ? [e.sx, e.sy] : [a.x, a.y];
     } else p = wherePt(w, cue.leave);
     const d = antWalk(w, a, p[0], p[1], p[0], p[1], key, speed, dt);

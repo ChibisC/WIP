@@ -459,6 +459,11 @@ The default population limit is 300.
 - The tuning lives in `BALANCE.aiWar`.
 
 ### 3.11b Species specials (Phase 12)
+- **Caste balance (2026-11-02, `docs/balance/castes.md`):** every species' workers are alike for their cost (all build
+  for 10; within ±0.18 of the black garden ant worker in equal-food fights) but keep their own shapes; soldiers are tuned
+  against the black garden ant soldier at 300 food, majors against the fire ant major at 420. Tools:
+  `tools/caste-table.ts` (the numbers), `tools/balance-matrix.ts` (equal-food fights, creature fights),
+  `tools/balance-tune.ts` (the stat scale at which a caste ties its reference).
 - **Black garden ant (Lasius):** tends aphids on the surface; root-aphid pastures in the nest trickle honeydew.
 - **Red wood ant (Formica):** acid (opener sprays; mortar and rapid sprayers). Thatch stores warm the nest, so brood grows faster.
 - **Leafcutter (Atta):** cuts leaves, with minims riding on them as hitchhikers. Fungus gardens turn the leaves into food.
