@@ -153,7 +153,8 @@ for (const [species, mins] of [
 const helpGroupsOut = (S: ReturnType<typeof allyInvasion>) => S.A.groups.filter((g) => g.marker === HELP).length;
 const antsOf = (S: ReturnType<typeof allyInvasion>, filter: (a: (typeof S.w.s.ants)[number]) => boolean) => S.w.s.ants.filter((a) => a.colony === S.A.id && a.state !== AS.Dead && filter(a)).length;
 {
-  const S = allyInvasion({ band: 20, developed: 70 });
+  // (14 Red wood soldiers: since the 2026-11-02 caste balance 20 overrun the ally's nest before the help can finish it)
+  const S = allyInvasion({ band: 14, developed: 70 });
   const { w, A, B } = S;
   let committed = -1;
   let inside = 0;
