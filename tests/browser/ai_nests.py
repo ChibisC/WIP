@@ -17,6 +17,15 @@ os.makedirs(OUT, exist_ok=True)
 res = []
 
 
+def blank(path):
+    """A frame with almost no detail (the view not drawn yet)."""
+    try:
+        from PIL import Image, ImageStat
+        return max(ImageStat.Stat(Image.open(path).convert("L")).stddev) < 6
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def note(r):
     res.append(r)
     print(r, flush=True)
@@ -49,7 +58,7 @@ with sync_playwright() as p:
           return { id: c.id, sp: c.species, ants: c.living, chambers: (c.aiBuild?.chambers ?? []).map((x) => (x.r === 2 ? 19 : 7)), lv,
                    hw: c.tiles.filter((t) => t.type === 'highway').length }; })""")
         for c in cols:
-            ok = pg.evaluate(f"""() => {{
+            CAM = f"""() => {{
               const s = window.__session; const w = s.world; const space = {c['id']} + 1;
               const nv = s.nests.get(space); if (!nv) return false;
               s.viewedArea = space; s.view.setActiveNest(space); s.view.space = 'nest';
@@ -61,12 +70,22 @@ with sync_playwright() as p:
               let far = 0;
               for (let q = 0; q < g.cols * g.rows; q++) if (g.isHexDug(q)) {{ const p = g.hexCenter(q); far = Math.max(far, Math.hypot(p.x - x, p.y - y)); }}
               const r = s.view.nestRig; r.jumpTo(x, y, Math.max(g.R * 30, far * 2.3)); r.pitchBias = 0.9;
-              return true; }}""")
+              return true; }}"""
+            ok = pg.evaluate(CAM)
             if not ok:
                 note(f"SKIP  {c['sp']} {m} min (no nest view)")
                 continue
-            pg.evaluate("window.__step(4, 1/30)")
-            pg.screenshot(path=os.path.join(OUT, f"{c['sp']}_{m}min.jpg"), type="jpeg", quality=84)
+            # let the view settle (the nest's meshes, the camera's focus), then shoot; a blank frame is shot again
+            path = os.path.join(OUT, f"{c['sp']}_{m}min.jpg")
+            for attempt in range(3):
+                # (switching to a nest view moves the camera on its own for a few frames: place it again after them)
+                pg.evaluate(f"window.__step({10 + attempt * 20}, 1/30)")
+                pg.evaluate(CAM)
+                pg.evaluate("window.__step(12, 1/30)")
+                pg.screenshot(path=path, type="jpeg", quality=84)
+                if not blank(path):
+                    break
+                note(f"  (blank frame for {c['sp']} {m} min, shooting again)")
             note(f"{'PASS' if not errs else 'FAIL'}  {c['sp']} {m} min: {c['ants']} ants, chambers {c['chambers'].count(7)} × 7 + {c['chambers'].count(19)} × 19, tiles by level {c['lv']}, highways {c['hw']} {errs[:2]}")
     ctx.close()
     b.close()

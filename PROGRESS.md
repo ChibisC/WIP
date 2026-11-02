@@ -1348,3 +1348,59 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
   it will need this merge); the older feature branches are already in `main` in other forms. Removed as replaced:
   extra entrances, spots, shafts, entrance digs, plugging, the AI's extra entrance, the old entrance tests and
   screenshots.
+
+### 2026-11-02 — AI colonies: allies start close, EotU-style chambers with upgrades, allies help each other (CHANGE_PLAN §22)
+User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `feature/ai-allies` from `main` (`fc6f58a`), with
+`main`'s one-entrance rework merged in on the way (`604e84d`). DESIGN §3.11 (placement, builder, war, ally brains).
+- **Allied nests start close** (`world/teamSites.ts`): whenever a team has two or more colonies (skirmish allies too, not
+  only the lobby), its sites come from the map's authored `teamSets` for the team shape (all five maps have 2v2, 2v1,
+  3v1, 2v2v2, 2v1v1, 3v3), else an exhaustive search over the 10 sites by land route on the hex layout (water and walls
+  gone round): allies within 33 % of the map's width, enemies beyond 30 %, the teams' food and middle routes even, the
+  smaller side of an uneven match the better food. No seed in it, so every client agrees and the lobby's map cards ring
+  each team's sites (yours green). Validator lines, `tools/team-sites.ts` → `docs/maps/team-sites.md` with sketches.
+  Known: Meadow Pond's and Rainforest's 2v2v2 cannot meet both limits (the best placement is used and reported).
+  Removed as replaced: `teamSiteOrder`, the `groupTeams` flag.
+- **Chambers** (`colonyAI.ts` builder, rewritten): 7-hex rosettes and, from mid game, 19-hex hexagons for the main
+  castes and fungus; one tile type (one caste) per chamber, filled from the centre out; walled apart by soil, joined by
+  the shortest tunnel; at most two store chambers beside the entrance, then store upgrades; highways on the tunnels and
+  the passage (stores' and the 19s' mouths first); upgrades from mid game (19s first, most points first, fighters first
+  in war, brood paid first); AI level Easy / Normal / Hard / Brutal (menu chips, `?ailevel=`). A developed head start
+  (menu rivals start `developed: 6`) is laid out the same way. Removed as replaced: the 7-hex-only chambers, bare
+  tunnels, groups of 8, the scattered developed tiles.
+- **Ally brain** (`warAI.ts allyTick`, every 2 s): an ally's danger from the enemies' weight there by where they are
+  (by the queen worst), its defenders, its losses, its queen; help only when not threatened at home, the ally is not
+  winning anyway, it is close enough (or its queen is in danger) and the cause is not lost; keeps a home guard, sends
+  just enough and more if the fight turns worse; marker V on the ally's hole, then on the fight; recalls at once when
+  threatened at home; stops when clear, after heavy losses, when outmatched, after 4 min; one go per threat (no
+  flip-flopping) and a cooldown; raids give way to bad trouble. Messages for a human ally; the ✋ call-for-help button (command `callHelp`, wire 25,
+  `BUILD_ID` `ud-mp-7`). Joint raids (gather short of the target, go together), shared targets.
+- **Growth** (`tools/econ.ts`, one AI colony, 900 mm meadow, seed 7; ants at 10 / 20 / 30 / 45 min; `main` = `f79ebd1`):
+
+  | Species | this branch | `main` | tiles by level at 45 min |
+  |---|---|---|---|
+  | Black garden | 20 / 52 / 102 / 187 | 22 / 55 / 109 / 138 | 200 / 27 / 33 |
+  | Leafcutter | 36 / 74 / 106 / 163 | 35 / 67 / 88 / 102 | 29 / 69 / 148 |
+  | Red wood | 20 / 49 / 89 / 121 | 21 / 51 / 78 / 135 | 180 / 12 / 0 |
+  | Fire ant | 15 / 22 / 32 / 62 | 18 / 29 / 45 / 67 | 102 / 0 / 0 |
+  | Army ant | 23 / 41 / 48 / 48 | 22 / 22 / 22 / 22 | 73 / 0 / 0 |
+
+  Fire ants start slower (their first brood mound waits for a chamber of its own; digging rooms only as they fill was
+  tried and changed nothing); Red wood ants end a little lower and upgrade little (their food goes to brood first).
+  The army-ant stall is older than this work (on `main` they stop at 22 ants; their foragers stop going out).
+- **Nests** (`tests/browser/ai_nests.py` → `docs/ai/chambers/`, five AI colonies on Meadow Pond in peace, at 10, 30 and
+  45 min, with `sheet.jpg`): 7-hex chambers at 10 min; 19-hex chambers, highways and level II–III tiles from 30 min.
+- **Help clip** (`tests/browser/ai_help.py` → `docs/ai/allies_help.mp4` and stills): your nest invaded by a band of Red
+  wood soldiers, the AI ally's soldiers marching over, down your entrance and onto the fight, then home.
+- **2v2 ecology** (`tools/ecology-teams.ts`, Meadow Pond, 45 min, wild creatures on; Black garden + Red wood v Fire ant
+  + Leafcutter, the leafcutters by far the strongest), ally brain off → on, when each colony fell:
+
+  | seed | Black garden | Red wood | Fire ant | Leafcutter |
+  |---|---|---|---|---|
+  | 1 | 16.9 → 23.9 min | 20.9 min → alive (59 ants) | 9.9 → 11.3 min | alive → alive |
+  | 2 | 31.9 → 44.4 min | alive (1 ant) → alive (63 ants) | 10.2 → 11.7 min | alive → alive |
+  | 3 | 14.4 → 27.2 min | 31.5 → 31.0 min | 10.5 → 16.9 min | alive → alive |
+
+  With the brain on, the Black garden and Fire ant colonies lasted longer in every seed, and the Red wood colony came
+  through two games it lost or barely survived without it (in the third it fell half a minute sooner); help started 2–7 times a game; every help was one start and one stop (no flip-flopping); stops were "done",
+  "fallen", "outmatched" and "home". The first version (before lost causes were left alone) did worse: helpers died in
+  hopeless fights and the helper fell sooner than with the brain off.
