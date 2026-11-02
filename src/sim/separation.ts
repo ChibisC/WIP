@@ -489,7 +489,9 @@ function pairCb(j: number): boolean {
   }
   const dx = po.x - pa.x;
   const dy = po.y - pa.y;
-  const min = fight && !mixed ? (wait && wt[i] && wt[j] ? P.ws : P.ps) * Math.max(len[i], len[j]) : (P.ra + ro) * (line && !mixed ? GUARD.fightRoom : 1);
+  // (user 2026-11-01: "make collision hitboxes 2x smaller … keep hitbox size but collision size of ants colliding each
+  // other is smaller") every ant–ant distance × `antContact`; the hit shapes (bites, climbs, creatures) are unchanged
+  const min = (fight && !mixed ? (wait && wt[i] && wt[j] ? P.ws : P.ps) * Math.max(len[i], len[j]) : (P.ra + ro) * (line && !mixed ? GUARD.fightRoom : 1)) * BALANCE.separation.antContact;
   const d2 = dx * dx + dy * dy;
   if (d2 >= min * min) return false;
   const d = dhypot(dx, dy);

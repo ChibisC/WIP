@@ -592,6 +592,7 @@ export function setTask(w: World, a: Ant, t: Task): void {
   if (a.task === t) return;
   a.task = t;
   a.taskT = 0;
+  a.trf = 0;
   // a fight in progress keeps its target; anything else starts afresh
   if (a.state === AS.Grapple || a.state === AS.Attack || a.state === AS.Spray || a.state === AS.Flung || snapping(a.state)) return;
   a.tgt = 0;

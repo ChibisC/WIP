@@ -393,7 +393,8 @@ const pct = (e: { mm: number; len: number }) => (e.len > 0 ? (e.mm / e.len) * 20
   // (anchored holders are no longer pushed apart, and ants go round full fights instead of standing outside them, so a
   // little less spread than v2's drifting duels at the same overlap: over seeds 3, 4, 7 combat v2 had 20.2 clusters,
   // 31 % small, 14 % overlapping; v2.1 about 14–16, 20–26 %, 13–15 %; the base before v2 8.3 clusters, 24 % overlapping)
-  check('duels: a 60 v 60 clash breaks into small, separated fights', r.clusters >= 12 && r.small >= 0.17 && r.overlap <= 0.16, `${r.clusters.toFixed(1)} clusters, ${(r.small * 100).toFixed(0)} % in clusters ≤ 4, ${(r.overlap * 100).toFixed(0)} % overlapping, nn teammate ${r.nnTeam.toFixed(2)} BL (before combat v2: 8.3 clusters, 24 % overlapping)`);
+  // (user 2026-11-01: swarms and half the collision distance — a few big brawls, bodies closer; see tests/combatV2.ts)
+  check('duels: a 60 v 60 clash still splits into several fights', r.clusters >= 7 && r.largest <= r.fighters * 0.8 && r.overlap <= 0.3, `${r.clusters.toFixed(1)} clusters, ${(r.small * 100).toFixed(0)} % in clusters ≤ 4, ${(r.overlap * 100).toFixed(0)} % overlapping, nn teammate ${r.nnTeam.toFixed(2)} BL (before combat v2: 8.3 clusters, 24 % overlapping)`);
   // six beetles in a group, 45 ants: the ants go round to the far sides and to the other beetles
   const { w, spawn } = arena(6);
   spawn(1, 'cr:groundBeetle', 6, [300, 300]);

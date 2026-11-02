@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { World } from '../sim/world';
 import { AS } from '../sim/types';
 import { casteOf } from '../sim/species';
+import { BALANCE } from '../sim/balance';
 import { bodyHook } from '../sim/slots';
 import { creatureHooks } from '../sim/combat';
 import { isTermiteQueen, queenBody } from '../sim/termites';
@@ -10,7 +11,8 @@ import { isTermiteQueen, queenBody } from '../sim/termites';
  * Debug overlay (F3 or `?hitboxes=1`): the simulation's hitboxes, drawn on the ground. Everything in
  * the sim collides and fights with simple maths, never with the meshes:
  *  - an ant is a circle: its hit radius (0.45 × its length, yellow) for bites, stings and sprays, and a
- *    smaller body circle (0.22 × its length, dim) for crowding (separation); a heading tick shows its front;
+ *    smaller body circle (0.11 × its length, dim: half its body, user 2026-11-01) for crowding (separation); a
+ *    heading tick shows its front;
  *  - a creature is a capsule (cyan: half-length `hl` along its heading, radius `r`): ants approach,
  *    latch and are pushed out by it; its bite reach from the centre is the magenta circle;
  *  - a termite queen's abdomen is a capsule too (orange).
@@ -49,7 +51,7 @@ export class HitboxOverlay {
       const cd = casteOf(a.caste);
       const y = heightAt(a.x, a.y) + 0.15;
       this.circle(a.x, y, a.y, cd.length * 0.45, 0xffd84a);
-      this.circle(a.x, y, a.y, cd.length * 0.224, 0x8a7a40);
+      this.circle(a.x, y, a.y, cd.length * BALANCE.separation.widthOfLength * BALANCE.separation.radiusOfWidth * BALANCE.separation.antContact, 0x8a7a40);
       this.line(a.x, y, a.y, a.x + Math.cos(a.h) * cd.length * 0.6, y, a.y + Math.sin(a.h) * cd.length * 0.6, 0xffd84a);
       if (isTermiteQueen(a)) {
         queenBody(a, qb);

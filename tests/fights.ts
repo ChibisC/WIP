@@ -106,7 +106,7 @@ for (const unit of ['ant:lasius_soldier', 'ant:nasute_soldier', 'ant:rhy_soldier
   run(w, 20 * 3);
   const nn = nnBodyLengths(w, 0);
   // (loose since 2026-11-01: each place nudged off its row, so the nearest teammate is a little under the spacing)
-  check(`${unit.slice(4)}: back at its marker it stands in a guard line, a body's room apart`, mine.filter((a) => a.state === AS.Rally).length >= mine.length * 0.8 && median(nn) >= 1.05, `${mine.filter((a) => a.state === AS.Rally).length}/${mine.length} in place, nearest teammate ${median(nn).toFixed(2)} body lengths (median)`);
+  check(`${unit.slice(4)}: back at its marker it stands in a guard line, a body's room apart`, mine.filter((a) => a.state === AS.Rally).length >= mine.length * 0.8 && median(nn) >= 0.95, `${mine.filter((a) => a.state === AS.Rally).length}/${mine.length} in place, nearest teammate ${median(nn).toFixed(2)} body lengths (median)`);
 }
 
 // ---- the guard line: a loose crowd at the marker, facing the front (rows until 2026-11-01)
@@ -139,7 +139,8 @@ for (const unit of ['ant:lasius_soldier', 'ant:nasute_soldier', 'ant:rhy_soldier
   const nnMean = nnG.reduce((x, y) => x + y, 0) / nnG.length;
   const nnCv = Math.sqrt(nnG.reduce((x, y) => x + (y - nnMean) ** 2, 0) / nnG.length) / nnMean;
   check('guard line: not drilled — uneven gaps, as a crowd stands', nnCv > 0.08, `nearest-teammate gaps vary by ${(nnCv * 100).toFixed(0)} % (a grid: ~0 %)`);
-  check('guard line: nobody on top of anybody', Math.min(...nnG) >= 0.5, `closest pair ${Math.min(...nnG).toFixed(2)} body lengths`);
+  // (ants may stand closer since 2026-11-01 — half the collision distance — but never on top of each other)
+  check('guard line: nobody on top of anybody', Math.min(...nnG) >= 0.3, `closest pair ${Math.min(...nnG).toFixed(2)} body lengths`);
   // it mills: over 20 s some ants shift to a new spot nearby, most stand, and the crowd keeps its place
   const before = new Map(u.map((a) => [a.id, { x: a.x, y: a.y }]));
   const len0 = casteOf(u[0].caste).length;
@@ -188,7 +189,8 @@ for (const unit of ['ant:lasius_soldier', 'ant:nasute_soldier', 'ant:rhy_soldier
   check('melee: the foes are shared out — attackers spread over many enemies, not one heap', foes >= 0.33, `${(foes * 100).toFixed(0)} distinct targets per 100 attackers (27 before)`);
   // (combat v2: slots by the victim's outline; tests/combatV2.ts checks them in detail)
   const nSlots = antSlotCount({ caste: 'lasius_soldier' } as Ant, casteOf('lasius_soldier').length, false);
-  check('melee: few holds on one ant (2–4 on one of the same size, by its outline)', nSlots >= 2 && nSlots <= 4, `${nSlots}`);
+  // (user 2026-11-01: 7+ round a worker-size ant)
+  check('melee: a swarm\'s worth of holds on one ant (7–8 on a worker-size one of the same size)', nSlots >= 7 && nSlots <= 8, `${nSlots}`);
 }
 
 // ---- creatures keep apart too, and still bite their foes
@@ -294,7 +296,9 @@ for (const noGather of [true, false]) {
     run(w, 1);
     carried = Math.max(carried, w.s.ants.filter((a) => a.colony === 0 && a.carry === Carry.Food).length);
   }
-  if (noGather) check('no gathering: the group stands at the marker and picks nothing up', carried === 0 && w.s.ants.filter((a) => a.colony === 0 && a.marker === 1 && a.state === AS.Rally).length >= 4, `${carried} carrying at most; ${w.s.ants.filter((a) => a.colony === 0 && a.marker === 1 && a.state === AS.Rally).length} in the guard line`);
+  // (in the crowd: standing in it, or one of the few walking back to the nest and out again — trail traffic, 2026-11-01)
+  const inLine = w.s.ants.filter((a) => a.colony === 0 && a.marker === 1 && (a.state === AS.Rally || (a.trf ?? 0) !== 0)).length;
+  if (noGather) check('no gathering: the group stands at the marker and picks nothing up', carried === 0 && inLine >= 4, `${carried} carrying at most; ${inLine} in the guard line (or its trail traffic)`);
   else check('no gathering off: the same group carries the food home', carried > 0, `${carried} carrying at most`);
 }
 

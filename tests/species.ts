@@ -46,7 +46,21 @@ function arena(w: World): { x: number; y: number } {
     const y = 200 + Math.floor(k / 20) * 15;
     let ok = true;
     for (let dx = -40; dx <= 70 && ok; dx += 2) for (let dy = -10; dy <= 10 && ok; dy += 5) if (!w.walkable(SURFACE, x + dx, y + dy)) ok = false;
-    if (ok) return { x, y };
+    if (ok) {
+      // (2026-11-01: obstacles block now — clear the pebbles round the scene too)
+      w.terrain.clearArea(x - 80, y - 60, x + 150, y + 60);
+      return { x, y };
+    }
+  }
+  // (2026-11-01: obstacles block now: clear a dry patch of them)
+  for (let k = 0; k < 400; k++) {
+    const x = 200 + (k % 20) * 15;
+    const y = 200 + Math.floor(k / 20) * 15;
+    let dry = true;
+    for (let dx = -40; dx <= 70 && dry; dx += 2) for (let dy = -10; dy <= 10 && dry; dy += 5) if (w.terrain.isWater(x + dx, y + dy)) dry = false;
+    if (!dry) continue;
+    w.terrain.clearArea(x - 80, y - 60, x + 150, y + 60);
+    return { x, y };
   }
   return { x: 350, y: 350 };
 }
@@ -289,7 +303,9 @@ function rampRun(phases: number[], targetCaste = 'formica_soldier'): { dmg: numb
 
   // AI: soldier-first foraging and a 10-minute determinism check against ants, with a command stream
   const mk = () => {
-    const ww = createWorld({ seed: 9, style: 'meadow', width: 700, depth: 700, food: 1, colonies: [{ species: 'nasutitermes', player: true, ai: true }, { species: 'lasius', player: false, ai: true }] }, new EventBus());
+    // (seed 10 since 2026-11-01: with pebbles and twigs blocking, seed 9's wood lies elsewhere and the AI starts on a
+    // stump 400 mm out — too slow to have nasutes to scout with in 10 minutes; seeds 10–14 all show it)
+    const ww = createWorld({ seed: 10, style: 'meadow', width: 700, depth: 700, food: 1, colonies: [{ species: 'nasutitermes', player: true, ai: true }, { species: 'lasius', player: false, ai: true }] }, new EventBus());
     const sched = new CommandSchedule();
     const c = ww.colony(0)!;
     const e = c.entrances[0];

@@ -18,6 +18,7 @@ import { FoodRenderer, SpaceMapper } from '../render/game/foodRenderer';
 import { SurfaceDecor } from '../render/game/surfaceDecor';
 import { CombatFx } from '../render/game/combatFx';
 import { WorldMarkers } from '../render/game/worldMarkers';
+import { MarkerTrail, TrailEnds } from '../render/game/markerTrail';
 import { World } from '../sim/world';
 import { createWorld, GameSetup } from '../sim/mapGen';
 import { AS, Colony, FloodState, SURFACE, TileType, colonyOfSpace, nestSpace } from '../sim/types';
@@ -172,6 +173,8 @@ export class GameSession {
   };
   private surfHeight = (x: number, y: number): number => this.terrainHeight(x, y) + this.mounds.height(x, y);
   private surfMarkers = new WorldMarkers();
+  /** the selected marker's trail line to the nearest entrance (user 2026-11-01, EotU) */
+  private surfTrail = new MarkerTrail();
   private views: AntView[] = [];
   private pheroTex: THREE.DataTexture;
   private pheroData: Uint8Array;
@@ -217,7 +220,7 @@ export class GameSession {
     this.surfAnts = new AntRenderer(this.view.renderer, 'surfaceAnts');
     this.surfAnts.lodScale = this.view.preset.lodScale;
     this.surfAnts.space = SURFACE;
-    this.view.surfaceScene.add(this.teamRings.group, this.surfUnder.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfFx.group);
+    this.view.surfaceScene.add(this.teamRings.group, this.surfUnder.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfTrail.group, this.surfFx.group);
     // Pheromone overlay texture.
     const ph = w.phero;
     this.pheroData = new Uint8Array(ph.w * ph.h * 4);
@@ -1135,6 +1138,46 @@ export class GameSession {
     return out;
   }
 
+  /**
+   * The selected marker's trail line in `space` (user 2026-11-01: "a straight trail line showing where the path the
+   * pheromone marker is going from the designated location to the nest like eotu"; only while selected or placing):
+   * from where it stands, and from the cursor where it would go, each to the entrance nearest it — the surface hole,
+   * or in your nest the top of the entrance tunnel. Nothing for areas that are not your nest.
+   */
+  private trailEnds(i: number, space: number, shown: ReturnType<GameSession['shownMarkers']>): TrailEnds | null {
+    if (i < 0 || this.arena) return null;
+    const w = this.world;
+    const c = this.player;
+    const m = shown[i];
+    const at = m && m.placed && m.space === space ? { x: m.x, y: m.y } : null;
+    let preview: { x: number; y: number } | null = null;
+    const g = space === SURFACE ? null : w.nestOf(space);
+    if (space !== SURFACE && (!g || space !== nestSpace(c.id))) return null;
+    if (space === SURFACE) {
+      const sp = this.view.pickSurface(this.input.mouseX, this.input.mouseY);
+      if (sp) preview = { x: sp.x, y: sp.z };
+    } else {
+      const np = this.view.pickNest(this.input.mouseX, this.input.mouseY);
+      if (np && g!.isAirAt(np.x, np.y)) preview = { x: np.x, y: np.y };
+    }
+    const nearest = (p: { x: number; y: number } | null) => {
+      if (!p) return null;
+      let best: { x: number; y: number } | null = null;
+      let bd = Infinity;
+      for (const e of c.entrances) {
+        if (e.shut || (e.fall ?? 0) > 0) continue;
+        const q = space === SURFACE ? { x: e.sx, y: e.sy } : g!.hexCenter(e.q);
+        const d = Math.hypot(q.x - p.x, q.y - p.y);
+        if (d < bd) {
+          bd = d;
+          best = { x: q.x, y: q.y };
+        }
+      }
+      return best;
+    };
+    return { at, nest: nearest(at), preview, nestP: nearest(preview) };
+  }
+
   /** Hexes with a command still waiting (ghost rings in the nest view). */
   pendingHexes(): Array<{ q: number; kind: 'dig' | 'undig' | 'build' | 'upgrade' | 'delete' }> {
     const out: Array<{ q: number; kind: 'dig' | 'undig' | 'build' | 'upgrade' | 'delete' }> = [];
@@ -1432,6 +1475,7 @@ export class GameSession {
       const owner = w.colony(colonyOfSpace(v.activeNest)) ?? null;
       if (nv) nv.overlay = this.tileOverlay;
       if (nv) nv.update(w, owner, this.player, cam, alpha, realDt, vh, v.observing ? v.observeRig.distance * 3 : v.nestRig.distance, sel, v.time, shown, this.pendingHexes());
+      if (nv) nv.trail.update(sel, this.trailEnds(sel, v.activeNest, shown), (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.distance, v.time);
       if (nv) nv.under.update(w, v.activeNest, alpha, (x, y) => nv.stage.terrain.heightAt(x, y), this.player.id);
       if (nv) nv.hit.update(w, v.activeNest, this.hitboxes, (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.goal.x, v.nestRig.goal.z, v.nestRig.distance * 2);
     } else {
@@ -1452,6 +1496,7 @@ export class GameSession {
       this.mounds.update(w, this.terrainHeight);
       this.view.storm = stormLevel(w.s.flood);
       this.surfMarkers.update(shown, SURFACE, this.surfHeight, v.observing ? v.observeRig.distance * 3 : v.surfaceRig.distance, (i) => markerRadius(w, this.player, i), sel, v.time);
+      this.surfTrail.update(sel, this.trailEnds(sel, SURFACE, shown), this.surfHeight, v.surfaceRig.distance, v.time);
       // creatures first: climbing ants are placed on their animated legs and backs
       this.surfCreatures.update(w.s.creatures, SURFACE, alpha, realDt, this.surfHeight, cam, vh);
       this.surfHit.update(w, SURFACE, this.hitboxes, this.surfHeight, v.surfaceRig.goal.x, v.surfaceRig.goal.z, v.surfaceRig.distance * 2);

@@ -210,7 +210,9 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
   out.pivX = 0;
   out.selected = a.id === selected;
   out.pose = a.pose;
-  out.headYaw = a.look * 0.6;
+  // (user 2026-11-01 head bug: heads face straight ahead unless an animation turns them) the head turns to a nestmate
+  // only while the two stop to antennate — `look` used to stay set after the meeting, so the head stayed turned
+  out.headYaw = a.pause > 0 ? a.look * 0.6 : 0;
   out.headPitch = 0;
   out.gaster = 0;
   out.mandible = 0;

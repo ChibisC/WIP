@@ -15,36 +15,10 @@ import { textures } from './textures';
  * leaf rafts), plus the look of its water and light.
  */
 
-export interface BiomeDress {
-  /** long-grass clumps per dm² (and how many of them hug the map edges) */
-  grass: number;
-  edge: number;
-  /** grass colour: green meadow or dry savanna */
-  dry: boolean;
-  /** pebbles per dm² */
-  pebbles: number;
-  /** wildflower drifts per dm² */
-  flowers: number;
-  /** fallen leaves per dm², and their size range (mm) */
-  leaves: number;
-  leafSize: readonly [number, number];
-  /** twigs per dm² */
-  twigs: number;
-  /** small fungus clusters per dm² */
-  fungi: number;
-  /** fern clumps per dm² */
-  ferns: number;
-  /** shore reed density (× the meadow's) */
-  reeds: number;
-}
-
-export const BIOME_DRESS: Record<Biome, BiomeDress> = {
-  meadow: { grass: 3.4, edge: 0.5, dry: false, pebbles: 7, flowers: 0.12, leaves: 0.25, leafSize: [18, 40], twigs: 0.08, fungi: 0, ferns: 0, reeds: 1 },
-  forest: { grass: 0.45, edge: 0.6, dry: false, pebbles: 4, flowers: 0, leaves: 8, leafSize: [20, 46], twigs: 1.1, fungi: 0.12, ferns: 0.07, reeds: 0.5 },
-  riverbank: { grass: 2.4, edge: 0.4, dry: false, pebbles: 9, flowers: 0.05, leaves: 0.8, leafSize: [18, 40], twigs: 0.35, fungi: 0, ferns: 0, reeds: 1.6 },
-  rainforest: { grass: 0.15, edge: 0.6, dry: false, pebbles: 2, flowers: 0, leaves: 5, leafSize: [30, 80], twigs: 0.7, fungi: 0.08, ferns: 0.2, reeds: 0.6 },
-  savanna: { grass: 2.2, edge: 0.3, dry: true, pebbles: 11, flowers: 0.02, leaves: 0.15, leafSize: [10, 22], twigs: 0.55, fungi: 0, ferns: 0, reeds: 0.4 },
-};
+// (moved to world/mapScatter.ts, 2026-11-01: the simulation places the obstacles from it)
+export { BIOME_DRESS } from '../world/mapScatter';
+export type { BiomeDress } from '../world/mapScatter';
+import type { BiomeDress } from '../world/mapScatter';
 
 /** Day light and air per biome (applied over the default sunny sky; night is left alone). */
 export interface BiomeLight {
@@ -447,19 +421,14 @@ export function litter(ctx: ScatterCtx, d: BiomeDress, group: THREE.Group): void
     m.name = 'mapLeaves';
     group.add(m);
   }
-  // twigs
+  // twigs (placed with the map's other obstacles, world/mapScatter.ts: the simulation walks round them)
   const twigs: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < area * d.twigs; i++) {
-    const x = rng.range(0, t.width);
-    const z = rng.range(0, t.depth);
-    if (!free(x, z, 6)) continue;
-    const r = new Rng(rng.int(0, 1 << 20));
-    const len = rng.range(30, 120);
-    const rad = rng.range(1.0, 2.6);
-    const g = branchGeometry(len, rad, r, 8, true);
-    const yaw = rng.range(0, 6.28);
-    g.rotateY(yaw);
-    g.translate(x, ground(x, z) + rad * 0.8, z);
+  for (const o of t.mapObs) {
+    if (o.kind !== 'twig') continue;
+    const rad = o.s;
+    const g = branchGeometry(o.len ?? 50, rad, new Rng(o.seed), 8, true);
+    g.rotateY(o.yaw ?? 0);
+    g.translate(o.x, ground(o.x, o.y) + rad * 0.8, o.y);
     twigs.push(g.index ? g.toNonIndexed() : g);
   }
   if (twigs.length) {
@@ -470,29 +439,19 @@ export function litter(ctx: ScatterCtx, d: BiomeDress, group: THREE.Group): void
     m.name = 'mapTwigs';
     group.add(m);
   }
-  // fungi and ferns (vertex coloured)
+  // fungi and ferns (vertex coloured; placed with the map's obstacles, world/mapScatter.ts)
   const vc: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < area * d.fungi; i++) {
-    const x = rng.range(0, t.width);
-    const z = rng.range(0, t.depth);
-    if (!free(x, z, 8) || ctx.keepClear(x, z, 1)) continue;
-    const r = new Rng(rng.int(0, 1 << 20));
-    for (let k = 0; k < r.int(1, 4); k++) {
-      const g = mushroomGeometry(r.range(6, 16), r);
-      g.rotateY(r.range(0, 6.28));
-      const ox = r.range(-8, 8);
-      const oz = r.range(-8, 8);
-      g.translate(x + ox, ground(x + ox, z + oz) - 0.4, z + oz);
+  for (const o of t.mapObs) {
+    if (o.kind === 'fungus') {
+      const g = mushroomGeometry(o.s, new Rng(o.seed));
+      g.rotateY(o.yaw ?? 0);
+      g.translate(o.x, ground(o.x, o.y) - 0.4, o.y);
       vc.push(g.index ? g.toNonIndexed() : g);
+    } else if (o.kind === 'fern') {
+      const g = fernGeometry(o.s, new Rng(o.seed));
+      g.translate(o.x, ground(o.x, o.y) - 0.5, o.y);
+      vc.push(g);
     }
-  }
-  for (let i = 0; i < area * d.ferns; i++) {
-    const x = rng.range(0, t.width);
-    const z = rng.range(0, t.depth);
-    if (!free(x, z, 10) || ctx.keepClear(x, z, 1)) continue;
-    const g = fernGeometry(rng.range(60, 150), rng);
-    g.translate(x, ground(x, z) - 0.5, z);
-    vc.push(g);
   }
   if (vc.length) {
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, side: THREE.DoubleSide });

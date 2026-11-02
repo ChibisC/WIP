@@ -180,7 +180,9 @@ export const BALANCE = {
    * ant's length; the heavier ant moves less. Creatures push ants out of their
    * bodies (`creatureStrength`); ants never push creatures.
    */
-  separation: { radiusOfWidth: 0.8, widthOfLength: 0.28, strength: 0.5, maxPush: 0.15, creatureStrength: 0.9, creatureMaxPush: 0.6, creatureAllyRoom: 1.3 },
+  // (`antContact`, user 2026-11-01: ants collide with each other at half the distance — body circles, personal space,
+  // waiting room, guard lines; hit shapes and creatures unchanged)
+  separation: { radiusOfWidth: 0.8, widthOfLength: 0.28, strength: 0.5, maxPush: 0.15, creatureStrength: 0.9, creatureMaxPush: 0.6, creatureAllyRoom: 1.3, antContact: 0.5 },
   /**
    * Combat v2 (CHANGE_PLAN §16, project doc claude/combat/02-spec-combat-v2.md): spread-out, readable fights.
    *
@@ -236,6 +238,9 @@ export const BALANCE = {
     holdFollow: 2,
     slotWidth: 0.28,
     slotSpacing: 5.6,
+    // (user 2026-11-01) attackers round an ant (slots.ts antSlotCount): its own size, 6 round a minim-size ant (≤ 3 mm),
+    // 7 round a 4 mm worker and one more every 3 mm longer; the perimeter rule above is for creatures now
+    swarm: { small: 6, smallMm: 3, worker: 7, workerMm: 4, stepMm: 3 },
     slotsMin: 2,
     slotsMax: 24,
     queenSlotsMin: 8,
@@ -847,6 +852,28 @@ export const TERMANT = {
    * there), at most `wallsPerEntrance` each.
    */
   ai: { raidNear: 0.3, raidScoreMul: 0.6, raidMarginMul: 0.8, woodWant: 1, woodSated: 0.3, wallsPerEntrance: 1 },
+} as const;
+
+/**
+ * Trails (user 2026-11-01: "make ants not trail in a straight line like eotu and after they all reach destination,
+ * some ants once in a while trail back to the nest … not all only like 2-3 + more depending on how many ants follow
+ * the trail so that your army is viable for attacking still").
+ *  - Weave (movement.ts `trailWeave`): an ant walking a route on the surface turns off it by the sum of three slow
+ *    sines (`weaveA` rad, each `weaveK` × its speed / length rad a second, its own phases), so the column wanders in a
+ *    band about four body widths wide instead of a ruled line. Within `weaveNearMm` of where it is going it walks
+ *    straight in. `weave` 0 turns it off.
+ *  - Traffic (guardLine.ts `trailTraffic`): of the fighters standing at a surface marker (not in the arena), now and
+ *    then one walks back to the nest's entrance and out again — at most `trafficMin` + `trafficPer` × the group
+ *    (never more than `trafficMaxShare` of it) at once, each starting on its own hashed clock.
+ */
+export const TRAIL = {
+  weave: 1,
+  weaveA: [0.25, 0.12, 0.08],
+  weaveK: [0.8, 2.1, 0.35],
+  weaveNearMm: 30,
+  trafficMin: 2,
+  trafficPer: 0.1,
+  trafficMaxShare: 0.3,
 } as const;
 
 /**

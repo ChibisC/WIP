@@ -180,18 +180,26 @@ function advanceFront(w: World, c: Colony, mi: number, R: EcRaid, roll: Roll, dt
   if (n === 0) return;
   const W = frontHalfWidth(w, c, mi, n);
   const near = W + 6 * LM();
+  // the raiders out raiding — on the surface, not carrying prey home (2026-11-01: with obstacles to walk round, a big
+  // haul could send most of the roll home at once and stall the front for good, counted against those away)
   let up = 0;
+  let out = 0;
   for (const id of roll.raid) {
     const a = w.antById.get(id);
-    if (a && a.space === SURFACE && sq(a.x - R.x) + sq(a.y - R.y) < near * near) up++;
+    if (!a || a.space !== SURFACE || a.carry !== Carry.None) continue;
+    out++;
+    if (sq(a.x - R.x) + sq(a.y - R.y) < near * near) up++;
   }
-  if (up < Math.max(1, Math.ceil(n * P.keepUpShare))) return;
+  if (out === 0 || up < Math.max(1, Math.ceil(out * P.keepUpShare))) return;
   const step = P.frontSpeedMul * CASTES.eciton_minor.speed * dt;
   const nx = R.x + dcos(R.h) * step;
   const ny = R.y + dsin(R.h) * step;
   const area = markerRadius(w, c, mi) * P.areaMul;
-  if (dhypot(nx - R.mx, ny - R.my) > area || !w.walkable(SURFACE, nx, ny)) {
-    // at the edge of the raid area (or water / a rock ahead): swing back in, alternately left and right of the marker
+  // (only the area's edge, water or the map's edge turn it: the front is the swarm's middle, and a pebble or a twig in
+  // its way — obstacles since 2026-11-01 — is walked round by the raiders, not a wall to it; turning at every one, it
+  // could swing between two blocked headings for good)
+  if (dhypot(nx - R.mx, ny - R.my) > area || w.terrain.isWater(nx, ny) || !w.terrain.inBounds(nx, ny, 8)) {
+    // at the edge of the raid area (or water ahead): swing back in, alternately left and right of the marker
     R.h = datan2(R.my - R.y, R.mx - R.x) + R.turn * P.turnRad;
     R.turn = -R.turn;
     return;

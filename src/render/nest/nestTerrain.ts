@@ -269,8 +269,9 @@ export class NestTerrain {
   /** Surface height (mm) at a nest-plane point: floor ≈ 0, soil top = wallH, ramps rise to the top. */
   heightAt(px: number, py: number): number {
     const g = this.grid;
-    // organic wobble so walls never follow the raster
-    const sdv = this.sdAt(px, py) + (valueNoise2(px * 0.11, py * 0.11, 7) - 0.5) * 1.1 + (valueNoise2(px * 0.35, py * 0.35, 3) - 0.5) * 0.35;
+    // organic wobble so walls never follow the raster (user 2026-11-01: "make walls a little more straighter (not too
+    // straight)" — about half the wobble it had: 1.1 and 0.35)
+    const sdv = this.sdAt(px, py) + (valueNoise2(px * 0.11, py * 0.11, 7) - 0.5) * 0.6 + (valueNoise2(px * 0.35, py * 0.35, 3) - 0.5) * 0.2;
     let t = (0.55 - sdv) / 2.8;
     t = Math.max(0, Math.min(1, t));
     t = t * t * (3 - 2 * t);
@@ -357,6 +358,32 @@ export class NestTerrain {
     const e = this.grid.cell * 0.6;
     const hx = this.heightAt(px + e, py) - this.heightAt(px - e, py);
     const hz = this.heightAt(px, py + e) - this.heightAt(px, py - e);
+    return out.set(-hx / (2 * e), 1, -hz / (2 * e)).normalize();
+  }
+
+  /**
+   * The floor ants walk on (user 2026-11-01: "for both underground and overground ants should only be flat on the
+   * ground and not walk on the walls of underground"): the dug floor's height with the walls left out — the slope up
+   * a wall's foot is the wall, not floor — and the entrance ramps, which ants do climb to the surface.
+   */
+  floorAt(px: number, py: number): number {
+    let h = 0;
+    for (const r of this.rampList()) {
+      if (r.shut) continue;
+      const m = rampAt(r, px, py);
+      if (m.d > this.grid.R * 1.0) continue;
+      const lat = 1 - smooth01((m.d - this.grid.R * 0.45) / (this.grid.R * 0.55));
+      const u = Math.max(0, 1 - m.s / r.len);
+      h = Math.max(h, this.wallH * 0.95 * Math.pow(u, 1.15) * lat);
+    }
+    return h;
+  }
+
+  /** The floor's normal (flat but for the ramps). */
+  floorNormalAt(px: number, py: number, out: THREE.Vector3): THREE.Vector3 {
+    const e = this.grid.cell * 0.6;
+    const hx = this.floorAt(px + e, py) - this.floorAt(px - e, py);
+    const hz = this.floorAt(px, py + e) - this.floorAt(px, py - e);
     return out.set(-hx / (2 * e), 1, -hz / (2 * e)).normalize();
   }
 

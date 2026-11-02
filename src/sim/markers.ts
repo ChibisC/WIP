@@ -88,8 +88,9 @@ export function placeMarker(w: World, c: Colony, i: number, space: number, x: nu
       space = ent.space;
       x = ent.x;
       y = ent.y;
-    } else if (w.terrain.layout) {
-      // on an authored map a marker dropped in water or on a wall moves to the nearest dry ground
+    } else {
+      // a marker dropped in water, on a wall or on a pebble or twig (obstacles since 2026-11-01) moves to the nearest
+      // open ground
       const p = nearestWalkable(w, x, y);
       if (p) {
         x = p.x;

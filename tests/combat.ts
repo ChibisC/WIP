@@ -7,6 +7,7 @@
  *   npx vite-node tests/combat.ts
  */
 import { EventBus } from '../src/core/events';
+import { NEST_HEX_SCALE } from '../src/world/nestGrid';
 import { createWorld } from '../src/sim/mapGen';
 import { Ant, AS, SURFACE } from '../src/sim/types';
 import { makeAnt } from '../src/sim/factory';
@@ -31,7 +32,9 @@ const t0 = Date.now();
 // ---------------------------------------------------------------- part 1: spinning, slots, separation
 {
   const b = battleStats(50, 25, 7);
-  check('spinning: in a 50 v 50 battle almost no ant turns a full circle one way within 3 s', b.spinners <= 3, `${b.spinners} of ${b.fighters}`);
+  // (≤ 5 since 2026-11-01: 7+ attackers fit round a worker now, so more go round a fight to a free place — 3–5 of ~90
+  // on this scene, was ≤ 3)
+  check('spinning: in a 50 v 50 battle almost no ant turns a full circle one way within 3 s', b.spinners <= 5, `${b.spinners} of ${b.fighters}`);
   check('spinning: fighting ants turn slowly on average (was 953°/s)', b.turnRate * 57.3 < 90, `${(b.turnRate * 57.3).toFixed(0)}°/s`);
   check('separation: few ants overlap in the battle (was 17 pairs a sample)', b.overlapPairs < 11, b.overlapPairs.toFixed(1));
   const r = beetleRing(30, 7);
@@ -39,7 +42,8 @@ const t0 = Date.now();
   check('slots: 30 ants on a beetle take a limited number of its slots (round it and under it) and do not spin', r.latched >= 6 && r.latched <= r.slots && r.spinners === 0, `${r.latched} latched of ${r.slots} slots, ${r.spinners} spun`);
   check('separation: no two ants on the beetle stacked', r.stacked === 0, `${r.stacked}`);
   const t = tunnelFlow(60, 40, 7);
-  check('tunnels: 60 workers squeeze out of a crowded nest', t.out === 60 && t.meanT < 9, `${t.out} out, mean ${t.meanT.toFixed(1)} s`);
+  // (the nest's tiles are 1.25 × larger since 2026-11-01: the way out is that much longer)
+  check('tunnels: 60 workers squeeze out of a crowded nest', t.out === 60 && t.meanT < 9 * NEST_HEX_SCALE, `${t.out} out, mean ${t.meanT.toFixed(1)} s`);
 }
 
 // ---------------------------------------------------------------- part 2: climbing

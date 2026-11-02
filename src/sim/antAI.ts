@@ -5,6 +5,7 @@ import { Ant, AS, Brood, Carry, Colony, Food, POSE, SURFACE, TileType, colonyOfS
 import { casteOf, CASTES } from './species';
 import { NestGrid } from '../world/nestGrid';
 import {
+  approachSurface,
   angleDiff,
   antSpeed,
   clampToMap,
@@ -24,7 +25,7 @@ import {
 import { dropCarried, hexCoreCells, onAntDied, setTask, tileCellsOfType, tilePoint } from './colony';
 import { jobWork, JobNav } from './jobs';
 import { tileAt } from './tiles';
-import { markerRadius, underOrder } from './markers';
+import { markerRadius, nearestWalkable, underOrder } from './markers';
 import { abilityMods } from './abilities';
 import { makeFood } from './factory';
 import { combatPreempt, flungUpdate, venomTick } from './combat';
@@ -35,7 +36,7 @@ import { holdMarkerSlot, onTermiteDied, sickleGuardIndex, startTermiteIdle, term
 import { surgeTick } from './surge';
 import { isHeld, snapTick } from './hellAnts';
 import { genesWanted, isTermant, tagPiece, termantDeposit, termantKing } from './termants';
-import { holdGuardLine, inGuardLine } from './guardLine';
+import { holdGuardLine, inGuardLine, trailTraffic } from './guardLine';
 import { crossBridge, ecitonTimers, escortPorter, holdLink, isArmyAnt, isMajor, raider, soldier, teamCarry, teamHelp } from './eciton';
 import { passiveAnt } from './arena';
 
@@ -681,16 +682,24 @@ function searchAndCollect(w: World, a: Ant, c: Colony, dt: number, area: { x: nu
         if (isWoodSource(f)) {
           const ang = (a.id * 2.399) % (Math.PI * 2);
           const r = f.size * 0.5 + cd.length * 0.35;
-          const sx = f.x + dcos(ang) * r;
-          const sy = f.y + dsin(ang) * r;
+          let sx = f.x + dcos(ang) * r;
+          let sy = f.y + dsin(ang) * r;
+          // (a pebble or a twig on its slot — obstacles since 2026-11-01: the nearest open ground to it)
+          if (!w.walkable(SURFACE, sx, sy)) {
+            const q = nearestWalkable(w, sx, sy);
+            if (q) {
+              sx = q.x;
+              sy = q.y;
+            }
+          }
           if (dhypot(sx - a.x, sy - a.y) > cd.length * 0.4) {
-            steerTo(w, a, sx, sy, dt);
+            approachSurface(w, a, sx, sy, dt, `food:${f.id}`, f.x, f.y);
             return;
           }
         } else {
           const reach = f.size * 0.5 + cd.length * 0.45;
           if (dhypot(f.x - a.x, f.y - a.y) > reach) {
-            steerTo(w, a, f.x, f.y, dt);
+            approachSurface(w, a, f.x, f.y, dt, `food:${f.id}`, f.x, f.y);
             return;
           }
         }
@@ -1302,8 +1311,9 @@ function marker(w: World, a: Ant, c: Colony, dt: number): void {
   if (cd.termite && holdMarkerSlot(w, a, c, a.marker, radius, dt)) return;
   // army-ant Soldiers: guard posts along the raid trail (or with the raid) — eciton.ts
   if (isArmyAnt(c) && isMajor(a) && m.space === SURFACE && a.space === SURFACE && soldier(w, a, c, a.marker, dt)) return;
-  // Fighters on the surface: the guard line across the marker (guardLine.ts)
-  if (a.space === SURFACE && inGuardLine(w, a) && holdGuardLine(w, a, c, a.marker, dt)) return;
+  // Fighters on the surface: the guard line across the marker (guardLine.ts); now and then a few walk back to the nest
+  // and out again (trail traffic, user 2026-11-01)
+  if (a.space === SURFACE && inGuardLine(w, a) && (trailTraffic(w, a, c, a.marker, dt) || holdGuardLine(w, a, c, a.marker, dt))) return;
   // Fighters (and workers in a nest): mill around the marker, ready to fight.
   const d = dhypot(m.x - a.x, m.y - a.y);
   if (d > radius) {

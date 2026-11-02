@@ -219,7 +219,9 @@ for (const [name, sp, squad, kind] of [
   U.allies = false;
   const off = mixedVsCreature(sp, squad, kind, 4, 30);
   U.allies = true;
-  check(`mixed squad: ${name} — as many fighting at once with the under-pass`, on.mean >= off.mean * 0.85, `holding ${on.mean.toFixed(1)} on average (${on.most} at most, ${on.underTall} under a tall teammate), killed ${on.diedAt >= 0 ? on.diedAt.toFixed(1) + ' s' : 'no'}; off: ${off.mean.toFixed(1)} (${off.most}), killed ${off.diedAt >= 0 ? off.diedAt.toFixed(1) + ' s' : 'no'}`);
+  // (since 2026-11-01 ants collide at half the distance, so even without the under-pass the minims crowd in: as many,
+  // or the kill at least as fast)
+  check(`mixed squad: ${name} — as many fighting at once with the under-pass (or as quick a kill)`, on.mean >= off.mean * 0.85 || (on.diedAt >= 0 && (off.diedAt < 0 || on.diedAt <= off.diedAt * 1.05)), `holding ${on.mean.toFixed(1)} on average (${on.most} at most, ${on.underTall} under a tall teammate), killed ${on.diedAt >= 0 ? on.diedAt.toFixed(1) + ' s' : 'no'}; off: ${off.mean.toFixed(1)} (${off.most}), killed ${off.diedAt >= 0 ? off.diedAt.toFixed(1) + ' s' : 'no'}`);
 }
 {
   // (user 2026-11-01: workers walk and attack under majors) leafcutter workers fight from among and under their majors

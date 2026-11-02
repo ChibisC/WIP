@@ -5,10 +5,10 @@ import { canEnter, canLeave, passEntrance, usableMask } from './entrances';
 import { casteOf } from './species';
 import { hexCoreCells } from './colony';
 import { hexSpeedOf } from './tiles';
-import { BALANCE, ECITON, NASUTE, TERMANT } from './balance';
+import { BALANCE, ECITON, NASUTE, TERMANT, TRAIL } from './balance';
 import { cartonBlocks, termantSpeedMul } from './termants';
 import { potholeMul, teamLoad } from './eciton';
-import { datan2, dcos, dhypot, dsin, sq } from './dmath';
+import { datan2, dcos, dhypot, dsin, hash01, sq } from './dmath';
 
 const TAU = Math.PI * 2;
 const tmp = { x: 0, y: 0 };
@@ -79,6 +79,38 @@ export function faceToward(a: Ant, tx: number, ty: number, dt: number): void {
 }
 
 /** Advance along the heading, resolving collisions with obstacles/soil. */
+/**
+ * Underground, an ant walking along a wall keeps its body on the floor (user 2026-11-01: "not walk on the walls of
+ * underground"): where soil is under its side (half its body width out) and the other side is open, it eases away from
+ * the wall by up to half its step.
+ */
+const SKIRT = [0.35, 0.7, 1.05, 1.4, 1.75, 2.1, 2.45, 2.8];
+/** ticks an ant that just skirted an obstacle keeps its heading along the edge before turning back to its goal */
+const SKIRT_TICKS = 6;
+
+/** Following an obstacle's edge (just skirted it): count the moment down; true while it lasts. */
+function skirting(a: Ant): boolean {
+  if ((a.avT ?? 0) <= 0) return false;
+  a.avT = (a.avT ?? 0) - 1;
+  return true;
+}
+
+function offWalls(w: World, a: Ant, step: number): void {
+  const hw = casteOf(a.caste).length * 0.17;
+  const px = -dsin(a.h) * hw;
+  const py = dcos(a.h) * hw;
+  const l = w.walkable(a.space, a.x + px, a.y + py);
+  const r = w.walkable(a.space, a.x - px, a.y - py);
+  if (l === r) return;
+  const k = (l ? 1 : -1) * Math.min(step * 0.5, hw * 0.25) / hw;
+  const x = a.x + px * k;
+  const y = a.y + py * k;
+  if (w.walkable(a.space, x, y)) {
+    a.x = x;
+    a.y = y;
+  }
+}
+
 export function moveForward(w: World, a: Ant, speed: number, dt: number): boolean {
   // rooted by a termite major's glue, or pinned in a hell ant's jaws: can't move (can still bite)
   if (speed <= 0 || a.pinned > 0 || a.stun > 0 || (a.root ?? 0) > w.s.tick) {
@@ -93,21 +125,49 @@ export function moveForward(w: World, a: Ant, speed: number, dt: number): boolea
     a.v = 0;
     return false;
   }
-  if (w.walkable(a.space, nx, ny)) {
+  // (on an obstacle it was put or pushed onto — a pebble since 2026-11-01 — it may always walk off it)
+  if (w.walkable(a.space, nx, ny) || (a.space === SURFACE && !w.walkable(SURFACE, a.x, a.y) && w.terrain.inBounds(nx, ny, 2) && !w.terrain.isWater(nx, ny))) {
     a.x = nx;
     a.y = ny;
     a.v = speed;
+    if (a.space !== SURFACE) offWalls(w, a, step);
     return true;
+  }
+  // (user 2026-11-01: rocks, pebbles and twigs are walked round, not climbed) on the surface, skirt the obstacle: the
+  // smallest turn off the way it wants to go that is clear a step and a half ahead, on the side it last went round by,
+  // so it follows the obstacle's edge round instead of jamming against it
+  if (a.space === SURFACE) {
+    // (its own side first, all the way round to nearly back the way it came — round a bulge in the edge — then the other)
+    const pref = a.avs || ((a.id & 1) === 0 ? 1 : -1);
+    for (let k = 0; k < 2; k++) {
+      for (const off of SKIRT) {
+        const side = k === 0 ? pref : -pref;
+        const h = a.h + off * side;
+        const cx = dcos(h);
+        const cy = dsin(h);
+        if (!w.walkable(SURFACE, a.x + cx * step * 1.5, a.y + cy * step * 1.5) || !w.walkable(SURFACE, a.x + cx * step, a.y + cy * step)) continue;
+        a.x += cx * step;
+        a.y += cy * step;
+        a.h = h;
+        a.avs = side;
+        // keep to the edge a moment before turning back toward the goal (wall following, not a jam)
+        a.avT = SKIRT_TICKS;
+        a.v = speed * 0.85;
+        return true;
+      }
+    }
   }
   // slide along an axis
   if (w.walkable(a.space, nx, a.y)) {
     a.x = nx;
     a.v = speed * 0.7;
+    if (a.space !== SURFACE) offWalls(w, a, step);
     return true;
   }
   if (w.walkable(a.space, a.x, ny)) {
     a.y = ny;
     a.v = speed * 0.7;
+    if (a.space !== SURFACE) offWalls(w, a, step);
     return true;
   }
   // turn away: sample alternatives
@@ -124,7 +184,7 @@ export function moveForward(w: World, a: Ant, speed: number, dt: number): boolea
 }
 
 /** Steer to a point; returns distance remaining. */
-export function steerTo(w: World, a: Ant, tx: number, ty: number, dt: number, speedMul = 1, rate = 8): number {
+export function steerTo(w: World, a: Ant, tx: number, ty: number, dt: number, speedMul = 1, rate = 8, weave = false): number {
   const dx = tx - a.x;
   const dy = ty - a.y;
   const d = dhypot(dx, dy);
@@ -132,9 +192,12 @@ export function steerTo(w: World, a: Ant, tx: number, ty: number, dt: number, sp
     a.v = 0;
     return 0;
   }
-  const want = datan2(dy, dx);
-  turnToward(a, want, dt, rate);
-  const facing = dcos(angleDiff(a.h, want));
+  // (`weave`: a trail walk — wandering in a band until the last stretch, user 2026-11-01)
+  const want = datan2(dy, dx) + (weave && d > TRAIL.weaveNearMm * 2 ? trailWeave(w, a) : 0);
+  // (going round an obstacle: along its edge at a walk, not slowed for facing away from the goal)
+  const round = a.space === SURFACE && skirting(a);
+  if (!round) turnToward(a, want, dt, rate);
+  const facing = round ? 0.85 : dcos(angleDiff(a.h, want));
   const sp = antSpeed(w, a) * speedMul * Math.max(0.15, facing);
   moveForward(w, a, Math.min(sp, d / Math.max(dt, 1e-3)), dt);
   return d;
@@ -318,6 +381,58 @@ export function nearestEntrance(c: Colony, x: number, y: number): number {
   return best;
 }
 
+/**
+ * How far off its route an ant on a trail turns now (rad; TRAIL): three slow sines of the time, each ant with its own
+ * phases and a little of its own pace, scaled by its speed over its length so every caste wanders a band of about the
+ * same number of its own body widths.
+ */
+export function trailWeave(w: World, a: Ant): number {
+  // (not in a fight: an ant going for a foe, or round to its place on one, walks straight)
+  if (!TRAIL.weave || a.tgt || a.state === AS.Attack || a.state === AS.Grapple) return 0;
+  const cd = casteOf(a.caste);
+  // (army ants keep their three-lane columns: outbound at the sides, laden in the middle — eciton.ts; termites walk in
+  // close processions inside their soldiers' guard lines)
+  if (cd.species === 'eciton' || cd.termite) return 0;
+  const f = cd.speed / Math.max(0.5, cd.length);
+  let h = 0;
+  for (let k = 0; k < 3; k++) {
+    const pace = 0.8 + 0.4 * hash01(a.id, 40 + k);
+    h += TRAIL.weaveA[k] * dsin(w.time * TRAIL.weaveK[k] * f * pace + hash01(a.id, 30 + k) * 6.2832);
+  }
+  return h * TRAIL.weave;
+}
+
+/** Is the straight way from (x0, y0) to (x1, y1) on the surface free of obstacles and water (sampled every 1.5 mm)? */
+export function lineClear(w: World, x0: number, y0: number, x1: number, y1: number): boolean {
+  const d = dhypot(x1 - x0, y1 - y0);
+  const n = Math.ceil(d / 1.5);
+  for (let i = 1; i < n; i++) {
+    const u = i / n;
+    if (!w.terrain.passable(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u)) return false;
+  }
+  return true;
+}
+
+/**
+ * Walk to a nearby point on the surface (user 2026-11-01: obstacles are walked round): straight there when the way is
+ * clear, else round by a shared route — `key`'s field to (rx, ry), the place many ants are going (a food item, a
+ * marker), so ants share one field rather than each building its own — and skirting what is left near the point.
+ */
+export function approachSurface(w: World, a: Ant, x: number, y: number, dt: number, key: string, rx: number, ry: number, speedMul = 1, rate = 8, weave = false): number {
+  const d = dhypot(x - a.x, y - a.y);
+  // (near the point, or within a body length or two of the shared target: skirting takes it round what is left)
+  const L = casteOf(a.caste).length;
+  if (d < 2 || dhypot(rx - a.x, ry - a.y) < L * 2 + 8 || lineClear(w, a.x, a.y, x, y)) return steerTo(w, a, x, y, dt, speedMul, rate, weave);
+  const c = w.surfFlow.cell;
+  const f = w.surfFlow.field(key, Math.round(rx / c) * 10007 + Math.round(ry / c), [{ x: rx, y: ry }]);
+  if (w.surfFlow.dir(f, a.x, a.y, tmp)) {
+    if (!skirting(a)) turnToward(a, datan2(tmp.y, tmp.x), dt, 6);
+    moveForward(w, a, antSpeed(w, a) * speedMul, dt);
+    return d;
+  }
+  return steerTo(w, a, x, y, dt, speedMul, rate, weave);
+}
+
 /** Walk home on the surface; enters the nest when reaching an entrance. Returns true once inside. */
 export function goHome(w: World, a: Ant, dt: number, speedMul = 1): boolean {
   const c = w.colony(a.colony);
@@ -337,9 +452,9 @@ export function goHome(w: World, a: Ant, dt: number, speedMul = 1): boolean {
   }
   const f = homeField(w, c);
   if (w.surfFlow.dir(f, a.x, a.y, tmp)) {
-    // blend with slight wobble for natural paths
-    const want = datan2(tmp.y, tmp.x) + dsin(w.time * 2 + a.id) * 0.15;
-    turnToward(a, want, dt, 6);
+    // (user 2026-11-01: not a straight line) wandering in a band along the way
+    const want = datan2(tmp.y, tmp.x) + trailWeave(w, a);
+    if (!skirting(a)) turnToward(a, want, dt, 6);
     moveForward(w, a, antSpeed(w, a) * speedMul, dt);
   } else steerTo(w, a, e.sx, e.sy, dt, speedMul);
   return false;
@@ -353,7 +468,8 @@ export function goHome(w: World, a: Ant, dt: number, speedMul = 1): boolean {
  */
 export function goToSurfacePoint(w: World, a: Ant, x: number, y: number, dt: number, key: string, speedMul = 1, avoid = false): number {
   const d = dhypot(x - a.x, y - a.y);
-  if (d < 30) {
+  // (straight in for the last few centimetres — unless an obstacle lies across the way: then the route round it)
+  if (d < 30 && lineClear(w, a.x, a.y, x, y)) {
     steerTo(w, a, x, y, dt, speedMul);
     return d;
   }
@@ -361,10 +477,11 @@ export function goToSurfacePoint(w: World, a: Ant, x: number, y: number, dt: num
   const stamp = Math.round(x / cell) * 10007 + Math.round(y / cell);
   const f = w.surfFlow.field(key, stamp, [{ x, y }]);
   if (w.surfFlow.dir(f, a.x, a.y, tmp)) {
-    let want = datan2(tmp.y, tmp.x) + dsin(w.time * 2 + a.id) * 0.12;
+    // (user 2026-11-01: not a straight line) wandering in a band along the way, straight in for the last stretch
+    let want = datan2(tmp.y, tmp.x) + (d > TRAIL.weaveNearMm * 2 ? trailWeave(w, a) : dsin(w.time * 2 + a.id) * 0.12);
     // a squad on its way to a marker passes round fights instead of plowing through them (combat v2.1)
     if (avoid) want = avoidHeading(w, a, want, BALANCE.combat21.avoidLook * casteOf(a.caste).length, true);
-    turnToward(a, want, dt, 6);
+    if (!skirting(a)) turnToward(a, want, dt, 6);
     moveForward(w, a, antSpeed(w, a) * speedMul, dt);
   } else steerTo(w, a, x, y, dt, speedMul);
   return d;

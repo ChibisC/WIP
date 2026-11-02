@@ -4,6 +4,7 @@ import type { MapDef, MapId } from '../maps/types';
 import { mapDef } from '../maps';
 import { shapeBox, shapeDist, smooth01 } from './mapShapes';
 import { SurfaceLayout, surfaceLayout } from './surfaceLayout';
+import { MapObstacle, mapObstacles, twigLine } from './mapScatter';
 
 /** Map styles drive generation of relief, ground cover and props. */
 export type MapStyle = 'meadow' | 'forest' | 'formicarium' | 'sandy' | 'riverbank';
@@ -64,6 +65,8 @@ export interface TerrainParams {
   zoneFlood?: number[];
   /** an authored map (docs/maps/design.md); absent for the procedural styles */
   map?: MapId;
+  /** boxes [x0, y0, x1, y1] cleared of obstacles (test scenes, `clearArea`; kept here so a restored game matches) */
+  cleared?: number[][];
 }
 
 /**
@@ -203,11 +206,21 @@ export class Terrain {
     // Flatten a rim so the playable edge reads cleanly.
     for (const op of p.sculpt) this.applySculpt(op, false);
     if (map) this.shapeMap(map);
-    // authored maps have no props in the simulation: their small decoration is render-only
+    // authored maps: their pebbles, twigs, fungi and ferns are placed from the map id (world/mapScatter.ts) once the
+    // walls, walkways and water are in, and block like the props of a generated map (grass and leaves stay render-only)
     else this.placeProps(rng);
     this.rebuildOverlay();
     this.rebuildWater();
+    if (map) this.mapObs = mapObstacles(this, map);
+    for (const b of p.cleared ?? []) this.dropObstacles(b[0], b[1], b[2], b[3]);
+    if (map || p.cleared?.length) {
+      this.rebuildOverlay();
+      this.rebuildWater();
+    }
   }
+
+  /** An authored map's obstacles (world/mapScatter.ts): blocked, drawn by render/mapDecor.ts. */
+  mapObs: MapObstacle[] = [];
 
   /**
    * An authored map's ground: height brushes, then each water body's basin (the bed sinks below
@@ -294,8 +307,12 @@ export class Terrain {
       }
     };
     const dens = style === 'formicarium' ? 0.4 : 1;
-    // Pebbles: many small, few large (power-law sizes).
+    // Pebbles: many small, few large (power-law sizes). (2026-11-01: they block now — ants walk round every one — so
+    // only every third of the 34 per dm² is kept, leaving open ground between them; all are drawn from the generator,
+    // so everything placed after them lies where it did)
+    const before = this.props.length;
     add('pebble', Math.round(area * 34 * dens), (p) => (p.scale = 0.5 + dpow(rng.next(), 3) * 4.5));
+    this.props = this.props.filter((p, i) => i < before || p.kind !== 'pebble' || (i - before) % 3 === 0);
     add('rock', Math.round(area * 0.1 * dens), (p) => (p.scale = rng.range(10, 26)));
     add('twig', Math.round(area * (style === 'forest' ? 1.4 : style === 'sandy' ? 0.2 : 0.55) * dens), (p) => {
       p.scale = rng.range(1.2, 3.4);
@@ -340,6 +357,49 @@ export class Terrain {
     }
   }
 
+  /**
+   * Clear the obstacles (pebbles, rocks, acorns, twigs, logs, mushrooms) within a box — for test scenes that need
+   * open ground (2026-11-01: obstacles block now). Deterministic; the flow fields rebuild on the version change.
+   */
+  clearArea(x0: number, y0: number, x1: number, y1: number): void {
+    (this.params.cleared ??= []).push([x0, y0, x1, y1]);
+    this.dropObstacles(x0, y0, x1, y1);
+    this.rebuildOverlay();
+    this.rebuildWater();
+  }
+
+  private dropObstacles(x0: number, y0: number, x1: number, y1: number): void {
+    const solid = new Set(['pebble', 'rock', 'acorn', 'twig', 'log', 'mushroom']);
+    const reach = (p: Prop) => (p.kind === 'twig' || p.kind === 'log' ? (p.len ?? 50) / 2 + p.scale * 2 : p.kind === 'acorn' ? 8 : p.scale * 1.2);
+    this.props = this.props.filter((p) => !solid.has(p.kind) || p.x + reach(p) < x0 || p.x - reach(p) > x1 || p.y + reach(p) < y0 || p.y - reach(p) > y1);
+    this.mapObs = this.mapObs.filter((o) => {
+      const r = o.kind === 'twig' ? (o.len ?? 50) / 2 + o.r : o.r;
+      return o.x + r < x0 || o.x - r > x1 || o.y + r < y0 || o.y - r > y1;
+    });
+  }
+
+  /** Mark the cells within r of (cx, cy) as blocked (an obstacle ants and creatures walk round). */
+  private block(cx: number, cy: number, r: number): void {
+    const { nx, ny, res } = this;
+    const i0 = Math.max(0, Math.floor((cx - r) / res));
+    const i1 = Math.min(nx - 1, Math.ceil((cx + r) / res));
+    const j0 = Math.max(0, Math.floor((cy - r) / res));
+    const j1 = Math.min(ny - 1, Math.ceil((cy + r) / res));
+    // (a cell is blocked when the obstacle covers its centre, or for a small one, its nearest cell)
+    let any = false;
+    for (let j = j0; j <= j1; j++)
+      for (let i = i0; i <= i1; i++)
+        if (dhypot(i * res - cx, j * res - cy) < r) {
+          this.blocked[j * nx + i] = 1;
+          any = true;
+        }
+    if (!any) {
+      const i = Math.min(nx - 1, Math.max(0, Math.round(cx / res)));
+      const j = Math.min(ny - 1, Math.max(0, Math.round(cy / res)));
+      this.blocked[j * nx + i] = 1;
+    }
+  }
+
   /** Bake props into the walk-height overlay and obstacle mask (on an authored map: walkways and walls). */
   rebuildOverlay(): void {
     this.overlay.fill(0);
@@ -365,16 +425,19 @@ export class Terrain {
           }
         }
     };
+    // (user 2026-11-01: "ants should only be flat on the ground … not walk over rocks (they walk around it) … this also
+    // applies to sticks and other obstacles cos they should only walk on a flat plain") rocks, pebbles, acorns, twigs,
+    // logs and mushrooms block; only a fallen leaf, flat, lifts the ground a little
     for (const p of this.props) {
       switch (p.kind) {
         case 'pebble':
-          stamp(p.x, p.y, p.scale, (d) => p.scale * 0.7 * Math.sqrt(1 - d * d));
+          this.block(p.x, p.y, p.scale * 1.05);
           break;
         case 'rock':
-          stamp(p.x, p.y, p.scale * 1.05, (d) => p.scale * 0.55 * dpow(1 - d * d, 0.6));
+          this.block(p.x, p.y, p.scale * 1.05);
           break;
         case 'acorn':
-          stamp(p.x, p.y, 7 * p.scale, (d) => 9 * p.scale * Math.sqrt(1 - d * d));
+          this.block(p.x, p.y, 7 * p.scale);
           break;
         case 'leaf':
           stamp(p.x, p.y, p.scale * 0.45, () => 0.5);
@@ -385,10 +448,11 @@ export class Terrain {
           const r = p.scale;
           const dx = dcos(p.rot);
           const dy = dsin(p.rot);
-          const steps = Math.ceil(len / res);
+          // (stamps half a cell apart, at least three quarters of a cell wide: no gap an ant slips through)
+          const steps = Math.ceil(len / (res * 0.5));
           for (let s = 0; s <= steps; s++) {
             const t = s / steps - 0.5;
-            stamp(p.x + dx * t * len, p.y + dy * t * len, r * 1.1, (d) => r * 2 * Math.sqrt(Math.max(0, 1 - d * d)));
+            this.block(p.x + dx * t * len, p.y + dy * t * len, Math.max(r * 1.1, res * 0.75));
           }
           break;
         }
@@ -436,6 +500,14 @@ export class Terrain {
       each(shapeBox(wl.shape, 0), (k, x, y) => {
         if (shapeDist(wl.shape, x, y) < 0) this.blocked[k] = 1;
       });
+    // (user 2026-11-01: walk round pebbles, twigs and other obstacles, on flat ground)
+    for (const o of this.mapObs) {
+      if (o.kind === 'twig') {
+        // (stamps half a cell apart, at least three quarters of a cell wide: no gap an ant slips through)
+        const n = Math.max(2, Math.ceil((o.len ?? 50) / (this.res * 0.5)));
+        for (const [x, y] of twigLine(o, n)) this.block(x, y, Math.max(o.r, this.res * 0.75));
+      } else this.block(o.x, o.y, o.r);
+    }
   }
 
   rebuildWater(): void {

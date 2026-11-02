@@ -50,7 +50,21 @@ function arena(w: World): { x: number; y: number } {
     const y = 200 + Math.floor(k / 20) * 15;
     let ok = true;
     for (let dx = -40; dx <= 70 && ok; dx += 2) for (let dy = -10; dy <= 60 && ok; dy += 5) if (!w.walkable(SURFACE, x + dx, y + dy)) ok = false;
-    if (ok) return { x, y };
+    if (ok) {
+      // (2026-11-01: obstacles block now — clear the pebbles round the scene too)
+      w.terrain.clearArea(x - 80, y - 60, x + 150, y + 120);
+      return { x, y };
+    }
+  }
+  // (none open: clear the first dry patch)
+  for (let k = 0; k < 400; k++) {
+    const x = 200 + (k % 20) * 15;
+    const y = 200 + Math.floor(k / 20) * 15;
+    let dry = true;
+    for (let dx = -40; dx <= 70 && dry; dx += 2) for (let dy = -10; dy <= 60 && dry; dy += 5) if (w.terrain.isWater(x + dx, y + dy)) dry = false;
+    if (!dry) continue;
+    w.terrain.clearArea(x - 80, y - 60, x + 150, y + 120);
+    return { x, y };
   }
   return { x: 350, y: 350 };
 }
@@ -163,7 +177,9 @@ check('lunge: the grab resolves 6 ticks in (round(0.58 × 0.55 s × 20))', LUNGE
   const p = arena(w);
   const v = dummy(w, 1, big.id, p.x + 8, p.y, 1e6);
   v.task = 'idle';
-  const s = soldierAt(w, p.x, p.y, v);
+  // (a little further back since 2026-11-01: right under the big ant's head — it crouches under now — its feet pushed
+  // the soldier out of range now and then, restarting the ramp)
+  const s = soldierAt(w, p.x - 1.5, p.y, v);
   w.reindex();
   let grabbed = false;
   let maxRamp = 0;
@@ -282,7 +298,9 @@ check('lunge: the grab resolves 6 ticks in (round(0.58 × 0.55 s × 20))', LUNGE
 }
 {
   // the guard line (user notes 2026-10-25): along the route the workers walk, wide, spare soldiers spread along it
-  const r = guardScene(24, 30, 19, 75);
+  // (seed 25 since 2026-11-01: with pebbles and twigs blocking, seed 19's route came out nearly straight — no bends to
+  // follow)
+  const r = guardScene(24, 30, 25, 75);
   check(
     'guard line: half the sickle-jaws guard and half gather; the guards spread along the whole route, none piled at the entrance',
     r.guards >= 13 && r.gatherers >= 13 && r.atEntrance === 0 && r.arcTo - r.arcFrom > r.trail * 0.6 && r.maxGap < r.trail * 0.2,

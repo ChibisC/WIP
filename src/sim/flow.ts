@@ -418,6 +418,12 @@ export class SurfaceFlow {
   readonly h: number;
   passable: Uint8Array;
   /**
+   * Steps between neighbouring cells that cross an obstacle finer than a cell (a twig, a pebble between two open
+   * cell centres — user 2026-11-01: ants walk round obstacles): per cell, bit 0 east, 1 south, 2 south-east,
+   * 3 south-west blocked. Without it a field would lead straight into a thin twig the coarse grid did not see.
+   */
+  edges: Uint8Array;
+  /**
    * Authored maps: no diagonal step between two blocked cells (walls and shores are real edges there),
    * and a target in water starts from the nearest walkable cell. The procedural styles keep the old rule.
    */
@@ -430,6 +436,7 @@ export class SurfaceFlow {
     this.w = Math.ceil(terrain.width / this.cell) + 1;
     this.h = Math.ceil(terrain.depth / this.cell) + 1;
     this.passable = new Uint8Array(this.w * this.h);
+    this.edges = new Uint8Array(this.w * this.h);
     this.strict = !!terrain.layout;
     this.rebuildPassable();
   }
@@ -459,7 +466,66 @@ export class SurfaceFlow {
         const y = Math.min(t.depth, j * this.cell);
         this.passable[j * this.w + i] = t.passable(x, y) ? 1 : 0;
       }
+    // the steps between cells, sampled on the terrain's own grid along the straight line between the two points
+    const C = this.cell;
+    const n = Math.max(2, Math.ceil((C * 1.42) / Math.max(1, t.res)));
+    const DIRS = [
+      [1, 0],
+      [0, 1],
+      [1, 1],
+      [-1, 1],
+    ];
+    this.edges.fill(0);
+    for (let j = 0; j < this.h; j++)
+      for (let i = 0; i < this.w; i++) {
+        const x0 = Math.min(t.width, i * C);
+        const y0 = Math.min(t.depth, j * C);
+        let bits = 0;
+        for (let b = 0; b < 4; b++) {
+          const ii = i + DIRS[b][0];
+          const jj = j + DIRS[b][1];
+          if (ii < 0 || jj < 0 || ii >= this.w || jj >= this.h) continue;
+          const x1 = Math.min(t.width, ii * C);
+          const y1 = Math.min(t.depth, jj * C);
+          // (solid obstacles only: where a field's cells cut the corner of a puddle, the trail crosses that water —
+          // army ants bridge it — as before)
+          for (let s = 1; s < n; s++) {
+            const u = s / n;
+            if (t.isBlocked(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u)) {
+              bits |= 1 << b;
+              break;
+            }
+          }
+        }
+        this.edges[j * this.w + i] = bits;
+      }
     this.fields.clear();
+  }
+
+  /** Is the straight way from (x0, y0) to (x1, y1) free of solid obstacles on the terrain's own grid (water as before)? */
+  private clearTo(x0: number, y0: number, x1: number, y1: number): boolean {
+    const t = this.terrain;
+    const n = Math.max(2, Math.ceil(dhypot(x1 - x0, y1 - y0) / Math.max(1, t.res * 0.75)));
+    for (let s = 1; s <= n; s++) {
+      const u = s / n;
+      const x = Math.min(t.width, Math.max(0, x0 + (x1 - x0) * u));
+      const y = Math.min(t.depth, Math.max(0, y0 + (y1 - y0) * u));
+      if (t.isBlocked(x, y)) return false;
+    }
+    return true;
+  }
+
+  /** May one step from cell (x, y) to its neighbour (x + dx, y + dy), both in the grid? */
+  private stepOk(x: number, y: number, dx: number, dy: number): boolean {
+    // each step is stored once, from the cell whose neighbour lies east, south, south-east or south-west
+    if (dy < 0 || (dy === 0 && dx < 0)) {
+      x += dx;
+      y += dy;
+      dx = -dx;
+      dy = -dy;
+    }
+    const b = dy === 0 ? 0 : dx === 0 ? 1 : dx > 0 ? 2 : 3;
+    return (this.edges[y * this.w + x] & (1 << b)) === 0;
   }
 
   /** Dijkstra field to target points (mm). Cached under key with a stamp. */
@@ -510,6 +576,7 @@ export class SurfaceFlow {
           if (!P[n]) continue;
           // no squeezing diagonally between two blocked cells
           if (strict && dx && dy && (!P[y * W + xx] || !P[yy * W + x])) continue;
+          if (!this.stepOk(x, y, dx, dy)) continue;
           const nd = d + (dx && dy ? 1.414 : 1);
           if (nd < dist[n]) {
             dist[n] = nd;
@@ -541,9 +608,15 @@ export class SurfaceFlow {
     if (i < 0 || j < 0 || i >= this.w || j >= this.h) return false;
     const W = this.w;
     const d0 = dist[j * W + i];
+    // the best neighbour the ant can walk straight to from where it actually is (an obstacle finer than a cell — a
+    // twig's end — can lie between it and the cell the field leads to; user 2026-11-01: ants walk round obstacles),
+    // else the best one regardless (skirting takes it round)
     let best = d0;
     let bx = 0;
     let by = 0;
+    let bestAny = d0;
+    let ax = 0;
+    let ay = 0;
     for (let dy = -1; dy <= 1; dy++)
       for (let dx = -1; dx <= 1; dx++) {
         if (!dx && !dy) continue;
@@ -551,13 +624,24 @@ export class SurfaceFlow {
         const yy = j + dy;
         if (xx < 0 || yy < 0 || xx >= W || yy >= this.h) continue;
         if (this.strict && dx && dy && (!this.passable[j * W + xx] || !this.passable[yy * W + i])) continue;
+        if (!this.stepOk(i, j, dx, dy)) continue;
         const dd = dist[yy * W + xx];
-        if (dd < best) {
+        if (dd < bestAny) {
+          bestAny = dd;
+          ax = dx;
+          ay = dy;
+        }
+        if (dd < best && this.clearTo(x, y, (i + dx) * this.cell, (j + dy) * this.cell)) {
           best = dd;
           bx = dx;
           by = dy;
         }
       }
+    if (best === d0) {
+      best = bestAny;
+      bx = ax;
+      by = ay;
+    }
     if (best === d0 || best === Infinity) return false;
     // aim at the neighbour cell centre from the actual position (smooth heading)
     const tx = (i + bx) * this.cell - x;

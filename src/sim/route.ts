@@ -1,4 +1,4 @@
-import { dhypot } from './dmath';
+import { dcos, dhypot, dsin } from './dmath';
 import { Colony, SURFACE } from './types';
 import { World } from './world';
 import { homeField, nearestEntrance } from './movement';
@@ -58,6 +58,11 @@ export function markerRoute(w: World, c: Colony, mi: number, stepMm: number, ref
       } else {
         nx = x + tdir.x * stepMm;
         ny = y + tdir.y * stepMm;
+        // (2026-11-01: pebbles and twigs block — keep the trail's middle a little clear of them, so the ants walking
+        // it, laden ones in the middle lane, are not forced off it)
+        const q = clearOfObstacles(w, nx, ny);
+        nx = q.x;
+        ny = q.y;
       }
       len += dhypot(nx - x, ny - y);
       x = nx;
@@ -129,4 +134,30 @@ export function routeNearest(r: Route, x: number, y: number, out: { s: number; d
       out.uy = dy / l;
     }
   }
+}
+
+const clr = { x: 0, y: 0 }; // det-ok: scratch
+/** A point eased up to 1.5 mm away from solid obstacles within 2.5 mm of it (the point itself when none, or no room). */
+function clearOfObstacles(w: World, x: number, y: number): { x: number; y: number } {
+  let px = 0;
+  let py = 0;
+  for (let k = 0; k < 8; k++) {
+    const c = dcos(k * 0.7854);
+    const s = dsin(k * 0.7854);
+    if (w.terrain.isBlocked(x + c * 2.5, y + s * 2.5)) {
+      px -= c;
+      py -= s;
+    }
+  }
+  const l = dhypot(px, py);
+  clr.x = x;
+  clr.y = y;
+  if (l < 1e-6) return clr;
+  const qx = x + (px / l) * 1.5;
+  const qy = y + (py / l) * 1.5;
+  if (w.walkable(SURFACE, qx, qy)) {
+    clr.x = qx;
+    clr.y = qy;
+  }
+  return clr;
 }

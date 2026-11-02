@@ -1,12 +1,12 @@
 import { World } from './world';
 import { Ant, AS, Carry, Colony, SURFACE } from './types';
 import { casteOf } from './species';
-import { BALANCE, GUARD } from './balance';
-import { angleDiff, goToSurfacePoint, steerTo, turnToward } from './movement';
+import { BALANCE, GUARD, TRAIL } from './balance';
+import { angleDiff, approachSurface, goToSurfacePoint, nearestEntrance, turnToward } from './movement';
 import { creatureHooks, friendlyCreature } from './combat';
 import { datan2, dcos, dhypot, dsin, hash01, sq } from './dmath';
 import { arenaOf } from './arenaState';
-import { underOrder } from './markers';
+import { nearestWalkable, underOrder } from './markers';
 
 /**
  * Guard line (user note 2026-10-25: fighters stood "too compact … like they are fighting in a guard line like
@@ -175,8 +175,10 @@ export function guardSlot(w: World, a: Ant, c: Colony, mi: number): { x: number;
   out.y = m.y + L.ux * across - L.uy * back;
   out.h = datan2(L.uy, L.ux) + (hash01(a.id, ep * 4 + 4) - 0.5) * 2 * GUARD.faceSpread + GUARD.sway * dsin(w.time * 0.8 + (a.id % 97));
   if (!w.walkable(m.space, out.x, out.y)) {
-    out.x = m.x;
-    out.y = m.y;
+    // (on the surface: the nearest open ground to its place — a pebble or a twig there, since 2026-11-01; else the marker)
+    const q = m.space === SURFACE ? nearestWalkable(w, out.x, out.y) : null;
+    out.x = q ? q.x : m.x;
+    out.y = q ? q.y : m.y;
   }
   return out;
 }
@@ -203,7 +205,7 @@ export function holdGuardLine(w: World, a: Ant, c: Colony, mi: number, dt: numbe
     const direct = w.s.mode.arena ? GUARD.directMmArena : GUARD.directMm;
     // (on the way round fights, not through them: combat v2.1; straight into its own place in the line)
     if (d > direct && dhypot(m.x - a.x, m.y - a.y) > direct) goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${mi}`, 1, true);
-    else steerTo(w, a, p.x, p.y, dt, d < len * 2 ? 0.6 : 1);
+    else approachSurface(w, a, p.x, p.y, dt, `mk:${c.id}:${mi}`, m.x, m.y, d < len * 2 ? 0.6 : 1, 8, true);
     a.alarm = Math.max(a.alarm, 0.15);
     return true;
   }
@@ -214,4 +216,62 @@ export function holdGuardLine(w: World, a: Ant, c: Colony, mi: number, dt: numbe
     a.st = 0;
   }
   return true;
+}
+
+/**
+ * Trail traffic (user 2026-11-01: "after they all reach destination, some ants once in a while trail back to the nest
+ * for a realism of how trails look … only like 2-3 + more depending on how many ants follow the trail so that your
+ * army is viable for attacking still"): now and then one of the fighters standing at a surface marker walks back to
+ * the nest's entrance and out to its place again. At most `TRAIL.trafficMin` + `trafficPer` × the group at once (never
+ * more than `trafficMaxShare` of it); a standing ant starts on its own hashed clock — about once per round trip per
+ * free place. Not in the battle arena. Fights preempt it (combat runs first). Returns true when it handled the tick.
+ */
+export function trailTraffic(w: World, a: Ant, c: Colony, mi: number, dt: number): boolean {
+  const m = c.markers[mi];
+  if (w.s.mode.arena || m.space !== SURFACE || a.space !== SURFACE || !c.entrances.length) {
+    a.trf = 0;
+    return false;
+  }
+  const L = lineOf(w, c, mi);
+  const n = L.ids.length;
+  const cap = Math.min(Math.floor(n * TRAIL.trafficMaxShare), Math.floor(TRAIL.trafficMin + TRAIL.trafficPer * n));
+  const len = casteOf(a.caste).length;
+  const tr = a.trf ?? 0;
+  if (tr === 0) {
+    // standing in its place: may it set off? (once a second, on its own tick)
+    if (cap < 1 || a.state !== AS.Rally || (w.s.tick + a.id) % BALANCE.tickHz !== 0) return false;
+    let busy = 0;
+    for (const id of L.ids) if ((w.antById.get(id)?.trf ?? 0) !== 0) busy++;
+    if (busy >= cap) return false;
+    const e = c.entrances[nearestEntrance(c, m.x, m.y)];
+    const trip = (2 * dhypot(e.sx - m.x, e.sy - m.y)) / Math.max(1, casteOf(a.caste).speed);
+    // each free place starts about one trip per round trip: expected busy ≈ cap
+    const p = (cap - busy) / Math.max(1, n - busy) / Math.max(1, trip);
+    if (hash01(a.id, Math.floor(w.s.tick / BALANCE.tickHz) * 7 + 3) >= p) return false;
+    a.trf = 1;
+    a.state = AS.Idle;
+    a.st = 0;
+  }
+  if (a.trf === 1) {
+    const ei = nearestEntrance(c, m.x, m.y);
+    const e = c.entrances[ei];
+    if (dhypot(e.sx - a.x, e.sy - a.y) < Math.max(4, len * 1.5)) a.trf = 2;
+    else {
+      goToSurfacePoint(w, a, e.sx, e.sy, dt, `trf:${c.id}:${ei}`);
+      return true;
+    }
+  }
+  // on its way out again: to the marker, then back to its place in the crowd
+  if (dhypot(m.x - a.x, m.y - a.y) < Math.max(markerReach(w, c, mi), len * 3)) {
+    a.trf = 0;
+    return false;
+  }
+  goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${mi}`, 1, true);
+  return true;
+}
+
+/** How near the marker a returning ant has to be to rejoin the crowd (its slots reach about this far). */
+function markerReach(w: World, c: Colony, mi: number): number {
+  const L = lineOf(w, c, mi);
+  return L.room.length ? Math.sqrt(L.cum[L.cum.length - 1] * (0.88 / Math.PI)) * GUARD.aspect + L.room[L.room.length - 1] : 10;
 }

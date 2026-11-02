@@ -513,8 +513,7 @@ export function stepMotion(
   m.pitch = damp(m.pitch, clamp((-m.acc / Math.max(L, 1e-3)) * 0.004, -0.06, 0.06), 8, dt);
   out.roll += m.roll;
   out.pitch += m.pitch;
-  // the head leads the turn
-  out.headYaw += clamp(wrap(inp.h - m.hb) * 0.7, -0.45, 0.45);
+  // (the head used to lead the turn; user 2026-11-01: heads face straight ahead unless an animation turns them)
 
   m.hitT += dt;
   m.flash = Math.max(0, m.flash - dt * 7);

@@ -169,6 +169,12 @@ export interface Ant {
   fhd?: number;
   /** its slot on an ant foe is under the foe's body (combat v2.2: from beneath a tall enemy), 1; else 0 */
   gUn?: number;
+  /** trail traffic (guardLine.ts trailTraffic): 1 walking back to the nest from its marker, 2 on its way out again, 0 not */
+  trf?: number;
+  /** the side (±1; 0 not yet) it last skirted an obstacle by (movement.ts moveForward), kept so it follows the edge round */
+  avs?: number;
+  /** ticks left following an obstacle's edge before turning back toward its goal (movement.ts) */
+  avT?: number;
   /** climbing / riding: the creature id (0 = on the ground) */
   rideId?: number;
   /** climbing: 0 walking to the foot of the rail, 1 up, 2 riding, 3 down (1–3: untouchable) */

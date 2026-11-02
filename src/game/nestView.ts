@@ -8,6 +8,7 @@ import { FoodRenderer, SpaceMapper } from '../render/game/foodRenderer';
 import { BroodRenderer } from '../render/game/broodRenderer';
 import { TileDecor } from '../render/nest/tileDecor';
 import { ShownMarker, WorldMarkers } from '../render/game/worldMarkers';
+import { MarkerTrail } from '../render/game/markerTrail';
 import { CombatFx } from '../render/game/combatFx';
 import { ProgressRings, RingItem } from '../render/nest/progressRings';
 import { jobProgress } from '../sim/jobs';
@@ -45,6 +46,8 @@ export class NestView {
   readonly brood = new BroodRenderer();
   readonly decor: TileDecor;
   readonly markers = new WorldMarkers();
+  /** the selected marker's trail line to the nest's entrance (session sets it) */
+  readonly trail = new MarkerTrail();
   readonly fx = new CombatFx();
   readonly rings = new ProgressRings();
   /** show incubation rings on every larva (tile info overlay) */
@@ -71,14 +74,14 @@ export class NestView {
     this.creatures = new CreatureRenderer('areaCreatures' + space);
     this.hit = new HitboxOverlay('areaHitboxes' + space);
     this.under = new UnderOutline('areaUnderOutline' + space);
-    stage.scene.add(this.hit.group, this.under.group, this.ants.group, this.creatures.group, this.food.group, this.brood.group, this.decor.group, this.markers.group, this.fx.group, this.rings.mesh);
-    // The nest is a plane: ants walk on the floor heightfield (and up the entrance ramps).
+    stage.scene.add(this.hit.group, this.under.group, this.ants.group, this.creatures.group, this.food.group, this.brood.group, this.decor.group, this.markers.group, this.trail.group, this.fx.group, this.rings.mesh);
+    // The nest is a plane: ants walk flat on the floor (and up the entrance ramps), never up the walls (user 2026-11-01).
     this.adapter = {
-      toWorld: (x, y, out) => out.set(x, nt.heightAt(x, y), y),
-      normal: (x, y, out) => nt.normalAt(x, y, out),
+      toWorld: (x, y, out) => out.set(x, nt.floorAt(x, y), y),
+      normal: (x, y, out) => nt.floorNormalAt(x, y, out),
       forward: (h, out) => out.set(Math.cos(h), 0, Math.sin(h)),
     };
-    this.floorHeight = (x, z) => nt.heightAt(x, z);
+    this.floorHeight = (x, z) => nt.floorAt(x, z);
     const up = new THREE.Vector3(0, 1, 0);
     this.map = {
       pos: (x, y, lift, out) => out.set(x, nt.heightAt(x, y) + lift, y),

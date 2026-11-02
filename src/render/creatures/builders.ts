@@ -669,8 +669,9 @@ function mantisBody(rig: Rig, p: CrPose, look: MantisLook): void {
   rig.tube(tmpA, tmpB, L * 0.022 * look.heavy, look.body, satin);
   const nx = tmpB.x;
   const ny = tmpB.y;
-  // triangular head swivelling, big eyes at the corners
-  const yaw = sway * 3 + Math.sin(p.t * 0.7 + p.v2 * 3) * 0.3;
+  // triangular head, big eyes at the corners: it swivels only while it lurks (its idle; user 2026-11-01: heads face
+  // straight ahead unless an animation turns them)
+  const yaw = p.state === ST.Lurk ? sway * 3 + Math.sin(p.t * 0.7 + p.v2 * 3) * 0.3 : 0;
   rig.ell(nx + L * 0.03, ny + L * 0.02, 0, L * 0.03, L * 0.035, L * 0.055, look.body, satin, yaw, 0.3, 0);
   for (const side of [-1, 1]) rig.ell(nx + L * 0.03 + Math.sin(yaw) * side * -L * 0.05, ny + L * 0.045, side * L * 0.05 * Math.cos(yaw), L * 0.022, L * 0.025, L * 0.02, look.eye, S(0.1, 1.1));
   antennae(rig, p, nx + L * 0.05, ny + L * 0.05, L * 0.02, L * 0.35, L * 0.004, look.body, satin, 0.25, 0.4);

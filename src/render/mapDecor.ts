@@ -677,31 +677,10 @@ export class MapDecor {
       }
     }
 
-    // pebbles: a light scatter, scree round the rocks, gravel on the shores
+    // pebbles: a light scatter, scree round the rocks, gravel on the shores — placed with the map's other obstacles
+    // (world/mapScatter.ts), which the simulation walks round
     const peb: Array<[number, number, number]> = [];
-    for (let i = 0; i < area * d.pebbles; i++) {
-      const x = rng.range(0, W);
-      const z = rng.range(0, D);
-      if (free(x, z, 3)) peb.push([x, z, 0.5 + Math.pow(rng.next(), 3) * 2.8]);
-    }
-    // gravel banks along running water (riverbank)
-    if (d.reeds > 1)
-      for (let i = 0; i < area * 12; i++) {
-        const x = rng.range(0, W);
-        const z = rng.range(0, D);
-        if (nearWater(map, x, z, 45) && !nearWater(map, x, z, 9) && free(x, z, 3)) peb.push([x, z, 0.6 + Math.pow(rng.next(), 2) * 3.2]);
-      }
-    for (const wl of map.walls) {
-      const o = polar(wl.shape);
-      if (!o) continue;
-      for (let i = 0; i < o.rMax * 0.5; i++) {
-        const a = rng.range(0, Math.PI * 2);
-        const r = o.r(a) + Math.abs(rng.gauss()) * 10 + 1;
-        const x = o.cx + Math.cos(a) * r;
-        const z = o.cz + Math.sin(a) * r;
-        if (free(x, z, 3)) peb.push([x, z, 0.8 + Math.pow(rng.next(), 2) * 4]);
-      }
-    }
+    for (const o of t.mapObs) if (o.kind === 'pebble') peb.push([o.x, o.y, o.s]);
     if (peb.length) {
       const stoneMat = new THREE.MeshStandardMaterial({ map: tex.stone.map, normalMap: tex.stone.normal, roughness: 0.8, metalness: 0 });
       patchDapple(stoneMat);

@@ -102,8 +102,10 @@ function separateOnly(w: World, n: number): void {
   const ab = dist(a, b);
   const ee = dist(e1, e2);
   const gg = dist(g1, g2);
-  check('spacing: two fighting allies end at least 0.9 × the personal space apart', ab >= 0.9 * C2.personalSpace * L, `${(ab / L).toFixed(2)} body lengths (personal space ${C2.personalSpace})`);
-  check('spacing: two enemies not fighting each other keep only their bodies\' radii (lines can meet)', ee >= 0.9 * (rad('lasius_worker') + rad('fire_soldier')) && ee < 0.6 * C2.personalSpace * L, `${ee.toFixed(2)} mm (radii ${(rad('lasius_worker') + rad('fire_soldier')).toFixed(2)} mm)`);
+  // (user 2026-11-01: ants collide with each other at half the distance — `separation.antContact`)
+  const K = S.antContact;
+  check('spacing: two fighting allies end at least 0.9 × the personal space apart (× antContact)', ab >= 0.9 * C2.personalSpace * L * K, `${(ab / L).toFixed(2)} body lengths (personal space ${C2.personalSpace} × ${K})`);
+  check('spacing: two enemies not fighting each other keep only their bodies\' radii (× antContact; lines can meet)', ee >= 0.9 * (rad('lasius_worker') + rad('fire_soldier')) * K && ee < 0.6 * C2.personalSpace * L * K, `${ee.toFixed(2)} mm (radii ${(rad('lasius_worker') + rad('fire_soldier')).toFixed(2)} mm × ${K})`);
   check('spacing: allies at the slots of one foe are spaced by the slots, not pushed a personal space apart', gg < 0.9 * C2.personalSpace * L, `${(gg / L).toFixed(2)} body lengths`);
 }
 
@@ -164,8 +166,13 @@ function separateOnly(w: World, n: number): void {
 {
   const { w, p } = field();
   const worker = (c: string) => antSlotCount({ caste: c } as Ant, casteOf(c).length, false);
-  const ws = ['lasius_worker', 'formica_worker', 'fire_minor', 'atta_media'].map(worker);
-  check('slots: a worker ant has room for 2–4 attackers of its own size', ws.every((n) => n >= 2 && n <= 4), ws.join(', '));
+  // (user 2026-11-01: "for minum and sizes similar make it 6 max, worker n others of those sizes are 7+ depending on size")
+  const ws = ['lasius_worker', 'formica_worker', 'eciton_minor', 'atta_media'].map(worker);
+  check('slots: a worker ant has room for 7+ attackers of its own size (more the bigger it is)', ws.every((n) => n >= 7) && ws[3] >= ws[0], ws.join(', '));
+  const ms = ['atta_minim', 'fire_minor', 'solenopsis_nanitic'].map(worker);
+  check('slots: a minim-size ant (≤ 3 mm) has room for at most 6 of its own size', ms.every((n) => n >= 5 && n <= 6) && antSlotCount({ caste: 'atta_minim' } as Ant, 1.5, false) <= 6, ms.join(', '));
+  const big = antSlotCount({ caste: 'atta_media' } as Ant, casteOf('atta_major').length, false);
+  check('slots: fewer big attackers fit round a smaller ant', big < ws[3], `${big} majors round a worker (${ws[3]} workers)`);
   const beetle = spawnCreature(w, 'groundBeetle', SURFACE, p.x, p.y);
   const bs = ['lasius_worker', 'formica_worker', 'lasius_soldier'].map((c) => creatureSlotCount(beetle, casteOf(c).length));
   check('slots: a ground beetle has room for 6–10 attackers round it', bs.every((n) => n >= 6 && n <= 10), bs.join(', '));
@@ -181,7 +188,8 @@ function separateOnly(w: World, n: number): void {
   const v = fighter(w, 1, 'fire_soldier', p.x, p.y, 0);
   v.hp = v.maxHp = 1e6;
   const att: Ant[] = [];
-  for (let i = 0; i < 7; i++) {
+  // (more than its slots: a fire soldier has room for 7 Lasius workers since 2026-11-01, so 11 come)
+  for (let i = 0; i < 11; i++) {
     const x = fighter(w, 0, 'lasius_worker', p.x - 25 + (i % 4) * 2, p.y - 6 + Math.floor(i / 4) * 5, 0);
     x.state = AS.Attack;
     x.tgt = v.id;
@@ -258,8 +266,10 @@ function separateOnly(w: World, n: number): void {
 }
 {
   const r = duelBattle('ant:lasius_worker', 60, 'ant:fire_soldier', 60, 20, 4);
-  check('duels: a 60 v 60 clash breaks into many small, separated fights', r.clusters >= 12 && r.small >= 0.2, `${r.clusters.toFixed(1)} clusters a sample, ${(r.small * 100).toFixed(0)} % of fighters in clusters of ≤ 4 (base: 8.3, 11 %)`);
-  check('duels: few bodies overlap in the clash', r.overlap <= 0.2, `${(r.overlap * 100).toFixed(0)} % (base 24 %)`);
+  // (user 2026-11-01: swarms — 7+ attackers round a worker, ants colliding at half the distance — so a clash is a few
+  // big brawls rather than combat v2's many duels (12+ clusters, 20 % in small ones): it still splits into several)
+  check('duels: a 60 v 60 clash still splits into several fights, not one heap', r.clusters >= 7 && r.largest <= r.fighters * 0.8, `${r.clusters.toFixed(1)} clusters a sample, the largest ${r.largest.toFixed(0)} of ${r.fighters.toFixed(0)} fighters, ${(r.small * 100).toFixed(0)} % in clusters of ≤ 4 (base: 8.3, 11 %)`);
+  check('duels: few bodies overlap in the clash', r.overlap <= 0.3, `${(r.overlap * 100).toFixed(0)} % (base 24 %)`);
 }
 
 // ---------------------------------------------------------------- no snapping: ants walk into place and keep up

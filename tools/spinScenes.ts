@@ -7,6 +7,7 @@
  *
  * The scenes behind `tools/spin-check.ts` (run that).
  */
+import { BALANCE } from '../src/sim/balance';
 import { EventBus } from '../src/core/events';
 import { createWorld } from '../src/sim/mapGen';
 import { Ant, AS, SURFACE } from '../src/sim/types';
@@ -24,7 +25,31 @@ export function openGround(w: World, span = 120): { x: number; y: number } {
     for (let dx = -span / 2; dx <= span / 2 && ok; dx += 3) for (let dy = -span / 3; dy <= span / 3 && ok; dy += 3) if (!w.walkable(SURFACE, x + dx, y + dy)) ok = false;
     if (ok) return { x, y };
   }
-  return { x: 320, y: 320 };
+  // (2026-11-01: pebbles, rocks and twigs block now and open ground that wide is rare: the dry patch with the fewest
+  // of them, cleared)
+  let best = -1;
+  let fewest = Infinity;
+  for (let k = 0; k < 900; k++) {
+    const x = 120 + (k % 30) * 15;
+    const y = 120 + Math.floor(k / 30) * 15;
+    if (!w.terrain.inBounds(x - span / 2 - 10, y - span / 3 - 10) || !w.terrain.inBounds(x + span / 2 + 10, y + span / 3 + 10)) continue;
+    let n = 0;
+    let dry = true;
+    for (let dx = -span / 2; dx <= span / 2 && dry; dx += 3)
+      for (let dy = -span / 3; dy <= span / 3 && dry; dy += 3) {
+        if (w.terrain.isWater(x + dx, y + dy)) dry = false;
+        else if (!w.walkable(SURFACE, x + dx, y + dy)) n++;
+      }
+    if (dry && n < fewest) {
+      fewest = n;
+      best = k;
+    }
+  }
+  if (best < 0) return { x: 320, y: 320 };
+  const x = 120 + (best % 30) * 15;
+  const y = 120 + Math.floor(best / 30) * 15;
+  w.terrain.clearArea(x - span / 2 - 10, y - span / 3 - 10, x + span / 2 + 10, y + span / 3 + 10);
+  return { x, y };
 }
 
 const wrap = (d: number) => {
@@ -37,6 +62,8 @@ export function battleStats(n = 50, seconds = 25, seed = 7): { spinners: number;
   const w = createWorld({ seed, style: 'meadow', width: 640, depth: 640, food: 1, colonies: [{ species: 'lasius', player: true, ai: false }, { species: 'formica', player: false, ai: false }], settings: { creatures: 0 } }, new EventBus());
   w.s.creatures.length = 0;
   const p = openGround(w);
+  // (a battle on open ground: since 2026-11-01 pebbles and twigs block, so clear the whole field it spreads over)
+  w.terrain.clearArea(p.x - 160, p.y - 130, p.x + 160, p.y + 130);
   const ants: Ant[] = [];
   for (let i = 0; i < n; i++) {
     const a = makeAnt(w, 0, i % 5 === 0 ? 'lasius_soldier' : 'lasius_worker', SURFACE, p.x - 25 + (i % 5) * 3, p.y - 20 + Math.floor(i / 5) * 4, 0);
@@ -88,7 +115,8 @@ export function battleStats(n = 50, seconds = 25, seed = 7): { spinners: number;
         for (let j = i + 1; j < live.length; j++) {
           const a = live[i];
           const b = live[j];
-          const r = (casteOf(a.caste).length + casteOf(b.caste).length) * 0.12;
+          // (× antContact: since 2026-11-01 ants collide at half the distance; this counts ones on top of each other)
+          const r = (casteOf(a.caste).length + casteOf(b.caste).length) * 0.12 * BALANCE.separation.antContact;
           if (Math.hypot(a.x - b.x, a.y - b.y) < r) overlapPairs++;
         }
     }

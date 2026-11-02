@@ -198,11 +198,26 @@ function ellipsePerimeter(A: number, B: number): number {
   return Math.PI * (3 * (A + B) - Math.sqrt((3 * A + B) * (A + 3 * B)));
 }
 
-/** Attack slots on an ant for an attacker of length `attackerLen`. */
+/** The line round an ant of length L that attackers of length La stand on, per attacker length. */
+function ringPer(L: number, La: number): number {
+  return ellipsePerimeter(L * C2.antHalfLen + La / 2, L * C2.antHalfWidth + La / 2) / La;
+}
+
+/**
+ * Attack slots on an ant for an attacker of length `attackerLen` (user 2026-11-01: "for minum and sizes similar make it
+ * 6 max, worker n others of those sizes are 7+ depending on size"): attackers its own size fit `swarm.small` round an ant
+ * of up to `swarm.smallMm`, else `swarm.worker` from `swarm.workerMm` and one more every `swarm.stepMm` longer; bigger
+ * attackers fewer, smaller more, as the room on the line they stand on goes (never more than `swarm.small` round a
+ * small one).
+ */
 export function antSlotCount(victim: Ant, attackerLen: number, isQueen: boolean): number {
   const L = casteOf(victim.caste).length;
-  const h = attackerLen / 2;
-  const n = clampSlots(ellipsePerimeter(L * C2.antHalfLen + h, L * C2.antHalfWidth + h), attackerLen);
+  const W = C2.swarm;
+  const small = L <= W.smallMm;
+  const base = small ? W.small : W.worker + Math.floor(Math.max(0, L - W.workerMm) / W.stepMm + 1e-9);
+  let n = Math.round((base * ringPer(L, attackerLen)) / ringPer(L, L));
+  if (small) n = Math.min(n, W.small);
+  n = Math.max(C2.slotsMin, Math.min(C2.slotsMax, n));
   return isQueen ? Math.max(C2.queenSlotsMin, n) : n;
 }
 
