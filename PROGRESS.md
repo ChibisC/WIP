@@ -1349,6 +1349,23 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
   extra entrances, spots, shafts, entrance digs, plugging, the AI's extra entrance, the old entrance tests and
   screenshots.
 
+## 2026-11-02 — Gene Thief Ant: the termite soldiers are borrowable (user note)
+- **User note:** "gene thief ants also have the termite caste soldiers." `BORROWABLE` (`src/sim/species.ts`) now keeps the
+  termite soldier castes — Nasute (`nasute_soldier`), Nasute Major (`nasute_major`) and Sickle-jaw (`rhy_soldier`) —
+  so a Gene Thief Ant colony (`plagiaria`) can pick them in the skirmish menu and the multiplayer lobby, for a player
+  or an AI (`randomBorrowed` draws from the same list). 24 borrowable castes (was 21). Termite workers and royals stay
+  out. The sim already branches on the caste, not the colony's species (the Termants raise the same castes), so no
+  other code changed: the termite soldiers hatch from their own brood tiles, keep their models, abilities and sounds.
+- Lobby labels: `borrowName(id)` (species common name singular, caste name; "Soldier" when the caste's name only
+  repeats the species') — "Nasute Termite Soldier", "Nasute Termite Major", "Sickle-Jaw Termite Soldier", and the
+  ant labels unchanged ("Red Wood Mortar"). Used by `ui/menu.ts` and `ui/multiplayer.ts`.
+- **Tests:** `tests/species.ts` — the three castes are borrowable and termite workers/royals are not; a developed
+  Gene Thief AI with them raises nasute and sickle-jaw soldiers within 6 sim minutes; determinism (two runs, same
+  hash). Browser: `tests/browser/gene_thief_termites.py` (chips present, named, toggling; shot
+  `docs/multiplayer/gene-thief-termites.png`). `npm test` (24 suites) and `check-determinism` clean.
+- Docs: README (lobby line, species table), `docs/multiplayer.md` §Gene Thief. The Termants' `STOLEN_CASTES` already
+  had the nasute and sickle-jaw soldiers; unchanged.
+
 ### 2026-11-02 — Story mode, chapter 1: the Gene-Thief campaign, two levels on layered maps
 - User specs `claude/story/02-spec-gene-thief-chapter1-two-levels.md` and `03-spec-story-level-maps.md` (answers:
   build the layered-ground core here, and let it take precedence where it overlaps other work; merge and publish here).
