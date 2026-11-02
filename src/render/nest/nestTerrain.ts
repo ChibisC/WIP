@@ -600,41 +600,82 @@ float floorM = 1.0 - smoothstep(0.02, 0.18, hf);
 float surfRough = 0.93;
 float bumpH = 0.0;
 
-// ---- packed earth floor: warm tan with grain, pebble drifts along wall feet, rootlets, debris
+// ---- packed earth floor (realism pass, 2026-11-02; study notes in docs/realism/underground.md). At the ants' scale
+// soil is grains: sand 0.2–0.5 mm (quartz, feldspar, dark minerals, rusty iron-stained grains) set in a brown silt-clay
+// matrix, crumbs of a millimetre or two, and the pellets the diggers carry, scattered most along the wall feet. The
+// floor is packed and a little smoothed where ants walk; damp patches are darker and less rough. Colours stay
+// neutral (the nest's key light is warm).
 float grain = vnoise(gp*2.6);
-vec3 floorC = mix(vec3(0.21,0.155,0.07), vec3(0.32,0.235,0.11), fbm(gp*0.06));
-floorC *= 0.86 + 0.24*grain;
-floorC = mix(floorC, floorC*0.7, smoothstep(0.5, 0.8, fbm(gp*0.22 + 4.0)));
-floorC = mix(floorC, floorC*1.25, smoothstep(0.55, 0.85, fbm(gp*0.035 + 9.0)));
-bumpH += grain*0.25;
-// pebble drifts: dense near the wall foot, sparse in the open
 float edgeK = 1.0 - smoothstep(0.3, 3.5, sdW);
+vec3 floorC = mix(vec3(0.165,0.13,0.098), vec3(0.265,0.212,0.158), fbm(gp*0.06));
+floorC *= 0.9 + 0.16*grain;
+floorC = mix(floorC, floorC*0.78, smoothstep(0.5, 0.8, fbm(gp*0.22 + 4.0)));
+floorC = mix(floorC, floorC*1.15, smoothstep(0.55, 0.85, fbm(gp*0.035 + 9.0)));
+float damp = smoothstep(0.58, 0.84, fbm(gp*0.045 + 13.0));
+// sand grains (cells 0.28 mm)
+vec3 sg = worley(gp*3.6);
+float gR = 0.34 + 0.12*h21(vec2(sg.z*17.0));
+float gShow = step(0.32, h21(vec2(sg.z*7.0)));
+float gIn = smoothstep(gR, gR - 0.1, sg.x) * gShow;
+float gDome = clamp(1.0 - sg.x/gR, 0.0, 1.0);
+float gk = h21(vec2(sg.z*53.0));
+vec3 gC = gk < 0.42 ? vec3(0.44,0.40,0.33) : (gk < 0.62 ? vec3(0.40,0.30,0.24) : (gk < 0.84 ? vec3(0.12,0.105,0.09) : vec3(0.38,0.21,0.11)));
+// (worn smooth where ants walk: the open middle of the floor; loose along the walls)
+float worn = (1.0 - edgeK) * 0.45;
+floorC = mix(floorC, gC * (0.72 + 0.4*sqrt(gDome)), gIn * (0.6 - 0.25*worn));
+bumpH += gIn * sqrt(gDome) * (0.4 - 0.2*worn);
+float quartz = gIn * step(gk, 0.42) * smoothstep(0.55, 0.95, gDome);
+// crumb structure (~1 mm): dark crevices between the crumbs, softer where trodden
+vec3 ag = worley(gp*0.85);
+float crev = smoothstep(0.1, 0.0, ag.y - ag.x);
+floorC *= 1.0 - crev * (0.22 - 0.12*worn);
+bumpH += -crev*0.35 + (1.0 - ag.x)*0.15;
+// pebble drifts: dense near the wall foot, sparse in the open
 vec3 wp = worley(gp*0.55 + vec2(vnoise(gp*0.3), vnoise(gp*0.3+7.0))*0.8);
 float pr = 0.26 + 0.2*h21(vec2(wp.z*31.0));
-float pebDens = mix(0.9, 0.22, edgeK);
+float pebDens = mix(0.94, 0.3, edgeK);
 float isPeb = step(pebDens, wp.z) * smoothstep(pr + 0.05, pr - 0.04, wp.x);
 float dome = clamp(1.0 - wp.x/max(pr,0.01), 0.0, 1.0);
-vec3 pebC = mix(vec3(0.26,0.30,0.34), vec3(0.17,0.18,0.19), h21(vec2(wp.z*91.0)));
-pebC = mix(pebC, vec3(0.34,0.3,0.24), step(0.82, h21(vec2(wp.z*13.0))));
+vec3 pebC = mix(vec3(0.30,0.30,0.30), vec3(0.18,0.175,0.17), h21(vec2(wp.z*91.0)));
+pebC = mix(pebC, vec3(0.36,0.31,0.25), step(0.7, h21(vec2(wp.z*13.0))));
 pebC *= 0.5 + 0.65*sqrt(dome);
+// a pebble's contact shadow on the floor round it
+floorC *= 1.0 - 0.35*step(pebDens, wp.z)*smoothstep(pr + 0.16, pr + 0.02, wp.x)*(1.0 - isPeb);
 floorC = mix(floorC, pebC, isPeb);
 bumpH += isPeb * sqrt(dome) * 1.4;
-// fine sand specks
-vec3 ws = worley(gp * 3.1);
-floorC = mix(floorC, vec3(0.36,0.29,0.18), step(0.92, ws.z) * smoothstep(0.3, 0.1, ws.x) * 0.35);
+// diggers' pellets (balls of ~160 grains, ~1 mm): scattered on the floor, most along the walls
+vec3 pw2 = worley(gp*0.62 + 3.7);
+float pelR = 0.22 + 0.08*h21(vec2(pw2.z*5.0));
+float isPel = step(mix(0.97, 0.78, edgeK), pw2.z) * (1.0 - isPeb);
+float pelIn = isPel * smoothstep(pelR, pelR - 0.05, pw2.x);
+float pelDome = clamp(1.0 - pw2.x/pelR, 0.0, 1.0);
+vec3 pelC = mix(vec3(0.24,0.19,0.14), vec3(0.32,0.26,0.19), h21(vec2(pw2.z*3.0))) * (0.6 + 0.5*sqrt(pelDome)) * (0.85 + 0.3*vnoise(gp*9.0));
+floorC *= 1.0 - 0.3*isPel*smoothstep(pelR + 0.12, pelR, pw2.x)*(1.0 - pelIn);
+floorC = mix(floorC, pelC, pelIn);
+bumpH += pelIn * sqrt(pelDome) * 1.0;
 // pale rootlets crossing the floor
 float rl = abs(fbm(vec2(gp.x*0.03, gp.y*0.027) + 3.3) - 0.5);
-floorC = mix(floorC, vec3(0.34,0.26,0.16), smoothstep(0.004, 0.001, rl) * 0.4 * step(0.55, fbm(gp*0.02 + 1.0)));
+floorC = mix(floorC, vec3(0.34,0.27,0.19), smoothstep(0.004, 0.001, rl) * 0.4 * step(0.55, fbm(gp*0.02 + 1.0)));
+// damp: darker
+floorC *= 1.0 - 0.22*damp;
 // baked occlusion at the foot of walls
 floorC *= mix(0.45, 1.0, smoothstep(0.0, 3.0, sdW));
+surfRough = mix(0.9, 0.7, damp) - quartz*0.35;
 
-// ---- walls: compacted, scraped soil with root ends and embedded stones
-vec3 wallC = mix(vec3(0.05,0.045,0.03), vec3(0.09,0.075,0.05), fbm(gp*0.12));
+// ---- walls: compacted soil the diggers have scraped smooth, short mandible scrapes, grains and roots in it
+vec3 wallC = mix(vec3(0.07,0.057,0.043), vec3(0.12,0.097,0.07), fbm(gp*0.12));
 float scrape = vnoise(vec2(gp.x*1.1 + gp.y*0.9, gp.y*1.1 - gp.x*0.7) * 1.3);
-wallC *= 0.8 + 0.35*scrape;
+wallC *= 0.8 + 0.3*scrape;
+// mandible scrapes: short shallow grooves, a few directions, in patches
+float sa = fbm(gp*0.4 + 21.0) * 6.2832;
+vec2 sdir = vec2(cos(sa), sin(sa));
+float grooves = smoothstep(0.8, 1.0, abs(sin(dot(gp, sdir)*7.0))) * smoothstep(0.45, 0.7, vnoise(gp*1.4 + 2.0));
+wallC *= 1.0 - grooves*0.22;
+wallC = mix(wallC, gC*0.45, gIn*0.35);
 float roots = smoothstep(0.012, 0.003, abs(fbm(gp*0.08 + 11.0) - 0.5));
 wallC = mix(wallC, vec3(0.24,0.18,0.12), roots*0.6);
-bumpH += scrape*0.4 + roots*0.5;
+wallC *= 1.0 - 0.2*damp;
+bumpH += scrape*0.4 + roots*0.5 - grooves*0.25;
 
 // ---- termite nests: carton (mostly faeces with chewed wood, bound with saliva) — dark, papery,
 // layered laminae with fibres; the floor is trodden carton, a little lighter and smoother
@@ -680,15 +721,18 @@ vec3 cl = worley(gp*0.55);
 float clod = smoothstep(0.5, 0.05, cl.x);
 topC *= 0.7 + 0.5*clod*(0.6 + 0.4*cl.z);
 topC *= 0.8 + 0.4*vnoise(gp*3.0);
-bumpH += clod*1.2 + vnoise(gp*3.0)*0.3;
+// (the same grains in it, and the dark gaps between clods)
+topC = mix(topC, gC*0.4, gIn*0.3);
+topC *= 1.0 - 0.35*smoothstep(0.1, 0.0, cl.y - cl.x);
+bumpH += clod*1.2 + vnoise(gp*3.0)*0.3 + gIn*0.2;
 // buried stones (undiggable, user note 2026-10-25: "hard to identify rocks that you can't dig"): pale
 // cool-grey rock slabs, cracked into plates, with a light rim and a dark gap where they meet the soil, and
 // kept readable in the dark far from the dug area — unlike the warm, crumbly, dark soil you can dig
 float stoneE = lightT.a + (vnoise(gp*0.9)-0.5)*0.12;
 stoneM = smoothstep(0.42, 0.52, stoneE);
 vec3 sw = worley(gp*0.42);
-// (blue-biased so the nest's warm key light, 0xffc27a, leaves them a neutral stone grey)
-vec3 stoneC = mix(vec3(0.30,0.40,0.60), vec3(0.44,0.58,0.84), fbm(gp*0.3)) * (0.85 + 0.25*vnoise(gp*3.5));
+// (a little blue-biased so the nest's warm key light, 0xffdcb4, leaves them a neutral stone grey)
+vec3 stoneC = mix(vec3(0.33,0.39,0.50), vec3(0.47,0.55,0.70), fbm(gp*0.3)) * (0.85 + 0.25*vnoise(gp*3.5));
 float crack = smoothstep(0.07, 0.0, sw.y - sw.x);
 stoneC *= 1.0 - crack*0.5;
 stoneC += vec3(0.10,0.10,0.10) * smoothstep(0.52, 0.6, stoneE) * (1.0 - smoothstep(0.6, 0.72, stoneE)); // light rim
@@ -729,35 +773,39 @@ if (htype > 0.5 && htype < 10.5) {
   vec3 tc = col;
   vec3 tint = texture2D(tTint, huv).rgb;
   if (htype < 1.5) {
-    // queen: pale blue-grey silk mat of fine crossing strands
-    vec3 base = vec3(0.28,0.36,0.46);
-    float s1 = abs(sin(dot(gp, vec2(0.83, 0.55))*3.1 + fbm(gp*0.4)*6.0));
-    float s2 = abs(sin(dot(gp, vec2(-0.42, 0.91))*2.7 + fbm(gp*0.37+5.0)*6.0));
-    float s3 = abs(sin(dot(gp, vec2(0.99, -0.12))*3.5 + fbm(gp*0.5+9.0)*5.0));
-    float strands = smoothstep(0.93, 1.0, s1) + smoothstep(0.94, 1.0, s2) + smoothstep(0.95, 1.0, s3)*0.7;
-    tc = base * (0.6 + 0.3*fbm(gp*0.9)) + vec3(0.62,0.72,0.85)*clamp(strands,0.0,1.0)*0.5;
-    tc = mix(col*0.6, tc, 0.85);
+    // queen's chamber (realism pass 2026-11-02: was a blue silk mat): its floor plastered with fine pale silt the
+    // workers have smoothed, a few grains showing through, the faint sheen of a much-trodden floor; cool grey so it
+    // still reads apart from the other tiles
+    float strands = 0.0;
+    vec3 silt = mix(vec3(0.30,0.30,0.29), vec3(0.40,0.39,0.36), fbm(gp*0.5)) * (0.9 + 0.12*vnoise(gp*6.0));
+    silt = mix(silt, gC*0.9, gIn*0.18);
+    float trod = smoothstep(0.3, 0.8, fbm(gp*0.18 + 2.0));
+    tc = mix(col*0.7, silt, 0.82) * (0.94 + 0.08*trod);
     // termites: the royal chamber is a smooth, dense carton cell, not silk
     if (uCarton > 0.5 && uCarton < 1.5) tc = mix(tc, vec3(0.075,0.045,0.026) * (0.8 + 0.4*fbm(gp*0.9)) + vec3(0.03,0.02,0.01)*clamp(strands,0.0,1.0), 0.85);
     // sickle-jaws: a smooth, dense cell of damp soil
     if (uCarton > 1.5) tc = mix(tc, vec3(0.085,0.058,0.036) * (0.8 + 0.4*fbm(gp*0.9)), 0.85);
-    surfRough = mix(surfRough, 0.55, tileK);
-    bumpH += strands*0.25;
+    surfRough = mix(surfRough, 0.6 - 0.1*trod, tileK);
+    bumpH = bumpH*0.35 + gIn*0.08;
   } else if (htype < 2.5) {
-    // brood tile: caste-tinted packed cells with rounded pits
+    // brood tile: shallow brood pockets pressed into the packed floor, its soil washed with the caste's colour (the
+    // brood itself lies in them, tileDecor); realism pass 2026-11-02: less of a painted pattern, more soil
     vec3 cw = worley(gp * (0.9 + 0.1*hlevel));
     float pit = smoothstep(0.62, 0.12, cw.x);
     float rim = smoothstep(0.05, 0.0, cw.y - cw.x);
-    tc = tint * (0.55 + 0.35*vnoise(gp*1.7)) * (1.0 - pit*0.45);
-    tc += tint * rim * 0.25;
+    vec3 soilT2 = mix(col, gC, gIn*0.3);
+    tc = mix(soilT2, tint * (0.6 + 0.3*vnoise(gp*1.7)), 0.62) * (1.0 - pit*0.35);
+    tc += tint * rim * 0.12;
     tc = mix(tc, tc*1.3 + vec3(0.06,0.04,0.0), step(1.5, hlevel) * step(0.92, cw.z) * 0.6); // upgraded: bright flecks
     bumpH += -pit*0.7 + rim*0.3;
     surfRough = mix(surfRough, 0.82, tileK);
   } else if (htype < 3.5) {
-    // food store: mossy green bed with honeydew beads
-    vec3 base = mix(vec3(0.16,0.24,0.08), vec3(0.28,0.36,0.12), fbm(gp*0.5));
+    // food store: a dry, swept store floor stained olive by what is kept on it, honeydew beads catching the light
+    // (the stores themselves lie on it, tileDecor)
+    vec3 base = mix(vec3(0.17,0.20,0.10), vec3(0.26,0.29,0.14), fbm(gp*0.5));
+    base = mix(base, gC*0.8, gIn*0.25);
     vec3 mw = worley(gp*1.6);
-    tc = base * (0.7 + 0.5*smoothstep(0.6, 0.1, mw.x));
+    tc = base * (0.78 + 0.32*smoothstep(0.6, 0.1, mw.x));
     float bead = step(0.86, mw.z) * smoothstep(0.32, 0.12, mw.x);
     tc = mix(tc, vec3(0.75,0.62,0.25), bead*0.8);
     surfRough = mix(surfRough, mix(0.8, 0.25, bead), tileK);
@@ -836,7 +884,7 @@ if (htype > 0.5 && htype < 10.5) {
     bumpH += band*0.5;
   }
   // soft inner bevel so neighbouring tiles read as separate cells
-  tc *= mix(isEnt > 0.5 ? 1.0 : 0.72, 1.0, smoothstep(0.0, 0.9, edgeProx)); // (a tunnel has no cell edges)
+  tc *= mix(isEnt > 0.5 ? 1.0 : 0.82, 1.0, smoothstep(0.0, 0.9, edgeProx)); // (a tunnel has no cell edges)
   float hflags = floor(hexT.a*255.0 + 0.5);
   float planned = mod(floor(hflags / 2.0), 2.0);
   // planned tiles are ghosts: a faint wash of their material and a dashed rim
@@ -909,7 +957,7 @@ const FRAG_EMISSIVE = /* glsl */ `
   // warm light pooling over open dug floor, falling off down tunnels and up the walls
   float spot = 0.65 + 0.7 * smoothstep(0.35, 0.8, fbm(gp*0.012 + 3.0));   // uneven pools, like light through cracks
   float lp = pow(pool, 2.2) * pow(wideL, 1.5) * spot * (floorM + wallM*0.12) * (1.0 - tileK*0.55);
-  totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.74, 0.38) * lp * 1.25 * uPool;
+  totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.84, 0.62) * lp * 1.05 * uPool;
   if (desig > 0.5) totalEmissiveRadiance += vec3(1.0,0.6,0.2) * smoothstep(0.9, 0.2, edgeProx) * 0.5;
   // daylight down an open entrance tunnel: strongest at the top (level 0), cool white
   if (isEnt > 0.5 && hout < 0.5) {

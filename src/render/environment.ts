@@ -96,9 +96,10 @@ export function createNestEnvironment(renderer: THREE.WebGLRenderer, scene: THRE
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(envScene, 0.04).texture;
   pmrem.dispose();
-  // Underground: very little ambient so undug soil sinks into darkness; a warm raking key.
-  const ambient = new THREE.AmbientLight(0x4a3828, 0.16);
-  const key = new THREE.DirectionalLight(0xffc27a, 1.15);
+  // Underground: very little ambient so undug soil sinks into darkness; a warm raking key (realism pass 2026-11-02:
+  // a warm white rather than orange, which tinted every soil the same orange-gold)
+  const ambient = new THREE.AmbientLight(0x45382c, 0.16);
+  const key = new THREE.DirectionalLight(0xffdcb4, 1.12);
   key.position.set(-300, 430, -300);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);

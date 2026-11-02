@@ -182,7 +182,9 @@ for (const id of PLAYABLE_MAPS) {
 }
 
 // ---- nest tiles
-check('nest tiles 1.25 × larger (a 4 mm worker: 7.5 mm hexes, was 6)', hexRadiusFor(4) === 7.5 && hexRadiusFor(20) === 13.75 && hexRadiusFor(1) === 6.25);
+// (2026-11-02: "1.25x size it too big, maybe make it slightly smaler" … "just do 1.10x size")
+const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+check('nest tiles 1.10 × larger (a 4 mm worker: 6.6 mm hexes, was 6)', near(hexRadiusFor(4), 6.6) && near(hexRadiusFor(20), 12.1) && near(hexRadiusFor(1), 5.5), `${hexRadiusFor(4)}, ${hexRadiusFor(20)}, ${hexRadiusFor(1)}`);
 
 // ---- heads face straight ahead outside head animations
 {
