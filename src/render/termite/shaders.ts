@@ -647,6 +647,7 @@ if (vFx.x > 0.01) {
   vec4 realF = rigF(RC_REAL); // realism rework: on, breathe, glint, eggs
   bool real = realF.x > 0.5;
   float memb = 0.0;
+  float qPlate = 0.0;
   vec3 col = diffuseColor.rgb;
   vec3 V = normalize(vViewPosition);
   float ndv = clamp(abs(dot(normal, V)), 0.0, 1.0);
@@ -688,11 +689,14 @@ if (vFx.x > 0.01) {
       float lobes = 0.5 + 0.5 * sin(bt * 16.0 + sd * 6.2832);
       float lump = tNoise(vRestP * 5.5 + vec3(sd * 9.0, 0.0, 0.0));
       gm *= (0.6 + 0.55 * lobes) * (0.65 + 0.7 * lump);
+      gm *= mix(0.3, 1.0, ndv * ndv); // (round 2: "a painted smudge" — seen through the wall, so fading toward the rim)
     }
     // (realism: the gut a defined dark mass with a lumpy edge, not a smear — review round 1)
     col = mix(col, rigF(RC_GUT).rgb, (real ? smoothstep(0.2, 0.55, gm) : smoothstep(0.05, 0.75, gm)) * mix(0.55, 0.92, tanK));
     // (the gut's dense core darker still, seen through the thinnest wall)
     if (real) col = mix(col, rigF(RC_GUT).rgb * 0.6, smoothstep(0.6, 1.05, gm) * 0.5 * tanK);
+    // (the segment margins run over the gut: it lies under the cuticle, not painted on it)
+    if (real) col = mix(col, inter, im * 0.55 * step(0.04, bt));
     if (real) {
       // the segment membranes: sunken, paler and more translucent (the abdomen breathes there)
       memb = im * step(0.04, bt);
@@ -733,10 +737,16 @@ if (vFx.x > 0.01) {
     float kn = clamp(kk / (QA_SEGS - 1.0), 0.0, 1.0);
     float hp = mix(q0.y, q0.z, kn) * rr;
     float lat = 1.0 - smoothstep(0.45 * hp, hp, abs(vRestP.z) + 0.15 * hp * (tNoise(vRestP * 9.0) - 0.5));
-    float along = (kk > 0.5 && kk < QA_SEGS - 0.5) ? smoothstep(0.0, 0.07, d) * (1.0 - smoothstep(0.2, 0.36, d)) : 0.0;
+    float along = (kk > 0.5 && kk < QA_SEGS - 0.5) ? smoothstep(0.0, 0.07, d) * (1.0 - smoothstep(real ? 0.3 : 0.2, real ? 0.46 : 0.36, d)) : 0.0;
     along = max(along, smoothstep(0.42, 0.47, w) * (1.0 - smoothstep(0.6, 0.66, w))); // the front roll's own plate
     float plate = along * lat * smoothstep(0.2, 0.5, nyz.x);
-    col = mix(col, rigF(RC_TERGITE).rgb * (0.85 + 0.2 * mott), plate * 0.95);
+    if (real) {
+      // realism rework, review round 2 ("identical repeated cream discs, no tergite islands"): each roll a little
+      // different in tone, and the plates darker, wider islands
+      col *= 0.93 + 0.13 * fract(sin(kk * 12.9898 + 4.1) * 43758.5453);
+      col = mix(col, rigF(RC_TERGITE).rgb * (0.7 + 0.2 * mott), plate);
+      qPlate = plate;
+    } else col = mix(col, rigF(RC_TERGITE).rgb * (0.85 + 0.2 * mott), plate * 0.95);
     // sternites below (smaller, paler)
     float sl = 1.0 - smoothstep(0.6 * 0.6 * hp, 0.6 * hp, abs(vRestP.z));
     float salong = (kk > 0.5 && kk < QA_SEGS - 0.5) ? smoothstep(0.05, 0.08, d) * (1.0 - smoothstep(0.15, 0.19, d)) : 0.0;
@@ -837,7 +847,7 @@ if (vFx.x > 0.01) {
     tr = tr * 1.3 + 0.3 * memb;
     sssC = mix(col, col * col * 1.7, 0.45);
   }
-  totalEmissiveRadiance += sssC * tr * (0.22 * rim + 0.02) * (1.0 - plateGloss);
+  totalEmissiveRadiance += sssC * tr * (0.22 * rim + 0.02) * (1.0 - max(plateGloss, qPlate));
   #if NUM_DIR_LIGHTS > 0
   {
     vec3 Ld = directionalLights[0].direction;
@@ -845,7 +855,7 @@ if (vFx.x > 0.01) {
     float ndl = dot(normal, Ld);
     float wrap = max(0.0, (ndl + 0.6) / 1.6) - max(0.0, ndl);
     float back = pow(clamp(dot(V, -Ld), 0.0, 1.0), 3.0) * (0.35 + 0.65 * rim);
-    totalEmissiveRadiance += sssC * Lc * RECIPROCAL_PI * tr * (0.5 * wrap + 0.9 * back) * (1.0 - plateGloss);
+    totalEmissiveRadiance += sssC * Lc * RECIPROCAL_PI * tr * (0.5 * wrap + 0.9 * back) * (1.0 - max(plateGloss, qPlate));
   }
   #endif
 }

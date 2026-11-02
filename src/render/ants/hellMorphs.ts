@@ -7,7 +7,7 @@ const HELL_COLORS = {
   gasterRear: 0x54221a, gasterRearDark: 0x2e120e, band: 0x7e5036,
   // (realism rework 2026-11-02: legs a warm brown-orange, not toy orange; the jaws dark, near black at the tips)
   leg: 0x7c3c1e, legLight: 0x92502a, legDark: 0x4e2212, claw: 0x2e1c0e, mand: 0x4e2414, mandTip: 0x1a0c06,
-  hornBase: 0x6a3a22, hornTip: 0x9e6040, eye: 0x1c1812, hair: 0xd8ccb2, trigger: 0x4a4234, fringe: 0xbcae92,
+  hornBase: 0x6a3a22, hornTip: 0x9e6040, eye: 0x3a3026, hair: 0xd8ccb2, trigger: 0x4a4234, fringe: 0xbcae92,
   spot: 0x3c3620, scar: 0x3e2d1a, plate: 0x4a3f26,
 };
 // (realism rework: smooth and shining, little pubescence — the baked detail adds the microsculpture and hair pits)

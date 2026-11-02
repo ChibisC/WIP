@@ -1019,8 +1019,15 @@ export function buildTermiteGeometry(casteId: CasteId, lod = 0): BufferGeometry 
       for (let i = 0; i < n; i++) {
         const l = segL[i];
         const r = antR * (i === 0 ? 1.05 : i === 1 ? 0.85 : 0.8 + 0.22 * (i / n));
-        if (i > 0) S.push({ p: at(s0 + l * 0.06), rN: r * 0.58, bone, col: antJoint, bt: s0 + l * 0.06 });
-        S.push({ p: at(s0 + l * 0.5), rN: r, bone, col: mixC(antBaseCol, antMid, 0.3), bt: s0 + l * 0.5 });
+        if (P.real && i > 0) {
+          // realism rework, review round 2 ("strung spheres"): barrel-shaped articles — a short narrow joint, then full
+          // along most of the article, rounding off at its tip
+          for (const [f, k, c] of [[0.04, 0.6, 1], [0.2, 0.93, 0], [0.5, 1, 0], [0.8, 0.97, 0], [0.96, 0.8, 1]] as const)
+            S.push({ p: at(s0 + l * f), rN: r * k, bone, col: c ? antJoint : mixC(antBaseCol, antMid, 0.3), bt: s0 + l * f });
+        } else {
+          if (i > 0) S.push({ p: at(s0 + l * 0.06), rN: r * 0.58, bone, col: antJoint, bt: s0 + l * 0.06 });
+          S.push({ p: at(s0 + l * 0.5), rN: r, bone, col: mixC(antBaseCol, antMid, 0.3), bt: s0 + l * 0.5 });
+        }
         s0 += l;
       }
       S.push({ p: at(antLen - segL[n - 1] * 0.1), rN: antR * 0.5, bone, col: antJoint, bt: antLen });

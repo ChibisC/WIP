@@ -158,6 +158,17 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
       const u = rnd.range(0.12, 0.92), zf = rnd.range(-0.55, 0.55), y = base + mTop(u) * H * (0.98 - 0.25 * zf * zf);
       hellSeta(n, new HV(u * mL, y, zf * (mW(u) / 2) * H), new HV(-0.45, 1, zf * 0.7).normalize(), rnd.range(0.1, 0.18) * H, 0.006 * H, PART.BODY, C.hair, lk.hair, new HV(-0.2, 0, 0));
     }
+    // (review round 2: "a few straight isolated spikes, not a coat") a fine decumbent pubescence: short thin hairs lying
+    // back along the head and the mesosoma, catching the light
+    for (let k = 0; k < 34; k++) {
+      const s = rnd.range(0.1, 0.85), zf = rnd.range(-0.85, 0.85);
+      const root = toB(s * H, (hCy(s) + hRy(s) * taper(s) * Math.sqrt(1 - zf * zf) * 0.985) * H, zf * hRz(s) * H * taper(s));
+      hellSeta(n, root, new HV(-1, 0.45, zf * 0.4).applyQuaternion(hq).normalize(), rnd.range(0.04, 0.08) * H, 0.0032 * H, PART.HEAD, C.hair, lk.hair, new HV(0, -0.1, 0));
+    }
+    for (let k = 0; k < 48; k++) {
+      const u = rnd.range(0.06, 0.95), zf = rnd.range(-0.9, 0.9), y = base + ((mTop(u) + mBot(u)) / 2 + ((mTop(u) - mBot(u)) / 2) * Math.sqrt(1 - zf * zf) * 0.985) * H;
+      hellSeta(n, new HV(u * mL, y, zf * (mW(u) / 2) * H * 0.985), new HV(-1, 0.4, zf * 0.5).normalize(), rnd.range(0.04, 0.08) * H, 0.0032 * H, PART.BODY, C.hair, lk.hair, new HV(0, -0.1, 0));
+    }
   }
   const face = 0.985, faceTop = hCy(face) + hRy(face) * 0.92 * taper(face), faceBot = hCy(face) - hRy(face) * 0.88 * taper(face);
   const hornBase = toB(0.94 * H, (hCy(0.94) + hRy(0.94) * taper(0.94) * 0.9) * H, 0);
@@ -168,7 +179,8 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
     const es = i.eyes, s = es.pos;
     for (const sd of [-1, 1]) {
       const c = toB(s * H, (hCy(s) + hRy(s) * es.up) * H, sd * hRz(s) * H * 0.84);
-      hellBlob(n, c, V(es.len, es.ht, 0.08), S(14, 8, 6), PART.HEAD, C.eye, { rough: 0.12, coat: 1, sheen: 0 }, hq, 3);
+      // (review round 2: "flat decal eye") bulging, a dark bronze that shows the facets and the highlight
+      hellBlob(n, c, V(es.len, es.ht, 0.11), S(16, 8, 6), PART.HEAD, C.eye, { rough: 0.2, coat: 0.9, sheen: 0 }, hq, 3);
     }
   }
   // ---------- horn (clypeal process) ----------
@@ -348,6 +360,12 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
       const dir = new HV(-0.35, Math.sin(a), Math.cos(a)).normalize();
       hellSeta(n, root, dir, rnd.range(0.07, 0.14) * H, 0.006 * H, PART.GASTER, C.hair, lk.hair, new HV(-0.2, 0, 0));
     }
+    // (review round 2) the gaster's fine pubescence: short hairs lying back, densest toward the tip
+    if (o) for (let k = 0; k < 80; k++) {
+      const s = Math.sqrt(rnd.range(0.05, 0.94)), a = rnd.range(-0.2, Math.PI + 0.2), r = prof(s);
+      const c = gp.clone().addScaledVector(ax, s * gL), root = c.clone().add(new HV(0, Math.sin(a) * (ga.h / 2) * H * r * 0.99, Math.cos(a) * (ga.w / 2) * H * r * 0.99));
+      hellSeta(n, root, ax.clone().multiplyScalar(1).add(new HV(0, Math.sin(a) * 0.4, Math.cos(a) * 0.4)).normalize(), rnd.range(0.05, 0.09) * H, 0.0032 * H, PART.GASTER, C.hair, lk.hair, new HV(0, -0.08, 0));
+    }
     // (realism rework) sparse erect setae over the gaster's back and sides, leaning back
     if (o) for (let k = 0; k < 16; k++) {
       const s = rnd.range(0.32, 0.9), a = rnd.range(0.15, Math.PI - 0.15), r = prof(s);
@@ -384,9 +402,9 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
       const m = S(11, 4, 2), pts = [], rr = [];
       for (let k = 0; k <= m; k++) { const s = k / m; pts.push(c1.clone().lerp(knee, s)); rr.push(th0 * (0.95 + 0.62 * Math.exp(-((s - 0.32) ** 2) / 0.06) - 0.27 * s)); }
       hellTube(n, pts, rr, S(12, 4, 3), p0, legCol, lk.leg, false, true, 1, 0, REGION.LEG);
-      if (o) for (let k = 0; k < 3; k++) {
+      if (o) for (let k = 0; k < 7; k++) {
         // erect setae on the femur's underside
-        const s = 0.25 + 0.25 * k, q = Math.round(s * m), r = pts[q].clone().add(new HV(0, -rr[q] * 0.9, 0));
+        const s = 0.15 + 0.11 * k, q = Math.round(s * m), r = pts[q].clone().add(new HV(0, -rr[q] * 0.9, 0)).addScaledVector(axis, rnd.range(-0.5, 0.5) * rr[q]);
         hellSeta(n, r, new HV(0, -1, 0).addScaledVector(knee.clone().sub(c1).normalize(), 0.9).normalize(), 0.07 * H, 0.004 * H, p0, C.hair, lk.hair);
       }
     }
@@ -403,8 +421,8 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
           const sp = ankle.clone().lerp(knee, 0.04).addScaledVector(axis, (q === 0 ? 1 : -1) * sd * 0.015 * H);
           n.hair([sp, sp.clone().addScaledVector(tdir, (pair === 0 ? 0.12 : 0.08) * H).add(V(0, -0.02)), sp.clone().addScaledVector(tdir, (pair === 0 ? 0.17 : 0.12) * H).add(V(0, -0.05)).addScaledVector(axis, (q === 0 ? 1 : -1) * sd * 0.02 * H)], [th0 * 0.32, th0 * 0.2, th0 * 0.05], 3, p0 + 1, C.legDark, lk.leg);
         }
-        for (let k = 0; k < 4; k++) {
-          const s = 0.2 + 0.18 * k, r = knee.clone().lerp(ankle, s).add(new HV(0, -th0 * 0.55, 0));
+        for (let k = 0; k < 10; k++) {
+          const s = 0.1 + 0.085 * k, r = knee.clone().lerp(ankle, s).add(new HV(0, -th0 * 0.55, 0)).addScaledVector(axis, rnd.range(-0.5, 0.5) * th0);
           hellSeta(n, r, new HV(0, -0.6, 0).addScaledVector(tdir, 1).addScaledVector(axis, sd * 0.3).normalize(), 0.06 * H, 0.0035 * H, p0 + 1, C.hair, lk.hair);
         }
       }
