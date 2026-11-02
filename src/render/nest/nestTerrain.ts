@@ -612,6 +612,12 @@ floorC *= 0.9 + 0.16*grain;
 floorC = mix(floorC, floorC*0.78, smoothstep(0.5, 0.8, fbm(gp*0.22 + 4.0)));
 floorC = mix(floorC, floorC*1.15, smoothstep(0.55, 0.85, fbm(gp*0.035 + 9.0)));
 float damp = smoothstep(0.58, 0.84, fbm(gp*0.045 + 13.0));
+// (round 4, after the second blind review: no single-colour floors — patches of greyer and of redder soil, and paler,
+// smoother paths worn by traffic)
+float hueP = fbm(gp*0.022 + 31.0);
+floorC = mix(floorC, floorC*vec3(0.92, 0.95, 1.02), smoothstep(0.55, 0.75, hueP));
+floorC = mix(floorC, floorC*vec3(1.1, 0.95, 0.85), smoothstep(0.45, 0.25, hueP));
+float path = smoothstep(0.035, 0.0, abs(fbm(gp*0.018 + 7.0) - 0.5)) * (1.0 - smoothstep(0.0, 4.0, -sdW + 6.0));
 // sand grains (cells 0.28 mm)
 vec3 sg = worley(gp*3.6);
 float gR = 0.34 + 0.12*h21(vec2(sg.z*17.0));
@@ -621,7 +627,7 @@ float gDome = clamp(1.0 - sg.x/gR, 0.0, 1.0);
 float gk = h21(vec2(sg.z*53.0));
 vec3 gC = gk < 0.42 ? vec3(0.44,0.40,0.33) : (gk < 0.62 ? vec3(0.40,0.30,0.24) : (gk < 0.84 ? vec3(0.12,0.105,0.09) : vec3(0.38,0.21,0.11)));
 // (worn smooth where ants walk: the open middle of the floor; loose along the walls)
-float worn = (1.0 - edgeK) * 0.45;
+float worn = (1.0 - edgeK) * 0.45 + path*0.4;
 floorC = mix(floorC, gC * (0.72 + 0.4*sqrt(gDome)), gIn * (0.6 - 0.25*worn));
 bumpH += gIn * sqrt(gDome) * (0.4 - 0.2*worn);
 float quartz = gIn * step(gk, 0.42) * smoothstep(0.55, 0.95, gDome);
@@ -659,8 +665,8 @@ bumpH += pelIn * sqrt(pelDome) * 1.0;
 // pale rootlets crossing the floor
 float rl = abs(fbm(vec2(gp.x*0.03, gp.y*0.027) + 3.3) - 0.5);
 floorC = mix(floorC, vec3(0.34,0.27,0.19), smoothstep(0.004, 0.001, rl) * 0.4 * step(0.55, fbm(gp*0.02 + 1.0)));
-// damp: darker
-floorC *= 1.0 - 0.22*damp;
+// damp: darker; worn paths a little paler
+floorC *= (1.0 - 0.22*damp) * (1.0 + 0.08*path);
 // baked occlusion at the foot of walls
 floorC *= mix(0.45, 1.0, smoothstep(0.0, 3.0, sdW));
 surfRough = mix(0.9, 0.7, damp) - quartz*0.35;
@@ -698,8 +704,8 @@ if (uCarton > 0.5 && uCarton < 1.5) {
   vec3 fc = mix(vec3(0.09,0.052,0.03), vec3(0.15,0.095,0.055), fbm(gp*0.08));
   fc = mix(fc, vec3(0.19,0.13,0.075), ridgeF*0.35);
   fc *= 0.86 + 0.24*grain;
-  floorC = mix(floorC, fc * mix(0.45, 1.0, smoothstep(0.0, 3.0, sdW)), 0.85);
-  bumpH += ridgeF*0.3;
+  floorC = mix(floorC, fc * mix(0.45, 1.0, smoothstep(0.0, 3.0, sdW)), 0.78);
+  bumpH += ridgeF*0.45 + fib*0.15;
 }
 // ---- Sickle-Jaw Termite nests: dark, damp soil chambers — crumbly walls, glossy wet patches, a darker
 // trodden floor (model kit v2 damp-soil look)
@@ -710,7 +716,7 @@ if (uCarton > 1.5) {
   vec3 dc = mix(vec3(0.05,0.034,0.022), vec3(0.095,0.064,0.04), fbm(gp*0.4));
   wallC = dc * (0.78 + 0.45*crumb*(0.6 + 0.4*cr.z)) * (1.0 - 0.35*wet) * 1.6;
   vec3 df = mix(vec3(0.075,0.052,0.033), vec3(0.12,0.085,0.05), fbm(gp*0.07));
-  floorC = mix(floorC*0.5, df*(0.82 + 0.36*crumb) * (1.0 - 0.3*wet), 0.75);
+  floorC = mix(floorC*0.55, df*(0.82 + 0.36*crumb) * (1.0 - 0.3*wet), 0.6);
   bumpH += crumb*0.55 + vnoise(gp*6.0)*0.15;
   surfRough = mix(surfRough, 0.3, wet*0.75);
 }
@@ -785,13 +791,13 @@ if (htype > 0.5 && htype < 10.5) {
     silt = mix(silt, gC*0.9, gIn*0.18);
     float trod = smoothstep(0.3, 0.8, fbm(gp*0.18 + 2.0));
     // (round 3: the floor's grains and crumbs show through the silt — not a smooth slab)
-    tc = mix(col, silt, 0.6) * (0.94 + 0.08*trod);
+    tc = mix(col, silt, 0.55) * (0.94 + 0.08*trod) * (1.0 - crev*0.12);
     // termites: the royal chamber is a smooth, dense carton cell, not silk
     if (uCarton > 0.5 && uCarton < 1.5) tc = mix(tc, vec3(0.075,0.045,0.026) * (0.8 + 0.4*fbm(gp*0.9)) + vec3(0.03,0.02,0.01)*clamp(strands,0.0,1.0), 0.85);
     // sickle-jaws: a smooth, dense cell of damp soil
     if (uCarton > 1.5) tc = mix(tc, vec3(0.085,0.058,0.036) * (0.8 + 0.4*fbm(gp*0.9)), 0.85);
     surfRough = mix(surfRough, 0.6 - 0.1*trod, tileK);
-    bumpH = bumpH*0.6;
+    bumpH = bumpH*0.75;
   } else if (htype < 2.5) {
     // brood tile: shallow brood pockets pressed into the packed floor, its soil washed with the caste's colour (the
     // brood itself lies in them, tileDecor); realism pass 2026-11-02: less of a painted pattern, more soil
@@ -915,9 +921,9 @@ if (hedges > 0.5 && floorM > 0.2) {
   float ang = atan(hl.y, hl.x);
   float sector = mod(floor((ang + 0.5235988) / 1.0471976 + 0.5), 6.0);
   float on = bitOf(hedges, sector);
-  float line = on * smoothstep(0.4, 0.1, edgeProx) * floorM;
+  float line = on * smoothstep(0.4, 0.1, edgeProx) * floorM * (0.65 + 0.35*vnoise(gp*1.6));
   vec3 oc = uMarkerCols[int(clamp(hout, 0.0, 6.0))];
-  col = mix(col, oc, line*0.75);
+  col = mix(col, oc * (0.85 + 0.3*grain), line*0.6);
 }
 // grid overlay (placement mode)
 if (uGrid > 0.5) {

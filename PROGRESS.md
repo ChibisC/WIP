@@ -1366,3 +1366,22 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
 - Docs: README (lobby line, species table), `docs/multiplayer.md` §Gene Thief. The Termants' `STOLEN_CASTES` already
   had the nasute and sickle-jaw soldiers; unchanged.
 
+
+### 2026-11-02 — Underground textures realism pass; nest hexes 1.10×
+User notes: 2026-11-01 23:55 "use this realism prompt to fix the underground textures as well" (no prompt file came
+with it: the realism pipeline of `claude/realism/01–02` was used); 2026-11-02 01:15 "1.25x size it too big, maybe make
+it slightly smaler for underground hex", then "nvm just do 1.10x size". Branch `feature/underground-realism` from
+`main` (`18bf3d4`); `origin/main` (`f79ebd1`, Gene Thief termite soldiers) merged in. Notes:
+`docs/realism/underground.md`; shots `docs/realism/underground/` (`tests/browser/underground_realism.py`).
+- **Hex size:** `NEST_HEX_SCALE` 1.25 → 1.10 (`hexRadiusFor`); saves keep the size they were made with; protocol
+  `ud-mp-7`. Every suite passed with the smaller nests except the size check itself (`tests/notes1101.ts`, updated).
+- **Soil, render only** (`render/nest/nestTerrain.ts`, `render/environment.ts`): sand grains at real scale in four
+  mineral colours (glassy quartz tops), a neutral silt-clay matrix with greyer and redder patches, crumb structure
+  softened where ants walk and along paler worn paths, diggers' pellets, soil crumbs and a few angular stones with
+  contact shadows (most along the walls), damp patches; crumbly walls with mandible scrapes and rare roots; grains in
+  the soil top; the queen's chamber smoothed pale silt (was a blue silk mat), brood tiles the soil washed with the
+  caste colour, the food store an olive-stained floor; softer, slightly irregular group outlines; the nest key light
+  warm white (was orange) and the light pools less orange; termite floors keep more grain and relief.
+- **Blind reviews** (fresh agent, before/after shuffled as A/B, 1–10): round 2 — new preferred 8/8, "could it be a
+  macro photo" 4.25 vs ~2; round 3 — 10/10, 4.9 vs 2.0. Remaining after round 3 (addressed in round 4): flat-looking
+  tiles, printed outlines, single-colour floors, felt-like termite floors.

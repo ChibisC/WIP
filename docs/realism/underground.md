@@ -34,10 +34,23 @@ baked occlusion, no flat CG patterns, review against before shots). Render-only:
 - Light: the nest's key light is a warm white (0xffdcb4, was orange 0xffc27a) and the light pools are less orange, so
   soils keep their own colours; stones are less blue-biased to match.
 
+- Round 3 (after the first blind review): soil crumbs and a few angular stones with irregular outlines instead of
+  round blue-grey pebbles; crumbly walls (fewer, rarer roots; no fibrous scrape streaks); the queen's and food tiles
+  keep the floor's grain under their silt and stain; thinner group outlines; a little soil shows in the dark beyond
+  the dug floor (the darkness floor 0.12 → 0.17).
+
 ## Review
 Before/after renders (render-only) in `docs/realism/underground/` (`tests/browser/underground_realism.py`, TAG=before
 from `main` before the pass, TAG=after): each colony's nest at gameplay zoom, its queen's chamber, a wall close up, the
-entrance.
+entrance. Nest hexes are 1.10 × in the after shots (1.25 × before; the cameras are placed in hex radii, so the framing
+matches).
+
+Blind reviews (a fresh agent each round, before and after shuffled as A/B, scored 1–10 on surface, colour, lighting
+and "could this be a macro photo of a real ant nest in soil?"):
+- Round 2 (8 pairs): the new render preferred in 8 of 8; photo-likeness 4.25 vs about 2. Remaining: tiles read as
+  flat slabs with printed outlines; spotlight pools falling to black; leftover warm tint on some brood floors;
+  round blue-grey pebbles; fibrous walls.
+
 
 ## Sources
 - W. Tschinkel, "my colored sand box": https://waltertschinkel.substack.com/p/my-colored-sand-box
