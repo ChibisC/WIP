@@ -167,7 +167,22 @@ common name in the singular plus the caste's own name; the two termite soldiers 
 
 ## 10. Facts and sources
 
-See §10 at the end of this file (filled from the fact check).
+Every real-species line in the captions and the journal (`story/text/en.ts`), checked 2026-11-02:
+
+| claim (caption key) | wording used | source |
+|---|---|---|
+| Lasius niger is one of Europe's commonest ants; workers 3.5–5 mm (`garden.contact1`, journal) | "one of the commonest ants in Europe" | [AntWiki: Lasius niger](https://antwiki.org/wiki/Lasius_niger) ("one of the commonest European species"; Collingwood 1979: 3.5–5.0 mm) |
+| a founding queen seals herself in a claustral chamber and raises the first brood on her own reserves; the first workers are small (`garden.intro3`, `garden.nanitics`) | as written | [Black garden ant, Wikipedia](https://en.wikipedia.org/wiki/Lasius_niger) ("claustral chamber"); [AntWiki](https://antwiki.org/wiki/Lasius_niger) |
+| a L. niger queen lived ~28¾ years in captivity, kept by the German entomologist Hermann Appel (`garden.queenFact`) | "kept by a German entomologist lived nearly twenty-nine years" (was "in a laboratory") | [Queen ant, Wikipedia](https://en.wikipedia.org/wiki/Queen_ant) |
+| young workers nurse, older ones forage — true of ants in general, not shown for L. niger in what I found (`garden.contact2`, journal) | "in an ant colony the young workers …" (was said of Lasius) | [Ant, Wikipedia](https://en.wikipedia.org/wiki/Ant) |
+| L. niger foragers recruit along pheromone trails (`garden.contact3`) | as written | [AntWiki](https://antwiki.org/wiki/Lasius_niger) ("mass recruiter"); Evison et al. 2008, *Behav. Ecol. Sociobiol.* 63: 261–267 |
+| L. niger tends aphids for honeydew and drives off ladybirds (`garden.aphids`) | as written | [AntWiki](https://antwiki.org/wiki/Lasius_niger) (aphids tended, honeydew); [Black garden ant, Wikipedia](https://en.wikipedia.org/wiki/Lasius_niger) (removes ladybirds from black bean aphids) |
+| nuptial flights on hot summer days, over a whole district at once (`garden.flight`) | as written | [AntWiki](https://antwiki.org/wiki/Lasius_niger) ("huge numbers may fly over a large district on the same date"); [Wikipedia](https://en.wikipedia.org/wiki/Lasius_niger) |
+| S. geminata is American and spread with 16th-century Spanish trade, Acapulco to Manila (`fireBanks.intro2`, journal) | "Spanish galleons carried it across the Pacific in the 1500s" (was "ships … centuries ago") | Gotzek, Axen, Suarez, Helms Cahan & Shoemaker 2015, *Molecular Ecology*, doi:10.1111/mec.13040; [U. Illinois news](https://las.illinois.edu/news/2015-04-01/silk-gold-spices-andants) |
+| workers are strongly polymorphic; majors have square heads and blunt jaws that crack seeds, which the colony stores (`fireBanks.foragers`, `fireBanks.majors`) | "from small minors to big, square-headed majors" (was "majors twice their length") | [Tropical fire ant fact sheet, Lucid](https://apps.lucidcentral.org/ppp_v9/pdf/web_full/tropical_fire_ant_362.pdf); [Landcare Research, S. geminata](https://oldwww.landcareresearch.co.nz/__data/assets/pdf_file/0015/51063/solgem.pdf) |
+| fire ants grip with the mandibles and sting repeatedly; the venom is mostly alkaloids (`fireBanks.sting`) | as written | [Tropical fire ant fact sheet, Lucid](https://apps.lucidcentral.org/ppp_v9/pdf/web_full/tropical_fire_ant_362.pdf) |
+| fire ants raft on floods — documented in the red imported fire ant, S. invicta (`fireBanks.river2`, journal) | "best known from a cousin, the red imported fire ant" (was said of fire ants in general) | [eXtension: fire ants in floods](https://ant-pests.extension.org/what-happens-to-fire-ants-during-a-flood); Mlot, Tovey & Hu 2011, *PNAS* (raft formation by S. invicta) |
+| ants evolved within the stinging wasps; termites are a branch of the cockroaches (`garden.termant`) | as written | [Ant, Wikipedia](https://en.wikipedia.org/wiki/Ant); [Termite, Wikipedia](https://en.wikipedia.org/wiki/Termite) |
 
 ## 11. Later chapters (outline, so the framework fits them)
 

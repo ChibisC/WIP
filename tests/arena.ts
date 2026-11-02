@@ -15,6 +15,7 @@ import { STANCE, arenaOf } from '../src/sim/arenaState';
 import { Command, CommandBody, CommandSchedule, applyCommand, decodeCommandLog, encodeCommandLog, quantize, stepWithCommands } from '../src/sim/commands';
 import { encodeState, hashState, restoreWorld } from '../src/sim/snapshot';
 import { CASTES } from '../src/sim/species';
+import { CREATURES } from '../src/sim/creatures/kinds';
 
 let failed = 0;
 function check(name: string, ok: boolean, info = ''): void {
@@ -87,7 +88,7 @@ for (const n of [2, 3, 4]) {
   check('spawn: a level III fire-ant major has ×1.5 health and level III damage', lv.length === 3 && lv.every((a) => a.level === 3 && Math.abs(a.maxHp - CASTES.fire_major.hp * BALANCE.levelHp[2]) < 1e-6 && a.power === BALANCE.levelDamage[2]));
   cmd(spawn(2, 'cr:wolfSpider', 2, 2, { x: A.cx, y: A.cy + 30 }));
   const sp = crs(w, A.teams[2].colony);
-  check('place tool: two level II wolf spiders where clicked, for Green', sp.length === 2 && sp.every((c) => Math.hypot(c.x - A.cx, c.y - A.cy - 30) < 40 && c.data.level === 2 && Math.abs(c.maxHp - 140 * BALANCE.levelHp[1]) < 1e-6));
+  check('place tool: two level II wolf spiders where clicked, for Green', sp.length === 2 && sp.every((c) => Math.hypot(c.x - A.cx, c.y - A.cy - 30) < 40 && c.data.level === 2 && Math.abs(c.maxHp - CREATURES.wolfSpider.hp * BALANCE.levelHp[1]) < 1e-6));
   check('refused: queens, kings, the antlion, unknown units, a fifth team', cmd(spawn(0, 'ant:lasius_queen', 1)) !== null && cmd(spawn(0, 'ant:termant_king', 1)) !== null && cmd(spawn(0, 'cr:antlion', 1)) !== null && cmd(spawn(0, 'cr:dragon', 1)) !== null && cmd(spawn(4, 'ant:lasius_worker', 1)) !== null);
   check('the roster: every non-royal caste and every creature but the antlion', Object.values(CASTES).filter((c) => arenaUnitOk('ant:' + c.id)).length >= 25 && !arenaUnitOk('ant:eciton_queen') && arenaUnitOk('cr:scolopendra'));
   let why: string | null = null;

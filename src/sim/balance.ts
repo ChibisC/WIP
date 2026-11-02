@@ -63,7 +63,7 @@ export const BALANCE = {
     // workers: build 10
     lasius_worker: { build: 10, hatch: 2, grow: 18 },
     formica_worker: { build: 10, hatch: 3, grow: 22 },
-    fire_minor: { build: 10, hatch: 1.5, grow: 14 },
+    fire_minor: { build: 10, hatch: 1, grow: 14 }, // (balance pass 2026-11-02: hatch was 1.5)
     atta_minim: { build: 10, hatch: 1, grow: 12 },
     atta_media: { build: 10, hatch: 2.5, grow: 20 },
     eciton_minor: { build: 10, hatch: 2, grow: 16 },
@@ -71,19 +71,19 @@ export const BALANCE = {
     plagiaria_worker: { build: 10, hatch: 2.5, grow: 20 },
     // soldiers
     lasius_soldier: { build: 20, hatch: 4, grow: 28 },
-    fire_soldier: { build: 20, hatch: 3.5, grow: 24 },
+    fire_soldier: { build: 16, hatch: 3, grow: 24 },
     atta_soldier: { build: 24, hatch: 5, grow: 30 },
-    eciton_media: { build: 28, hatch: 5, grow: 30 },
+    eciton_media: { build: 24, hatch: 5, grow: 30 },
     formica_soldier: { build: 30, hatch: 6, grow: 36 },
     formica_mortar: { build: 30, hatch: 6, grow: 36 },
     formica_rapid: { build: 30, hatch: 6, grow: 36 },
     // majors
     fire_major: { build: 60, hatch: 10, grow: 44 },
     atta_major: { build: 70, hatch: 10, grow: 50 },
-    eciton_major: { build: 90, hatch: 12, grow: 50 },
+    eciton_major: { build: 75, hatch: 11, grow: 50 },
     // Nasute Termites, paid in wood: × the baseline worker (10 / 2 / 18) by NASUTE.broodCostWoodMul / broodTimeMul
     nasute_worker: { build: 10, hatch: 2, grow: 18 }, // × 1.0 / × 1.0
-    nasute_soldier: { build: 18, hatch: 3.6, grow: 23.4 }, // × 1.8 / × 1.3
+    nasute_soldier: { build: 22, hatch: 4.4, grow: 23.4 }, // × 2.2 / × 1.3 (balance pass 2026-11-02: was × 1.8; the glue stream is the user's)
     nasute_major: { build: 35, hatch: 7, grow: 32.4 }, // × 3.5 / × 1.8
     // Sickle-Jaw Termites, paid in plant matter: × the baseline worker (10 / 2 / 18) by SICKLE.broodCostMul / broodTimeMul
     rhy_worker: { build: 10, hatch: 2, grow: 18 }, // × 1.0 / × 1.0
@@ -648,7 +648,7 @@ export const NASUTE = {
     /** sources guaranteed near each termite nest at the start (twigs and branches) */
     startNear: 2,
   },
-  broodCostWoodMul: { worker: 1.0, nasute: 1.8, major: 3.5 },
+  broodCostWoodMul: { worker: 1.0, nasute: 2.2, major: 3.5 },
   broodTimeMul: { worker: 1.0, nasute: 1.3, major: 1.8 },
   /** final share of soldier brood growth drawn as a pale presoldier (render only) */
   presoldierFraction: 0.25,
