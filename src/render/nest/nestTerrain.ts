@@ -802,6 +802,11 @@ if (htype > 0.5 && htype < 10.5) {
     float pellet = step(0.9, pw.z) * smoothstep(0.3, 0.1, pw.x) * (1.0 - wornK);
     tc = mix(tc, vec3(0.30,0.22,0.15), pellet*0.7);
     bumpH += pellet*0.6 - wornK*0.1;
+    if (uEntR > 0.0) {
+      // a nest's wide entrance: its top edge, where the floor rises to the surface, fades into darkness
+      float upk = clamp(0.5 + dot(gp - uEnt.xy, uEnt.zw) / (uEntR * 1.1), 0.0, 1.0);
+      tc *= mix(1.0, 0.28, smoothstep(0.6, 1.0, upk));
+    }
     if (hout > 0.5) {
       vec3 cw2 = worley(gp*1.4);
       tc = vec3(0.16,0.11,0.07) * (0.75 + 0.5*smoothstep(0.5, 0.1, cw2.x));
@@ -913,8 +918,10 @@ const FRAG_EMISSIVE = /* glsl */ `
     float up = 1.0 - hlevel / 3.0;
     float core = smoothstep(apo * 1.05, apo * 0.25, hd);
     if (uEntR > 0.0) {
+      // (the shaft falls across its upper middle; the very top, nearest the surface, stays dark)
       vec2 ed = gp - uEnt.xy;
-      up = clamp(0.45 + dot(ed, uEnt.zw) / (uEntR * 1.3), 0.0, 1.0);
+      float upk = clamp(0.5 + dot(ed, uEnt.zw) / (uEntR * 1.1), 0.0, 1.0);
+      up = smoothstep(0.0, 0.55, upk) * (1.0 - smoothstep(0.72, 1.0, upk));
       core = smoothstep(uEntR * 1.08, uEntR * 0.35, length(ed));
     }
     totalEmissiveRadiance += diffuseColor.rgb * vec3(0.78, 0.85, 1.0) * (0.12 + 0.75 * up * up) * core;

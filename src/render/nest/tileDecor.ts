@@ -42,20 +42,20 @@ function needle(): THREE.BufferGeometry {
 }
 
 /** Soft vertical shaft of daylight falling onto an entrance ramp. */
-function beamMaterial(): THREE.ShaderMaterial {
+function beamMaterial(motes = 40): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
-    uniforms: { uTime: globalUniforms.uTime, uCol: { value: new THREE.Color(0.92, 0.95, 1.0) } },
+    uniforms: { uTime: globalUniforms.uTime, uCol: { value: new THREE.Color(0.92, 0.95, 1.0) }, uMotes: { value: motes } },
     vertexShader: `varying vec2 vUv; varying vec3 vP; void main(){ vUv = uv; vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-    fragmentShader: `uniform float uTime; uniform vec3 uCol; varying vec2 vUv; varying vec3 vP;
+    fragmentShader: `uniform float uTime; uniform vec3 uCol; uniform float uMotes; varying vec2 vUv; varying vec3 vP;
       float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
       void main(){
         float fall = pow(1.0 - vUv.y, 0.6);                 // brighter at the bottom
         float edge = sin(vUv.x * 3.14159);                  // soft sides
-        float motes = step(0.985, h(floor(vec2(vUv.x*40.0, vUv.y*60.0 + uTime*1.5))));
+        float motes = step(0.985, h(floor(vec2(vUv.x*uMotes, vUv.y*60.0 + uTime*1.5))));
         float a = fall * edge * edge * 0.16 + motes * 0.25 * edge;
         gl_FragColor = vec4(uCol * a, a);
       }`,
@@ -80,6 +80,8 @@ export class TileDecor {
   private beams: THREE.Mesh[] = [];
   private beamGeo: THREE.CylinderGeometry;
   private beamMat = beamMaterial();
+  /** the wide shaft over a nest's flower (finer motes: it is scaled up) */
+  private wideBeamMat = beamMaterial(100);
   private dust: THREE.Points;
   private dustVersion = -1;
   private m = new THREE.Matrix4();
@@ -180,9 +182,11 @@ export class TileDecor {
         const top = g.hexCenter(g.tunnels[i]?.[0] ?? q);
         b.position.set(p.x + (top.x - p.x) * 0.35, 0, p.y + (top.y - p.y) * 0.35);
         b.scale.set(2.5, 1, 2.5);
+        b.material = this.wideBeamMat;
       } else {
         b.position.set(p.x, 0, p.y);
         b.scale.set(1, 1, 1);
+        b.material = this.beamMat;
       }
       // no daylight down a fallen-in entrance
       b.visible = !this.terrain.isShut(q);
@@ -191,6 +195,7 @@ export class TileDecor {
     // cool daylight by day, a faint blue moonlight at night
     const night = Math.max(0, Math.min(1, w.s.night));
     this.beamMat.uniforms.uCol.value.setRGB(0.92 - night * 0.6, 0.95 - night * 0.55, 1.0 - night * 0.35);
+    this.wideBeamMat.uniforms.uCol.value.copy(this.beamMat.uniforms.uCol.value);
     // Tile contents change slowly: rebuild a few times a second or when tiles change.
     const day = w.s.night < 0.5;
     const key = `${c.tileVersion}|${Math.round(c.food)}|${Math.round(c.fungus)}|${day}|${c.tiles.reduce((s, t) => s + (t.type === 'carton' ? Math.round(t.hp ?? 0) : 0), 0)}|${g.tunnels.length}|${g.flowers.map((f) => f.length).join(',')}`;

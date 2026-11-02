@@ -206,6 +206,11 @@ export class GameSession {
     this.view = new GameView(canvas, this.input);
     this.view.setQuality(quality);
     const w = this.world;
+    // (no grass through the anthills: each one's holes and the ground round them)
+    this.view.grassClear = w.s.colonies.map((c) => {
+      const m = anthillCentre(c.entrances, { x: 0, y: 0 });
+      return { x: m.x, y: m.y, r: Math.max(...c.entrances.map((e) => Math.hypot(e.sx - m.x, e.sy - m.y))) * 1.7 + 6 };
+    });
     this.view.setTerrain(w.terrain);
     // Every underground area gets its own stage; the player's nest comes first (area 1).
     for (const a of areasFor(w, this.player.id)) {

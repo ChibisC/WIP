@@ -1,8 +1,32 @@
-# Nest entrances by species (research notes for the surface and tunnel models)
+# Nest entrances by species (research notes for the anthill and entrance models)
 
-Study notes behind `render/game/entranceModels.ts` (surface) and the entrance tunnel in
+Study notes behind `render/game/entranceModels.ts` (surface) and the entrance in
 `render/nest/nestTerrain.ts` (underground). Reference photos were studied only; nothing from them is
 used in the game. Sizes are for the game's real scale (1 unit = 1 mm; workers 2–6 mm).
+
+**Since 2026-11-01 (user spec "one wide underground entrance, three surface holes per anthill"):** every
+colony's anthill has three holes, alike, round one structure centred between them, all leading into the
+nest's one wide entrance (DESIGN §3.12b). Real nests of most of these species have several openings (black
+garden ants: often several small craters; fire ants: up to ~20 holes; leafcutters: many craters), so three
+is a game simplification in the spirit of Empires of the Undergrowth's anthills; the looks below are kept
+and rearranged so the three holes read as one nest:
+
+| Species | Anthill now |
+|---|---|
+| Black garden ant | A low crater of crumbly soil pellets (rampart crest ~0.7 of its radius, fading into the ground), the three holes in its rampart, a flat stone over one. |
+| Red wood ant | The thatch dome over the middle, the three holes in its flanks, worn trails running out past each. |
+| Leafcutter | A wide low mound of bare orange soil with three big craters on its flanks, leaf fragments along each hole's trail, the pale refuse dump beside it (where the dead are dropped: `refuseSpot`). |
+| Fire ant | The worked-soil dome centred over the holes, the three small holes with granular collars at its edge; no opening in the middle (the single tunnel opening ~70 mm away is gone). |
+| Army ant | The bivouac over the middle, three dark gaps in its skirt; the real ants stream in and out of them. |
+| Gene Thief Ant (*F. plagiaria*) | As the black garden ant's crater, with plant slivers. |
+| Hell ant (reconstruction) | Three small neat holes on a minimal ring of soil, leaf litter round about. |
+| Gilded Ant | The rotting stump in the middle, a root running out to each hole (the holes open among the roots), pale frass below. |
+| Termant | The black garden ant's crater, carton-reinforced: dark carton flakes on it, a carton collar in each throat. |
+| Nasute termite | The lobed carton nest over the middle, its three openings at its base, gallery tubes running off between them. |
+| Sickle-jaw termite | Three small soil collars in the leaf litter (no extra foraging holes: three holes, one nest). |
+
+The table below is the original study (2026-10-26), when each colony had a main entrance and up to two extra
+ones.
 
 | Species (game) | What the real entrance looks like | Model |
 |---|---|---|
@@ -19,10 +43,13 @@ used in the game. Sizes are for the game's real scale (1 unit = 1 mm; workers 2�
 | Sickle-jaw termites, *Rhynchotermes perarmatus* | Nest underground or shallow and epigeic in forest leaf litter; most species forage on the surface in the open, mainly on litter. Openings are inconspicuous. | A tiny soil turret (r 1.1 mm hole, 1.1 mm collar) in leaf litter, with four smaller foraging holes and their collars scattered nearby. |
 
 ## Underground (all species)
-The underground end of every entrance is a tunnel of three hexes rising from the nest floor to the
-hole: loose, paler soil worn smooth along the middle, spoil pellets toward the sides, a shaft of daylight
-(cool white by day, faint blue moonlight at night) falling down it. A plugged entrance is capped with
-fresh dark soil and has no light.
+Since 2026-11-01 the nest's one entrance is a wide 7-hex "flower" at the nest's edge: its floor slopes up
+toward the surface as one wide ramp (highest, and darkening, at its top edge), loose paler soil worn smooth
+along the middle, the species' bits (soil pellets; needles for wood ants, leaf scraps for leafcutters, carton
+flakes for nasutes and Termants, frass for Gilded Ants, worked soil for fire ants) round its rim where the
+walls flare out, and one broad soft shaft of daylight (cool white by day, faint blue moonlight at night)
+falling across it. A fallen colony's entrance is capped with fresh dark soil over all seven hexes and has no
+light. (Before: a tunnel of three hexes per entrance.) Creature caves keep their three-hex tunnel.
 
 ## Sources
 - *Solenopsis geminata*: [Wikipedia](https://en.wikipedia.org/wiki/Solenopsis_geminata) (mounds or craters up to 2 ft across and 12 in tall, up to ~20 entrance holes, open sunny soil).

@@ -81,7 +81,7 @@ with sync_playwright() as p:
                 pg.screenshot(path=os.path.join(OUT, f"{name}_{vn}.jpg"), type="jpeg", quality=84)
                 note(f"{'PASS' if not errs else 'FAIL'}  {name}_{vn}  ({time.time() - t1:.0f} s) {errs[:2]}")
             # underground: the nest's one wide entrance, close up and at gameplay zoom
-            for vn, (k, pitch) in {"nestclose": (9, 0.42), "nestzoom": (22, 0.5)}.items():
+            for vn, (k, pitch) in {"nestclose": (13, 0.62), "nestzoom": (30, 0.55)}.items():
                 if not want(f"{name}_{vn}"):
                     continue
                 ok = pg.evaluate(f"""() => {{

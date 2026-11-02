@@ -161,6 +161,8 @@ export class SurfaceEntrances {
   private detailMat: THREE.MeshStandardMaterial;
   private massMat: THREE.MeshStandardMaterial;
   private cartonMat: THREE.MeshStandardMaterial;
+  /** loose-soil craters and mounds (vertex alpha at their edge) */
+  private craterMat: THREE.MeshStandardMaterial;
   /** glossy cuticle for the army-ant bivouac's bodies (instance colours) */
   private bodyMat: THREE.MeshStandardMaterial;
   /** flat lists for height queries */
@@ -175,6 +177,8 @@ export class SurfaceEntrances {
     patchDapple(this.detailMat);
     this.massMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97, normalMap: tex.soil.normal, normalScale: new THREE.Vector2(1.3, 1.3), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
     patchDapple(this.massMat);
+    this.craterMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, normalMap: tex.soil.normal, normalScale: new THREE.Vector2(1.2, 1.2), transparent: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    patchDapple(this.craterMat);
     this.cartonMat = createCartonMaterial({ layerMm: 0.45, bump: 0.8 });
     this.bodyMat = new THREE.MeshStandardMaterial({ roughness: 0.42, metalness: 0.05 });
     patchDapple(this.bodyMat);
@@ -246,6 +250,8 @@ export class SurfaceEntrances {
     const ctr = anthillCentre(c.entrances, { x: 0, y: 0 });
     const details: THREE.BufferGeometry[] = [];
     const massGeos: THREE.BufferGeometry[] = [];
+    // (low craters and mounds of loose soil: fading into the ground at their edge)
+    const craterGeos: THREE.BufferGeometry[] = [];
     const cartonGeos: THREE.BufferGeometry[] = [];
     const rng = new Rng(c.id * 7919 + 101);
     const far = Math.max(4, ...c.entrances.map((e) => Math.hypot(e.sx - ctr.x, e.sy - ctr.y)));
@@ -271,10 +277,10 @@ export class SurfaceEntrances {
       addTrails(R);
     } else if (look === 'lasius' || look === 'plagiaria' || look === 'termant') {
       // a low crater of crumbly worked soil, the three holes in its rampart (Termants: carton-reinforced)
-      const R = far * 1.5;
-      const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: (1.1 + living * 1.1) * (look === 'termant' ? 1.25 : 1) * (1 - 0.6 * fallC), k: 1, seed: c.id * 23 + 9, ring: far / R };
+      const R = far * 1.45;
+      const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: (1.7 + living * 1.5) * (look === 'termant' ? 1.25 : 1) * (1 - 0.6 * fallC), k: 1, seed: c.id * 23 + 9, ring: far / R };
       b.masses.push(m);
-      massGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed)));
+      craterGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed, h / m.h), true));
       const at = (x: number, y: number) => ground(x, y) + massHeight(m, x, y);
       details.push(...pellets(ctr.x, ctr.y, R * 0.97, Math.round((260 + living * 260) * (1 - 0.6 * fallC)), rng, at, [pal.pellet, pal.dry, pal.damp, 0x6a5644], 0.3, 0.75));
       if (look === 'termant') details.push(...pellets(ctr.x, ctr.y, R * 0.8, Math.round(40 + living * 40), rng, at, [0x2e2016, 0x3b2a1e, 0x4a3626], 0.45, 0.9, far * 0.5));
@@ -284,7 +290,7 @@ export class SurfaceEntrances {
       const R = far * 1.7;
       const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: (2.5 + living * 4) * (1 - 0.6 * fallC), k: 0.8, seed: c.id * 29 + 4 };
       b.masses.push(m);
-      massGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed)));
+      craterGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed, h / m.h), true));
       const rs = refuseSpot(c, { x: 0, y: 0 });
       const d: Mass = { x: rs.x, y: rs.y, r: 6 + living * 6, h: 1.4 + living * 1.6, k: 0.8, seed: c.id * 19 + 7 };
       b.masses.push(d);
@@ -340,7 +346,7 @@ export class SurfaceEntrances {
       const R = far * 1.3;
       const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: 0.45 * (1 - 0.6 * fallC), k: 1, seed: c.id * 31 + 6, ring: far / R };
       b.masses.push(m);
-      massGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed)));
+      craterGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed, h / m.h), true));
       details.push(...leafBits(ctr.x, ctr.y, R * 1.8, 30, rng, (x, y) => ground(x, y) + massHeight(m, x, y), [0x5a3e22, 0x7a5430, 0x4a321c, 0x6a4a2a, 0x8a6236], [2, 4.2], far * 0.2));
     } else if (look === 'sickle') {
       // three small openings with soil collars in the leaf litter
@@ -386,6 +392,17 @@ export class SurfaceEntrances {
       if (g) {
         const m = new THREE.Mesh(g, this.massMat);
         m.castShadow = m.receiveShadow = true;
+        b.objs.push(m);
+        this.group.add(m);
+      }
+    }
+    if (craterGeos.length) {
+      const g = mergeGeometries(craterGeos);
+      if (g) {
+        const m = new THREE.Mesh(g, this.craterMat);
+        m.receiveShadow = true;
+        m.castShadow = true;
+        m.renderOrder = 0;
         b.objs.push(m);
         this.group.add(m);
       }
@@ -494,8 +511,11 @@ function apronMesh(o: Hole, under: (x: number, y: number) => number, pal: Palett
   return g;
 }
 
-/** A polar mesh over a mass (dome, dump), coloured by `paint(x, y, h, t)` (t = distance / radius). */
-function massMesh(m: Mass, ground: (x: number, y: number) => number, paint: (x: number, y: number, h: number, t: number) => THREE.Color): THREE.BufferGeometry {
+/**
+ * A polar mesh over a mass (dome, dump), coloured by `paint(x, y, h, t)` (t = distance / radius); `fade`: with vertex
+ * alpha, fading into the ground over its outer part (a crater of loose soil has no hard edge).
+ */
+function massMesh(m: Mass, ground: (x: number, y: number) => number, paint: (x: number, y: number, h: number, t: number) => THREE.Color, fade = false): THREE.BufferGeometry {
   const RINGS = 22;
   const SEG = 56;
   const pos: number[] = [];
@@ -515,6 +535,7 @@ function massMesh(m: Mass, ground: (x: number, y: number) => number, paint: (x: 
       uv.push(x / 16, y / 16 + h / 16);
       const cc = paint(x, y, h, t);
       col.push(cc.r, cc.g, cc.b);
+      if (fade) col.push(1 - smooth((t - 0.62) / 0.38));
     }
   }
   for (let i = 0; i < SEG; i++) idx.push(0, 1 + ((i + 1) % SEG), 1 + i);
@@ -531,7 +552,7 @@ function massMesh(m: Mass, ground: (x: number, y: number) => number, paint: (x: 
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, fade ? 4 : 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx);
   g.computeVertexNormals();
@@ -551,10 +572,10 @@ function thatchColour(x: number, y: number, h: number, t: number, seed: number):
 }
 
 /** Worked soil of a mound or crater in the species' palette: crumbly, darker and damper toward the foot. */
-function soilColour(x: number, y: number, t: number, pal: Palette, seed: number): THREE.Color {
+function soilColour(x: number, y: number, t: number, pal: Palette, seed: number, crest = 0.5): THREE.Color {
   const n = valueNoise2(x * 1.1, y * 1.1, seed);
   const n2 = valueNoise2(x * 3.7, y * 3.7, seed + 2);
-  tmpC.setHex(pal.dry).lerp(new THREE.Color(pal.pellet), 0.35 * n2).multiplyScalar(0.82 + 0.3 * n);
+  tmpC.setHex(pal.dry).lerp(new THREE.Color(pal.pellet), 0.35 * n2).multiplyScalar((0.7 + 0.3 * n) * (0.8 + 0.4 * crest));
   if (t > 0.8) tmpC.lerp(new THREE.Color(pal.damp), Math.min(1, (t - 0.8) / 0.25) * 0.5);
   return tmpC.clone();
 }
