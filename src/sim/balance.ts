@@ -506,6 +506,46 @@ export const BALANCE = {
   respawnDietShare: 0.5,
 
   // ---------------------------------------------------------------- rival AI war (sim/warAI.ts)
+  /**
+   * The AI builder (sim/colonyAI.ts; CHANGE_PLAN §22): EotU-style chambers of 7 or 19 hexes, one tile type (one caste)
+   * each, highways on the tunnels, upgrades from mid game.
+   */
+  aiBuild: {
+    /** 19-hex chambers once the colony has this many ants and this much game time (s) has passed (× levelFrom) */
+    chamber19From: { ants: 45, time: 600 },
+    /** a caste counts as one of the colony's main ones (19-hex chambers) with at least this share of the mix */
+    mainShare: 0.15,
+    /** a colony this big gets a 19-hex second store chamber (leafcutters always) */
+    bigColony: 120,
+    /** soil between a new chamber's rim and the other rooms' rims: at least, and to the nearest room at most (hexes) */
+    rimGapMin: 2,
+    rimGapMax: 5,
+    /** longest tunnel to a new chamber (hexes) */
+    tunnelMax: 6,
+    /** at most this many food store chambers, within storeNearEntrance hexes (rim) of the entrance */
+    maxStoreChambers: 2,
+    storeNearEntrance: 8,
+    /** a tile type's (caste's) chambers count as nearly full with this many free hexes or fewer: plan the next */
+    nearlyFull: 1,
+    /** stores count as full at this share of the capacity; no new store tiles past foodCapMax */
+    storeFull: 0.8,
+    foodCapMax: 2400,
+    /** highways on the tunnels once the colony has this many ants, keeping this much food after paying */
+    highwayFrom: 18,
+    highwayReserve: 12,
+    /** upgrades from mid game (× levelFrom): game time (s), ants, food in store */
+    upgradeFrom: { time: 720, ants: 50, food: 60 },
+    /**
+     * food kept back after paying an upgrade: this much, plus what the larvae on their tiles still need, plus the price
+     * of the next brood tile and its ant (brood comes first: upgrades spend the surplus)
+     */
+    upgradeReserve: 20,
+    /** upgrade jobs waiting at once (× levelInFlight, at least 1) */
+    upgradesInFlight: 2,
+    /** AI level (settings.aiLevel 0 Easy … 3 Brutal): × the mid-game thresholds, × upgrades in flight */
+    levelFrom: [1.6, 1, 0.8, 0.6],
+    levelInFlight: [0.5, 1, 1.5, 2],
+  },
   /** AI colonies with allies (CHANGE_PLAN §22, user spec claude/ai/01-spec-ai-allies-chambers.md) */
   aiAllies: {
     /** team-aware placement (world/teamSites.ts): limits as fractions of the map's width, and the score's weights */

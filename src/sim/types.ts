@@ -571,7 +571,19 @@ export interface Colony {
   /** movement factor per nest hex (tiles slow, highways speed up); rebuilt with the tiles */
   hexSpeed: Float32Array | null;
   /** AI build planner memory. Kept in state so snapshots and rejoining clients match (colonyAI). */
-  aiBuild?: { t: number; blocked: boolean; mix: Record<string, number>; chambers?: Array<{ q: number; kind: 'brood' | 'food' }>; tunnels?: number[] };
+  /**
+   * The builder brain (sim/colonyAI.ts). A chamber: its centre, radius (1: a 7-hex rosette, 2: a 19-hex hexagon), the
+   * one tile type it holds (brood: one caste). Saves from before CHANGE_PLAN §22 have `kind` only (radius 1, any caste).
+   */
+  aiBuild?: {
+    t: number;
+    blocked: boolean;
+    mix: Record<string, number>;
+    chambers?: Array<{ q: number; kind?: 'brood' | 'food'; r?: number; type?: TileType; caste?: string }>;
+    tunnels?: number[];
+    /** the tile the last think had no room for: the next chamber is for it */
+    need?: { type: TileType; caste?: string } | null;
+  };
   /** enemies inside the nest, refreshed every second by the invasion check (combat) */
   intruders?: Array<{ x: number; y: number }>;
   /** army ants: the swarm raid at each marker (eciton.ts) */
@@ -758,6 +770,8 @@ export interface SimSettings {
   statMul: number;
   enemyStatMul: number;
   aggression: number;
+  /** AI colonies' level (CHANGE_PLAN §22): 0 Easy, 1 Normal (undefined), 2 Hard, 3 Brutal — chamber sizes and upgrades */
+  aiLevel?: number;
   foodRespawn: number;
   /**
    * Multiplayer game speed (1, 2 or 4; undefined = 1): faster only when every player agrees (`speedVote`). Each
