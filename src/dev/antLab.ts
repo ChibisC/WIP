@@ -69,6 +69,17 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     m.setPosition(vP);
     return m;
   };
+  const dirs: Record<string, THREE.Vector3> = {
+    side: new THREE.Vector3(0, 0.12, 1),
+    // realism v2: a side view from a little above (field macro photos: ground behind, no horizon)
+    fside: new THREE.Vector3(0.08, 0.42, 1),
+    top: new THREE.Vector3(0.0001, 1, 0.0001),
+    front: new THREE.Vector3(1, 0.25, 0.0001),
+    back: new THREE.Vector3(-1, 0.35, 0.0001),
+    '34': new THREE.Vector3(0.7, 0.55, 0.85),
+    low: new THREE.Vector3(0.9, 0.18, 0.6),
+    under: new THREE.Vector3(0.3, -0.25, 1),
+  };
   // termites (model kit): ?ants=termite_nasute,termite_worker&tstate=5&ramp=1&fire=1&tan=1
   const termiteKeys = keys.filter((k) => k.startsWith('termite_'));
   if (termiteKeys.length) {
@@ -110,14 +121,25 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     if (!keys.length) {
       const cam = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 5000);
       const camKind = q.get('cam') || '34';
-      const dirs2: Record<string, THREE.Vector3> = { side: new THREE.Vector3(0, 0.12, 1), top: new THREE.Vector3(0.0001, 1, 0.0001), front: new THREE.Vector3(1, 0.25, 0.0001), '34': new THREE.Vector3(0.7, 0.55, 0.85) };
       const span = Math.max(totalT, maxL);
       const dist = Number(q.get("dist") || span * 2.6);
-      const target = new THREE.Vector3(0, Number(q.get('ty') || maxL * 0.12), 0);
-      cam.position.copy(target).addScaledVector(dirs2[camKind].normalize(), dist);
+      const target = new THREE.Vector3(Number(q.get('tx') || 0), Number(q.get('ty') || maxL * 0.12), Number(q.get('tz') || 0));
+      cam.position.copy(target).addScaledVector(dirs[camKind].normalize(), dist);
       if (camKind === 'top') cam.up.set(1, 0, 0);
       cam.lookAt(target);
       const sun = env.sun;
+      // realism (CHANGE_PLAN §21): with ?light= the termites get the same lighting presets, macro ground and lens as the ants
+      const lit = q.get('light') !== null;
+      if (lit) {
+        applyLabLight(renderer, scene, env, cam, target, span, q, ground);
+        const sc2 = sun.shadow.camera as THREE.OrthographicCamera;
+        sc2.left = -span;
+        sc2.right = span;
+        sc2.top = span;
+        sc2.bottom = -span;
+        sc2.updateProjectionMatrix();
+        sun.shadow.radius = Number(q.get('shadowr') || 2.5);
+      }
       sun.target.position.copy(target);
       sun.position.copy(target).addScaledVector(env.sunDir, 200);
       const post = new PostPipeline(renderer);
@@ -126,6 +148,9 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
       post.tilt = 0;
       post.settings.dofStrength = Number(q.get('dof') || 0);
       post.settings.ao = q.get('ao') !== '0';
+      if (q.get('grain')) post.settings.grade.grain = Number(q.get('grain'));
+      if (q.get('aostr')) post.settings.aoStrength = Number(q.get('aostr'));
+      if (q.get('bloom') === '0' || q.get('light') === 'studio') post.settings.bloom = false;
       post.render(scene, cam);
       post.render(scene, cam);
       (window as unknown as { __shotInfo: unknown }).__shotInfo = geos.map((g, i) => ({ key: termiteKeys[i], tris: g.userData.rig.triangles }));
@@ -198,17 +223,6 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
   const dist = Number(q.get('dist') || span * (keys.length > 1 ? 1.25 : 1.9));
   const cam = new THREE.PerspectiveCamera(Number(q.get('fov') || 30), window.innerWidth / window.innerHeight, dist * 0.02, dist * 50);
   const target = new THREE.Vector3(Number(q.get('tx') || 0), Number(q.get('ty') || maxL * 0.1), Number(q.get('tz') || 0));
-  const dirs: Record<string, THREE.Vector3> = {
-    side: new THREE.Vector3(0, 0.12, 1),
-    // realism v2: a side view from a little above (field macro photos: ground behind, no horizon)
-    fside: new THREE.Vector3(0.08, 0.42, 1),
-    top: new THREE.Vector3(0.0001, 1, 0.0001),
-    front: new THREE.Vector3(1, 0.25, 0.0001),
-    back: new THREE.Vector3(-1, 0.35, 0.0001),
-    '34': new THREE.Vector3(0.7, 0.55, 0.85),
-    low: new THREE.Vector3(0.9, 0.18, 0.6),
-    under: new THREE.Vector3(0.3, -0.25, 1),
-  };
   cam.position.copy(target).addScaledVector(dirs[camKind].normalize(), dist);
   if (camKind === 'top') cam.up.set(1, 0, 0);
   cam.lookAt(target);
