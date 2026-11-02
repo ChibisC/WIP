@@ -20,6 +20,10 @@ OUT = sys.argv[1] if len(sys.argv) > 1 else "docs/realism/hell-nasute/renders"
 W = int(os.environ.get("W", "1000"))
 H = int(os.environ.get("H", "680"))
 EXTRA = os.environ.get("EXTRA", "")
+# review round 2: a finer, denser macro ground with litter, contact shadows, stronger contact occlusion (ROUND=1: the round-1 look)
+R1 = os.environ.get("ROUND", "2") == "1"
+GROUND = "grains=500&grainmm=0.09" if R1 else "grains=1400&grainmm=0.06&contact=1"
+AOSTR = "1" if R1 else "1.5"
 os.makedirs(OUT, exist_ok=True)
 
 # unit: (lab key, model length in world units (about mm), extra query)
@@ -62,7 +66,7 @@ OVERRIDE = {
     ("sickle_queen", "side"): "cam=fside&dist=46&tx=-9&ty=1.5",
     ("sickle_queen", "34"): "cam=34&dist=50&tx=-9",
 }
-DOF = {"side": 0.5, "top": 0.4, "front": 0.7, "34": 1.0, "macro": 1.3, "jaw": 0.8}
+DOF = {"side": 0.8, "top": 0.4, "front": 0.7, "34": 1.0, "macro": 1.3, "jaw": 0.8}
 units = [u for u in os.environ.get("UNITS", ",".join(k for k in UNITS if not k.startswith(("sickle", "anchor")))).split(",") if u]
 views = [v for v in os.environ.get("VIEWS", "side,34,macro").split(",") if v]
 lights = [l for l in os.environ.get("LIGHTS", "overcast,forest").split(",") if l]
@@ -77,7 +81,7 @@ with sync_playwright() as p:
         key, L, q0 = UNITS[u]
         for v in views:
             for li in lights:
-                q = f"scene=antlab&ants={key}&{OVERRIDE.get((u, v)) or VIEWS[v](L)}&light={li}&dof={DOF[v]}&grains=500&grainmm=0.09&grain=0.03&aostr=1&amp=0&{q0}&{EXTRA}"
+                q = f"scene=antlab&ants={key}&{OVERRIDE.get((u, v)) or VIEWS[v](L)}&light={li}&dof={DOF[v]}&{GROUND}&grain=0.03&aostr={AOSTR}&amp=0&{q0}&{EXTRA}"
                 path = os.path.join(OUT, f"{u}_{v}_{li}.png")
                 t0 = time.time()
                 pg.goto(BASE + "?" + q, wait_until="load", timeout=600000)

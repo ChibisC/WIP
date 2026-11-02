@@ -6,13 +6,13 @@ import { ATTACK_CONTACT, AttackPose, applyAttackBody, attackPose, neutralPose } 
 import { MORPHS } from '../render/ants/morphs';
 import { PostPipeline } from '../render/post';
 import { createSurfaceEnvironment } from '../render/environment';
-import { addAmber, applyLabLight, renderLabMask } from './labLight';
+import { addAmber, addContactShadows, applyLabLight, renderLabMask } from './labLight';
 import { textures } from '../render/textures';
 import { globalUniforms, patchDapple } from '../render/shaderPatch';
 import { buildTermiteGeometry } from '../render/termite/build';
 import { CasteId } from '../render/termite/castes';
 import { getTermiteMaterial, TermiteInstances, termiteTime, nasusTipLocal } from '../render/termite/material';
-import { AnimState } from '../render/termite/rig';
+import { AnimState, legBone } from '../render/termite/rig';
 import { GlueStreams, NASUTE_GLUE } from '../render/termite/glue';
 
 /**
@@ -80,6 +80,7 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     low: new THREE.Vector3(0.9, 0.18, 0.6),
     under: new THREE.Vector3(0.3, -0.25, 1),
   };
+  const contacts: Parameters<typeof addContactShadows>[2] = [];
   // termites (model kit): ?ants=termite_nasute,termite_worker&tstate=5&ramp=1&fire=1&tan=1
   const termiteKeys = keys.filter((k) => k.startsWith('termite_'));
   if (termiteKeys.length) {
@@ -98,6 +99,14 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
       herd.count = 1;
       const mx = posed(tx + widths[i] / 2, Number(q.get('rot') || 0), g.userData.rig.bodyLength, 1);
       herd.setMatrix(0, mx);
+      {
+        // contact shadows (?contact=1): a pool under the body, a spot under each foot (from the tarsus pivots)
+        const r = g.userData.rig, bx = (r.bounds.min[0] + r.bounds.max[0]) / 2, bl = r.bodyLength;
+        const c0 = new THREE.Vector3(bx, 0, 0).applyMatrix4(mx);
+        const feet: THREE.Vector3[] = [];
+        for (let l = 0; l < 6; l++) { const b = legBone(l, 3); feet.push(new THREE.Vector3(r.pivots[b * 3], 0, r.pivots[b * 3 + 2] * 1.15).applyMatrix4(mx)); }
+        contacts.push({ x: c0.x, z: c0.z, len: (r.bounds.max[0] - r.bounds.min[0]) * 0.8, wid: bl * (r.isQueen ? 0.12 : 0.13), rot: Number(q.get('rot') || 0), feet, footR: bl * (r.isQueen ? 0.012 : 0.04) });
+      }
       const st = Number(q.get('tstate') || (g.userData.rig.isQueen ? AnimState.QUEEN : AnimState.IDLE));
       // with ?atk the kit's bite / ram is posed on the attack's contact like in the game
       const ph = atk ? Number(atkQ) - ATTACK_CONTACT + 0.25 : Number(q.get('phase') || 0.15);
@@ -133,6 +142,7 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
       if (lit) {
         applyLabLight(renderer, scene, env, cam, target, span, q, ground);
         addAmber(scene, env, target, span, q, ground);
+        if (q.get('amber') !== '1') addContactShadows(scene, q, contacts);
         const sc2 = sun.shadow.camera as THREE.OrthographicCamera;
         sc2.left = -span;
         sc2.right = span;
@@ -191,6 +201,12 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     const rotY = Number(q.get('rot') || 0);
     mx.copy(posed(cx, rotY, b.rig.length * sc, sc));
     im.setMatrixAt(0, mx);
+    {
+      const r = b.rig as typeof b.rig & { foot?: THREE.Vector3[] };
+      const feet = (r.foot ?? r.ankle ?? []).map((f) => new THREE.Vector3(f.x, 0, f.z).applyMatrix4(mx));
+      const c0 = new THREE.Vector3(0, 0, 0).applyMatrix4(mx);
+      contacts.push({ x: c0.x, z: c0.z, len: b.rig.length * sc, wid: b.rig.length * sc * 0.11, rot: rotY, feet, footR: b.rig.length * sc * 0.025 });
+    }
     im.castShadow = true;
     im.receiveShadow = true;
     im.customDepthMaterial = depth;
@@ -230,6 +246,7 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
   // realism v2: lighting preset, backlit test, tone mapping, macro ground (dev/labLight.ts)
   applyLabLight(renderer, scene, env, cam, target, span, q, ground);
   addAmber(scene, env, target, span, q, ground);
+  if (q.get('amber') !== '1') addContactShadows(scene, q, contacts);
   const sun = env.sun;
   const sc = sun.shadow.camera as THREE.OrthographicCamera;
   sc.left = -span;

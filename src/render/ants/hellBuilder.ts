@@ -196,14 +196,17 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
     const fr = hn.fringe, roots = [], tips = [];
     const count = S(fr.count, 10, 0);
     for (let k = 0; k < count; k++) {
-      const s = fr.from + (fr.to - fr.from) * (k / Math.max(1, count - 1)), kk = Math.round(s * (hornPts.length - 1));
-      const p = hornPts[kk], tn = hornTan[kk], under = new HV(tn.y, -tn.x, 0), len = H * fr.len * (0.45 + 0.55 * Math.sin(Math.PI * Math.min(1, (s - fr.from) / (fr.to - fr.from) * 0.9 + 0.1)));
-      const dir = under.clone().multiplyScalar(0.75).add(new HV(0, -0.55, 0)).normalize();
+      // (review round 1: "a white toothbrush comb" — the setae now irregular in spacing, length and lean)
+      const jit = o ? rnd.range(-0.45, 0.45) / Math.max(1, count - 1) : 0;
+      const s = Math.min(fr.to, Math.max(fr.from, fr.from + (fr.to - fr.from) * (k / Math.max(1, count - 1)) + jit)), kk = Math.round(s * (hornPts.length - 1));
+      const p = hornPts[kk], tn = hornTan[kk], under = new HV(tn.y, -tn.x, 0), len = H * fr.len * (0.45 + 0.55 * Math.sin(Math.PI * Math.min(1, (s - fr.from) / (fr.to - fr.from) * 0.9 + 0.1))) * (o ? rnd.range(0.6, 1.1) : 1);
+      const dir = under.clone().multiplyScalar(0.75).add(new HV(0, -0.55, 0)).addScaledVector(tn, o ? rnd.range(-0.35, 0.25) : 0).normalize();
       roots.push(p.clone().addScaledVector(under, hornR[kk] * 0.85)); tips.push(roots[k].clone().addScaledVector(dir, len));
     }
     if (o) for (let k = 0; k < count; k++) for (const sd of [-1, 1]) {
-      const r = roots[k].clone().add(new HV(0, 0, sd * hornR[0] * 0.35)), tp = tips[k].clone().add(new HV(rnd.range(-0.02, 0.02) * H, rnd.range(-0.03, 0.03) * H, sd * rnd.range(0.01, 0.05) * H));
-      n.hair([r, r.clone().lerp(tp, 0.5).add(new HV(0, -0.02 * H, 0)), tp], [0.007 * H, 0.0045 * H, 0.001 * H], 3, PART.HEAD, C.hair, lk.hair);
+      if (rnd.range(0, 1) < 0.3) continue; // gaps: some setae missing on each side
+      const r = roots[k].clone().add(new HV(0, 0, sd * hornR[0] * rnd.range(0.15, 0.5))), tp = tips[k].clone().add(new HV(rnd.range(-0.05, 0.05) * H, rnd.range(-0.05, 0.04) * H, sd * rnd.range(0.01, 0.07) * H));
+      n.hair([r, r.clone().lerp(tp, 0.5).add(new HV(rnd.range(-0.02, 0.02) * H, -rnd.range(0.01, 0.05) * H, 0)), tp], [0.0055 * H, 0.0035 * H, 0.0008 * H], 3, PART.HEAD, C.fringe ?? C.hair, lk.hair);
     }
     else for (let k = 0; k < count; k++) hellHair(n, roots[k], roots[k].clone().lerp(tips[k], 0.85), 0.012 * H, PART.HEAD, C.hair, lk.hair);
     // (No spicules on the spoon tip: the user asked for a clean tip, 2026-10-24.)
@@ -273,7 +276,7 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
       const m = S(10, 5, 3), sp = [], sr = [];
       const bow = new HV(0, 0, sd * 0.05 * H).add(new HV(-sDir.y, sDir.x, 0).multiplyScalar(0.04 * H));
       for (let k = 0; k <= m; k++) { const s = k / m; sp.push(sk.clone().lerp(el, s).addScaledVector(bow, Math.sin(Math.PI * s))); sr.push(an.r * H * (0.8 + 0.55 * ss(0.15, 1, s)) * (k === 0 ? 0.85 : 1)); }
-      hellTube(n, sp, sr, S(7, 4, 3), sd < 0 ? PART.SCAPE_L : PART.SCAPE_R, (s) => hellMix(C.legDark, hellMix(C.leg, C.legLight, 0.35 + 0.4 * s), ss(0, 0.12, s) * ss(1, 0.9, s)), lk.leg, true, true, 1, 0, REGION.ANTENNA);
+      hellTube(n, sp, sr, S(10, 4, 3), sd < 0 ? PART.SCAPE_L : PART.SCAPE_R, (s) => hellMix(C.legDark, hellMix(C.leg, C.legLight, 0.35 + 0.4 * s), ss(0, 0.12, s) * ss(1, 0.9, s)), lk.leg, true, true, 1, 0, REGION.ANTENNA);
     }
     // the funiculus' path: the old arc, sampled coarsely and run through a spline (smooth curvature)
     const ctrl = [];
@@ -293,7 +296,7 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
       rad.push(an.r * H * (0.82 + 0.12 * s) * neck);
     }
     const colAt = (s) => { const [, fr] = segAt(s); return hellMix(C.legDark, hellMix(C.leg, C.legLight, 0.3 + 0.5 * Math.sin(Math.PI * fr)), ss(0, 0.3, fr) * 0.9 + 0.1); };
-    hellTube(n, pts, rad, S(6, 4, 3), sd < 0 ? PART.FUNI_L : PART.FUNI_R, colAt, lk.leg, true, true, 1, 0, REGION.ANTENNA);
+    hellTube(n, pts, rad, S(9, 4, 3), sd < 0 ? PART.FUNI_L : PART.FUNI_R, colAt, lk.leg, true, true, 1, 0, REGION.ANTENNA);
     if (o) {
       // fine short setae standing off the funiculus (pubescent antennae)
       for (let k = 0; k < 14; k++) {
@@ -374,12 +377,13 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
     reach += Math.hypot(foot.x - c0.x, foot.z - c0.z);
     const p0 = PART.LEG0 + li * 3, th0 = lg.thick * H;
     // seg 0: coxa, trochanter, femur
-    hellTube(n, [c0, c0.clone().lerp(c1, 0.5), c1], [th0 * 1.5, th0 * 1.45, th0 * 1.15], S(7, 4, 3), p0, () => C.leg, lk.leg, lod < 2, false, 1, 0, REGION.LEG);
-    if (lod < 2) hellBlob(n, c1, V(0.07, 0.06, 0.06), S(7, 4, 4), p0, C.legDark, lk.leg, undefined, 0, REGION.LEG);
+    hellTube(n, [c0, c0.clone().lerp(c1, 0.5), c1], [th0 * 1.5, th0 * 1.45, th0 * 1.15], S(12, 4, 3), p0, () => C.leg, lk.leg, lod < 2, false, 1, 0, REGION.LEG);
+    // (review round 1: "ball joints" — the trochanter flush with the femur, no knob)
+    if (lod < 2) hellBlob(n, c1, V(0.05, 0.045, 0.045), S(10, 4, 4), p0, C.leg, lk.leg, undefined, 0, REGION.LEG);
     {
       const m = S(11, 4, 2), pts = [], rr = [];
       for (let k = 0; k <= m; k++) { const s = k / m; pts.push(c1.clone().lerp(knee, s)); rr.push(th0 * (0.95 + 0.62 * Math.exp(-((s - 0.32) ** 2) / 0.06) - 0.27 * s)); }
-      hellTube(n, pts, rr, S(8, 4, 3), p0, legCol, lk.leg, false, true, 1, 0, REGION.LEG);
+      hellTube(n, pts, rr, S(12, 4, 3), p0, legCol, lk.leg, false, true, 1, 0, REGION.LEG);
       if (o) for (let k = 0; k < 3; k++) {
         // erect setae on the femur's underside
         const s = 0.25 + 0.25 * k, q = Math.round(s * m), r = pts[q].clone().add(new HV(0, -rr[q] * 0.9, 0));
@@ -387,12 +391,12 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
       }
     }
     // the knee: a soft, paler joint membrane (it moves with the tibia)
-    if (lod < 2) hellBlob(n, knee, V(0.036, 0.036, 0.036), S(8, 4, 4), p0 + 1, hellMix(C.leg, C.legLight, 0.6), knLook, undefined, 0, REGION.LEG);
+    if (lod < 2) hellBlob(n, knee, V(0.03, 0.03, 0.03), S(10, 4, 4), p0 + 1, hellMix(C.leg, C.legLight, 0.35), knLook, undefined, 0, REGION.LEG);
     // seg 1: tibia, slim, widening at the apex, with its spurs (1 on the fore leg, 2 on the mid and hind)
     {
       const m = S(7, 2, 1), pts = [], rr = [];
       for (let k = 0; k <= m; k++) { const s = k / m; pts.push(knee.clone().lerp(ankle, s)); rr.push(th0 * (0.6 + 0.14 * ss(0.65, 1, s) - 0.06 * ss(0, 0.2, s))); }
-      hellTube(n, pts, rr, S(7, 4, 3), p0 + 1, legCol, lk.leg, lod < 2, true, 1, 0, REGION.LEG);
+      hellTube(n, pts, rr, S(10, 4, 3), p0 + 1, legCol, lk.leg, lod < 2, true, 1, 0, REGION.LEG);
       if (o) {
         const tdir = ankle.clone().sub(knee).normalize();
         for (let q = 0; q < (pair === 0 ? 1 : 2); q++) {
@@ -416,7 +420,7 @@ export function buildHellAnt(i: any, t: number, e = 1): BuiltAnt {
           acc = b;
         }
       } else { pts.push(ankle.clone().lerp(foot, 0.5)); rr.push(th0 * 0.45); pts.push(foot.clone()); rr.push(th0 * 0.35); }
-      hellTube(n, pts, rr, S(6, 3, 3), p0 + 2, (s) => hellMix(C.leg, C.legLight, Math.sin(Math.PI * ((s * 5) % 1)) * 0.45), lk.leg, false, true, 1, 0, REGION.TARSUS);
+      hellTube(n, pts, rr, S(8, 3, 3), p0 + 2, (s) => hellMix(C.leg, C.legLight, Math.sin(Math.PI * ((s * 5) % 1)) * 0.45), lk.leg, false, true, 1, 0, REGION.TARSUS);
       if (o) for (const cs of [-1, 1]) {
         const a = foot.clone().addScaledVector(axis, cs * th0 * 0.25), b = a.clone().addScaledVector(hz, 0.06 * H).add(V(0, -0.02)), c = b.clone().add(V(0, -0.05)).addScaledVector(hz, -0.01 * H);
         hellTube(n, [a, b, c], [th0 * 0.2, th0 * 0.13, th0 * 0.03], 3, p0 + 2, () => C.claw, { rough: 0.3, coat: 0.6, sheen: 0 }, false, true);

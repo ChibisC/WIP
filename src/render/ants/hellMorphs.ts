@@ -7,13 +7,15 @@ const HELL_COLORS = {
   gasterRear: 0x54221a, gasterRearDark: 0x2e120e, band: 0x7e5036,
   // (realism rework 2026-11-02: legs a warm brown-orange, not toy orange; the jaws dark, near black at the tips)
   leg: 0x7c3c1e, legLight: 0x92502a, legDark: 0x4e2212, claw: 0x2e1c0e, mand: 0x4e2414, mandTip: 0x1a0c06,
-  hornBase: 0x6a3a22, hornTip: 0x9e6040, eye: 0x1c1812, hair: 0xeae3cf, trigger: 0x4a4234,
+  hornBase: 0x6a3a22, hornTip: 0x9e6040, eye: 0x1c1812, hair: 0xd8ccb2, trigger: 0x4a4234, fringe: 0xbcae92,
   spot: 0x3c3620, scar: 0x3e2d1a, plate: 0x4a3f26,
 };
 // (realism rework: smooth and shining, little pubescence — the baked detail adds the microsculpture and hair pits)
 const HELL_SURF = {
-  body: { rough: 0.42, coat: 0.5, sheen: 0.08 }, leg: { rough: 0.4, coat: 0.45, sheen: 0.1 },
-  mandible: { rough: 0.3, coat: 0.7, sheen: 0.04 }, horn: { rough: 0.38, coat: 0.5, sheen: 0.1 },
+  // (review round 1: "one uniform glossy plastic per part, a single hotspot" — less clearcoat, more roughness; the baked
+  // sculpture breaks the highlight up)
+  body: { rough: 0.5, coat: 0.28, sheen: 0.1 }, leg: { rough: 0.46, coat: 0.25, sheen: 0.12 },
+  mandible: { rough: 0.32, coat: 0.55, sheen: 0.04 }, horn: { rough: 0.42, coat: 0.35, sheen: 0.1 },
   hornTip: { rough: 0.18, coat: 0.95, sheen: 0.05 }, hair: { rough: 0.6, coat: 0.1, sheen: 0.15 },
 };
 const HELL_BASE = {

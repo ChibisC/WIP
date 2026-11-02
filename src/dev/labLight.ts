@@ -307,3 +307,45 @@ export function addAmber(scene: THREE.Scene, env: SurfaceLights, target: THREE.V
     scene.add(d);
   }
 }
+
+let contactTex: THREE.DataTexture | null = null;
+/**
+ * Contact shadows for the review renders (realism rework, spec §2: "a ground plane, contact shadows"; render only,
+ * `?contact=1`): a soft occlusion pool under each body — the overcast sky blocked by the animal — and a small dark
+ * spot under each foot, laid on the ground as multiplied decals. Positions in world mm, `rot` the body's yaw.
+ */
+export function addContactShadows(scene: THREE.Scene, q: URLSearchParams, items: Array<{ x: number; z: number; len: number; wid: number; rot: number; feet?: THREE.Vector3[]; footR?: number }>): void {
+  if (q.get('contact') !== '1') return;
+  if (!contactTex) {
+    const N = 64;
+    const d = new Uint8Array(N * N * 4);
+    for (let j = 0; j < N; j++)
+      for (let i = 0; i < N; i++) {
+        const x = (i + 0.5) / N * 2 - 1;
+        const y = (j + 0.5) / N * 2 - 1;
+        const a = Math.exp(-3.2 * (x * x + y * y)) * Math.max(0, 1 - Math.sqrt(x * x + y * y));
+        d.set([0, 0, 0, Math.round(255 * a)], (j * N + i) * 4);
+      }
+    contactTex = new THREE.DataTexture(d, N, N, THREE.RGBAFormat);
+    contactTex.needsUpdate = true;
+    contactTex.magFilter = THREE.LinearFilter;
+  }
+  const k = Number(q.get('contactk') || 1);
+  const mat = (o: number) => new THREE.MeshBasicMaterial({ map: contactTex, transparent: true, opacity: o * k, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const body = mat(0.85);
+  const foot = mat(0.7);
+  for (const it of items) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(it.len * 1.25, it.wid * 2.4).rotateX(-Math.PI / 2), body);
+    m.position.set(it.x, 0.004, it.z);
+    m.rotation.y = it.rot;
+    m.renderOrder = 1;
+    scene.add(m);
+    for (const f of it.feet ?? []) {
+      const r = it.footR ?? it.len * 0.035;
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2).rotateX(-Math.PI / 2), foot);
+      s.position.set(f.x, 0.005, f.z);
+      s.renderOrder = 1;
+      scene.add(s);
+    }
+  }
+}

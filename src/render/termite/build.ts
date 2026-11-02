@@ -1031,7 +1031,7 @@ export function buildTermiteGeometry(casteId: CasteId, lod = 0): BufferGeometry 
         S.push({ p: at(s), rN: antR * (0.95 - 0.15 * (i / (m - 1))) * (Lc.antDetail === 2 ? 1.25 : 1), bone, col: mixC(antBaseCol, antMid, 0.4), bt: s });
       }
     }
-    acc.sweep(S, Lc.antRadial, bodyMat, true, true);
+    acc.sweep(S, lod === 0 && P.antRadial ? P.antRadial : Lc.antRadial, bodyMat, true, true);
   }
 
   // =========================================================================

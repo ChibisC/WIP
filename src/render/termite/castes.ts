@@ -180,6 +180,8 @@ export interface CasteParams {
    * the deeper subsurface light
    */
   real?: { breathe: number; glint: number; eggs?: number };
+  /** radial segments of the antennae at LOD0 (default the LOD's 6; realism: 10, so the beads are round) */
+  antRadial?: number;
 }
 
 const SOLDIER_COLORS: CastePalette = {
@@ -236,6 +238,8 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     antenna: { beads: 13, lengthFrac: 0.4, radius: 0.064 },
     setae: { head: 6, perTergite: 7 },
     real: { breathe: 0.022, glint: 0.45 },
+    legRadial: 10,
+    antRadial: 10,
     legs: { length: [0.37, 0.39, 0.46], radius: 0.092, spread: 1.0 },
     clearance: 0.32,
     colors: SOLDIER_COLORS,
@@ -261,6 +265,8 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     antenna: { beads: 13, lengthFrac: 0.36, radius: 0.062 },
     setae: { head: 6, perTergite: 7 },
     real: { breathe: 0.02, glint: 0.45 },
+    legRadial: 10,
+    antRadial: 10,
     legs: { length: [0.36, 0.38, 0.44], radius: 0.1, spread: 1.0 },
     clearance: 0.38,
     colors: { ...SOLDIER_COLORS, head: '#3A160D', headHi: '#5E2716', headTip: '#7A3E20' },
@@ -288,6 +294,8 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     antenna: { beads: 14, lengthFrac: 0.3, radius: 0.058 },
     setae: { head: 0, perTergite: 6 },
     real: { breathe: 0.028, glint: 0.55 },
+    legRadial: 10,
+    antRadial: 10,
     legs: { length: [0.27, 0.29, 0.33], radius: 0.088, spread: 1.0 },
     clearance: 0.2,
     colors: {
@@ -296,8 +304,8 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
       headHi: '#C9A062',
       headTip: '#D9B87F',
       // (realism rework: the live workers in the photos are creamy amber, not white — a little deeper and warmer)
-      body: '#E6C996',
-      tergite: '#CC9C5C',
+      body: '#DDBD88',
+      tergite: '#BF8E50',
       inter: '#F2E0BA',
       gut: '#3E2617',
       // (still pale cream, but warm and translucent like the photos' legs)
@@ -336,12 +344,14 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     real: { breathe: 0.018, glint: 0.4 },
     legs: { length: [0.36, 0.4, 0.46], radius: 0.07, spread: 1.0 },
     clearance: 0.3,
-    colors: ROYAL_COLORS,
+    // (review round 1: "drawn white seam lines" — the king's intersegmental membranes a darker, duller tan)
+    colors: { ...ROYAL_COLORS, inter: '#8C7254' },
     translucency: 0.12,
     gut: 0.0,
     headCoat: 0.7,
     gait: { amplitude: 0.3, lift: 0.36 },
-    legRadial: 8,
+    legRadial: 10,
+    antRadial: 10,
   },
   queen: {
     id: 'queen',
@@ -369,8 +379,9 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     gait: { amplitude: 0.2, lift: 0.2 },
     // (realism rework: the royal-chamber photos show a pale tan, grey-ivory membrane, not saturated yellow — the same
     // ages, the kit's colours desaturated; the default age stays 0.5)
-    physogastric: { length: 22, width: 4.9, height: 4.9, pleat: 0.17, age: 0.5, ivory: '#EEE6D6', amber: '#D8BE90', honey: '#BF9866' },
-    legRadial: 8,
+    physogastric: { length: 22, width: 4.9, height: 4.9, pleat: 0.17, age: 0.5, plate: 0.44, ivory: '#EEE6D6', amber: '#D8BE90', honey: '#BF9866' },
+    legRadial: 10,
+    antRadial: 10,
   },
   larva: {
     id: 'larva',
@@ -388,6 +399,8 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     antenna: { beads: 13, lengthFrac: 0.26, radius: 0.055 },
     setae: { head: 0, perTergite: 0 },
     real: { breathe: 0.03, glint: 0.4 },
+    legRadial: 10,
+    antRadial: 10,
     legs: { length: [0.22, 0.24, 0.27], radius: 0.085, spread: 0.85 },
     clearance: 0.12,
     colors: {

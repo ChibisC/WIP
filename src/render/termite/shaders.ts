@@ -656,6 +656,14 @@ if (vFx.x > 0.01) {
   if (cut) col *= vTint;
   if (cut) col = mix(uPale, col, tanK);
   col *= 0.96 + 0.08 * fract(vLook.w * 7.31); // per-instance subtle variation
+  if (real && m > 0.5 && m < 1.5) {
+    // realism rework, review round 1 ("flat cream plastic"): soft cuticle is never one flat tone — a faint mottle, and
+    // fine wrinkles that break the highlight
+    float mo = tNoise(vRestP * 3.1 + 7.0) * 0.6 + tNoise(vRestP * 9.0) * 0.4;
+    col *= 0.9 + 0.18 * mo;
+    float wr = tNoise(vRestP * vec3(26.0, 9.0, 26.0)) * 0.7 + tNoise(vRestP * 61.0) * 0.3;
+    normal = tBump(normal, 0.0009 * (wr - 0.5) * rigF(RC_RIG_A).x);
+  }
 
   bool abd = abs(bone - 6.0) < 0.5;
   float plateGloss = 0.0;
@@ -681,7 +689,8 @@ if (vFx.x > 0.01) {
       float lump = tNoise(vRestP * 5.5 + vec3(sd * 9.0, 0.0, 0.0));
       gm *= (0.6 + 0.55 * lobes) * (0.65 + 0.7 * lump);
     }
-    col = mix(col, rigF(RC_GUT).rgb, smoothstep(0.05, 0.75, gm) * mix(0.55, 0.92, tanK));
+    // (realism: the gut a defined dark mass with a lumpy edge, not a smear — review round 1)
+    col = mix(col, rigF(RC_GUT).rgb, (real ? smoothstep(0.2, 0.55, gm) : smoothstep(0.05, 0.75, gm)) * mix(0.55, 0.92, tanK));
     // (the gut's dense core darker still, seen through the thinnest wall)
     if (real) col = mix(col, rigF(RC_GUT).rgb * 0.6, smoothstep(0.6, 1.05, gm) * 0.5 * tanK);
     if (real) {
@@ -736,7 +745,7 @@ if (vFx.x > 0.01) {
     // spiracles: one small dark dot on each side of each roll
     float sang = atan(nyz.x, side); // 0 at the side, + above
     float sp = (kk < QA_SEGS - 0.5 && d > 0.0) ? 1.0 - smoothstep(0.5, 1.0, length(vec2((d - 0.3) / 0.035, (sang - 0.2) / 0.055))) : 0.0;
-    col = mix(col, vec3(0.13, 0.07, 0.035), sp * 0.7);
+    col = mix(col, vec3(0.13, 0.07, 0.035), sp * (real ? 0.35 : 0.7)); // (realism: review round 1 read the dot as a decal)
     if (real && realF.w > 0.0) {
       // realism rework: eggs seen faintly through the stretched membrane on the flanks — pale creamy ovals with a
       // soft darker edge, packed in the middle rolls, hidden by the plates and the creases
