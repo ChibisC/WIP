@@ -141,6 +141,11 @@ export function setBakeRenderer(r: THREE.WebGLRenderer | null, quality = 1): voi
   bakeQuality = quality;
 }
 
+/** The registered bake renderer and quality (the ground bake uses them too: render/ground/groundBake.ts). */
+export function bakeRendererNow(): { r: THREE.WebGLRenderer | null; quality: number } {
+  return { r: bakeRenderer, quality: bakeQuality };
+}
+
 const cache = new Map<string, DetailMaps>();
 
 /** Gutter around each tile (px): the next repeat of the tile, so filtering and the first mips never bleed. */

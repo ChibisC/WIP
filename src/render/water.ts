@@ -72,10 +72,27 @@ export class Water {
         [
           '#include <color_fragment>',
           `#include <color_fragment>
-           float dd = clamp(vDepth / 4.0, 0.0, 1.0);
-           diffuseColor.a *= smoothstep(0.0, 0.6, vDepth) * mix(0.35, 1.0, dd);
-           diffuseColor.rgb *= mix(1.25, 0.8, dd);`,
+           // murky water (ground realism item 4): light absorbed and scattered with depth — the shallows show the bed
+           // through a thin brown-green tint, deeper water is dark and nearly opaque
+           float dep = max(vDepth, 0.0);
+           vec3 Tr = exp(-vec3(0.36, 0.27, 0.22) * dep);
+           float op = 1.0 - dot(Tr, vec3(0.3333));
+           diffuseColor.a *= clamp(op * 1.2, 0.0, 1.0) * smoothstep(0.0, 0.3, dep);
+           diffuseColor.rgb *= mix(1.3, 0.82, smoothstep(0.5, 5.0, dep));
+           // the edge: a broken line of foam and scum where the water meets the shore, drifting a little
+           float edge = smoothstep(0.02, 0.1, dep) * (1.0 - smoothstep(0.12, 0.55, dep));
+           float fn1 = texture2D(tNoise, vWP.xz / 40.0 + vec2(uTime * 0.002, uTime * 0.0013)).r;
+           float fn2 = texture2D(tNoise, vWP.xz / 20.0 - vec2(uTime * 0.004, -uTime * 0.003)).b;
+           float foam = edge * smoothstep(0.62, 0.8, fn1 * 0.5 + fn2 * 0.6);
+           float bub = edge * step(0.975, texture2D(tNoise, vWP.xz / 70.0 + vec2(uTime * 0.001, 0.0)).a) * 0.8;
+           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.72, 0.66), max(foam * 0.7, bub));
+           diffuseColor.a = max(diffuseColor.a, max(foam * 0.7, bub));
+           // floating specks: grit, seeds, bits of plant (no leaves), thicker toward the shore
+           float speck = step(0.982, texture2D(tNoise, vWP.xz / 85.0 + 0.5).a) * (1.0 - smoothstep(0.5, 5.0, dep));
+           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.17, 0.13, 0.09), speck * 0.8);
+           diffuseColor.a = max(diffuseColor.a, speck * 0.8);`,
         ],
+        ['#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.75, max(foam, speck));'],
       ],
     });
     this.mesh = new THREE.Mesh(this.geo, this.material);

@@ -1545,6 +1545,18 @@ away and just waits for worker to build it. if you dont have enough food you can
   at a marker, the notice, leafcutters, an AI colony growing for 8 min with every plan paid, determinism); the earth
   tones in `tests/casteLooks.ts`.
 
+### 2026-11-02 — Ground realism merged (user add-on, items 1–8)
+- Branch `feature/ground-realism` (b010a9a) merged into `main` by the story agent: procedural ground layers baked on the
+  GPU at real mm sizes (`render/ground/groundBake.ts`), height-blended with stochastic tiling and close-up self-shadow
+  (`render/terrainMesh.ts`), wetness by the water, floods and storms, sculpted and dressed banks and ramps
+  (`render/ground/bankSculpt.ts`, `bankDressing.ts`), water edges, rock surfaces, the story maps' moods. Render only;
+  nothing in the simulation changed. References and colour numbers: `docs/maps/realism.md` (photos study-only, not in
+  the repo). Creature and ant visibility on every ground type: `docs/maps/realism/visibility-probe.*`
+  (`tests/browser/ground_visibility.py`).
+- The helper's review rounds ended with the container it ran in (its last pushed commit is b010a9a); the comparison sheets
+  were study-only and never in the repo. A fresh render of both story maps was compared with the user's photos in chat.
+- Merge: clean (no conflicts); all 28 suites, the determinism check and the build pass.
+
 
 ### 2026-11-02 — AI colonies: allies start close, EotU-style chambers with upgrades, allies help each other (CHANGE_PLAN §23)
 User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `feature/ai-allies` from `main` (`fc6f58a`), with
