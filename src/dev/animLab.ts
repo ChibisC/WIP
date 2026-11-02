@@ -282,6 +282,16 @@ function clips(): Record<string, Clip> {
       ],
       cam: { tx: -7, ty: 1.5, tz: 0, dir: [0.25, 0.7, 1], dist: 52, fov: 30 },
     },
+    // realism rework: one attacker, seen from the side — the hell ants' vertical snap (variant 0: the snap; the soldier's
+    // impale), slowed by a long attack gap so the cocked jaws, the trap firing, the hit-stop and the lift read
+    snap: {
+      dur: 5,
+      ants: [
+        { morph: FIRE, script: (_t, v) => Object.assign(v, { x: 0, y: 0, heading: Math.PI * 0.5, hp: 100, antennaActivity: 1, mandible: 0.5 }) },
+        { script: attacker(R * 0.55, 0, Math.PI, 0, 1.6, 0.1) },
+      ],
+      cam: { tx: R * 0.5, ty: 0.5, tz: 0, dir: [0.06, 0.22, 1], dist: 8, fov: 30 },
+    },
     // two workers walk and die (onto the back / the side)
     death: {
       dur: 4,

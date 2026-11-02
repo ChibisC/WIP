@@ -259,12 +259,14 @@ const RAGE_K: Key = { up: 0.03, fwd: 0.02, pitch: 0.06, headPitch: 0.2, mand: 1,
  * the recoil; a hit-stop holds the contact a moment; then the prey is lifted against the horn (worker, queen) or the
  * paddle driven down and pulled free (the soldier's impale). Never a sideways swing of the jaws or the head.
  */
-const SNAP_W: Key = { fwd: 0.02, up: -0.035, pitch: -0.07, px: 0.25, headPitch: -0.3, mand: 1, gaster: 0.15, spread: 0.3 };
-const SNAP_S: Key = { fwd: -0.02, up: 0.0, pitch: 0.03, headPitch: 0.26, mand: 0, gaster: 0.05, spread: 0.3 };
-const SNAP_L: Key = { fwd: -0.04, up: 0.025, pitch: 0.07, headPitch: 0.34, mand: 0, spread: 0.25 };
-const IMPALE_W: Key = { fwd: -0.06, up: 0.05, pitch: 0.2, px: -0.3, headPitch: 0.32, mand: 1, gaster: 0.3, spread: 0.4, front: 0.35 };
-const IMPALE_S: Key = { fwd: 0.11, up: -0.03, pitch: -0.12, px: 0.25, headPitch: -0.46, mand: 0, gaster: 0.1, spread: 0.4 };
-const IMPALE_L: Key = { fwd: -0.03, up: 0.03, pitch: 0.06, headPitch: 0.18, mand: 0.15, spread: 0.3 };
+// (the clips: with the head lowered the cocked scythes swung into the ground — the head and front rise as the jaws
+// cock, so the open jaws sweep just above the ground in front of the prey, and the snap lifts it)
+const SNAP_W: Key = { fwd: 0.02, up: 0.03, pitch: 0.1, px: -0.25, headPitch: 0.32, mand: 0.85, gaster: 0.15, spread: 0.3 };
+const SNAP_S: Key = { fwd: -0.02, up: 0.035, pitch: 0.13, px: -0.25, headPitch: 0.52, mand: 0, gaster: 0.05, spread: 0.3 };
+const SNAP_L: Key = { fwd: -0.04, up: 0.04, pitch: 0.12, px: -0.25, headPitch: 0.44, mand: 0, spread: 0.25 };
+const IMPALE_W: Key = { fwd: -0.06, up: 0.06, pitch: 0.22, px: -0.3, headPitch: 0.45, mand: 0.85, gaster: 0.3, spread: 0.4, front: 0.35 };
+const IMPALE_S: Key = { fwd: 0.11, up: 0.0, pitch: -0.02, px: 0.25, headPitch: 0.02, mand: 0, gaster: 0.1, spread: 0.4 };
+const IMPALE_L: Key = { fwd: -0.03, up: 0.04, pitch: 0.1, headPitch: 0.3, mand: 0.1, spread: 0.3 };
 /** fraction of the attack cycle the hell ants' snap freezes on the contact */
 export const HIT_STOP = 0.07;
 

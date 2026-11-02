@@ -333,7 +333,8 @@ export function addContactShadows(scene: THREE.Scene, q: URLSearchParams, items:
   const k = Number(q.get('contactk') || 1);
   const mat = (o: number) => new THREE.MeshBasicMaterial({ map: contactTex, transparent: true, opacity: o * k, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const body = mat(0.85);
-  const foot = mat(0.7);
+  // (review round 4: the foot spots read as black dots at close range — fainter, wider)
+  const foot = mat(0.32);
   for (const it of items) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(it.len * 1.25, it.wid * 2.4).rotateX(-Math.PI / 2), body);
     m.position.set(it.x, 0.004, it.z);
@@ -341,7 +342,7 @@ export function addContactShadows(scene: THREE.Scene, q: URLSearchParams, items:
     m.renderOrder = 1;
     scene.add(m);
     for (const f of it.feet ?? []) {
-      const r = it.footR ?? it.len * 0.035;
+      const r = (it.footR ?? it.len * 0.035) * 1.6;
       const s = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2).rotateX(-Math.PI / 2), foot);
       s.position.set(f.x, 0.005, f.z);
       s.renderOrder = 1;
