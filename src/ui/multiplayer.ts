@@ -2,7 +2,7 @@
  * Title screen (Single-player / Multiplayer), the multiplayer menu (create or
  * join a game) and the lobby screen (multiplayer brief, Part E).
  */
-import { BORROWABLE, CASTES, SPECIES } from '../sim/species';
+import { BORROWABLE, CASTES, SPECIES, borrowName } from '../sim/species';
 import { Lobby, LOBBY_SPECIES, SLOT_COUNT } from '../net/lobby';
 import { LOBBY_TEAMS, TEAM_COLORS, TEAM_NAMES, cleanTeam, matchPlayers, simTeam } from '../net/match';
 import { mapPreview } from './mapPreview';
@@ -14,8 +14,8 @@ import type { MapId } from '../maps/types';
 import { runNetCheck } from './netCheckView';
 
 const COLORS = ['#d9a441', '#d0554a', '#5b8ed6', '#4fb595', '#b072d6', '#e07a3c', '#8fbf3f', '#e0e0d0'];
-/** "Red Wood Mortar": a borrowable caste's species and caste name */
-const casteName = (id: string) => `${SPECIES[CASTES[id].species].common.replace(' Ant', '')} ${CASTES[id].name}`;
+/** "Red Wood Mortar", "Nasute Termite Soldier": a borrowable caste's species and caste name */
+const casteName = borrowName;
 /** map card thumbnails, drawn once per map */
 const thumbs = new Map<string, HTMLCanvasElement>();
 
