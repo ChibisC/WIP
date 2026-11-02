@@ -16,7 +16,14 @@ npx vite build      # production build in dist/
 
 ## Modes
 
-The title screen has **Single-player** and **Multiplayer**.
+The title screen has **Story**, **Single-player** and **Multiplayer**.
+
+- **Story — *The Gene-Thief*** (chapter 1): a storm washes a Gene-Thief Termant queen ashore on Wayfarer Island. On the
+  island map pick a level, a difficulty (Easy, Normal, Hard, Brutal) and the stolen castes to bring (one slot); steal
+  each species' caste from its dead and keep it by winning. *The Garden Below* (black garden ants: steal the Black
+  Garden Ant Soldier) opens *Fire on the Banks* (tropical fire ants: steal the Tropical Fire Ant Major). Each level has
+  its own map with terraces and ramps, narration by a field scientist, short skippable camera shots (Esc), three medals
+  (time, losses, a bonus objective) and a field-journal page. Progress is kept in this browser.
 
 - **Single-player**, at your own pace, in four tabs: **Missions** (two story missions, *A Meadow Kingdom* and *The Forest Floor*, with a narrator, staged goals and a boss finale), **Skirmish** (you against 1–9 AI colonies on one of five authored maps — Meadow Pond, Forest Floor, Riverbank, Rainforest, Savanna — in teams; win when every rival queen falls), **Sandbox** (no rules: place any creature or boss, fill the stores, infinite food, wild creatures on or off) and **Battle Arena** (2–4 teams — Red, Blue, Green, Gold: drop any ants, termites or creatures in, 1–50 at a time and level I–III, round a team's corner or where you click; each team charges, holds or stands passive; the last team standing wins the round. Slow motion down to ¼×, climb rails and hitboxes make climbing easy to watch: put a passive stag beetle in the middle and send ants at it). You can pause (P) and change speed (− / =).
 - **Maps:** **Meadow Pond**, the first hand-made map (1.6 × 1.6 m: a lily pond, two streams with stepping stones, rocks, ten colony sites), or a random map in one of four styles. Four more hand-made maps are on the way.
@@ -99,7 +106,7 @@ You start with a queen, her seven-tile chamber and three small **nanitic** worke
 | Brood tiles | One per caste. Placed on dug floor as a ghost; a worker builds it and the food is paid on completion. Touching tiles of one kind form a chamber, which is one group card. |
 | Food Storage | Holds 10 / 40 / 100 food by level. |
 | Highway | Packed-earth floor: +10 / 20 / 25 % speed by level (other built tiles slow ants by 35 %). |
-| Species tiles | Fungus garden (leafcutters), root-aphid pasture (black garden ants), thatch (wood ants), sun-warmed brood mound (fire ants), carton wall (Termants: paid in wood, blocks enemies until chewed through). |
+| Species tiles | Fungus garden (leafcutters), root-aphid pasture (black garden ants), thatch (wood ants), sun-warmed brood mound (fire ants), carton wall (Termants: paid from their one food store, blocks enemies until chewed through). |
 | Upgrade (U) | Mark a tile for upgrade. Needs 6 points for level 2 and 12 for level 3 from its neighbours (same kind: its level; soil: 1; highway: its level). Costs the build cost. Hover shows each neighbour's points. |
 | Delete (Delete) | Downgrades one level first; at level 1 removes the tile (its ant dies) and refunds two-thirds of the cost as seeds, which workers carry to storage. |
 
@@ -172,6 +179,12 @@ npx vite-node tests/species.ts                                      # Nasute Ter
 npx vite-node tests/royals.ts                                       # termite royals (kit v2.1): sizes, chamber fit, king beside her, eggs from her tip
 npx vite-node tests/sickle.ts                                       # Sickle-Jaw Termites: the ramp, holds, rescue, one soldier per victim, size limit, miss, alarm, king, AI, litter, determinism
 npx vite-node tests/eciton.ts                                       # army ants: castes and old ids, diet, swarm front, lanes, porters, Soldier posts, bridges, plugs, hook, pinning, models unchanged, determinism
+npx vite-node tests/story.ts                                        # story mode and layered ground: rename, banks and ramps, both story maps, setup by difficulty and loadout, the director's scenes, every objective type, bonus and medals, a caste missed, the campaign save, determinism
+npx vite-node tools/playtest-story.ts -- garden normal 50 7          # a story level played headless by the colony AI plus a scripted player (level, difficulty, minutes, seed, loadout)
+npx vite-node tools/caste-table.ts                                   # every caste's numbers (-- creatures: the creatures')
+npx vite-node tools/balance-matrix.ts -- refs 300                     # equal-food fights v a reference caste (refw / refs / refm / creatures; docs/balance/castes.md)
+npx vite-node tools/balance-tune.ts -- lasius_soldier 300 atta_soldier # the stat scale at which a caste ties the reference
+# dev: ?story=1 the island map; ?story=garden&stage=2&ants=30 a level from any stage (with extra ants); &nocine=1 no camera shots
 npx vite-node tests/termants.ts                                     # Termants: genes from enemy corpses only, unlock, cost ×1.5, max 3, forget, glue and acid, wood, carton walls, one queen and no replacement, AI, determinism
 npx vite-node tests/animation.ts                                    # animation pass (render only): planted feet, variety, idles, hits, deaths, flings
 npx vite-node tools/anim-cost.ts -- 1040                            # the animation controller's CPU cost per frame for a crowd

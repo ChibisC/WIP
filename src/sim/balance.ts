@@ -61,7 +61,7 @@ export const BALANCE = {
     // workers: build 10
     lasius_worker: { build: 10, hatch: 2, grow: 18 },
     formica_worker: { build: 10, hatch: 3, grow: 22 },
-    fire_minor: { build: 10, hatch: 1.5, grow: 14 },
+    fire_minor: { build: 10, hatch: 1, grow: 14 }, // (balance pass 2026-11-02: hatch was 1.5)
     atta_minim: { build: 10, hatch: 1, grow: 12 },
     atta_media: { build: 10, hatch: 2.5, grow: 20 },
     eciton_minor: { build: 10, hatch: 2, grow: 16 },
@@ -69,19 +69,19 @@ export const BALANCE = {
     plagiaria_worker: { build: 10, hatch: 2.5, grow: 20 },
     // soldiers
     lasius_soldier: { build: 20, hatch: 4, grow: 28 },
-    fire_soldier: { build: 20, hatch: 3.5, grow: 24 },
+    fire_soldier: { build: 16, hatch: 3, grow: 24 },
     atta_soldier: { build: 24, hatch: 5, grow: 30 },
-    eciton_media: { build: 28, hatch: 5, grow: 30 },
+    eciton_media: { build: 24, hatch: 5, grow: 30 },
     formica_soldier: { build: 30, hatch: 6, grow: 36 },
     formica_mortar: { build: 30, hatch: 6, grow: 36 },
     formica_rapid: { build: 30, hatch: 6, grow: 36 },
     // majors
     fire_major: { build: 60, hatch: 10, grow: 44 },
     atta_major: { build: 70, hatch: 10, grow: 50 },
-    eciton_major: { build: 90, hatch: 12, grow: 50 },
+    eciton_major: { build: 75, hatch: 11, grow: 50 },
     // Nasute Termites, paid in wood: × the baseline worker (10 / 2 / 18) by NASUTE.broodCostWoodMul / broodTimeMul
     nasute_worker: { build: 10, hatch: 2, grow: 18 }, // × 1.0 / × 1.0
-    nasute_soldier: { build: 18, hatch: 3.6, grow: 23.4 }, // × 1.8 / × 1.3
+    nasute_soldier: { build: 22, hatch: 4.4, grow: 23.4 }, // × 2.2 / × 1.3 (balance pass 2026-11-02: was × 1.8; the glue stream is the user's)
     nasute_major: { build: 35, hatch: 7, grow: 32.4 }, // × 3.5 / × 1.8
     // Sickle-Jaw Termites, paid in plant matter: × the baseline worker (10 / 2 / 18) by SICKLE.broodCostMul / broodTimeMul
     rhy_worker: { build: 10, hatch: 2, grow: 18 }, // × 1.0 / × 1.0
@@ -646,7 +646,7 @@ export const NASUTE = {
     /** sources guaranteed near each termite nest at the start (twigs and branches) */
     startNear: 2,
   },
-  broodCostWoodMul: { worker: 1.0, nasute: 1.8, major: 3.5 },
+  broodCostWoodMul: { worker: 1.0, nasute: 2.2, major: 3.5 },
   broodTimeMul: { worker: 1.0, nasute: 1.3, major: 1.8 },
   /** final share of soldier brood growth drawn as a pale presoldier (render only) */
   presoldierFraction: 0.25,
@@ -859,10 +859,13 @@ export const TERMANT = {
   /** soldier glue burst: every `cooldown` s within `range` mm: `damage`, the target slowed to `slowMul` for `slow` s; formic acid × `acidMul` on a glued target */
   glue: { cooldown: 5, slow: 3, slowMul: 0.4, damage: 3, range: 4, acidMul: 2 },
   /**
-   * Dual diet: workers also gather dead wood, kept in a separate store (at most `cap`) that digests into food at
-   * `digestRate` food per second per 10 wood stored (× `toFood`). Wood sources spawn on maps with Termants.
+   * One store for everything (user 2026-11-02: "termants have the special ability to consume all known food resources
+   * as food (wood leaves and normal food all share 1 store)"): their workers gather dead wood, leaf litter and leaves as
+   * well as ordinary food, and each goes into the food store at `toFood` food per unit delivered. `cap` and
+   * `digestRate` are kept only for old saves (their wood store is turned into food on load). Wood sources spawn on
+   * maps with Termants.
    */
-  wood: { cap: 60, digestRate: 0.15, toFood: 0.5 },
+  wood: { cap: 60, digestRate: 0.15, toFood: 0.5, leafToFood: 1 },
   /** carton wall tile: paid in wood, hit points, build time (s), upgrade points */
   cartonWall: { cost: 8, hp: 120, build: 6, points: 1 },
   /** workers fetch corpses of species whose genes are still short first */
@@ -874,7 +877,7 @@ export const TERMANT = {
   corpseLingerSec: 25,
   /**
    * Termant AI: raid sooner (score × `raidScoreMul`, margin × `raidMarginMul`) a rival whose genes are within
-   * `raidNear` of their threshold; wood counts × `woodWant` as a forage source while the wood store is under half
+   * `raidNear` of their threshold; wood and leaves count × `woodWant` as a forage source while the food store is under half
    * full (× `woodSated` above); a carton wall goes up beside each entrance while intruders are inside (if the wood is
    * there), at most `wallsPerEntrance` each.
    */
@@ -1067,4 +1070,58 @@ export const ENTRANCE = {
   trafficS: 10,
   /** the refuse spot lies this far (mm) beyond the anthill's holes, between its first two */
   refuseMm: 24,
+};
+
+/**
+ * Layered ground (claude/maps/05-spec-layered-maps.md; world/layers.ts, docs/maps/layers.md): terraces one `step` above
+ * the other, their banks too steep to walk, joined by ramps no steeper than `rampMaxSlope`.
+ */
+export const LAYERS = {
+  /** height of one level (mm): about 8–9 worker lengths */
+  step: 34,
+  /** horizontal width of a bank (mm): 34 mm over 12 is about 70° */
+  bankW: 12,
+  /** the bank's outline wanders this far (mm) either side of the authored shape, over features of `jitterScale` mm */
+  bankJitter: 5,
+  jitterScale: 70,
+  /** a ramp's sides blend into the ground beside it over this many mm */
+  rampSide: 8,
+  /** the steepest ground ants and creatures walk (tan of the slope: 0.75 ≈ 37°); steeper bank and ramp-side ground blocks */
+  maxWalkSlope: 0.75,
+  /** the validator's limits for ramps: slope along the path (tan 25°), width (mm) */
+  rampMaxSlope: 0.47,
+  rampMinWidth: 40,
+  /** ants walking up a ramp go at this share of their speed (down: full speed) */
+  upSpeed: 0.85,
+  /** optional damage bonus for fighting from higher ground (off: EotU has none) */
+  highGroundBonus: 0,
+};
+
+/**
+ * Story mode (claude/story/02-spec; sim/story, docs/story/DESIGN-STORY.md). Difficulty multipliers (every one here):
+ * `enemyStat` scales enemy ants' and creatures' health and damage (`settings.enemyStatMul`), `wave` the size of
+ * scripted attack waves, `aggression` the rival AI's raid margin and the war AI (`settings.aggression`), `food` the
+ * player's starting food, `rival` the rival colonies' head start (developed nest and starting workers).
+ */
+export const STORY = {
+  difficulty: {
+    easy: { enemyStat: 0.75, wave: 0.6, aggression: 0.6, food: 1.6, rival: 0.7 },
+    normal: { enemyStat: 1, wave: 1, aggression: 1, food: 1, rival: 1 },
+    hard: { enemyStat: 1.2, wave: 1.35, aggression: 1.3, food: 0.85, rival: 1.25 },
+    brutal: { enemyStat: 1.4, wave: 1.7, aggression: 1.6, food: 0.7, rival: 1.5 },
+  },
+  /** stolen-caste slots: one to start, one more per boss beaten (later chapters) */
+  slots: { start: 1, perBoss: 1 },
+  /** seconds before a cue that waits on the world gives up and the scene moves on */
+  cueTimeout: 60,
+  /** how near (mm) counts as arrived for a walking cue */
+  arriveMm: 5,
+  /** a group cue is done when this share of its living members have done it */
+  groupDone: 0.8,
+  /** members of a walking group spread round the point (mm per member, a loose cluster) */
+  spread: 4,
+  /** a wave is beaten when this share of it is dead or gone (or it has been back home) */
+  waveBeaten: 0.8,
+  /** a guarding actor chases what came within its radius at most this far beyond it (mm) */
+  guardLeash: 40,
 };

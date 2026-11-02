@@ -1366,6 +1366,78 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
 - Docs: README (lobby line, species table), `docs/multiplayer.md` §Gene Thief. The Termants' `STOLEN_CASTES` already
   had the nasute and sickle-jaw soldiers; unchanged.
 
+### 2026-11-02 — Story mode, chapter 1: the Gene-Thief campaign, two levels on layered maps
+- User specs `claude/story/02-spec-gene-thief-chapter1-two-levels.md` and `03-spec-story-level-maps.md` (answers:
+  build the layered-ground core here, and let it take precedence where it overlaps other work; merge and publish here).
+  Design: `docs/story/DESIGN-STORY.md`; DESIGN.md §6 (story mode, layered ground).
+- **Rename**: the Termants are the **Gene-Thief Termants** everywhere players see them (`termant` stays the id). Stolen
+  castes go by the ants' own names — "Black Garden Ant Soldier", "Tropical Fire Ant Major", "Nasute Termite Soldier" —
+  never nicknames (`termants.ts stolenName`).
+- **Layered ground** (`world/layers.ts`, `MapDef.layers/ramps`, `LAYERS` in balance.ts): an authored map can raise or
+  sink areas by whole levels (34 mm a step) inside wandering banks; ramps are corridors with an eased rise. Bank faces
+  steeper than `maxWalkSlope` block (they become cliff cells of the obstacle mask), so flow fields route over the
+  ramps; ants slow going uphill (`Terrain.slopeSpeed`). The validator checks ramp width, slope, a clear centre line,
+  every level reachable dry and flooded, and that floods only fill low ground. `testTerrace` is the test map.
+- **Framework** (`sim/story/`): levels as data (`story/levels/*.ts`): actors (a creature, colony ants or a whole rival)
+  run scenes of cues (walk, path, hold, patrol, guard, follow, flee, charge, wait for a flag, release); stages hold
+  objectives (raise, fighters, build, dig, collect food, store wood, kill ants, steal a caste, raise it, kill the queen,
+  survive, kill a creature, escort, protect, reach, enter a nest; optional ones), captions on time or flags, and
+  actions (spawn, flood, food, camera shot, music, rival raid, tip). Everything is sim state in `w.s.mode.mission.story`
+  (saves, snapshots and replays carry it; the same commands give the same game). Difficulty (`STORY.difficulty`): enemy
+  stats, waves, aggression, food and rival size. Medals for time, losses and a level bonus.
+- **Client**: cinematic shots (letterbox, skippable with Esc), named captions by the narrator Dr. Elena Varga (no
+  model; captions only), music moods, the campaign save in localStorage (`ud-campaign-v1`), the chapter-end screen.
+- **The island hub** (`ui/islandMap.ts`, `ui/storyHub.ts`): Wayfarer Island with six regions and 43 level slots (the
+  campaign is planned for 30–40 levels, user 2026-11-02): pan, zoom and pinch, a level list by chapter, the genome
+  (stolen castes and the loadout for the next level), the journal, difficulty, medals.
+- **Level 1 "The Garden Below"** (`maps/story/gardenBelow.ts`, 1100 × 900 mm; meadow and flowerbed terraces, a soil
+  slope, a moss bank, stone steps and a slumped back ramp): the queen comes ashore after a storm; a ground beetle looks
+  her over; first contact with two Lasius scouts; corpses into the stores to steal the Black Garden Ant Soldier; a
+  Lasius raid; take the aphid plants and kill the queen.
+- **Level 2 "Fire on the Banks"** (`maps/story/fireBanks.ts`, 1200 × 900 mm; a clay shelf and a high sand bank over a
+  stream): a fire-ant foraging column; the swarm down the slope; steal the Tropical Fire Ant Major; the river floods the
+  low margin; take the mound by the main slope or the root at the east end. Chapter end.
+- Narration facts checked against sources (DESIGN-STORY §10); four lines corrected (the Lasius queen's 28¾ years were
+  in an entomologist's care, not a laboratory's; the Spanish galleons of the 1500s; fire-ant rafts are best known from
+  the red imported fire ant; "majors twice their length" dropped).
+- Tests: `tests/story.ts` (added to `npm test`): levels and maps validate, the director's cues, objectives, latching,
+  missed castes, medals, the campaign save, island capacity, two runs agree, snapshot restore mid-scene.
+  `tools/playtest-story.ts` plays a level with the colony AI and a scripted player.
+- Playtests after the caste balance (bot, seed 7): The Garden Below won on all four difficulties (29.6 / 48.0 / 33.7 /
+  38.4 min); Fire on the Banks won on Easy (33.2 min) and Normal (42.3 min), not in 60 min on Hard and Brutal (left to
+  people). Level 2's mound was cut down for the tougher fire ant minors (pop 18, developed 3, 10 starting workers; enemy
+  scale 0.85; 170 starting food). A story level no longer opens on the skirmish missions' briefing card.
+- Fixed on the way: the layered-ground commit gave flat authored maps a generated map's random props (a misplaced
+  `else` in `terrain.ts`).
+
+### 2026-11-02 — Caste and creature balance
+- User 00:34: "balance all current ant and termite species soldiers and workers and other castes (workers should be
+  similar in strength and stats but not the same like eotu) and buff creatures cos they are weak against ants right now".
+  Tables, method and results: `docs/balance/castes.md`; tools `tools/caste-table.ts`, `tools/balance-matrix.ts`,
+  `tools/balance-tune.ts`.
+- Equal-food fights against a reference caste (workers at 150 food, soldiers at 300, majors at 420; three seeds, both
+  sides), and a tie-point search on a stat scale, since the margins snowball. Every worker now ends within ±0.18 of the
+  black garden ant worker (before, the round-robin scores ran from −0.89 to +0.80: both termite workers lost to
+  everything, Plagiaria and leafcutter medias won almost everything); soldiers and majors within about ±0.3 of theirs.
+- Workers keep their own shapes (armoured leafcutter medias, fast army ants, venomous fire ants, slow tough termites,
+  acid-spraying Plagiaria); all build for 10.
+- The nasute's glue stream (2 → 20 dps) is the user's and stays; the nasute costs more wood instead (× 2.2).
+  Sickle-jaw soldiers win one on one and lose in groups (they hold one enemy at a time).
+- Creatures: hit points about doubled and bites up a little; the mantis strikes every 1.6 s, has armour 2 and flees at
+  10 %. Wild predators now beat 5 and 10 workers and need about 20 (the stone centipede and the mantis died to 5 before).
+  Bosses unchanged (80–120 workers or more).
+
+### 2026-11-02 — Termants: one food store for wood, leaves and food
+- User 10:47: "termants have the special ability to consume all known food resources as food (wood leaves and normal
+  food all share 1 store) fix that and push it to the game rn". Termant workers chew dead wood and leaf litter and carry
+  leaves as well as ordinary food, and all of it goes into the food store (`termants.ts termantDeposit`: wood at
+  `TERMANT.wood.toFood` 0.5 food a unit, leaves `leafToFood` 1; `diet.ts`: Termants eat every food kind). The separate
+  wood store, its digestion and the top bar's wood counter are gone; carton walls are paid from the food store (and
+  refunded as seeds like other tiles); the AI's wood want follows the food store. Save migration: an old save's wood
+  store turns into food on the next second. The story's "gather wood" goal counts wood carried in (`stats.wood`).
+- Tests: `tests/termants.ts` (wood into the food store, leaves into the food store, an old wood store converted, carton
+  walls paid from food, the AI plans a wall with the food).
+
 
 ## 2026-11-02 — Realism rework: hell ants and nasute termites (CHANGE_PLAN §22)
 User spec `claude/realism/08-spec-hell-ants-nasute-termites.md`. Looks and animation only: every unit id, stat, ability

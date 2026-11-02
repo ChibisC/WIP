@@ -1,7 +1,7 @@
 /**
  * Headless tests for the Termants (claude/termyrms package, plan Step 8): data and the king, gene samples only
  * from enemy corpses delivered to the store, unlocking a stolen caste (its tile, its cost), the three-caste limit and
- * forgetting with refunds, the glue burst (slow, double acid), the wood store and digestion, carton walls (block
+ * forgetting with refunds, the glue burst (slow, double acid), one food store for wood, leaves and food, carton walls (block
  * enemies, are chewed down, break), one queen and no replacement, other species' models
  * unchanged, and determinism.
  *   npx vite-node tests/termants.ts
@@ -19,7 +19,7 @@ import { CASTES, SPECIES, casteOf } from '../src/sim/species';
 import { assignGroup, placeMarker } from '../src/sim/markers';
 import { applyCommand } from '../src/sim/commands';
 import { placeTile, tileAt, tileCost } from '../src/sim/tiles';
-import { genesNear, genomeOf, STOLEN_CASTES, stolenOf, termantAI, threshold } from '../src/sim/termants';
+import { genesNear, genomeOf, STOLEN_CASTES, stolenName, stolenOf, termantAI, threshold } from '../src/sim/termants';
 import { encodeState, hashState, restoreWorld } from '../src/sim/snapshot';
 import { MORPHS } from '../src/render/ants/morphs';
 import { hashMorph } from '../tools/morphHashLib';
@@ -69,9 +69,10 @@ const cmd = (w: World, body: Parameters<typeof applyCommand>[1]) => applyCommand
   const c = w.colony(0)!;
   const king = w.antById.get(c.king ?? -1);
   const queen = w.antById.get(c.queen)!;
-  check('Termants: worker, soldier, queen and king; display name from the config value', SPECIES.termant.common === 'Termants' && c.castes.join() === 'termant_worker,termant_soldier' && casteOf('termant_king').role === 'king');
+  check('Termants: worker, soldier, queen and king; display name from the config value', SPECIES.termant.common === 'Gene-Thief Termants' && c.castes.join() === 'termant_worker,termant_soldier' && casteOf('termant_king').role === 'king');
   check('the king is spawned beside the queen in the royal chamber', !!king && king.caste === 'termant_king' && king.space === nestSpace(0) && Math.hypot(king.x - queen.x, king.y - queen.y) < 12, `${king ? Math.hypot(king.x - queen.x, king.y - queen.y).toFixed(1) : '-'} mm from her`);
-  check('the stolen-caste table covers the species in the game', STOLEN_CASTES.length >= 8 && STOLEN_CASTES.every((e) => CASTES[e.caste]), STOLEN_CASTES.map((e) => e.name).join(', '));
+  check('the stolen-caste table covers the species in the game', STOLEN_CASTES.length >= 8 && STOLEN_CASTES.every((e) => CASTES[e.caste]), STOLEN_CASTES.map((e) => stolenName(e)).join(', '));
+  check('stolen castes go by their ant names, no nicknames (user 2026-11-01)', stolenName('lasius_soldier') === 'Black Garden Ant Soldier' && stolenName('fire_major') === 'Tropical Fire Ant Major' && stolenName('nasute_soldier') === 'Nasute Termite Soldier' && STOLEN_CASTES.every((e) => !('name' in e)), STOLEN_CASTES.map((e) => stolenName(e)).join(', '));
   const base = morphBase as Record<string, string>;
   const changed = Object.keys(base).filter((k) => MORPHS[k] && hashMorph(k) !== base[k]);
   check(`other species' ant models are byte-identical (${Object.keys(base).length} morphs)`, changed.length === 0, changed.join(', '));
@@ -167,20 +168,30 @@ const cmd = (w: World, body: Parameters<typeof applyCommand>[1]) => applyCommand
   const wood = makeFood(w, 'wood', SURFACE, mx, my, 1, 'branch');
   wood.amount = wood.max = 40;
   w.reindex();
-  const food0 = c.food;
-  let maxWood = 0;
-  for (let t = 0; t < 20 * 90; t++) {
-    run(w, 1);
-    maxWood = Math.max(maxWood, c.wood ?? 0);
-  }
-  check('workers chew dead wood and store it apart from food', maxWood > 3, `wood store peaked at ${maxWood.toFixed(1)}`);
+  // one store (user 2026-11-02): wood goes straight into the food store
+  const stored0 = c.stats.food;
+  for (let t = 0; t < 20 * 90; t++) run(w, 1);
+  const wood0 = c.stats.wood ?? 0;
+  check('workers chew dead wood into the food store (no separate wood store)', wood0 > 3 && c.stats.food - stored0 >= wood0 * TERMANT.wood.toFood - 1e-6 && !(c.wood ?? 0), `${wood0.toFixed(1)} wood carried in; food stored +${(c.stats.food - stored0).toFixed(1)}`);
   const sol = makeAnt(w, 0, 'termant_soldier', SURFACE, mx, my, 0);
   check('soldiers leave the wood to the workers', !casteOf(sol.caste).wood && !!casteOf('termant_worker').wood);
-  c.wood = TERMANT.wood.cap + 50;
+  // an old save's wood store becomes food
+  c.wood = 40;
   c.food = 0;
-  const w0 = c.wood;
-  run(w, 20 * 10);
-  check(`wood digests slowly into food (${TERMANT.wood.digestRate} per s per 10 stored, × ${TERMANT.wood.toFood})`, (c.wood ?? 0) < w0 && c.food > 0, `${w0} wood → ${(c.wood ?? 0).toFixed(1)}; food ${c.food.toFixed(1)} (from ${food0.toFixed(0)} before)`);
+  run(w, 20 * 2);
+  check('an old save\'s wood store is turned into food on the next second', !(c.wood ?? 0) && c.food >= 40 * TERMANT.wood.toFood - 1e-6, `food ${c.food.toFixed(1)}`);
+}
+{
+  // leaves are food too, carried in by the workers into the same store
+  const w = world();
+  const c = w.colony(0)!;
+  const { mx, my } = foragers(w, 8);
+  const leaf = makeFood(w, 'leaf', SURFACE, mx + 6, my, 2, 'leaf');
+  leaf.loose = 1;
+  w.reindex();
+  for (let t = 0; t < 20 * 60 && w.s.food.includes(leaf) && leaf.amount > 0; t++) run(w, 1);
+  run(w, 20 * 20);
+  check('workers carry leaves into the food store', c.stats.food > 0 && (!w.s.food.includes(leaf) || leaf.amount <= 0) && !c.fungus, `food stored ${c.stats.food.toFixed(1)}`);
 }
 
 // ---- carton walls
@@ -231,7 +242,7 @@ const cmd = (w: World, body: Parameters<typeof applyCommand>[1]) => applyCommand
     foe.cd = 0;
   }
   check('chewed down to nothing, the wall is gone', !tileAt(c, wq));
-  check('carton walls are paid in wood', tileCost(c, 'carton') === TERMANT.cartonWall.cost);
+  check('carton walls are paid from the food store', tileCost(c, 'carton') === TERMANT.cartonWall.cost);
 }
 
 // ---- the king (user note 2026-10-25): never targeted, no damage, a weak bite, dies with the queen; one queen, no replacement
@@ -272,11 +283,11 @@ const cmd = (w: World, body: Parameters<typeof applyCommand>[1]) => applyCommand
   check('Termant AI: with a fourth caste waiting it forgets the stolen caste with the fewest living ants', G.stolen.includes(keep) && !G.pending && G.stolen.length === TERMANT.maxStolen && before.filter((cs) => !G.stolen.includes(cs)).length === 1 && before.indexOf(before.find((cs) => !G.stolen.includes(cs))!) === 1, `${before.join(', ')} → ${G.stolen.join(', ')}`);
   // intruders inside, wood in store: a carton wall planned beside the entrance
   const g = w.nest(0)!;
-  c.wood = 30;
+  c.food = Math.max(c.food, 30);
   c.intruders = [{ x: 0, y: 0 }];
   termantAI(w, c);
   const wall = c.tiles.find((t) => t.type === 'carton');
-  check('Termant AI: under invasion, with the wood, it plans a carton wall beside the entrance', !!wall && !wall.built && g.neighbors(wall.q).some((n) => n >= 0 && g.isEntrance(n)));
+  check('Termant AI: under invasion, with the food, it plans a carton wall beside the entrance', !!wall && !wall.built && g.neighbors(wall.q).some((n) => n >= 0 && g.isEntrance(n)));
   c.intruders = [];
   check('Termant AI: raids sooner a rival whose genes it nearly has', ((G.samples.eciton = threshold(stolenOf('eciton_major')!) * 0.8), genesNear(c, 'eciton')) && !genesNear(c, 'formica'));
 }
@@ -320,7 +331,7 @@ const cmd = (w: World, body: Parameters<typeof applyCommand>[1]) => applyCommand
     run(w, 1);
     if (lancer.state === AS.Spray) sprayed = true;
   }
-  check("a stolen Acid Lancer fights with its own species' formic-acid spray, for the Termants", sprayed && lancer.colony === 0 && foe.hp < 400, `foe ${foe.hp.toFixed(0)} / 400`);
+  check("a stolen Red Wood Ant Rapid Sprayer fights with its own species' formic-acid spray, for the Termants", sprayed && lancer.colony === 0 && foe.hp < 400, `foe ${foe.hp.toFixed(0)} / 400`);
 }
 
 void Carry;

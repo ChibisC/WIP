@@ -459,6 +459,11 @@ The default population limit is 300.
 - The tuning lives in `BALANCE.aiWar`.
 
 ### 3.11b Species specials (Phase 12)
+- **Caste balance (2026-11-02, `docs/balance/castes.md`):** every species' workers are alike for their cost (all build
+  for 10; within ±0.18 of the black garden ant worker in equal-food fights) but keep their own shapes; soldiers are tuned
+  against the black garden ant soldier at 300 food, majors against the fire ant major at 420. Tools:
+  `tools/caste-table.ts` (the numbers), `tools/balance-matrix.ts` (equal-food fights, creature fights),
+  `tools/balance-tune.ts` (the stat scale at which a caste ties its reference).
 - **Black garden ant (Lasius):** tends aphids on the surface; root-aphid pastures in the nest trickle honeydew.
 - **Red wood ant (Formica):** acid (opener sprays; mortar and rapid sprayers). Thatch stores warm the nest, so brood grows faster.
 - **Leafcutter (Atta):** cuts leaves, with minims riding on them as hitchhikers. Fungus gardens turn the leaves into food.
@@ -612,7 +617,7 @@ From the user's package `claude/termyrms/` (2026-10-25). An ant–termite hybrid
 
 - **Castes:** worker 5 mm (formic-acid opener, gathers wood), soldier 7 mm (glue burst; gathers and fights like an ant's soldier), king 7.5 mm (spawned beside the queen; role `king`, never in caste ratios), queen 12 mm. Ratio 85 / 15. One queen and no replacement queens (user note, 2026-10-25): when she dies the colony is lost, king or not.
 - **Genes → stolen castes:** samples credited at the store (`termantDeposit`) from enemy corpses only (size classes 1 / 2 / 4 / 7, creatures 3; pieces cut from a corpse carry their share). 12 samples (18 heavy) unlock the source species' caste from `STOLEN_CASTES`; it joins `colony.castes`, so everything about it is that species' own. Max 3; a fourth waits until one is forgotten (command `forgetCaste`: tiles refunded, living ants stay, samples to half). Tiles ×1.5. Corpses linger 25 s in Termant games so they can be carried home. Command `corpsePriority` makes workers fetch the corpses of still-short species first.
-- **Glue burst** (`glueT` on ants and creatures): +3 damage, speed ×0.4 for 3 s, formic acid ×2 meanwhile. **Wood:** separate store (cap 60) digesting into food. **Carton walls:** tile `carton`, paid in wood, 120 HP, blocks enemies (they chew it), own ants pass, wall points for upgrades.
+- **Glue burst** (`glueT` on ants and creatures): +3 damage, speed ×0.4 for 3 s, formic acid ×2 meanwhile. **One food store** (user 2026-11-02): dead wood, leaf litter and leaves go into the food store with everything else (wood at `TERMANT.wood.toFood` 0.5 food a unit, leaves 1); an old save's wood store turns into food on load. **Carton walls:** tile `carton`, paid from the food store, 120 HP, blocks enemies (they chew it), own ants pass, wall points for upgrades.
 - **Ability:** Alarm Drumming (colony alarmed 15 s, every glue burst ready; 70 s). **UI:** Genome tab, wood in the top bar, stolen names on tiles and cards. **Render:** stolen-caste amber tint (code in `aD.z`, see `antMaterial.TINT_GLSL`). **AI:** mix follows the stolen castes, forgets the least-used, carton walls when invaded, raids sooner a rival whose genes it nearly has.
 
 ### 3.12 Underground areas (`sim/areas.ts`, Revision 2)
@@ -901,6 +906,20 @@ both modes.
 - **Single-player** holds the missions, skirmish and sandbox, with pause and speed controls.
 - **Multiplayer** is 2–4 players plus AI colonies on one generated map, through a lobby and invite links; last queen standing wins.
 - A multiplayer match runs at 1× and **cannot be paused** (user note).
+
+**Story mode (2026-11-02; `docs/story/DESIGN-STORY.md`).** The **Story** tab (and the title screen's Story card) opens
+the island map of *The Gene-Thief* campaign: chapter 1 is two levels for the Gene-Thief Termants on their own layered
+maps (*The Garden Below* against black garden ants, *Fire on the Banks* against tropical fire ants). A story level is a
+data file (`src/story/levels/`) played by the mission runner above (`missionDef(id)` resolves missions and levels; the
+Missions menu still lists only the two missions). It adds data-driven objectives, captions and actions on times and
+flags, a director that makes the level's creatures and enemy ants act out scenes (`sim/story/director.ts`, cues such as
+walk, hold, patrol, guard, leave, charge, release), letterboxed camera shots, difficulty (`STORY` in balance.ts), three
+medals per level and a campaign save (castes kept, slots, journal) that never touches skirmish or multiplayer.
+
+**Layered ground (2026-11-02; `world/layers.ts`, claude/maps/05-spec).** A map may raise terraces and sink hollows one
+`LAYERS.step` (34 mm) per level; their banks are cliffs that block like walls, and ramps are the only way between levels
+(≤ 25°, ≥ 40 mm wide, checked by the validator with layer reachability, dry and flooded). The two story maps use it; the
+five skirmish maps are unchanged so far (their rework is the layered-maps spec's own job).
 
 ### Caste/tile model
 Every caste is a `CasteDef`: stats, morph, abilities and a **tier** (worker / soldier / heavy). Costs are **per caste** in `BALANCE.castes` (user note 2026-10-24): every worker caste costs 10 to build, and hatch cost and grow time scale with strength (castes not listed fall back to their tier).

@@ -414,9 +414,9 @@ function sourceValue(w: World, c: Colony, x: number, y: number, cut: boolean, te
   w.foodNear(x, y, 34, (f) => {
     if (f.space !== SURFACE || f.heldBy || f.amount <= 0 || f.kind === 'honeydew' || f.colony === -2) return false;
     if (f.kind === 'corpse' && w.teamOf(f.colony) === w.teamOf(c.id)) return false;
-    if (f.kind === 'leaf' && !cut) return false;
+    if (f.kind === 'leaf' && !cut && c.species !== 'termant') return false;
     if (!edible(c, f)) return false;
-    v += f.kind === 'wood' && c.species === 'termant' ? f.amount * woodWant(c) : f.amount;
+    v += (f.kind === 'wood' || f.kind === 'leaf') && c.species === 'termant' ? f.amount * woodWant(c) : f.amount;
     return false;
   });
   // Leafcutters live on their fungus: leaves count for more while the garden is hungry.

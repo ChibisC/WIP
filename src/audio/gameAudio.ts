@@ -89,6 +89,9 @@ export class GameAudio {
   private mixer = new Mixer();
   private heat = 0;
   private boss = 0;
+  /** story levels: the music mood the level asks for (a floor under the fight intensity, and the boss stem) */
+  private moodFloor = 0;
+  private moodBoss = 0;
   private bossNear = 0;
   private surfaceMix = 1;
   private last = performance.now();
@@ -180,6 +183,11 @@ export class GameAudio {
   // ---------------------------------------------------------------- events
 
   private event(e: SimEvent): void {
+    if (e.t === 'story' && e.what === 'music') {
+      const M: Record<string, [number, number]> = { calm: [0, 0], tense: [0.35, 0], swarm: [0.85, 0.35], assault: [0.6, 0.15] };
+      [this.moodFloor, this.moodBoss] = M[e.mood ?? 'calm'] ?? [0, 0];
+      return;
+    }
     if (!audio.ctx) return;
     const me = this.s.player.id;
     switch (e.t) {
@@ -555,7 +563,7 @@ export class GameAudio {
     const target = v.space === 'surface' ? 1 : 0;
     this.surfaceMix += (target - this.surfaceMix) * (1 - Math.exp(-dt / 0.5));
     this.ambience.update({ style: this.style, surface: this.surfaceMix, night: s.world.s.night ?? 0, zoom: Math.max(0, Math.min(1, (L.ref - 40) / 500)), rain: this.rain, activity: this.activity });
-    this.music.update(dt, 1 - Math.exp(-this.heat * 0.8), this.boss);
+    this.music.update(dt, Math.max(this.moodFloor, 1 - Math.exp(-this.heat * 0.8)), Math.max(this.boss, this.moodBoss));
   }
 
   /**

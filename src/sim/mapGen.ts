@@ -20,7 +20,9 @@ import { BALANCE, NASUTE, SICKLE } from './balance';
 import { edible } from './diet';
 import { datan2, dcos, dhypot, dsin } from './dmath';
 import { creatureSystem, ecologySystem, registerCreatureHooks } from './creatures/creatureAI';
-import { MissionId, missionSystem, startMission } from './missions';
+import { MissionId, missionOf, missionSystem, startMission } from './missions';
+import type { Difficulty } from './story/types';
+import { initStory, storySystem } from './story/runner';
 import { ecitonSystem } from './eciton';
 import { termantSystem } from './termants';
 import { arenaSystem, setupArena } from './arena';
@@ -61,6 +63,8 @@ export interface GameSetup {
   settings?: Partial<SimState['settings']>;
   /** single-player mission script (sim/missions.ts) */
   mission?: MissionId;
+  /** a story level (sim/story): the difficulty and the stolen castes brought in (the level is `mission`) */
+  story?: { difficulty: Difficulty; loadout: string[] };
   /** sandbox game: the sandbox commands (spawn, fill stores, toggles) are allowed */
   sandbox?: boolean;
   /** battle arena (sim/arena.ts): the colonies are the teams; no economy */
@@ -130,6 +134,8 @@ export function registerSystems(w: World): void {
     { name: 'separation', fn: separationSystem, every: 2 },
     { name: 'ecology', fn: ecologySystem, every: 20 },
     { name: 'mission', fn: missionSystem, every: 20 },
+    // story levels: the director (scenes, cues, waves) every tick (sim/story)
+    { name: 'story', fn: storySystem },
     // storms on authored maps (only when the match turns floods on)
     { name: 'floods', fn: floodSystem },
     ...extraSystems,
@@ -176,6 +182,7 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
     createColony(w, opts);
   });
   if (setup.mission) startMission(w, setup.mission, w.s.colonies.find((c) => c.player)?.id ?? 0);
+  if (setup.mission && setup.story) initStory(w, missionOf(w)!, setup.mission as 'garden' | 'fireBanks', setup.story.difficulty, setup.story.loadout);
   if (setup.sandbox) w.s.mode.sandbox = true;
   if (setup.arena) setupArena(w);
 

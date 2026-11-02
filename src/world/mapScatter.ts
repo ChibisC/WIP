@@ -119,6 +119,8 @@ export function mapObstacles(t: Terrain, map: MapDef): MapObstacle[] {
     for (const wb of map.water) if (shapeDist(wb.shape, x, z) < 10) return false;
     for (const wl of map.walls) if (shapeDist(wl.shape, x, z) < 1) return false;
     for (const wk of map.walkways) if (shapeDist(wk.shape, x, z) < m) return false;
+    // layered ground: nothing on a ramp (its walkway stays open, its sides are bank) or on a bank (world/layers.ts)
+    if (t.layers && (onLayerEdge(t, x, z) || onLayerEdge(t, x + r + 2, z) || onLayerEdge(t, x - r - 2, z) || onLayerEdge(t, x, z + r + 2) || onLayerEdge(t, x, z - r - 2))) return false;
     return !keepClear(x, z, r);
   };
   const out: MapObstacle[] = [];
@@ -180,6 +182,15 @@ export function mapObstacles(t: Terrain, map: MapDef): MapObstacle[] {
     if (free(x, z, 10, 10)) out.push({ kind: 'fern', x, y: z, s, seed, r: Math.max(3, s * 0.05) });
   }
   return out;
+}
+
+/** On a ramp (core or sides) or a bank of the layered ground? */
+function onLayerEdge(t: Terrain, x: number, z: number): boolean {
+  const L = t.layers!;
+  const i = Math.min(t.nx - 1, Math.max(0, Math.round(x / t.res)));
+  const j = Math.min(t.ny - 1, Math.max(0, Math.round(z / t.res)));
+  const k = j * t.nx + i;
+  return L.ramp[k] !== 0 || L.bank[k] !== 0;
 }
 
 /** The centre line of a twig (as render/props.ts branchGeometry bends it, from the same seed), `n` + 1 points. */

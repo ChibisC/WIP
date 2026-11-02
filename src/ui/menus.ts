@@ -3,7 +3,7 @@ import { GameSession } from '../game/session';
 import { Action, ACTION_LABELS, DEFAULT_BINDINGS } from '../core/input';
 import { Volumes, bindingChanges, keyLabel, profile, rebind, settings, updateSettings } from '../game/profile';
 import { SAVE_SLOTS, SaveSlot, describeSave, download, listSaves, putSave, readSaveHeader, savesPersist, slotName, stampedName } from '../game/saves';
-import { MISSIONS, missionOf } from '../sim/missions';
+import { MISSIONS, missionDef, missionOf } from '../sim/missions';
 import { SPECIES } from '../sim/species';
 import { creditsHtml } from './credits';
 import { BUILD_ID } from '../net/messages';
@@ -196,6 +196,9 @@ export class Menus {
       r5.append(give);
     }
     r5.append(button('', 'Credits', 'Who made what, and the licences of the sounds', () => this.credits()));
+    // a story level: back to the island map (the level is not won; nothing is recorded)
+    const sm = missionOf(this.s.world);
+    if (sm && missionDef(sm.id)?.story) r5.append(button('', 'Back to the island', 'Leave this level and return to the island map', () => (location.href = `${location.pathname}?story=1`)));
     r5.append(button('', 'Quit to title', 'Leave this game and return to the title screen', () => (location.href = location.pathname)));
     m.appendChild(r5);
   }
@@ -404,7 +407,7 @@ export class Menus {
   briefing(): void {
     const m = missionOf(this.s.world);
     if (!m) return;
-    const def = MISSIONS[m.id];
+    const def = missionDef(m.id);
     const sp = SPECIES[this.s.player.species];
     const best = profile().medals[m.id];
     this.modal(def.title, (box) => {
@@ -417,7 +420,17 @@ export class Menus {
       box.appendChild(el('h3', '', `Your colony: ${esc(sp.common)}`));
       box.appendChild(el('p', '', `<i>${esc(sp.scientific)}</i>. ${esc(sp.blurb)}${sp.id !== def.species ? ` (The mission was written for the ${esc(SPECIES[def.species].common.toLowerCase())}; any colony can play it.)` : ''}`));
       box.appendChild(el('h3', '', 'Medals'));
-      box.appendChild(el('p', '', `Finish within 25 minutes of game time for <b class="medal gold">gold</b>, 40 for <b class="medal silver">silver</b>; any finish earns <b class="medal bronze">bronze</b>.${best ? ` Your best: <b class="medal ${best.medal}">${best.medal}</b> in ${fmtTime(best.time)}.` : ''}`));
+      const md = def.story?.medals;
+      if (md)
+        // a story level's three medals (sim/story/runner.ts storyMedals)
+        box.appendChild(
+          el(
+            'p',
+            '',
+            `<b>Time:</b> <b class="medal gold">gold</b> within ${Math.round(md.time[0] / 60)} minutes, <b class="medal silver">silver</b> within ${Math.round(md.time[1] / 60)}. <b>Losses:</b> gold at ${md.losses[0]} ants lost or fewer, silver at ${md.losses[1]}. <b>Bonus:</b> ${esc(md.bonus.text)}.`,
+          ),
+        );
+      else box.appendChild(el('p', '', `Finish within 25 minutes of game time for <b class="medal gold">gold</b>, 40 for <b class="medal silver">silver</b>; any finish earns <b class="medal bronze">bronze</b>.${best ? ` Your best: <b class="medal ${best.medal}">${best.medal}</b> in ${fmtTime(best.time)}.` : ''}`));
       const r = el('div', 'row');
       r.append(button('go-btn', 'Begin', 'Start the mission', () => this.close()));
       box.appendChild(r);

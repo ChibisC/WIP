@@ -5,6 +5,9 @@ import { FOREST_FLOOR } from './forestFloor';
 import { RIVERBANK } from './riverbank';
 import { RAINFOREST } from './rainforest';
 import { SAVANNA } from './savanna';
+import { TEST_TERRACE } from './testTerrace';
+import { GARDEN_BELOW } from './story/gardenBelow';
+import { FIRE_BANKS } from './story/fireBanks';
 
 export type { MapDef, MapId } from './types';
 
@@ -17,6 +20,10 @@ export const MAPS: Partial<Record<MapId, MapDef>> = {
   riverbank: RIVERBANK,
   rainforest: RAINFOREST,
   savanna: SAVANNA,
+  testTerrace: TEST_TERRACE,
+  // story maps (claude/story/03-spec): played from the campaign, not offered in the skirmish menus
+  gardenBelow: GARDEN_BELOW,
+  fireBanks: FIRE_BANKS,
 };
 
 /** The maps offered in menus and the lobby, in order. */

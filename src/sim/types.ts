@@ -204,6 +204,15 @@ export interface Ant {
   cd: number;
   /** special ability cooldown (acid) */
   cd2: number;
+  /**
+   * Story director (sim/story/director.ts): the actor this ant plays (its index in the level's cast; absent when it
+   * is not directed), its place along a path (`dirW`, loops `dirL`) and a wander goal (`dirX`, `dirY`).
+   */
+  dirA?: number;
+  dirW?: number;
+  dirL?: number;
+  dirX?: number;
+  dirY?: number;
   /** marker index 0..4 the ant's group is out at, −1 = home */
   marker: number;
   /** nest entrance index used */
@@ -528,6 +537,8 @@ export interface ColonyStats {
   peakPop: number;
   /** enemy brood carried off in raids */
   stolen: number;
+  /** dead wood a Termant colony has carried into its store (the story's "gather wood" goal) */
+  wood?: number;
 }
 
 export interface Colony {
@@ -580,7 +591,7 @@ export interface Colony {
   ecRaid?: EcRaid[];
   /** army ants: living bridges and pothole plugs on the raid trails (eciton.ts) */
   ecLinks?: EcLink[];
-  /** Termants (termants.ts): gene samples and stolen castes, the wood store */
+  /** Termants (termants.ts): gene samples and stolen castes; `wood` is only an old save's wood store (turned into food) */
   genome?: Genome;
   wood?: number;
   /** AI forage planner memory (colonyAI). */
