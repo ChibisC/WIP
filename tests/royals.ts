@@ -8,7 +8,7 @@
 import { EventBus, SimEvent } from '../src/core/events';
 import { createWorld } from '../src/sim/mapGen';
 import { World } from '../src/sim/world';
-import { Ant, AS, Colony, nestSpace } from '../src/sim/types';
+import { Ant, AS, Colony, POSE, nestSpace } from '../src/sim/types';
 import { CASTES, casteOf } from '../src/sim/species';
 import { tileAt } from '../src/sim/tiles';
 import { hashState } from '../src/sim/snapshot';
@@ -72,14 +72,34 @@ for (const seed of [4, 9, 13]) {
   let outside = 0;
   for (const [x, y] of bodyPoints(q)) if (!inChamber(w, c, x, y)) outside++;
   check(`seed ${seed}: the queen's whole 25 mm body lies inside the royal chamber`, outside === 0, `${outside} outline points outside`);
-  // a few minutes of colony life: the king settles beside her; nobody walks through her abdomen
+  // a few minutes of colony life: the king walks round her in the chamber (user note 2026-11-02); nobody walks through
+  // her abdomen
   let inside = 0;
   let worst = 0;
   let kingIn = true;
+  let kingWalked = 0;
+  let kingNear = Infinity;
+  let kingFar = 0;
+  let attended = 0;
+  let stood = 0;
+  let kx = NaN;
+  let ky = NaN;
   for (let t = 0; t < 180 * 20; t++) {
     w.step(0.05);
     events(w);
     if (t % 5 || t < 100) continue;
+    const kk = w.antById.get(c.king!)!;
+    if (!Number.isNaN(kx)) kingWalked += Math.hypot(kk.x - kx, kk.y - ky);
+    kx = kk.x;
+    ky = kk.y;
+    const ks = distToQueenBody(q, kk.x, kk.y);
+    kingNear = Math.min(kingNear, ks);
+    kingFar = Math.max(kingFar, ks);
+    if (kk.v === 0 && kk.pose !== POSE.ALARM) {
+      stood++;
+      const kv = antToView(w, kk, blankView(), kk.space, -1);
+      if (kv.tState === AnimState.ATTEND && kv.aimX !== undefined && distToQueenBody(q, kv.aimX, kv.aimY!) < 0) attended++;
+    }
     for (const a of w.s.ants) {
       if (a.state === AS.Dead || a.colony !== 0 || a === q || a.space !== q.space) continue;
       const d = distToQueenBody(q, a.x, a.y);
@@ -90,13 +110,9 @@ for (const seed of [4, 9, 13]) {
     if (!inChamber(w, c, k.x, k.y)) kingIn = false;
   }
   check(`seed ${seed}: nobody walks through the queen's abdomen (a solid body: paths go round, separation pushes out)`, inside === 0, `deepest ${(-worst).toFixed(2)} mm in`);
-  const k = w.antById.get(c.king!)!;
-  const kp = { x: 0, y: 0, h: 0 };
-  kingSpot(w, q, k.caste, kp);
-  const side = distToQueenBody(q, k.x, k.y);
-  check(`seed ${seed}: the king stands at his place beside her, clear of her body, close enough for his antennae, inside the chamber`, Math.hypot(k.x - kp.x, k.y - kp.y) < 1.5 && side > 1.2 && side < 4 && kingIn, `${Math.hypot(k.x - kp.x, k.y - kp.y).toFixed(2)} mm from his spot, ${side.toFixed(2)} mm from her side`);
-  const v = antToView(w, k, blankView(), k.space, -1);
-  check(`seed ${seed}: render: the king plays ATTEND (kit v2.1), head aimed at her abdomen`, v.tState === AnimState.ATTEND && v.aimX !== undefined && distToQueenBody(q, v.aimX, v.aimY!) < 0, `state ${v.tState}`);
+  const KL = casteOf(w.antById.get(c.king!)!.caste).length;
+  check(`seed ${seed}: the king walks round her inside the chamber, clear of her body, never far from her (user note 2026-11-02)`, kingIn && kingWalked > 50 && kingNear > 0.3 && kingFar < KL * 1.6, `walked ${kingWalked.toFixed(0)} mm; ${kingNear.toFixed(2)}–${kingFar.toFixed(2)} mm from her side`);
+  check(`seed ${seed}: render: standing by her the king plays ATTEND (kit v2.1), head aimed at her abdomen`, stood > 0 && attended >= stood * 0.8, `${attended} of ${stood} standing samples`);
 }
 
 // ---------------------------------------------------------------- eggs from her tip

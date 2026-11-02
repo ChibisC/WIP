@@ -1605,3 +1605,17 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   16 min (its ally went to help and fell back, outmatched). Allies with the brain are more decisive both ways.
   The first version (before lost causes were left alone) did worse: helpers died in
   hopeless fights and the helper fell sooner than with the brain off.
+
+### 2026-11-02 — Kings do no nest duties: they walk round the queen in her chamber
+- **User note** (15:21): "the kings of termants and termites should just wander around the nanitic chamber the queen
+  is on and doesnt do nest duties, it only walks around the queen and attacks intruders."
+- **Found:** every king counted as a worker for the nest jobs (`isJobWorker`: his caste's tier is "worker"). The
+  Termant king carried eggs and tended the queen like a worker (in 4 min: 527 ticks carrying brood, out of the royal
+  chamber for 678 ticks, up to 67 mm from the queen); a termite king was handed a job every few seconds and stood
+  still at his one spot (0 mm walked), holding a job slot the workers then could not take.
+- **Now** (`jobs.ts isJobWorker`, `termites.ts kingTick`, shared by the Termant king; `BALANCE.king`): no king takes
+  a nest job (an old save's job is dropped); he walks round his queen inside her seven tiles — a new spot on a ring
+  round her body every 6 s, a little further round each time, at 0.45 of his speed, pausing there to tap and groom her
+  (the termite kit's ATTEND) — and bites intruders inside the chamber. In 4 min: no ticks out of the chamber,
+  300–365 mm walked, at most 11 mm (Termant) or 25 mm (termites) from the queen's centre; an intruder dropped beside
+  the queen is killed and one at the entrance is left alone. No random draws (a hash of his id and the time).

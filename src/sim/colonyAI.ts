@@ -383,7 +383,8 @@ export function developChambers(w: World, c: Colony, plan: Array<{ type: TileTyp
         for (const h of disc(g, ch.q, chR(ch))) {
           if (occupied.has(h) || g.isEntrance(h)) continue;
           dig(h);
-          if (g.isHexDug(h) && !canPlaceTile(w, c, p.type, h, p.caste)) {
+          // (a head start is free: placed instant, so not refused for its cost the way canPlaceTile would)
+          if (g.isHexDug(h)) {
             at = h;
             break;
           }
@@ -504,8 +505,10 @@ function buildOne(w: World, c: Colony, b: BuildBrain, g: NestGrid, home: number,
       if (r.free + r.coming <= A.nearlyFull) noteNeed(w, b, { type, caste });
       return true;
     }
+    // (no room at all: plan the next chamber; free floor but no tile placed means it could not pay — tiles are paid
+    // when ordered since 2026-11-02 — so no new chamber for that)
     const r = roomLeft(type, caste);
-    if (!r.coming) noteNeed(w, b, { type, caste });
+    if (!r.free && !r.coming) noteNeed(w, b, { type, caste });
     return false;
   };
   // a) more storage when nearly full (once both store chambers are full, store upgrades take over)

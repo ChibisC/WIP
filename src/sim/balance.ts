@@ -548,6 +548,12 @@ export const BALANCE = {
     levelFrom: [1.6, 1, 0.8, 0.6],
     levelInFlight: [0.5, 1, 1.5, 2],
   },
+  /**
+   * Kings (termites and Termants; user note 2026-11-02): no nest duties; a slow walk round the queen inside her chamber —
+   * a new spot every `wanderS` s, `step` rad further round her, `ringMin`..`ringMax` of his length out from her body,
+   * at `walkMul` of his speed — and bites for intruders in the chamber (sim/termites.ts kingTick)
+   */
+  king: { wanderS: 7, step: 0.6, ringMin: 0.35, ringMax: 0.85, walkMul: 0.45 },
   /** AI colonies with allies (CHANGE_PLAN §23, user spec claude/ai/01-spec-ai-allies-chambers.md) */
   aiAllies: {
     /** the ally brain and joint raids on (off: AI allies leave each other alone, as before; tools/ecology-teams.ts) */
