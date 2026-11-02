@@ -104,6 +104,18 @@
 .gcard.pending { animation: gc-pending 0.35s ease-in-out infinite alternate; }
 @keyframes gc-pending { from { opacity: 0.55; border-color: rgba(255,244,214,0.9); } to { opacity: 1; } }
 .gcard .ant-sil { width: calc(34 * var(--u)); height: calc(34 * var(--u)); }
+.gcard.caste { border-top: calc(3 * var(--u)) solid var(--cc); }
+/* caste badges (2026-11-02): the caste's brood tile — its colour and texture — with the figure on top */
+.cbadge { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; background-position: center; background-size: contain; background-repeat: no-repeat; }
+.cbadge .ant-sil { filter: drop-shadow(0 0 0.7px rgba(255,236,200,0.8)) drop-shadow(0 1px 1px rgba(0,0,0,0.5)); }
+.gcard .cbadge { width: calc(38 * var(--u)); height: calc(36 * var(--u)); }
+.gcard .cbadge .ant-sil { width: calc(35 * var(--u)); height: calc(35 * var(--u)); }
+.tbtn .cbadge { width: calc(36 * var(--u)); height: calc(34 * var(--u)); }
+.tbtn .cbadge .ant-sil { width: calc(33 * var(--u)); height: calc(33 * var(--u)); }
+.caste-card .cbadge { width: calc(50 * var(--u)); height: calc(48 * var(--u)); }
+.caste-card .cbadge .ant-sil { width: calc(47 * var(--u)); height: calc(47 * var(--u)); }
+.gn-row .cbadge { width: calc(38 * var(--u)); height: calc(36 * var(--u)); }
+.gn-row .cbadge .ant-sil { width: calc(35 * var(--u)); height: calc(35 * var(--u)); }
 .gcard .gc-n { font-size: calc(12 * var(--u)); font-weight: 700; line-height: 1; margin-top: calc(1 * var(--u)); }
 .gcard .gc-n.hurt { color: #f3b27a; }
 .gcard .gc-badge { position: absolute; right: calc(-3 * var(--u)); bottom: calc(10 * var(--u)); width: calc(15 * var(--u)); height: calc(15 * var(--u)); border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #1a120b; border: 1px solid var(--bronze); }

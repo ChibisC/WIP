@@ -18,6 +18,8 @@ export interface HexVisual {
   outline: number;
   /** caste floor tint (brood tiles) */
   tint: THREE.Color;
+  /** caste texture pressed into a brood tile (render/casteLook CASTE_PATTERNS index) */
+  pattern?: number;
   /** only planned: drawn as a ghost until a worker builds it */
   planned?: boolean;
   /** pending job on a built tile: 1 upgrade, 2 delete */
@@ -251,7 +253,8 @@ export class NestTerrain {
       this.tintData[i] = Math.round(v.tint.r * 255);
       this.tintData[i + 1] = Math.round(v.tint.g * 255);
       this.tintData[i + 2] = Math.round(v.tint.b * 255);
-      this.tintData[i + 3] = 255;
+      // alpha: the brood tile's texture number (×16 + 8, read back as floor(a×255 / 16))
+      this.tintData[i + 3] = Math.max(0, Math.min(15, v.pattern ?? 0)) * 16 + 8;
     }
     this.hexTex.needsUpdate = true;
     this.tintTex.needsUpdate = true;
@@ -581,6 +584,80 @@ vec4 hexOf(vec2 p){
 }
 float hexDist(vec2 d){ d = abs(d); return max(d.y, d.x*0.8660254 + d.y*0.5); }
 float bitOf(float v, float b){ return mod(floor(v / pow(2.0, b)), 2.0); }
+// a band of half-width w around each half-period of s, smoothed over fs (s's change per pixel)
+float bandAt(float s, float w, float fs){ return 1.0 - smoothstep(w - fs, w + fs, abs(fract(s) - 0.5)); }
+// Caste textures worked into brood tiles (2026-11-02, user notes: every caste's tile its own colour and texture, and
+// "make the textures look more natural realistic and insect like"). The numbering and the shapes mirror
+// render/casteLook castePatternAt (the UI swatches); keep the two alike. u: hex-local, hex radius 1; w: the floor in
+// hex radii; pw: hex radii per pixel. Returns x: groove (pressed in, darker), y: ridge (raised, lighter).
+vec2 castePat(float pid, vec2 u, vec2 w, float pw){
+  vec2 r = vec2(0.0);
+  if (pid < 0.5) {            // brood pockets: round hollows in the plastered floor, a low rim between them
+    vec3 cw = worley(vec2(w.x*2.3 + (vnoise(w*1.7) - 0.5)*0.35, w.y*2.3));
+    r = vec2(smoothstep(0.46, 0.2, cw.x), smoothstep(0.08, 0.0, cw.y - cw.x) * 0.5);
+  } else if (pid < 1.5) {     // striate: fine raised striations flowing round the tile, as on an ant's cuticle
+    float s = dot(w, vec2(0.6, 0.8)) * 4.2 + fbm(w*0.7) * 2.2;
+    float fs = pw * 4.2 * 1.5;
+    r = vec2(bandAt(s + 0.5, 0.12, fs) * 0.4, bandAt(s, 0.2, fs));
+  } else if (pid < 2.5) {     // pellets: packed soil pellets, domed, dark gaps between
+    vec3 cw = worley(vec2(w.x*3.1 + (vnoise(w*2.1) - 0.5)*0.3, w.y*3.1));
+    r = vec2(smoothstep(0.05, 0.0, cw.y - cw.x) * 0.6, smoothstep(0.58, 0.0, cw.x));
+  } else if (pid < 3.5) {     // rugose: wrinkled ridges round the tile's centre
+    float s = length(u) * 3.4 + (vnoise(w*2.2) - 0.5)*1.1 + (vnoise(w*5.0) - 0.5)*0.3;
+    float fs = pw * 3.4 * 1.5;
+    r = vec2(bandAt(s + 0.5, 0.1, fs) * 0.35, bandAt(s, 0.17, fs));
+  } else if (pid < 4.5) {     // imbricate scales: each row overlapping the next, dark at the base, light free rims
+    vec2 p = vec2(w.x*2.4, w.y*3.0);
+    float best = 9.0;
+    // the row above lies on top: a point it covers belongs to it, else to its own row
+    for (int dr = -1; dr <= 0; dr++) {
+      if (best <= 1.0) break;
+      float rr = floor(p.y) + float(dr);
+      float off = 0.5 * mod(rr, 2.0);
+      float k0 = floor(p.x - off + 0.5);
+      for (int dk = -1; dk <= 1; dk++) {
+        vec2 v = vec2(p.x - (k0 + float(dk) + off), p.y - rr);
+        float d = length(vec2(v.x / 0.72, v.y / 1.3));
+        if (v.y >= 0.0 && d < 1.0 && d < best) best = d;
+      }
+    }
+    best = min(best, 1.0);
+    r = vec2(1.0 - smoothstep(0.0, 0.35, best), smoothstep(0.55, 0.92, best) * (1.0 - smoothstep(0.94, 1.0, best)));
+  } else if (pid < 5.5) {     // silk: fine fibres crossing three ways, broken and wandering
+    float f = 0.0;
+    for (int i = 0; i < 3; i++) {
+      float a = 0.4 + float(i)*1.1;
+      float s = dot(w, vec2(cos(a), sin(a))) * 3.4 + fbm(vec2(w.x*1.2 + float(i)*3.1, w.y*1.2)) * 2.4;
+      f = max(f, bandAt(s, 0.13, pw*3.4*1.5) * smoothstep(0.25, 0.45, vnoise(vec2(w.x*1.4 + float(i)*7.0, w.y*1.4))));
+    }
+    r = vec2(0.45 * (1.0 - f), f);
+  } else if (pid < 6.5) {     // wax comb: six-sided cells, gently warped, thick raised walls, hollow bottoms
+    vec2 q = w*2.8 + vec2(vnoise(w*1.8) - 0.5, vnoise(vec2(w.x*1.8 + 5.0, w.y*1.8)) - 0.5) * 0.3;
+    vec2 sz = vec2(1.0, 1.7320508);
+    vec2 a = mod(q, sz) - sz*0.5;
+    vec2 b = mod(q - sz*0.5, sz) - sz*0.5;
+    vec2 g = dot(a, a) < dot(b, b) ? a : b;
+    vec2 x = abs(g);
+    float e = 0.5 - max(x.x*0.5 + x.y*0.8660254, x.x);
+    r = vec2(smoothstep(0.12, 0.4, e) * 0.7, 1.0 - smoothstep(0.06, 0.12, e));
+  } else if (pid < 7.5) {     // veins: a wing's raised veins and finer cross-veins, membrane cells each a little different
+    vec3 a1 = worley(w*1.5);
+    vec3 b1 = worley(vec2(w.x*3.6 + 5.0, w.y*3.6));
+    float vr = max(1.0 - smoothstep(0.04, 0.085, a1.y - a1.x), (1.0 - smoothstep(0.02, 0.05, b1.y - b1.x)) * 0.6);
+    r = vec2((0.25 + (a1.z - 0.5)*0.5) * (1.0 - vr), vr);
+  } else if (pid < 8.5) {     // carton: the layered, wavy lamellae of chewed wood and soil termites build with
+    float s = fbm(w*0.8) * 5.0 + w.y*1.2 + (vnoise(w*4.0) - 0.5)*0.3;
+    r = vec2(bandAt(s + 0.5, 0.1, 0.05) * 0.6, bandAt(s, 0.22, 0.06));
+  } else {                    // cocoons: oval capsules lying in staggered rows
+    float py = w.y*2.6;
+    float row = floor(py);
+    float px = w.x*1.5 + 0.5*mod(row, 2.0);
+    vec2 f = vec2(fract(px) - 0.5, fract(py) - 0.5);
+    float dome = 1.0 - length(vec2(f.x/0.46, f.y/0.36));
+    r = vec2(smoothstep(0.08, -0.05, dome) * 0.8, smoothstep(0.0, 0.7, dome));
+  }
+  return r;
+}
 `;
 
 const FRAG_COLOR = /* glsl */ `
@@ -773,6 +850,7 @@ float hlevel = mod(hg, 4.0);
 float hedges = floor(hg / 4.0);
 float hout = floor(hexT.b*255.0 + 0.5);
 vec2 hl = gp - hctr;
+float pxU = max(length(fwidth(gp)) / uHexR, 1e-4); // hex radii per pixel (caste textures' smoothing)
 float hd = hexDist(hl);
 float apo = uHexR*0.8660254;
 float edgeProx = apo - hd;
@@ -799,20 +877,20 @@ if (htype > 0.5 && htype < 10.5) {
     surfRough = mix(surfRough, 0.6 - 0.1*trod, tileK);
     bumpH = bumpH*0.75;
   } else if (htype < 2.5) {
-    // brood tile: shallow brood pockets pressed into the packed floor, its soil washed with the caste's colour (the
-    // brood itself lies in them, tileDecor); realism pass 2026-11-02: less of a painted pattern, more soil
-    // (round 2: the caste colour a wash over the soil — its grains and crumbs still show — and the pockets shallow
-    // dips, not a printed pattern)
-    vec3 cw = worley(gp * (0.9 + 0.1*hlevel));
-    float pit = smoothstep(0.62, 0.12, cw.x);
-    float rim = smoothstep(0.05, 0.0, cw.y - cw.x);
-    float tintL = dot(tint, vec3(0.3, 0.5, 0.2)) + 1e-3;
-    vec3 wash = col * mix(vec3(1.0), tint / tintL, 0.55) * (0.95 + 0.25*tintL);
-    tc = mix(col, wash, 0.8) * (1.0 - pit*0.18);
-    tc *= 1.0 + rim*0.06;
-    tc = mix(tc, tc*1.3 + vec3(0.06,0.04,0.0), step(1.5, hlevel) * step(0.92, cw.z) * 0.6); // upgraded: bright flecks
-    bumpH = bumpH*0.8 - pit*0.45 + rim*0.15;
-    surfRough = mix(surfRough, 0.82, tileK);
+    // brood tile: the caste's colour and texture worked into the floor (2026-11-02, user notes: "make every unit tile
+    // ... have different colors and textures so they can be identifiable"; then "more natural realistic and insect
+    // like ... use more cleaner ones": render/casteLook). A clean colour with real relief — light catches the ridges,
+    // the hollows shade — and a waxy sheen on the raised parts; only a trace of the soil's grain under it. The brood
+    // itself lies on it (tileDecor).
+    float pid = floor(texture2D(tTint, huv).a * 255.0 / 16.0);
+    vec2 pr = castePat(pid, hl / uHexR, gp / uHexR, pxU);
+    float colL = dot(col, vec3(0.3, 0.5, 0.2));
+    vec3 base = tint * 0.5 * (0.92 + 0.08 * clamp(colL / 0.13, 0.4, 1.8));
+    tc = mix(col, base, 0.94);
+    tc *= (1.0 - pr.x * 0.45) * (1.0 + pr.y * 0.28);
+    tc = mix(tc, tc*1.3 + vec3(0.06,0.04,0.0), step(1.5, hlevel) * step(0.93, worley(gp*1.1).z) * 0.5); // upgraded: bright flecks
+    bumpH = bumpH*0.2 - pr.x*0.6 + pr.y*0.5;
+    surfRough = mix(surfRough, mix(0.72, (pid > 4.5 && pid < 5.5) ? 0.32 : 0.45, pr.y), tileK);
   } else if (htype < 3.5) {
     // food store: a dry, swept store floor stained olive by what is kept on it, honeydew beads catching the light
     // (the stores themselves lie on it, tileDecor)

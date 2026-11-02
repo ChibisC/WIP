@@ -2,6 +2,9 @@
  * Original line-art icon set (24×24, currentColor) and top-down ant
  * silhouettes for caste cards. All drawn for this game.
  */
+import { CASTES } from '../sim/species';
+import { BADGE_FIGURE, casteBadge } from '../render/casteLook';
+
 const svg = (body: string, vb = '0 0 24 24') => `<svg viewBox="${vb}" class="ic" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
 const hexPts = (cx: number, cy: number, r: number) =>
@@ -122,4 +125,9 @@ export function antSilhouette(role: string, color: string, head = 1): string {
     <ellipse cx="${20 - hr * 0.55}" cy="${hy - hr * 0.1}" rx=".9" ry="1.2" fill="#000" opacity=".55"/>
     <ellipse cx="${20 + hr * 0.55}" cy="${hy - hr * 0.1}" rx=".9" ry="1.2" fill="#000" opacity=".55"/>
   </svg>`;
+}
+
+/** A caste's badge: its brood tile's colour and texture with the ant (or termite) on top (render/casteLook). */
+export function casteIcon(caste: string, cls = ''): string {
+  return casteBadge(caste, antSilhouette(CASTES[caste]?.role ?? 'worker', BADGE_FIGURE), cls);
 }

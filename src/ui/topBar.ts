@@ -1,6 +1,7 @@
-import { GameSession, casteTint } from '../game/session';
+import { GameSession } from '../game/session';
 import { CASTES, basicCaste, resourceName } from '../sim/species';
 import { ICONS, antSilhouette } from './icons';
+import { casteFigureColour } from '../render/casteLook';
 import { TERMANT } from '../sim/balance';
 import { button, el, esc, shield } from './dom';
 
@@ -67,11 +68,11 @@ export class TopBar {
       if (this.wood.innerHTML !== wd) this.wood.innerHTML = wd;
       this.wood.classList.toggle('full', (c.wood ?? 0) >= TERMANT.wood.cap - 0.5);
     }
-    const wcol = '#' + casteTint(basicCaste(c.species)).multiplyScalar(1.35).getHexString();
+    const wcol = casteFigureColour(basicCaste(c.species));
     const wk = `${antSilhouette('worker', wcol)}<span class="cur">${c.workers}</span><span class="cap">/ ${c.workersMax}</span>`;
     if (this.workers.innerHTML !== wk) this.workers.innerHTML = wk;
     const sold = c.castes.find((cs) => CASTES[cs].role === 'soldier' || CASTES[cs].role === 'major');
-    const so = `${antSilhouette('soldier', sold ? '#' + casteTint(sold).multiplyScalar(1.35).getHexString() : '#b0503a')}<span class="cur">${c.soldiers}</span><span class="cap">/ ${c.soldiersMax}</span>`;
+    const so = `${antSilhouette('soldier', sold ? casteFigureColour(sold) : '#b0503a')}<span class="cur">${c.soldiers}</span><span class="cap">/ ${c.soldiersMax}</span>`;
     if (this.soldiers.innerHTML !== so) this.soldiers.innerHTML = so;
     this.soldiers.style.display = c.soldiersMax > 0 || c.soldiers > 0 ? '' : 'none';
     void esc;

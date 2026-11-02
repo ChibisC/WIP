@@ -1367,7 +1367,7 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
   had the nasute and sickle-jaw soldiers; unchanged.
 
 
-### 2026-11-02 — Underground textures realism pass; nest hexes 1.10×
+### 2026-11-02 — Underground textures realism pass; nest hexes 1.10×; a look of its own for every caste
 User notes: 2026-11-01 23:55 "use this realism prompt to fix the underground textures as well" (no prompt file came
 with it: the realism pipeline of `claude/realism/01–02` was used); 2026-11-02 01:15 "1.25x size it too big, maybe make
 it slightly smaler for underground hex", then "nvm just do 1.10x size". Branch `feature/underground-realism` from
@@ -1385,3 +1385,16 @@ it slightly smaler for underground hex", then "nvm just do 1.10x size". Branch `
 - **Blind reviews** (fresh agent, before/after shuffled as A/B, 1–10): round 2 — new preferred 8/8, "could it be a
   macro photo" 4.25 vs ~2; round 3 — 10/10, 4.9 vs 2.0. Remaining after round 3 (addressed in round 4): flat-looking
   tiles, printed outlines, single-colour floors, felt-like termite floors.
+- **Caste looks** (user note 10:40: "make every unit tile (both ants and termites and future ones) have different
+  colors and textures so they can be identifiable and different (also their UI color and look for pheromone markers
+  and building so they can be distinct from each other)"; 11:04 "make the textures look more natural realistic and
+  insect like, they can use different colors just use more cleaner ones"). New `render/casteLook.ts`: twelve clean,
+  clearly different colours × ten natural, insect-made textures in relief (brood pockets, cuticle striations, soil
+  pellets, rugose wrinkles, imbricate scales, silk fibres, wax comb, wing veins, termite carton, cocoons; the first
+  pass's geometric stripes, chevrons, spokes and diamonds and its grainy colour were replaced the same morning). Within a species no colour or texture repeats; no two castes anywhere share both; castes added
+  later get a free pair automatically. The brood tiles use it (floor shader `castePat`; the texture number rides in the
+  tint texture's alpha; replaces the soil wash of the realism pass), and so does the UI: build panel tile buttons,
+  Castes tab and Genome rows and the marker panel's group cards show a small hex of the tile (drawn by the same
+  texture code, `castePatternAt`) with a dark ant on top (cards also get a top edge in the caste colour); the nest minimap and top-bar figures use the colour.
+  `casteTint` now returns the caste colour. Test `tests/casteLooks.ts`; renders `docs/realism/caste-tiles/`
+  (`tests/browser/caste_tiles.py`, sheet `caste_sheet.py`).

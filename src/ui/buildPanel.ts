@@ -1,10 +1,10 @@
-import { GameSession, casteTint } from '../game/session';
+import { GameSession } from '../game/session';
 import { CASTES, SPECIES, resourceName } from '../sim/species';
 import { TILE_INFO, buildableTiles, groupById, groupCounts, growTime, hatchCost, tileAt, tileCost, upgradeNeed, upgradePoints } from '../sim/tiles';
 import { BALANCE } from '../sim/balance';
 import { tierOf } from '../sim/species';
 import { TileType } from '../sim/types';
-import { ICONS, antSilhouette } from './icons';
+import { ICONS, casteIcon } from './icons';
 import { button, el, esc, shield } from './dom';
 import { TERMANT } from '../sim/balance';
 import { STOLEN_CASTES, genomeOf, isTermant, stolenOf, threshold } from '../sim/termants';
@@ -140,7 +140,7 @@ export class BuildPanel {
       const row = el(
         'div',
         'gn-row' + (active ? ' on' : '') + (inMatch.has(e.source) || active ? '' : ' away'),
-        `${antSilhouette(cd.role, '#' + casteTint(e.caste).multiplyScalar(1.35).getHexString())}<div class="gn-mid"><div class="gn-t">${esc(e.name)}<span class="gn-st">${esc(state)}</span></div>
+        `${casteIcon(e.caste)}<div class="gn-mid"><div class="gn-t">${esc(e.name)}<span class="gn-st">${esc(state)}</span></div>
         <div class="gn-s">${esc(sp.common)} ${esc(cd.name.toLowerCase())}${e.heavy ? ' · heavy' : ''}${inMatch.has(e.source) ? '' : ' · not in this match'}</div><div class="gn-bar"><i style="width:${pct.toFixed(0)}%"></i></div></div>`,
       );
       row.dataset.tip = `<b>${esc(e.name)}</b> — the ${esc(sp.common)}' ${esc(cd.name.toLowerCase())}, raised by the Termant queen with that species' own body, weapons and habits.<br>${cd.length} mm · health ${cd.hp} · bite ${cd.bite}${cd.acid ? ' · formic acid' : ''}${cd.sting ? ' · venom sting' : ''}<br>Unlocks at <b>${need}</b> gene samples (small ants 1, workers 2, soldiers 4, majors 7). Its brood tile costs ×${TERMANT.stolenCostMul}.`;
@@ -172,7 +172,7 @@ export class BuildPanel {
         const card = el(
           'div',
           'caste-card',
-          `${antSilhouette(cd.role, '#' + casteTint(cs).multiplyScalar(1.35).getHexString())}<div><div class="cc-t">${esc(cd.species === c.species ? cd.name : isTermant(c) && stolenOf(cs) ? `${stolenOf(cs)!.name} (stolen from ${sp.common})` : `${sp.common.replace(' Ant', '')} ${cd.name}`)}</div>
+          `${casteIcon(cs)}<div><div class="cc-t">${esc(cd.species === c.species ? cd.name : isTermant(c) && stolenOf(cs) ? `${stolenOf(cs)!.name} (stolen from ${sp.common})` : `${sp.common.replace(' Ant', '')} ${cd.name}`)}</div>
           <div class="cc-s"><i>${esc(sp.scientific)}</i> · ${cd.length} mm · health ${cd.hp} · bite ${cd.bite}${cd.acid ? ' · formic acid' : ''}${cd.sting ? ' · venom sting' : ''}<br><span class="cc-mount">${mountText(cs)}</span><br>${esc(cd.fact)}</div></div>`,
         );
         this.grid.appendChild(card);
@@ -205,7 +205,7 @@ export class BuildPanel {
         add(
           'brood',
           bt.caste,
-          antSilhouette(cd.role, '#' + casteTint(bt.caste).multiplyScalar(1.35).getHexString()),
+          casteIcon(bt.caste),
           nm,
           `<b>${esc(nm)} brood tile</b> (${tier})${esc(TILE_INFO.brood.desc)}<br>Build <b>${tileCost(c, 'brood', bt.caste)}</b> ${res} · hatch <b>${hatchCost(bt.caste)}</b> ${res} · grows in ${growTime(bt.caste)} s<br>Holds ${cap.join(' / ')} ant${cap[2] > 1 ? 's' : ''} at levels I / II / III. Adjacent ${esc(nm.toLowerCase())} tiles form one chamber = one control group.${labour}`,
         );

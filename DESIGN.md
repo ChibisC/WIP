@@ -745,7 +745,8 @@ Style switches to replace (`MapStyle`, `terrain.ts:5`): `terrain.ts` (relief, co
 * **Tile floors**: drawn in the floor shader from a per-hex data texture (type,
   caste colour, level, group outline colour). Since the realism pass they are the soil
   first: queen = the floor plastered with smoothed pale silt (grains showing; was a
-  silk mat); brood = the soil washed with the caste's colour, shallow brood pockets in it;
+  silk mat); brood = the soil stained with the caste's own colour and pressed with its own texture (see
+  **Caste looks** in §6);
   food storage = the floor stained olive, honeydew beads; fungus garden = spongy white
   comb; the stored food and the brood lie on them (`tileDecor`). Group outlines are drawn on hex edges bordering
   another group, coloured by the assigned marker. Placement ghost hex, grid
@@ -920,6 +921,25 @@ Every caste is a `CasteDef`: stats, morph, abilities and a **tier** (worker / so
 Equal-food battles (`tools/equal.ts`, `tools/battle.ts`) were used to tune these: soldiers beat their own species' workers for the same food, majors beat soldiers, and the wood ants' tanks + shooters beat most equal-food armies while shooters alone lose to swarms.
 
 Every caste a colony can raise has its own **brood tile type**, and a colony's build panel lists exactly those tiles. Each species also has a **nanitic** caste (a small first-brood worker) raised only on queen tiles. The Gene Thief colony gets a brood tile type for each borrowed caste. Caste mix is decided by which brood tiles the player places; there is no ratio slider.
+
+**Caste looks** (user note 2026-11-02: "make every unit tile (both ants and termites and future ones) have different
+colors and textures so they can be identifiable and different (also their UI color and look for pheromone markers and
+building so they can be distinct from each other)"; then 11:04 "make the textures look more natural realistic and
+insect like, they can use different colors just use more cleaner ones"). Each caste's brood tile has a clean colour
+from a palette of twelve clearly different hues (amber, rust, crimson, rose, violet, indigo, sky, teal, green, lime,
+bone, lavender; every pair at least ΔE 20 apart) and one of ten natural, insect-made textures worked into it: brood
+pockets, cuticle striations, packed soil pellets, wrinkled (rugose) ridges, overlapping (imbricate) scales, silk
+fibres, wax comb, a wing-vein network, layered termite carton, rows of cocoons. They are drawn as relief (ridges catch
+the light, hollows shade, the raised parts have a waxy sheen; silk the most), with only a trace of the soil's grain
+under the colour. The castes of one species never share a colour or a texture, and no two castes
+anywhere share both, so a Gene Thief or Termant nest full of stolen castes still tells them apart. The table is
+`render/casteLook.ts`; a caste with no entry (a new species or caste) gets the first free pair from a spot set by its
+name, unlike its own species in colour and texture. Nanitics look like their species' worker; queens and kings have no
+brood tiles. The same look is used everywhere the caste appears: the tile (floor shader `castePat`, the texture number
+in the tint texture's alpha), the build panel's tile buttons, Castes tab and Genome rows (a small hex of the tile with
+a dark ant on top, drawn by the same texture code), the marker panel's group cards (the same badge, and a top edge in the
+caste colour), the nest minimap and the top bar's worker and soldier figures (in the caste colour). `tests/casteLooks.ts` checks it; renders in
+`docs/realism/caste-tiles/`.
 
 ## 7. Performance plan
 
