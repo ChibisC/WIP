@@ -289,7 +289,7 @@ const t0 = Date.now();
   const hub = new LocalHub();
   hub.latency = () => 40;
   const { clients, setup } = makeMatch(hub, 2, { slots, map: 'meadowPond' });
-  check('teams: lobby teams become simulation teams (Red, Red, Blue, Blue) and teammates are grouped', JSON.stringify(setup.colonies.map((c) => c.team)) === JSON.stringify([TEAM_BASE + 1, TEAM_BASE + 1, TEAM_BASE + 2, TEAM_BASE + 2]) && setup.groupTeams === true);
+  check('teams: lobby teams become simulation teams (Red, Red, Blue, Blue) — the map then places each team together (tests/aiAllies.ts)', JSON.stringify(setup.colonies.map((c) => c.team)) === JSON.stringify([TEAM_BASE + 1, TEAM_BASE + 1, TEAM_BASE + 2, TEAM_BASE + 2]));
   check("Gene Thief: the player's picks are kept (unknown castes dropped), an AI with no picks gets the default pair", JSON.stringify(setup.colonies[1].borrowed) === JSON.stringify(['atta_major', 'hell_soldier']) && JSON.stringify(setup.colonies[3].borrowed) === JSON.stringify(GENE_THIEF_DEFAULT), JSON.stringify(setup.colonies.map((c) => c.borrowed)));
   const w = clients[0].sim.w;
   check('Gene Thief: the borrowed castes are raised by that colony on every client', clients.every((c) => ['atta_major', 'hell_soldier'].every((id) => c.sim.w.colony(1)!.castes.includes(id))) && !w.colony(0)!.castes.includes('atta_major'), w.colony(1)!.castes.join(','));
