@@ -34,8 +34,6 @@ export const BALANCE = {
   workRate: [2, 4, 6],
   /** workers allowed on one soil hex (EotU) */
   digWorkersPerHex: 2,
-  /** workers allowed on an entrance dig (EotU) */
-  entranceDigWorkers: 7,
   /** how far (mm, × marker radius) a marker-group worker looks for nest jobs */
   markerJobReach: 1.6,
 
@@ -63,7 +61,7 @@ export const BALANCE = {
     // workers: build 10
     lasius_worker: { build: 10, hatch: 2, grow: 18 },
     formica_worker: { build: 10, hatch: 3, grow: 22 },
-    fire_minor: { build: 10, hatch: 1.5, grow: 14 },
+    fire_minor: { build: 10, hatch: 1, grow: 14 }, // (balance pass 2026-11-02: hatch was 1.5)
     atta_minim: { build: 10, hatch: 1, grow: 12 },
     atta_media: { build: 10, hatch: 2.5, grow: 20 },
     eciton_minor: { build: 10, hatch: 2, grow: 16 },
@@ -71,19 +69,19 @@ export const BALANCE = {
     plagiaria_worker: { build: 10, hatch: 2.5, grow: 20 },
     // soldiers
     lasius_soldier: { build: 20, hatch: 4, grow: 28 },
-    fire_soldier: { build: 20, hatch: 3.5, grow: 24 },
+    fire_soldier: { build: 16, hatch: 3, grow: 24 },
     atta_soldier: { build: 24, hatch: 5, grow: 30 },
-    eciton_media: { build: 28, hatch: 5, grow: 30 },
+    eciton_media: { build: 24, hatch: 5, grow: 30 },
     formica_soldier: { build: 30, hatch: 6, grow: 36 },
     formica_mortar: { build: 30, hatch: 6, grow: 36 },
     formica_rapid: { build: 30, hatch: 6, grow: 36 },
     // majors
     fire_major: { build: 60, hatch: 10, grow: 44 },
     atta_major: { build: 70, hatch: 10, grow: 50 },
-    eciton_major: { build: 90, hatch: 12, grow: 50 },
+    eciton_major: { build: 75, hatch: 11, grow: 50 },
     // Nasute Termites, paid in wood: × the baseline worker (10 / 2 / 18) by NASUTE.broodCostWoodMul / broodTimeMul
     nasute_worker: { build: 10, hatch: 2, grow: 18 }, // × 1.0 / × 1.0
-    nasute_soldier: { build: 18, hatch: 3.6, grow: 23.4 }, // × 1.8 / × 1.3
+    nasute_soldier: { build: 22, hatch: 4.4, grow: 23.4 }, // × 2.2 / × 1.3 (balance pass 2026-11-02: was × 1.8; the glue stream is the user's)
     nasute_major: { build: 35, hatch: 7, grow: 32.4 }, // × 3.5 / × 1.8
     // Sickle-Jaw Termites, paid in plant matter: × the baseline worker (10 / 2 / 18) by SICKLE.broodCostMul / broodTimeMul
     rhy_worker: { build: 10, hatch: 2, grow: 18 }, // × 1.0 / × 1.0
@@ -648,7 +646,7 @@ export const NASUTE = {
     /** sources guaranteed near each termite nest at the start (twigs and branches) */
     startNear: 2,
   },
-  broodCostWoodMul: { worker: 1.0, nasute: 1.8, major: 3.5 },
+  broodCostWoodMul: { worker: 1.0, nasute: 2.2, major: 3.5 },
   broodTimeMul: { worker: 1.0, nasute: 1.3, major: 1.8 },
   /** final share of soldier brood growth drawn as a pale presoldier (render only) */
   presoldierFraction: 0.25,
@@ -1022,27 +1020,53 @@ export const FLOOD = {
   swimMmS: 7,
 };
 
-/** Nest entrances (sim/entrances.ts; claude/maps/02-spec-nest-entrances, DESIGN.md "Entrances"). */
+/**
+ * Nest entrances (sim/entrances.ts; claude/maps/02-spec-nest-entrances, user spec 2026-11-01 "one wide underground
+ * entrance, three surface holes per anthill"; DESIGN.md "Entrances"). Each nest has one entrance: a 7-hex flower at the
+ * nest's edge underground, and three holes in its anthill on the surface, all leading into it, always open.
+ */
 export const ENTRANCE = {
-  /** extra entrances a colony may dig beside its main one (each site has this many surface spots) */
-  maxExtra: 2,
-  /** hexes in an entrance tunnel, from the ramp under the hole down to the nest floor */
-  tunnelLen: 3,
-  /** extra-entrance spots lie this many hexes from the queen's hex */
-  spotMin: 8,
-  spotMax: 13,
-  /** ants through one entrance per second, in and out together (a chokepoint: busy holes queue) */
+  /** surface holes per anthill */
+  holes: 3,
+  /** maps without anthill sites: the holes lie this far (mm) from the colony's centre, 120° apart, by species */
+  holeR: {
+    lasius: 18,
+    formica: 22,
+    atta: 26,
+    solenopsis: 20,
+    eciton: 20,
+    plagiaria: 18,
+    hell: 16,
+    aurimyrmex: 18,
+    termant: 18,
+    nasute: 18,
+    sickle: 16,
+  } as Record<string, number>,
+  /** holeR for a species not listed (authored sites put their holes about 22 mm out) */
+  holeRDefault: 18,
+  /** two holes of an anthill are at least this far apart (mm; the map validator and the fallback placement) */
+  holeGap: 16,
+  /**
+   * an ant waiting for a hole (no credit) takes another hole of the same anthill that has credit when that one is at most
+   * this much farther on its way (mm)
+   */
+  switchMm: 14,
+  /** … plus this fraction of its way (a crowd bound far off spreads over all three holes) */
+  switchFrac: 0.25,
+  /** ants through one hole per second, in and out together (each hole has its own credit) */
   passPerS: 10,
-  /** ants that may pass at once after a quiet spell */
+  /** ants that may pass a hole at once after a quiet spell */
   burst: 4,
-  /** seconds to plug an extra entrance with soil, or to open it again */
-  closeS: 4,
-  /** seconds for a fallen colony's entrances to cave in */
+  /** seconds for a fallen colony's holes and flower to cave in */
   collapseS: 60,
-  /** tunnel hexes move ants like a level I highway */
+  /** entrance hexes move ants like a level I highway */
   tunnelSpeed: 1.1,
-  /** rival AI colonies dig an extra entrance per this many living ants (at most maxExtra) */
-  aiExtraAt: 60,
+  /** creature caves keep a tunnel of this many hexes rising to their one hole */
+  caveTunnelLen: 3,
+  /** traffic shown in a hole's tooltip: ants through it over this many seconds */
+  trafficS: 10,
+  /** the refuse spot lies this far (mm) beyond the anthill's holes, between its first two */
+  refuseMm: 24,
 };
 
 /**

@@ -430,21 +430,23 @@ export interface NestGroup {
   marker: number;
 }
 
+/**
+ * One surface hole of an underground area's entrance (sim/entrances.ts). A colony's anthill has three, all leading into
+ * its nest's one entrance (the 7-hex flower: `q` its centre); a creature cave has one (`q` its tunnel's top).
+ */
 export interface Entrance {
-  /** top hex of the entrance tunnel in the nest (the ramp under the hole; the whole tunnel is NestGrid.tunnels) */
+  /** the entrance's underground end: a nest's flower centre, a cave's tunnel top (NestGrid.entrances) */
   q: number;
   /** surface hole */
   sx: number;
   sy: number;
-  /** 1 while plugged with soil: nobody passes (extra entrances only; sim/entrances.ts) */
-  shut?: number;
-  /** seconds of plugging or unplugging left (the change applies when it reaches 0) */
-  work?: number;
-  /** throughput credit (ants that may pass now) and the sim time it was last topped up */
+  /** throughput credit of this hole (ants that may pass now) and the sim time it was last topped up */
   cr?: number;
   crT?: number;
-  /** a fallen colony's entrance caving in: 0 → 1 over ENTRANCE.collapseS */
+  /** a fallen colony's hole caving in: 0 → 1 over ENTRANCE.collapseS */
   fall?: number;
+  /** ants through this hole so far, either way (its traffic, for the tooltip) */
+  n?: number;
 }
 
 /** One of the five pheromone markers (I–V). */

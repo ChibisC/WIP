@@ -1292,3 +1292,116 @@ wood ants' basics were 10 throughout. Notes, and what was done:
   5 px above the unit; the fill lighter along its top (vertex shading); a hit leaves a pale trail of the health just
   lost, which waits 0.35 s and drains at 0.8 of the bar a second; chevrons 7 px with a thin dark edge, 3 px left of the
   bar. Tests: 3 px thick near and far; the trail appears and drains.
+
+### 2026-11-01 (night, 3) — One wide underground entrance per nest, three surface holes per anthill (CHANGE_PLAN §21)
+User spec 22:47 (project doc `claude/maps/04-spec-one-wide-entrance-three-holes.md`); decisions: a 7-hex flower, the
+three holes share it, always open. Branch `feature/one-entrance` from `main` (`fc6f58a`). DESIGN §3.12/§3.12b.
+- **Underground:** every nest's one entrance is a hex and its six neighbours at its edge, over the end of the passage
+  from the queen (every species alike; the fire ants' long tunnel is gone), all dug, no tiles on it, highway speed
+  (`NestGrid.flowers`, `flowerEdges`; `entrances.ts flowerOver/digFlower`). Its floor is one wide ramp up its spine,
+  pale worn soil, darkening at its top edge, one broad soft daylight shaft (moonlight at night) across its upper middle,
+  the species' bits round its rim. Arrivals come out on its three top hexes by a hash of id and tick (no RNG draw);
+  leavers go up through them; home guards and termite majors hold its inner edge.
+- **Removed:** extra-entrance spots and shafts (and their dashed rings, the shader rim), entrance digs (and
+  `entranceDigWorkers`), `surfaceFor`, plugging (`setEntranceShut`, `shut`/`work`), the colony AI's extra entrance,
+  the Dig/Delete special cases and tips, the Free Play goal "Open a second entrance" (now: upgrade a brood tile to level
+  II). The `entrance` command (wire 23) is rejected but still parses; `BUILD_ID` `ud-mp-6`.
+- **Surface:** `Colony.entrances` is the anthill's three holes, each with its own credit (10 a second, burst 4) and a
+  traffic count `n`, all with the flower as underground end. Placement: a site's main and two extra spots; elsewhere
+  three points `ENTRANCE.holeR` (16–26 mm by species) round the colony centre, 120° apart, on walkable ground,
+  `holeGap` (16 mm) apart. Leaving: the hole nearest the ant's marker (along its shared surface field), food or foe,
+  else by id; while it is busy, another not much farther on its way (`switchMm` 14 + `switchFrac` 0.25 of the way), in
+  turn by id. Coming in: the nearest, or another with room within 14 mm. Enemies use any hole. A fallen colony's three
+  holes cave in over 60 s. The refuse spot is beside the anthill between its first two holes.
+- **Saves:** version 3; `upgradeWorldEntrances` (World constructor, and `restoreWorld` after the binary snapshot's grids)
+  drops extra entrances and spots, widens the main tunnel's top into the flower, moves tiles off it (or refunds them)
+  and logs it, rebuilds the holes. Idempotent.
+- **Looks:** each species' anthill centred between its holes (crater, thatch dome, bare mound with refuse dump,
+  fire-ant dome with holes at its edge, bivouac with three gaps, a stump with a root to each hole, carton nest with
+  openings at its base, three collars in litter, the hell ants' minimal ring); loose-soil craters fade into the ground;
+  no grass through anthills. Minimap: a crown at each anthill's centre and a dot per hole; one arrow on the flower.
+  Tooltip on a hole or the flower: area, owner, open/caving in, ants through each hole in the last 10 s.
+- **Tests:** new `tests/entrances.ts` (the old entrance checks in `tests/run-all.ts` removed; maps tests check three
+  holes per site; `tools/entrance-check.ts` updated). Every species' flower; 50 seeded matches never make another
+  entrance; three valid holes on the five maps, the formicarium and the arena; holes chosen by destination, home by
+  the nearest, arrivals spread over three hexes; a crowd of 60 leaves through all three holes in ~3.3 s (one hole:
+  ~6.3 s); raiders use all three holes and arrive on the flower's top; guards at its inner edge; collapse; old saves
+  (JSON and binary). Re-chosen: the army-ant bridge scene seed 6 → 10 (seeds 1–24: 1, 3, 10, 15, 22, 23 bridge; 10
+  also plugs), the raiders start at the route's hole; the sickle guard line seed 25 → 27 (the straight line measured
+  from the route's own hole; on 25 the crowd from the far holes walked its first stretch outside the line); the sickle
+  size-limit target is a true dummy (no bite back, pinned in place: the new random draws had the leafcutter soldier
+  decapitate the soldier within a second); the builder-growth check averages seeds 7–9 (7–11: 22, 21, 26, 24, 24).
+  Found on the way: the suite runner skipped `tests/run-all.ts` (its pattern had no `-`); its "hex radius" check
+  predated the 1.25 × hexes and now expects 6 × `NEST_HEX_SCALE`.
+- **Screenshot review fixes:** the fire-ant dome was built after its holes, so it covered them: the domes are now built
+  first and the anthill rebuilt when one grows, its lumps and clods keep off the holes, and the holes sit about 0.75 of
+  its radius out; hell-ant and sickle-jaw litter thinned (the user removed fallen leaves for visibility on 2026-11-01).
+  Shots: `docs/maps/entrances-v2/` (`tests/browser/entrances_v2.py`); the 2026-10-26 shots in `docs/maps/entrances/`
+  (extra entrances, plugs) removed.
+- **Checks:** `npm ci`, `npm test` (24 suites), determinism (60 files clean), `npm run build`; `tools/height-data.ts`
+  and `tools/climb-data.ts` regenerate unchanged. 10-colony tick time (`tools/map-perf.ts -- 90`): Meadow Pond 3.30 ms
+  avg / p95 7.5 (`main` 3.45 / 7.0), Forest Floor 2.56 / 5.3 (2.62 / 5.3). LAN two tabs (`tests/browser/lan.py`
+  ONLY=two): hashes match, no desync; one UI check ("asking for 2x shows the other player an Agree button") failed once
+  while the full suite ran beside it — not looked into further (speed-vote UI, untouched here).
+- **Merge (claude/handoff/00-MERGE-RULE.md):** `origin/main` had nothing new (still `fc6f58a`); `feature/story` is
+  work in progress (not merged; it branches from `fc6f58a` and touches `session.ts`, `mapGen.ts` and the termants —
+  it will need this merge); the older feature branches are already in `main` in other forms. Removed as replaced:
+  extra entrances, spots, shafts, entrance digs, plugging, the AI's extra entrance, the old entrance tests and
+  screenshots.
+
+### 2026-11-02 — Story mode, chapter 1: the Gene-Thief campaign, two levels on layered maps
+- User specs `claude/story/02-spec-gene-thief-chapter1-two-levels.md` and `03-spec-story-level-maps.md` (answers:
+  build the layered-ground core here, and let it take precedence where it overlaps other work; merge and publish here).
+  Design: `docs/story/DESIGN-STORY.md`; DESIGN.md §6 (story mode, layered ground).
+- **Rename**: the Termants are the **Gene-Thief Termants** everywhere players see them (`termant` stays the id). Stolen
+  castes go by the ants' own names — "Black Garden Ant Soldier", "Tropical Fire Ant Major", "Nasute Termite Soldier" —
+  never nicknames (`termants.ts stolenName`).
+- **Layered ground** (`world/layers.ts`, `MapDef.layers/ramps`, `LAYERS` in balance.ts): an authored map can raise or
+  sink areas by whole levels (34 mm a step) inside wandering banks; ramps are corridors with an eased rise. Bank faces
+  steeper than `maxWalkSlope` block (they become cliff cells of the obstacle mask), so flow fields route over the
+  ramps; ants slow going uphill (`Terrain.slopeSpeed`). The validator checks ramp width, slope, a clear centre line,
+  every level reachable dry and flooded, and that floods only fill low ground. `testTerrace` is the test map.
+- **Framework** (`sim/story/`): levels as data (`story/levels/*.ts`): actors (a creature, colony ants or a whole rival)
+  run scenes of cues (walk, path, hold, patrol, guard, follow, flee, charge, wait for a flag, release); stages hold
+  objectives (raise, fighters, build, dig, collect food, store wood, kill ants, steal a caste, raise it, kill the queen,
+  survive, kill a creature, escort, protect, reach, enter a nest; optional ones), captions on time or flags, and
+  actions (spawn, flood, food, camera shot, music, rival raid, tip). Everything is sim state in `w.s.mode.mission.story`
+  (saves, snapshots and replays carry it; the same commands give the same game). Difficulty (`STORY.difficulty`): enemy
+  stats, waves, aggression, food and rival size. Medals for time, losses and a level bonus.
+- **Client**: cinematic shots (letterbox, skippable with Esc), named captions by the narrator Dr. Elena Varga (no
+  model; captions only), music moods, the campaign save in localStorage (`ud-campaign-v1`), the chapter-end screen.
+- **The island hub** (`ui/islandMap.ts`, `ui/storyHub.ts`): Wayfarer Island with six regions and 43 level slots (the
+  campaign is planned for 30–40 levels, user 2026-11-02): pan, zoom and pinch, a level list by chapter, the genome
+  (stolen castes and the loadout for the next level), the journal, difficulty, medals.
+- **Level 1 "The Garden Below"** (`maps/story/gardenBelow.ts`, 1100 × 900 mm; meadow and flowerbed terraces, a soil
+  slope, a moss bank, stone steps and a slumped back ramp): the queen comes ashore after a storm; a ground beetle looks
+  her over; first contact with two Lasius scouts; corpses into the stores to steal the Black Garden Ant Soldier; a
+  Lasius raid; take the aphid plants and kill the queen.
+- **Level 2 "Fire on the Banks"** (`maps/story/fireBanks.ts`, 1200 × 900 mm; a clay shelf and a high sand bank over a
+  stream): a fire-ant foraging column; the swarm down the slope; steal the Tropical Fire Ant Major; the river floods the
+  low margin; take the mound by the main slope or the root at the east end. Chapter end.
+- Narration facts checked against sources (DESIGN-STORY §10); four lines corrected (the Lasius queen's 28¾ years were
+  in an entomologist's care, not a laboratory's; the Spanish galleons of the 1500s; fire-ant rafts are best known from
+  the red imported fire ant; "majors twice their length" dropped).
+- Tests: `tests/story.ts` (added to `npm test`): levels and maps validate, the director's cues, objectives, latching,
+  missed castes, medals, the campaign save, island capacity, two runs agree, snapshot restore mid-scene.
+  `tools/playtest-story.ts` plays a level with the colony AI and a scripted player.
+- Fixed on the way: the layered-ground commit gave flat authored maps a generated map's random props (a misplaced
+  `else` in `terrain.ts`).
+
+### 2026-11-02 — Caste and creature balance
+- User 00:34: "balance all current ant and termite species soldiers and workers and other castes (workers should be
+  similar in strength and stats but not the same like eotu) and buff creatures cos they are weak against ants right now".
+  Tables, method and results: `docs/balance/castes.md`; tools `tools/caste-table.ts`, `tools/balance-matrix.ts`,
+  `tools/balance-tune.ts`.
+- Equal-food fights against a reference caste (workers at 150 food, soldiers at 300, majors at 420; three seeds, both
+  sides), and a tie-point search on a stat scale, since the margins snowball. Every worker now ends within ±0.18 of the
+  black garden ant worker (before, the round-robin scores ran from −0.89 to +0.80: both termite workers lost to
+  everything, Plagiaria and leafcutter medias won almost everything); soldiers and majors within about ±0.3 of theirs.
+- Workers keep their own shapes (armoured leafcutter medias, fast army ants, venomous fire ants, slow tough termites,
+  acid-spraying Plagiaria); all build for 10.
+- The nasute's glue stream (2 → 20 dps) is the user's and stays; the nasute costs more wood instead (× 2.2).
+  Sickle-jaw soldiers win one on one and lose in groups (they hold one enemy at a time).
+- Creatures: hit points about doubled and bites up a little; the mantis strikes every 1.6 s, has armour 2 and flees at
+  10 %. Wild predators now beat 5 and 10 workers and need about 20 (the stone centipede and the mantis died to 5 before).
+  Bosses unchanged (80–120 workers or more).

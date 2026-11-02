@@ -87,6 +87,8 @@ export class GameView {
   terrain: Terrain | null = null;
   terrainMesh: TerrainMesh | null = null;
   grass: Grass | null = null;
+  /** ground kept clear of grass (the anthills: mm centre and radius), set before the terrain */
+  grassClear: Array<{ x: number; y: number; r: number }> = [];
   decor: MapDecor | null = null;
   props: Props | null = null;
   water: Water | null = null;
@@ -227,7 +229,7 @@ export class GameView {
       this.worldGroup.remove(this.grass.mesh);
       this.grass.mesh.geometry.dispose();
     }
-    this.grass = new Grass(this.terrain, this.preset.grassDensity, 320, this.decor?.clumps);
+    this.grass = new Grass(this.terrain, this.preset.grassDensity, 320, this.decor?.clumps, this.grassClear);
     this.worldGroup.add(this.grass.mesh);
   }
 

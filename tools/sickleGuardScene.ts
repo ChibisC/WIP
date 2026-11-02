@@ -61,8 +61,8 @@ export function guardScene(nWorkers: number, nSoldiers: number, sd: number, seco
     const tr = sickleTrail(w, c, 0);
     for (const a of w.s.ants) {
       if (a.colony !== 0 || a.caste !== 'rhy_worker' || a.space !== SURFACE || a.state === AS.Dead || a.v < 1) continue;
-      // on the way: away from the work area and the entrance
-      if (Math.hypot(a.x - mx, a.y - my) < radius || Math.hypot(a.x - e.sx, a.y - e.sy) < 12) continue;
+      // on the way: away from the work area and the anthill's holes
+      if (Math.hypot(a.x - mx, a.y - my) < radius || c.entrances.some((h) => Math.hypot(a.x - h.sx, a.y - h.sy) < 12)) continue;
       walking++;
       if (distToTrail(tr.pts, a.x, a.y) < half) inside++;
     }
@@ -74,10 +74,11 @@ export function guardScene(nWorkers: number, nSoldiers: number, sd: number, seco
   const gaps = arcs.slice(1).map((v, i) => v - arcs[i]);
   return {
     trail: total,
-    straight: Math.hypot(mx - e.sx, my - e.sy),
+    // (from the hole the route ends at: since 2026-11-01 an anthill has three, and the route runs to the nearest)
+    straight: Math.hypot(tr.pts[0] - tr.pts[tr.pts.length - 2], tr.pts[1] - tr.pts[tr.pts.length - 1]),
     guards: guards.length,
     gatherers: w.s.ants.filter((a) => a.colony === 0 && a.caste === 'rhy_soldier' && a.state !== AS.Rally && a.state !== AS.Dead).length,
-    atEntrance: guards.filter((g) => Math.hypot(g.x - e.sx, g.y - e.sy) < 15).length,
+    atEntrance: guards.filter((g) => c.entrances.some((h) => Math.hypot(g.x - h.sx, g.y - h.sy) < 15)).length,
     arcFrom: arcs[0] ?? 0,
     arcTo: arcs[arcs.length - 1] ?? 0,
     maxGap: gaps.length ? Math.max(...gaps) : 0,

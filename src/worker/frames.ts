@@ -58,9 +58,8 @@ export class FrameBuilder {
       d.hexDesig = g.hexDesig.slice();
       d.designatedCount = g.designatedCount;
       d.entrances = g.entrances.slice();
-      d.shafts = g.shafts.slice();
       d.tunnels = g.tunnels.map((t) => t.slice());
-      d.spots = g.spots.map((t) => t.slice());
+      d.flowers = g.flowers.map((t) => t.slice());
       if (seen.desig !== g.desigVersion) {
         d.designated = g.designated.slice();
         d.hexTotal = g.hexTotal.slice();

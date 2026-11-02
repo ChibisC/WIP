@@ -161,7 +161,7 @@ export function canPlaceTile(w: World, c: Colony, type: TileType, q: number, cas
   const g = w.nest(c.id);
   if (!g || q < 0) return 'Outside the nest';
   if (!g.isHexDug(q)) return 'Dig this ground out first';
-  if (g.isEntrance(q)) return 'Entrance ramps must stay clear';
+  if (g.isEntrance(q)) return 'The entrance must stay clear';
   if (tileAt(c, q)) return 'There is already a tile here';
   if (type === 'queen') return "The queen's chamber cannot be built: every colony starts with its own seven tiles";
   if (type === 'brood') {

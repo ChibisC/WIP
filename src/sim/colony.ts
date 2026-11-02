@@ -8,13 +8,12 @@ import { makeAnt, makeBrood } from './factory';
 import { applyLevel, hexSpeedOf, placeTile, popUsed, raisesAnts, recomputeGroups, recomputeTileCaps, tileAnts, tileAt, tileCapacity } from './tiles';
 import { BALANCE, NASUTE } from './balance';
 import { assignJobs, isJobWorker } from './jobs';
-import { applyGroupOrders, nearestWalkable } from './markers';
+import { applyGroupOrders } from './markers';
 import { abilityActive, abilityTick } from './abilities';
 import { buildTick, forageTick } from './colonyAI';
 import { warTick } from './warAI';
 import { dcos, dhypot, dsin, sq } from './dmath';
-import { ENTRANCE } from './balance';
-import { designateSpot, entranceTick, makeEntrance, markSpots, nestToSurface, openDugSpots } from './entrances';
+import { digFlower, entranceTick, flowerOver, placeHoles } from './entrances';
 
 /** Nest plane size in hexes (the same for every species; hex radius scales instead). */
 export const NEST_COLS = 34;
@@ -62,16 +61,6 @@ export function hexCoreCells(g: NestGrid, q: number, frac = 0.5): number[] {
 }
 
 export { nestToSurface } from './entrances';
-
-/** Where a colony's main entrance opens on an authored map's site (its authored entrance hex), or null. */
-function siteEntrance(w: World, c: Colony): { x: number; y: number } | null {
-  const L = w.terrain.layout;
-  if (!L || c.site === undefined) return null;
-  const s = L.sites[c.site];
-  if (!s || !s.entrances.length) return null;
-  const q = s.entrances[0];
-  return { x: L.hex.centerX(q), y: L.hex.centerY(q) };
-}
 
 // ---------------------------------------------------------------------------
 // Colony creation
@@ -166,34 +155,26 @@ export function createColony(w: World, o: ColonyOptions): Colony {
   // Starting area: hexes within 2 steps of the queen's hex.
   const start: number[] = [];
   for (let q = 0; q < g.cols * g.rows; q++) if (g.hexDistance(q, q0) <= 2) start.push(q);
-  // Tunnel north to the entrance ramp. Fire ants build a mound with no opening in the middle:
-  // their way out is a long foraging tunnel that surfaces well away from it.
+  // The passage north to the entrance (every species alike: a fire-ant dome's holes open at its edge).
   const path: number[] = [];
   let cur = q0;
-  const dirs = o.species === 'solenopsis' ? [5, 5, 5, 0, 5, 0, 0, 5, 0, 0, 5, 5, 0, 5, 5] : [5, 5, 0, 5, 5, 4, 5, 5];
-  for (let i = 0; i < dirs.length; i++) {
-    const n = g.neighbors(cur)[dirs[i]];
+  for (const d of [5, 5, 0, 5, 5, 4, 5, 5]) {
+    const n = g.neighbors(cur)[d];
     if (n < 0) break;
     cur = n;
     path.push(n);
   }
-  const entQ = path[path.length - 1];
   for (const q of [...start, ...path]) {
     g.softenHex(q);
     g.completeHex(q);
   }
-  // The main entrance: the last hexes of the passage form its tunnel, rising to the hole.
-  g.addEntrance(path.slice(-ENTRANCE.tunnelLen).reverse());
+  // The nest's one entrance: a 7-hex flower over the passage's end, its floor ramping up to the surface (sim/entrances.ts)
+  const fl = flowerOver(g, q0, path);
+  digFlower(g, fl.flower, fl.spine);
   w.addNest(id, g);
 
-  // Entrance on the surface.
-  const ep = g.hexCenter(entQ);
-  const proj = nestToSurface(w, c, ep.x, ep.y);
-  const es = siteEntrance(w, c) ?? nearestWalkable(w, proj.x, proj.y) ?? proj;
-  c.entrances.push(makeEntrance(entQ, es.x, es.y, w.time));
-  c.spoil.push(0);
-  // Marked extra-entrance spots further out (the player digs one out to open another entrance).
-  markSpots(w, c, g, q0, [...start, ...path]);
+  // The anthill's three holes on the surface, all leading into the flower.
+  placeHoles(w, c, g);
 
   // ---- The queen's chamber: her hex and the six around it. Each queen tile stores 10 food
   // and raises one nanitic worker (the queen's small first brood). The colony starts with
@@ -312,7 +293,8 @@ function developNest(w: World, c: Colony, extra: number): void {
       if (n < 0 || seen.has(n) || g.hexSoil[n] === 255) continue;
       seen.add(n);
       queue.push(n);
-      if (g.isEntrance(n) || g.shafts.includes(n)) continue;
+      // (the entrance, and the soil ringing it, stay as they are: the passage is the only way in)
+      if (g.isEntrance(n) || (!g.isHexDug(n) && g.neighbors(n).some((m) => m >= 0 && g.isEntrance(m)))) continue;
       if (!g.isHexDug(n)) g.completeHex(n);
       if (tileAt(c, n)) continue;
       const p = plan[i];
@@ -336,16 +318,10 @@ function developNest(w: World, c: Colony, extra: number): void {
 export function designateDig(w: World, c: Colony, q: number, on: boolean): boolean {
   const g = w.nest(c.id);
   if (!g || q < 0 || !g.isHexDiggable(q)) return false;
-  // an extra-entrance spot is dug out whole (sim/entrances.ts)
-  const sp = g.spotIndex(q);
-  if (sp >= 0) return designateSpot(w, c, sp, on);
+  // (digging never makes an entrance: each nest has its one, sim/entrances.ts)
   g.designateHex(q, on);
   return true;
 }
-
-// ---------------------------------------------------------------------------
-// Entrances
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Per-second colony bookkeeping
@@ -664,7 +640,6 @@ export function colonySystem(w: World, dt: number): void {
       auditTiles(w, c);
       countColony(w, c);
       recomputeTileCaps(c);
-      openDugSpots(w, c);
       fungusFarm(w, c, 1);
       aphidPastures(w, c, 1);
       allocateTasks(w, c);

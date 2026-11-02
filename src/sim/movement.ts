@@ -1,7 +1,7 @@
 import { antClear, antMostClear, antNeed } from './underpass';
 import { World } from './world';
 import { Ant, AS, Carry, Colony, Entrance, SURFACE, nestSpace, colonyOfSpace } from './types';
-import { canEnter, canLeave, passEntrance, usableMask } from './entrances';
+import { arrivalHash, canEnter, canLeave, entranceTop, exitHole, holeIn, passEntrance, usableMask } from './entrances';
 import { casteOf } from './species';
 import { hexCoreCells } from './colony';
 import { hexSpeedOf } from './tiles';
@@ -323,14 +323,18 @@ export function exitField(w: World, c: Colony): Float32Array | null {
   return exitFieldIn(w, nestSpace(c.id));
 }
 
-/** Field toward the top of every entrance ramp of any underground area. */
+/**
+ * Field toward the way out of any underground area: a nest's flower's three top hexes (ants climb out over the whole
+ * width of the entrance), a cave's tunnel top.
+ */
 export function exitFieldIn(w: World, space: number): Float32Array | null {
   const flow = w.flowOf(space);
   const g = w.nestOf(space);
   if (!flow || !g) return null;
   const ents = w.entrancesOf(space);
-  // closed or fallen-in entrances lead nowhere
-  return flow.field('exit', () => ents.flatMap((e) => (canLeave(e) ? hexCoreCells(g, e.q, 0.35) : [])), ents.length + 32 * usableMask(ents, true));
+  // (fallen-in holes lead nowhere)
+  const open = ents.some(canLeave);
+  return flow.field('exit', () => (open ? entranceTop(g).flatMap((q) => hexCoreCells(g, q, 0.35)) : []), ents.length + 32 * usableMask(ents, true));
 }
 
 /** Surface field toward an underground area's entrances. */
@@ -368,12 +372,12 @@ export function homeField(w: World, c: Colony): Float32Array {
   return w.surfFlow.field('home:' + c.id, stamp, targets);
 }
 
-/** Nearest entrance (index) on the surface to a point. */
+/** Nearest hole (index) of a colony's anthill to a surface point (any, when all have caved in). */
 export function nearestEntrance(c: Colony, x: number, y: number): number {
   let best = 0;
   let bd = Infinity;
   c.entrances.forEach((e, i) => {
-    if (i > 0 && !canEnter(e)) return; // closed extra entrances (the main one never closes)
+    if (!canEnter(e)) return;
     const d = sq(e.sx - x) + sq(e.sy - y);
     if (d < bd) {
       bd = d;
@@ -439,7 +443,9 @@ export function approachSurface(w: World, a: Ant, x: number, y: number, dt: numb
 export function goHome(w: World, a: Ant, dt: number, speedMul = 1): boolean {
   const c = w.colony(a.colony);
   if (!c) return false;
-  const ei = nearestEntrance(c, a.x, a.y);
+  // the nearest hole; while it is busy, another of the anthill's with room that is not much farther
+  let ei = holeIn(w, c.entrances, a.x, a.y);
+  if (ei < 0) ei = nearestEntrance(c, a.x, a.y);
   const e = c.entrances[ei];
   if (!e) return false;
   const de = dhypot(e.sx - a.x, e.sy - a.y);
@@ -501,17 +507,33 @@ export function enterNest(w: World, a: Ant, ei: number): void {
   enterArea(w, a, nestSpace(a.colony), ei);
 }
 
-/** Walk down entrance `ei` of any underground area (own nest, rival nest, cave). */
+/**
+ * Walk down hole `ei` of any underground area (own nest, rival nest, cave). In a nest the ant comes out on one of the
+ * flower's three top hexes, spread over them by a hash of its id and the tick (not the simulation's random numbers),
+ * facing down into the nest; in a cave at its tunnel's top.
+ */
 export function enterArea(w: World, a: Ant, space: number, ei: number): void {
   const e = w.entrancesOf(space)[ei];
   const g = w.nestOf(space);
   if (!e || !g) return;
-  const p = g.hexCenter(e.q);
-  const ang = w.rng.range(0, Math.PI * 2);
   a.space = space;
-  a.x = a.px = p.x + dcos(ang) * g.R * 0.15;
-  a.y = a.py = p.y + dsin(ang) * g.R * 0.15;
-  a.h = a.ph = ang;
+  if (g.flowers[0]?.length) {
+    const top = entranceTop(g);
+    const q = top[Math.min(top.length - 1, Math.floor(arrivalHash(w, a, 0) * top.length))];
+    const p = g.hexCenter(q);
+    const c = g.hexCenter(g.entrances[0]);
+    const r = g.R * 0.5 * arrivalHash(w, a, 1);
+    const ang = arrivalHash(w, a, 2) * Math.PI * 2;
+    a.x = a.px = p.x + dcos(ang) * r;
+    a.y = a.py = p.y + dsin(ang) * r;
+    a.h = a.ph = datan2(c.y - p.y, c.x - p.x) + (arrivalHash(w, a, 3) - 0.5) * 0.8;
+  } else {
+    const p = g.hexCenter(e.q);
+    const ang = w.rng.range(0, Math.PI * 2);
+    a.x = a.px = p.x + dcos(ang) * g.R * 0.15;
+    a.y = a.py = p.y + dsin(ang) * g.R * 0.15;
+    a.h = a.ph = ang;
+  }
   a.ent = ei;
   a.v = 0;
   a.entT = 0;
@@ -537,27 +559,32 @@ function exitAreaTo(w: World, a: Ant, space: number, ei: number): void {
   a.entT = 0;
 }
 
-/** In an area, at the top of an entrance ramp → surface. Returns true if exited. */
+/**
+ * In an area, at the top of its entrance (a nest: on one of its flower's top hexes; a cave: at its tunnel's top) →
+ * surface, through the hole nearest where the ant is going (entrances.ts exitHole; while it is busy, another of the
+ * anthill's with room). Returns true if exited.
+ */
 export function tryExit(w: World, a: Ant): boolean {
   if (a.space === SURFACE) return true;
   const g = w.nestOf(a.space);
   if (!g) return false;
   const ents = w.entrancesOf(a.space);
-  for (let i = 0; i < ents.length; i++) {
-    if (!canLeave(ents[i])) continue;
-    const p = g.hexCenter(ents[i].q);
-    if (sq(p.x - a.x) + sq(p.y - a.y) < sq(g.R * 0.3)) {
-      // queue in the tunnel while the hole is busy
-      if (!passEntrance(w, ents[i], true)) {
-        a.v = 0;
-        return false;
-      }
-      // Raiders and visitors leave through the host's entrance onto the surface beside it.
-      exitAreaTo(w, a, a.space, i);
-      return true;
-    }
+  if (!ents.length || !ents.some(canLeave)) return false;
+  if (g.flowers[0]?.length) {
+    if (!entranceTop(g).includes(g.hexAt(a.x, a.y))) return false;
+  } else {
+    const p = g.hexCenter(ents[0].q);
+    if (sq(p.x - a.x) + sq(p.y - a.y) >= sq(g.R * 0.3)) return false;
   }
-  return false;
+  const i = exitHole(w, a, ents);
+  // wait in the entrance, facing up, while the hole is busy
+  if (!passEntrance(w, ents[i], true)) {
+    a.v = 0;
+    return false;
+  }
+  // (raiders and visitors leave through the host's holes onto the surface beside them)
+  exitAreaTo(w, a, a.space, i);
+  return true;
 }
 
 /** Leave whichever area the ant is in via the nearest ramp. Returns true when on the surface. */
@@ -571,20 +598,21 @@ export function goOut(w: World, a: Ant, dt: number): boolean {
   if (!f) return false;
   const r = followNest(w, a, f, dt);
   if (r !== 'moving') {
-    // climb the last bit of the ramp
-    let best = ents[0];
+    // climb the last bit of the ramp, to the nearest of its top hexes
+    let best = -1;
     let bd = Infinity;
-    for (const e of ents) {
-      if (!canLeave(e)) continue;
-      const p = g.hexCenter(e.q);
+    for (const q of entranceTop(g)) {
+      const p = g.hexCenter(q);
       const d = sq(p.x - a.x) + sq(p.y - a.y);
       if (d < bd) {
         bd = d;
-        best = e;
+        best = q;
       }
     }
-    const p = g.hexCenter(best.q);
-    steerTo(w, a, p.x, p.y, dt);
+    if (best >= 0) {
+      const p = g.hexCenter(best);
+      steerTo(w, a, p.x, p.y, dt);
+    }
     tryExit(w, a);
   }
   return a.space === SURFACE;
@@ -602,7 +630,8 @@ export function goToArea(w: World, a: Ant, space: number, dt: number, speedMul =
     return false;
   }
   const ents = w.entrancesOf(space);
-  const bi = nearestOf(ents, a.x, a.y);
+  // (any hole: the nearest; while it is busy, another of the anthill's with room not much farther)
+  const bi = holeIn(w, ents, a.x, a.y);
   if (bi < 0) return false;
   const e = ents[bi];
   const de = dhypot(e.sx - a.x, e.sy - a.y);
