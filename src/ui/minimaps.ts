@@ -291,6 +291,32 @@ export class Minimaps {
         const h1 = t.heightAt(Math.min(t.width, wx + 3), Math.min(t.depth, wz + 3));
         const sh = Math.max(0.6, Math.min(1.3, 1 + (h0 - h1) * 0.08));
         const water = t.isWater(wx, wz);
+        // layered ground (world/layers.ts): higher levels lighter, banks a dark line, ramps a pale tan
+        let lv = 1;
+        let bank = false;
+        let ramp = false;
+        if (t.layers) {
+          const k = cj * t.nx + ci;
+          lv = 1 + t.layers.level[k] * 0.11;
+          bank = t.layers.cliff[k] === 1;
+          ramp = t.onRamp(wx, wz);
+        }
+        if (bank && !water) {
+          const i = (y * S + x) * 4;
+          img.data[i] = 52;
+          img.data[i + 1] = 38;
+          img.data[i + 2] = 26;
+          img.data[i + 3] = 255;
+          continue;
+        }
+        if (ramp) {
+          r = r * 0.5 + 92;
+          gg = gg * 0.5 + 80;
+          b = b * 0.5 + 56;
+        }
+        r *= lv;
+        gg *= lv;
+        b *= lv;
         // rocks, logs and other walls (authored maps) in grey; stepping stones over water in tan
         const wall = !water && t.isBlocked(wx, wz);
         const walk = !water && !wall && t.map !== null && t.waterAt(wx, wz) > -9999;

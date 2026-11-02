@@ -13,6 +13,7 @@ import { Body, anchored, bodyHook, distToCreatureBody } from '../slots';
 import { makeCreature, makeFood } from '../factory';
 import { CREATURES, CreatureKind, creatureKind, wildKinds } from './kinds';
 import { datan2, dcos, dhypot, dsin, sq } from '../dmath';
+import { directCreature } from '../story/director';
 
 /**
  * Creature behaviour (Phase 10, DESIGN 3.10). One program per species,
@@ -1881,7 +1882,10 @@ export function creatureSystem(w: World, dt: number): void {
         continue;
       }
     }
-    if (!arenaCreature(w, cr, k, dt)) PROGRAMS[k.ai]?.(w, cr, cr.faction >= 0 && stanceOf(w, cr.faction) >= 0 ? arenaKind(k) : k, dt);
+    // story levels: a creature the director plays walks its cue (sim/story/director.ts); else its own program
+    if (cr.data.dirA !== undefined && directCreature(w, cr, dt)) {
+      // (the director moved it)
+    } else if (!arenaCreature(w, cr, k, dt)) PROGRAMS[k.ai]?.(w, cr, cr.faction >= 0 && stanceOf(w, cr.faction) >= 0 ? arenaKind(k) : k, dt);
     // long bodies turn by curving, at most maxTurn rad/s (every path: walking, facing, snapping round)
     if (k.maxTurn !== undefined) {
       const dh = angleTo(h0, cr.h);

@@ -26,8 +26,9 @@ export function edible(c: Colony, f: Food): boolean {
   if (eatsWood(c)) return f.kind === 'wood' && (!isLitter(f) || c.species === 'rhynchotermes');
   // army ants are pure predators: insects and corpses, and crumbs of them (or of raided brood) — ECITON.foodKinds
   if (c.species === 'eciton') return ECITON.foodKinds.includes(f.kind) && !(f.kind === 'crumb' && PLANT_FROM.has(f.from));
-  // Termants: everything ants eat, and dead wood too (not leaf litter); only their workers gather the wood
-  if (c.species === 'termant') return f.kind !== 'wood' || !isLitter(f);
+  // Termants: every food there is — what ants eat, dead wood, leaf litter and leaves (one store; their workers gather
+  // the wood, litter and leaves: user 2026-11-02)
+  if (c.species === 'termant') return true;
   return f.kind !== 'wood';
 }
 

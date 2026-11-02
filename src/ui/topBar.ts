@@ -43,7 +43,7 @@ export class TopBar {
         : '<b>Food</b>Stored / storage capacity. Queen tiles hold 10 each; food storage tiles 10 / 40 / 100 by level. Food pays for building, upgrading and growing larvae.';
     this.workers.dataset.tip = '<b>Workers</b>Active / maximum. The maximum is the capacity of your worker brood tiles (queen tiles raise nanitics). Workers dig, build and carry eggs, and gather food.';
     this.soldiers.dataset.tip = '<b>Soldiers</b>Active / maximum, from soldier and major brood tiles. Soldiers fight and guard but never do nest jobs.';
-    this.wood.dataset.tip = `<b>Wood</b>Stored / most the colony can hold. Termant workers chew dead wood like termites; it is stored apart from food and digests slowly into food (half of it). Carton walls are built from wood.`;
+    this.wood.dataset.tip = `<b>Wood</b>Termants keep wood in their food store (no separate counter).`;
     this.right.append(this.food, this.wood, this.workers, this.soldiers, button('sc', 'Menu', '<b>Menu</b>Pause, settings and controls. <span class="k">Esc</span>', onMenu));
     this.root.append(this.left, this.right);
     shield(this.left);
@@ -61,13 +61,8 @@ export class TopBar {
     if (this.food.innerHTML !== fd) this.food.innerHTML = fd;
     this.food.classList.toggle('full', c.food >= c.foodCap - 0.5);
     this.food.classList.toggle('low', c.food < 10);
-    const termant = c.species === 'termant';
-    this.wood.style.display = termant ? '' : 'none';
-    if (termant) {
-      const wd = `${ICONS.wood}<span class="cur">${Math.floor(c.wood ?? 0)}</span><span class="cap">/ ${TERMANT.wood.cap}</span>`;
-      if (this.wood.innerHTML !== wd) this.wood.innerHTML = wd;
-      this.wood.classList.toggle('full', (c.wood ?? 0) >= TERMANT.wood.cap - 0.5);
-    }
+    // (Termants keep wood and leaves in the food store: no wood counter since 2026-11-02)
+    this.wood.style.display = 'none';
     const wcol = casteFigureColour(basicCaste(c.species));
     const wk = `${antSilhouette('worker', wcol)}<span class="cur">${c.workers}</span><span class="cap">/ ${c.workersMax}</span>`;
     if (this.workers.innerHTML !== wk) this.workers.innerHTML = wk;

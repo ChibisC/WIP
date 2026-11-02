@@ -35,6 +35,12 @@ import { NetGame } from './net/netGame';
 import { BroadcastChannelTransport, NetSimTransport, Transport } from './net/transport';
 import { ManualRtcTransport, installLanGuard } from './net/lanTransport';
 import { openHostDialog, showLanJoin } from './ui/lanCodes';
+import { showStoryHub } from './ui/storyHub';
+import { storySetup } from './sim/story/runner';
+import { missionOf } from './sim/missions';
+import { campaign } from './game/campaign';
+import { makeAnt } from './sim/factory';
+import { SURFACE } from './sim/types';
 
 installTouchGuards();
 fitMenus();
@@ -85,9 +91,11 @@ function runDeterminismPage(params: URLSearchParams): void {
 function startGame(): void {
   const ui = document.getElementById('ui')!;
   const launch = (c: MenuChoice) => {
+    // Story without a level chosen: the island map first
+    if (c.mode === 'story' && !c.story) return storyHub();
     const load = document.createElement('div');
     load.className = 'loading';
-    load.textContent = 'Excavating the founding chamber…';
+    load.textContent = c.mode === 'story' ? 'Washing ashore…' : 'Excavating the founding chamber…';
     ui.appendChild(load);
     setTimeout(() => {
       if (c.mode === 'arena') return launchArena(c, load);
@@ -119,7 +127,7 @@ function startGame(): void {
       }
       // the map grows with the number of colonies so nests are not crowded
       const size = colonies.length <= 2 ? 640 : colonies.length <= 4 ? 800 : 980;
-      const setup: GameSetup = {
+      const setup: GameSetup = c.mode === 'story' && c.story ? storySetup(c.story.level, c.story.difficulty, c.story.loadout, Number(q.get('seed') || Math.floor(Math.random() * 1e6))) : {
         seed: Number(q.get('seed') || Math.floor(Math.random() * 1e6)),
         style: mission ? mission.style : c.style,
         width: size,
@@ -138,6 +146,7 @@ function startGame(): void {
       s.build = BUILD_ID;
       s.autoQuality.enabled = c.quality === 'auto';
       if (q.get('reveal')) s.revealAreas = true;
+      if (q.get('nocine')) s.noShots = true;
       // ?delay=N: give single-player an input delay of N ticks, to try the multiplayer pending feedback
       if (q.get('delay')) s.commands.delay = Math.max(0, Math.min(8, Number(q.get('delay'))));
       (window as unknown as { __session: GameSession }).__session = s;
@@ -154,6 +163,18 @@ function startGame(): void {
       if (q.get('hitboxes')) s.setHitboxes(true);
       if (q.get('combatdebug')) s.setCombatDebug(true);
       if (q.get('layout') || q.get('battle') || q.get('chamber') || q.get('spawn')) s.replayable = false; // test scenes edit the world directly
+      // dev: a story level from any stage (?story=<level>&stage=N[&ants=N]), to test its scenes
+      if (c.mode === 'story' && q.get('stage')) {
+        const m = missionOf(s.world);
+        if (m) {
+          m.stage = Math.max(0, Number(q.get('stage')));
+          m.entered = false;
+        }
+        const extra = Number(q.get('ants') || 0);
+        const e0 = s.player.entrances[0];
+        for (let i = 0; i < extra; i++) makeAnt(s.world, s.player.id, i % 4 ? 'termant_worker' : 'termant_soldier', SURFACE, e0.sx + ((i % 7) - 3) * 4, e0.sy + Math.floor(i / 7) * 4 + 8, 0);
+        s.replayable = false;
+      }
       // The simulation runs in a Web Worker (the screenshot harness steps it synchronously in this thread; ?worker=0 too).
       if (!q.get('shot') && q.get('worker') !== '0') s.useWorker();
       if (q.get('shot')) {
@@ -235,7 +256,13 @@ function startGame(): void {
     launch({ teams: Number(q.get('teams') || 2), mode: (q.get('mode') as MenuChoice['mode']) || (q.get('mission') ? 'mission' : 'skirmish'), mission: (q.get('mission') as MenuChoice['mission']) || 'meadow', species: (q.get('species') as MenuChoice['species']) || 'lasius', borrowed: (q.get('borrow') || 'formica_mortar,fire_major').split(','), ais: (q.get('rival') || '').split(',').filter(Boolean).map((sp) => ({ species: sp as MenuChoice['species'], borrowed: [], team: 'own' as const })), style: (q.get('style') as MenuChoice['style']) || (q.get('mode') === 'arena' ? 'formicarium' : 'meadow'), map: (q.get('map') as MenuChoice['map']) || undefined, quality: (q.get('q') as MenuChoice['quality']) || 'high' });
     return;
   }
-  const title = () => showTitle(ui, () => showMenu(ui, launch), () => mpMenu(), (bytes) => watchReplay(bytes), { slot: (sl) => void loadSlot(sl), file: (b) => void loadGame(b) });
+  const title = () => showTitle(ui, () => showMenu(ui, launch), () => mpMenu(), (bytes) => watchReplay(bytes), { slot: (sl) => void loadSlot(sl), file: (b) => void loadGame(b) }, () => storyHub());
+
+  // ------------------------------------------------------------------ story mode: the island map (claude/story/02-spec)
+  function storyHub(): void {
+    history.replaceState(null, '', location.pathname);
+    showStoryHub(ui, (st) => launch({ mode: 'story', story: st, mission: 'meadow', species: 'termant', borrowed: [], ais: [], style: 'meadow', quality: settings().quality }), () => title());
+  }
 
   // ------------------------------------------------------------------ saved games (Phase 14)
   const loadSlot = async (slot: SaveSlot) => {
@@ -495,6 +522,18 @@ function startGame(): void {
     s.start();
     setTimeout(() => (w.__ready = true), 800);
   };
+
+  // ?story=1: the island map (a level's end screen comes back here); ?story=<level>[&diff=…&loadout=…]: that level
+  const storyParam = q.get('story');
+  if (storyParam === '1') return storyHub();
+  if (storyParam === 'garden' || storyParam === 'fireBanks') {
+    const cs = campaign();
+    const diff = (q.get('diff') as NonNullable<MenuChoice['story']>['difficulty']) || cs.difficulty[storyParam] || 'normal';
+    const loadout = (q.get('loadout') || '').split(',').filter(Boolean);
+    if (!q.get('shot')) history.replaceState(null, '', location.pathname);
+    launch({ mode: 'story', story: { level: storyParam, difficulty: diff, loadout }, mission: 'meadow', species: 'termant', borrowed: [], ais: [], style: 'meadow', quality: (q.get('q') as MenuChoice['quality']) || settings().quality });
+    return;
+  }
 
   // ?load=slot: the pause menu's Load restarts the page into a save
   const loadParam = q.get('load') as SaveSlot | null;

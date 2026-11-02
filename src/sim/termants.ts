@@ -18,7 +18,8 @@ import { tilePoint } from './colony';
  *    until the player forgets one (command `forgetCaste`: its brood tiles are refunded; living ants stay). Creature
  *    genes give a small passive bonus once (beetles armour, spiders speed).
  *  - Soldier glue burst (combat.ts → glueBurst): slows the target and makes formic acid hurt it double.
- *  - Dual diet: workers chew dead wood too; it is stored apart and digests slowly into food.
+ *  - Eats everything (user 2026-11-02): workers gather dead wood, leaf litter and leaves as well as ordinary food, and
+ *    all of it goes into the one food store (wood and leaves at `TERMANT.wood.toFood` / `leafToFood` food a unit).
  *  - A king beside the queen. Like a termite king he is never targeted, takes no damage, bites weakly and dies the
  *    moment his queen does (user note 2026-10-25). One queen and no replacement (user note, 2026-10-25): when she
  *    dies the colony is lost, as for every species.
@@ -26,30 +27,45 @@ import { tilePoint } from './colony';
 
 export const isTermant = (c: Colony | undefined): boolean => !!c && c.species === 'termant';
 
-/** A stolen caste: the source species' own caste, under a Termant name. */
+/**
+ * A stolen caste: the source species' own caste. (User 2026-11-01: stolen castes get no nicknames; they are called by
+ * their ant names, the source species' common name and the caste's own name — `stolenName`.)
+ */
 export interface StolenCaste {
   source: SpeciesId;
   caste: string;
-  name: string;
   heavy: boolean;
+  /** the caste word when the caste's own name reads badly after the species name ("Nasute Termite Nasute") */
+  as?: string;
+}
+
+/** Data only: one entry per source species (entries whose caste is not in the game are skipped). */
+export const STOLEN_CASTES: StolenCaste[] = [
+  { source: 'hell', caste: 'hell_soldier', heavy: true },
+  { source: 'nasutitermes', caste: 'nasute_soldier', heavy: false, as: 'Soldier' },
+  { source: 'rhynchotermes', caste: 'rhy_soldier', heavy: false, as: 'Soldier' },
+  { source: 'solenopsis', caste: 'fire_major', heavy: true },
+  { source: 'aurimyrmex', caste: 'aurimyrmex_soldier', heavy: false },
+  { source: 'formica', caste: 'formica_rapid', heavy: false },
+  { source: 'lasius', caste: 'lasius_soldier', heavy: false },
+  { source: 'atta', caste: 'atta_major', heavy: true },
+  { source: 'eciton', caste: 'eciton_major', heavy: true },
+].filter((e) => !!CASTES[e.caste] && !!SPECIES[e.source as SpeciesId]) as StolenCaste[];
+
+/** A species' common name for one animal ("Nasute Termites" → "Nasute Termite", "Saiy-Ants" → "Saiy-Ant"). */
+export function singularName(common: string): string {
+  return common.replace(/([^s])s$/, '$1');
 }
 
 /**
- * Data only: one entry per source species (the plan's table; entries whose caste is not in the game are skipped).
- * Black garden ants give their soldier under "Garden Bruiser" (the plan's "Acid Lancer" for both formicines, but the
- * game's Lasius soldier has no acid).
+ * A stolen caste's display name: the source species' common name and the caste's own name, e.g. "Black Garden Ant
+ * Soldier", "Tropical Fire Ant Major", "Nasute Termite Soldier" (the full list is in docs/story/DESIGN-STORY.md).
  */
-export const STOLEN_CASTES: StolenCaste[] = [
-  { source: 'hell', caste: 'hell_soldier', name: 'Impaler', heavy: true },
-  { source: 'nasutitermes', caste: 'nasute_soldier', name: 'Glue Gunner', heavy: false },
-  { source: 'rhynchotermes', caste: 'rhy_soldier', name: 'Sickle Grappler', heavy: false },
-  { source: 'solenopsis', caste: 'fire_major', name: 'Crusher', heavy: true },
-  { source: 'aurimyrmex', caste: 'aurimyrmex_soldier', name: 'Gilded', heavy: false },
-  { source: 'formica', caste: 'formica_rapid', name: 'Acid Lancer', heavy: false },
-  { source: 'lasius', caste: 'lasius_soldier', name: 'Garden Bruiser', heavy: false },
-  { source: 'atta', caste: 'atta_major', name: 'Shredder', heavy: true },
-  { source: 'eciton', caste: 'eciton_major', name: 'Reaper', heavy: true },
-].filter((e) => !!CASTES[e.caste] && !!SPECIES[e.source as SpeciesId]) as StolenCaste[];
+export function stolenName(e: StolenCaste | string): string {
+  const s = typeof e === 'string' ? stolenOf(e) : e;
+  if (!s) return CASTES[e as string]?.name ?? String(e);
+  return `${singularName(SPECIES[s.source].common)} ${s.as ?? CASTES[s.caste].name}`;
+}
 
 /** Creature genes: a passive bonus once (by kind name), no caste. */
 const CREATURE_BONUS: Array<{ match: RegExp; bonus: 'armor' | 'speed' }> = [
@@ -105,14 +121,15 @@ export function tagPiece(c: Colony, corpse: Food, piece: Food, amount: number): 
 
 /**
  * Food delivered to a Termant store (antAI.deposit): genes from an enemy corpse (or a piece of one), never from the
- * colony's own dead (those go to the midden, not here) nor from its own species. Wood goes to the wood store
- * instead of food. Returns the food amount to add (0 for wood).
+ * colony's own dead (those go to the midden, not here) nor from its own species. Wood, leaf litter and leaves are
+ * food too, in the same store (user 2026-11-02). Returns the food amount to add.
  */
 export function termantDeposit(w: World, c: Colony, item: Food | undefined, amount: number): number {
   if (!isTermant(c) || !item) return amount;
-  if (item.kind === 'wood') {
-    c.wood = Math.min(TERMANT.wood.cap, (c.wood ?? 0) + amount);
-    return 0;
+  if (item.kind === 'wood' || item.kind === 'leaf') {
+    // (counted for the story's "gather wood" goal)
+    if (item.kind === 'wood') c.stats.wood = (c.stats.wood ?? 0) + amount;
+    return amount * (item.kind === 'wood' ? TERMANT.wood.toFood : TERMANT.wood.leafToFood);
   }
   const whole = item.kind === 'corpse';
   const src = whole ? item.from : item.gsrc;
@@ -142,9 +159,9 @@ function unlock(w: World, c: Colony, e: StolenCaste): void {
   if (!c.castes.includes(e.caste)) c.castes.push(e.caste);
   c.tileVersion++;
   w.events.emit({ t: 'caste', colony: c.id, caste: e.caste, source: e.source });
-  w.events.emit({ t: 'message', text: `${SPECIES.termant.common}: the queen's new brood carries the weapons of its prey — ${e.name} (${SPECIES[e.source].common} ${CASTES[e.caste].name}) can be raised.`, kind: 'good', colony: c.id });
+  w.events.emit({ t: 'message', text: `${SPECIES.termant.common}: the queen's new brood carries the weapons of its prey — the ${stolenName(e)} can be raised.`, kind: 'good', colony: c.id });
   // the colonies whose dead it came from hear of it
-  for (const o of w.s.colonies) if (o.id !== c.id && o.species === e.source && o.alive) w.events.emit({ t: 'message', text: `A ${SPECIES.termant.common} colony now raises ${CASTES[e.caste].name}s stolen from your dead.`, kind: 'warn', colony: o.id });
+  for (const o of w.s.colonies) if (o.id !== c.id && o.species === e.source && o.alive) w.events.emit({ t: 'message', text: `A ${SPECIES.termant.common} colony now raises ${stolenName(e)}s from the genes of your dead.`, kind: 'warn', colony: o.id });
 }
 
 /** Forget a stolen caste (command): its brood tiles are refunded; living ants stay; a waiting caste takes its place. */
@@ -206,7 +223,7 @@ export function termantSystem(w: World, dt: number): void {
       if (G.stolen.length < TERMANT.maxStolen) unlock(w, c, e);
       else if (!G.pending) {
         G.pending = e.caste;
-        w.events.emit({ t: 'message', text: `${SPECIES.termant.common}: ${e.name} (${SPECIES[e.source].common}) is ready to be raised — forget a stolen caste to make room (three at most).`, kind: 'info', colony: c.id });
+        w.events.emit({ t: 'message', text: `${SPECIES.termant.common}: the ${stolenName(e)} is ready to be raised — forget a stolen caste to make room (three at most).`, kind: 'info', colony: c.id });
       }
     }
     for (const [src, n] of Object.entries(G.samples)) {
@@ -218,12 +235,11 @@ export function termantSystem(w: World, dt: number): void {
         w.events.emit({ t: 'message', text: `${SPECIES.termant.common}: genes from the ${src.slice(3)} — ${b.bonus === 'armor' ? 'harder shells (5 % less damage)' : 'quicker legs (+5 % speed)'}.`, kind: 'good', colony: c.id });
       }
     }
-    // dead wood digests slowly into food
+    // an old save's separate wood store (before the one store, 2026-11-02) turns into food once
     const wood = c.wood ?? 0;
     if (wood > 0) {
-      const d = Math.min(wood, (TERMANT.wood.digestRate * wood) / 10);
-      c.wood = wood - d;
-      c.food = Math.min(c.foodCap, c.food + d * TERMANT.wood.toFood);
+      c.wood = 0;
+      c.food = Math.min(c.foodCap, c.food + wood * TERMANT.wood.toFood);
     }
   }
   void dt;
@@ -363,9 +379,9 @@ export function genesNear(c: Colony, species: string): boolean {
   return have >= need * (1 - TERMANT.ai.raidNear) && have < need;
 }
 
-/** How much a wood source is worth to the forage AI (more while the wood store is low). */
+/** How much a wood or leaf source is worth to the forage AI (more while the food store is low). */
 export function woodWant(c: Colony): number {
-  return (c.wood ?? 0) < TERMANT.wood.cap * 0.5 ? TERMANT.ai.woodWant : TERMANT.ai.woodSated;
+  return c.food < c.foodCap * 0.5 ? TERMANT.ai.woodWant : TERMANT.ai.woodSated;
 }
 
 /**
@@ -391,7 +407,7 @@ export function termantAI(w: World, c: Colony): void {
   const g = w.nest(c.id);
   if (!g) return;
   if (c.tiles.some((t) => t.type === 'carton' && !t.built)) return;
-  if ((c.wood ?? 0) < TERMANT.cartonWall.cost) return;
+  if (c.food < TERMANT.cartonWall.cost) return;
   const N = g.cols * g.rows;
   for (let k = 0; k < N; k++) {
     if (!g.isEntrance(k)) continue;

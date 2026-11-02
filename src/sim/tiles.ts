@@ -59,7 +59,7 @@ export function tileCost(c: Colony, type: TileType, caste?: string): number {
     case 'mound':
       return BALANCE.mound.build;
     case 'carton':
-      return TERMANT.cartonWall.cost; // (wood, not food)
+      return TERMANT.cartonWall.cost;
     default:
       return 0;
   }
@@ -224,14 +224,12 @@ export function placeTile(w: World, c: Colony, type: TileType, q: number, caste?
 /** Finish building a planned tile; pays its food. Returns false (and waits) when the colony can't afford it. */
 export function completeBuild(w: World, c: Colony, t: Tile): boolean {
   const cost = tileCost(c, t.type, t.caste);
+  // (a carton wall is paid from the one food store too, like every tile: user 2026-11-02)
+  if (!c.infiniteFood && c.food < cost) return false;
+  if (!c.infiniteFood) c.food -= cost;
   if (t.type === 'carton') {
-    // a carton wall is paid in wood (Termants' wood store)
-    if (!c.infiniteFood && (c.wood ?? 0) < cost) return false;
-    if (!c.infiniteFood) c.wood = (c.wood ?? 0) - cost;
     t.hp = TERMANT.cartonWall.hp;
   } else {
-    if (!c.infiniteFood && c.food < cost) return false;
-    if (!c.infiniteFood) c.food -= cost;
   }
   t.built = true;
   t.progress = 0;
@@ -378,8 +376,7 @@ export function completeUpgrade(w: World, c: Colony, t: Tile): string | null {
 export function completeDelete(w: World, c: Colony, t: Tile): void {
   const g = w.nest(c.id)!;
   const ctr = g.hexCenter(t.q);
-  if (t.type === 'carton') c.wood = Math.min(TERMANT.wood.cap, (c.wood ?? 0) + tileCost(c, t.type) * BALANCE.refund);
-  else dropSeeds(w, c, ctr.x, ctr.y, tileCost(c, t.type, t.caste) * BALANCE.refund);
+  dropSeeds(w, c, ctr.x, ctr.y, tileCost(c, t.type, t.caste) * BALANCE.refund);
   t.pend = 0;
   t.progress = 0;
   if (t.level > 1) {

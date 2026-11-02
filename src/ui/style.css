@@ -179,3 +179,4 @@ html.touch .menu { -webkit-overflow-scrolling: touch; padding: max(10px, env(saf
 .lb-maps .map-card[disabled] { cursor: default; opacity: 0.55; }
 .lb-maps .map-card.on[disabled] { opacity: 1; }
 .lb-maps .map-thumb { height: 112px; }
+.title-modes .mode-card.story { grid-column: 1 / -1; border-color: rgba(224,166,74,0.55); background: linear-gradient(120deg, rgba(224,166,74,0.14), rgba(255,240,210,0.04)); }

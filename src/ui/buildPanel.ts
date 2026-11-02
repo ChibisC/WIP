@@ -7,7 +7,7 @@ import { TileType } from '../sim/types';
 import { ICONS, casteIcon } from './icons';
 import { button, el, esc, shield } from './dom';
 import { TERMANT } from '../sim/balance';
-import { STOLEN_CASTES, genomeOf, isTermant, stolenOf, threshold } from '../sim/termants';
+import { STOLEN_CASTES, genomeOf, isTermant, stolenName, stolenOf, threshold } from '../sim/termants';
 import { CLICK, TOUCH } from '../core/device';
 import { casteMount } from '../sim/creatures/climb';
 
@@ -125,7 +125,7 @@ export class BuildPanel {
     this.grid.appendChild(head);
     if (G.pending) {
       const e = stolenOf(G.pending);
-      this.grid.appendChild(el('div', 'gn-note', `<b>${esc(e?.name ?? G.pending)}</b> is ready, but the colony already raises ${TERMANT.maxStolen} stolen castes. Forget one to make room.`));
+      this.grid.appendChild(el('div', 'gn-note', `<b>${esc(e ? stolenName(e) : G.pending)}</b> is ready, but the colony already raises ${TERMANT.maxStolen} stolen castes. Forget one to make room.`));
     }
     const rows = [...STOLEN_CASTES].sort((a, b) => Number(inMatch.has(b.source)) - Number(inMatch.has(a.source)));
     for (const e of rows) {
@@ -140,13 +140,13 @@ export class BuildPanel {
       const row = el(
         'div',
         'gn-row' + (active ? ' on' : '') + (inMatch.has(e.source) || active ? '' : ' away'),
-        `${casteIcon(e.caste)}<div class="gn-mid"><div class="gn-t">${esc(e.name)}<span class="gn-st">${esc(state)}</span></div>
+        `${casteIcon(e.caste)}<div class="gn-mid"><div class="gn-t">${esc(stolenName(e))}<span class="gn-st">${esc(state)}</span></div>
         <div class="gn-s">${esc(sp.common)} ${esc(cd.name.toLowerCase())}${e.heavy ? ' · heavy' : ''}${inMatch.has(e.source) ? '' : ' · not in this match'}</div><div class="gn-bar"><i style="width:${pct.toFixed(0)}%"></i></div></div>`,
       );
-      row.dataset.tip = `<b>${esc(e.name)}</b> — the ${esc(sp.common)}' ${esc(cd.name.toLowerCase())}, raised by the Termant queen with that species' own body, weapons and habits.<br>${cd.length} mm · health ${cd.hp} · bite ${cd.bite}${cd.acid ? ' · formic acid' : ''}${cd.sting ? ' · venom sting' : ''}<br>Unlocks at <b>${need}</b> gene samples (small ants 1, workers 2, soldiers 4, majors 7). Its brood tile costs ×${TERMANT.stolenCostMul}.`;
+      row.dataset.tip = `<b>${esc(stolenName(e))}</b> — the ${esc(sp.common)}' own ${esc(cd.name.toLowerCase())}, raised by the Termant queen with that species' own body, weapons and habits.<br>${cd.length} mm · health ${cd.hp} · bite ${cd.bite}${cd.acid ? ' · formic acid' : ''}${cd.sting ? ' · venom sting' : ''}<br>Unlocks at <b>${need}</b> gene samples (small ants 1, workers 2, soldiers 4, majors 7). Its brood tile costs ×${TERMANT.stolenCostMul}.`;
       if (active)
         row.appendChild(
-          button('gn-forget', 'Forget', `<b>Forget ${esc(e.name)}</b>Stop raising this caste: its brood tiles are removed with the usual refund. Living ants of the caste stay until they die. The genes fade to half.`, () => s.issue({ type: 'forgetCaste', caste: e.caste })),
+          button('gn-forget', 'Forget', `<b>Forget the ${esc(stolenName(e))}</b>Stop raising this caste: its brood tiles are removed with the usual refund. Living ants of the caste stay until they die. The genes fade to half.`, () => s.issue({ type: 'forgetCaste', caste: e.caste })),
         );
       this.grid.appendChild(row);
     }
@@ -172,7 +172,7 @@ export class BuildPanel {
         const card = el(
           'div',
           'caste-card',
-          `${casteIcon(cs)}<div><div class="cc-t">${esc(cd.species === c.species ? cd.name : isTermant(c) && stolenOf(cs) ? `${stolenOf(cs)!.name} (stolen from ${sp.common})` : `${sp.common.replace(' Ant', '')} ${cd.name}`)}</div>
+          `${casteIcon(cs)}<div><div class="cc-t">${esc(cd.species === c.species ? cd.name : isTermant(c) && stolenOf(cs) ? `${stolenName(cs)} (stolen)` : `${sp.common.replace(' Ant', '')} ${cd.name}`)}</div>
           <div class="cc-s"><i>${esc(sp.scientific)}</i> · ${cd.length} mm · health ${cd.hp} · bite ${cd.bite}${cd.acid ? ' · formic acid' : ''}${cd.sting ? ' · venom sting' : ''}<br><span class="cc-mount">${mountText(cs)}</span><br>${esc(cd.fact)}</div></div>`,
         );
         this.grid.appendChild(card);
@@ -199,7 +199,7 @@ export class BuildPanel {
       if (bt.type === 'brood' && bt.caste) {
         const cd = CASTES[bt.caste];
         const sp = SPECIES[cd.species];
-        const nm = cd.species === c.species ? cd.name : isTermant(c) && stolenOf(bt.caste) ? stolenOf(bt.caste)!.name : `${sp.common.replace(' Ant', '')} ${cd.name}`;
+        const nm = cd.species === c.species ? cd.name : isTermant(c) && stolenOf(bt.caste) ? stolenName(bt.caste) : `${sp.common.replace(' Ant', '')} ${cd.name}`;
         const tier = tierOf(bt.caste);
         const cap = BALANCE.capacity[bt.caste] ?? BALANCE.capacity.default;
         add(
@@ -234,7 +234,7 @@ export class BuildPanel {
         const cost = tileCost(c, t.type, t.caste);
         const txt = String(cost);
         if (costEl.textContent !== txt) costEl.textContent = txt;
-        t.b.classList.toggle('cant', (t.type === 'carton' ? (c.wood ?? 0) : c.food) < cost && !c.infiniteFood);
+        t.b.classList.toggle('cant', c.food < cost && !c.infiniteFood);
       }
     }
     this.foodBtn.classList.toggle('on', s.foodView);
