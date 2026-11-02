@@ -367,7 +367,9 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     gut: 0.0,
     headCoat: 0.7,
     gait: { amplitude: 0.2, lift: 0.2 },
-    physogastric: { length: 22, width: 4.9, height: 4.9, pleat: 0.17, age: 0.5 },
+    // (realism rework: the royal-chamber photos show a pale tan, grey-ivory membrane, not saturated yellow — the same
+    // ages, the kit's colours desaturated; the default age stays 0.5)
+    physogastric: { length: 22, width: 4.9, height: 4.9, pleat: 0.17, age: 0.5, ivory: '#EEE6D6', amber: '#D8BE90', honey: '#BF9866' },
     legRadial: 8,
   },
   larva: {
