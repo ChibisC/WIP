@@ -506,6 +506,22 @@ export const BALANCE = {
   respawnDietShare: 0.5,
 
   // ---------------------------------------------------------------- rival AI war (sim/warAI.ts)
+  /** AI colonies with allies (CHANGE_PLAN §22, user spec claude/ai/01-spec-ai-allies-chambers.md) */
+  aiAllies: {
+    /** team-aware placement (world/teamSites.ts): limits as fractions of the map's width, and the score's weights */
+    sites: {
+      /** each ally's land route to its nearest teammate at most this */
+      allyMaxRoute: 0.33,
+      /** each colony's land route to its nearest enemy at least this */
+      enemyMinRoute: 0.3,
+      /** weights: allies' routes (shorter better), the teams' spread (fairer better), the nearest enemy (farther better) */
+      wAlly: 1,
+      wFair: 2,
+      wEnemy: 0.5,
+      /** an uneven match: how much the smaller side's worse food route counts */
+      smallSideFood: 2,
+    },
+  },
   aiWar: {
     /** seconds between decisions */
     every: 4,

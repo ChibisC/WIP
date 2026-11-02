@@ -11,6 +11,7 @@ import { broodSystem } from './brood';
 import { antSystem } from './antAI';
 import { foodSystem } from './food';
 import { invasionCheck, projectileSystem } from './combat';
+import { pickTeamSites } from '../world/teamSites';
 import { makeFood } from './factory';
 import { aphidClaims, registerSpeciesAI } from './speciesAI';
 import { SURFACE, SimState } from './types';
@@ -69,7 +70,10 @@ export interface GameSetup {
   map?: MapId;
   /** which of the map's balanced site sets for this colony count (default: chosen by the seed) */
   siteSet?: number;
-  /** multiplayer teams: colonies sharing a `team` start on neighbouring sites of the balanced set */
+  /**
+   * multiplayer teams: colonies sharing a `team` start on neighbouring sites. Since CHANGE_PLAN §22 any setup with a
+   * team of two or more is placed by world/teamSites.ts; this only matters for a map too small for that search.
+   */
   groupTeams?: boolean;
 }
 
@@ -157,7 +161,11 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
   // Place colonies: on an authored map on its sites (a balanced set), else far apart on dry ground.
   const L = w.terrain.layout;
   let sites = L ? L.siteOrder(setup.colonies.length, setup.siteSet ?? -1, setup.seed) : null;
-  if (sites && L && setup.groupTeams && sites.length === setup.colonies.length) {
+  // teams (CHANGE_PLAN §22): allies on neighbouring sites, enemies apart, the teams fairly placed — the map's authored
+  // set for the team shape, else the best of every assignment (world/teamSites.ts); not for hand-placed colonies
+  const placed = L && setup.colonies.every((c) => !c.at) ? pickTeamSites(L, setup.colonies.map((c) => c.team)) : null;
+  if (placed) sites = placed.sites;
+  else if (sites && L && setup.groupTeams && sites.length === setup.colonies.length) {
     const centres = sites.map((site) => ({ x: L.hex.centerX(L.sites[site].centre), y: L.hex.centerY(L.sites[site].centre) }));
     sites = teamSiteOrder(sites, centres, w.terrain.width / 2, w.terrain.depth / 2, setup.colonies.map((c) => c.team));
   }

@@ -58,7 +58,7 @@ export function randomBorrowed(): string[] {
 const PLAYABLE: SpeciesId[] = ['lasius', 'formica', 'atta', 'solenopsis', 'eciton', 'nasutitermes', 'rhynchotermes', 'hell', 'aurimyrmex', 'termant', 'plagiaria'];
 
 /** Prototype start screen: species, Gene Thief caste picks, AI colonies and their teams, map and quality. */
-const thumbs = new Map<MapId, HTMLCanvasElement>();
+const thumbs = new Map<string, HTMLCanvasElement>();
 
 export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): void {
   const choice: MenuChoice = { mode: 'mission', mission: 'meadow', species: 'lasius', borrowed: ['formica_mortar', 'fire_major'], ais: [{ species: 'formica', borrowed: [], team: 'own' }], style: 'meadow', quality: settings().quality, teams: 2 };
@@ -148,8 +148,11 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
     // map thumbnails, drawn once from the map data
     root.querySelectorAll<HTMLElement>('[data-thumb]').forEach((el) => {
       const id = el.dataset.thumb as MapId;
-      let c = thumbs.get(id);
-      if (!c) thumbs.set(id, (c = mapPreview(MAPS[id]!, 124)));
+      // your line-up's teams on the map (CHANGE_PLAN §22): allies next door, each team ringed in its colour
+      const teams = choice.mode === 'skirmish' ? [0, ...choice.ais.map((a) => teamOf(a.team))] : undefined;
+      const key = `${id}|${teams?.map((t) => t ?? '-').join(',') ?? ''}`;
+      let c = thumbs.get(key);
+      if (!c) thumbs.set(key, (c = mapPreview(MAPS[id]!, 124, teams)));
       el.appendChild(c);
     });
   };

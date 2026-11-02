@@ -1,4 +1,6 @@
 import type { MapDef, Shape } from '../maps/types';
+import { surfaceLayout } from '../world/surfaceLayout';
+import { pickTeamSites, teamGroups } from '../world/teamSites';
 
 /** Map card thumbnails: an authored map's water, walls, crossings, food and colony sites drawn from its data. */
 
@@ -27,8 +29,17 @@ function paint(ctx: CanvasRenderingContext2D, s: Shape, k: number, fill: string)
   }
 }
 
-/** A canvas `size` px on its long side showing the map from above. */
-export function mapPreview(def: MapDef, size = 132): HTMLCanvasElement {
+/** Ring colours of the teams in a preview: your team, then the others; a colony on its own team is pale. */
+const YOURS = '#7fdc6a';
+const OTHERS = ['#e0584a', '#e8b84a', '#a07ae0', '#4ac0b0', '#e07ab8'];
+const ALONE = '#f2e6c8';
+
+/**
+ * A canvas `size` px on its long side showing the map from above. With `teams` (a team per colony; colony `you` is
+ * yours; CHANGE_PLAN §22) and a team of two or more, each colony's site is ringed in its team's colour, allies joined by
+ * a line and the sites nobody gets dimmed — the placement the match will use (world/teamSites.ts).
+ */
+export function mapPreview(def: MapDef, size = 132, teams?: Array<number | undefined>, you = 0): HTMLCanvasElement {
   const c = document.createElement('canvas');
   const k = size / Math.max(def.width, def.depth);
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -47,14 +58,37 @@ export function mapPreview(def: MapDef, size = 132): HTMLCanvasElement {
   for (const wl of def.walls) paint(ctx, wl.shape, k, wl.kind === 'termiteMound' ? '#9a6a40' : wl.kind === 'log' || wl.kind === 'trunk' || wl.kind === 'buttress' ? '#5a4232' : '#8a8478');
   for (const wk of def.walkways) paint(ctx, wk.shape, k, '#c8a878');
   for (const z of def.zones) if (z.kind === 'lair') paint(ctx, z.shape, k, 'rgba(160,50,40,0.55)');
-  for (const s of def.sites) {
+  const placed = teams && teams.length > 1 ? pickTeamSites(surfaceLayout(def), teams) : null;
+  const used = new Set(placed?.sites ?? []);
+  def.sites.forEach((s, i) => {
     ctx.beginPath();
     ctx.arc(s.at[0] * k, s.at[1] * k, Math.max(2, 3.2), 0, Math.PI * 2);
-    ctx.fillStyle = '#f2e6c8';
+    ctx.fillStyle = placed && !used.has(i) ? 'rgba(242,230,200,0.35)' : '#f2e6c8';
     ctx.fill();
     ctx.lineWidth = 1;
     ctx.strokeStyle = '#2a1e12';
     ctx.stroke();
+  });
+  if (placed && teams) {
+    const at = (i: number) => def.sites[placed.sites[i]].at;
+    let other = 0;
+    for (const g of teamGroups(teams)) {
+      const col = g.includes(you) ? YOURS : g.length > 1 ? OTHERS[other++ % OTHERS.length] : ALONE;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.5;
+      for (let a = 1; a < g.length; a++) {
+        ctx.beginPath();
+        ctx.moveTo(at(g[a - 1])[0] * k, at(g[a - 1])[1] * k);
+        ctx.lineTo(at(g[a])[0] * k, at(g[a])[1] * k);
+        ctx.stroke();
+      }
+      for (const i of g) {
+        ctx.beginPath();
+        ctx.arc(at(i)[0] * k, at(i)[1] * k, i === you ? 7 : 5.5, 0, Math.PI * 2);
+        ctx.lineWidth = i === you ? 2.5 : 2;
+        ctx.stroke();
+      }
+    }
   }
   return c;
 }

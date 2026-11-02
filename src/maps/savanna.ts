@@ -127,6 +127,8 @@ export const SAVANNA: MapDef = {
     4: [[6, 7, 8, 9], [0, 1, 2, 3]],
     10: [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]],
   },
+  /** team layouts (CHANGE_PLAN §22; picked with tools/team-sites.ts, checked on docs/maps/team-sites/savanna.png) */
+  teamSets: { '2v2': [[2, 8], [3, 9]], '2v1': [[2, 8], [3]], '3v1': [[1, 5, 7], [6]], '2v2v2': [[2, 8], [0, 6], [3, 9]], '2v1v1': [[1, 7], [6], [8]], '3v3': [[1, 5, 7], [0, 4, 6]] },
   zones: [
     { kind: 'food', shape: { circle: [1126.3, 1126.3], r: 70 }, weight: 2, name: 'grass seed patch' },
     { kind: 'food', shape: { circle: [673.7, 673.7], r: 70 }, weight: 2, name: 'grass seed patch' },
