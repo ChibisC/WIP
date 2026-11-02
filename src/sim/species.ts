@@ -566,11 +566,27 @@ export function isSoldierCaste(caste: string): boolean {
   return t === 'soldier' || t === 'heavy';
 }
 
-/** Castes that a custom (plagiaria) colony may borrow. */
+/**
+ * Castes that a custom (plagiaria, Gene Thief Ant) colony may borrow: every ant caste but queens, kings and nanitics,
+ * plus the termite soldier castes (nasutes, nasute majors, sickle-jaws) — user note 2026-11-02: "gene thief ants also
+ * have the termite caste soldiers". Termite workers and royals stay out (wood diet, fed by their own workers).
+ */
 export const BORROWABLE = Object.values(CASTES)
-  // ants cannot raise termites (another insect order: no pupae, wood diet, fed by their own workers)
-  .filter((c) => c.role !== 'queen' && c.role !== 'king' && c.species !== 'plagiaria' && c.species !== 'termant' && !c.nanitic && !c.termite)
+  .filter((c) => c.role !== 'queen' && c.role !== 'king' && c.species !== 'plagiaria' && c.species !== 'termant' && !c.nanitic)
+  .filter((c) => !c.termite || c.termite === 'nasute' || c.termite === 'major' || c.termite === 'sickle')
   .map((c) => c.id);
+
+/**
+ * Lobby label of a borrowable caste: the species' common name (singular, without "Ant") plus the caste's own name —
+ * "Red Wood Mortar", "Nasute Termite Major"; "Soldier" when the caste's name only repeats the species' ("Nasute
+ * Termite Soldier", "Sickle-Jaw Termite Soldier").
+ */
+export function borrowName(id: string): string {
+  const c = CASTES[id];
+  const sp = SPECIES[c.species].common.replace(/ Ants?$/, '').replace(/ Termites$/, ' Termite');
+  const caste = sp.toLowerCase().includes(c.name.toLowerCase()) ? 'Soldier' : c.name;
+  return `${sp} ${caste}`;
+}
 
 /** A king (termites, Termants): never targeted, takes no damage, dies with his queen (user note 2026-10-25). */
 export const isKing = (caste: string): boolean => casteOf(caste).role === 'king';
