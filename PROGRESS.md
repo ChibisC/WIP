@@ -1514,7 +1514,7 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
 - **Allied nests start close** (`world/teamSites.ts`): whenever a team has two or more colonies (skirmish allies too, not
   only the lobby), its sites come from the map's authored `teamSets` for the team shape (all five maps have 2v2, 2v1,
   3v1, 2v2v2, 2v1v1, 3v3), else an exhaustive search over the 10 sites by land route on the hex layout (water and walls
-  gone round): allies within 33 % of the map's width, enemies beyond 30 %, the teams' food and middle routes even, the
+  gone round; on layered ground, up the ramps): allies within 33 % of the map's width, enemies beyond 30 %, the teams' food and middle routes even, the
   smaller side of an uneven match the better food. No seed in it, so every client agrees and the lobby's map cards ring
   each team's sites (yours green). Validator lines, `tools/team-sites.ts` → `docs/maps/team-sites.md` with sketches.
   Known: Meadow Pond's and Rainforest's 2v2v2 cannot meet both limits (the best placement is used and reported).

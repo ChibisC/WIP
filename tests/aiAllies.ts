@@ -15,7 +15,7 @@ import { allyDanger, HELP } from '../src/sim/warAI';
 import { applyCommand } from '../src/sim/commands';
 import { makeAnt } from '../src/sim/factory';
 import { surfaceLayout } from '../src/world/surfaceLayout';
-import { pickTeamSites, teamGroups } from '../src/world/teamSites';
+import { pickTeamSites, siteRoutes, teamGroups } from '../src/world/teamSites';
 import { allyInvasion } from '../tools/allyScenes';
 
 const t0 = Date.now();
@@ -85,6 +85,16 @@ const fighter = (cs: string) => CASTES[cs].role === 'soldier' || CASTES[cs].role
   const auth = MAPS.meadowPond!.teamSets!['2v2'];
   const p = pickTeamSites(surfaceLayout(MAPS.meadowPond!), [0, 0, 1, 1])!;
   check('placement: a map’s authored team set is used for its shape', p.source === 'authored' && groups.every((g, gi) => g.every((i, k) => p.sites[i] === auth[gi][k])), `${p.sites.join(',')} from ${p.source}`);
+}
+{
+  // layered ground (world/layers.ts): a bank between levels blocks the land route; the ramps are the way up
+  const T = MAPS.testTerrace!;
+  const withRamps = siteRoutes(surfaceLayout(T)).d[1];
+  const noRamps = siteRoutes(surfaceLayout({ ...T, ramps: [] })).d[1];
+  const G = MAPS.gardenBelow!;
+  const garden = siteRoutes(surfaceLayout(G)).d[1];
+  const gardenFlat = siteRoutes(surfaceLayout({ ...G, layers: [], ramps: [] })).d[1];
+  check('placement on layered ground: routes between levels go up the ramps (none without one; longer than over flat ground on Garden Below)', Number.isFinite(withRamps) && !Number.isFinite(noRamps) && Number.isFinite(garden) && garden > gardenFlat, `Test Terrace ${withRamps.toFixed(0)} mm, without its ramps ${noRamps}; Garden Below ${garden.toFixed(0)} mm (${gardenFlat.toFixed(0)} flat)`);
 }
 
 // ---------------------------------------------------------------- 2. chambers, highways, upgrades

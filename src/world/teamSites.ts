@@ -4,10 +4,12 @@
  *
  * Pure arithmetic on the map file and the team shape — no seed, no random numbers — so every client, the lobby preview
  * and the validator get the same answer. Routes run on the map's hex layout (ground and walkways; water and walls block;
- * a future layer edge is one more blocked hex type).
+ * on layered maps a bank between levels blocks too, except along a ramp).
  */
 import { BALANCE } from '../sim/balance';
 import { HEX_GROUND, HEX_WALKWAY, HF_FOOD, SurfaceLayout } from './surfaceLayout';
+import { inShape } from './mapShapes';
+import { nearestOnPath } from './layers';
 
 export interface SiteRoutes {
   /** sites on the map */
@@ -24,18 +26,48 @@ export interface SiteRoutes {
 
 const routeCache = new WeakMap<SurfaceLayout, SiteRoutes>(); // det-ok: a pure cache of numbers derived from an immutable layout
 
-/** Hex steps from `from` over open ground, to every hex (−1 where it cannot reach). */
+const levelCache = new WeakMap<SurfaceLayout, { level: Int8Array; ramp: Uint8Array } | null>(); // det-ok: pure cache, as above
+
+/**
+ * Layered maps (world/layers.ts): each hex's level (the last layer whose outline holds its centre; 0 the base ground)
+ * and whether it lies on a ramp (within half the ramp's width of its path, plus a hex). Null on a flat map.
+ */
+function hexLevels(L: SurfaceLayout): { level: Int8Array; ramp: Uint8Array } | null {
+  if (levelCache.has(L)) return levelCache.get(L)!;
+  const def = L.def;
+  let r: { level: Int8Array; ramp: Uint8Array } | null = null;
+  if (def.layers?.length) {
+    const n = L.type.length;
+    r = { level: new Int8Array(n), ramp: new Uint8Array(n) };
+    const o = { d: 0, s: 0, len: 0 };
+    for (let q = 0; q < n; q++) {
+      const x = L.hex.centerX(q);
+      const y = L.hex.centerY(q);
+      for (const ly of def.layers) if (inShape(ly.shape, x, y)) r.level[q] = ly.level;
+      for (const rp of def.ramps ?? []) {
+        nearestOnPath(rp.path, x, y, o);
+        if (o.d <= rp.width / 2 + L.hex.R) r.ramp[q] = 1;
+      }
+    }
+  }
+  levelCache.set(L, r);
+  return r;
+}
+
+/** Hex steps from `from` over open ground, to every hex (−1 where it cannot reach); between levels only up a ramp. */
 function steps(L: SurfaceLayout, from: number): Int32Array {
   const n = L.type.length;
   const out = new Int32Array(n).fill(-1);
   if (from < 0) return out;
   const open = (q: number) => L.type[q] === HEX_GROUND || L.type[q] === HEX_WALKWAY;
+  const lv = hexLevels(L);
   out[from] = 0;
   const queue = [from];
   for (let i = 0; i < queue.length; i++) {
     const q = queue[i];
     for (const nb of L.hex.neighbors(q)) {
       if (nb < 0 || out[nb] >= 0 || !open(nb)) continue;
+      if (lv && lv.level[nb] !== lv.level[q] && !(lv.ramp[nb] && lv.ramp[q])) continue;
       out[nb] = out[q] + 1;
       queue.push(nb);
     }
