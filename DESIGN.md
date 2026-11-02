@@ -884,6 +884,20 @@ both modes.
 - **Multiplayer** is 2–4 players plus AI colonies on one generated map, through a lobby and invite links; last queen standing wins.
 - A multiplayer match runs at 1× and **cannot be paused** (user note).
 
+**Story mode (2026-11-02; `docs/story/DESIGN-STORY.md`).** The **Story** tab (and the title screen's Story card) opens
+the island map of *The Gene-Thief* campaign: chapter 1 is two levels for the Gene-Thief Termants on their own layered
+maps (*The Garden Below* against black garden ants, *Fire on the Banks* against tropical fire ants). A story level is a
+data file (`src/story/levels/`) played by the mission runner above (`missionDef(id)` resolves missions and levels; the
+Missions menu still lists only the two missions). It adds data-driven objectives, captions and actions on times and
+flags, a director that makes the level's creatures and enemy ants act out scenes (`sim/story/director.ts`, cues such as
+walk, hold, patrol, guard, leave, charge, release), letterboxed camera shots, difficulty (`STORY` in balance.ts), three
+medals per level and a campaign save (castes kept, slots, journal) that never touches skirmish or multiplayer.
+
+**Layered ground (2026-11-02; `world/layers.ts`, claude/maps/05-spec).** A map may raise terraces and sink hollows one
+`LAYERS.step` (34 mm) per level; their banks are cliffs that block like walls, and ramps are the only way between levels
+(≤ 25°, ≥ 40 mm wide, checked by the validator with layer reachability, dry and flooded). The two story maps use it; the
+five skirmish maps are unchanged so far (their rework is the layered-maps spec's own job).
+
 ### Caste/tile model
 Every caste is a `CasteDef`: stats, morph, abilities and a **tier** (worker / soldier / heavy). Costs are **per caste** in `BALANCE.castes` (user note 2026-10-24): every worker caste costs 10 to build, and hatch cost and grow time scale with strength (castes not listed fall back to their tier).
 

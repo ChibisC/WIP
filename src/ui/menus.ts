@@ -3,7 +3,7 @@ import { GameSession } from '../game/session';
 import { Action, ACTION_LABELS, DEFAULT_BINDINGS } from '../core/input';
 import { Volumes, bindingChanges, keyLabel, profile, rebind, settings, updateSettings } from '../game/profile';
 import { SAVE_SLOTS, SaveSlot, describeSave, download, listSaves, putSave, readSaveHeader, savesPersist, slotName, stampedName } from '../game/saves';
-import { MISSIONS, missionOf } from '../sim/missions';
+import { MISSIONS, missionDef, missionOf } from '../sim/missions';
 import { SPECIES } from '../sim/species';
 import { creditsHtml } from './credits';
 import { BUILD_ID } from '../net/messages';
@@ -196,6 +196,9 @@ export class Menus {
       r5.append(give);
     }
     r5.append(button('', 'Credits', 'Who made what, and the licences of the sounds', () => this.credits()));
+    // a story level: back to the island map (the level is not won; nothing is recorded)
+    const sm = missionOf(this.s.world);
+    if (sm && missionDef(sm.id)?.story) r5.append(button('', 'Back to the island', 'Leave this level and return to the island map', () => (location.href = `${location.pathname}?story=1`)));
     r5.append(button('', 'Quit to title', 'Leave this game and return to the title screen', () => (location.href = location.pathname)));
     m.appendChild(r5);
   }
@@ -404,7 +407,7 @@ export class Menus {
   briefing(): void {
     const m = missionOf(this.s.world);
     if (!m) return;
-    const def = MISSIONS[m.id];
+    const def = missionDef(m.id);
     const sp = SPECIES[this.s.player.species];
     const best = profile().medals[m.id];
     this.modal(def.title, (box) => {

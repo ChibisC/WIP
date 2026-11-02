@@ -4,7 +4,9 @@ import { MAPS, PLAYABLE_MAPS } from '../maps';
 import { mapPreview } from './mapPreview';
 import { MapStyle } from '../world/terrain';
 import { Quality } from '../render/view';
-import { MISSIONS, MissionId } from '../sim/missions';
+import { MISSIONS } from '../sim/missions';
+
+type MissionId = keyof typeof MISSIONS;
 import { profile, settings } from '../game/profile';
 
 /** Which side an AI colony is on: allied with you, one of three teams, or on its own (free-for-all). */
@@ -17,7 +19,7 @@ export interface AiChoice {
   team: AiTeam;
 }
 
-export type GameMode = 'mission' | 'skirmish' | 'sandbox' | 'arena';
+export type GameMode = 'story' | 'mission' | 'skirmish' | 'sandbox' | 'arena';
 
 export interface MenuChoice {
   mode: GameMode;
@@ -36,6 +38,8 @@ export interface MenuChoice {
   quality: Quality | 'auto';
   /** battle arena: 2–4 teams */
   teams?: number;
+  /** story mode: the level, difficulty and loadout chosen on the island map (with mode 'story'; none opens the map) */
+  story?: { level: 'garden' | 'fireBanks'; difficulty: 'easy' | 'normal' | 'hard' | 'brutal'; loadout: string[] };
 }
 
 /** AI colonies beside you: the authored maps have ten colony sites */
@@ -110,6 +114,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       : '';
     const q = (['auto', 'low', 'medium', 'high'] as Array<Quality | 'auto'>).map((id) => `<button class="chip ${choice.quality === id ? 'on' : ''}" data-q="${id}">${id[0].toUpperCase() + id.slice(1)}</button>`).join('');
     const modes: Array<[GameMode, string, string]> = [
+      ['story', 'Story', 'The Gene-Thief campaign: a castaway queen and the island’s species'],
       ['mission', 'Missions', 'Story missions with a narrator and a boss at the end'],
       ['skirmish', 'Skirmish', 'You against 1 to 9 AI colonies on one of five maps, in teams if you like'],
       ['sandbox', 'Sandbox', 'No rules: spawn creatures and bosses, infinite food'],
@@ -127,8 +132,11 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
     const arenaFloors: Array<[MapStyle, string]> = [['formicarium', 'Formicarium'], ['meadow', 'Meadow'], ['forest', 'Forest floor'], ['sandy', 'Sandy scrub']];
     const arenaBody = `<h2>Teams</h2><div class="opt-row">${[2, 3, 4].map((n) => `<button class="chip ${choice.teams === n ? 'on' : ''}" data-teams="${n}">${n} teams</button>`).join('')}<span class="dim">Red, Blue${(choice.teams ?? 2) > 2 ? ', Green' : ''}${(choice.teams ?? 2) > 3 ? ', Gold' : ''} — fill them with any ants and creatures once the arena opens</span></div>
            <h2>Arena floor</h2><div class="opt-row">${arenaFloors.map(([id, n]) => `<button class="chip ${arenaStyle === id ? 'on' : ''}" data-afloor="${id}">${n}</button>`).join('')}</div>`;
+    const storyBody = `<h2>The Gene-Thief</h2><p class="dim">A storm carries a Gene-Thief Termant queen to Wayfarer Island, where ants and other creatures from across the world live side by side. Level by level her colony spreads inland, defeating each species it meets and stealing its castes. Chapter 1: two levels, with more of the island to come.</p>`;
     const body =
-      choice.mode === 'arena'
+      choice.mode === 'story'
+        ? storyBody
+        : choice.mode === 'arena'
         ? arenaBody
         : choice.mode === 'mission'
         ? `<h2>Mission</h2><div class="species-grid">${missions}</div>
@@ -136,13 +144,13 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
         : `<h2>Colony</h2><div class="species-grid">${sp}</div>${borrow}
            <h2>AI colonies</h2>${rivals}
            <h2>Map</h2>${map}${mapNote}`;
-    const go = choice.mode === 'mission' ? `Start ${MISSIONS[choice.mission].title}` : choice.mode === 'sandbox' ? 'Open the sandbox' : choice.mode === 'arena' ? 'Open the arena' : 'Found the colony';
+    const go = choice.mode === 'story' ? 'Open the island map' : choice.mode === 'mission' ? `Start ${MISSIONS[choice.mission].title}` : choice.mode === 'sandbox' ? 'Open the sandbox' : choice.mode === 'arena' ? 'Open the arena' : 'Found the colony';
     root.innerHTML = `<div class="menu-card">
       <h1>UNDERGROUND DOMINION</h1>
       <p class="tag">Single-player</p>
       ${modeRow}
       ${body}
-      <h2>Graphics</h2><div class="opt-row">${q}</div>
+      ${choice.mode === 'story' ? '' : `<h2>Graphics</h2><div class="opt-row">${q}</div>`}
       <button class="go" ${choice.mode === 'skirmish' && !choice.ais.length ? 'disabled title="Add at least one AI colony"' : ''}>${go}</button>
     </div>`;
     // map thumbnails, drawn once from the map data

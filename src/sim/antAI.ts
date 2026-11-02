@@ -39,6 +39,7 @@ import { genesWanted, isTermant, tagPiece, termantDeposit, termantKing } from '.
 import { holdGuardLine, inGuardLine, trailTraffic } from './guardLine';
 import { crossBridge, ecitonTimers, escortPorter, holdLink, isArmyAnt, isMajor, raider, soldier, teamCarry, teamHelp } from './eciton';
 import { passiveAnt } from './arena';
+import { directAnt, directMode } from './story/director';
 
 const tmp = { x: 0, y: 0 };
 
@@ -360,6 +361,20 @@ export function antSystem(w: World, dt: number): void {
       a.v = 0;
       finish(w, a);
       continue;
+    }
+    // story levels: an ant the director plays (sim/story/director.ts) — fights first unless passive, then its cue
+    if (a.dirA !== undefined) {
+      const dm = directMode(w, a);
+      if (dm === 1 || (dm === 2 && !combatPreempt(w, a, c, dt))) {
+        if (directAnt(w, a, c, dt)) {
+          venomTick(w, a, dt);
+          finish(w, a);
+          continue;
+        }
+      } else if (dm === 2) {
+        finish(w, a);
+        continue;
+      }
     }
     // A worker on a nest job ignores food and enemies (venom still hurts).
     if (a.task === 'job') {

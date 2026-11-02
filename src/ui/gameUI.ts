@@ -20,6 +20,14 @@ import { CREATURES } from '../sim/creatures/kinds';
 import { ArenaPanel } from './arenaPanel';
 import { arenaOf } from '../sim/arenaState';
 import { TOUCH } from '../core/device';
+import { missionDef } from '../sim/missions';
+import { storyOf } from '../sim/story/state';
+import { storyMedals, storyStolen } from '../sim/story/runner';
+import { recordLoss, recordWin, campaign } from '../game/campaign';
+import { CHAPTERS } from '../story/campaign';
+import { storyText } from '../story/text';
+import { showStoryEnd } from './storyEnd';
+import './story.css';
 
 /** what the touch cancel button names */
 const TOOL_NAMES: Record<string, string> = { dig: 'digging', tile: 'building', upgrade: 'upgrading', remove: 'deleting', marker: 'marker', spawn: 'placing', arena: 'placing' };
@@ -49,6 +57,8 @@ export class GameUI {
   readonly audio: GameAudio;
   /** narrator captions (missions) */
   private caption = el('div', 'caption');
+  /** story levels: letterbox bars and Skip while an in-engine shot plays */
+  private letterbox = el('div', 'letterbox', '<i class="t"></i><i class="b"></i><button class="skip">Skip ▸</button>');
   /** mission goals, always in view under the top-left buttons */
   private goals = el('div', 'pnl goals-mini');
   private goalsKey = '';
@@ -88,7 +98,23 @@ export class GameUI {
       this.labels.push(l);
       this.root.appendChild(l);
     }
-    this.root.append(this.vignette, this.tileLayer, this.crBars.root, this.top.root, this.status, this.minimaps.root, this.markers.root, this.build.root, this.info.root, this.boss.root, this.sandbox.root, this.goals, this.caption, this.toasts.root, this.paused, this.obsBar, this.menus.root);
+    this.root.append(this.vignette, this.tileLayer, this.crBars.root, this.top.root, this.status, this.minimaps.root, this.markers.root, this.build.root, this.info.root, this.boss.root, this.sandbox.root, this.goals, this.caption, this.toasts.root, this.paused, this.obsBar, this.menus.root, this.letterbox);
+    (this.letterbox.querySelector('.skip') as HTMLElement).addEventListener('click', (e) => {
+      e.stopPropagation();
+      s.skipShot();
+    });
+    // Esc skips a story shot before anything else
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        if (e.key === 'Escape' && s.cine) {
+          s.skipShot();
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      },
+      true,
+    );
     // the battle arena has no nest, markers or economy: its own panel and scoreboard instead
     if (s.arena) {
       this.arena = new ArenaPanel(s);
@@ -195,7 +221,7 @@ export class GameUI {
 
   private event(e: SimEvent): void {
     const pid = this.s.player.id;
-    if (e.t === 'message' && e.kind === 'narrator') this.say(e.text);
+    if (e.t === 'message' && e.kind === 'narrator') this.say(e.text, !!e.key);
     else if (e.t === 'message') this.toasts.push(e.text, e.kind === 'researcher' ? 'info' : e.kind);
     else if (e.t === 'queenHurt' && e.colony === pid) this.toasts.push('The queen is under attack!', 'warn', 'queen');
     else if (e.t === 'invasion' && e.colony === pid) this.toasts.push('Intruders in the nest!', 'warn', 'invasion');
@@ -230,8 +256,10 @@ export class GameUI {
   }
 
   /** A narrator caption: shown above the panels, for long enough to read it. */
-  private say(text: string): void {
-    this.caption.textContent = text;
+  private say(text: string, story = false): void {
+    // story levels: the narrator is named (she has no model; she is only these captions)
+    if (story) this.caption.innerHTML = `<span class="who">Dr. Elena Varga · field journal</span>${esc(text)}`;
+    else this.caption.textContent = text;
     this.caption.classList.add('show');
     this.captionT = performance.now() + 4000 + text.length * 55;
   }
@@ -246,6 +274,12 @@ export class GameUI {
     let title = '';
     let text = '';
     let extra = '';
+    if (m && missionDef(m.id)?.story) {
+      if (!m.result) return;
+      this.ended = true;
+      this.storyEnd(m.result === 'won');
+      return;
+    }
     if (m) {
       if (m.result === 'won') {
         [title, text] = ['Mission complete', 'Every goal met and the finale won. You can keep playing in this world.'];
@@ -265,9 +299,61 @@ export class GameUI {
     this.menus.result(title, text, extra);
   }
 
+  /** A story level's end: the campaign records it, then the level-end screen. */
+  private storyEnd(won: boolean): void {
+    const s = this.s;
+    const w = s.world;
+    const st = storyOf(w);
+    const m = missionOf(w)!;
+    const L = missionDef(m.id).story!;
+    this.audio.stinger(won);
+    const nav = (q: string) => (location.href = `${location.pathname}?${q}`);
+    const hub = () => nav('story=1');
+    const retry = () => nav(`story=${L.id}&diff=${st?.diff ?? 'normal'}${st?.loadout.length ? `&loadout=${st.loadout.join(',')}` : ''}`);
+    if (!won) {
+      recordLoss(L.id);
+      showStoryEnd(this.root, { won, title: L.title, newCastes: [], reward: L.reward.caste, rewardStolen: false, quote: storyText(`${L.id}.${L.lose}`), chapterDone: false }, { hub, retry, keep: () => {} });
+      return;
+    }
+    const medals = storyMedals(w)!;
+    const stolen = storyStolen(w, st?.loadout ?? []);
+    const rewardStolen = s.player.castes.includes(L.reward.caste) && !(st?.loadout ?? []).includes(L.reward.caste);
+    const chapter = CHAPTERS.find((c) => c.levels.includes(L.id));
+    const wasDone = !!chapter && chapter.levels.every((l) => campaign().levels[l]?.won);
+    // the screen first (it covers the canvas), then the photograph (one render to the canvas, read back)
+    const info = {
+      won,
+      title: L.title,
+      medals,
+      medalText: { time: `gold under ${Math.round(L.medals.time[0] / 60)} min`, losses: '', bonus: L.medals.bonus.text },
+      newCastes: [] as string[],
+      reward: L.reward.caste,
+      rewardStolen,
+      shot: undefined as string | undefined,
+      quote: storyText(`${L.id}.${L.win}`),
+      chapterDone: false,
+    };
+    const shot = rewardStolen ? s.portrait(L.reward.caste) : undefined;
+    const r = recordWin(L.id, st?.diff ?? 'normal', medals, stolen, rewardStolen ? { caste: L.reward.caste, url: shot } : null);
+    info.newCastes = r.newCastes;
+    info.shot = shot;
+    const nowDone = !!chapter && chapter.levels.every((l) => campaign().levels[l]?.won);
+    if (nowDone && !wasDone) {
+      info.chapterDone = true;
+      info.quote = `${info.quote} ${storyText(`${L.id}.ending`)}`.trim();
+    }
+    showStoryEnd(this.root, info, { hub, retry, keep: () => {} });
+  }
+
   private update(): void {
     this.tick++;
     this.audio.update();
+    // story shots: letterbox bars, the HUD out of the way
+    const cine = !!this.s.cine;
+    if (this.letterbox.classList.contains('show') !== cine) {
+      this.letterbox.classList.toggle('show', cine);
+      this.root.classList.toggle('cine', cine);
+    }
     if (this.captionT && performance.now() > this.captionT) {
       this.captionT = 0;
       this.caption.classList.remove('show');
