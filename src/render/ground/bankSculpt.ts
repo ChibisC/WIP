@@ -150,7 +150,7 @@ export function buildBankSculpt(t: Terrain, f: GroundFields): THREE.BufferGeomet
     const x = P[v * 3];
     const y = P[v * 3 + 2];
     const lin = t.heightAt(x, y);
-    const wgt = Math.min(1, dist[v] / 3);
+    const wgt = Math.min(1, dist[v] / 6);
     const ws = wgt * wgt * (3 - 2 * wgt);
     let h = ws > 0 ? lin + (cubicHeight(t, x, y) - lin) * ws : lin;
     let dx = 0;
