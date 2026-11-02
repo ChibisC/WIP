@@ -1403,6 +1403,10 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
 - Tests: `tests/story.ts` (added to `npm test`): levels and maps validate, the director's cues, objectives, latching,
   missed castes, medals, the campaign save, island capacity, two runs agree, snapshot restore mid-scene.
   `tools/playtest-story.ts` plays a level with the colony AI and a scripted player.
+- Playtests after the caste balance (bot, seed 7): The Garden Below won on all four difficulties (29.6 / 48.0 / 33.7 /
+  38.4 min); Fire on the Banks won on Easy (33.2 min) and Normal (42.3 min), not in 60 min on Hard and Brutal (left to
+  people). Level 2's mound was cut down for the tougher fire ant minors (pop 18, developed 3, 10 starting workers; enemy
+  scale 0.85; 170 starting food). A story level no longer opens on the skirmish missions' briefing card.
 - Fixed on the way: the layered-ground commit gave flat authored maps a generated map's random props (a misplaced
   `else` in `terrain.ts`).
 

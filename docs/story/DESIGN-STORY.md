@@ -158,6 +158,18 @@ Played headless by `tools/playtest-story.ts` (the colony's own AI plus a scripte
 asks, takes rival corpses for genes, waits for an army before the assault, falls back to regroup) on every difficulty;
 results in PROGRESS.md. Targets: 20–40 min on Normal for a person; the bot (weaker than a person) wins Easy and Normal.
 
+Results after the caste balance (2026-11-02, seed 7 unless noted; the bot is the colony AI plus the scripted player):
+
+| level | Easy | Normal | Hard | Brutal |
+|---|---|---|---|---|
+| The Garden Below | won 29.6 min | won 48.0 min (seed 11: 20.8 min) | won 33.7 min | won 38.4 min |
+| Fire on the Banks | won 33.2 min (seed 11: 50.8 min) | won 42.3 min (seed 11: not in 60 min) | not in 60 min | not in 60 min |
+
+The caste balance made fire ant minors much tougher (13.5 health, was 8), so level 2's mound holds fewer ants (pop 18,
+developed 3, 10 starting workers; was 55 / 4 / 12) under a level enemy scale of 0.85 (`StoryLevelDef.enemyStat`), and
+the player starts with 170 food. Hard and Brutal level 2 are left to people: the bot takes the mound's hole head-on
+and never uses the root at the east end.
+
 ## 9. Stolen-caste names (no nicknames, user 2026-11-01)
 
 Hell Ant Soldier, Nasute Termite Soldier, Sickle-Jaw Termite Soldier, Tropical Fire Ant Major, Saiy-Ant Soldier, Red
