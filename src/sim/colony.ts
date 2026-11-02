@@ -14,6 +14,7 @@ import { buildTick, developChambers, forageTick } from './colonyAI';
 import { warTick } from './warAI';
 import { dcos, dhypot, dsin, sq } from './dmath';
 import { digFlower, entranceTick, flowerOver, placeHoles } from './entrances';
+import { foodFull, storeNotice, storesFull } from './stores';
 
 /** Nest plane size in hexes (the same for every species; hex radius scales instead). */
 export const NEST_COLS = 34;
@@ -469,7 +470,10 @@ function fungusFarm(w: World, c: Colony, dt: number): void {
   let gardeners = 0;
   for (const a of w.s.ants) if (a.colony === c.id && a.task === 'garden') gardeners++;
   const rate = (0.25 + Math.min(1, gardeners / 4) * 0.5) * dt;
-  const conv = Math.min(c.fungus, rate * (1 + cap / 160));
+  // (the garden turns leaves into food only while the food store has room: a full store fills the garden, and then
+  // the leaf cutting stops too — stores.ts)
+  const room = c.infiniteFood ? Infinity : Math.max(0, c.foodCap - c.food) / BALANCE.atta.fungusToFood;
+  const conv = Math.min(c.fungus, rate * (1 + cap / 160), room);
   c.fungus -= conv;
   c.food = Math.min(c.foodCap, c.food + conv * BALANCE.atta.fungusToFood);
   c.fungus = Math.min(cap, c.fungus);
@@ -512,13 +516,15 @@ export function allocateTasks(w: World, c: Colony): void {
   }
   // the Home column's "no gathering" order: nobody carries food to the stores (or goes out for it)
   const noGather = !!c.homeOrders?.noGather;
-  want.haul = noGather ? 0 : Math.min(haulWork, Math.ceil(W * 0.25));
+  // (EotU: a full store stops the gathering — food on the floor waits, nobody goes out: stores.ts)
+  const full = storesFull(c);
+  want.haul = noGather || foodFull(c) ? 0 : Math.min(haulWork, Math.ceil(W * 0.25));
   const hasGarden = c.fungusCap > 0;
   want.garden = hasGarden ? Math.min(Math.ceil(W * 0.2), 2 + Math.ceil(c.fungusCap / 60)) : 0;
   // EotU: home workers stay in the nest (jobs, eggs, hauling, gardens); food is
   // gathered by groups sent to markers. Mass recruitment (Lasius) is the
   // exception: while it runs, idle home workers pour out to forage round the nest.
-  want.forage = abilityActive(c) && c.species === 'lasius' && !c.recall && !noGather ? W : 0;
+  want.forage = abilityActive(c) && c.species === 'lasius' && !c.recall && !noGather && !full ? W : 0;
   if (c.recall) for (const a of workers) if (a.task === 'forage' || a.task === 'tend') setTask(w, a, 'guard');
 
   const order: Task[] = ['haul', 'garden', 'forage'];
@@ -646,6 +652,7 @@ export function colonySystem(w: World, dt: number): void {
       aphidPastures(w, c, 1);
       allocateTasks(w, c);
       c.food = Math.min(c.food, c.foodCap);
+      storeNotice(w, c);
       // Queen death → colony lost (unless toggled off). One queen per colony and no replacement queens (user note)
       const q = w.antById.get(c.queen);
       if ((!q || q.state === AS.Dead) && c.alive) {

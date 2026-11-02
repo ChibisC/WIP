@@ -169,6 +169,7 @@ straight with antennae low; ants that meet antennate; idle ants groom
 workers pull eggs from the queen's abdomen and carry them to the brood tiles.
 
 **Foraging (Phase 7).**
+- **A full store stops the gathering** (EotU; user note 2026-11-02 12:06; `sim/stores.ts`). While the food store is full, foragers at a marker collect nothing and hold the marker like fighters, home foragers (Lasius mass recruitment) and haulers stand down, aphid tenders stop milking, and a load already carried is still brought home. Leafcutters keep cutting while their fungus garden has room; the garden turns leaves into food only while the food store has room, so it fills and then the cutting stops too. The player is told once each time the stores fill.
 - **Finding food.**
   - Food is found by odour: the detection radius grows with the item's size (seeds the least).
   - Each scout leaves the nest with a heading of its own (directional persistence, biased outward). It searches for up to 110 s before giving up.
@@ -214,7 +215,7 @@ The nest floor is laid out on a hidden **flat-top hex grid**, shown only while p
 | Species tiles | — | Fungus garden (Atta), root-aphid pasture (Lasius), thatch (Formica), sun-warmed brood mound (Solenopsis). Same rules; per-level effects in balance.ts. |
 
 **Placement and grouping**
-- **Placing a tile creates a planned tile** (a ghost on the floor) and a build job. The food is paid when the worker completes it. If there isn't enough food then, the job waits.
+- **Placing a tile takes its food at once** and creates a planned tile (a ghost on the floor) with a build job; a worker builds it. **A tile the colony can't afford can't be placed** (the button's cost turns red, the ghost shows red and says "Not enough food: needs N"). Cancelling a plan (clicking it again, or Delete) gives the food back in full; what no longer fits in the store lies on the tile as seeds for the workers to carry in. (EotU; user note 2026-11-02 12:06. Until then the food was paid when the worker finished, and the job waited when there wasn't enough. Plans saved before the change still pay when finished: save migration, `Tile.paid`.)
 - Adjacent tiles of the same type (and caste) form a **chamber**. All living ants of a brood chamber form one **control group**: one card in the marker panel, starting in the home column. Splitting a group means splitting the chamber by deleting tiles between.
 
 **Population**
@@ -237,7 +238,7 @@ Edge cases:
 - Deleting a tile kills its ant and drops its larva as food.
 
 **Upgrades** (the only upgrade system)
-- **Applying.** The **Upgrade tool** marks an upgrade job; a worker completes it (6 points). It costs the tile's build cost. Max level is 3.
+- **Applying.** The **Upgrade tool** marks an upgrade job; a worker completes it (6 points). It costs the tile's build cost, **taken when the job is marked** (refused when the colony can't afford it; given back when it is called off or replaced by a delete; `Tile.upPaid`). Max level is 3.
 - **Upgrade points.** A tile needs **6** to reach level 2 and **12** to reach level 3. Points come from its neighbours:
   - each adjacent tile **of the same type** adds 1 / 2 / 3 (its level);
   - each adjacent **soil/wall** hex adds 1;
@@ -471,7 +472,7 @@ The default population limit is 300.
 - The tuning lives in `BALANCE.aiWar` (joint raids and shared targets in `BALANCE.aiAllies`).
 
 **Ally brain (2026-11-02, `warAI.ts` `allyTick`; called first in `warTick`, every `every` = 2 s).** Numbers in `BALANCE.aiAllies`.
-- **Danger** (`allyDanger`): the enemies' fighting weight at an ally (health × damage rate; creatures by health × bite rate × `creatureWeight`) × where they are — by its queen `locQueen` (within `queenRadius`), deep in its nest `locDeep`, at its entrance flower `locEntrance`, at its holes `locSiege`, near them on the surface `locNear` — minus its defenders' weight, plus its losses a second × `lossWeight`; × `queenMul` when its queen is hurt below `queenHurt` or enemies are by her. A human ally's **call for help** (command `callHelp`, wire 25, `BUILD_ID` `ud-mp-8`; the ✋ button by the markers; only with allies) lasts `callHelpSec` s: its danger × `callBoost`, at least `callMin`.
+- **Danger** (`allyDanger`): the enemies' fighting weight at an ally (health × damage rate; creatures by health × bite rate × `creatureWeight`) × where they are — by its queen `locQueen` (within `queenRadius`), deep in its nest `locDeep`, at its entrance flower `locEntrance`, at its holes `locSiege`, near them on the surface `locNear` — minus its defenders' weight, plus its losses a second × `lossWeight`; × `queenMul` when its queen is hurt below `queenHurt` or enemies are by her. A human ally's **call for help** (command `callHelp`, wire 25, `BUILD_ID` `ud-mp-9`; the ✋ button by the markers; only with allies) lasts `callHelpSec` s: its danger × `callBoost`, at least `callMin`.
 - **Whether.** Never while threatened at home (enemies in the nest or at the holes) or defending; never an ally whose defenders already have `allyWinningRatio` × the attackers' weight, or under `assistMinDanger`; never one farther than `assistMaxTravel` s by land route unless its queen is in danger. Several allies: the highest danger ÷ travel time. **Never a lost cause:** when all it can spare + the ally's defenders would still be under `assistMinOdds` × the attackers (`assistMinOddsQueen` with the ally's queen in danger), it keeps its fighters (a human who called for help is told so, once). Found in the 2v2 ecology runs: helpers sent into a hopeless fight died, and the helper fell sooner.
 - **How many.** Whole fighter groups, enough that help + the ally's defenders reach `assistOvermatch` × the attackers' weight, keeping a home guard of `homeGuardShare` of the weight (and at least `homeGuardMin` fighters). They go to **marker V** (help). While helping, if help + defenders fall short again (the ally's defenders dying, more enemies), more groups follow, at most every `reinforceEvery` s, still keeping the guard.
 - **Where.** While the enemy is inside the ally's nest, marker V goes on the ally's hole nearest us (it snaps down to the entrance flower); once `insideShare` of the helpers are inside, it moves onto the threat. Enemies on the surface: straight to the threat.
@@ -694,7 +695,7 @@ From the user's package `claude/termyrms/` (2026-10-25). An ant–termite hybrid
 - **Refuse**: the dead and waste go to `refuseSpot` — beside the anthill, `ENTRANCE.refuseMm` beyond its holes, between the first two (the leafcutters' dump is drawn there).
 
 **Commands, saves, multiplayer.**
-- `entrance` (wire id 23) stays in the codec so old replays parse, and is always rejected ("Entrances are always open"); `speedVote` keeps 24. `BUILD_ID` was `ud-mp-6` for this rework (`ud-mp-7` with the 1.10 × nest hexes; `ud-mp-8` with the AI allies' `callHelp`, wire 25, §3.11): older builds cannot join.
+- `entrance` (wire id 23) stays in the codec so old replays parse, and is always rejected ("Entrances are always open"); `speedVote` keeps 24. `BUILD_ID` was `ud-mp-6` for this rework (`ud-mp-7` with the 1.10 × nest hexes; `ud-mp-8` with tiles paid when ordered; `ud-mp-9` with the AI allies' `callHelp`, wire 25, §3.11): older builds cannot join.
 - Save version 3. `upgradeWorldEntrances` (World constructor; again in `restoreWorld` once a binary snapshot's grids are attached) is idempotent: an older nest's extra entrances, spots and shafts are dropped (their dug hexes stay plain dug floor); the flower goes over the old main tunnel as a new nest's goes over its passage, its 7 hexes dug; a tile on one of them moves to the nearest free dug hex (or its cost is refunded) and the load log says so; ants and food stay where they are (the old tunnels stay dug); the three holes are rebuilt from the site or the fallback, keeping the old main hole's credit and cave-in. `normalizeEntrance` drops `shut` and `work` and adds `n` in a fixed order (canonical snapshots). The worker sends `entrances`, `tunnels` and `flowers` with each grid delta.
 
 **Surface models** (`render/game/entranceModels.ts`, notes in `docs/creatures/entrances.md`): one structure per colony centred between its three holes, which are alike (no main/extra sizes): black garden ants and Plagiaria — a low crater of crumbly soil pellets, the holes in its rampart (a flat stone over one); Termants — the same, carton-reinforced, carton collars in each throat; red wood ants — the thatch dome, holes in its flanks, worn trails out past each; leafcutters — a wide bare-soil mound with three big craters, leaf fragments and trails leading in, the refuse dump beside it; fire ants — the worked-soil dome (`render/game/mounds.ts`, now centred over the holes) with three small holes at its edge; army ants — the bivouac with three gaps in its skirt (the ants stream in and out of them); hell ants — three small neat holes on a minimal soil ring in leaf litter (a reconstruction); Gilded Ants — the stump with a root running out to each hole, frass below; nasute termites — the carton nest with three openings at its base, gallery tubes leading away between them; sickle-jaw termites — three small openings with soil collars in the litter. Craters and mounds of loose soil fade into the ground at their edge; grass does not grow through anthills. Meshes rebuild only when the anthill grows a size step or caves in.
@@ -947,6 +948,12 @@ medals per level and a campaign save (castes kept, slots, journal) that never to
 `LAYERS.step` (34 mm) per level; their banks are cliffs that block like walls, and ramps are the only way between levels
 (≤ 25°, ≥ 40 mm wide, checked by the validator with layer reachability, dry and flooded). The two story maps use it; the
 five skirmish maps are unchanged so far (their rework is the layered-maps spec's own job).
+Finding the way (user 2026-11-02 12:08): flow fields already route over the ramps; anything that steers straight —
+a chase (`steerTo`, `steerAvoid`), the last stretch to a point or home, a creature's `walkTo` — goes round by the ramps
+when the straight line crosses a cliff (`Terrain.crossesCliff`), down a shared surface field to the target's
+`LAYERS.routeCell` (24 mm) cell. An ant inside its marker's circle but over a bank from it walks round to it; a foe over
+a bank scores `LAYERS.crossBankScore` (9×) farther in target choice. Flat maps are untouched (`crossesCliff` is false).
+`tools/slope-probe.ts` measures it on testTerrace.
 
 ### Caste/tile model
 Every caste is a `CasteDef`: stats, morph, abilities and a **tier** (worker / soldier / heavy). Costs are **per caste** in `BALANCE.castes` (user note 2026-10-24): every worker caste costs 10 to build, and hatch cost and grow time scale with strength (castes not listed fall back to their tier).
@@ -966,9 +973,11 @@ Every caste a colony can raise has its own **brood tile type**, and a colony's b
 **Caste looks** (user note 2026-11-02: "make every unit tile (both ants and termites and future ones) have different
 colors and textures so they can be identifiable and different (also their UI color and look for pheromone markers and
 building so they can be distinct from each other)"; then 11:04 "make the textures look more natural realistic and
-insect like, they can use different colors just use more cleaner ones"). Each caste's brood tile has a clean colour
-from a palette of twelve clearly different hues (amber, rust, crimson, rose, violet, indigo, sky, teal, green, lime,
-bone, lavender; every pair at least ΔE 20 apart) and one of ten natural, insect-made textures worked into it: brood
+insect like, they can use different colors just use more cleaner ones"; then 12:04 "change their colors to be more
+earth tone? like around grey, black, brown, sandy, grass green, dead grass, sky blue, and all of the above (earth tone
+red and purple and orange is fine too)"). Each caste's brood tile has an earth-tone colour from a palette of twelve
+(black, grey, slate, brown, sand, dead grass, grass, moss, sky, earth red, burnt orange, heather purple; every pair at
+least ΔE 24 apart, muted: mean Lab chroma 31) and one of ten natural, insect-made textures worked into it: brood
 pockets, cuticle striations, packed soil pellets, wrinkled (rugose) ridges, overlapping (imbricate) scales, silk
 fibres, wax comb, a wing-vein network, layered termite carton, rows of cocoons. They are drawn as relief (ridges catch
 the light, hollows shade, the raised parts have a waxy sheen; silk the most), with only a trace of the soil's grain
@@ -978,8 +987,8 @@ anywhere share both, so a Gene Thief or Termant nest full of stolen castes still
 name, unlike its own species in colour and texture. Nanitics look like their species' worker; queens and kings have no
 brood tiles. The same look is used everywhere the caste appears: the tile (floor shader `castePat`, the texture number
 in the tint texture's alpha), the build panel's tile buttons, Castes tab and Genome rows (a small hex of the tile with
-a dark ant on top, drawn by the same texture code), the marker panel's group cards (the same badge, and a top edge in the
-caste colour), the nest minimap and the top bar's worker and soldier figures (in the caste colour). `tests/casteLooks.ts` checks it; renders in
+a dark ant on top — a pale one on the darkest tiles — drawn by the same texture code), the marker panel's group cards (the same badge, and a top edge in the
+caste colour), the nest minimap and the top bar's worker and soldier figures (in the caste colour, dark colours lifted). `tests/casteLooks.ts` checks it; renders in
 `docs/realism/caste-tiles/`.
 
 ## 7. Performance plan

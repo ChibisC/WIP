@@ -3,7 +3,7 @@
  * silhouettes for caste cards. All drawn for this game.
  */
 import { CASTES } from '../sim/species';
-import { BADGE_FIGURE, casteBadge } from '../render/casteLook';
+import { badgeFigure, casteBadge } from '../render/casteLook';
 
 const svg = (body: string, vb = '0 0 24 24') => `<svg viewBox="${vb}" class="ic" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
@@ -131,5 +131,5 @@ export function antSilhouette(role: string, color: string, head = 1): string {
 
 /** A caste's badge: its brood tile's colour and texture with the ant (or termite) on top (render/casteLook). */
 export function casteIcon(caste: string, cls = ''): string {
-  return casteBadge(caste, antSilhouette(CASTES[caste]?.role ?? 'worker', BADGE_FIGURE), cls);
+  return casteBadge(caste, antSilhouette(CASTES[caste]?.role ?? 'worker', badgeFigure(caste)), cls);
 }

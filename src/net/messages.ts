@@ -15,9 +15,10 @@ import type { MapId } from '../maps/types';
 
 /**
  * (6: one entrance per nest, three holes per anthill; the `entrance` command is rejected — 2026-11-01. 7: nest hexes
- * 1.10 × instead of 1.25 × — 2026-11-02. 8: the `callHelp` command and team-aware placement, CHANGE_PLAN §23 — 2026-11-02)
+ * 1.10 × instead of 1.25 × — 2026-11-02. 8: tiles and upgrades paid when ordered, full stores stop the gathering —
+ * 2026-11-02. 9: the `callHelp` command and team-aware placement, CHANGE_PLAN §23 — 2026-11-02)
  */
-export const BUILD_ID = 'ud-mp-8';
+export const BUILD_ID = 'ud-mp-9';
 
 /** A lobby slot (players 0–3; the slot number is the colony id). */
 export interface Slot {

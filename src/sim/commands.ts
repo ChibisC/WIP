@@ -17,7 +17,7 @@ import { World } from './world';
 import { Colony, SURFACE, TileType } from './types';
 import { assignGroup, placeMarker, recallAll, removeMarker, MARKER_ORDERS, MarkerOrder, setMarkerOrder } from './markers';
 import { designateDig } from './colony';
-import { markDelete, markUpgrade, placeTile, TILE_INFO } from './tiles';
+import { canPlaceTile, markDelete, markUpgrade, placeTile, TILE_INFO } from './tiles';
 import { forgetCaste, setCorpsePriority } from './termants';
 import { useAbility } from './abilities';
 import { killAnt } from './antAI';
@@ -182,6 +182,11 @@ export function applyCommand(w: World, cmd: Command): string | null {
       if (!hexOk(w, c, cmd.q)) return 'bad hex';
       if (!(cmd.tile in TILE_INFO)) return 'bad tile';
       if (cmd.caste && !c.castes.includes(cmd.caste)) return 'bad caste';
+      {
+        // (the reason, e.g. not enough food: EotU, a tile is paid when placed)
+        const why = canPlaceTile(w, c, cmd.tile, cmd.q, cmd.caste || undefined);
+        if (why) return why;
+      }
       return placeTile(w, c, cmd.tile, cmd.q, cmd.caste || undefined) ? null : 'cannot build there';
     case 'markUpgrade':
       if (!hexOk(w, c, cmd.q)) return 'bad hex';

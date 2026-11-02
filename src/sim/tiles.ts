@@ -1,6 +1,6 @@
 import { World } from './world';
 import { Ant, AS, Colony, NestGroup, Tile, TileType, nestSpace } from './types';
-import { CASTES, SPECIES, casteOf, naniticCaste, tierOf } from './species';
+import { CASTES, SPECIES, casteOf, naniticCaste, resourceName, tierOf } from './species';
 import { tunnelSpeed } from './entrances';
 import { BALANCE, NASUTE, TERMANT } from './balance';
 import { makeFood } from './factory';
@@ -9,7 +9,9 @@ import { dcos, dsin } from './dmath';
 /**
  * Hex tile system (Revision 2, EotU rules — see DESIGN.md 3.7). Tiles sit on
  * dug hexes. A placed tile is first *planned*; a worker builds it (and later
- * upgrades or deletes it) as a nest job. Brood tiles raise and keep ants of
+ * upgrades or deletes it) as a nest job. Its food is taken when it is placed
+ * (or the upgrade ordered), and a tile the colony can't afford can't be placed
+ * (EotU; user note 2026-11-02 12:06); a cancelled plan gives the food back. Brood tiles raise and keep ants of
  * their caste; adjacent same-type tiles form a chamber = one control group.
  * Upgrades need points from neighbours. Built tiles slow ants; highways
  * speed them up.
@@ -29,7 +31,7 @@ export const TILE_INFO: Record<TileType, TileInfo> = {
   aphid: { name: 'Root-aphid Pasture', desc: 'Black garden ants keep root aphids in the nest; they trickle honeydew.' },
   thatch: { name: 'Thatch Store', desc: 'Red wood ants pack plant material that warms the nest: brood grows faster.' },
   mound: { name: 'Sun-warmed Brood Mound', desc: 'Fire ants heap worked soil over the nest. The sun warms it and workers carry the brood up into it by day: brood grows faster (a quarter as much at night).' },
-  carton: { name: 'Carton Wall', desc: 'Termant workers chew dead wood into a papery wall across the tunnel: enemies must chew through it, your own ants pass its doorway. Paid in wood; gives upgrade points to the tiles beside it like a soil wall.' },
+  carton: { name: 'Carton Wall', desc: 'Termant workers chew dead wood into a papery wall across the tunnel: enemies must chew through it, your own ants pass its doorway. Paid from the food store like every tile; gives upgrade points to the tiles beside it like a soil wall.' },
 };
 
 export const MAX_TILE_LEVEL = BALANCE.maxLevel;
@@ -169,7 +171,53 @@ export function canPlaceTile(w: World, c: Colony, type: TileType, q: number, cas
     if (popUsed(c) + 1 > c.popLimit + 1e-6) return `Brood limit reached (${c.popLimit})`;
   }
   if (!buildableTiles(c).some((b) => b.type === type && (type !== 'brood' || b.caste === caste))) return `${SPECIES[c.species].common}s cannot build this`;
+  const cost = tileCost(c, type, caste);
+  if (!affords(c, cost)) return notEnough(c, cost);
   return null;
+}
+
+/** Can the colony pay this now? (EotU: building and upgrading take the food up front.) */
+export function affords(c: Colony, cost: number): boolean {
+  return c.infiniteFood || c.food >= cost - 1e-6;
+}
+
+/** The refusal shown when the colony can't pay. */
+export function notEnough(c: Colony, cost: number): string {
+  return `Not enough ${resourceName(c.species)}: needs ${Math.ceil(cost)}`;
+}
+
+function pay(c: Colony, cost: number): void {
+  if (!c.infiniteFood) c.food = Math.max(0, c.food - cost);
+}
+
+/**
+ * Give back food paid for work that was not done (a cancelled plan or upgrade): into the store, and whatever no
+ * longer fits there as seeds on the tile for the workers to carry in later.
+ */
+function giveBack(w: World, c: Colony, t: Tile, amount: number): void {
+  if (c.infiniteFood || amount <= 0) return;
+  const into = Math.min(Math.max(0, c.foodCap - c.food), amount);
+  c.food += into;
+  const g = w.nest(c.id);
+  if (g && amount - into > 0.01) {
+    const ctr = g.hexCenter(t.q);
+    dropSeeds(w, c, ctr.x, ctr.y, amount - into);
+  }
+}
+
+/** A planned tile goes: its food back if it was paid. */
+function cancelPlan(w: World, c: Colony, t: Tile): void {
+  if (t.paid) giveBack(w, c, t, tileCost(c, t.type, t.caste));
+  t.paid = false;
+  c.tiles = c.tiles.filter((x) => x !== t);
+  recomputeGroups(w, c);
+  recomputeTileCaps(c);
+}
+
+/** A pending upgrade is called off: its food back if it was paid. */
+function cancelUpgrade(w: World, c: Colony, t: Tile): void {
+  if (t.pend === 1 && t.upPaid) giveBack(w, c, t, upgradeCost(c, t));
+  t.upPaid = false;
 }
 
 /** The group a tile placed at q would join (largest adjacent same-kind group), or null for a new group. */
@@ -194,9 +242,9 @@ export function groupWouldJoin(w: World, c: Colony, type: TileType, q: number, c
 }
 
 /**
- * Place a tile. Normally it is *planned*: a ghost on the floor and a build
- * job; the food is paid when a worker completes it. `instant` builds it at
- * once for free (level setup, tests).
+ * Place a tile. Normally it is *planned*: its food is paid now, and it waits
+ * as a ghost on the floor with a build job until a worker builds it. `instant`
+ * builds it at once for free (level setup, tests).
  */
 export function placeTile(w: World, c: Colony, type: TileType, q: number, caste?: string, instant = false): Tile | null {
   if (!instant && canPlaceTile(w, c, type, q, caste)) return null;
@@ -215,18 +263,28 @@ export function placeTile(w: World, c: Colony, type: TileType, q: number, caste?
     progress: 0,
   };
   if (instant && type === 'carton') t.hp = TERMANT.cartonWall.hp;
+  if (!instant) {
+    pay(c, tileCost(c, type, t.caste));
+    t.paid = true;
+  }
   c.tiles.push(t);
   recomputeGroups(w, c);
   recomputeTileCaps(c);
   return t;
 }
 
-/** Finish building a planned tile; pays its food. Returns false (and waits) when the colony can't afford it. */
+/**
+ * Finish building a planned tile. It was paid when placed; a plan from an older save (not paid) pays now, and waits
+ * (returns false) while the colony can't afford it.
+ */
 export function completeBuild(w: World, c: Colony, t: Tile): boolean {
-  const cost = tileCost(c, t.type, t.caste);
-  // (a carton wall is paid from the one food store too, like every tile: user 2026-11-02)
-  if (!c.infiniteFood && c.food < cost) return false;
-  if (!c.infiniteFood) c.food -= cost;
+  if (!t.paid) {
+    const cost = tileCost(c, t.type, t.caste);
+    // (a carton wall is paid from the one food store too, like every tile: user 2026-11-02)
+    if (!affords(c, cost)) return false;
+    pay(c, cost);
+  }
+  t.paid = false;
   if (t.type === 'carton') {
     t.hp = TERMANT.cartonWall.hp;
   } else {
@@ -298,17 +356,23 @@ export function canUpgrade(w: World, c: Colony, t: Tile): string | null {
   return null;
 }
 
-/** Mark an upgrade job (a worker completes it and pays the build cost). */
+/** Mark an upgrade job: its food is paid now (EotU), and a worker completes it. */
 export function markUpgrade(w: World, c: Colony, q: number): string | null {
   const t = tileAt(c, q);
   if (!t) return 'No tile here';
   if (t.pend === 1) {
+    cancelUpgrade(w, c, t); // clicking again cancels, and gives the food back
     t.pend = 0;
     t.progress = 0;
-    return null; // clicking again cancels
+    return null;
   }
   const why = canUpgrade(w, c, t);
   if (why) return why;
+  const cost = upgradeCost(c, t);
+  if (!affords(c, cost)) return notEnough(c, cost);
+  if (t.pend === 2) t.progress = 0; // (an upgrade ordered over a pending delete replaces it)
+  pay(c, cost);
+  t.upPaid = true;
   t.pend = 1;
   t.progress = 0;
   return null;
@@ -320,9 +384,7 @@ export function markDelete(w: World, c: Colony, q: number): string | null {
   if (!t) return 'No tile here';
   if (t.type === 'queen') return "The queen's chamber cannot be removed";
   if (!t.built) {
-    c.tiles = c.tiles.filter((x) => x !== t);
-    recomputeGroups(w, c);
-    recomputeTileCaps(c);
+    cancelPlan(w, c, t); // (its food back)
     return null;
   }
   if (t.pend === 2) {
@@ -330,6 +392,7 @@ export function markDelete(w: World, c: Colony, q: number): string | null {
     t.progress = 0;
     return null;
   }
+  cancelUpgrade(w, c, t); // (a delete ordered over a pending upgrade replaces it: the upgrade's food back)
   t.pend = 2;
   t.progress = 0;
   return null;
@@ -349,13 +412,18 @@ export function upgradeTile(w: World, c: Colony, q: number): string | null {
 export function completeUpgrade(w: World, c: Colony, t: Tile): string | null {
   const why = canUpgrade(w, c, t);
   if (why) {
+    cancelUpgrade(w, c, t);
     t.pend = 0;
     t.progress = 0;
     return why;
   }
-  const cost = upgradeCost(c, t);
-  if (!c.infiniteFood && c.food < cost) return `Needs ${cost} food`;
-  if (!c.infiniteFood) c.food -= cost;
+  // paid when ordered; an upgrade from an older save pays now, and waits while the colony can't afford it
+  if (!t.upPaid) {
+    const cost = upgradeCost(c, t);
+    if (!affords(c, cost)) return `Needs ${cost} food`;
+    pay(c, cost);
+  }
+  t.upPaid = false;
   t.level++;
   t.pend = 0;
   t.progress = 0;
@@ -374,6 +442,12 @@ export function completeUpgrade(w: World, c: Colony, t: Tile): string | null {
  * as seeds for the workers to carry back to storage.
  */
 export function completeDelete(w: World, c: Colony, t: Tile): void {
+  // a plan never built: its food back in full
+  if (!t.built) {
+    cancelPlan(w, c, t);
+    return;
+  }
+  cancelUpgrade(w, c, t);
   const g = w.nest(c.id)!;
   const ctr = g.hexCenter(t.q);
   dropSeeds(w, c, ctr.x, ctr.y, tileCost(c, t.type, t.caste) * BALANCE.refund);

@@ -23,7 +23,7 @@ import { createWorld, GameSetup } from '../sim/mapGen';
 import { AS, Colony, FloodState, SURFACE, TileType, colonyOfSpace, nestSpace } from '../sim/types';
 import { AreaInfo, areaOpen, areasFor, teamPresence } from '../sim/areas';
 import { CASTES, SPECIES, canonCaste, isTermiteSpecies } from '../sim/species';
-import { canPlaceTile, canUpgrade, groupWouldJoin, hatchCost, neighbourPoints, tileAt, tileCost, TILE_INFO, upgradeNeed, upgradePoints } from '../sim/tiles';
+import { affords, canPlaceTile, canUpgrade, notEnough, upgradeCost, groupWouldJoin, hatchCost, neighbourPoints, tileAt, tileCost, TILE_INFO, upgradeNeed, upgradePoints } from '../sim/tiles';
 import { BALANCE, ENTRANCE, FLOOD } from '../sim/balance';
 import { anthillCentre } from '../sim/entrances';
 import { entranceAt, markerRadius } from '../sim/markers';
@@ -680,7 +680,8 @@ export class GameSession {
       else this.issue({ type: 'buildTile', q, tile: this.buildType, caste: this.buildCaste || '' }, phase !== 'start');
     } else if (this.tool === 'upgrade') {
       const t = tileAt(c, q);
-      const why = !t ? 'No tile here' : t.pend === 1 ? null : canUpgrade(w, c, t);
+      // (EotU: an upgrade is paid when ordered, so the colony must afford it now)
+      const why = !t ? 'No tile here' : t.pend === 1 ? null : (canUpgrade(w, c, t) ?? (affords(c, upgradeCost(c, t)) ? null : notEnough(c, upgradeCost(c, t))));
       if (why) {
         if (phase === 'start') this.onEvent?.({ t: 'message', text: why, kind: 'warn' });
       } else this.issue({ type: 'markUpgrade', q }, phase !== 'start');

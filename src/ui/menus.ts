@@ -444,7 +444,7 @@ export class Menus {
         el(
           'p',
           '',
-          'Your queen sits in her seven-tile chamber. Each chamber tile stores 10 food and raises one small <b>nanitic</b> worker; you start with three. The queen lays eggs and your <b>home workers</b> carry them to empty brood tiles, where each larva grows while there is food. Use <b>Dig</b> to mark soil, place <b>brood tiles</b>, <b>food stores</b> and <b>highways</b> on dug floor — a worker builds each one and the food is paid when it is done — and use <b>Upgrade</b> and <b>Delete</b> on finished tiles. Touching tiles of one kind form a <b>chamber</b>: one group card in the marker panel.',
+          'Your queen sits in her seven-tile chamber. Each chamber tile stores 10 food and raises one small <b>nanitic</b> worker; you start with three. The queen lays eggs and your <b>home workers</b> carry them to empty brood tiles, where each larva grows while there is food. Use <b>Dig</b> to mark soil, place <b>brood tiles</b>, <b>food stores</b> and <b>highways</b> on dug floor — each costs food, taken when you place it (you cannot place what you cannot afford), and a worker then builds it; when the food store is full your foragers stop gathering — and use <b>Upgrade</b> and <b>Delete</b> on finished tiles. Touching tiles of one kind form a <b>chamber</b>: one group card in the marker panel.',
         ),
       );
       m.appendChild(el('h3', '', 'Food and markers'));

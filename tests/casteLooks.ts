@@ -50,6 +50,13 @@ for (let i = 0; i < pal.length; i++)
   }
 check('palette colours all clearly different (ΔE ≥ 20)', minPal >= 20, `closest ${minPair} ΔE ${minPal.toFixed(1)}`);
 
+// earth tones (user note 12:04): muted colours — Lab chroma at most 60 each and 40 on average (the bright palette
+// it replaced averaged 57)
+const chroma = pal.map(([k, v]) => { const [, a, b] = lab(v); return [k, Math.hypot(a, b)] as [string, number]; });
+const meanC = chroma.reduce((t, [, c]) => t + c, 0) / chroma.length;
+check('palette is earth tones (muted: chroma ≤ 60 each, mean ≤ 40)', chroma.every(([, c]) => c <= 60) && meanC <= 40, `mean ${meanC.toFixed(0)}; ${chroma.map(([k, c]) => `${k} ${c.toFixed(0)}`).join(', ')}`);
+check('palette has the asked-for tones', ['grey', 'black', 'brown', 'sand', 'grass', 'straw', 'sky', 'red', 'purple', 'orange'].every((k) => k in CASTE_PALETTE));
+
 // within each species: no shared colour, no shared texture
 for (const sp of Object.keys(SPECIES)) {
   const cs = brood.filter((c) => CASTES[c].species === sp);
@@ -85,7 +92,7 @@ const fl = fake.map((c) => casteLook(c));
 check('future castes get looks of their own', new Set(fl.map((l) => l.colour)).size === 3 && new Set(fl.map((l) => l.pattern)).size === 3, fl.map((l) => `${l.colour}/${l.pattern}`).join(', '));
 const all = Object.keys(CASTES).filter(hasBroodLook);
 check('…without repeating any existing pair', new Set(all.map((c) => `${casteLook(c).colour}|${casteLook(c).pattern}`)).size === all.length);
-check('…and the existing castes keep their looks', casteLook('lasius_worker').colour === 'bone' && casteLook('atta_minim').pattern === 'pellets');
+check('…and the existing castes keep their looks', casteLook('lasius_worker').colour === 'sand' && casteLook('atta_minim').pattern === 'pellets');
 for (const id of fake) delete (CASTES as Record<string, unknown>)[id];
 resetCasteLooks();
 
