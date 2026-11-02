@@ -184,18 +184,20 @@ export interface CasteParams {
   antRadial?: number;
 }
 
+// (realism rework, review round 3: "candy-orange striped abdomen with bright white segment lines", "white pin hairs" —
+// the body a little less saturated, the membranes close to it, the hairs a translucent gold)
 const SOLDIER_COLORS: CastePalette = {
   head: '#4A1E12',
   headHi: '#7A3420',
   headTip: '#8C4A26',
-  body: '#D98A3E',
-  tergite: '#B9652A',
-  inter: '#F0B472',
+  body: '#CC8A48',
+  tergite: '#B06632',
+  inter: '#DCA466',
   gut: '#3E2617',
   leg: '#DE9D52',
   legMid: '#F2C27A',
   legJoint: '#B87534',
-  hair: '#F3E6CC',
+  hair: '#D2BC92',
   mandible: '#6A3018',
   mandibleTip: '#3A160D',
 };
@@ -312,7 +314,7 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
       leg: '#DEC18C',
       legMid: '#EAD3A6',
       legJoint: '#C4A066',
-      hair: '#F6EAD2',
+      hair: '#D8C49C',
       mandible: '#A8743C',
       mandibleTip: '#4A2410',
       suture: '#D4B47E', // faint: barely paler than the head
@@ -379,7 +381,7 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     gait: { amplitude: 0.2, lift: 0.2 },
     // (realism rework: the royal-chamber photos show a pale tan, grey-ivory membrane, not saturated yellow — the same
     // ages, the kit's colours desaturated; the default age stays 0.5)
-    physogastric: { length: 22, width: 4.9, height: 4.9, pleat: 0.17, age: 0.5, plate: 0.44, ivory: '#EEE6D6', amber: '#D8BE90', honey: '#BF9866' },
+    physogastric: { length: 22, width: 4.9, height: 4.9, pleat: 0.17, age: 0.5, plate: 0.55, ivory: '#EEE6D6', amber: '#D8BE90', honey: '#BF9866' },
     legRadial: 10,
     antRadial: 10,
   },

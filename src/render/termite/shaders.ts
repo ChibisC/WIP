@@ -677,7 +677,7 @@ if (vFx.x > 0.01) {
     float band = smoothstep(0.2, 0.92, u);
     col = mix(col, terg * 0.92, band * (0.95 * dorsal + 0.35 * (1.0 - dorsal)));
     float im = max(1.0 - smoothstep(0.0, 0.12, u), smoothstep(0.965, 1.0, u));
-    col = mix(col, inter, im * 0.85 * step(0.04, bt));
+    col = mix(col, inter, im * (real ? 0.5 : 0.85) * step(0.04, bt));
     // gut contents: soft dark patch seen through the skin
     // blob centred a little behind mid-abdomen, seen best on the back and sides
     vec4 gut = rigF(RC_GUT); // rgb + spread
@@ -844,8 +844,12 @@ if (vFx.x > 0.01) {
   vec3 sssC = (m > 1.5 && m < 2.5) || m > 11.5 ? col * col * 1.5 : col;
   // realism rework: deeper subsurface light in the soft cuticle, strongest through the thin segment membranes
   if (real && m > 0.5 && m < 1.5) {
-    tr = tr * 1.3 + 0.3 * memb;
+    tr = tr * 1.6 + 0.3 * memb;
     sssC = mix(col, col * col * 1.7, 0.45);
+    // (review round 3: "opaque vinyl, no translucency") light from inside: the albedo a little lower, the edges where
+    // the body wall thins glowing warm and saturated
+    diffuseColor.rgb *= 0.9;
+    totalEmissiveRadiance += col * col * 1.6 * pow(rim, 1.5) * 0.22;
   }
   totalEmissiveRadiance += sssC * tr * (0.22 * rim + 0.02) * (1.0 - max(plateGloss, qPlate));
   #if NUM_DIR_LIGHTS > 0
