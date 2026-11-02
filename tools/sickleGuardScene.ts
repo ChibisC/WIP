@@ -55,6 +55,8 @@ export function guardScene(nWorkers: number, nSoldiers: number, sd: number, seco
   let walking = 0;
   const radius = markerRadius(w, c, 0);
   for (let t = 0; t < 20 * seconds; t++) {
+    // (the store is kept from filling so the gathering goes on: since 2026-11-02 a full store stops it, sim/stores.ts)
+    c.food = Math.min(c.food, c.foodCap * 0.5);
     w.step(0.05);
     w.events.drain();
     if (t < 20 * 30 || t % 10) continue;

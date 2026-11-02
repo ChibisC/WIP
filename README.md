@@ -103,7 +103,7 @@ You start with a queen, her seven-tile chamber and three small **nanitic** worke
 | Tool | What it does |
 |---|---|
 | Dig (G) | Mark soil hexes; workers dig them (6 points each; 2 workers per hex). Click a marked hex again to cancel. |
-| Brood tiles | One per caste. Placed on dug floor as a ghost; a worker builds it and the food is paid on completion. Touching tiles of one kind form a chamber, which is one group card. |
+| Brood tiles | One per caste. Placed on dug floor as a ghost, its food taken at once (you can't place what you can't afford; cancelling gives it back); a worker then builds it. Touching tiles of one kind form a chamber, which is one group card. |
 | Food Storage | Holds 10 / 40 / 100 food by level. |
 | Highway | Packed-earth floor: +10 / 20 / 25 % speed by level (other built tiles slow ants by 35 %). |
 | Species tiles | Fungus garden (leafcutters), root-aphid pasture (black garden ants), thatch (wood ants), sun-warmed brood mound (fire ants), carton wall (Termants: paid from their one food store, blocks enemies until chewed through). |

@@ -169,6 +169,7 @@ straight with antennae low; ants that meet antennate; idle ants groom
 workers pull eggs from the queen's abdomen and carry them to the brood tiles.
 
 **Foraging (Phase 7).**
+- **A full store stops the gathering** (EotU; user note 2026-11-02 12:06; `sim/stores.ts`). While the food store is full, foragers at a marker collect nothing and hold the marker like fighters, home foragers (Lasius mass recruitment) and haulers stand down, aphid tenders stop milking, and a load already carried is still brought home. Leafcutters keep cutting while their fungus garden has room; the garden turns leaves into food only while the food store has room, so it fills and then the cutting stops too. The player is told once each time the stores fill.
 - **Finding food.**
   - Food is found by odour: the detection radius grows with the item's size (seeds the least).
   - Each scout leaves the nest with a heading of its own (directional persistence, biased outward). It searches for up to 110 s before giving up.
@@ -214,7 +215,7 @@ The nest floor is laid out on a hidden **flat-top hex grid**, shown only while p
 | Species tiles | — | Fungus garden (Atta), root-aphid pasture (Lasius), thatch (Formica), sun-warmed brood mound (Solenopsis). Same rules; per-level effects in balance.ts. |
 
 **Placement and grouping**
-- **Placing a tile creates a planned tile** (a ghost on the floor) and a build job. The food is paid when the worker completes it. If there isn't enough food then, the job waits.
+- **Placing a tile takes its food at once** and creates a planned tile (a ghost on the floor) with a build job; a worker builds it. **A tile the colony can't afford can't be placed** (the button's cost turns red, the ghost shows red and says "Not enough food: needs N"). Cancelling a plan (clicking it again, or Delete) gives the food back in full; what no longer fits in the store lies on the tile as seeds for the workers to carry in. (EotU; user note 2026-11-02 12:06. Until then the food was paid when the worker finished, and the job waited when there wasn't enough. Plans saved before the change still pay when finished: save migration, `Tile.paid`.)
 - Adjacent tiles of the same type (and caste) form a **chamber**. All living ants of a brood chamber form one **control group**: one card in the marker panel, starting in the home column. Splitting a group means splitting the chamber by deleting tiles between.
 
 **Population**
@@ -237,7 +238,7 @@ Edge cases:
 - Deleting a tile kills its ant and drops its larva as food.
 
 **Upgrades** (the only upgrade system)
-- **Applying.** The **Upgrade tool** marks an upgrade job; a worker completes it (6 points). It costs the tile's build cost. Max level is 3.
+- **Applying.** The **Upgrade tool** marks an upgrade job; a worker completes it (6 points). It costs the tile's build cost, **taken when the job is marked** (refused when the colony can't afford it; given back when it is called off or replaced by a delete; `Tile.upPaid`). Max level is 3.
 - **Upgrade points.** A tile needs **6** to reach level 2 and **12** to reach level 3. Points come from its neighbours:
   - each adjacent tile **of the same type** adds 1 / 2 / 3 (its level);
   - each adjacent **soil/wall** hex adds 1;
@@ -947,9 +948,11 @@ Every caste a colony can raise has its own **brood tile type**, and a colony's b
 **Caste looks** (user note 2026-11-02: "make every unit tile (both ants and termites and future ones) have different
 colors and textures so they can be identifiable and different (also their UI color and look for pheromone markers and
 building so they can be distinct from each other)"; then 11:04 "make the textures look more natural realistic and
-insect like, they can use different colors just use more cleaner ones"). Each caste's brood tile has a clean colour
-from a palette of twelve clearly different hues (amber, rust, crimson, rose, violet, indigo, sky, teal, green, lime,
-bone, lavender; every pair at least ΔE 20 apart) and one of ten natural, insect-made textures worked into it: brood
+insect like, they can use different colors just use more cleaner ones"; then 12:04 "change their colors to be more
+earth tone? like around grey, black, brown, sandy, grass green, dead grass, sky blue, and all of the above (earth tone
+red and purple and orange is fine too)"). Each caste's brood tile has an earth-tone colour from a palette of twelve
+(black, grey, slate, brown, sand, dead grass, grass, moss, sky, earth red, burnt orange, heather purple; every pair at
+least ΔE 24 apart, muted: mean Lab chroma 31) and one of ten natural, insect-made textures worked into it: brood
 pockets, cuticle striations, packed soil pellets, wrinkled (rugose) ridges, overlapping (imbricate) scales, silk
 fibres, wax comb, a wing-vein network, layered termite carton, rows of cocoons. They are drawn as relief (ridges catch
 the light, hollows shade, the raised parts have a waxy sheen; silk the most), with only a trace of the soil's grain
@@ -959,8 +962,8 @@ anywhere share both, so a Gene Thief or Termant nest full of stolen castes still
 name, unlike its own species in colour and texture. Nanitics look like their species' worker; queens and kings have no
 brood tiles. The same look is used everywhere the caste appears: the tile (floor shader `castePat`, the texture number
 in the tint texture's alpha), the build panel's tile buttons, Castes tab and Genome rows (a small hex of the tile with
-a dark ant on top, drawn by the same texture code), the marker panel's group cards (the same badge, and a top edge in the
-caste colour), the nest minimap and the top bar's worker and soldier figures (in the caste colour). `tests/casteLooks.ts` checks it; renders in
+a dark ant on top — a pale one on the darkest tiles — drawn by the same texture code), the marker panel's group cards (the same badge, and a top edge in the
+caste colour), the nest minimap and the top bar's worker and soldier figures (in the caste colour, dark colours lifted). `tests/casteLooks.ts` checks it; renders in
 `docs/realism/caste-tiles/`.
 
 ## 7. Performance plan

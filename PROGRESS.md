@@ -1506,3 +1506,27 @@ and behaviour unchanged. Report: `docs/realism/hell-nasute/README.md`; rubric: `
 - Checks: `tsc`, determinism (60 files clean), morph hashes (only the hell ants changed; re-baselined), termite kit
   hashes (only the nasute castes changed), `sim/heightData.ts` regenerated (taller hell ants; no new underpasses),
   climb data unchanged.
+
+### 2026-11-02 — Caste looks in earth tones; tiles paid when placed, full stores stop the gathering (EotU)
+User notes 12:04 "change their colors to be more earth tone? like around grey, black, brown, sandy, grass green, dead
+grass, sky blue, and all of the above (earth tone red and purple and orange is fine too)" and 12:06 "fix the tile
+system and food system. if food stores are full, units stop collecting. and building with cost automatically takes food
+away and just waits for worker to build it. if you dont have enough food you cant build it similar to eotu". Branch
+`feature/caste-earth-tones` from `main` (`14d78e9`).
+- **Earth tones** (`render/casteLook.ts`): black, grey, slate, brown, sand, dead grass (straw), grass, moss, sky, earth
+  red, burnt orange, heather purple (every pair ΔE ≥ 24, mean chroma 31 against 57 before). Each caste maps one to one
+  from its old colour, so the rules hold (no repeat within a species, no repeated pair). The textures are unchanged.
+  Pale ants on the darkest badges; dark colours lifted on the top bar, the arena roster and the minimap.
+- **Tiles paid when placed** (`sim/tiles.ts`): placing takes the food at once (`Tile.paid`) and a worker then builds
+  the ghost; `canPlaceTile` refuses what the colony can't afford ("Not enough food: needs N"; the build command returns
+  that reason, the ghost shows it). Upgrades are paid when marked (`Tile.upPaid`). Cancelling a plan or an upgrade
+  (or a delete replacing a pending upgrade) gives the food back; what doesn't fit lies as seeds on the tile.
+  Save migration: plans and upgrades saved before the change carry no flag and still pay when finished.
+- **Full stores stop the gathering** (`sim/stores.ts`): foragers at a marker don't collect (they hold it); home
+  foragers and haulers stand down; aphid tenders stop; loads already carried come home. Leafcutters cut while the
+  garden has room; the garden converts leaves only while the food store has room. The player is told once per fill.
+- Protocol `ud-mp-8`. Text in the build panel, the help page, README and DESIGN (§3.7 placement and upgrades,
+  Foraging) updated.
+- Test `tests/foodTiles.ts` (paid on placing, refused when poor, refunds, upgrades, the old-save path, a full store
+  at a marker, the notice, leafcutters, an AI colony growing for 8 min with every plan paid, determinism); the earth
+  tones in `tests/casteLooks.ts`.

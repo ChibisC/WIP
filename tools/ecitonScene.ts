@@ -118,6 +118,8 @@ export function raidScene(o: RaidOpts = {}) {
   let bridgeMembers = 0;
   const crossing = new Set<number>();
   for (let t = 0; t < 20 * seconds; t++) {
+    // (the store is kept from filling so the raid goes on: since 2026-11-02 a full store stops the gathering, sim/stores.ts)
+    c.food = Math.min(c.food, c.foodCap * 0.5);
     w.step(0.05);
     w.events.drain();
     for (const a of w.s.ants) {

@@ -413,6 +413,13 @@ export interface Tile {
   wait: number;
   /** false while only planned (a ghost waiting for a worker to build it) */
   built: boolean;
+  /**
+   * The planned build has been paid for: EotU, food is taken when the tile is placed (user note 2026-11-02 12:06).
+   * Absent on tiles planned in older saves, which pay when a worker finishes them (save migration).
+   */
+  paid?: boolean;
+  /** The pending upgrade (`pend` 1) has been paid for, when it was ordered. Absent: pays when finished (old saves). */
+  upPaid?: boolean;
   /** pending job on a built tile: 0 none, 1 upgrade, 2 delete */
   pend: number;
   /** completion points of the current build / upgrade / delete job */
@@ -629,6 +636,8 @@ export interface Colony {
   /** invincible / infinite food toggles (sandbox) */
   invincibleQueen: boolean;
   infiniteFood: boolean;
+  /** the player has been told the stores are full (stores.ts storeNotice; cleared once they have room) */
+  fullNoted?: boolean;
   aggression: number;
   color: string;
   /** spoil heap volume per entrance (visual) */

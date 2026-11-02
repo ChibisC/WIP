@@ -39,6 +39,7 @@ import { genesWanted, isTermant, tagPiece, termantDeposit, termantKing } from '.
 import { holdGuardLine, inGuardLine, trailTraffic } from './guardLine';
 import { crossBridge, ecitonTimers, escortPorter, holdLink, isArmyAnt, isMajor, raider, soldier, teamCarry, teamHelp } from './eciton';
 import { passiveAnt } from './arena';
+import { storeFullFor, storesFull } from './stores';
 import { directAnt, directMode } from './story/director';
 
 const tmp = { x: 0, y: 0 };
@@ -643,6 +644,11 @@ function forage(w: World, a: Ant, c: Colony, dt: number): void {
     returnAndStore(w, a, c, dt);
     return;
   }
+  // EotU: with the stores full nobody goes out for more (stores.ts)
+  if (storesFull(c)) {
+    setTask(w, a, 'idle');
+    return;
+  }
   if (a.state === AS.Troph) {
     trophUpdate(w, a, dt);
     return;
@@ -688,7 +694,7 @@ function searchAndCollect(w: World, a: Ant, c: Colony, dt: number, area: { x: nu
   // 1. heading to a known food item
   if (a.tk === 1 && (a.state === AS.ToFood || a.state === AS.Collect)) {
     const f = w.foodById.get(a.tgt);
-    if (!f || f.amount <= 0 || f.heldBy !== 0 || f.space !== SURFACE) {
+    if (!f || f.amount <= 0 || f.heldBy !== 0 || f.space !== SURFACE || storeFullFor(c, f.kind)) {
       a.tgt = 0;
       a.tk = 0;
       enterState(a, AS.Scout);
@@ -743,6 +749,7 @@ function searchAndCollect(w: World, a: Ant, c: Colony, dt: number, area: { x: nu
     w.foodNear(a.x, a.y, SENSE + 30, (f, d2) => {
       if (f.amount <= 0 || f.heldBy !== 0 || f.kind === 'honeydew') return false;
       if (!edible(c, f)) return false; // termites: wood only; ants: never wood (Termants: their workers)
+      if (storeFullFor(c, f.kind)) return false; // (its store is full: stores.ts)
       if (f.kind === 'wood' && !eatsWood(c) && !cd.wood) return false;
       if (f.kind === 'corpse' && w.teamOf(f.colony) === (a.team ?? a.colony)) return false; // only enemies take the dead
       if (f.colony === -2) return false; // the refuse heap is avoided (hygiene)
@@ -834,6 +841,7 @@ function looseNear(w: World, a: Ant, c: Colony, r: number): Food | null {
   let bd = r * r;
   w.foodNear(a.x, a.y, r, (f, d2) => {
     if (!f.loose || f.amount <= 0 || f.heldBy !== 0 || f.space !== a.space || f.colony === -2 || !edible(c, f)) return false;
+    if (storeFullFor(c, f.kind)) return false;
     if (f.kind === 'leaf' && !cd.cutLeaves && !cd.wood) return false; // (Termant workers take leaves as food)
     if (d2 < bd) {
       bd = d2;
@@ -1039,7 +1047,8 @@ function haul(w: World, a: Ant, c: Colony, dt: number): void {
     if (f.heldBy) continue;
     // home workers only tidy their own nest (EotU: they do not go out)
     // (the colony's own dead are not carried: they sink into the ground within seconds)
-    const floor = f.space === home && f.kind !== 'corpse' && f.colony !== -2 && edible(c, f);
+    // (nothing to carry in while its store is full: stores.ts)
+    const floor = f.space === home && f.kind !== 'corpse' && f.colony !== -2 && edible(c, f) && !storeFullFor(c, f.kind);
     if (!floor) continue;
     const d = f.space === a.space ? sq(f.x - a.x) + sq(f.y - a.y) : 1e7;
     if (d < bd) {
@@ -1332,7 +1341,8 @@ function marker(w: World, a: Ant, c: Colony, dt: number): void {
   // Every caste collects food at a marker (fighters still fight first: combat preempts this). Termite soldiers
   // gather like ant soldiers (user note 2026-10-25); where there is nothing to gather they take their escort slots.
   // a marker's "no gathering" order: its ants hold the marker (the guard line) and pick nothing up
-  const forager = cd.forage && cd.carry > 0 && !underOrder(c, a, 'noGather');
+  // EotU: with the stores full they stop collecting and hold the marker like fighters (stores.ts)
+  const forager = cd.forage && cd.carry > 0 && !underOrder(c, a, 'noGather') && !storesFull(c);
   let escort = forager && a.space === SURFACE && a.carry === Carry.None && (cd.termite === 'nasute' || cd.termite === 'major' || cd.termite === 'sickle');
   if (escort) {
     const food = foodAt(w, c, m.x, m.y, radius * 1.3);
