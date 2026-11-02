@@ -11,6 +11,8 @@ from playwright.sync_api import sync_playwright
 
 BASE = os.environ.get("BASE", "http://127.0.0.1:5173/")
 ONLY = os.environ.get("ONLY", "hub,garden,fireBanks").split(",")
+# OPEN=0 skips the opening flights (render-only views only)
+OPEN = os.environ.get("OPEN", "1") == "1"
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "story", "shots")
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"]
 os.makedirs(OUT, exist_ok=True)
@@ -89,18 +91,19 @@ with sync_playwright() as p:
         if lv not in ONLY:
             continue
         # the opening: flight, letterbox and captions (UI on)
-        t0 = time.time()
-        pg.goto(BASE + f"?story={lv}&shot=1&q=high&seed=3&ticks=2", wait_until="load")
-        wait_ready(pg, t0)
-        note(f"loaded {lv} in {time.time() - t0:.0f} s")
-        pg.evaluate("window.__step(2, 0.05)")
-        shot(pg, f"{lv}_open_0s")
-        for k in range(10):
-            pg.evaluate("window.__step(10, 0.05)")
-        shot(pg, f"{lv}_open_5s")
-        for k in range(14):
-            pg.evaluate("window.__step(10, 0.05)")
-        shot(pg, f"{lv}_open_12s")
+        if OPEN:
+            t0 = time.time()
+            pg.goto(BASE + f"?story={lv}&shot=1&q=high&seed=3&ticks=2", wait_until="load")
+            wait_ready(pg, t0)
+            note(f"loaded {lv} in {time.time() - t0:.0f} s")
+            pg.evaluate("window.__step(2, 0.05)")
+            shot(pg, f"{lv}_open_0s")
+            for k in range(10):
+                pg.evaluate("window.__step(10, 0.05)")
+            shot(pg, f"{lv}_open_5s")
+            for k in range(14):
+                pg.evaluate("window.__step(10, 0.05)")
+            shot(pg, f"{lv}_open_12s")
         # render-only views (no UI, no shots)
         for name, (cx, cz, dist, yaw, pitch) in VIEWS[lv].items():
             t0 = time.time()
