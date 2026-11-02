@@ -593,6 +593,8 @@ export const BALANCE = {
      * helpers + defenders drop under assistQuitOdds × the attackers (they would only die with the ally)
      */
     assistMinOdds: 0.8,
+    /** while helping: more groups (still keeping the guard) at most this often (s) when help + defenders fall short */
+    reinforceEvery: 10,
     assistMinOddsQueen: 0.5,
     assistQuitOdds: 0.5,
     /** stop helping: clear (danger under clearDanger) for clearFor s, losses over assistMaxLoss of those sent, or after

@@ -117,6 +117,8 @@ function startGame(): void {
         colonies.push({ species: 'lasius', player: false, ai: true, team: 0, name: 'Allied black ants', developed: 3, startWorkers: 8 });
         caves.push({ name: 'Beetle den', kind: 'lair', food: 40 });
       }
+      // ?developed=N: every colony starts grown by N tiles (test scenes and clips: tests/browser/ai_help.py)
+      if (q.get('developed')) for (const col of colonies) col.developed = Number(q.get('developed'));
       // the map grows with the number of colonies so nests are not crowded
       const size = colonies.length <= 2 ? 640 : colonies.length <= 4 ? 800 : 980;
       const setup: GameSetup = {

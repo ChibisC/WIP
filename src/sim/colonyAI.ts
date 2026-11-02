@@ -3,7 +3,7 @@ import { AphidCluster, AS, Colony, SURFACE, TileType } from './types';
 import { CASTES, basicCaste, casteOf, isTermiteSpecies, tierOf } from './species';
 import { designateDig } from './colony';
 import type { NestGrid } from '../world/nestGrid';
-import { MAX_TILE_LEVEL, buildableTiles, canPlaceTile, hatchCost, markUpgrade, placeTile, raisesAnts, tileCost, upgradeCost, upgradeNeed, upgradePoints } from './tiles';
+import { MAX_TILE_LEVEL, buildableTiles, canPlaceTile, hatchCost, markUpgrade, placeTile, popUsed, raisesAnts, tileCost, upgradeCost, upgradeNeed, upgradePoints } from './tiles';
 import { JOB, listJobs } from './jobs';
 import { assignGroup, markerRadius, placeMarker, removeMarker } from './markers';
 import { creatureHooks } from './combat';
@@ -357,6 +357,49 @@ function planChamber(w: World, c: Colony, b: BuildBrain, home: number, need: Nee
 function isFighter(cs: string): boolean {
   const r = CASTES[cs].role;
   return r === 'soldier' || r === 'major';
+}
+
+/**
+ * A developed AI colony's head start (colony.ts `developNest`: rivals' and tests' grown colonies), laid out the way its
+ * builder lays a nest out: workers in the founding ring, then the stores and every other caste each in a chamber of its
+ * own, planned like the builder's, dug and filled at once (centre out). Tiles that find no room are left out.
+ */
+export function developChambers(w: World, c: Colony, plan: Array<{ type: TileType; caste?: string }>): void {
+  const g = w.nest(c.id)!;
+  const b = brainOf(c);
+  const home = homeHex(w, c);
+  const occupied = new Set(c.tiles.map((t) => t.q));
+  const dig = (q: number) => {
+    if (!g.isHexDug(q) && g.isHexDiggable(q) && !g.isEntrance(q)) g.completeHex(q);
+  };
+  const basic = basicCaste(c.species);
+  const first = (p: { type: TileType; caste?: string }) => (p.type === 'brood' && p.caste === basic ? 0 : p.type === 'food' ? 1 : 2);
+  const order = [...plan].sort((p, q) => first(p) - first(q));
+  for (const p of order) {
+    if (p.type === 'brood' && popUsed(c) + 1 > c.popLimit) continue;
+    let at = -1;
+    for (let pass = 0; pass < 2 && at < 0; pass++) {
+      for (const ch of roomsFor(c, b, home, p.type, p.caste)) {
+        for (const h of disc(g, ch.q, chR(ch))) {
+          if (occupied.has(h) || g.isEntrance(h)) continue;
+          dig(h);
+          if (g.isHexDug(h) && !canPlaceTile(w, c, p.type, h, p.caste)) {
+            at = h;
+            break;
+          }
+        }
+        if (at >= 0) break;
+      }
+      // no room: the next chamber for it, dug at once with its tunnel (the whole room, so the tunnel reaches its floor)
+      if (at < 0 && pass === 0) {
+        if (!planChamber(w, c, b, home, { type: p.type, caste: p.caste })) break;
+        const ch = b.chambers![b.chambers!.length - 1];
+        for (const h of [...(b.tunnels ?? []), ...disc(g, ch.q, chR(ch))]) dig(h);
+      }
+    }
+    if (at < 0 || !placeTile(w, c, p.type, at, p.caste, true)) continue;
+    occupied.add(at);
+  }
 }
 
 /** Put one tile in its own kind of room, from the room's centre outward. False when no room has a free hex. */

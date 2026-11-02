@@ -635,6 +635,8 @@ export interface Colony {
     foeT: number;
     /** why the last help ended: home (threatened itself), done, fallen, losses, outmatched, time */
     why?: string;
+    /** when groups were last sent (reinforcements at most every `reinforceEvery` s) */
+    sentT?: number;
     /** the human ally's call for help (its helpCall) already answered with "can't spare enough" */
     told?: number;
     /** the ally last helped: not helped again until its danger has cleared once (one go per threat, no flip-flopping) */

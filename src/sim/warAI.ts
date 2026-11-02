@@ -478,6 +478,28 @@ function homeFighterGroups(w: World, c: Colony): Array<{ id: number; power: numb
   return out.sort((p, q) => p.id - q.id);
 }
 
+/**
+ * The fighter groups at home to send for `need` more fighting weight, lowest id first, keeping the home guard
+ * (`homeGuardShare` of all its fighters' weight, at least `homeGuardMin` fighters); `out` is the weight already out
+ * helping.
+ */
+function helpGroups(w: World, c: Colony, need: number, out: number): { go: number[]; power: number; n: number } {
+  const A = BALANCE.aiAllies;
+  const total = fighters(w, c);
+  const guard = Math.max(total.power * A.homeGuardShare, total.n ? (total.power / total.n) * A.homeGuardMin : 0);
+  let power = 0;
+  let n = 0;
+  const go: number[] = [];
+  for (const g of homeFighterGroups(w, c)) {
+    if (power >= need) break;
+    if (total.power - out - power - g.power < guard) continue;
+    go.push(g.id);
+    power += g.power;
+    n += g.n;
+  }
+  return { go, power, n };
+}
+
 /** Each tile's group (an ant belongs to its tile's group). */
 function groupsByTile(c: Colony): Map<number, number> {
   const m = new Map<number, number>();
@@ -486,10 +508,10 @@ function groupsByTile(c: Colony): Map<number, number> {
 }
 
 /**
- * Living ants of the groups out helping (marker V): how many, how many inside the ally's nest, and the weight of those
- * still on their way (not yet in the ally's nest or near its holes, so not in its `defence`).
+ * Living ants of the groups out helping (marker V): how many, how many inside the ally's nest, their weight, and the
+ * weight of those still on their way (not yet in the ally's nest or near its holes, so not in its `defence`).
  */
-function helpers(w: World, c: Colony): { n: number; inside: number; space: number; coming: number } {
+function helpers(w: World, c: Colony): { n: number; inside: number; space: number; coming: number; power: number } {
   const s = allyBrain(c);
   const o = s.ally >= 0 ? w.colony(s.ally) : undefined;
   const space = o ? nestSpace(o.id) : -1;
@@ -499,13 +521,15 @@ function helpers(w: World, c: Colony): { n: number; inside: number; space: numbe
   let n = 0;
   let inside = 0;
   let coming = 0;
+  let power = 0;
   for (const a of w.s.ants) {
     if (a.colony !== c.id || a.state === AS.Dead || a.tile < 0 || !groups.has(groupOf.get(a.tile) ?? -1)) continue;
     n++;
+    power += weight(a.caste);
     if (a.space === space) inside++;
     else if (!(a.space === SURFACE && o && o.entrances.some((e) => sq(a.x - e.sx) + sq(a.y - e.sy) < near * near))) coming += weight(a.caste);
   }
-  return { n, inside, space, coming };
+  return { n, inside, space, coming, power };
 }
 
 /** Stop helping: the groups walk home, the marker is lifted, a cooldown; a human ally is told why. */
@@ -588,6 +612,13 @@ export function allyTick(w: World, c: Colony, dt: number): void {
       s.clearT += step;
       if (s.clearT >= A.clearFor) return stopHelp(w, c, 'done');
     } else s.clearT = 0;
+    // the fight is going worse than it looked (the ally's defenders falling, more enemies): send more, keeping the guard
+    const more = A.assistOvermatch * d.enemy - d.defence - h.coming;
+    if (d.enemy > 0 && more > 0 && w.s.time - (s.sentT ?? s.since) >= A.reinforceEvery) {
+      const r = helpGroups(w, c, more, h.power);
+      for (const id of r.go) assignGroup(w, c, id, HELP);
+      if (r.go.length) ((s.sent += r.n), (s.sentT = w.s.time));
+    }
     if (d.enemy > 0) steerHelp(w, c, o, d);
     return;
   }
@@ -618,21 +649,9 @@ export function allyTick(w: World, c: Colony, dt: number): void {
     endRaid(w, c, false);
   }
   // ---- send enough fighters, keeping a home guard
-  const groups = homeFighterGroups(w, c);
-  const total = fighters(w, c);
-  const guard = Math.max(total.power * A.homeGuardShare, total.n ? (total.power / total.n) * A.homeGuardMin : 0);
   const need = A.assistOvermatch * pick.d.enemy - pick.d.defence;
   if (need <= 0) return;
-  let sent = 0;
-  let sentN = 0;
-  const go: number[] = [];
-  for (const g of groups) {
-    if (sent >= need) break;
-    if (total.power - sent - g.power < guard) continue;
-    go.push(g.id);
-    sent += g.power;
-    sentN += g.n;
-  }
+  const { go, power: sent, n: sentN } = helpGroups(w, c, need, 0);
   if (!go.length) return;
   // a lost cause: even all it can spare would leave the ally's side well short of the attackers
   if (sent + pick.d.defence < (pick.d.queen ? A.assistMinOddsQueen : A.assistMinOdds) * pick.d.enemy) {
@@ -646,6 +665,7 @@ export function allyTick(w: World, c: Colony, dt: number): void {
   for (const id of go) assignGroup(w, c, id, HELP);
   s.ally = pick.o.id;
   s.since = w.s.time;
+  s.sentT = w.s.time;
   s.sent = sentN;
   s.stage = pick.d.inside ? 0 : 1;
   s.clearT = 0;
