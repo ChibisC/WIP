@@ -317,10 +317,13 @@ function gatherCheck(w: World, c: Colony, gather: NonNullable<WarBrain['gather']
   }
   for (const o of w.s.colonies) {
     if (!o.alive || o.team !== c.team || o.aiWar?.target !== c.aiWar?.target || o.aiWar?.joined !== c.id) continue;
+    // the fighters it sent (its groups on marker III), not the ones still at home
+    const raid = new Set(o.groups.filter((g) => g.marker === ATTACK).map((g) => g.id));
+    const groupOf = groupsByTile(o);
     let all = 0;
     let there = 0;
     for (const a of w.s.ants) {
-      if (a.colony !== o.id || a.state === AS.Dead || !isFighter(a.caste)) continue;
+      if (a.colony !== o.id || a.state === AS.Dead || a.tile < 0 || !raid.has(groupOf.get(a.tile) ?? -1)) continue;
       all++;
       if (a.space === SURFACE && sq(a.x - gather.x) + sq(a.y - gather.y) < A.gatherR * A.gatherR) there++;
     }

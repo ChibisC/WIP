@@ -605,9 +605,9 @@ export const BALANCE = {
     joinWindow: 30,
     joinMinFighters: 6,
     gatherDist: 140,
-    gatherR: 50,
+    gatherR: 70,
     gatherShare: 0.6,
-    gatherMax: 60,
+    gatherMax: 120,
     /** shared targets: an enemy seen attacking the team within foeMemory s is raided first (its score × sharedTargetMul) */
     foeMemory: 300,
     sharedTargetMul: 0.5,
