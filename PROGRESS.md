@@ -1166,3 +1166,21 @@ wood ants' basics were 10 throughout. Notes, and what was done:
   - All hashed from ids and ticks (`dmath.hash01`), no draws from the sim's random stream; determinism checks pass.
 - tests/fights.ts: the row checks replaced by crowd checks (wider than deep but no long line; faces the front on the
   whole; facing spread > 0.15 rad; uneven gaps; nobody on top of anybody; it mills, the crowd stays put).
+
+### 2026-11-01 (evening, 5) — Workers and other ants walk and fight under majors (crouching)
+- User: "atta worker n other ants should b able to walk under and attack under majors". An ant getting under something
+  crouches (`BALANCE.underpass.crouch` 0.65): its body lowered by up to that share of its own belly clearance, so the
+  under-pass counts it that much lower (`antNeed`); the renderer lowers it only as far as the room above needs
+  (`antCrouch` → `AntView.crouch`, eased; the head and gaster tip up just enough to stay off the ground, the legs bend
+  over their planted feet). The Atta major stands a little higher (stance .165 → .185; height data regenerated, morph
+  hash re-baselined).
+- Now under an Atta major (rear 2.36 / middle 2.63 mm): the Atta worker (needs 2.33 crouched), Red wood workers and
+  soldiers, Black garden ants, army-ant workers and porters, fire-ant majors… — not the Media. The Eciton worker now also
+  passes under the porter and media, the porter under the soldier's middle (the under-pass spec's expectations).
+- Tests (`tests/underpass.ts`): the worker fits under the major; ten castes of other species fit; an Atta worker walks
+  straight under a column of majors; army-ant workers fight an Atta major from under it; 4 majors + 16 workers v a
+  ground beetle: workers fight from under their majors (kill 13.7 s; 17.4 s with the under-pass off).
+  `tests/eciton.ts`: the raid front's roam is averaged over two raids (one raid swings 135–394 mm with the seed; seed 5
+  alone came to 139 with the crouch). Browser clips `workers_*`, `foes_under_major` in `tests/browser/underpass.py`.
+- LAN: `tests/browser/lan.py` (two players) now also checks the game-speed vote: 2× only when both agree, either can drop
+  back to 1×, hashes still match.

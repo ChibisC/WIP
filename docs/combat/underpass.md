@@ -130,7 +130,7 @@ Combat v2 assumed every ant is 0.3 × its length tall and gave each creature one
 | expected | measured (shipped) | why / what to do |
 |---|---|---|
 | Atta minim fits under media, soldier, major, queen | **yes** (rear and middle; queen middle and front) | the big castes' heads are carried low, as in real majors |
-| Atta media fits under the major's middle (maybe the soldier's) | **no**: needs 3.14 mm, major middle 1.99, soldier 1.60 | the major would have to stand with its belly at 22 % of its length; the models (and photos of majors on trails) carry the mesosoma lower. For the realism session to check against the reference photos; when the models change, regenerate and it follows |
+| Atta media fits under the major's middle (maybe the soldier's) | **since 2026-11-01 yes** (crouched, §9): needs 2.33 mm, major rear 2.36 / middle 2.63; before: **no**, needs 3.14 mm, major middle 1.99, soldier 1.60 | the major would have to stand with its belly at 22 % of its length; the models (and photos of majors on trails) carry the mesosoma lower. For the realism session to check against the reference photos; when the models change, regenerate and it follows |
 | nothing fits under the minim | **yes** | |
 | Eciton worker fits under the porter, media, soldier, queen (not her gaster) | soldier rear and middle, queen **yes**; porter **no** (needs 1.68, belly 1.55), media **no** (1.58) | 8 % short. Real porters carry prey under the body, so their stance is high; the realism session can raise the porter's and media's stance (it already made the legs more compact). Without the 10 % margin the worker would fit; the margin is the spec's, kept |
 | porter possibly under the soldier | **no** (needs 2.82, soldier middle 1.97) | consistent with the models |
@@ -159,8 +159,29 @@ Tests (`tests/underpass.ts`, in `npm test`; `main`'s models):
 - An ant under a taller unit (`Ant.udr`) is outlined through it: its body's outline at half its height, in its team's colour (the arena's team colours; elsewhere green yours, blue an ally's, red a foe's), drawn over everything (`render/game/underOutline.ts`; on the surface and in the nests).
 - Clicking picks the unit nearest the cursor; clicking the same spot again (within 6 px) picks the next one there, round and round (`GameSession.pickAnt`).
 - Health: the creature health bars are screen-space labels (never hidden by a body); ants show theirs in the info card. Nothing to offset. There is no box select in this game (EotU-style: orders are markers, not unit selection).
-- Posture: units under another should keep a slightly lower posture where the clearance is close. The ant renderer is the realism session's (`src/render/ants/*`): handed over (claude/handoff/05-UPDATE-2026-10-31-underpass.md). The 10 % margin keeps heads under bellies meanwhile.
+- Posture: an ant under another lowers its antennae and head where the room is close (`underPosture` in `game/antViews.ts`) and crouches as far as it needs (§9; `AntView.crouch`, eased in the renderer, the head and gaster tipped up just enough to stay off the ground).
 - `?combatdebug` / the arena's *Combat* button also shows the under-pass: the height zones of a unit with something under it (green fits, red too low, amber a front waiting to lower), its feet (violet), a magenta line up from the ant under it to its height, a violet ring on ants holding from under a foe, orange arrows on ants stepping out (red: mid-attack, waiting).
+
+## 9. Crouching (2026-11-01)
+User: "atta worker n other ants should b able to walk under and attack under majors". An ant getting under something
+crouches: legs bent, its body lowered by up to `underpass.crouch` (0.65) × its own belly clearance (its middle zone).
+The sim counts its height that much lower (`antNeed`); the renderer lowers it only as far as the room over it needs
+(`antCrouch`). The Atta major also stands a little higher (stance .165 → .185; real majors stand tall on long legs).
+
+| | needs crouched (mm) | under an Atta major (rear 2.36 / middle 2.63) |
+|---|---|---|
+| Atta worker (`atta_media`, 8 mm) | 2.33 (standing 3.22) | rear, middle |
+| Atta Media (`atta_soldier`, 10.5 mm) | 2.91 | no |
+| Red wood worker / soldier | 1.71 / 2.38 | rear, middle / middle |
+| Black garden worker / soldier | 0.99 / 1.26 | rear, middle |
+| Army-ant worker / porter | 1.07 / 1.78 | rear, middle |
+| Fire-ant major | 1.36 | rear, middle |
+
+Also: the Eciton worker now passes under the porter and media (all zones) and the porter under the soldier's middle —
+the spec's expectations in §5. Ants fit under more creatures too (the same rule). Tests: `tests/underpass.ts` (fits,
+an Atta worker walking straight under a column of majors, army-ant workers fighting an Atta major from under it, 4 majors
++ 16 workers v a ground beetle: workers fight from under their majors and kill it in 13.7 s, 17.4 with the under-pass
+off). Clips: `workers_through_majors`, `workers_close_side`, `workers_mixed_beetle`, `foes_under_major`.
 
 ## Sources
 - EotU official wiki, Stat Explanation (Size): https://hoodedhorse.com/wiki/Empires_of_the_Undergrowth/Stat_Explanation

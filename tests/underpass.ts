@@ -51,7 +51,9 @@ const U = BALANCE.underpass as { allies: boolean; enemies: boolean };
 
 // ---------------------------------------------------------------- 2. who fits under whom (Atta and Eciton)
 const fits = (small: string, tall: string) => {
-  const need = antHeights(small).h * casteOf(small).length * (1 + BALANCE.underpass.margin);
+  // (crouched since 2026-11-01: the body lowered by `crouch` × its own belly clearance)
+  const s = antHeights(small);
+  const need = (s.h - BALANCE.underpass.crouch * s.c[1]) * casteOf(small).length * (1 + BALANCE.underpass.margin);
   const d = antHeights(tall);
   const L = casteOf(tall).length;
   return ['rear', 'middle', 'front'].filter((_, z) => need <= d.c[z] * L);
@@ -63,6 +65,12 @@ const fits = (small: string, tall: string) => {
   check('Atta: nothing fits under the minim', none.length === 0, none.join(', '));
   const ec = ['eciton_major', 'eciton_queen'].map((t) => [t, fits('eciton_minor', t)] as const);
   check('Eciton: the worker fits under the soldier and the queen', ec.every(([, z]) => z.length > 0), ec.map(([t, z]) => `${t}: ${z.join('/')}`).join('; '));
+  // (user 2026-11-01: "atta worker n other ants should b able to walk under and attack under majors")
+  const maj = fits('atta_media', 'atta_major');
+  check('Atta: a worker (crouched) fits under the major\'s gaster and middle', maj.includes('rear') && maj.includes('middle'), maj.join('/') || 'no');
+  const others = ['lasius_worker', 'lasius_soldier', 'formica_worker', 'formica_soldier', 'fire_major', 'eciton_minor', 'eciton_submajor', 'plagiaria_worker', 'hell_worker', 'aurimyrmex_worker'];
+  const notUnder = others.filter((c) => !fits(c, 'atta_major').includes('middle'));
+  check('other species: workers and soldiers of every ant species up to a Red wood soldier fit under an Atta major', notUnder.length === 0, notUnder.join(', ') || `${others.length} castes`);
   // the spec's other expectations depend on the models (docs/combat/underpass.md): reported, not required
   console.log(`  ..  Eciton worker under the porter: ${fits('eciton_minor', 'eciton_submajor').join('/') || 'no'}; under the media: ${fits('eciton_minor', 'eciton_media').join('/') || 'no'}; Atta media under the major: ${fits('atta_media', 'atta_major').join('/') || 'no'}; Eciton porter under the soldier: ${fits('eciton_submajor', 'eciton_major').join('/') || 'no'}`);
 }
@@ -71,6 +79,7 @@ const fits = (small: string, tall: string) => {
 {
   for (const [sp, tall, small] of [
     ['atta', 'atta_major', 'atta_minim'],
+    ['atta', 'atta_major', 'atta_media'],
     ['eciton', 'eciton_major', 'eciton_minor'],
   ]) {
     U.allies = true;
@@ -160,15 +169,15 @@ for (const busy of PB ? [false, true] : []) {
 {
   // a tall enemy (an Eciton soldier, held where it stands) and 30 Atta minims after it: every place round it taken,
   // some fight from under it (with enemies' under-pass on), none with it off
-  const run = (on: boolean) => {
+  const run = (on: boolean, tallC = 'eciton_major', smallC = 'atta_minim', tallCol = 1, smallCol = 0, n = 30, R = 14) => {
     U.enemies = on;
     const { w, p } = field(9);
-    const tall = makeAnt(w, 1, 'eciton_major', SURFACE, p.x, p.y, 0);
+    const tall = makeAnt(w, tallCol, tallC, SURFACE, p.x, p.y, 0);
     tall.hp = tall.maxHp = 1e7;
     const minis: Ant[] = [];
-    for (let i = 0; i < 30; i++) {
-      const ang = (i / 30) * Math.PI * 2;
-      const a = makeAnt(w, 0, 'atta_minim', SURFACE, p.x + Math.cos(ang) * 14, p.y + Math.sin(ang) * 14, ang + Math.PI);
+    for (let i = 0; i < n; i++) {
+      const ang = (i / n) * Math.PI * 2;
+      const a = makeAnt(w, smallCol, smallC, SURFACE, p.x + Math.cos(ang) * R, p.y + Math.sin(ang) * R, ang + Math.PI);
       a.task = 'guard';
       a.alarm = 1;
       a.tgt = tall.id;
@@ -195,6 +204,10 @@ for (const busy of PB ? [false, true] : []) {
   const on = run(true);
   const off = run(false);
   check('from beneath: small ants fight a tall enemy ant from under its body when every place round it is taken', on.under >= 1 && off.under === 0 && on.most >= off.most, `${on.under} under it (${on.most} holding at most); with enemies' under-pass off: ${off.under} (${off.most})`);
+  // (user 2026-11-01: "… walk under and attack under majors") Eciton workers, crouched, fight an Atta major from under it
+  const on2 = run(true, 'atta_major', 'eciton_minor', 0, 1, 24, 18);
+  const off2 = run(false, 'atta_major', 'eciton_minor', 0, 1, 24, 18);
+  check('from beneath: army-ant workers fight an Atta major from under its body', on2.under >= 1 && off2.under === 0 && on2.most >= off2.most, `${on2.under} under it (${on2.most} holding at most); off: ${off2.under} (${off2.most})`);
 }
 // mixed squads against creatures: no fewer fighting at once with the under-pass (EotU)
 for (const [name, sp, squad, kind] of [
@@ -207,6 +220,15 @@ for (const [name, sp, squad, kind] of [
   const off = mixedVsCreature(sp, squad, kind, 4, 30);
   U.allies = true;
   check(`mixed squad: ${name} — as many fighting at once with the under-pass`, on.mean >= off.mean * 0.85, `holding ${on.mean.toFixed(1)} on average (${on.most} at most, ${on.underTall} under a tall teammate), killed ${on.diedAt >= 0 ? on.diedAt.toFixed(1) + ' s' : 'no'}; off: ${off.mean.toFixed(1)} (${off.most}), killed ${off.diedAt >= 0 ? off.diedAt.toFixed(1) + ' s' : 'no'}`);
+}
+{
+  // (user 2026-11-01: workers walk and attack under majors) leafcutter workers fight from among and under their majors
+  U.allies = true;
+  const on = mixedVsCreature('atta', [['atta_major', 4], ['atta_media', 16]], 'groundBeetle', 4, 30);
+  U.allies = false;
+  const off = mixedVsCreature('atta', [['atta_major', 4], ['atta_media', 16]], 'groundBeetle', 4, 30);
+  U.allies = true;
+  check('mixed squad: 4 Atta majors + 16 workers v a ground beetle — workers fight from under their majors, as many at once', on.underTall >= 1 && on.mean >= off.mean * 0.85, `${on.underTall} workers under a major at most; holding ${on.mean.toFixed(1)} on average (${on.most} at most), killed ${on.diedAt >= 0 ? on.diedAt.toFixed(1) + ' s' : 'no'}; off: ${off.mean.toFixed(1)} (${off.most}), killed ${off.diedAt >= 0 ? off.diedAt.toFixed(1) + ' s' : 'no'}`);
 }
 
 // ---------------------------------------------------------------- 6. determinism

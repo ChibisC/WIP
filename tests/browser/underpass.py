@@ -7,6 +7,10 @@ real-time clips in the arena, recorded on main before the change (LABEL=before) 
   eciton_raid            3 Eciton soldiers, 3 porters and 30 workers v 12 Red wood ants: workers among the long legs
   from_beneath           25 fire-ant minors v 2 Atta majors: small foes under a tall enemy ant's body
   outline_top            the same as minims_through_majors from above: outlines of the minims under the majors (after)
+  workers_through_majors (2026-11-01) the same with eight Atta workers, crouching under the majors
+  workers_close_side     close and low from the side: the crouched workers clear the majors' bellies
+  workers_mixed_beetle   4 Atta majors + 16 workers v a ground beetle: workers fighting from under their majors
+  foes_under_major       2 Atta majors v 14 Eciton workers + 8 Red wood workers: foes fighting from under a major
 
 Each clip is 6 s of game time at 10 frames a second, low over the ground (from above for outline_top), plus a still of
 its last frame. Fails on page errors or shader warnings.
@@ -49,8 +53,15 @@ CAM = """(c) => { const s = window.__session; const A = s.world.s.mode.arena; co
 
 WALK = ([S(0, "ant:atta_major", 5, 1, (300, 300)), S(0, "ant:atta_minim", 8, 1, (270, 300)), S(1, "cr:groundBeetle", 1, 1, (360, 300)), PASSIVE(1)],
         {"tall": "atta_major", "small": "atta_minim", "x": 300, "y": 300, "gap": 6})
+# (user 2026-11-01: "atta worker n other ants should b able to walk under and attack under majors") crouched workers
+WALKW = ([S(0, "ant:atta_major", 5, 1, (300, 300)), S(0, "ant:atta_media", 8, 1, (270, 300)), S(1, "cr:groundBeetle", 1, 1, (360, 300)), PASSIVE(1)],
+         {"tall": "atta_major", "small": "atta_media", "x": 300, "y": 300, "gap": 7})
 # name: (setup commands, column, seconds to advance before recording, camera)
 CLIPS = {
+    "workers_through_majors": (WALKW[0], WALKW[1], 0.8, {"x": 298, "y": 300, "d": 40, "p": -0.3, "yaw": 1.9}),
+    "workers_close_side": (WALKW[0], WALKW[1], 1.4, {"x": 300, "y": 300, "d": 24, "p": -0.45, "yaw": 1.57}),
+    "workers_mixed_beetle": ([S(0, "ant:atta_major", 4, 1, (280, 300)), S(0, "ant:atta_media", 16, 1, (275, 300)), S(1, "cr:groundBeetle", 1, 1, (320, 300)), PASSIVE(1)], None, 3, {"d": 70, "p": -0.25, "cr": 0, "yaw": 1.2}),
+    "foes_under_major": ([S(0, "ant:atta_major", 2, 1, (300, 300)), S(1, "ant:eciton_minor", 14, 1, (325, 300)), S(1, "ant:formica_worker", 8, 1, (325, 300))], None, 3, {"d": 55, "p": -0.25, "fight": True, "yaw": 1.2}),
     "minims_through_majors": (WALK[0], WALK[1], 0.6, {"x": 298, "y": 300, "d": 38, "p": -0.3, "yaw": 1.9}),
     "atta_mixed_beetle": ([S(0, "ant:atta_major", 4, 1, (280, 300)), S(0, "ant:atta_minim", 20, 1, (275, 300)), S(1, "cr:groundBeetle", 1, 1, (320, 300)), PASSIVE(1)], None, 3, {"d": 70, "p": -0.25, "cr": 0, "yaw": 1.2}),
     "eciton_raid": ([S(0, "ant:eciton_major", 3, 1, (270, 300)), S(0, "ant:eciton_submajor", 3, 1, (270, 300)), S(0, "ant:eciton_minor", 30, 1, (265, 300)), S(1, "ant:formica_worker", 12, 1, (320, 300))], None, 3, {"d": 90, "p": -0.25, "fight": True, "yaw": 1.2}),

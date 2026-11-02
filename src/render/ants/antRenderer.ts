@@ -50,6 +50,8 @@ export interface AntView {
   colorVar: number;
   /** vertical lift (e.g. flung through the air), mm */
   lift: number;
+  /** under a taller unit: the body lowered over its feet by this much (mm; legs bent), head and gaster kept clear */
+  crouch?: number;
   /** Additional roll (rad) e.g. stagger */
   roll: number;
   /** body pitch override (rad), e.g. rearing for acid spray */
@@ -151,6 +153,8 @@ interface AnimState {
   ap: number;
   gp: number;
   cr: number;
+  /** crouch (mm, eased) */
+  ck?: number;
   pose: number;
   poseW: number;
   pph: number;
@@ -409,6 +413,11 @@ const _lp = new THREE.Vector3();
  * the body's own shift).
  */
 function lowestPosed(rig: AntRig, hp: number, gp: number, q: THREE.Quaternion): number {
+  return Math.min(lowestHead(rig, hp, q), lowestGaster(rig, gp, q));
+}
+
+/** The head's part of `lowestPosed`. */
+function lowestHead(rig: AntRig, hp: number, q: THREE.Quaternion): number {
   let low = Infinity;
   const ch = Math.cos(hp);
   const sh = Math.sin(hp);
@@ -418,6 +427,11 @@ function lowestPosed(rig: AntRig, hp: number, gp: number, q: THREE.Quaternion): 
     _lp.set(rig.neck.x + dx * ch - dy * sh, rig.neck.y + dx * sh + dy * ch, p.z).applyQuaternion(q);
     low = Math.min(low, _lp.y);
   }
+  return low;
+}
+
+/** The gaster's part of `lowestPosed`. */
+function lowestGaster(rig: AntRig, gp: number, q: THREE.Quaternion): number {
   const cg = Math.cos(-gp);
   const sg = Math.sin(-gp);
   const g = rig.gasterTip;
@@ -425,7 +439,7 @@ function lowestPosed(rig: AntRig, hp: number, gp: number, q: THREE.Quaternion): 
   const gx = g.x - P.x;
   const gy = g.y - P.y;
   _lp.set(P.x + gx * cg - gy * sg, P.y + gx * sg + gy * cg, 0).applyQuaternion(q);
-  return Math.min(low, _lp.y);
+  return _lp.y;
 }
 
 export class AntRenderer {
@@ -713,6 +727,7 @@ export class AntRenderer {
       s.ap = damp(s.ap, v.antennaPitch + (M ? M.antPitch : 0), 5, dt);
       s.gp = damp(s.gp, v.gaster, 6, dt);
       s.cr = damp(s.cr, v.crop, 1.5, dt);
+      s.ck = damp(s.ck ?? 0, v.crouch ?? 0, 7, dt);
       const act = M ? Math.max(v.antennaActivity, M.antAct) : v.antennaActivity;
       s.wave += dt * clock * (0.5 + act * 2.5 + s.amp * 0.6) * (v.waveMul ?? 1) * (s.m2 ? s.m2.waveK : 1);
       if (!M) s.death = damp(s.death, v.dead ? 1 : 0, 4, dt);
@@ -815,6 +830,18 @@ export class AntRenderer {
         // turned about a pivot at the body's height (along the body by the pose's px), not about the ground point
         vPiv.set(atkP.px * w * Lr + (v.pivX ?? 0) * Lr, rig.stance, 0);
         vT.add(vPiv).sub(vPiv.applyQuaternion(qB));
+        // (user 2026-11-01: walking and fighting under majors) crouched: the body lowered over its feet, the legs bend;
+        // the head and gaster tip up just enough to stay off the ground (below, the body rises for what is left)
+        const ck = s.ck ?? 0;
+        if (ck > 1e-3) {
+          vT.y -= ck / scale;
+          const floor = Lr * 0.015 - vT.y;
+          // (whichever way of turning lifts it: head up, gaster tip up)
+          const hd = lowestHead(rig, hp + 0.05, qB) > lowestHead(rig, hp - 0.05, qB) ? 0.08 : -0.08;
+          for (let i = 0; i < 6 && lowestHead(rig, hp, qB) < floor; i++) hp += hd;
+          const gd = lowestGaster(rig, gp + 0.05, qB) > lowestGaster(rig, gp - 0.05, qB) ? 0.08 : -0.08;
+          for (let i = 0; i < 6 && lowestGaster(rig, gp, qB) < floor; i++) gp += gd;
+        }
         // (user ratings A5, A6, F7, L7, L8: attacks and rears sank the jaws, the head or the gaster into the ground)
         // the lowest of the jaw tips, the chin and the gaster tip as posed — head and gaster turned, the body pitched —
         // stays 1.5 % of the body length above the ground: the body rises over its planted feet, the legs straighten

@@ -415,7 +415,9 @@ const attaMajor: AntMorph = {
   setae: { ...attaSetae, color: 0xa0502a, head: 70, len: [0.006, 0.026] },
   // (combat v2.2 check, user 2026-11-01: "make sure the models also work with the combat rework" — standing, its
   // jaws went 0.2 mm into the ground; its big head is held up off the ground on long legs)
-  stance: 0.165,
+  // (user 2026-11-01: "atta worker n other ants should b able to walk under and attack under majors" — a little
+  // higher again, .165 → .185, so a crouching worker passes under its gaster and middle; real majors stand tall)
+  stance: 0.185,
 };
 
 const attaQueen: AntMorph = {

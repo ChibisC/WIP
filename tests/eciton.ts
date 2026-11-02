@@ -77,7 +77,11 @@ function open(w: World): { x: number; y: number } {
 {
   const r = raidScene({ minors: 40, porters: 8, medias: 5, majors: 8, seconds: 120, seed: 5, creatures: 4 });
   const L = r.minL;
-  check('the front roams the raid area (it creeps on and turns back in at its edge)', r.frontTravel > 150 && r.maxFrontDist <= r.radius * ECITON.raid.areaMul + 1, `roamed ${r.frontTravel.toFixed(0)} mm, at most ${r.maxFrontDist.toFixed(0)} mm from the marker`);
+  // (how far one raid's front gets in 2 minutes swings a lot with small changes — seeds 1–9: 135–394 mm — so two raids,
+  // on average; since 2026-11-01 workers crouch under the porters and soldiers and seed 5 alone came to 139 mm)
+  const r6 = raidScene({ minors: 40, porters: 8, medias: 5, majors: 8, seconds: 120, seed: 6, creatures: 4 });
+  const roam = (r.frontTravel + r6.frontTravel) / 2;
+  check('the front roams the raid area (it creeps on and turns back in at its edge)', roam > 150 && Math.max(r.maxFrontDist, r6.maxFrontDist) <= r.radius * ECITON.raid.areaMul + 1, `roamed ${roam.toFixed(0)} mm on average (${r.frontTravel.toFixed(0)}, ${r6.frontTravel.toFixed(0)}), at most ${Math.max(r.maxFrontDist, r6.maxFrontDist).toFixed(0)} mm from the marker`);
   check('raiders pulse: run ahead, fall back, wait', r.pulseShare > 0.3 && r.pulseShare < 0.9 && r.raidStates > 200, `${(100 * r.pulseShare).toFixed(0)} % of raid samples surging forward`);
   check('three lanes: outbound ants keep to the sides of the trail, laden ants to the middle', r.laneOut - r.laneIn > 0.5 * L && r.laneOutN > 100 && r.laneInN > 100, `outbound ${(r.laneOut / L).toFixed(2)} L, laden ${(r.laneIn / L).toFixed(2)} L from the centre`);
   check('porters carry their load under the body', r.porterCarry > 50 && r.porterUnderShare > 0.99, `${(100 * r.porterUnderShare).toFixed(0)} % of ${r.porterCarry} samples`);

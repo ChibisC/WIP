@@ -367,9 +367,13 @@ export const BALANCE = {
    * `pose.porterLoaded`; rearing to spray raises the front by `pose.rearing`; dead or flung: nothing passes under.
    * A unit that no longer fits steps out sideways (`stepOut` × its length clear of the body) in a planned move; one
    * mid-attack finishes its attack first, and B's front waits to lower until it has.
+   * (user 2026-11-01: "atta worker n other ants should b able to walk under and attack under majors") To get under
+   * something an ant crouches: legs bent, its body lowered by up to `crouch` × its own belly clearance (its middle
+   * zone), so its height counts that much less (the render lowers it as far as the room above needs).
    */
   underpass: {
     margin: 0.1,
+    crouch: 0.65,
     allies: true,
     enemies: true,
     footR: 0.03,

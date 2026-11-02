@@ -220,6 +220,16 @@ with sync_playwright() as p:
             check('state hashes match (2 players)', ok, hs)
             check('no desync', not any(ev(pg, '!!__net.status().desync') for pg in [h, g]))
             shot(g, 'lan-match.png')
+            # the game-speed vote works over LAN as online (user question 2026-11-01): 2x only when both agree
+            h.locator('.spd').locator('xpath=..').dispatch_event('click')
+            check('LAN: asking for 2x shows the other player an Agree button', wait(lambda: g.locator('[data-a="speed-yes"]').is_visible(), 30))
+            check('LAN: the match stays at 1x until they agree', all((ev(pg, '__session.world.s.settings.gameSpeed') or 1) == 1 for pg in [h, g]))
+            g.locator('[data-a="speed-yes"]').dispatch_event('click')
+            ok = wait(lambda: all(ev(pg, '__session.world.s.settings.gameSpeed') == 2 and ev(pg, '__session.loop.speed') > 1.5 for pg in [h, g]), 30)
+            check('LAN: when both agree, both devices run at 2x', ok, [ev(pg, '[__session.world.s.settings.gameSpeed, __session.loop.speed]') for pg in [h, g]])
+            ev(g, '__session.setSpeed(1)')
+            check('LAN: either player can bring it back to 1x at once', wait(lambda: all((ev(pg, '__session.world.s.settings.gameSpeed') or 1) == 1 for pg in [h, g]), 30))
+            check('no desync after the speed changes', not any(ev(pg, '!!__net.status().desync') for pg in [h, g]))
 
         # ------------------------------------------------------------------ 3. reconnect
         if lobby_ok and want('reconnect'):

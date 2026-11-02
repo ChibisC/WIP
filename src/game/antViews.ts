@@ -11,7 +11,7 @@ import { ATTACK_CONTACT } from '../render/ants/attackPoses';
 import { CASTE_FX } from '../sim/casteAbilities';
 import { queenBody, rampFraction } from '../sim/termites';
 import { World } from '../sim/world';
-import { antClear, antHeights, antNeed, creatureClear, creatureHeights, zoneAt } from '../sim/underpass';
+import { antClear, antCrouch, antHeights, antNeed, creatureClear, creatureHeights, zoneAt } from '../sim/underpass';
 
 /** Surface holes of every area (rebuilt once per sim tick) for the scurry-in fade. */
 let holeTick = -1;
@@ -176,6 +176,7 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
   }
   out.colorVar = a.colorVar;
   out.lift = a.state === AS.Flung ? a.fz : 0;
+  out.crouch = 0;
   // animation pass: a drop in hit points starts a hit reaction; a thrown ant tumbles (not one held in antlers)
   out.hp = a.hp;
   out.cause = a.state === AS.Dead ? (a.lastHit ?? 0) : 0;
@@ -318,8 +319,8 @@ const UCLR = [0, 0, 0];
 /**
  * Combat v2.2 (spec §5, handed to the realism branch; user 2026-11-01 "make sure the models also work with the combat
  * rework"): an ant standing under a taller unit keeps lower where the room above it is close — antennae swept down and
- * back, head lowered (not mid-bite), jaws shut — so nothing pokes into the belly over it. Render only: the sim's fit
- * test (sim/underpass.ts) already keeps a 10 % margin over its height.
+ * back, head lowered (not mid-bite), jaws shut — so nothing pokes into the belly over it — and crouched as low as it
+ * needs (`crouch`). Render only: the sim's fit test (sim/underpass.ts) counts it crouched, with a 10 % margin.
  */
 function underPosture(w: World, a: Ant, out: AntView): void {
   const u = a.udr ?? 0;
@@ -337,6 +338,9 @@ function underPosture(w: World, a: Ant, out: AntView): void {
     clear = UCLR[zoneAt(creatureHeights(cr.kind), cr.scale, cr.x, cr.y, cr.h, a.x, a.y)];
   }
   const need = antNeed(a);
+  // (user 2026-11-01: workers and other ants walk and fight under majors) crouched: legs bent, the body lowered as far
+  // as the room over it needs (the sim counts it crouched)
+  out.crouch = antCrouch(a, clear);
   // 0 with a quarter of its height to spare, 1 when it only just fits
   const tight = Math.max(0, Math.min(1, 1 - (clear - need) / (need * 0.25)));
   if (tight <= 0) return;
@@ -839,6 +843,7 @@ export function blankView(): AntView {
     sizeVar: 0,
     colorVar: 0,
     lift: 0,
+    crouch: 0,
     roll: 0,
     pitch: 0,
     selected: false,

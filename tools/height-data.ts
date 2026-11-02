@@ -46,19 +46,21 @@ ${body(H.creature)}
   console.log('wrote src/sim/heightData.ts');
 }
 // the table, in mm, per caste
-const U = (BALANCE as { underpass?: { margin: number } }).underpass;
+const U = (BALANCE as { underpass?: { margin: number; crouch?: number } }).underpass;
 const margin = U?.margin ?? 0.1;
+const crouch = U?.crouch ?? 0;
+// (an ant's `h` here is its crouched height: lowered by `crouch` × its belly clearance, as sim/underpass.ts counts it)
 const rows: Array<{ id: string; L: number; h: number; c: number[] }> = [];
 for (const [id, c] of Object.entries(CASTES)) {
   const d = c.morph ? H.ant[c.morph] : undefined;
   if (!d) continue;
-  rows.push({ id, L: c.length, h: d.h * c.length, c: d.c.map((v) => v * c.length) });
+  rows.push({ id, L: c.length, h: (d.h - crouch * d.c[1]) * c.length, c: d.c.map((v) => v * c.length) });
 }
 for (const [id, k] of Object.entries(CREATURES)) {
   const d = H.creature[id];
   if (d) rows.push({ id: 'cr:' + id, L: k.length, h: d.h * k.length, c: d.c.map((v) => v * k.length) });
 }
-console.log('unit                    length  height  clearance rear / middle / front (mm)');
+console.log('unit                    length  crouched height  clearance rear / middle / front (mm)');
 for (const r of rows) console.log(`${r.id.padEnd(22)} ${r.L.toFixed(1).padStart(6)}  ${r.h.toFixed(2).padStart(6)}  ${r.c.map((v) => v.toFixed(2)).join(' / ')}`);
 // who fits under whom (same species, and every ant under creatures), by zone
 const fits = (a: (typeof rows)[0], b: (typeof rows)[0]) => ['rear', 'middle', 'front'].filter((_, z) => a.h * (1 + margin) <= b.c[z]);

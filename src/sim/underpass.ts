@@ -41,11 +41,16 @@ export function creatureHeights(kind: string): HeightDef {
   return d;
 }
 
-/** Per caste: its heights, length (mm), height with the margin (mm) and the most clearance any pose gives (mm). */
+/**
+ * Per caste: its heights, length (mm), the height it needs crouched with the margin (mm), standing (mm, no margin),
+ * how far it can lower its body (mm) and the most clearance any pose gives (mm).
+ */
 interface CasteRec {
   d: HeightDef;
   L: number;
   need: number;
+  stand: number;
+  drop: number;
   most: number;
 }
 const casteRec = new Map<string, CasteRec>(); // det-ok: constant lookups
@@ -55,15 +60,27 @@ function recOf(caste: string): CasteRec {
     const d = antHeights(caste);
     const L = casteOf(caste).length;
     const k = Math.max(1, U.pose.braced, U.pose.porterLoaded, U.pose.rearing);
-    r = { d, L, need: d.h * L * (1 + U.margin), most: Math.max(d.c[0], d.c[1], d.c[2]) * L * k };
+    // (user 2026-11-01: workers and other ants walk and fight under majors) crouched: the body lowered by up to
+    // `crouch` × its own belly clearance
+    const drop = U.crouch * d.c[1] * L;
+    r = { d, L, need: (d.h * L - drop) * (1 + U.margin), stand: d.h * L, drop, most: Math.max(d.c[0], d.c[1], d.c[2]) * L * k };
     casteRec.set(caste, r);
   }
   return r;
 }
 
-/** An ant's height with the margin (mm): what must fit under another. */
+/** An ant's height crouched, with the margin (mm): what must fit under another. */
 export function antNeed(a: Ant): number {
   return recOf(a.caste).need;
+}
+
+/**
+ * How far an ant under a unit with `clear` mm of room over it lowers its body (mm, render): enough that its height
+ * with the margin fits, at most as far as it can crouch.
+ */
+export function antCrouch(a: Ant, clear: number): number {
+  const r = recOf(a.caste);
+  return Math.max(0, Math.min(r.drop, r.stand - clear / (1 + U.margin)));
 }
 
 /** The most clearance an ant of this caste has in any pose (mm): a quick "nothing fits under it" check. */
