@@ -179,6 +179,9 @@ npx vite-node tools/anim-cost.ts -- 1040                            # the animat
 # &cdist= / &ctx= / &ctz= move the camera; tests/browser/anim_clips.py records clips (docs/realism/combat/)
 # any species in the lab: &ant=<morph>&big=<morph> (e.g. &ant=atta_media&big=atta_major); clip=spray (Formica's three sprayers), troph (Lasius)
 # realism sheets and clips per species: docs/realism/<species>/ (render only); the overnight report: docs/realism/OVERNIGHT-REPORT.md
+# hell ants and nasute termites (realism rework 2026-11-02): clip=termites (the nasute castes' states), clip=royals; &ant=hell_worker for the snap
+# ant lab extras: &light= now lights termites too; &contact=1 contact shadows; &amber=1 a unit in a block of amber (lab only, never in the game)
+python3 tests/browser/hell_nasute_realism.py docs/realism/hell-nasute/renders   # lab renders per unit, view and light (UNITS, VIEWS, LIGHTS; with_server.sh)
 npx vite-node tests/fights.ts                                       # guard line, room in a fight, foes shared out, creatures apart, calm after a fight, marker orders (no attacking / gathering / climbing)
 npx vite-node tools/postfight.ts -- ant:lasius_soldier 20           # what fighters do once their foes are dead (zigzags, stop-start, states)
 npx vite-node tools/fightspread.ts -- ant:lasius_soldier 24 ant:formica_soldier 24   # how spread out a melee is, second by second
