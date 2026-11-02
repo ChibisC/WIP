@@ -189,7 +189,8 @@ export class GameUI {
     });
     // a new mission opens on its briefing (not a loaded one already under way)
     const m = missionOf(s.world);
-    if (m && m.stage === 0 && !s.startSnapshot && !s.watchingReplay) setTimeout(() => this.menus.briefing(), 300);
+    // (a story level skips it: the island hub showed its card, and the opening flight and captions follow)
+    if (m && m.stage === 0 && !s.startSnapshot && !s.watchingReplay && !missionDef(m.id).story) setTimeout(() => this.menus.briefing(), 300);
   }
 
   /**

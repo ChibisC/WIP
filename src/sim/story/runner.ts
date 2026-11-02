@@ -40,7 +40,7 @@ export function storySetup(level: StoryLevelDef['id'], diff: Difficulty, loadout
     food: 1.3,
     aphids: L.aphids,
     plants: L.plants,
-    settings: { creatures: L.creatures, enemyStatMul: D.enemyStat, aggression: D.aggression },
+    settings: { creatures: L.creatures, enemyStatMul: D.enemyStat * (L.enemyStat ?? 1), aggression: D.aggression },
     mission: level,
     story: { difficulty: diff, loadout: L.loadout ? loadout : [] },
   };

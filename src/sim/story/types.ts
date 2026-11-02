@@ -196,6 +196,8 @@ export interface StoryLevelDef {
   rivals: Record<string, RivalDef>;
   /** wild creatures besides the cast (settings.creatures; 0 none) */
   creatures: number;
+  /** the level's own scale on enemy health and damage, times the difficulty's (default 1) */
+  enemyStat?: number;
   /** aphid clusters and leafy plants placed in the map's zones */
   aphids: number;
   plants: number;

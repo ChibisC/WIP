@@ -31,7 +31,10 @@ const ASSIST = 4;
 const ARMY = Number(process.env.ARMY ?? 45);
 
 const ev = new EventBus();
-const w = createWorld(storySetup(level, diff, loadout, seed), ev);
+const setup = storySetup(level, diff, loadout, seed);
+// ESTAT=x: try another enemy scale on top of the level's and the difficulty's (balancing)
+if (process.env.ESTAT && setup.settings) setup.settings.enemyStatMul = (setup.settings.enemyStatMul ?? 1) * Number(process.env.ESTAT);
+const w = createWorld(setup, ev);
 const c = w.colony(0)!;
 c.ai = true;
 const def = missionDef(level);
@@ -42,6 +45,11 @@ let assisting = false;
 /** the final assault: under way, and the army it set out with (it falls back to regroup below 45 %) */
 let assaulting = false;
 let assaultStart = 0;
+/** after a failed assault, the army to rebuild before going again */
+let regroupTo = 0;
+/** the assault has gathered at its staging point and is going in */
+let pushing = false;
+let gatherT = 0;
 let deaths = 0;
 ev.on('death', (e) => {
   if (e.kind === 'ant' && e.colony === 0) deaths++;
@@ -99,13 +107,42 @@ for (let t = 0; t < minutes * 1200; t++) {
     } else if (o.type === 'reach' && c.living >= 20) {
       const p = wherePt(w, o.at);
       target = { space: SURFACE, x: p[0], y: p[1] };
-    } else if (o.type === 'killQueen' && rival && rival.alive && (assaulting || (c.living >= Math.max(ARMY, rival.living * 1.5)) || m.t > 1200)) {
-      if (!assaulting) assaultStart = c.living;
-      assaulting = c.living > assaultStart * 0.45;
+    } else if (o.type === 'killQueen' && rival && rival.alive) {
+      // go when the army is big enough (or, after 20 min of the stage, at the army size alone); fall back below 45 %
+      // of the army it set out with and rebuild to at least that size before going again, as a player would
+      if (assaulting) {
+        assaulting = c.living > assaultStart * 0.45;
+        if (!assaulting) (pushing = false), (gatherT = 0);
+      } else if (c.living >= Math.max(ARMY, rival.living * 1.5, regroupTo) || (m.t > 1200 && c.living >= Math.max(ARMY, regroupTo))) {
+        assaulting = true;
+        assaultStart = c.living;
+        regroupTo = Math.round(assaultStart * 0.9);
+      }
+      if (!assaulting) continue;
       const q = w.antById.get(rival.queen);
       const inside = w.s.ants.some((a) => a.colony === c.id && a.space === nestSpace(rival.id) && a.state !== AS.Dead);
+      // as a player would: gather the army at a staging point short of the rival's hole first, then go in together
+      const hole = rival.entrances[0];
+      const home = c.entrances[0];
+      const dx = home.sx - hole.sx;
+      const dy = home.sy - hole.sy;
+      const dl = Math.hypot(dx, dy) || 1;
+      const stage = { x: hole.sx + (dx / dl) * 70, y: hole.sy + (dy / dl) * 70 };
+      if (!pushing && !inside) {
+        let near = 0;
+        let out = 0;
+        for (const a of w.s.ants)
+          if (a.colony === c.id && a.state !== AS.Dead && a.task === 'marker' && a.marker === ASSIST) {
+            out++;
+            if (a.space === SURFACE && Math.hypot(a.x - stage.x, a.y - stage.y) < 60) near++;
+          }
+        gatherT++;
+        // (checked every 5 s: go once most are there, or after a minute and a half of waiting)
+        if ((out && near >= out * 0.6) || gatherT > 18) pushing = true;
+      }
       if (q && inside) target = { space: q.space, x: q.x, y: q.y };
-      else target = { space: SURFACE, x: rival.entrances[0].sx, y: rival.entrances[0].sy };
+      else if (pushing) target = { space: SURFACE, x: hole.sx, y: hole.sy };
+      else target = { space: SURFACE, x: stage.x, y: stage.y };
     }
   }
   if (target) {

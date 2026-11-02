@@ -420,7 +420,17 @@ export class Menus {
       box.appendChild(el('h3', '', `Your colony: ${esc(sp.common)}`));
       box.appendChild(el('p', '', `<i>${esc(sp.scientific)}</i>. ${esc(sp.blurb)}${sp.id !== def.species ? ` (The mission was written for the ${esc(SPECIES[def.species].common.toLowerCase())}; any colony can play it.)` : ''}`));
       box.appendChild(el('h3', '', 'Medals'));
-      box.appendChild(el('p', '', `Finish within 25 minutes of game time for <b class="medal gold">gold</b>, 40 for <b class="medal silver">silver</b>; any finish earns <b class="medal bronze">bronze</b>.${best ? ` Your best: <b class="medal ${best.medal}">${best.medal}</b> in ${fmtTime(best.time)}.` : ''}`));
+      const md = def.story?.medals;
+      if (md)
+        // a story level's three medals (sim/story/runner.ts storyMedals)
+        box.appendChild(
+          el(
+            'p',
+            '',
+            `<b>Time:</b> <b class="medal gold">gold</b> within ${Math.round(md.time[0] / 60)} minutes, <b class="medal silver">silver</b> within ${Math.round(md.time[1] / 60)}. <b>Losses:</b> gold at ${md.losses[0]} ants lost or fewer, silver at ${md.losses[1]}. <b>Bonus:</b> ${esc(md.bonus.text)}.`,
+          ),
+        );
+      else box.appendChild(el('p', '', `Finish within 25 minutes of game time for <b class="medal gold">gold</b>, 40 for <b class="medal silver">silver</b>; any finish earns <b class="medal bronze">bronze</b>.${best ? ` Your best: <b class="medal ${best.medal}">${best.medal}</b> in ${fmtTime(best.time)}.` : ''}`));
       const r = el('div', 'row');
       r.append(button('go-btn', 'Begin', 'Start the mission', () => this.close()));
       box.appendChild(r);
