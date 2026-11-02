@@ -149,11 +149,20 @@ export class Toasts {
   root = el('div', 'toasts');
   private last = new Map<string, number>();
 
-  push(text: string, kind = 'info', key = text): void {
+  /** `onClick`: the toast is a button (e.g. "click to look": the camera jumps to it) */
+  push(text: string, kind = 'info', key = text, onClick?: () => void): void {
     const now = performance.now();
     if ((this.last.get(key) ?? -1e9) > now - 4000) return;
     this.last.set(key, now);
     const m = el('div', 'toast ' + kind, text);
+    if (onClick) {
+      m.style.pointerEvents = 'auto';
+      m.style.cursor = 'pointer';
+      m.addEventListener('click', () => {
+        onClick();
+        m.remove();
+      });
+    }
     this.root.appendChild(m);
     window.setTimeout(() => m.classList.add('fade'), 5000);
     window.setTimeout(() => m.remove(), 5900);

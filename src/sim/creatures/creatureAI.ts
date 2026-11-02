@@ -1,3 +1,4 @@
+import { titanRaidTick } from './titanDig';
 import { World } from '../world';
 import { tauntOf } from '../casteAbilities';
 import { HF_CREATURE } from '../../world/surfaceLayout';
@@ -53,6 +54,8 @@ export const CS = {
   Strike: 18,
   /** stag beetle: ants clamped in its antlers, lifted (render: head and forebody raised) */
   Lift: 19,
+  /** a titan digging a nest's hole wider (titanDig.ts; render: its digging style) */
+  Dig: 20,
 } as const;
 
 const TAU = Math.PI * 2;
@@ -98,7 +101,7 @@ function faceAnt(cr: Creature, a: Ant, dt: number, rate: number): void {
   turnCreature(cr, datan2(dy, dx), dt, rate);
 }
 
-function setState(cr: Creature, s: number): void {
+export function setState(cr: Creature, s: number): void {
   if (cr.state === s) return;
   cr.state = s;
   cr.st = 0;
@@ -157,7 +160,7 @@ function holdMul(cr: Creature, k: CreatureKind): number {
 
 /** Turn toward a point and walk; returns the remaining distance. */
 const routeTmp = { x: 0, y: 0 }; // det-ok: scratch vector, overwritten before every read
-function walkTo(w: World, cr: Creature, k: CreatureKind, tx: number, ty: number, speedMul: number, dt: number, turnRate = 5): number {
+export function walkTo(w: World, cr: Creature, k: CreatureKind, tx: number, ty: number, speedMul: number, dt: number, turnRate = 5): number {
   const dx = tx - cr.x;
   const dy = ty - cr.y;
   const d = dhypot(dx, dy);
@@ -202,7 +205,7 @@ function walkTo(w: World, cr: Creature, k: CreatureKind, tx: number, ty: number,
 }
 
 /** Live ants within r of a point in the creature's space; the best by score (lower is better). */
-function pickAnt(w: World, cr: Creature, x: number, y: number, r: number, score?: (a: Ant, d2: number) => number): Ant | null {
+export function pickAnt(w: World, cr: Creature, x: number, y: number, r: number, score?: (a: Ant, d2: number) => number): Ant | null {
   // taunted by a leafcutter major (casteAbilities.ts): that one
   const tn = tauntOf(w, cr);
   if (tn && !riding(tn)) return tn;
@@ -244,7 +247,7 @@ function antsIn(w: World, cr: Creature, x: number, y: number, r: number, cone?: 
   return out;
 }
 
-function bite(w: World, cr: Creature, k: CreatureKind, a: Ant, mul = 1): void {
+export function bite(w: World, cr: Creature, k: CreatureKind, a: Ant, mul = 1): void {
   // (a battle-arena creature's level multiplies its bite: data.power)
   damageAnt(w, a, k.bite * mul * (cr.data.power ?? 1), 'bite', cr);
   if (k.venom) applyVenom(w, a, k.venom.dps, k.venom.duration, k.venom.maxStacks);
@@ -482,7 +485,7 @@ export function creatureAttacking(cr: Creature): boolean {
 // ---------------------------------------------------------------------------
 
 const RD = BALANCE.creatureReachDefault;
-function reachOf(k: CreatureKind): { r: number; arc: number } {
+export function reachOf(k: CreatureKind): { r: number; arc: number } {
   return BALANCE.creatureReach[k.id] ?? RD;
 }
 
@@ -508,7 +511,7 @@ export function inStrike(cr: Creature, k: CreatureKind, a: Ant, slack = 1): bool
 const RX = BALANCE.creatureReachDefault;
 
 /** From its centre to the front of its body outline (mm). */
-function frontR(cr: Creature): number {
+export function frontR(cr: Creature): number {
   const b = creatureBody(cr);
   return b.hl + b.r;
 }
@@ -1890,8 +1893,11 @@ export function creatureSystem(w: World, dt: number): void {
         continue;
       }
     }
-    // story levels: a creature the director plays walks its cue (sim/story/director.ts); else its own program
-    if (cr.data.dirA !== undefined && directCreature(w, cr, dt)) {
+    // a titan digging into a nest (titanDig.ts) — before the director: a story's digInto cue hands it over
+    if ((cr.data.raid ?? 0) > 0 && titanRaidTick(w, cr, k, dt)) {
+      // (the raid moved it)
+    } else if (cr.data.dirA !== undefined && directCreature(w, cr, dt)) {
+      // story levels: a creature the director plays walks its cue (sim/story/director.ts); else its own program
       // (the director moved it)
     } else if (!arenaCreature(w, cr, k, dt)) PROGRAMS[k.ai]?.(w, cr, cr.faction >= 0 && stanceOf(w, cr.faction) >= 0 ? arenaKind(k) : k, dt);
     // long bodies turn by curving, at most maxTurn rad/s (every path: walking, facing, snapping round)

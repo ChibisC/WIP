@@ -55,6 +55,13 @@ export interface CreatureKind {
   fleeAt: number;
   boss?: boolean;
   /**
+   * Titans that dig into nests (claude/creatures/01-spec-digging-titans.md): `speed` × the hole's difficulty sets how long
+   * it takes to dig a surface hole wide enough (BALANCE.titanDig.holeWork ÷ speed seconds); `style` picks the animation
+   * (rake: fangs and front legs rake soil out; squeeze: pushes and wriggles through; bulldoze: head and mandibles shove).
+   * Absent or `can: false`: it never enters a nest.
+   */
+  dig?: { can: boolean; speed: number; style: 'rake' | 'squeeze' | 'bulldoze' };
+  /**
    * The fastest it can turn (rad/s), whatever it is doing. Long chain bodies (centipedes, caterpillars)
    * turn by curving round, not by spinning on the spot: without a limit they swung round in a few ticks
    * and their drawn bodies looped into knots (user report 2026-10-25: the "dislocated neck").
@@ -288,6 +295,7 @@ export const CREATURES: Record<string, CreatureKind> = {
     mass: 300,
     fleeAt: 0,
     boss: true,
+    dig: { can: true, speed: 0.6, style: 'bulldoze' }, // shoves with its head and mandibles: slow
     wild: 0,
     ai: 'stag',
     facts: ['Male stag beetles use their antler mandibles to wrestle and throw rivals off branches.', 'Stag beetle larvae spend 3 to 7 years underground feeding on decaying wood.', 'Adult stag beetles live only a few weeks and feed mostly on sap.'],
@@ -311,6 +319,7 @@ export const CREATURES: Record<string, CreatureKind> = {
     mass: 250,
     fleeAt: 0,
     boss: true,
+    dig: { can: true, speed: 1.6, style: 'rake' }, // a burrower: fangs and front legs rake the soil out
     wild: 0,
     ai: 'tarantula',
     facts: ['New World tarantulas defend themselves by flicking barbed urticating hairs from their abdomen.', 'Female red-knee tarantulas can live 25 to 30 years.', "Tarantulas' fangs strike downward, not pinching sideways like most spiders."],
@@ -334,6 +343,7 @@ export const CREATURES: Record<string, CreatureKind> = {
     mass: 200,
     fleeAt: 0,
     boss: true,
+    dig: { can: true, speed: 1.0, style: 'squeeze' }, // squeezes and pushes through
     wild: 0,
     maxTurn: 1.8,
     ai: 'scolopendra',
@@ -357,6 +367,7 @@ export const CREATURES: Record<string, CreatureKind> = {
     mass: 220,
     fleeAt: 0,
     boss: true,
+    dig: { can: false, speed: 0, style: 'rake' }, // mantises don't burrow
     wild: 0,
     ai: 'giantMantis',
     facts: ['Large mantises are known to catch small birds and lizards, though this is rare.', 'Hierodula are called giant Asian mantises and are among the bulkiest mantis species.'],
@@ -380,6 +391,7 @@ export const CREATURES: Record<string, CreatureKind> = {
     mass: 160,
     fleeAt: 0,
     boss: true,
+    dig: { can: true, speed: 1.5, style: 'rake' }, // a burrowing wolf spider: rakes the soil out
     wild: 0,
     ai: 'hogna',
     facts: ['Mother wolf spiders carry their spiderlings on their backs for about a week after hatching.', 'Hogna carolinensis is the largest wolf spider in North America.'],

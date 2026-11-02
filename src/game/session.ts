@@ -291,6 +291,18 @@ export class GameSession {
           if (!this.net) this.loop.hitStop(big ? 0.05 : 0.033);
         }
       }
+      // a titan digging into a nest: a low rumble as it closes in (the warning), the ground jolting as it digs and as the
+      // soil breaks round it underground — scaled by how close the camera is
+      if (e.t === 'titanDig') {
+        const surf = this.view.space === 'surface';
+        if (e.phase === 'warn' && e.colony === this.player.id && surf) this.view.surfaceRig.shake = Math.max(this.view.surfaceRig.shake, 0.35 * shakeK);
+        else if ((e.phase === 'dig' || e.phase === 'breach') && surf) {
+          const rig = this.view.surfaceRig;
+          const zoomK = Math.min(1, 420 / Math.max(1, rig.distance));
+          if (Math.hypot(rig.target.x - e.x, rig.target.z - e.y) < rig.distance * 1.5) rig.shake = Math.max(rig.shake, (e.phase === 'breach' ? 0.5 : 0.18) * zoomK * shakeK);
+        }
+        if (e.phase === 'enter' || e.phase === 'breach') this.alert(e.space);
+      }
       if (e.t === 'story' && e.what === 'shot' && e.shot) this.playShot(e.shot);
       if (e.t === 'message' && e.colony !== undefined && e.colony !== this.player.id) return; // another player's message
       this.onEvent?.(e);

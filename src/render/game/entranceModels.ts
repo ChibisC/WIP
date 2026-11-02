@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { World } from '../../sim/world';
 import { Colony, Entrance } from '../../sim/types';
 import { anthillCentre, refuseSpot } from '../../sim/entrances';
+import { TITAN_DIG } from '../../sim/balance';
 import { SpeciesId } from '../../sim/species';
 import { Rng, valueNoise2 } from '../../core/rng';
 import { patchDapple } from '../shaderPatch';
@@ -221,7 +222,7 @@ export class SurfaceEntrances {
       const dug = g ? g.dugHexCount() : 30;
       const size = Math.round(Math.min(0.8, Math.max(0, (dug - 30) / 120)) * 10) / 10;
       const living = Math.round(Math.min(1, Math.sqrt(Math.max(0, c.living)) / 18) * 5) / 5;
-      const sig = `${look}|${size}|${living}|${c.entrances.map((e) => `${e.sx.toFixed(1)},${e.sy.toFixed(1)},${Math.round((e.fall ?? 0) * 4)}`).join(';')}`;
+      const sig = `${look}|${size}|${living}|${c.entrances.map((e) => `${e.sx.toFixed(1)},${e.sy.toFixed(1)},${Math.round((e.fall ?? 0) * 4)},${(e.breach ?? 0) ? Math.round((1 - (e.repair ?? 0)) * 6) : 'n'}`).join(';')}`;
       const old = this.built.get(key);
       if (old && old.sig === sig) continue;
       if (old) this.dispose(old);
@@ -367,9 +368,11 @@ export class SurfaceEntrances {
     // ---- each hole: its rim, opening and loose details (the three alike: one anthill)
     c.entrances.forEach((e, i) => {
       const k = Math.min(1.35, s);
-      const hr = HOLE[look];
+      // a titan's breach (sim/creatures/titanDig.ts): a wide, raw crater, shrinking back as the colony repairs it
+      const br = (e.breach ?? 0) ? 1 - (e.repair ?? 0) : 0;
+      const hr = HOLE[look] + (TITAN_DIG.breachHoleMm - HOLE[look]) * br;
       const seed = c.id * 31 + i * 7 + 1;
-      const rim = rimFor(look, hr, k, seed, true);
+      const rim = br > 0 ? { holeR: hr, rimR: hr * 1.9, rimH: (1.2 + 3.5 * br) * k, outR: hr * 4.2, wob: 1.3, seed } : rimFor(look, hr, k, seed, true);
       const hole: Hole = { x: e.sx, y: e.sy, look, rim, plug: 0, fall: e.fall ?? 0 };
       b.holes.push(hole);
       const apron = apronMesh(hole, under, PAL[look]);

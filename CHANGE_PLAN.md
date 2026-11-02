@@ -821,3 +821,24 @@ feature branches into this branch (combine both sides; never drop another agent'
 replaced (keep save migrations), run `npm ci`, `npm test`, the determinism check and the build, regenerate the
 height and climb data, re-baseline only the hell ant hashes, merge into `main`, push, and write a handoff update
 (what was merged, how conflicts were resolved, what was removed). Merge `origin/main` in along the way whenever it moves.
+
+## 23. Titans dig into nests (user spec 2026-11-02, claude/creatures/01-spec-digging-titans.md)
+Survey: creatures already live in any space (`cr.space`; the renderer, health bars and effects draw by space; ants find
+creature targets underground through `w.s.creatures`; `invasionCheck` counts creatures in a nest as intruders, and the
+war AI defends against hostile creatures at the holes or inside). Nest ground is the fine raster (soil types, 255 stone)
+with a hex layer; cells only go solid → air, logged for the flow fields. Holes are `Colony.entrances` (three per anthill,
+one flower underground).
+Plan, as built:
+1. Data: `CreatureKind.dig` per titan; `TITAN_DIG` in balance.ts (hole work, stagger, set-back, give-up, underground
+   speed, break margin, flee, stay, repair, raids, warning, breach look).
+2. Sim (`sim/creatures/titanDig.ts`): a raid state on the creature (`data.raid/rph/rhole/rprog/rstag/rhp/rin/…`) and on
+   the entrance (`breach`, `breachBy`, `repair`; optional, so old saves load as before); `titanRaidTick` before the
+   director and the creature programs; `titanRaidSystem` once a second (repairs, skirmish raids). `NestGrid.breakHex`
+   opens a hex, stone included. Riders change space with the titan.
+3. Story: cue `digInto` (a rival's key or 'player', a hole) and action `endRaid` (dawn).
+4. Client: event `titanDig` (warn, dig, breach, enter, break, leave): clickable warning toast (jumps the camera), area
+   alert, rumble and digging shake, soil spray and clods (`combatFx`), sounds; the breach crater (`entranceModels`); each
+   style's digging pose (`builders.digPose`).
+5. Lobby: "Titans raid nests" (menu and multiplayer lobby, `settings.titanRaids`), protocol `ud-mp-8`.
+6. Tests `tests/titans.ts`; clips `tests/browser/titan_dig.py`.
+Not done here: the ally brain's titan danger (on `feature/ai-allies`, not in `main` yet — noted for that work).

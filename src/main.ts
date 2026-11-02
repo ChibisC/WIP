@@ -136,9 +136,10 @@ function startGame(): void {
         caves,
         food: 1.2,
         // floods only on an authored map, and only when the player turned them on (off by default)
-        settings: { creatures: q.get('creatures') ? Number(q.get('creatures')) : 1, ...((c.floods || q.get('floods')) && c.map && !mission ? { floods: true } : {}) },
+        settings: { creatures: q.get('creatures') ? Number(q.get('creatures')) : 1, ...((c.floods || q.get('floods')) && c.map && !mission ? { floods: true } : {}), ...(c.titanRaids === false || q.get('titans') === '0' ? { titanRaids: false } : {}) },
         mission: mission?.id,
         sandbox: c.mode === 'sandbox',
+        ...(q.get('titanRaid') ? { devTitanRaid: q.get('titanRaid')! } : {}),
         ...(c.map && !mission ? { map: c.map, siteSet: q.get('sites') ? Number(q.get('sites')) : undefined } : {}),
       };
       if (!q.get('play')) updateSettings({ quality: c.quality });

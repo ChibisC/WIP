@@ -1,3 +1,4 @@
+import { creatureKind } from '../sim/creatures/kinds';
 import './theme.css';
 import { GameSession } from '../game/session';
 import { SimEvent } from '../core/events';
@@ -225,6 +226,12 @@ export class GameUI {
     if (e.t === 'message' && e.kind === 'narrator') this.say(e.text, !!e.key);
     else if (e.t === 'message') this.toasts.push(e.text, e.kind === 'researcher' ? 'info' : e.kind);
     else if (e.t === 'queenHurt' && e.colony === pid) this.toasts.push('The queen is under attack!', 'warn', 'queen');
+    // a titan digging toward the nest (sim/creatures/titanDig.ts): click to look
+    else if (e.t === 'titanDig' && e.colony === pid && (e.phase === 'warn' || e.phase === 'breach')) {
+      const name = creatureKind(e.kind)?.name.toLowerCase() ?? 'titan';
+      const text = e.phase === 'warn' ? `${/^[aeiou]/.test(name) ? 'An' : 'A'} ${name} is digging toward your nest! Click to look.` : `The ${name} has broken into the nest!`;
+      this.toasts.push(text, 'warn', `titan:${e.phase}`, () => this.s.jumpTo(e.phase === 'warn' ? 'surface' : 'nest', e.x, e.y, e.phase === 'warn' ? undefined : e.space));
+    }
     else if (e.t === 'invasion' && e.colony === pid) this.toasts.push('Intruders in the nest!', 'warn', 'invasion');
     else if (e.t === 'colonyLost' && e.colony === pid) this.toasts.push('Your queen has died. The colony is lost.', 'warn');
     else if (e.t === 'colonyLost') {
