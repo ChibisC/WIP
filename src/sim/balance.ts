@@ -1069,3 +1069,32 @@ export const LAYERS = {
   /** optional damage bonus for fighting from higher ground (off: EotU has none) */
   highGroundBonus: 0,
 };
+
+/**
+ * Story mode (claude/story/02-spec; sim/story, docs/story/DESIGN-STORY.md). Difficulty multipliers (every one here):
+ * `enemyStat` scales enemy ants' and creatures' health and damage (`settings.enemyStatMul`), `wave` the size of
+ * scripted attack waves, `aggression` the rival AI's raid margin and the war AI (`settings.aggression`), `food` the
+ * player's starting food, `rival` the rival colonies' head start (developed nest and starting workers).
+ */
+export const STORY = {
+  difficulty: {
+    easy: { enemyStat: 0.75, wave: 0.6, aggression: 0.6, food: 1.6, rival: 0.7 },
+    normal: { enemyStat: 1, wave: 1, aggression: 1, food: 1, rival: 1 },
+    hard: { enemyStat: 1.2, wave: 1.35, aggression: 1.3, food: 0.85, rival: 1.25 },
+    brutal: { enemyStat: 1.4, wave: 1.7, aggression: 1.6, food: 0.7, rival: 1.5 },
+  },
+  /** stolen-caste slots: one to start, one more per boss beaten (later chapters) */
+  slots: { start: 1, perBoss: 1 },
+  /** seconds before a cue that waits on the world gives up and the scene moves on */
+  cueTimeout: 60,
+  /** how near (mm) counts as arrived for a walking cue */
+  arriveMm: 5,
+  /** a group cue is done when this share of its living members have done it */
+  groupDone: 0.8,
+  /** members of a walking group spread round the point (mm per member, a loose cluster) */
+  spread: 4,
+  /** a wave is beaten when this share of it is dead or gone (or it has been back home) */
+  waveBeaten: 0.8,
+  /** a guarding actor chases what came within its radius at most this far beyond it (mm) */
+  guardLeash: 40,
+};

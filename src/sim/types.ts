@@ -204,6 +204,15 @@ export interface Ant {
   cd: number;
   /** special ability cooldown (acid) */
   cd2: number;
+  /**
+   * Story director (sim/story/director.ts): the actor this ant plays (its index in the level's cast; absent when it
+   * is not directed), its place along a path (`dirW`, loops `dirL`) and a wander goal (`dirX`, `dirY`).
+   */
+  dirA?: number;
+  dirW?: number;
+  dirL?: number;
+  dirX?: number;
+  dirY?: number;
   /** marker index 0..4 the ant's group is out at, −1 = home */
   marker: number;
   /** nest entrance index used */

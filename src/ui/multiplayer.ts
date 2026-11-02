@@ -39,13 +39,14 @@ export interface TitleSaves {
 }
 
 /** The first screen: Continue (the newest save), single-player or multiplayer, load a game, watch a replay. */
-export function showTitle(parent: HTMLElement, single: () => void, multi: () => void, replay?: (bytes: Uint8Array) => void, saves?: TitleSaves): void {
+export function showTitle(parent: HTMLElement, single: () => void, multi: () => void, replay?: (bytes: Uint8Array) => void, saves?: TitleSaves, story?: () => void): void {
   const root = screen(
     parent,
     `<h1>UNDERGROUND DOMINION</h1>
      <p class="tag">An ant colony strategy game rooted in real biology</p>
      <div class="continue-row"></div>
      <div class="title-modes">
+       ${story ? '<button class="mode-card story" data-m="story"><b>Story</b><p>The Gene-Thief: a castaway queen on Wayfarer Island steals the weapons of every species she meets. Chapter 1.</p></button>' : ''}
        <button class="mode-card" data-m="single"><b>Single-player</b><p>Missions, skirmish against AI colonies, and the sandbox. Your own pace: pause and speed up any time.</p></button>
        <button class="mode-card" data-m="multi"><b>Multiplayer</b><p>2–4 players and AI colonies on one map. Create a game and send the invite link. Last queen standing wins. The match runs at 1× and cannot be paused.</p></button>
      </div>
@@ -102,6 +103,10 @@ export function showTitle(parent: HTMLElement, single: () => void, multi: () => 
     if (b.dataset.m === 'continue' && saves && list[0]) {
       root.remove();
       return saves.slot(list[0].slot);
+    }
+    if (b.dataset.m === 'story' && story) {
+      root.remove();
+      return story();
     }
     if (b.dataset.m !== 'single' && b.dataset.m !== 'multi') return;
     root.remove();

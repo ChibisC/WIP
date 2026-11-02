@@ -34,7 +34,7 @@ import { LocalSim, SimHost, WorkerSim } from './simHost';
 import { AutoQuality } from './autoQuality';
 import type { NetGame } from '../net/netGame';
 import { matchWinner } from '../net/match';
-import { MISSIONS, missionOf } from '../sim/missions';
+import { MISSIONS, missionDef, missionOf } from '../sim/missions';
 import { restoreWorld } from '../sim/snapshot';
 import { commandsByTick, encodeReplay } from './replay';
 import { SaveHeader, SaveRecord, SaveSlot, encodeSave, putSave } from './saves';
@@ -45,6 +45,8 @@ import { TeamRings } from '../render/game/teamRings';
 import { HealthBars } from '../render/game/healthBars';
 import { arenaOf } from '../sim/arenaState';
 import { TEAM_NAMES } from '../sim/arena';
+import { Cinematic } from './cinematic';
+import type { StoryShotData } from '../core/events';
 
 export { casteTint };
 
@@ -282,6 +284,7 @@ export class GameSession {
           if (!this.net) this.loop.hitStop(big ? 0.05 : 0.033);
         }
       }
+      if (e.t === 'story' && e.what === 'shot' && e.shot) this.playShot(e.shot);
       if (e.t === 'message' && e.colony !== undefined && e.colony !== this.player.id) return; // another player's message
       this.onEvent?.(e);
     });
@@ -928,7 +931,7 @@ export class GameSession {
     const c = this.player;
     const m = missionOf(this.world);
     if (m) {
-      const def = MISSIONS[m.id];
+      const def = missionDef(m.id);
       const st = def.stages[m.stage];
       const stage = m.result === 'won' ? 'Complete' : m.result === 'lost' ? 'Failed' : st ? `Stage ${m.stage + 1} of ${def.stages.length}: ${st.name}` : '';
       return { title: def.title, brief: def.brief, stage, goals: m.goals };
@@ -1002,7 +1005,7 @@ export class GameSession {
     const m = missionOf(w);
     const c = this.player;
     const mode: SaveHeader['mode'] = m ? 'mission' : this.sandbox ? 'sandbox' : this.arena ? 'arena' : w.s.colonies.some((o) => o.team !== c.team) ? 'skirmish' : 'game';
-    const title = m ? MISSIONS[m.id].title : mode === 'sandbox' ? 'Sandbox' : mode === 'arena' ? 'Battle Arena' : mode === 'skirmish' ? 'Skirmish' : 'Free play';
+    const title = m ? missionDef(m.id).title : mode === 'sandbox' ? 'Sandbox' : mode === 'arena' ? 'Battle Arena' : mode === 'skirmish' ? 'Skirmish' : 'Free play';
     const map = w.terrain.map?.name;
     return { build, title, mode, mission: m?.id, ...(map ? { map } : {}), local: c.id, species: c.species, colonyName: c.name, ants: c.living, time: w.s.time, tick: w.s.tick, date: new Date().toISOString() };
   }
@@ -1548,9 +1551,84 @@ export class GameSession {
     const px = (vh * 0.5) / Math.tan(THREE.MathUtils.degToRad((cam as THREE.PerspectiveCamera).fov) * 0.5);
     this.surfFx.update(simDt, this.surfHeight, px);
     for (const nv of this.nests.values()) nv.fx.update(simDt, (x, y) => nv.stage.terrain.heightAt(x, y), px);
-    v.frame(realDt);
+    // a story shot steers the surface camera (input waits until it is over or skipped)
+    let cineOn = false;
+    if (this.cine) {
+      cineOn = this.cine.update(realDt);
+      if (!cineOn) this.cine = null;
+    }
+    v.frame(realDt, !cineOn);
     this.autoQuality.update(v, realDt);
     this.onFrame?.();
+  }
+
+  // ---------------------------------------------------------------- story mode (sim/story; claude/story/02-spec)
+
+  /** The in-engine shot playing (letterbox, camera flight), or null. Client-side only. */
+  cine: Cinematic | null = null;
+  /** dev and screenshots (?nocine=1): story shots are not played */
+  noShots = false;
+
+  /** Play a story shot (from the simulation's `story` event); shots never pull a player out of a nest view. */
+  playShot(shot: StoryShotData): void {
+    if (this.noShots || this.net || this.view.space !== 'surface' || this.view.observing) return;
+    if (this.cine) this.cine.finish();
+    const c = new Cinematic(shot, this.world, this.view.surfaceRig);
+    this.cine = c.done ? null : c;
+  }
+
+  skipShot(): void {
+    this.cine?.finish();
+    this.cine = null;
+  }
+
+  /**
+   * A small picture of one of the player's ants of `caste` (the field journal's photograph): a close camera on it,
+   * one render to the canvas, read back as a JPEG data URL. Surface ants only (their instances are current while
+   * the surface is shown); undefined when there is none to photograph.
+   */
+  portrait(caste: string): string | undefined {
+    const w = this.world;
+    const v = this.view;
+    if (v.space !== 'surface') return undefined;
+    const t = w.terrain;
+    let best: { x: number; y: number; h: number } | undefined;
+    let bd = Infinity;
+    for (const a of w.s.ants) {
+      if (a.colony !== this.player.id || a.caste !== caste || a.space !== SURFACE || a.state === AS.Dead) continue;
+      const d = (a.x - v.surfaceRig.target.x) ** 2 + (a.y - v.surfaceRig.target.z) ** 2;
+      if (d < bd) {
+        bd = d;
+        best = a;
+      }
+    }
+    if (!best) return undefined;
+    const L = CASTES[caste]?.length ?? 5;
+    const cam = new THREE.PerspectiveCamera(30, 3 / 2, 0.2, 4000);
+    const gy = t.walkHeight(Math.min(Math.max(best.x, 0), t.width), Math.min(Math.max(best.y, 0), t.depth));
+    const ang = best.h + 2.3;
+    cam.position.set(best.x + Math.cos(ang) * L * 4.2, gy + L * 1.9, best.y + Math.sin(ang) * L * 4.2);
+    cam.lookAt(best.x, gy + L * 0.25, best.y);
+    try {
+      const r = v.renderer;
+      const size = r.getSize(new THREE.Vector2());
+      cam.aspect = size.x / size.y;
+      cam.updateProjectionMatrix();
+      r.setRenderTarget(null);
+      r.render(v.surfaceScene, cam);
+      const src = r.domElement;
+      const out = document.createElement('canvas');
+      out.width = 360;
+      out.height = 240;
+      const g = out.getContext('2d')!;
+      // the middle 3:2 of the canvas
+      const sw = Math.min(src.width, (src.height * 3) / 2);
+      const sh = (sw * 2) / 3;
+      g.drawImage(src, (src.width - sw) / 2, (src.height - sh) / 2, sw, sh, 0, 0, 360, 240);
+      return out.toDataURL('image/jpeg', 0.82);
+    } catch {
+      return undefined;
+    }
   }
 }
 
