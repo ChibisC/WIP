@@ -4,6 +4,7 @@ import { HEX_GROUND, HEX_WALL, HEX_WATER, HF_LAIR, HF_SHORE, SurfaceLayout } fro
 import { Terrain, mapTerrainParams } from './terrain';
 import { LAYERS } from '../sim/balance';
 import { RAMP_SIDE, nearestOnPath, rampLevels } from './layers';
+import { datan, dhypot } from '../sim/dmath';
 
 /** The hard rules for every site (brief §3; docs/maps/design.md §4). */
 export const SITE_RULES = {
@@ -231,7 +232,7 @@ function layerChecks(
     nearestOnPath(r.path, r.path[0][0], r.path[0][1], np);
     const len = (() => {
       let l = 0;
-      for (let k = 1; k < r.path.length; k++) l += Math.hypot(r.path[k][0] - r.path[k - 1][0], r.path[k][1] - r.path[k - 1][1]);
+      for (let k = 1; k < r.path.length; k++) l += dhypot(r.path[k][0] - r.path[k - 1][0], r.path[k][1] - r.path[k - 1][1]);
       return l;
     })();
     let worst = 0;
@@ -239,7 +240,7 @@ function layerChecks(
     const at = (s: number): [number, number] => {
       let acc = 0;
       for (let k = 1; k < r.path.length; k++) {
-        const l = Math.hypot(r.path[k][0] - r.path[k - 1][0], r.path[k][1] - r.path[k - 1][1]);
+        const l = dhypot(r.path[k][0] - r.path[k - 1][0], r.path[k][1] - r.path[k - 1][1]);
         if (acc + l >= s || k === r.path.length - 1) {
           const u = l > 0 ? Math.min(1, Math.max(0, (s - acc) / l)) : 0;
           return [r.path[k - 1][0] + (r.path[k][0] - r.path[k - 1][0]) * u, r.path[k - 1][1] + (r.path[k][1] - r.path[k - 1][1]) * u];
@@ -254,9 +255,9 @@ function layerChecks(
       worst = Math.max(worst, Math.abs(t.heightAt(x1, y1) - t.heightAt(x0, y0)) / 4);
       if (!t.passable(x0, y0)) blocked++;
     }
-    if (worst > LAYERS.rampMaxSlope) problems.push(`ramp ${i}: ${(Math.atan(worst) * 57.3).toFixed(0)}° at its steepest (max ${(Math.atan(LAYERS.rampMaxSlope) * 57.3).toFixed(0)}°)`);
+    if (worst > LAYERS.rampMaxSlope) problems.push(`ramp ${i}: ${(datan(worst) * 57.3).toFixed(0)}° at its steepest (max ${(datan(LAYERS.rampMaxSlope) * 57.3).toFixed(0)}°)`);
     if (blocked) problems.push(`ramp ${i}: ${blocked} points of its centre line are blocked`);
-    info.push(`  ramp ${i} (${r.style}): level ${la} → ${lb}, ${len.toFixed(0)} mm long, ${r.width} mm wide, steepest ${(Math.atan(worst) * 57.3).toFixed(0)}°`);
+    info.push(`  ramp ${i} (${r.style}): level ${la} → ${lb}, ${len.toFixed(0)} mm long, ${r.width} mm wide, steepest ${(datan(worst) * 57.3).toFixed(0)}°`);
   });
   // every layer's top reachable from the first site, dry and in each flood
   const s0 = t.layout!.sites[0];

@@ -207,12 +207,12 @@ export class Terrain {
     }
     // Flatten a rim so the playable edge reads cleanly.
     for (const op of p.sculpt) this.applySculpt(op, false);
-    if (map) this.shapeMap(map);
-    // layered ground: the banks and ramp sides too steep to walk, once every height is final (world/layers.ts)
-    if (this.layers) cliffs(this.layers, this, this.heights);
     // authored maps: their pebbles, twigs, fungi and ferns are placed from the map id (world/mapScatter.ts) once the
     // walls, walkways and water are in, and block like the props of a generated map (grass and leaves stay render-only)
+    if (map) this.shapeMap(map);
     else this.placeProps(rng);
+    // layered ground: the banks and ramp sides too steep to walk, once every height is final (world/layers.ts)
+    if (this.layers) cliffs(this.layers, this, this.heights);
     this.rebuildOverlay();
     this.rebuildWater();
     if (map) this.mapObs = mapObstacles(this, map);
