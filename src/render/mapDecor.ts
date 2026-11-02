@@ -376,7 +376,7 @@ export class MapDecor {
     // the layered ground's banks: roots, pebbles in the face, the spill at the foot, grass along the lip
     if (terrain.layers) {
       const bd = buildBankDressing(terrain, groundFields(terrain));
-      if (bd.mesh) this.group.add(bd.mesh);
+      for (const mesh of bd.meshes) this.group.add(mesh);
       this.clumps.push(...bd.clumps);
     }
   }

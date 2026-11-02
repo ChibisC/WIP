@@ -40,7 +40,7 @@ export const GL_COUNT = 16;
  * real millimetres, so a 1 mm crumb is 1 mm tall whatever the tile).
  */
 export const GL_TILE: number[] = [64, 64, 80, 48, 56, 40, 64, 64, 64, 56, 96, 56, 48, 64, 40, 56];
-export const GL_RELIEF: number[] = [3.0, 2.6, 1.6, 3.2, 2.8, 0.9, 4.5, 1.0, 1.2, 3.2, 3.5, 1.6, 1.4, 4.5, 0.9, 2.8];
+export const GL_RELIEF: number[] = [3.0, 2.6, 1.6, 3.2, 2.8, 0.9, 4.5, 1.0, 2.0, 3.2, 3.5, 1.6, 1.4, 4.5, 0.9, 2.8];
 
 export interface GroundMaps {
   a: THREE.Texture;
@@ -359,7 +359,7 @@ vec4 sward(vec2 u, bool dry) {
 vec4 sand(vec2 u, bool savanna) {
   float rip = sin((u.y * 4.0 + pf(u, 2.0, 3, 61.0) * 1.8) * 6.2832) * 0.5 + 0.5;
   float h = rip * 0.25 + pf(u, 6.0, 3, 62.0) * 0.12;
-  vec3 c = savanna ? vec3(0.58, 0.44, 0.32) : vec3(0.55, 0.49, 0.40);       // the shadowed spaces between grains
+  vec3 c = savanna ? vec3(0.56, 0.42, 0.30) : vec3(0.50, 0.44, 0.36);       // the shadowed spaces between grains
   Pt g = scatter(u, 110.0, 2, 0.9, 0.3, 0.6, 0.6, 0.15, 0.7, 63.0);          // 0.2–0.4 mm grains
   Pt g2 = scatter(u, 48.0, 1, 0.45, 0.3, 0.6, 0.6, 0.2, 0.7, 64.0);          // 0.4–0.8 mm
   gRough = 0.9;
@@ -369,11 +369,11 @@ vec4 sand(vec2 u, bool savanna) {
   if (hg > h) {
     h = hg;
     vec3 q = savanna ? vec3(0.80, 0.64, 0.47) : vec3(0.78, 0.71, 0.58);
-    if (id > 0.93) q = vec3(0.24, 0.22, 0.20);
+    if (id > 0.955) q = vec3(0.36, 0.33, 0.30);
     else if (id > 0.82) q = savanna ? vec3(0.72, 0.46, 0.30) : vec3(0.74, 0.60, 0.52);
     else if (id > 0.6) q = savanna ? vec3(0.86, 0.74, 0.58) : vec3(0.84, 0.79, 0.69);
     else if (id < 0.06) { q = vec3(0.86, 0.84, 0.78); gRough = 0.45; }
-    c = q * (0.88 + 0.2 * pn(u, 300.0, 65.0));
+    c = q * (0.84 + 0.24 * pn(u, 300.0, 65.0)) * (0.92 + 0.1 * pf(u, 12.0, 3, 66.0));
   }
   return vec4(c, h);
 }
@@ -421,22 +421,31 @@ vec4 mud(vec2 u) {
   return vec4(c, h);
 }
 
-// clay (cut faces): fine and smooth, laminations, mottles of grey and orange, a few shrinkage cracks
+// clay (cut faces): fine-grained and dense, broken into blocky peds by shrinkage cracks (vertical and level ones),
+// grey and rust mottles, a few faint laminations, crumbs fallen into the cracks; satin where smooth
 vec4 clay(vec2 u) {
-  vec2 w = warp(u, 3.0, 0.05, 91.0);
-  float lam = sin((w.y * 26.0 + pf(u, 3.0, 3, 92.0) * 2.0) * 6.2832) * 0.5 + 0.5;
+  vec2 w = warp(u, 3.0, 0.07, 91.0);
   float mot = pf(u, 5.0, 4, 93.0);
-  vec3 c = vec3(0.50, 0.36, 0.27);
-  c = mix(c, vec3(0.62, 0.42, 0.25), smoothstep(0.6, 0.78, mot) * 0.6);
-  c = mix(c, vec3(0.52, 0.49, 0.44), smoothstep(0.32, 0.18, mot) * 0.55);
-  c *= 0.92 + 0.1 * lam;
-  vec4 ck = pw(warp(u, 5.0, 0.08, 94.0), 5.0, 95.0, 0.9);
-  float crack = smoothstep(0.018, 0.0, ck.y - ck.x) * smoothstep(0.62, 0.74, pf(u, 3.0, 2, 96.0));
-  c *= 1.0 - crack * 0.5;
-  float grit = pf(u, 60.0, 3, 98.0);
-  c *= 0.93 + 0.12 * pn(u, 200.0, 97.0);
-  gRough = 0.68 + 0.14 * mot;
-  return vec4(c, 0.3 + lam * 0.04 + grit * 0.12 - crack * 0.35 + pf(u, 6.0, 4, 99.0) * 0.5);
+  float mot2 = pf(u + 0.31, 9.0, 3, 94.0);
+  vec3 c = vec3(0.47, 0.37, 0.29);
+  c = mix(c, vec3(0.56, 0.38, 0.24), smoothstep(0.62, 0.78, mot) * 0.55);       // rust mottles
+  c = mix(c, vec3(0.50, 0.48, 0.44), smoothstep(0.36, 0.2, mot2) * 0.5);       // grey (gleyed) mottles
+  float lam = pn(vec2(0.5, w.y), 18.0, 92.0);
+  c *= 0.95 + 0.06 * lam;
+  // blocky peds: a Worley on a grid stretched across (peds 6–12 mm), cracks between them
+  vec4 pd = pw(w, 7.0, 95.0, 0.75);
+  float crack = smoothstep(0.035, 0.0, pd.y - pd.x);
+  float ped = pd.z;
+  c *= 0.9 + 0.16 * ped;
+  float h = 0.9 + ped * 0.5 - crack * 0.9 + pf(u, 24.0, 3, 96.0) * 0.25;
+  // each ped's face slightly domed and rough
+  h += (1.0 - smoothstep(0.0, 0.6, pd.x)) * 0.3;
+  Pt cr = scatter(u, 30.0, 1, 0.3, 0.25, 0.5, 0.5, 0.4, 0.6, 97.0);
+  if (cr.h > 0.0 && cr.h + 0.5 > h) { h = cr.h + 0.5; c *= 0.95; }
+  c *= 1.0 - crack * 0.55;
+  c *= 0.94 + 0.1 * pn(u, 200.0, 98.0);
+  gRough = 0.66 + 0.18 * mot + crack * 0.2;
+  return vec4(c, h);
 }
 
 // bank faces (u across the face, v up it; the tile repeats every GL_TILE mm up the face): a broken earth face — clods
@@ -498,7 +507,8 @@ vec4 bankSand(vec2 u) {
   vec4 s = sand(u, false);
   vec2 w = warp(u, 3.0, 0.06, 131.0);
   float lam = sin((w.y * 14.0 + pf(u, 3.0, 3, 132.0) * 2.0) * 6.2832) * 0.5 + 0.5;
-  vec3 c = s.rgb * (0.86 + 0.18 * lam);
+  // a cut sand face is damper and darker than the dry surface, with more fines in it
+  vec3 c = s.rgb * vec3(0.8, 0.78, 0.74) * (0.86 + 0.18 * lam);
   float slump = smoothstep(0.55, 0.8, pf(u * vec2(1.0, 2.0), 5.0, 3, 133.0));
   c *= 1.0 - slump * 0.12;
   // a pebble band

@@ -606,6 +606,14 @@ GS groundShade() {
   W[0] = cw.x; Ls[0] = uChan.x; W[1] = cw.y; Ls[1] = uChan.y; W[2] = cw.z; Ls[2] = uChan.z; W[3] = cw.w; Ls[3] = uChan.w;
   W[4] = gravel; Ls[4] = ${GL.GRAVEL}.0; W[5] = mud; Ls[5] = ${GL.MUD}.0; W[6] = trail; Ls[6] = sandy > 0.45 ? uChan.z : ${GL.TRAIL}.0;  // a sand slide wears to packed sand
   W[7] = dampMoss * 0.8; Ls[7] = ${GL.MOSS}.0;
+  // ragged transitions: noise moves each layer's edge a few mm (no straight lines along the mesh's triangles)
+  vec4 tn = texture2D(tNoise, P.xz / 43.0 + 0.11) - 0.5;
+  vec4 tn2 = texture2D(tNoise, P.xz / 17.0 + 0.53) - 0.5;
+  for (int i = 0; i < 8; i++) {
+    float w = W[i];
+    float n = (i == 0 ? tn.r : i == 1 ? tn.g : i == 2 ? tn.b : i == 3 ? tn2.r : i == 4 ? tn2.g : i == 5 ? tn2.b : i == 6 ? tn.r - tn2.g : tn.b + tn2.r);
+    W[i] = clamp(w + n * 1.1 * w * (1.0 - w) * 2.0, 0.0, 1.0);
+  }
   // the three heaviest layers only (the rest are below the height blend's reach anyway)
   float wa = 0.02, wb = 0.02, wc = 0.02, wd = 0.0; float la = -1.0, lb = -1.0, lc = -1.0;
   for (int i = 0; i < 8; i++) {
@@ -721,6 +729,9 @@ GS groundShade() {
   float drift = 0.86 + macro * 0.22 + (macro2 - 0.5) * 0.14 + (macro3 - 0.5) * 0.08;
   alb *= drift; mean *= drift;
   alb = mix(alb, alb * vec3(1.04, 1.0, 0.94), smoothstep(0.4, 0.7, macro2) * 0.5);
+  // seen from far, the ground is a mosaic of damper and drier, barer and leafier patches
+  float far_ = smoothstep(300.0, 900.0, dCam);
+  alb *= 1.0 + (macro - 0.5) * 0.35 * far_ + (macro2 - 0.5) * 0.2 * far_;
   // detail fades toward the layer's mean with distance; at gameplay zoom the micro-contrast is calmed a little
   alb = mix(alb, mean, fade * 0.5 + read * 0.22);
 

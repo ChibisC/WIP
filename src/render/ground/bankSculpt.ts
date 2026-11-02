@@ -39,7 +39,7 @@ function fbm3(x: number, y: number, z: number): number {
   return vnoise3(x, y, z) * 0.55 + vnoise3(x * 2.1 + 7, y * 2.1, z * 2.1) * 0.3 + vnoise3(x * 4.3, y * 4.3 + 3, z * 4.3) * 0.15;
 }
 
-/** Catmull-Rom height at (x, y) mm from the terrain samples (smooth bank shapes). */
+/** Smooth (cubic B-spline) height at (x, y) mm from the terrain samples (smooth bank shapes). */
 function cubicHeight(t: Terrain, x: number, y: number): number {
   const fx = x / t.res;
   const fy = y / t.res;
@@ -48,7 +48,12 @@ function cubicHeight(t: Terrain, x: number, y: number): number {
   const u = fx - i;
   const v = fy - j;
   const H = (a: number, b: number) => t.heights[Math.min(t.ny - 1, Math.max(0, b)) * t.nx + Math.min(t.nx - 1, Math.max(0, a))];
-  const cr = (p0: number, p1: number, p2: number, p3: number, s: number) => 0.5 * (2 * p1 + (-p0 + p2) * s + (2 * p0 - 5 * p1 + 4 * p2 - p3) * s * s + (-p0 + 3 * p1 - 3 * p2 + p3) * s * s * s);
+  // a cubic B-spline: smooth and, unlike Catmull-Rom, never overshoots at the lip (no raised teeth along the edge)
+  const cr = (p0: number, p1: number, p2: number, p3: number, s: number) => {
+    const s2 = s * s;
+    const s3 = s2 * s;
+    return ((1 - s) ** 3 * p0 + (3 * s3 - 6 * s2 + 4) * p1 + (-3 * s3 + 3 * s2 + 3 * s + 1) * p2 + s3 * p3) / 6;
+  };
   const row = (b: number) => cr(H(i - 1, b), H(i, b), H(i + 1, b), H(i + 2, b), u);
   return cr(row(j - 1), row(j), row(j + 1), row(j + 2), v);
 }

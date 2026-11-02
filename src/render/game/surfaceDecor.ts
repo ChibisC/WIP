@@ -259,7 +259,7 @@ export class SurfaceDecor {
       this.p.set(pl.x, base, pl.y);
       this.s.set(0.9, height, 0.9);
       this.m.compose(this.p, this.q.identity(), this.s);
-      this.stems.add(this.m, this.c.setHSL(0.27, 0.4, 0.32, THREE.SRGBColorSpace));
+      this.stems.add(this.m, this.c.setHSL(0.2, 0.15, 0.82, THREE.SRGBColorSpace)); // (the stem's own colours tint it)
       const total = 9;
       const shown = Math.round(total * Math.max(0, pl.leaf / pl.max));
       for (let k = 0; k < total; k++) {
@@ -273,7 +273,8 @@ export class SurfaceDecor {
         this.q.setFromEuler(this.e);
         this.s.setScalar(len);
         this.m.compose(this.p, this.q, this.s);
-        this.leaves.add(this.m, this.c.setHSL(0.25 + rng.range(-0.02, 0.03), 0.5, 0.32 + rng.range(-0.05, 0.05), THREE.SRGBColorSpace));
+        // leaf greens as measured on real leaves in daylight: muted, a little yellow in the older (lower) leaves
+        this.leaves.add(this.m, this.c.setHSL(0.24 + rng.range(-0.025, 0.03) - (1 - k / total) * 0.02, 0.36, 0.28 + rng.range(-0.04, 0.04), THREE.SRGBColorSpace));
       }
     }
     for (const pool of [this.holes, this.spoil, this.aphids, this.stems, this.leaves, this.foodRings]) pool.end();

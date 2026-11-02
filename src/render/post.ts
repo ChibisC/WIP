@@ -153,8 +153,8 @@ void main(){
   // distance haze (a map's mood: heat haze over the sand), in linear HDR before the grade
   if (uHaze > 0.0) {
     float zh = linDepth(texture2D(tDepth, vUv).x);
-    float hz = uHaze * (1.0 - exp(-zh / 900.0));
-    col = mix(col, uHazeColor * 2.2, hz);
+    float hz = uHaze * (1.0 - exp(-zh / 1400.0));
+    col = mix(col, uHazeColor * 0.75, hz);
   }
   // Colour grade in linear HDR
   col *= exposure;

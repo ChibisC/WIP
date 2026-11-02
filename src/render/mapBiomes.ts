@@ -70,7 +70,7 @@ export const MAP_MOOD: Record<string, MapMood> = {
   gardenBelow: {
     sunEl: 26,
     sunAz: 290,
-    light: { sun: 2.7, sunColor: 0xfff1de, hemi: 1.08, hemiSky: 0xc8daf4, hemiGround: 0x4e4a2c, fog: 1.1, fogColor: 0xd9dcd2, dapple: 0.55 },
+    light: { sun: 2.7, sunColor: 0xfff1de, hemi: 1.08, hemiSky: 0xc8daf4, hemiGround: 0x4e4a2c, fog: 0.85, fogColor: 0xd9dcd2, dapple: 0.55 },
     exposure: 1.02,
     saturation: 1.04,
     warmth: -0.08,
@@ -78,14 +78,14 @@ export const MAP_MOOD: Record<string, MapMood> = {
   fireBanks: {
     sunEl: 66,
     sunAz: 250,
-    light: { sun: 3.5, sunColor: 0xffe2b0, hemi: 1.0, hemiSky: 0xdfe4ea, hemiGround: 0x8a7650, fog: 1.6, fogColor: 0xe8dcc0, dapple: 0.2 },
-    exposure: 1.05,
-    contrast: 0.94,
+    light: { sun: 3.4, sunColor: 0xffe2b0, hemi: 1.0, hemiSky: 0xdfe4ea, hemiGround: 0x8a7650, fog: 1.1, fogColor: 0xe2d8c0, dapple: 0.2 },
+    exposure: 1.0,
+    contrast: 0.96,
     saturation: 0.96,
     warmth: 0.12,
     bloom: 0.08,
-    haze: 0.35,
-    hazeColor: 0xeadfc8,
+    haze: 0.16,
+    hazeColor: 0xe6dcc6,
   },
 };
 

@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Terrain } from '../../world/terrain';
 import { RAMP_SIDE } from '../../world/layers';
 import type { DecorClump } from '../mapDecor';
 import type { GroundFields } from '../terrainMesh';
 import { patchDapple } from '../shaderPatch';
+import { GL, bakedSurfacePatch } from './surfacePatch';
 
 /**
  * What a cut bank carries (ground realism item 3; render only, deterministic from the terrain): roots coming out of
@@ -22,7 +23,11 @@ function hash2(i: number, j: number, s: number): number {
 
 /** A lumpy stone or crumb: a displaced icosahedron, radius ~1, squashed, coloured. */
 function lump(seed: number, rough: number, squash: number, col: THREE.Color, detail = 1): THREE.BufferGeometry {
-  const g = new THREE.IcosahedronGeometry(1, detail);
+  // shared vertices (smooth normals, no facets)
+  let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(1, detail);
+  g.deleteAttribute('uv');
+  g.deleteAttribute('normal');
+  g = mergeVertices(g);
   const p = g.attributes.position as THREE.BufferAttribute;
   const v = new THREE.Vector3();
   for (let i = 0; i < p.count; i++) {
@@ -31,7 +36,6 @@ function lump(seed: number, rough: number, squash: number, col: THREE.Color, det
     const k = 1 + (n - 0.5) * rough;
     p.setXYZ(i, v.x * k, v.y * k * squash, v.z * k);
   }
-  g.deleteAttribute('uv');
   g.computeVertexNormals();
   const c = new Float32Array(p.count * 3);
   const cc = new THREE.Color();
@@ -40,7 +44,7 @@ function lump(seed: number, rough: number, squash: number, col: THREE.Color, det
     c.set([cc.r, cc.g, cc.b], i * 3);
   }
   g.setAttribute('color', new THREE.BufferAttribute(c, 3));
-  return g;
+  return g.toNonIndexed();
 }
 
 /** A root: a tapering tube along a curve, bark-coloured, lighter at the broken tip. */
@@ -71,18 +75,20 @@ function root(pts: THREE.Vector3[], r0: number, seed: number): THREE.BufferGeome
 }
 
 export interface BankDressing {
-  mesh: THREE.Mesh | null;
+  meshes: THREE.Mesh[];
   clumps: DecorClump[];
 }
 
 export function buildBankDressing(t: Terrain, f: GroundFields): BankDressing {
-  const out: BankDressing = { mesh: null, clumps: [] };
+  const out: BankDressing = { meshes: [], clumps: [] };
   const L = t.layers;
   if (!L) return out;
   const { nx, ny, res } = t;
   const biome = t.map?.biome ?? 'meadow';
   const H = (x: number, y: number) => t.heightAt(Math.min(Math.max(x, 0), t.width), Math.min(Math.max(y, 0), t.depth));
   const geos: THREE.BufferGeometry[] = [];
+  // stones take the baked weathered-stone surface (render/ground/surfacePatch.ts); roots and crumbs their colours
+  const stoneGeos: THREE.BufferGeometry[] = [];
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const e = new THREE.Euler();
@@ -147,7 +153,7 @@ export function buildBankDressing(t: Terrain, f: GroundFields): BankDressing {
         sc.set(r, r, r * 0.8);
         pos.set(x + ox * r * 0.35, h, y + oz * r * 0.35);
         m.compose(pos, q, sc);
-        geos.push(g.applyMatrix4(m));
+        stoneGeos.push(g.applyMatrix4(m));
       }
       // ---- the spill at the foot: crumbs and a few stones, piled against the face (still in the blocked band)
       if (fr < 0.22 && r3 < (style === 2 ? 0.12 : 0.3)) {
@@ -166,7 +172,7 @@ export function buildBankDressing(t: Terrain, f: GroundFields): BankDressing {
           sc.setScalar(r);
           pos.set(cx, H(cx, cz) + r * 0.15, cz);
           m.compose(pos, q, sc);
-          geos.push(g.applyMatrix4(m));
+          (stone ? stoneGeos : geos).push(g.applyMatrix4(m));
         }
       }
       // ---- grass along the lip of soil banks (meadow, garden, riverbank), leaning out over the edge
@@ -191,15 +197,17 @@ export function buildBankDressing(t: Terrain, f: GroundFields): BankDressing {
       for (let s = 0; s < l; s += 2) pts.push([P[i - 1][0] + (dx * s) / l, P[i - 1][1] + (dz * s) / l, dx / l, dz / l]);
     }
     if (r.style === 'stoneSteps') {
-      for (let k = 4; k < pts.length - 4; k += 7) {
+      for (let k = 4; k < pts.length - 4; k += 9) {
         const [x, z, ux, uz] = pts[k];
-        const across = Math.max(2, Math.round(r.width / 22));
+        const across = Math.max(2, Math.round(r.width / 26));
         for (let a = 0; a < across; a++) {
+          if (hash2(k, a, ri + 5) < 0.2) continue; // a stone missing here and there
           const off = ((a + 0.5) / across - 0.5) * r.width * 0.9 + (hash2(k, a, ri) - 0.5) * 4;
           const cx = x - uz * off + ux * (hash2(k, a, 7) - 0.5) * 4;
           const cz = z + ux * off + uz * (hash2(k, a, 8) - 0.5) * 4;
           const rad = Math.min(r.width / across, 14) * (0.5 + 0.12 * hash2(k, a, 9));
-          const g = lump(ri * 977 + k * 13 + a, 0.25, 0.12, stoneCols[(k + a) % stoneCols.length].clone().multiplyScalar(0.95), 2);
+          // worn, dirty paving: darker than fresh stone, irregular, sunk to its shoulders
+          const g = lump(ri * 977 + k * 13 + a, 0.42, 0.12, stoneCols[(k + a) % stoneCols.length].clone().multiplyScalar(0.62 + 0.15 * hash2(k, a, 11)), 2);
           // tilt with the ramp's slope
           const h0 = H(cx - ux * rad, cz - uz * rad);
           const h1 = H(cx + ux * rad, cz + uz * rad);
@@ -209,9 +217,9 @@ export function buildBankDressing(t: Terrain, f: GroundFields): BankDressing {
           const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -pitch);
           q.multiply(tilt);
           sc.set(rad, rad, rad * (0.9 + 0.2 * hash2(k, a, 10)));
-          pos.set(cx, H(cx, cz) + 0.35 - rad * 0.12 * 0.4, cz);
+          pos.set(cx, H(cx, cz) + 0.25 - rad * 0.12 * 0.55, cz);
           m.compose(pos, q, sc);
-          geos.push(g.applyMatrix4(m));
+          stoneGeos.push(g.applyMatrix4(m));
         }
       }
     } else {
@@ -242,15 +250,19 @@ export function buildBankDressing(t: Terrain, f: GroundFields): BankDressing {
       }
     }
   }
-  if (geos.length) {
+  const build = (list: THREE.BufferGeometry[], name: string, stone: boolean) => {
+    if (!list.length) return;
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
     patchDapple(mat);
-    const mesh = new THREE.Mesh(mergeGeometries(geos.map((g) => (g.index ? g.toNonIndexed() : g))), mat);
+    if (stone) bakedSurfacePatch(mat, { layer: GL.ROCK, relief: 0.8 });
+    const mesh = new THREE.Mesh(mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g))), mat);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    mesh.name = 'bankDressing';
-    out.mesh = mesh;
-  }
+    mesh.name = name;
+    out.meshes.push(mesh);
+  };
+  build(geos, 'bankDressing', false);
+  build(stoneGeos, 'bankStones', true);
   void lips;
   void f;
   return out;
