@@ -52,7 +52,7 @@ export const EN: Record<string, string> = {
   'tip.tiles': 'Tip: brood tiles raise ants; food store tiles hold food. Tiles next to each other form one chamber and one group.',
   'tip.forage': 'Tip: foragers find food on their own and lay trails home. Place marker I on a food source to send a group there.',
   'tip.markers': 'Tip: markers I–V send your groups across the surface. Drag a group’s button onto a marker in the marker panel.',
-  'tip.wood': 'Tip: Gene-Thief Termant workers gather dead wood too; it is stored apart and slowly digests into food. It also builds carton walls.',
+  'tip.wood': 'Tip: Gene-Thief Termant workers eat everything: dead wood, leaf litter and leaves go into the same food store as the rest, and carton walls are built from it.',
   'tip.genes': 'Tip: carry enemy corpses into the stores. The Genome tab in the Build panel shows the gene samples of each species.',
   'tip.caste': 'Tip: the Black Garden Ant Soldier is in the Build panel now. Its brood tile raises soldiers from the stolen genes.',
   'tip.ramps': 'Tip: the banks are too steep to climb. Ants go up and down by the ramps; a defended ramp is a chokepoint.',

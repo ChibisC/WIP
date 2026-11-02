@@ -859,10 +859,13 @@ export const TERMANT = {
   /** soldier glue burst: every `cooldown` s within `range` mm: `damage`, the target slowed to `slowMul` for `slow` s; formic acid × `acidMul` on a glued target */
   glue: { cooldown: 5, slow: 3, slowMul: 0.4, damage: 3, range: 4, acidMul: 2 },
   /**
-   * Dual diet: workers also gather dead wood, kept in a separate store (at most `cap`) that digests into food at
-   * `digestRate` food per second per 10 wood stored (× `toFood`). Wood sources spawn on maps with Termants.
+   * One store for everything (user 2026-11-02: "termants have the special ability to consume all known food resources
+   * as food (wood leaves and normal food all share 1 store)"): their workers gather dead wood, leaf litter and leaves as
+   * well as ordinary food, and each goes into the food store at `toFood` food per unit delivered. `cap` and
+   * `digestRate` are kept only for old saves (their wood store is turned into food on load). Wood sources spawn on
+   * maps with Termants.
    */
-  wood: { cap: 60, digestRate: 0.15, toFood: 0.5 },
+  wood: { cap: 60, digestRate: 0.15, toFood: 0.5, leafToFood: 1 },
   /** carton wall tile: paid in wood, hit points, build time (s), upgrade points */
   cartonWall: { cost: 8, hp: 120, build: 6, points: 1 },
   /** workers fetch corpses of species whose genes are still short first */
@@ -874,7 +877,7 @@ export const TERMANT = {
   corpseLingerSec: 25,
   /**
    * Termant AI: raid sooner (score × `raidScoreMul`, margin × `raidMarginMul`) a rival whose genes are within
-   * `raidNear` of their threshold; wood counts × `woodWant` as a forage source while the wood store is under half
+   * `raidNear` of their threshold; wood and leaves count × `woodWant` as a forage source while the food store is under half
    * full (× `woodSated` above); a carton wall goes up beside each entrance while intruders are inside (if the wood is
    * there), at most `wallsPerEntrance` each.
    */

@@ -234,7 +234,7 @@ export class BuildPanel {
         const cost = tileCost(c, t.type, t.caste);
         const txt = String(cost);
         if (costEl.textContent !== txt) costEl.textContent = txt;
-        t.b.classList.toggle('cant', (t.type === 'carton' ? (c.wood ?? 0) : c.food) < cost && !c.infiniteFood);
+        t.b.classList.toggle('cant', c.food < cost && !c.infiniteFood);
       }
     }
     this.foodBtn.classList.toggle('on', s.foodView);

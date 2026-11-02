@@ -47,7 +47,7 @@ export function objectiveText(w: World, st: StoryState, o: Objective): string {
     case 'collectFood':
       return `Gather ${o.amount} food`;
     case 'storeWood':
-      return `Store ${o.amount} wood`;
+      return `Gather ${o.amount} wood`;
     case 'killAnts':
       return `Kill ${o.n} of the ${rival(o.rival).toLowerCase()}`;
     case 'stealCaste':
@@ -99,7 +99,7 @@ export function evalObjective(w: World, c: Colony, st: StoryState, base: StageBa
     case 'collectFood':
       return count(c.stats.food - base.food0, o.amount);
     case 'storeWood':
-      return count(c.wood ?? 0, o.amount);
+      return count(c.stats.wood ?? 0, o.amount);
     case 'killAnts':
       return count(c.stats.kills - base.kills0, o.n);
     case 'stealCaste': {

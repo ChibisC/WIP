@@ -106,7 +106,7 @@ You start with a queen, her seven-tile chamber and three small **nanitic** worke
 | Brood tiles | One per caste. Placed on dug floor as a ghost; a worker builds it and the food is paid on completion. Touching tiles of one kind form a chamber, which is one group card. |
 | Food Storage | Holds 10 / 40 / 100 food by level. |
 | Highway | Packed-earth floor: +10 / 20 / 25 % speed by level (other built tiles slow ants by 35 %). |
-| Species tiles | Fungus garden (leafcutters), root-aphid pasture (black garden ants), thatch (wood ants), sun-warmed brood mound (fire ants), carton wall (Termants: paid in wood, blocks enemies until chewed through). |
+| Species tiles | Fungus garden (leafcutters), root-aphid pasture (black garden ants), thatch (wood ants), sun-warmed brood mound (fire ants), carton wall (Termants: paid from their one food store, blocks enemies until chewed through). |
 | Upgrade (U) | Mark a tile for upgrade. Needs 6 points for level 2 and 12 for level 3 from its neighbours (same kind: its level; soil: 1; highway: its level). Costs the build cost. Hover shows each neighbour's points. |
 | Delete (Delete) | Downgrades one level first; at level 1 removes the tile (its ant dies) and refunds two-thirds of the cost as seeds, which workers carry to storage. |
 

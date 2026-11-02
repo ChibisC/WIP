@@ -537,6 +537,8 @@ export interface ColonyStats {
   peakPop: number;
   /** enemy brood carried off in raids */
   stolen: number;
+  /** dead wood a Termant colony has carried into its store (the story's "gather wood" goal) */
+  wood?: number;
 }
 
 export interface Colony {
@@ -589,7 +591,7 @@ export interface Colony {
   ecRaid?: EcRaid[];
   /** army ants: living bridges and pothole plugs on the raid trails (eciton.ts) */
   ecLinks?: EcLink[];
-  /** Termants (termants.ts): gene samples and stolen castes, the wood store */
+  /** Termants (termants.ts): gene samples and stolen castes; `wood` is only an old save's wood store (turned into food) */
   genome?: Genome;
   wood?: number;
   /** AI forage planner memory (colonyAI). */

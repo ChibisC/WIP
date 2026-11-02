@@ -76,7 +76,7 @@ export interface CasteDef {
   snap?: { kind: 'pin' | 'impale'; windup: number; dps: number; hold: number; cooldown: number; maxPreyMass: number; burst?: number };
   /** Saiy-Ants: can flash into the gold surge (sim/surge.ts) */
   surge?: boolean;
-  /** Termants: may gather dead wood (stored apart and digested slowly into food; sim/termants.ts) */
+  /** Termants: may gather dead wood, leaf litter and leaves, all into the one food store (sim/termants.ts) */
   wood?: boolean;
   /** Termant soldier: the point-blank glue burst from the frontal pore (sim/termants.ts) */
   glue?: { cooldown: number; slow: number; slowMul: number; damage: number; range: number };
@@ -511,8 +511,8 @@ export const SPECIES: Record<SpeciesId, SpeciesDef> = {
     id: 'termant', common: SPECIES_DISPLAY_NAME.termant ?? TERMANT_FALLBACK_NAME, scientific: 'Chimaeromyrmex termitoides', queen: 'termant_queen', king: 'termant_king', fictional: true,
     castes: ['termant_worker', 'termant_soldier'],
     ratio: { termant_worker: 0.85, termant_soldier: 0.15 }, startWorkers: 7, eggInterval: 5.5, color: '#b07a42',
-    blurb: 'Custom colony (fictional). Half ant, half termite: eats the other species and raises their castes as its own, and digests dead wood. Ants and termites are only distantly related and cannot hybridize or share genes like this.',
-    traits: ['Steals castes from eaten enemies (3 at a time)', 'Soldier glue burst; worker formic acid', 'Eats wood as well as prey', 'A king beside the one queen'],
+    blurb: 'Custom colony (fictional). Half ant, half termite: eats the other species and raises their castes as its own, and eats everything else too: dead wood, leaf litter and leaves share its one food store. Ants and termites are only distantly related and cannot hybridize or share genes like this.',
+    traits: ['Steals castes from eaten enemies (3 at a time)', 'Soldier glue burst; worker formic acid', 'Eats every food: wood, leaves, prey (one store)', 'A king beside the one queen'],
   },
 };
 

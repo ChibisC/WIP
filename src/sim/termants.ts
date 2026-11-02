@@ -18,7 +18,8 @@ import { tilePoint } from './colony';
  *    until the player forgets one (command `forgetCaste`: its brood tiles are refunded; living ants stay). Creature
  *    genes give a small passive bonus once (beetles armour, spiders speed).
  *  - Soldier glue burst (combat.ts → glueBurst): slows the target and makes formic acid hurt it double.
- *  - Dual diet: workers chew dead wood too; it is stored apart and digests slowly into food.
+ *  - Eats everything (user 2026-11-02): workers gather dead wood, leaf litter and leaves as well as ordinary food, and
+ *    all of it goes into the one food store (wood and leaves at `TERMANT.wood.toFood` / `leafToFood` food a unit).
  *  - A king beside the queen. Like a termite king he is never targeted, takes no damage, bites weakly and dies the
  *    moment his queen does (user note 2026-10-25). One queen and no replacement (user note, 2026-10-25): when she
  *    dies the colony is lost, as for every species.
@@ -120,14 +121,15 @@ export function tagPiece(c: Colony, corpse: Food, piece: Food, amount: number): 
 
 /**
  * Food delivered to a Termant store (antAI.deposit): genes from an enemy corpse (or a piece of one), never from the
- * colony's own dead (those go to the midden, not here) nor from its own species. Wood goes to the wood store
- * instead of food. Returns the food amount to add (0 for wood).
+ * colony's own dead (those go to the midden, not here) nor from its own species. Wood, leaf litter and leaves are
+ * food too, in the same store (user 2026-11-02). Returns the food amount to add.
  */
 export function termantDeposit(w: World, c: Colony, item: Food | undefined, amount: number): number {
   if (!isTermant(c) || !item) return amount;
-  if (item.kind === 'wood') {
-    c.wood = Math.min(TERMANT.wood.cap, (c.wood ?? 0) + amount);
-    return 0;
+  if (item.kind === 'wood' || item.kind === 'leaf') {
+    // (counted for the story's "gather wood" goal)
+    if (item.kind === 'wood') c.stats.wood = (c.stats.wood ?? 0) + amount;
+    return amount * (item.kind === 'wood' ? TERMANT.wood.toFood : TERMANT.wood.leafToFood);
   }
   const whole = item.kind === 'corpse';
   const src = whole ? item.from : item.gsrc;
@@ -233,12 +235,11 @@ export function termantSystem(w: World, dt: number): void {
         w.events.emit({ t: 'message', text: `${SPECIES.termant.common}: genes from the ${src.slice(3)} — ${b.bonus === 'armor' ? 'harder shells (5 % less damage)' : 'quicker legs (+5 % speed)'}.`, kind: 'good', colony: c.id });
       }
     }
-    // dead wood digests slowly into food
+    // an old save's separate wood store (before the one store, 2026-11-02) turns into food once
     const wood = c.wood ?? 0;
     if (wood > 0) {
-      const d = Math.min(wood, (TERMANT.wood.digestRate * wood) / 10);
-      c.wood = wood - d;
-      c.food = Math.min(c.foodCap, c.food + d * TERMANT.wood.toFood);
+      c.wood = 0;
+      c.food = Math.min(c.foodCap, c.food + wood * TERMANT.wood.toFood);
     }
   }
   void dt;
@@ -378,9 +379,9 @@ export function genesNear(c: Colony, species: string): boolean {
   return have >= need * (1 - TERMANT.ai.raidNear) && have < need;
 }
 
-/** How much a wood source is worth to the forage AI (more while the wood store is low). */
+/** How much a wood or leaf source is worth to the forage AI (more while the food store is low). */
 export function woodWant(c: Colony): number {
-  return (c.wood ?? 0) < TERMANT.wood.cap * 0.5 ? TERMANT.ai.woodWant : TERMANT.ai.woodSated;
+  return c.food < c.foodCap * 0.5 ? TERMANT.ai.woodWant : TERMANT.ai.woodSated;
 }
 
 /**
@@ -406,7 +407,7 @@ export function termantAI(w: World, c: Colony): void {
   const g = w.nest(c.id);
   if (!g) return;
   if (c.tiles.some((t) => t.type === 'carton' && !t.built)) return;
-  if ((c.wood ?? 0) < TERMANT.cartonWall.cost) return;
+  if (c.food < TERMANT.cartonWall.cost) return;
   const N = g.cols * g.rows;
   for (let k = 0; k < N; k++) {
     if (!g.isEntrance(k)) continue;

@@ -1426,3 +1426,14 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
 - Creatures: hit points about doubled and bites up a little; the mantis strikes every 1.6 s, has armour 2 and flees at
   10 %. Wild predators now beat 5 and 10 workers and need about 20 (the stone centipede and the mantis died to 5 before).
   Bosses unchanged (80–120 workers or more).
+
+### 2026-11-02 — Termants: one food store for wood, leaves and food
+- User 10:47: "termants have the special ability to consume all known food resources as food (wood leaves and normal
+  food all share 1 store) fix that and push it to the game rn". Termant workers chew dead wood and leaf litter and carry
+  leaves as well as ordinary food, and all of it goes into the food store (`termants.ts termantDeposit`: wood at
+  `TERMANT.wood.toFood` 0.5 food a unit, leaves `leafToFood` 1; `diet.ts`: Termants eat every food kind). The separate
+  wood store, its digestion and the top bar's wood counter are gone; carton walls are paid from the food store (and
+  refunded as seeds like other tiles); the AI's wood want follows the food store. Save migration: an old save's wood
+  store turns into food on the next second. The story's "gather wood" goal counts wood carried in (`stats.wood`).
+- Tests: `tests/termants.ts` (wood into the food store, leaves into the food store, an old wood store converted, carton
+  walls paid from food, the AI plans a wall with the food).
