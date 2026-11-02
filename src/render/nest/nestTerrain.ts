@@ -634,13 +634,16 @@ bumpH += -crev*0.35 + (1.0 - ag.x)*0.15;
 vec3 wp = worley(gp*0.55 + vec2(vnoise(gp*0.3), vnoise(gp*0.3+7.0))*0.8);
 float pr = 0.26 + 0.2*h21(vec2(wp.z*31.0));
 float pebDens = mix(0.94, 0.3, edgeK);
-float isPeb = step(pebDens, wp.z) * smoothstep(pr + 0.05, pr - 0.04, wp.x);
-float dome = clamp(1.0 - wp.x/max(pr,0.01), 0.0, 1.0);
-vec3 pebC = mix(vec3(0.30,0.30,0.30), vec3(0.18,0.175,0.17), h21(vec2(wp.z*91.0)));
-pebC = mix(pebC, vec3(0.36,0.31,0.25), step(0.7, h21(vec2(wp.z*13.0))));
+// (round 3, after a blind review: soil crumbs and a few angular stones, not round blue-grey river pebbles)
+float wpx = wp.x + (vnoise(gp*2.4 + wp.z*17.0) - 0.5)*0.14;
+float isPeb = step(pebDens, wp.z) * smoothstep(pr + 0.05, pr - 0.04, wpx);
+float dome = clamp(1.0 - wpx/max(pr,0.01), 0.0, 1.0);
+float pk = h21(vec2(wp.z*13.0));
+vec3 pebC = pk < 0.55 ? mix(vec3(0.26,0.205,0.15), vec3(0.19,0.15,0.11), h21(vec2(wp.z*91.0)))
+          : (pk < 0.85 ? mix(vec3(0.31,0.30,0.28), vec3(0.22,0.21,0.2), h21(vec2(wp.z*91.0))) : vec3(0.12,0.11,0.1));
 pebC *= 0.5 + 0.65*sqrt(dome);
 // a pebble's contact shadow on the floor round it
-floorC *= 1.0 - 0.35*step(pebDens, wp.z)*smoothstep(pr + 0.16, pr + 0.02, wp.x)*(1.0 - isPeb);
+floorC *= 1.0 - 0.35*step(pebDens, wp.z)*smoothstep(pr + 0.16, pr + 0.02, wpx)*(1.0 - isPeb);
 floorC = mix(floorC, pebC, isPeb);
 bumpH += isPeb * sqrt(dome) * 1.4;
 // diggers' pellets (balls of ~160 grains, ~1 mm): scattered on the floor, most along the walls
@@ -664,16 +667,17 @@ surfRough = mix(0.9, 0.7, damp) - quartz*0.35;
 
 // ---- walls: compacted soil the diggers have scraped smooth, short mandible scrapes, grains and roots in it
 vec3 wallC = mix(vec3(0.07,0.057,0.043), vec3(0.12,0.097,0.07), fbm(gp*0.12));
-float scrape = vnoise(vec2(gp.x*1.1 + gp.y*0.9, gp.y*1.1 - gp.x*0.7) * 1.3);
-wallC *= 0.8 + 0.3*scrape;
+float scrape = vnoise(gp * 1.3);
+vec3 wcr = worley(gp*1.1 + 5.0);
+wallC *= (0.8 + 0.3*scrape) * (0.85 + 0.25*smoothstep(0.5, 0.1, wcr.x)) * (1.0 - 0.3*smoothstep(0.08, 0.0, wcr.y - wcr.x));
 // mandible scrapes: short shallow grooves, a few directions, in patches
 float sa = fbm(gp*0.4 + 21.0) * 6.2832;
 vec2 sdir = vec2(cos(sa), sin(sa));
 float grooves = smoothstep(0.8, 1.0, abs(sin(dot(gp, sdir)*7.0))) * smoothstep(0.45, 0.7, vnoise(gp*1.4 + 2.0));
 wallC *= 1.0 - grooves*0.22;
 wallC = mix(wallC, gC*0.45, gIn*0.35);
-float roots = smoothstep(0.012, 0.003, abs(fbm(gp*0.08 + 11.0) - 0.5));
-wallC = mix(wallC, vec3(0.24,0.18,0.12), roots*0.6);
+float roots = smoothstep(0.008, 0.002, abs(fbm(gp*0.06 + 11.0) - 0.5)) * step(0.6, fbm(gp*0.03 + 4.0));
+wallC = mix(wallC, vec3(0.24,0.18,0.12), roots*0.45);
 wallC *= 1.0 - 0.2*damp;
 bumpH += scrape*0.4 + roots*0.5 - grooves*0.25;
 
@@ -746,7 +750,7 @@ vec3 col = floorC * floorM + wallC * wallM + topC * topM;
 float covered = floorM + wallM + topM;
 col /= max(covered, 1e-3);
 // darkness grows away from dug ground (soil top and walls); stones stay readable in it
-float darkK = mix(0.12, 1.0, wideL*wideL);
+float darkK = mix(0.17, 1.0, wideL*wideL);
 darkK = mix(darkK, max(darkK, 0.62), stoneM * topM);
 col *= mix(1.0, darkK, 1.0 - floorM);
 
@@ -780,32 +784,36 @@ if (htype > 0.5 && htype < 10.5) {
     vec3 silt = mix(vec3(0.30,0.30,0.29), vec3(0.40,0.39,0.36), fbm(gp*0.5)) * (0.9 + 0.12*vnoise(gp*6.0));
     silt = mix(silt, gC*0.9, gIn*0.18);
     float trod = smoothstep(0.3, 0.8, fbm(gp*0.18 + 2.0));
-    tc = mix(col*0.7, silt, 0.82) * (0.94 + 0.08*trod);
+    // (round 3: the floor's grains and crumbs show through the silt — not a smooth slab)
+    tc = mix(col, silt, 0.6) * (0.94 + 0.08*trod);
     // termites: the royal chamber is a smooth, dense carton cell, not silk
     if (uCarton > 0.5 && uCarton < 1.5) tc = mix(tc, vec3(0.075,0.045,0.026) * (0.8 + 0.4*fbm(gp*0.9)) + vec3(0.03,0.02,0.01)*clamp(strands,0.0,1.0), 0.85);
     // sickle-jaws: a smooth, dense cell of damp soil
     if (uCarton > 1.5) tc = mix(tc, vec3(0.085,0.058,0.036) * (0.8 + 0.4*fbm(gp*0.9)), 0.85);
     surfRough = mix(surfRough, 0.6 - 0.1*trod, tileK);
-    bumpH = bumpH*0.35 + gIn*0.08;
+    bumpH = bumpH*0.6;
   } else if (htype < 2.5) {
     // brood tile: shallow brood pockets pressed into the packed floor, its soil washed with the caste's colour (the
     // brood itself lies in them, tileDecor); realism pass 2026-11-02: less of a painted pattern, more soil
+    // (round 2: the caste colour a wash over the soil — its grains and crumbs still show — and the pockets shallow
+    // dips, not a printed pattern)
     vec3 cw = worley(gp * (0.9 + 0.1*hlevel));
     float pit = smoothstep(0.62, 0.12, cw.x);
     float rim = smoothstep(0.05, 0.0, cw.y - cw.x);
-    vec3 soilT2 = mix(col, gC, gIn*0.3);
-    tc = mix(soilT2, tint * (0.6 + 0.3*vnoise(gp*1.7)), 0.62) * (1.0 - pit*0.35);
-    tc += tint * rim * 0.12;
+    float tintL = dot(tint, vec3(0.3, 0.5, 0.2)) + 1e-3;
+    vec3 wash = col * mix(vec3(1.0), tint / tintL, 0.55) * (0.95 + 0.25*tintL);
+    tc = mix(col, wash, 0.8) * (1.0 - pit*0.18);
+    tc *= 1.0 + rim*0.06;
     tc = mix(tc, tc*1.3 + vec3(0.06,0.04,0.0), step(1.5, hlevel) * step(0.92, cw.z) * 0.6); // upgraded: bright flecks
-    bumpH += -pit*0.7 + rim*0.3;
+    bumpH = bumpH*0.8 - pit*0.45 + rim*0.15;
     surfRough = mix(surfRough, 0.82, tileK);
   } else if (htype < 3.5) {
     // food store: a dry, swept store floor stained olive by what is kept on it, honeydew beads catching the light
     // (the stores themselves lie on it, tileDecor)
     vec3 base = mix(vec3(0.17,0.20,0.10), vec3(0.26,0.29,0.14), fbm(gp*0.5));
-    base = mix(base, gC*0.8, gIn*0.25);
+    base = mix(col, base * (dot(col, vec3(0.33)) / 0.2 * 0.6 + 0.4), 0.55);
     vec3 mw = worley(gp*1.6);
-    tc = base * (0.78 + 0.32*smoothstep(0.6, 0.1, mw.x));
+    tc = base * (0.85 + 0.25*smoothstep(0.6, 0.1, mw.x));
     float bead = step(0.86, mw.z) * smoothstep(0.32, 0.12, mw.x);
     tc = mix(tc, vec3(0.75,0.62,0.25), bead*0.8);
     surfRough = mix(surfRough, mix(0.8, 0.25, bead), tileK);
@@ -907,9 +915,9 @@ if (hedges > 0.5 && floorM > 0.2) {
   float ang = atan(hl.y, hl.x);
   float sector = mod(floor((ang + 0.5235988) / 1.0471976 + 0.5), 6.0);
   float on = bitOf(hedges, sector);
-  float line = on * smoothstep(0.55, 0.15, edgeProx) * floorM;
+  float line = on * smoothstep(0.4, 0.1, edgeProx) * floorM;
   vec3 oc = uMarkerCols[int(clamp(hout, 0.0, 6.0))];
-  col = mix(col, oc, line*0.85);
+  col = mix(col, oc, line*0.75);
 }
 // grid overlay (placement mode)
 if (uGrid > 0.5) {
