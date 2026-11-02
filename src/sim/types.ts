@@ -602,7 +602,40 @@ export interface Colony {
   homeOrders?: { noAttack?: boolean; noGather?: boolean; noClimb?: boolean };
   aiForage?: { t: number; age: number; target: { x: number; y: number } | null; queenOut: boolean; scoutT?: number; scouted?: boolean; enemyAt?: number };
   /** rival AI war planner (sim/warAI.ts): raid target (−1 none), fighters at the start, raid age, cooldown until (game time), defending and seconds clear */
-  aiWar?: { t: number; target: number; start: number; age: number; cooldown: number; defending: boolean; clearT: number };
+  aiWar?: {
+    t: number;
+    target: number;
+    start: number;
+    age: number;
+    cooldown: number;
+    defending: boolean;
+    clearT: number;
+    /** a joint raid (CHANGE_PLAN §22): the ally whose raid this colony joined (its own id when it leads one) */
+    joined?: number;
+    /** a joint raid's gathering point near the target and when to go anyway (s); `go` once everyone is there */
+    gather?: { x: number; y: number; until: number; go: boolean };
+  };
+  /**
+   * The ally brain (sim/warAI.ts, CHANGE_PLAN §22): the ally being helped (−1 none), since when, how many ants were sent,
+   * the stage (0 marker on the ally's entrance, 1 on the threat), how long the threat has been clear, the cooldown after
+   * helping, how many times help started or stopped, the allies' deaths last seen, and the enemy colony last seen
+   * attacking the team (and when).
+   */
+  aiAlly?: {
+    t: number;
+    ally: number;
+    since: number;
+    sent: number;
+    stage: number;
+    clearT: number;
+    cooldown: number;
+    flips: number;
+    died: Record<number, number>;
+    foe: number;
+    foeT: number;
+  };
+  /** a human player's call for help to its allies (command `callHelp`): active until this game time (s) */
+  helpCall?: number;
   /** fungus garden capacity (Atta) */
   fungusCap: number;
   /** attack anything (true) or defend only (false) */

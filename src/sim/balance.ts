@@ -550,6 +550,64 @@ export const BALANCE = {
   },
   /** AI colonies with allies (CHANGE_PLAN §22, user spec claude/ai/01-spec-ai-allies-chambers.md) */
   aiAllies: {
+    /** seconds between the ally brain's decisions */
+    every: 2,
+    /**
+     * An ally's danger (warAI.ts allyDanger): the enemies' fighting weight there (health × damage rate) × where they are,
+     * minus its defenders' weight; plus its losses a second × lossWeight; × queenMul when its queen is in danger.
+     * Where: by the queen (within queenRadius mm), deep in the nest, at its entrance (within entranceRadius of the
+     * flower), at its surface holes (siegeRadius), near them on the surface (nearRadius).
+     */
+    locQueen: 4,
+    locDeep: 3,
+    locEntrance: 2,
+    locSiege: 1.5,
+    locNear: 1,
+    queenRadius: 40,
+    entranceRadius: 30,
+    siegeRadius: 60,
+    nearRadius: 150,
+    queenHurt: 0.7,
+    queenMul: 3,
+    lossWeight: 400,
+    /** a creature's weight per point of health × its bite rate */
+    creatureWeight: 1,
+    /** help only above this danger, and not an ally whose defenders already have this × the attackers' weight */
+    assistMinDanger: 300,
+    allyWinningRatio: 1.5,
+    /** help only if it can get there in this long (s; the land route over the fighters' speed), unless the queen is in danger */
+    assistMaxTravel: 90,
+    /** keep this share of the fighting weight at home (and at least homeGuardMin fighters); send enough that help +
+     * the ally's defenders reach assistOvermatch × the attackers' weight, no more */
+    homeGuardShare: 0.3,
+    homeGuardMin: 3,
+    assistOvermatch: 1.3,
+    /** stop helping: clear (danger under clearDanger) for clearFor s, losses over assistMaxLoss of those sent, or after
+     * assistMaxTime s; then a cooldown (s) */
+    clearDanger: 120,
+    clearFor: 8,
+    assistMaxLoss: 0.6,
+    assistMaxTime: 240,
+    cooldown: 30,
+    /** inside the ally's nest: the marker moves from its entrance to the threat once this share of the helpers is in */
+    insideShare: 0.5,
+    /** a raid gives way to helping when the ally's danger is over this (or its queen is in danger, or it is the same enemy) */
+    raidValue: 1500,
+    /** a human player's call for help (command callHelp): this long (s), its danger × callBoost and at least callMin */
+    callHelpSec: 45,
+    callBoost: 2,
+    callMin: 400,
+    /** joint raids: an AI ally may join a raid this young (s) with at least joinMinFighters; everyone gathers gatherDist
+     * mm short of the target's holes and goes when gatherShare of each one's fighters are there, or after gatherMax s */
+    joinWindow: 30,
+    joinMinFighters: 6,
+    gatherDist: 140,
+    gatherR: 50,
+    gatherShare: 0.6,
+    gatherMax: 60,
+    /** shared targets: an enemy seen attacking the team within foeMemory s is raided first (its score × sharedTargetMul) */
+    foeMemory: 300,
+    sharedTargetMul: 0.5,
     /** team-aware placement (world/teamSites.ts): limits as fractions of the map's width, and the score's weights */
     sites: {
       /** each ally's land route to its nearest teammate at most this */
