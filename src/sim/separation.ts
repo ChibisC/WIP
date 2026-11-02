@@ -460,8 +460,8 @@ function pairCb(j: number): boolean {
   // …and two enemies each holding someone else (separate duels) drift apart too, so neighbouring duels keep ground
   // between them; enemies closing in, or fighting each other, keep only their bodies' radii
   const sameFoe = ally && P.foeK !== 0 && foeKind(po) === P.foeK && foeId(po) === P.foeId;
-  // (a teammate waiting for a slot: `waitSpace` from another waiting one, a personal space from one fighting — same foe
-  // or not: waiting)
+  // (a teammate pressing in for a slot: `waitSpace` from any teammate in the fight, same foe or not — the crowd presses
+  // up behind the fighters: user 2026-11-01, evening)
   const wait = ally && (fa & fo & 16) !== 0 && (wt[i] | wt[j]) !== 0;
   const fight = wait || ((fa & fo & 16) !== 0 && (ally ? !sameFoe : pa.state === AS.Grapple && po.state === AS.Grapple && !engaged(pa, po)));
   const line = !fight && ally && ((fa | fo) & 128) !== 0 && (fa & 144) !== 0 && (fo & 144) !== 0;
@@ -491,7 +491,7 @@ function pairCb(j: number): boolean {
   const dy = po.y - pa.y;
   // (user 2026-11-01: "make collision hitboxes 2x smaller … keep hitbox size but collision size of ants colliding each
   // other is smaller") every ant–ant distance × `antContact`; the hit shapes (bites, climbs, creatures) are unchanged
-  const min = (fight && !mixed ? (wait && wt[i] && wt[j] ? P.ws : P.ps) * Math.max(len[i], len[j]) : (P.ra + ro) * (line && !mixed ? GUARD.fightRoom : 1)) * BALANCE.separation.antContact;
+  const min = (fight && !mixed ? (wait ? P.ws : P.ps) * Math.max(len[i], len[j]) : (P.ra + ro) * (line && !mixed ? GUARD.fightRoom : 1)) * BALANCE.separation.antContact;
   const d2 = dx * dx + dy * dy;
   if (d2 >= min * min) return false;
   const d = dhypot(dx, dy);
@@ -672,11 +672,10 @@ function fighting(a: Ant): boolean {
 }
 
 /**
- * Waiting for a free slot (every slot on its foe taken), 2026-10-31 (user note: dozens of ants circling one fight): two
- * waiting teammates keep `combat21.waitSpace` × the larger one's length (less than a personal space), whatever foe
- * they wait for; a waiting ant and a teammate fighting keep a personal space even when they are on the same foe (the
- * crowd stays out of the fight). Before, ants waiting on the same foe kept only their bodies' room and stood shoulder
- * to shoulder round the ring.
+ * Pressing in for a free slot (every slot on its foe taken; combat.ts waitForSlot): a pressing ant and any teammate in
+ * the fight keep `combat21.waitSpace` × the larger one's length, whatever foe they are on (2026-11-01, evening: the
+ * crowd presses up behind the fighters instead of keeping a personal space off them; 2026-10-31: two waiting on the
+ * same foe no longer stand shoulder to shoulder round an exact ring).
  */
 function waiting(a: Ant): boolean {
   return a.state === AS.Attack && (a.waitT ?? 0) > 0;

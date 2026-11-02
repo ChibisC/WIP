@@ -1,7 +1,8 @@
 /**
- * The user's notes of 2026-11-01 (evening): ants collide at half the distance, swarm room by the victim's size, trails
+ * The user's notes of 2026-11-01 (18:26): ants collide at half the distance, swarm room by the victim's size, trails
  * that wander and carry a little traffic back to the nest, flat ground (obstacles walked round, never climbed; nest
- * walls not walked on), roomier nest tiles, heads that face straight ahead outside head animations.
+ * walls not walked on), roomier nest tiles, heads that face straight ahead outside head animations; and (20:25) a
+ * swarm that presses in and takes turns instead of queueing off to one side, and no fallen leaves on any map.
  *
  *   npx vite-node tests/notes1101.ts
  */
@@ -17,9 +18,10 @@ import { antSlotCount } from '../src/sim/slots';
 import { Terrain, mapTerrainParams, defaultTerrainParams } from '../src/world/terrain';
 import { PLAYABLE_MAPS } from '../src/maps';
 import { hexRadiusFor } from '../src/world/nestGrid';
-import { twigLine } from '../src/world/mapScatter';
+import { BIOME_DRESS, twigLine } from '../src/world/mapScatter';
 import { HF_ENTRANCE, HF_SITE } from '../src/world/surfaceLayout';
 import { antToView, blankView } from '../src/game/antViews';
+import { pressScene, shareScene } from '../tools/press-probe';
 
 let failed = 0;
 function check(name: string, ok: boolean, detail = ''): void {
@@ -34,6 +36,23 @@ const t0 = Date.now();
   check('swarm: 6 of its own size round a minim, no more', n('atta_minim', 'atta_minim') === 6 && n('atta_minim', 'fire_minor') <= 6, `${n('atta_minim', 'atta_minim')}, ${n('atta_minim', 'fire_minor')} fire minors`);
   check('swarm: 7 round a 4 mm worker, more round bigger ones', n('lasius_worker', 'lasius_worker') === 7 && n('atta_media', 'atta_media') > 7 && n('atta_major', 'atta_major') > n('atta_media', 'atta_media'), `${n('lasius_worker', 'lasius_worker')}, ${n('atta_media', 'atta_media')}, ${n('atta_major', 'atta_major')}`);
   check('swarm: ants collide with each other at half the distance', BALANCE.separation.antContact === 0.5);
+}
+
+// ---- the swarm presses in and takes turns (user 2026-11-01, evening: "they need to look like they are trying to swarm
+// and attack even if they cant fit, make it so that after some attacks if other ants are trying to attack to some ants
+// currently fighting take a small retreat to let the others in but dont allow whatever in the left is happening ever")
+{
+  const s = pressScene('lasius_worker', 'fire_minor', 16, 20, 11);
+  check('swarm: ants with no place press in right behind the fighters — none stands back in a queue, none stands still', s.pressMean >= 3 && s.farShare === 0 && s.stillShare === 0, `${s.pressMean.toFixed(1)} pressing in on average, ${(s.farShare * 100).toFixed(0)} % over 2.5 body lengths back, ${(s.stillShare * 100).toFixed(0)} % standing still`);
+  check('swarm: the fighters take turns, stepping back to let those pressing in have a go', s.turns >= 10, `${s.turns} turns in 20 s`);
+  check('swarm: … and the places stay nearly all filled', s.holdMean >= s.slots - 1.2 && s.holdMean <= s.slots, `${s.holdMean.toFixed(1)} of ${s.slots} holding on average`);
+  // (21:06: "now too much are surrounding a single ant. some other ants are more free than others … selectively swarm
+  // enemies depending on how many are already currently swarming the enemy")
+  const sh = shareScene();
+  const spread = Math.max(...sh.on) - Math.min(...sh.on);
+  check('swarm: shared out over the foes — 30 fire minors charging 3 workers fill all three, none left free', Math.min(...sh.hold) >= 6.5 && spread <= 4 && sh.emptyAfter4 === 0, `holding ${sh.hold.map((x) => x.toFixed(1)).join(' / ')}, on each ${sh.on.map((x) => x.toFixed(1)).join(' / ')} (8–14 s), ${sh.emptyAfter4.toFixed(1)} s with one free after 4 s`);
+  const big = pressScene('atta_major', 'lasius_worker', 30, 20, 11);
+  check('swarm: round a big ant too (an Atta major and 30 Lasius workers)', big.farShare === 0 && big.stillShare === 0 && big.turns >= 10 && big.holdMean + big.under >= big.slots * 0.8, `${big.turns} turns, ${(big.holdMean + big.under).toFixed(1)} of ${big.slots} places filled on average`);
 }
 
 // ---- trails: weave and traffic
@@ -136,9 +155,16 @@ function trailWorld(n: number, seed = 5): { w: World; mx: number; my: number; ex
   const solid = t.props.filter((p) => p.kind === 'pebble' || p.kind === 'rock' || p.kind === 'acorn' || p.kind === 'twig' || p.kind === 'log' || p.kind === 'mushroom');
   const open = solid.filter((p) => !t.isBlocked(p.x, p.y));
   check('flat ground (generated map): every rock, pebble, acorn, twig, log and mushroom blocks (ants walk round)', solid.length > 100 && open.length === 0, `${solid.length} obstacles, ${open.length} walkable`);
-  // (the overlay is sampled bilinearly: a leaf lifts the ground up to a cell beyond its edge)
-  const raised = solid.filter((p) => t.walkHeight(p.x, p.y) - t.heightAt(p.x, p.y) > 1e-6 && !t.props.some((q) => q.kind === 'leaf' && Math.hypot(q.x - p.x, q.y - p.y) < q.scale * 0.45 + t.res * 1.5));
-  check('flat ground: nothing lifts the walking height but a flat fallen leaf', raised.length === 0, `${raised.length} raised`);
+  const raised = solid.filter((p) => t.walkHeight(p.x, p.y) - t.heightAt(p.x, p.y) > 1e-6);
+  check('flat ground: nothing lifts the walking height', raised.length === 0 && t.overlay.every((v) => v === 0), `${raised.length} raised`);
+}
+// ---- no fallen leaves on any map (user 2026-11-01, evening: "remove all the leaves on the ground for all maps cos it
+// blocks visual gameplay")
+{
+  const styles = ['meadow', 'forest', 'sandy', 'riverbank', 'formicarium'] as const;
+  const leafy = styles.filter((st) => new Terrain(defaultTerrainParams(7, st as never, 700, 700)).props.some((p) => p.kind === 'leaf'));
+  const dress = Object.values(BIOME_DRESS).filter((d) => 'leaves' in d);
+  check('no fallen leaves: none on generated maps, none in the authored maps\' dress', leafy.length === 0 && dress.length === 0, leafy.length ? `leaves on ${leafy.join(', ')}` : 'none');
 }
 for (const id of PLAYABLE_MAPS) {
   const t = new Terrain(mapTerrainParams(5, id));

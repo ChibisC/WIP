@@ -759,15 +759,16 @@ function bridgeSpot(w: World, rt: Route): { ax: number; ay: number; bx: number; 
       const by = rt.pts[j * 2 + 1];
       const span = dhypot(bx - ax, by - ay);
       if (span > maxSpan || span < LM() * 2 || arc < span * B.detourRatio || arc - span <= bestSave) continue;
-      // the span must cross water, and nothing but water
+      // the span must cross water, and nothing but water (a pebble under the water is no rock in the way: since
+      // 2026-11-01 every pebble blocks, and a puddle's floor has them too)
       let wet = false;
       let ok = true;
       const steps = Math.ceil(span / 2);
       for (let k = 1; k < steps && ok; k++) {
         const x = ax + ((bx - ax) * k) / steps;
         const y = ay + ((by - ay) * k) / steps;
-        if (w.terrain.isBlocked(x, y)) ok = false;
-        else if (w.terrain.isWater(x, y)) wet = true;
+        if (w.terrain.isWater(x, y)) wet = true;
+        else if (w.terrain.isBlocked(x, y)) ok = false;
       }
       if (!ok || !wet) continue;
       bestSave = arc - span;

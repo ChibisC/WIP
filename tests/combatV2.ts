@@ -201,8 +201,25 @@ function separateOnly(w: World, n: number): void {
   let dup = 0;
   let over = 0;
   let waited = 0;
+  let most = 0;
+  let held = 0;
+  let samples = 0;
+  let stillest = 0;
+  let ticks = 0;
+  const still = new Map<number, number>();
   run(w, 8, () => {
     v.stun = 1;
+    if (++ticks > 60) {
+      const h = att.filter((x) => x.state === AS.Grapple && x.gId === v.id && (x.gUn ?? 0) === 0).length;
+      most = Math.max(most, h);
+      held += h;
+      samples++;
+    }
+    for (const x of att) {
+      const s = x.state === AS.Attack && (x.waitT ?? 0) > 0 && x.v <= 1e-6 ? (still.get(x.id) ?? 0) + 1 : 0;
+      still.set(x.id, s);
+      stillest = Math.max(stillest, s);
+    }
     const taken = new Map<number, number>();
     for (const x of att) {
       const on = (x.state === AS.Grapple && x.gId === v.id) || (x.state === AS.Attack && (x.rsv ?? 0) === v.id && x.tgt === v.id);
@@ -216,15 +233,19 @@ function separateOnly(w: World, n: number): void {
   });
   const holding = att.filter((x) => x.state === AS.Grapple && x.gId === v.id);
   check('reservation: no two attackers ever hold or head for the same slot', dup === 0 && over === 0, `${dup} clashes, ${over} over the ${n} slots`);
-  check('limited attackers: only as many hold the victim as it has slots', holding.length === n, `${holding.length} of ${n}`);
+  // (2026-11-01, evening: the fighters take turns with those pressing in — a place stands empty for a moment as one
+  // steps back and the next comes in)
+  check('limited attackers: never more hold the victim than it has slots, and its places stay nearly all filled', most <= n && held / samples >= n - 1.5, `at most ${most} of ${n}, ${(held / samples).toFixed(1)} on average`);
   const angs = holding.map((x) => Math.atan2(x.y - v.y, x.x - v.x)).sort((a, b) => a - b);
   let spread = 0;
   for (let i = 0; i < angs.length; i++) for (let j = i + 1; j < angs.length; j++) spread = Math.max(spread, Math.abs(Math.atan2(Math.sin(angs[j] - angs[i]), Math.cos(angs[j] - angs[i]))));
   check('flanking: attackers coming from one side spread round to slots on the far side', spread > Math.PI / 2, `${((spread * 180) / Math.PI).toFixed(0)}° between the farthest two`);
   const waiting = att.filter((x) => x.state === AS.Attack && (x.waitT ?? 0) > 0);
   const L = casteOf('lasius_worker').length;
-  const ringOk = waiting.every((x) => dist(x, v) >= casteOf(v.caste).length * 0.5 + L * (C2.frontHalf - C2.jawOverlap) + C2.personalSpace * L * 0.6);
-  check('overflow: the rest wait in a loose ring outside the fight, not piled behind it', waited >= 1 && waiting.length === att.length - holding.length - att.filter((x) => x.state === AS.Dead).length && ringOk, `${waiting.length} waiting`);
+  // (user 2026-11-01, evening: "they need to look like they are trying to swarm and attack even if they cant fit … dont
+  // allow whatever in the left is happening ever" — a still line of waiting ants off to one side)
+  const backs = waiting.map((x) => (dist(x, v) - antOutlineR(v, Math.atan2(x.y - v.y, x.x - v.x))) / L);
+  check('overflow: the rest press in right behind the fighters, never standing still in a queue', waited >= 1 && backs.every((b) => b <= 2.5) && stillest <= 10, `${waiting.length} pressing in, ${backs.length ? Math.max(...backs).toFixed(1) : '–'} body lengths from the foe at most, still for ${stillest} ticks at most`);
 
   // another foe with room nearby: the extra attackers switch to it instead of waiting
   const { w: w2, p: q } = field(12);

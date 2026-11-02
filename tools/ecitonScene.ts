@@ -14,7 +14,7 @@ import { assignGroup, placeMarker, markerRadius } from '../src/sim/markers';
 import { CASTES } from '../src/sim/species';
 import { ECITON } from '../src/sim/balance';
 import { raidRoute, frontHalfWidth } from '../src/sim/eciton';
-import { routeNearest, routeLength } from '../src/sim/route';
+import { routeAt, routeNearest, routeLength } from '../src/sim/route';
 import { spawnCreature } from '../src/sim/creatures/creatureAI';
 
 export interface RaidOpts {
@@ -26,7 +26,7 @@ export interface RaidOpts {
   seconds?: number;
   prey?: number;
   creatures?: number;
-  /** a puddle across the way, 80 mm out (the trail bends round it: a living bridge forms over it) */
+  /** a puddle across the trail, 80 mm out (the trail bends round it: a living bridge forms over it) */
   puddle?: boolean;
   /** keep running and call back every second (render tools) */
   onSecond?: (w: World, t: number) => void;
@@ -52,9 +52,15 @@ export function raidScene(o: RaidOpts = {}) {
     }
   }
   if (o.puddle) {
-    const ang = Math.atan2(my - e.sy, mx - e.sx);
-    // a round puddle right across the way: the trail goes round it
-    w.terrain.addPuddle(e.sx + Math.cos(ang) * 80, e.sy + Math.sin(ang) * 80, 22);
+    // a round puddle right across the trail, 80 mm out from the nest: the trail goes round it and a living bridge spans
+    // the detour (2026-11-01: it was put 80 mm out on the straight line to the marker, 22 mm across, and the bridge
+    // formed only where the 8 mm flow cells happened to cut its edge — with pebbles and twigs blocking, the trail bends
+    // and on most seeds missed it; on the trail itself, and small enough for a bridge to span, it is there every time)
+    placeMarker(w, c, 0, SURFACE, mx, my);
+    const rt = raidRoute(w, c, 0);
+    const at = { x: 0, y: 0, ux: 0, uy: 0 };
+    routeAt(rt, Math.max(0, routeLength(rt) - 80), at);
+    w.terrain.addPuddle(at.x, at.y, 14);
   }
   // prey scattered round the raid area (insects: what army ants eat), and seeds they must leave alone
   const rngPts = (n: number, r: number, f: (x: number, y: number, i: number) => void) => {

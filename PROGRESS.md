@@ -1184,3 +1184,65 @@ wood ants' basics were 10 throughout. Notes, and what was done:
   alone came to 139 with the crouch). Browser clips `workers_*`, `foes_under_major` in `tests/browser/underpass.py`.
 - LAN: `tests/browser/lan.py` (two players) now also checks the game-speed vote: 2× only when both agree, either can drop
   back to 1×, hashes still match.
+
+### 2026-11-01 (evening, 6) — The 18:26 notes: contact, swarm room, trails, flat ground, nest tiles, heads
+- **Contact half as far** ("keep hitbox size but collision size of ants colliding each other is smaller"): every
+  ant–ant separation distance × `BALANCE.separation.antContact` 0.5; bites, climbs and creature shapes unchanged (the
+  hitbox overlay's crowding circle scales with it).
+- **Swarm room by size** (`combat2.swarm`, `slots.ts antSlotCount`): at most 6 round a minim-sized ant (≤ 3 mm), 7 round
+  a 4 mm worker, one more for every 3 mm beyond.
+- **Trail line** (only while a marker is selected or being placed): a dashed, flowing ribbon from the entrance to the
+  marker, and a fainter preview to the cursor (`render/game/markerTrail.ts`, `game/session.ts trailEnds`).
+- **Trails that wander** (`TRAIL`, `movement.ts trailWeave`): an EotU-like band — each ant weaves on three slow sines of
+  its own; not army ants or termites (their lanes), not fighting ants. **Traffic** (`guardLine.ts trailTraffic`, not in
+  the arena): at a marker, now and then 2–3 (+10 % of the group, never over 30 %) walk back to the nest and out again.
+- **Flat ground** ("ants should only be flat on the ground … walk around it … also sticks and other obstacles"):
+  every rock, pebble, acorn, twig, log and mushroom blocks (`terrain.ts block`); ants skirt round them and follow their
+  edge (`moveForward`), the flow field keeps off blocked edges (`flow.ts edges`, `clearTo`), trails keep 1.5 mm off
+  them (`route.ts`). Pebbles thinned to a third (the generator sequence kept). Authored maps get their obstacles from
+  `world/mapScatter.ts` (same every game, none on sites or entrances). Markers dropped on an obstacle move to open
+  ground. Nest floors: ants walk the floor, never up the walls (`nestTerrain.ts floorAt`); walls a little straighter.
+- **Nest tiles** 1.25 × larger, same count (`NEST_HEX_SCALE`).
+- **Heads** face straight ahead except when antennating a nestmate (paused) and in attack animations (the head-leads-
+  the-turn yaw is gone; the mantis turns its head only while lurking).
+- Tests: `tests/notes1101.ts`; fights/combat v2/v2.1/under-pass checks moved to the new spacing; species and sickle
+  scenes clear their patch of obstacles (`Terrain.clearArea`, kept in snapshots); the raid front and lanes averaged over
+  two raids (pebbles and twigs blur the army-ant lanes a little).
+
+### 2026-11-01 (evening, 7) — No queues: the swarm presses in and takes turns; no fallen leaves
+- User (20:25, arena screenshot with a line of fire minors standing off to the left): "they need to look like they are
+  trying to swarm and attack even if they cant fit, make it so that after some attacks if other ants are trying to
+  attack to some ants currently fighting take a small retreat to let the others in but dont allow whatever in the left
+  is happening ever. also remove all the leaves on the ground for all maps cos it blocks visual gameplay".
+- **Pressing in** (`combat.ts waitForSlot`, `combat21.press…`): an ant with no place presses in 0.9 × its length
+  behind the hold line (measured from the foe's outline that way: a long foe's sides are nearer than its ends), turned
+  0.55 rad round the ring, edging round the crowd and switching sides every ~2 s, nosing in when there — never still
+  (it scrabbles against the fighters) — and its jaws snap on a rhythm of its own (`antViews.ts pressingIn`). Pressing
+  ants keep only `waitSpace` from any teammate in the fight (they come right up behind the fighters).
+- **Taking turns** (`takeTurns`, `turnOut`): after 3–5 bites, a fighter with a teammate pressing for the same foe within
+  2.5 × its length lets go and hands its place to the presser nearest it round the ring (which goes straight for it, no
+  going round); it steps back 0.7 × its length, turned away from the newcomer, and presses in itself for 1.6 s. Army
+  ants keep their hooks in (their hold pins the prey). Places stay ~90–95 % filled (an Atta major ringed by 30 Lasius
+  workers: 18.4 of 20).
+- **Sharing the swarm out** (user 21:06, on a screenshot of one worker buried while another stood free: "selectively
+  swarm enemies depending on how many are already currently swarming the enemy"; `combat.ts findTarget`):
+  - each nestmate already on a foe counts as `combat2.crowdLen` 1.5 × the ant's length farther away, on a foe with room
+    for `crowdRef` 7 (in proportion less on a bigger foe). Before, the crowd multiplied the squared distance, so nothing
+    outweighed standing right beside a foe, and outnumbering the foes 4:1 or a marker on them dropped it altogether —
+    the arena's charge does both;
+  - picks count at once (`claim`): 30 ants deciding in the same tick no longer all take the same nearest foe;
+  - an ant closing in looks again every `retargetSec` 0.5 s (from the edge of its sight it saw one foe);
+  - a full foe is pressed on only when no foe in sight has room, marker or not; a marker on a foe now draws ants to it as
+    if `focusPull` 0.6 × as far (squared), and an ant's current foe gets `keepBias` 0.8 (no flitting).
+  - 30 fire minors charging 3 Lasius workers: 7.0 / 7.7 / 7.8 holding each, 11 / 10 / 9 on each (8–14 s); before, 14
+    on one while another stood free for seconds. The 60 v 60 clash: 9.8 fights a sample (was 9.3).
+- **No fallen leaves** on any map: generated maps still draw them from the generator (everything after lies where it
+  did) but drop them, and nothing lifts the walking height any more; authored maps lose their litter leaves; the forest
+  floor's ground texture had 48 whole leaves painted in — now fine humus crumbs (`textures.ts litterTexture`). Leaf
+  rafts over water and the leafcutters' leaves stay; pine needles on the generated forest style were kept.
+- Army-ant bridge test: the scene's puddle now lies on the trail itself, 14 mm (a bridge spans the detour). It was put on
+  the straight line to the marker and bridged only where the flow cells cut its edge; with obstacles blocking and no
+  leaves the trail missed it on most seeds. Bridges may also span pebbles lying under water.
+- Tests: `tests/notes1101.ts` (pressing: none over 2.5 lengths back, none still; turns; places filled; round an Atta
+  major too; shared out over three foes; no leaves); `tests/combatV2.ts` overflow checks moved to pressing; `tools/press-probe.ts`,
+  `tools/press-run.ts`.

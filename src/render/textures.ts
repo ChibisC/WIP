@@ -236,12 +236,16 @@ export function sandTexture(size = 512): TexPair {
   );
 }
 
-/** Leaf litter: decayed leaf fragments over dark humus. */
+/**
+ * Forest floor: fine crumbs of humus over dark soil. (User 2026-11-01, evening: "remove all the leaves on the ground for
+ * all maps cos it blocks visual gameplay" — this was leaf litter, 48 whole leaves with midribs painted in; now only
+ * small, low-contrast crumbs, no leaf shapes.)
+ */
 export function litterTexture(size = 512): TexPair {
   const P = 8;
   const rng = new Rng(77);
   const frags: Array<[number, number, number, number, number, number]> = [];
-  for (let i = 0; i < 48; i++) frags.push([rng.next(), rng.next(), rng.range(0.015, 0.06), rng.range(0, Math.PI), rng.next(), rng.range(0.3, 0.7)]);
+  for (let i = 0; i < 140; i++) frags.push([rng.next(), rng.next(), rng.range(0.003, 0.009), rng.range(0, Math.PI), rng.next(), rng.range(0.55, 1)]);
   return genPair(
     size,
     (x, y, u, v) => {
@@ -259,14 +263,14 @@ export function litterTexture(size = 512): TexPair {
         const ly = -dx * Math.sin(fa) + dy * Math.cos(fa);
         const d = Math.hypot(lx / fr, ly / (fr * fe));
         if (d < 1) {
-          const vein = Math.abs(ly) < fr * 0.03 ? 0.75 : 1;
           const jag = pnoise(u * 300, v * 300, 300, 43);
-          if (d < 0.85 + jag * 0.15) {
-            const tone = 0.7 + fc * 0.5;
-            r = mix(0.26, 0.42, fc) * tone * vein;
-            g = mix(0.17, 0.27, fc) * tone * vein;
-            b = mix(0.09, 0.13, fc) * tone * vein;
-            h = 0.55 + (1 - d) * 0.2;
+          if (d < 0.8 + jag * 0.2) {
+            // a crumb a little lighter or darker than the soil round it (no outline, no vein)
+            const tone = 0.85 + fc * 0.4;
+            r = mix(0.15, 0.21, fc) * tone;
+            g = mix(0.105, 0.14, fc) * tone;
+            b = mix(0.06, 0.08, fc) * tone;
+            h = 0.45 + (1 - d) * 0.15;
           }
         }
       }

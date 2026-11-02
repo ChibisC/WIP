@@ -80,7 +80,12 @@ function meleeOf(w: World, a: Ant, L: number): boolean {
   const t = a.tk === 3 ? w.antById.get(a.tgt) : a.tk === 4 ? w.creatureById.get(a.tgt) : undefined;
   if (!t) return false;
   const r = 'caste' in t ? casteOf(t.caste).length * 0.45 : t.scale * 0.45;
-  return Math.hypot(t.x - a.x, t.y - a.y) <= r + L * 0.6;
+  // pressing in behind the fighters for a place (combat.ts waitForSlot): snapping too, out to the back of the crowd
+  return Math.hypot(t.x - a.x, t.y - a.y) <= r + L * (pressingIn(a) ? 3 : 0.6);
+}
+/** Pressing in for a place on its foe (every slot taken): it snaps at the air, trying to get at it (user 2026-11-01). */
+function pressingIn(a: Ant): boolean {
+  return a.state === AS.Attack && (a.waitT ?? 0) > 0;
 }
 /**
  * Caste abilities (sim/casteAbilities.ts), render: the leafcutter major's taunt display and the army-ant soldier's
@@ -120,10 +125,17 @@ function meleeAttack(w: World, a: Ant, out: AntView): void {
     r = { cd: a.cd, gap: cd.attackInterval, q: 0, n: 0, v: a.id % 3, seen: w.s.tick };
     atkRecs.set(a.id, r);
   }
-  if (a.cd > r.cd + 1e-6) r.gap = Math.max(0.15, a.cd); // the bite just landed: the new gap
+  let p: number;
+  if (pressingIn(a)) {
+    // no bite lands: it snaps on a rhythm of its own (by its id), a little quicker than its bites
+    r.gap = Math.max(0.15, cd.attackInterval * (0.65 + 0.3 * ((a.id * 0.618034) % 1)));
+    p = (w.time / r.gap + a.id * 0.37) % 1;
+  } else {
+    if (a.cd > r.cd + 1e-6) r.gap = Math.max(0.15, a.cd); // the bite just landed: the new gap
+    p = Math.min(1, Math.max(0, 1 - a.cd / r.gap));
+  }
   r.cd = a.cd;
   r.seen = w.s.tick;
-  const p = Math.min(1, Math.max(0, 1 - a.cd / r.gap));
   const q = (p + ATTACK_CONTACT) % 1;
   if (q < r.q - 0.5) {
     // a new cycle: the next of the three attacks (never the same twice running; half the ants go round the other way),

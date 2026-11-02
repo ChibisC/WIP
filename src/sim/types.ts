@@ -175,6 +175,11 @@ export interface Ant {
   avs?: number;
   /** ticks left following an obstacle's edge before turning back toward its goal (movement.ts) */
   avT?: number;
+  /** bites in its current hold (combat.ts: a fighter takes turns with teammates pressing for its foe) */
+  bN?: number;
+  /** taking turns: seconds left of its turn out of the fight (stepping back, then pressing in; no place reserved), signed by
+   * the side it steps back to */
+  rotT?: number;
   /** climbing / riding: the creature id (0 = on the ground) */
   rideId?: number;
   /** climbing: 0 walking to the foot of the rail, 1 up, 2 riding, 3 down (1–3: untouchable) */

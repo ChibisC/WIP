@@ -9,8 +9,8 @@ import type { Terrain } from './terrain';
  * The small obstacles lying about an authored map — pebbles, twigs, fungi and fern clumps — placed once from the
  * map id, so the simulation and the renderer agree on them (user 2026-11-01: "ants should only be flat on the ground
  * and not … walk over rocks (they walk around it) … this also applies to sticks and other obstacles"). The terrain
- * blocks them (ants and creatures walk round); render/mapDecor.ts and render/mapBiomes.ts draw them. Grass, leaves and
- * flowers stay render-only (ants walk through grass and over flat leaves).
+ * blocks them (ants and creatures walk round); render/mapDecor.ts and render/mapBiomes.ts draw them. Grass and
+ * flowers stay render-only (ants walk through grass; no fallen leaves since 2026-11-01, evening).
  */
 
 /** How much grass, litter, twigs, ferns and fungi a biome has (per dm²). */
@@ -24,9 +24,6 @@ export interface BiomeDress {
   pebbles: number;
   /** wildflower drifts per dm² */
   flowers: number;
-  /** fallen leaves per dm², and their size range (mm) */
-  leaves: number;
-  leafSize: readonly [number, number];
   /** twigs per dm² */
   twigs: number;
   /** small fungus clusters per dm² */
@@ -38,11 +35,11 @@ export interface BiomeDress {
 }
 
 export const BIOME_DRESS: Record<Biome, BiomeDress> = {
-  meadow: { grass: 3.4, edge: 0.5, dry: false, pebbles: 7, flowers: 0.12, leaves: 0.25, leafSize: [18, 40], twigs: 0.08, fungi: 0, ferns: 0, reeds: 1 },
-  forest: { grass: 0.45, edge: 0.6, dry: false, pebbles: 4, flowers: 0, leaves: 8, leafSize: [20, 46], twigs: 1.1, fungi: 0.12, ferns: 0.07, reeds: 0.5 },
-  riverbank: { grass: 2.4, edge: 0.4, dry: false, pebbles: 9, flowers: 0.05, leaves: 0.8, leafSize: [18, 40], twigs: 0.35, fungi: 0, ferns: 0, reeds: 1.6 },
-  rainforest: { grass: 0.15, edge: 0.6, dry: false, pebbles: 2, flowers: 0, leaves: 5, leafSize: [30, 80], twigs: 0.7, fungi: 0.08, ferns: 0.2, reeds: 0.6 },
-  savanna: { grass: 2.2, edge: 0.3, dry: true, pebbles: 11, flowers: 0.02, leaves: 0.15, leafSize: [10, 22], twigs: 0.55, fungi: 0, ferns: 0, reeds: 0.4 },
+  meadow: { grass: 3.4, edge: 0.5, dry: false, pebbles: 7, flowers: 0.12, twigs: 0.08, fungi: 0, ferns: 0, reeds: 1 },
+  forest: { grass: 0.45, edge: 0.6, dry: false, pebbles: 4, flowers: 0, twigs: 1.1, fungi: 0.12, ferns: 0.07, reeds: 0.5 },
+  riverbank: { grass: 2.4, edge: 0.4, dry: false, pebbles: 9, flowers: 0.05, twigs: 0.35, fungi: 0, ferns: 0, reeds: 1.6 },
+  rainforest: { grass: 0.15, edge: 0.6, dry: false, pebbles: 2, flowers: 0, twigs: 0.7, fungi: 0.08, ferns: 0.2, reeds: 0.6 },
+  savanna: { grass: 2.2, edge: 0.3, dry: true, pebbles: 11, flowers: 0.02, twigs: 0.55, fungi: 0, ferns: 0, reeds: 0.4 },
 };
 
 /** One obstacle (map mm; y is the plane's second axis, the renderer's z). */

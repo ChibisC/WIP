@@ -318,12 +318,16 @@ export class Terrain {
       p.scale = rng.range(1.2, 3.4);
       p.len = rng.range(30, 140);
     });
+    // (user 2026-11-01, evening: "remove all the leaves on the ground for all maps cos it blocks visual gameplay") no
+    // fallen leaves; they are still drawn from the generator, so everything placed after them lies where it did
     const leafCount = style === 'forest' ? 6 : style === 'sandy' ? 0.3 : style === 'formicarium' ? 0.6 : 2.2;
+    const noLeaves = this.props.length;
     add('leaf', Math.round(area * leafCount), (p) => {
       p.scale = rng.range(18, 46);
       p.hue = rng.next();
       p.tilt = rng.range(-0.15, 0.15);
     });
+    this.props.length = noLeaves;
     if (style === 'forest') add('needle', Math.round(area * 26), (p) => (p.scale = rng.range(14, 26)));
     if (style !== 'sandy') {
       add('mushroom', Math.round(area * (style === 'forest' ? 0.3 : 0.08) * dens), (p) => (p.scale = rng.range(8, 22)));
@@ -410,24 +414,9 @@ export class Terrain {
       this.version++;
       return;
     }
-    const stamp = (cx: number, cy: number, r: number, h: (d: number) => number) => {
-      const i0 = Math.max(0, Math.floor((cx - r) / res));
-      const i1 = Math.min(nx - 1, Math.ceil((cx + r) / res));
-      const j0 = Math.max(0, Math.floor((cy - r) / res));
-      const j1 = Math.min(ny - 1, Math.ceil((cy + r) / res));
-      for (let j = j0; j <= j1; j++)
-        for (let i = i0; i <= i1; i++) {
-          const d = dhypot(i * res - cx, j * res - cy) / r;
-          if (d < 1) {
-            const k = j * nx + i;
-            const v = h(d);
-            if (v > this.overlay[k]) this.overlay[k] = v;
-          }
-        }
-    };
     // (user 2026-11-01: "ants should only be flat on the ground … not walk over rocks (they walk around it) … this also
     // applies to sticks and other obstacles cos they should only walk on a flat plain") rocks, pebbles, acorns, twigs,
-    // logs and mushrooms block; only a fallen leaf, flat, lifts the ground a little
+    // logs and mushrooms block; nothing lifts the ground (the fallen leaves that did are gone, 2026-11-01 evening)
     for (const p of this.props) {
       switch (p.kind) {
         case 'pebble':
@@ -438,9 +427,6 @@ export class Terrain {
           break;
         case 'acorn':
           this.block(p.x, p.y, 7 * p.scale);
-          break;
-        case 'leaf':
-          stamp(p.x, p.y, p.scale * 0.45, () => 0.5);
           break;
         case 'twig':
         case 'log': {

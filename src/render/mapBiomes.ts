@@ -392,35 +392,14 @@ export interface ScatterCtx {
   keepClear: (x: number, z: number, ring?: number) => boolean;
 }
 
-/** Fallen leaves, twigs, small fungi and ferns for a biome. */
+/** Twigs, small fungi and ferns for a biome. */
 export function litter(ctx: ScatterCtx, d: BiomeDress, group: THREE.Group): void {
   const { terrain: t, rng, ground, free } = ctx;
   const tex = textures();
   const area = (t.width * t.depth) / 1e4;
   const dense = (x: number, z: number) => fbm2(x / 140, z / 140, 3, 31) > 0.42; // patchy, not even
-  // fallen leaves
-  const leaves: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < area * d.leaves; i++) {
-    const x = rng.range(0, t.width);
-    const z = rng.range(0, t.depth);
-    const size = rng.range(d.leafSize[0], d.leafSize[1]);
-    // the whole leaf stays off water, walls and crossings (big rainforest leaves would hide them)
-    if (!free(x, z, Math.max(4, size * 0.45)) || (!dense(x, z) && rng.chance(0.6))) continue;
-    const g = leafGeometry(size, rng.int(0, 7), tex.leaves.cols, tex.leaves.rows, rng);
-    g.rotateX(rng.range(-0.12, 0.12));
-    g.rotateY(rng.range(0, 6.28));
-    g.translate(x, ground(x, z) + 0.25 + rng.range(0, 0.4), z);
-    leaves.push(g);
-  }
-  if (leaves.length) {
-    const mat = new THREE.MeshStandardMaterial({ map: tex.leaves.map, normalMap: tex.leaves.normal, roughness: 0.72, side: THREE.DoubleSide });
-    patchDapple(mat);
-    const m = new THREE.Mesh(mergeGeometries(leaves), mat);
-    m.receiveShadow = true;
-    m.castShadow = true;
-    m.name = 'mapLeaves';
-    group.add(m);
-  }
+  // (no fallen leaves: user 2026-11-01, evening — "remove all the leaves on the ground for all maps cos it blocks visual
+  // gameplay"; leaf rafts over water stay)
   // twigs (placed with the map's other obstacles, world/mapScatter.ts: the simulation walks round them)
   const twigs: THREE.BufferGeometry[] = [];
   for (const o of t.mapObs) {

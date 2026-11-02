@@ -203,10 +203,12 @@ export const BALANCE = {
    * neighbouring attackers about a personal space apart and gives the counts the spec asks for: a worker on a
    * worker 3, a Lasius worker on a ground beetle 9, a boss the cap.)
    *
-   * Overflow and duels (combat.ts findTarget / waitForSlot): each ant already on a foe counts `crowdPenalty` more
-   * (on the squared distance); a target with no free slot is skipped. Focus fire (no crowd penalty, may wait in a
-   * full target's ring) only when the ant's marker is within `focusMarkerMm` of the foe or its side outnumbers the
-   * foes in sight `focusOutnumber` to 1. Waiting ants stand on a ring at a personal space and look for a free slot
+   * Overflow and duels (combat.ts findTarget / waitForSlot): each nestmate already on a foe counts as `crowdLen` × the
+   * ant's length farther away on a foe with room for `crowdRef` attackers, in proportion less on a bigger one (user
+   * 2026-11-01, 21:06: share the swarm out by how many are already on each foe); picks count at once, an ant closing
+   * in looks again every `retargetSec`, and its current foe gets `keepBias`. A target with no free slot is skipped.
+   * Focus fire (the ant's marker within `focusMarkerMm` of the foe): the foe counts `focusPull` × as far (squared), and a
+   * full target may be pressed on. Waiting ants stand on a ring at a personal space and look for a free slot
    * every `ringCheckSec`; an ant whose slot is more than `flankStep` rad round the ring sidles round it facing the
    * target at `flankSpeed` × its speed. A bitten ant turns on the
    * biter only when its own target is more than `keepTargetReach` × its length from its hold point.
@@ -244,9 +246,12 @@ export const BALANCE = {
     slotsMin: 2,
     slotsMax: 24,
     queenSlotsMin: 8,
-    crowdPenalty: 2.5,
+    crowdLen: 1.5,
+    crowdRef: 7,
+    focusPull: 0.6,
+    keepBias: 0.8,
+    retargetSec: 0.5,
     focusMarkerMm: 6,
-    focusOutnumber: 4,
     ringCheckSec: 0.5,
     flankStep: 0.7,
     flankSpeed: 0.8,
@@ -310,12 +315,22 @@ export const BALANCE = {
    * way; ties by its id. Walking in a fight or to a marker, it steers round teammates in its way: `avoidLook` × its
    * length ahead, in a cone of `avoidCone` rad, turning up to `avoidTurn` rad.
    *
-   * **Waiting** (2026-10-31, user note: dozens of ants circling one fight in a spiral): every slot on its foe taken, an ant
-   * waits in a loose crowd anywhere from just inside the ring to `waitBand` × its length beyond it, standing where it
-   * stopped; two waiting teammates keep `waitSpace` × the larger one's length apart (less than a personal space: before,
-   * ants waiting on the same foe kept only their bodies' room and stood shoulder to shoulder round an exact ring), a
-   * waiting ant and a fighting teammate a personal space. A full foe is waited on only when no foe in sight has room, or
-   * when a marker is on it; outnumbering the foes only drops the crowd penalty.
+   * **Pressing in, never a queue** (user 2026-11-01, evening: "they need to look like they are trying to swarm and attack
+   * even if they cant fit … take a small retreat to let the others in but dont allow whatever in the left is happening
+   * ever" — the ants that stood in a still line off to one side, 2026-10-31's loose waiting band): every slot on its
+   * foe taken, an ant presses in `pressGap` × its length behind the hold line (where the fighters stand), turned
+   * `pressAngle` rad round the ring from facing the foe — edging round the crowd for a way in, the side it edges to
+   * flipping every `pressFlipSec` (± a third, by its id) — at `pressSpeed` × its speed, nosing on at `pressPush` once
+   * there (the fighters and the crowd push it back: it scrabbles on the spot, its jaws snapping in the render), backing
+   * out at `pressBack` when pushed in closer than `pressNear` × its length behind the hold line. A place on an ant foe comes
+   * free within `pressSidle` × its length: it sidles straight to it (no going round on the outer ring). Any teammate within
+   * `waitSpace` × the larger one's length of a pressing ant is pushed off at the walking strength (a crowd, not a fight's
+   * spacing). **Taking turns:** a fighter that has bitten `rotBites` (+ 0..`rotSpread`, by its id) times while a teammate
+   * presses for the same foe within `rotNear` × its length lets go and hands its place to the presser nearest it round the
+   * ring (which goes straight for it); it steps back `rotBackLen` × its length over `rotBackSec`, turned `rotTurn` rad
+   * from straight back away from the side the presser comes from, and presses in itself until `rotSec` is up. A full
+   * foe is pressed on only when no foe in sight has room, or when a marker is on it (and then the crowd on it still
+   * counts: `combat2`).
    */
   combat21: {
     windupSec: 0.25,
@@ -345,8 +360,22 @@ export const BALANCE = {
     avoidLook: 2,
     avoidCone: 0.7,
     avoidTurn: 0.9,
-    waitBand: 3,
     waitSpace: 1,
+    pressGap: 0.9,
+    pressAngle: 0.55,
+    pressFlipSec: 2.2,
+    pressSpeed: 0.45,
+    pressPush: 0.12,
+    pressBack: 0.35,
+    pressNear: 0.3,
+    pressSidle: 3,
+    rotBites: 3,
+    rotSpread: 2,
+    rotNear: 2.5,
+    rotBackLen: 0.7,
+    rotTurn: 0.6,
+    rotBackSec: 0.45,
+    rotSec: 1.6,
   },
   /**
    * Mounting (EotU, CHANGE_PLAN §16 step 8): only ants and termites mount. A caste is small (mounts large and huge
