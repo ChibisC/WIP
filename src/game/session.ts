@@ -4,7 +4,7 @@ import { EventBus, SimEvent } from '../core/events';
 import { GameLoop } from '../core/loop';
 import { Input, PointerInfo } from '../core/input';
 import { GameView, Quality } from '../render/view';
-import { AntRenderer, AntSpaceAdapter, AntView } from '../render/ants/antRenderer';
+import { AntRenderer, AntSpaceAdapter, AntView, animHooks } from '../render/ants/antRenderer';
 import { edible } from '../sim/diet';
 import { HitboxOverlay } from './hitboxOverlay';
 import { CombatDebugOverlay } from './combatDebugOverlay';
@@ -198,6 +198,7 @@ export class GameSession {
     this.commands = new LocalCommands(this.world, this.player.id);
     this.sim = new LocalSim(this.world, this.commands.schedule);
     this.viewedArea = nestSpace(this.player.id);
+    animHooks.fx = this.routeDust;
     this.input = new Input(canvas);
     const st = settings();
     this.input.bindings = bindingsOf(st);
@@ -1439,6 +1440,15 @@ export class GameSession {
     const q = w.antById.get(this.player.queen);
     if (q && q.hp < q.maxHp * 0.5 && q.state !== AS.Dead && w.s.tick % 20 === 0) this.alert(q.space);
   }
+
+  /** Render-only dust (a hell ant's snap, render/ants/antRenderer.ts animHooks.fx) in the scene of its space. */
+  private routeDust = (x: number, y: number, space: number, size: number): void => {
+    if (space === SURFACE) this.surfFx.dust(x, y, size, this.surfHeight);
+    else {
+      const nv = this.nests.get(space);
+      if (nv) nv.fx.dust(x, y, size, (px, py) => nv.stage.terrain.heightAt(px, py));
+    }
+  };
 
   /** Combat effects go to the scene of the space they happened in. */
   private routeFx(e: SimEvent): void {

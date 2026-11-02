@@ -481,6 +481,9 @@ void termiteDeform(out vec3 oP, out vec3 oN) {
       vec3 r = p - proj;
       float sc = P.abd.z;
       bool queen = rigT(RC_RIG_A).z > 0.5;
+      // realism rework: the abdomen breathes (a slow pulse, out of step between termites); not once dead
+      vec4 realT = rigT(RC_REAL);
+      if (realT.y > 0.0 && !queen && !isState(aAnim.x, 10.0)) sc *= 1.0 + realT.y * sin(uTermiteTime * 2.6 + seed * 6.2832) * smoothstep(0.05, 0.3, tt);
       if (queen) {
         // v2.1: a slow peristaltic wave rolls front -> back every QA_PERIOD s; as it passes, the rolls narrow
         // and the pleats squeeze (creases deepen), then relax; each roll also breathes gently
@@ -490,7 +493,7 @@ void termiteDeform(out vec3 oP, out vec3 oN) {
         float pulse = exp(-pow((tt - wc) / 0.1, 2.0));
         float mask = smoothstep(0.04, 0.14, tt) * (1.0 - smoothstep(0.9, 1.0, tt));
         float pleat = rigT(RC_QUEEN0).w;
-        sc *= 1.0 - mask * pulse * (0.035 + 0.6 * pleat * cr);
+        sc *= 1.0 - mask * pulse * (0.035 + 0.6 * pleat * cr) * (realT.x > 0.5 ? 1.6 : 1.0);
         sc *= 1.0 + mask * (0.012 * sin(uTermiteTime * 1.4 + seed * 6.0) + 0.008 * sin(uTermiteTime * 2.3 - w * 0.9));
       }
       sc *= 1.0 - P.abd.w * smoothstep(0.78, 1.0, tt);
@@ -641,6 +644,9 @@ if (vFx.x > 0.01) {
   float bone = vA.y;
   float bt = vA.z;
   vec4 skin = rigF(RC_SKIN); // translucency, gut, headCoat, kind
+  vec4 realF = rigF(RC_REAL); // realism rework: on, breathe, glint, eggs
+  bool real = realF.x > 0.5;
+  float memb = 0.0;
   vec3 col = diffuseColor.rgb;
   vec3 V = normalize(vViewPosition);
   float ndv = clamp(abs(dot(normal, V)), 0.0, 1.0);
@@ -668,7 +674,21 @@ if (vFx.x > 0.01) {
     vec4 gut = rigF(RC_GUT); // rgb + spread
     float gm = skin.y * exp(-pow((bt - 0.55) / max(gut.w, 0.05), 2.0)) * smoothstep(-0.7, 0.35, vRestN.y);
     gm *= (0.55 + 0.45 * tNoise(vRestP * 3.0 + 1.7)) * mix(0.45, 1.0, ndv); // mottled, paler toward the translucent rim
+    if (real) {
+      // realism rework: an irregular gut — two or three lobes along the abdomen, a lumpy edge, each termite its own
+      float sd = fract(vLook.w * 3.71);
+      float lobes = 0.5 + 0.5 * sin(bt * 16.0 + sd * 6.2832);
+      float lump = tNoise(vRestP * 5.5 + vec3(sd * 9.0, 0.0, 0.0));
+      gm *= (0.6 + 0.55 * lobes) * (0.65 + 0.7 * lump);
+    }
     col = mix(col, rigF(RC_GUT).rgb, smoothstep(0.05, 0.75, gm) * mix(0.55, 0.92, tanK));
+    // (the gut's dense core darker still, seen through the thinnest wall)
+    if (real) col = mix(col, rigF(RC_GUT).rgb * 0.6, smoothstep(0.6, 1.05, gm) * 0.5 * tanK);
+    if (real) {
+      // the segment membranes: sunken, paler and more translucent (the abdomen breathes there)
+      memb = im * step(0.04, bt);
+      normal = tBump(normal, -0.0035 * rigF(RC_RIG_A).x * memb);
+    }
   }
   if (abd && (abs(m - 2.0) < 0.5 || abs(m - 12.0) < 0.5)) {
     // v2.1 physogastric queen: glossy, wet, translucent membrane coloured by age (ivory -> amber -> honey),
@@ -717,6 +737,17 @@ if (vFx.x > 0.01) {
     float sang = atan(nyz.x, side); // 0 at the side, + above
     float sp = (kk < QA_SEGS - 0.5 && d > 0.0) ? 1.0 - smoothstep(0.5, 1.0, length(vec2((d - 0.3) / 0.035, (sang - 0.2) / 0.055))) : 0.0;
     col = mix(col, vec3(0.13, 0.07, 0.035), sp * 0.7);
+    if (real && realF.w > 0.0) {
+      // realism rework: eggs seen faintly through the stretched membrane on the flanks — pale creamy ovals with a
+      // soft darker edge, packed in the middle rolls, hidden by the plates and the creases
+      vec2 ec = tCell(vRestP * vec3(1.1, 1.9, 1.9) + 11.0);
+      float on = step(0.3, ec.y);
+      float egg = (1.0 - smoothstep(0.2, 0.33, ec.x)) * on;
+      float ring = smoothstep(0.24, 0.31, ec.x) * (1.0 - smoothstep(0.31, 0.4, ec.x)) * on;
+      float vis = realF.w * smoothstep(0.1, 0.25, u) * (1.0 - smoothstep(0.82, 0.96, u)) * (1.0 - cr) * mix(0.35, 1.0, ndv) * (1.0 - plate);
+      col = mix(col, col * vec3(1.08, 1.05, 0.95) + vec3(0.02, 0.018, 0.008), egg * vis * 0.35);
+      col = mix(col, col * 0.8, ring * vis * 0.4);
+    }
     plateGloss = 0.5 * max(plate, stern);
   }
   // v2.1 royals' compound eyes: dark, with a subtle facet texture (tiny lenses)
@@ -782,10 +813,21 @@ if (vFx.x > 0.01) {
   else if (abs(bone - 1.0) < 0.5) tCoat = skin.z * 0.5;
 
   tSheen = (m > 0.5 && m < 1.5) ? 1.0 : 0.0; // waxy satin sheen on soft cuticle only
+  if (real && m > 0.5 && m < 1.5) {
+    // realism rework: a wet glint on the soft cuticle (a thin clear film: sharp, broken highlights), waxier underneath
+    float film = 0.55 + 0.45 * tNoise(vRestP * 2.3 + 5.0);
+    tCoat = max(tCoat, realF.z * film);
+    roughnessFactor = min(roughnessFactor, 0.36 + 0.12 * film);
+  }
   // waxy translucent soft tissue: rim glow, light wrap and back-lit transmission
   float tr = ((m > 0.5 && m < 2.5) || (m > 6.5 && m < 7.5) || m > 11.5) ? skin.x : (m > 8.5 && m < 9.5 ? 0.25 : (m > 9.5 && m < 10.5 ? 0.1 : (m > 10.5 ? 0.18 : 0.0)));
   // queens: light scattered through the thick membrane comes out deeper and more saturated
   vec3 sssC = (m > 1.5 && m < 2.5) || m > 11.5 ? col * col * 1.5 : col;
+  // realism rework: deeper subsurface light in the soft cuticle, strongest through the thin segment membranes
+  if (real && m > 0.5 && m < 1.5) {
+    tr = tr * 1.3 + 0.3 * memb;
+    sssC = mix(col, col * col * 1.7, 0.45);
+  }
   totalEmissiveRadiance += sssC * tr * (0.22 * rim + 0.02) * (1.0 - plateGloss);
   #if NUM_DIR_LIGHTS > 0
   {

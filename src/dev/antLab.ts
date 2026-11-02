@@ -6,14 +6,14 @@ import { ATTACK_CONTACT, AttackPose, applyAttackBody, attackPose, neutralPose } 
 import { MORPHS } from '../render/ants/morphs';
 import { PostPipeline } from '../render/post';
 import { createSurfaceEnvironment } from '../render/environment';
-import { applyLabLight, renderLabMask } from './labLight';
+import { addAmber, applyLabLight, renderLabMask } from './labLight';
 import { textures } from '../render/textures';
 import { globalUniforms, patchDapple } from '../render/shaderPatch';
 import { buildTermiteGeometry } from '../render/termite/build';
 import { CasteId } from '../render/termite/castes';
 import { getTermiteMaterial, TermiteInstances, termiteTime, nasusTipLocal } from '../render/termite/material';
 import { AnimState } from '../render/termite/rig';
-import { GlueStreams } from '../render/termite/glue';
+import { GlueStreams, NASUTE_GLUE } from '../render/termite/glue';
 
 /**
  * Model review scene: ?scene=antlab&ant=lasius_worker&lod=0&cam=34&phase=0.2&pose=0
@@ -91,7 +91,7 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     const widths = geos.map((g) => (g.userData.rig.bounds.max[0] - g.userData.rig.bounds.min[0]) * 1.25);
     const totalT = widths.reduce((s, x2) => s + x2, 0);
     tx = -totalT / 2;
-    const glue = new GlueStreams(8, { diameter: 0.22 });
+    const glue = new GlueStreams(8, q.get('stringy') === '0' ? { diameter: 0.22 } : NASUTE_GLUE);
     let gn = 0;
     geos.forEach((g, i) => {
       const herd = new TermiteInstances(g, 1, { glueShell: true });
@@ -132,6 +132,7 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
       const lit = q.get('light') !== null;
       if (lit) {
         applyLabLight(renderer, scene, env, cam, target, span, q, ground);
+        addAmber(scene, env, target, span, q, ground);
         const sc2 = sun.shadow.camera as THREE.OrthographicCamera;
         sc2.left = -span;
         sc2.right = span;
@@ -228,6 +229,7 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
   cam.lookAt(target);
   // realism v2: lighting preset, backlit test, tone mapping, macro ground (dev/labLight.ts)
   applyLabLight(renderer, scene, env, cam, target, span, q, ground);
+  addAmber(scene, env, target, span, q, ground);
   const sun = env.sun;
   const sc = sun.shadow.camera as THREE.OrthographicCamera;
   sc.left = -span;

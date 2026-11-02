@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { SurfaceLights } from '../render/environment';
 import { LightPreset, presetEnvironment, setCreatureLighting } from '../render/lightPresets';
 import { textures } from '../render/textures';
@@ -62,7 +63,7 @@ export function applyLabLight(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
     scene.fog = new THREE.Fog(scene.background.getHex(), camDist * 1.6 + span, camDist * 5 + span * 3);
     if (ground) ground.scale.setScalar(20);
   }
-  const grains = q.get('mask') === '1' || q.get('bg') === 'studio' || light === 'studio' ? 0 : Number(q.get('grains') || 0);
+  const grains = q.get('mask') === '1' || q.get('bg') === 'studio' || light === 'studio' || q.get('amber') === '1' ? 0 : Number(q.get('grains') || 0);
   if (grains > 0) {
     scene.add(macroGround(target, span, grains, Number(q.get('grainmm') || span * 0.03), Number(q.get('litter') || 0)));
     // the ground at the subject's scale, three textures blended by low-frequency noise so nothing repeats
@@ -245,4 +246,64 @@ function mixGround(ground: THREE.Mesh, span: number): void {
       );
   };
   ground.material = mat;
+}
+
+/**
+ * Amber specimen mode (realism rework, CHANGE_PLAN §21.2; render only): `?amber=1` sets the subject inside a polished
+ * block of amber on a light table — a rounded slab of warm, transmissive resin (ior 1.54, absorbing toward orange),
+ * a scatter of small air bubbles and dark plant debris, lit from below and behind as amber pieces are photographed.
+ * Nothing here reaches the game.
+ */
+export function addAmber(scene: THREE.Scene, env: SurfaceLights, target: THREE.Vector3, span: number, q: URLSearchParams, ground?: THREE.Mesh): void {
+  if (q.get('amber') !== '1') return;
+  env.sky.visible = false;
+  if (ground) ground.visible = false;
+  scene.fog = null;
+  scene.background = new THREE.Color(q.get('bgcol') ? Number('0x' + q.get('bgcol')) : 0xf1eadc);
+  // the light table under the piece
+  const table = new THREE.Mesh(new THREE.PlaneGeometry(span * 40, span * 40).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xf4efe6, roughness: 0.9, emissive: 0xfff6e8, emissiveIntensity: 0.35 }));
+  const bh = span * 1.3;
+  const cy = span * 0.28;
+  table.position.set(target.x, cy - bh / 2 - 0.01, target.z);
+  table.receiveShadow = true;
+  scene.add(table);
+  const w = span * 1.5;
+  const block = new THREE.Mesh(
+    new RoundedBoxGeometry(w, bh, span * 0.95, 6, span * 0.14),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xffd48a,
+      roughness: 0.04,
+      metalness: 0,
+      transmission: 1,
+      ior: 1.54,
+      // (a small thickness: the subject sits inside the piece, so it is seen through one flat face, barely bent)
+      thickness: span * 0.12,
+      attenuationColor: new THREE.Color(0xc4680e),
+      attenuationDistance: span * Number(q.get('amberd') || 0.8),
+      specularIntensity: 1,
+      clearcoat: 0.6,
+      clearcoatRoughness: 0.08,
+    }),
+  );
+  block.position.set(target.x, cy, target.z);
+  block.rotation.y = 0.04;
+  block.renderOrder = 3;
+  scene.add(block);
+  const rnd = rand(77);
+  const bubbleMat = new THREE.MeshPhysicalMaterial({ color: 0xfff4dc, roughness: 0.02, transmission: 0.85, ior: 1.15, thickness: 0.05, specularIntensity: 1, envMapIntensity: 1.4 });
+  const debrisMat = new THREE.MeshStandardMaterial({ color: 0x2e1c0e, roughness: 0.85 });
+  const inside = (m: number) => new THREE.Vector3(target.x + (rnd() - 0.5) * w * m, cy + (rnd() - 0.5) * bh * m, target.z + (rnd() - 0.5) * span * 0.85 * m);
+  for (let k = 0; k < 40; k++) {
+    const b = new THREE.Mesh(new THREE.SphereGeometry(span * (0.004 + 0.016 * rnd() * rnd()), 10, 8), bubbleMat);
+    b.position.copy(inside(0.9));
+    b.renderOrder = 2;
+    scene.add(b);
+  }
+  for (let k = 0; k < 26; k++) {
+    const d = new THREE.Mesh(new THREE.TetrahedronGeometry(span * (0.003 + 0.007 * rnd()), 0), debrisMat);
+    d.position.copy(inside(0.92));
+    d.scale.set(1, 0.3 + rnd() * 0.5, 0.6 + rnd());
+    d.rotation.set(rnd() * 6, rnd() * 6, rnd() * 6);
+    scene.add(d);
+  }
 }

@@ -1255,6 +1255,7 @@ export function buildTermiteGeometry(casteId: CasteId, lod = 0): BufferGeometry 
     put(RigCol.QAMBER, am.r, am.g, am.b);
     put(RigCol.QHONEY, ho.r, ho.g, ho.b);
   }
+  put(RigCol.REAL, P.real ? 1 : 0, P.real?.breathe ?? 0, P.real?.glint ?? 0, P.real?.eggs ?? 0);
 
   const rig: TermiteRig = {
     casteId,

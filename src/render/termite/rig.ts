@@ -134,7 +134,9 @@ export const RigCol = {
   QIVORY: 60, // rgb young-queen colour
   QAMBER: 61, // rgb mid-age colour
   QHONEY: 62, // rgb old-queen colour
-  COUNT: 63,
+  // ---- realism rework (CHANGE_PLAN §21.3; 0 for castes without it, so their look is unchanged) ----
+  REAL: 63, // on (1), breathing amplitude, wet-glint strength, eggs seen through the membrane (queen)
+  COUNT: 64,
 } as const;
 /**
  * v2.1: layout of the physogastric queen abdomen, shared by the builder (geometry) and the shader (crease

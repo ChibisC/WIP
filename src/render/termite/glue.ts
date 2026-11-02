@@ -45,7 +45,15 @@ export interface GlueStreamOptions {
   sag: number;
   /** viscous wobble of the jet (fraction of its radius) */
   wobble: number;
+  /**
+   * realism rework (CHANGE_PLAN §21.3): 0..1 stringy glue — the squirts as beads on a thin thread that stays
+   * between them (a viscous terpenoid secretion), not separate blobs; 0 keeps the old stream exactly
+   */
+  stringy: number;
 }
+
+/** Nasute glue as used in the game and the lab (realism rework: stringy, sagging a little more). */
+export const NASUTE_GLUE: Partial<GlueStreamOptions> = { diameter: 0.22, dropletSpeed: 45, stringy: 1, sag: 0.07 };
 
 /** v2: point-blank acid jet of the Sickle-Jaw soldier (clear -> pale amber, thicker/faster/brighter with the ramp) */
 export const ACID_STREAM: Partial<GlueStreamOptions> = {
@@ -112,6 +120,7 @@ export class GlueStreams {
         uWobble: { value: opts.wobble ?? 0 },
         uDiameter: { value: diameter },
         uSpeed: { value: speed },
+        uStringy: { value: opts.stringy ?? 0 },
       },
       transparent: true,
       depthWrite: false,
@@ -120,6 +129,7 @@ export class GlueStreams {
       vertexShader: /* glsl */ `
         attribute vec3 iStart; attribute vec3 iEnd; attribute vec4 iParams; // ramp, firing, seed, unused
         uniform float uDiameter; uniform float uSag; uniform float uWobble; uniform float uTime;
+        uniform float uStringy; uniform vec2 uRate; uniform float uSpeed;
         varying float vT; varying float vF; varying float vSeed; varying float vLen;
         varying vec3 vN; varying vec3 vView;
         void main() {
@@ -132,6 +142,13 @@ export class GlueStreams {
           vec3 c = iStart + d * t - vec3(0.0, sag * 4.0 * t * (1.0 - t), 0.0);
           float r = 0.5 * uDiameter * mix(0.4, 1.0, f) * (1.0 - 0.3 * t) * (0.35 + 0.65 * smoothstep(0.0, 0.05, t));
           if (iParams.y < 0.5) r = 0.0;
+          if (uStringy > 0.0) {
+            // beads on a string: each squirt a fat bead travelling down a thin thread, the thread sagging between them
+            float ph = fract((uTime - t * len / uSpeed) * mix(uRate.x, uRate.y, f) + iParams.z);
+            float bead = smoothstep(0.0, 0.08, ph) * (1.0 - smoothstep(0.18, 0.36, ph));
+            r *= mix(1.0, 0.2 + 0.95 * bead, uStringy * (1.0 - 0.6 * f));
+            c.y -= uStringy * sag * 0.6 * bead * sin(3.14159 * t);
+          }
           vec3 off = (e1 * position.y + e2 * position.z);
           if (uWobble > 0.0) c += (e1 * sin(t * 19.0 - uTime * 14.0 + iParams.z * 6.0) + e2 * cos(t * 13.0 - uTime * 11.0)) * uWobble * r * sin(3.14159 * t);
           vec4 mv = modelViewMatrix * vec4(c + off * r, 1.0);
@@ -141,7 +158,7 @@ export class GlueStreams {
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: /* glsl */ `
-        uniform float uTime; uniform vec3 uColor; uniform vec3 uHot; uniform float uSat; uniform vec2 uRate; uniform vec2 uCont; uniform float uSpeed;
+        uniform float uTime; uniform vec3 uColor; uniform vec3 uHot; uniform float uSat; uniform vec2 uRate; uniform vec2 uCont; uniform float uSpeed; uniform float uStringy;
         varying float vT; varying float vF; varying float vSeed; varying float vLen;
         varying vec3 vN; varying vec3 vView;
         void main() {
@@ -150,7 +167,7 @@ export class GlueStreams {
           float ph = fract((uTime - travel) * rate + vSeed);
           float drop = smoothstep(0.0, 0.06, ph) * (1.0 - smoothstep(0.22, 0.42, ph));
           float cont = smoothstep(uCont.x, uCont.y, vF);
-          float body = max(drop, cont);
+          float body = max(max(drop, cont), uStringy * 0.75); // stringy: the thread between the beads stays
           if (body < 0.03) discard;
           vec3 N = normalize(vN); vec3 V = normalize(vView);
           float fres = pow(1.0 - abs(dot(N, V)), 2.0);
