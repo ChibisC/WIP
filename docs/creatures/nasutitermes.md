@@ -215,6 +215,28 @@ Compare renders against these.
 
 ---
 
+## 11. Shape and material numbers for the realism rework (2026-11-02)
+
+Measured on the user's twelve study photos (live soldiers and workers on soil, moss and wood; specimen sheets of the alate, worker and soldier with a 2 mm bar; a soldier in top, side and head views; the alate head and wings; two royal-chamber photos with queen and king) and the UF/IFAS figures (§9). L is the body length without antennae.
+
+| Unit | Number | From |
+|---|---|---|
+| Soldier head | bulb 0.23 L long and 0.22 L wide, nasus 0.16 L, tip radius 0.012 L; the bulb's top 1.2× the thorax height | specimen top/side; live side |
+| Soldier head finish | glassy: a sharp window highlight and a soft rim; dark red-brown to black, the nasus tip lighter and translucent | live macro photos (soil, wood, moss) |
+| Soldier setae | **six** stiff pale setae on the head (two on the bulb's top, two on the sides, two near the nasus base), each 0.25× the head width | UF/IFAS Fig. 3 |
+| Body cuticle (soldier, worker) | waxy and soft: light passes through the abdomen and legs (strongest at the edges), a wet glint on the abdomen's top | all live photos |
+| Gut | dark brown, irregular (lumpy edge, two to three lobes), 45–70 % of the abdomen length, centred a little back, never a clean oval | live worker photos |
+| Segment membranes | pale bands between tergites, 12–20 % of a tergite's length on a full worker, slightly sunken; tergites darker toward their rear margin | live workers; specimens |
+| Fine hairs | sparse long pale hairs at the tergites' rear margins (6–10 per tergite), short fine hairs on head and legs | specimens |
+| Worker head | domed, 0.24 L wide, amber-straw, glossy, faint sutures | live workers; v2.2 brief |
+| Legs | short and sturdy, femur 0.18–0.22 L, tibia a little shorter; pale, translucent | specimens |
+| Antennae | straight beaded chains (13 soldier, 14 worker, 15 royals), beads lengthening toward the tip, carried forward in a gentle curve | specimens; live |
+| King | dark brown, head and thorax sclerotised and glossy, abdomen 1.25× head + thorax with pale membranes | royal chamber photos |
+| Queen | membrane ivory-grey to amber with a soft sheen; dark tergite bars 0.3–0.4 of each roll's length; 9–10 rolls; faint ovals (eggs) seen through the membrane on the flanks; dark creases | royal chamber photos |
+| Glue | clear to milky-amber, stringy: threads and droplets that stretch between nasus and target and sag; dries duller | live soldier photos; genus literature |
+
+**Behaviour seen in the photos and used for animation:** antennae never still (tapping forward, alternating); the abdomen gently pulses (breathing); soldiers hold the head low and swing it toward a disturbance; workers lower the head to chew with short jerks; the queen's abdomen ripples in slow waves from front to back.
+
 ## 10. Sources
 
 - Tong, R. L., Tenn, K. E., & Scheffrahn, R. H. *Conehead Termite* Nasutitermes corniger *(Motschulsky)*. UF/IFAS EENY-745 / IN1275 (2019, revised 2024-11-13). https://ask.ifas.ufl.edu/publication/IN1275

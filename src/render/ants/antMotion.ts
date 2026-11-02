@@ -24,7 +24,7 @@ import { ATK } from './attackPoses';
  */
 
 /** Which morphs use the pass (the pilot: the tropical fire ant; the rollout widens this). */
-export const ANIM_V2_PREFIXES = ['fire_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_'];
+export const ANIM_V2_PREFIXES = ['fire_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_', 'hell_'];
 /** Lab switch: false shows the old motion (before/after clips). */
 export const animSettings = { v2: true };
 export const animV2 = (morph: string): boolean => animSettings.v2 && ANIM_V2_PREFIXES.some((p) => morph.startsWith(p));
@@ -67,6 +67,12 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
   }
   if (v.special === 2) {
     out.variant = ATK.RAGE;
+    return out;
+  }
+  // hell ants (realism rework): the vertical snap; the soldier mostly impales with its paddle; now and then a lunge
+  if (morph.startsWith('hell_')) {
+    out.variant = morph === 'hell_soldier' ? [ATK.IMPALE, ATK.SNAP, ATK.IMPALE][av] : [ATK.SNAP, ATK.SNAP, ATK.LUNGE][av];
+    if (v.atkSeq && morph !== 'hell_soldier') out.variant = hash01(seed * 1000 + n, 6) < 0.8 ? ATK.SNAP : ATK.LUNGE;
     return out;
   }
   if (morph.startsWith('fire_major')) {
@@ -147,7 +153,7 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
 }
 
 /** Render-side sound hooks (spec 04): moments the sim has no event for (its bites, stings and deaths sound already). */
-export const ANIM_SFX = { GRIP: 1, CRUNCH: 2, FLIP: 3, RIGHT: 4, DEATH: 5 } as const;
+export const ANIM_SFX = { GRIP: 1, CRUNCH: 2, FLIP: 3, RIGHT: 4, DEATH: 5, SNAP: 6 } as const;
 
 export const IDLE = { GROOM_ANT: 0, GROOM_LEGS: 1, LOOK: 2, ANTENNATE: 3, SHUFFLE: 4 } as const;
 const IDLE_W = [0.26, 0.2, 0.2, 0.18, 0.16];

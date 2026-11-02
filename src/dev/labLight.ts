@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { SurfaceLights } from '../render/environment';
 import { LightPreset, presetEnvironment, setCreatureLighting } from '../render/lightPresets';
 import { textures } from '../render/textures';
@@ -62,7 +63,7 @@ export function applyLabLight(renderer: THREE.WebGLRenderer, scene: THREE.Scene,
     scene.fog = new THREE.Fog(scene.background.getHex(), camDist * 1.6 + span, camDist * 5 + span * 3);
     if (ground) ground.scale.setScalar(20);
   }
-  const grains = q.get('mask') === '1' || q.get('bg') === 'studio' || light === 'studio' ? 0 : Number(q.get('grains') || 0);
+  const grains = q.get('mask') === '1' || q.get('bg') === 'studio' || light === 'studio' || q.get('amber') === '1' ? 0 : Number(q.get('grains') || 0);
   if (grains > 0) {
     scene.add(macroGround(target, span, grains, Number(q.get('grainmm') || span * 0.03), Number(q.get('litter') || 0)));
     // the ground at the subject's scale, three textures blended by low-frequency noise so nothing repeats
@@ -245,4 +246,109 @@ function mixGround(ground: THREE.Mesh, span: number): void {
       );
   };
   ground.material = mat;
+}
+
+/**
+ * Amber specimen mode (realism rework, CHANGE_PLAN §22.2; render only): `?amber=1` sets the subject inside a polished
+ * block of amber on a light table — a rounded slab of warm, transmissive resin (ior 1.54, absorbing toward orange),
+ * a scatter of small air bubbles and dark plant debris, lit from below and behind as amber pieces are photographed.
+ * Nothing here reaches the game.
+ */
+export function addAmber(scene: THREE.Scene, env: SurfaceLights, target: THREE.Vector3, span: number, q: URLSearchParams, ground?: THREE.Mesh): void {
+  if (q.get('amber') !== '1') return;
+  env.sky.visible = false;
+  if (ground) ground.visible = false;
+  scene.fog = null;
+  scene.background = new THREE.Color(q.get('bgcol') ? Number('0x' + q.get('bgcol')) : 0xf1eadc);
+  // the light table under the piece
+  const table = new THREE.Mesh(new THREE.PlaneGeometry(span * 40, span * 40).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xf4efe6, roughness: 0.9, emissive: 0xfff6e8, emissiveIntensity: 0.35 }));
+  const bh = span * 1.3;
+  const cy = span * 0.28;
+  table.position.set(target.x, cy - bh / 2 - 0.01, target.z);
+  table.receiveShadow = true;
+  scene.add(table);
+  const w = span * 1.5;
+  const block = new THREE.Mesh(
+    new RoundedBoxGeometry(w, bh, span * 0.95, 6, span * 0.14),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xffd48a,
+      roughness: 0.04,
+      metalness: 0,
+      transmission: 1,
+      ior: 1.54,
+      // (a small thickness: the subject sits inside the piece, so it is seen through one flat face, barely bent)
+      thickness: span * 0.12,
+      attenuationColor: new THREE.Color(0xc4680e),
+      attenuationDistance: span * Number(q.get('amberd') || 0.8),
+      specularIntensity: 1,
+      clearcoat: 0.6,
+      clearcoatRoughness: 0.08,
+    }),
+  );
+  block.position.set(target.x, cy, target.z);
+  block.rotation.y = 0.04;
+  block.renderOrder = 3;
+  scene.add(block);
+  const rnd = rand(77);
+  const bubbleMat = new THREE.MeshPhysicalMaterial({ color: 0xfff4dc, roughness: 0.02, transmission: 0.85, ior: 1.15, thickness: 0.05, specularIntensity: 1, envMapIntensity: 1.4 });
+  const debrisMat = new THREE.MeshStandardMaterial({ color: 0x2e1c0e, roughness: 0.85 });
+  const inside = (m: number) => new THREE.Vector3(target.x + (rnd() - 0.5) * w * m, cy + (rnd() - 0.5) * bh * m, target.z + (rnd() - 0.5) * span * 0.85 * m);
+  for (let k = 0; k < 40; k++) {
+    const b = new THREE.Mesh(new THREE.SphereGeometry(span * (0.004 + 0.016 * rnd() * rnd()), 10, 8), bubbleMat);
+    b.position.copy(inside(0.9));
+    b.renderOrder = 2;
+    scene.add(b);
+  }
+  for (let k = 0; k < 26; k++) {
+    const d = new THREE.Mesh(new THREE.TetrahedronGeometry(span * (0.003 + 0.007 * rnd()), 0), debrisMat);
+    d.position.copy(inside(0.92));
+    // (the sheets: specks over the animal read as glitches — the debris keeps clear of the subject)
+    if (Math.abs(d.position.x - target.x) < span * 0.6 && d.position.y < span * 0.75 && Math.abs(d.position.z - target.z) < span * 0.35) continue;
+    d.scale.set(1, 0.3 + rnd() * 0.5, 0.6 + rnd());
+    d.rotation.set(rnd() * 6, rnd() * 6, rnd() * 6);
+    scene.add(d);
+  }
+}
+
+let contactTex: THREE.DataTexture | null = null;
+/**
+ * Contact shadows for the review renders (realism rework, spec §2: "a ground plane, contact shadows"; render only,
+ * `?contact=1`): a soft occlusion pool under each body — the overcast sky blocked by the animal — and a small dark
+ * spot under each foot, laid on the ground as multiplied decals. Positions in world mm, `rot` the body's yaw.
+ */
+export function addContactShadows(scene: THREE.Scene, q: URLSearchParams, items: Array<{ x: number; z: number; len: number; wid: number; rot: number; feet?: THREE.Vector3[]; footR?: number }>): void {
+  if (q.get('contact') !== '1') return;
+  if (!contactTex) {
+    const N = 64;
+    const d = new Uint8Array(N * N * 4);
+    for (let j = 0; j < N; j++)
+      for (let i = 0; i < N; i++) {
+        const x = (i + 0.5) / N * 2 - 1;
+        const y = (j + 0.5) / N * 2 - 1;
+        const a = Math.exp(-3.2 * (x * x + y * y)) * Math.max(0, 1 - Math.sqrt(x * x + y * y));
+        d.set([0, 0, 0, Math.round(255 * a)], (j * N + i) * 4);
+      }
+    contactTex = new THREE.DataTexture(d, N, N, THREE.RGBAFormat);
+    contactTex.needsUpdate = true;
+    contactTex.magFilter = THREE.LinearFilter;
+  }
+  const k = Number(q.get('contactk') || 1);
+  const mat = (o: number) => new THREE.MeshBasicMaterial({ map: contactTex, transparent: true, opacity: o * k, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const body = mat(0.85);
+  // (review round 4: the foot spots read as black dots at close range — fainter, wider)
+  const foot = mat(0.32);
+  for (const it of items) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(it.len * 1.25, it.wid * 2.4).rotateX(-Math.PI / 2), body);
+    m.position.set(it.x, 0.004, it.z);
+    m.rotation.y = it.rot;
+    m.renderOrder = 1;
+    scene.add(m);
+    for (const f of it.feet ?? []) {
+      const r = (it.footR ?? it.len * 0.035) * 1.6;
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2).rotateX(-Math.PI / 2), foot);
+      s.position.set(f.x, 0.005, f.z);
+      s.renderOrder = 1;
+      scene.add(s);
+    }
+  }
 }

@@ -1,5 +1,5 @@
 import { SURFACE } from '../sim/types';
-import { GameSession, casteTint } from '../game/session';
+import { GameSession } from '../game/session';
 import { CASTES, SPECIES } from '../sim/species';
 import { MARKER_COLORS, MARKER_NAMES, MARKER_ORDERS, MarkerOrder, homeCounts, markerCounts, orderOn } from '../sim/markers';
 import { groupCounts, groupTiles, raisesAnts } from '../sim/tiles';
@@ -7,7 +7,8 @@ import { surgeReady } from '../sim/surge';
 import { BALANCE } from '../sim/balance';
 import { NestGroup } from '../sim/types';
 import { ABILITIES, abilityOf } from '../sim/abilities';
-import { ICONS, abilityIcon, antSilhouette } from './icons';
+import { ICONS, abilityIcon, antSilhouette, casteIcon } from './icons';
+import { casteLook } from '../render/casteLook';
 import { button, el, esc, shield } from './dom';
 import { CLICK } from '../core/device';
 
@@ -246,10 +247,12 @@ export class MarkerPanel {
     card.dataset.gid = String(g.id);
     const tiles = groupTiles(c, g.id);
     const lvl = Math.round(tiles.reduce((a, t) => a + t.level, 0) / Math.max(1, tiles.length));
-    const color = queen ? '#c9d6e6' : '#' + casteTint(g.caste!).multiplyScalar(1.35).getHexString();
+    const color = '#c9d6e6';
+    if (!queen) card.style.setProperty('--cc', casteLook(g.caste!).css);
+    card.classList.toggle('caste', !queen);
     const role = cd.role;
     const badge = queen ? ICONS.queen : role === 'soldier' || role === 'major' ? ICONS.attack : role === 'minim' ? ICONS.leaf : ICONS.food;
-    card.innerHTML = `${antSilhouette(role, color)}<div class="gc-n">0/0</div><div class="gc-badge">${badge}</div><div class="gc-lvl">${'<i></i>'.repeat(Math.max(0, lvl - 1))}</div>`;
+    card.innerHTML = `${queen ? antSilhouette(role, color) : casteIcon(g.caste!)}<div class="gc-n">0/0</div><div class="gc-badge">${badge}</div><div class="gc-lvl">${'<i></i>'.repeat(Math.max(0, lvl - 1))}</div>`;
     const sp = SPECIES[cd.species];
     const who = cd.species === c.species ? `${cd.name}s` : `${sp.common.replace(' Ant', '')} ${cd.name.toLowerCase()}s`;
     card.dataset.tip = `<b>${queen ? "Queen's chamber workers" : esc(who)}</b>${tiles.length} ${queen ? 'chamber tiles' : 'brood tiles'} · level ${ROMAN[lvl] ?? lvl}<br>Drag to a marker column to send this group out; drag to the home column to keep it in the nest. Click to find its tiles.`;

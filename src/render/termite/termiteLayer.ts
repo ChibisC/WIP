@@ -3,7 +3,7 @@ import { buildTermiteGeometry } from './build';
 import { CASTES, CasteId, WORKER_VARIANT_SCALE } from './castes';
 import { getTermiteMaterial, nasusTipLocal, computeAim, termiteTime, TermiteInstances, holdAimAt, holdNasusTipLocal, solveFreeSquirt, HoldPoseInput } from './material';
 import { AnimState, TermiteRig } from './rig';
-import { ACID_STREAM, AcidFizz, GlueStreams } from './glue';
+import { ACID_STREAM, AcidFizz, GlueStreams, NASUTE_GLUE } from './glue';
 import { patchDapple } from '../shaderPatch';
 import type { AntSpaceAdapter, AntView, MountFn, MountOut } from '../ants/antRenderer';
 import { ATTACK_CONTACT, AttackPose, applyAttackBody, attackPose, neutralPose } from '../ants/attackPoses';
@@ -69,7 +69,7 @@ export class TermiteLayer {
   private sets = new Map<string, Array<TermiteInstances | null>>();
   private counts = new Map<string, number[]>();
   private units = new Map<number, Unit>();
-  private glue = new GlueStreams(256, { diameter: 0.22, dropletSpeed: 45 });
+  private glue = new GlueStreams(256, NASUTE_GLUE);
   private glueN = 0;
   /** sickle-jaw acid jets and the fizz on their targets (visual only) */
   private acid = new GlueStreams(128, { ...ACID_STREAM, diameter: 0.16 });

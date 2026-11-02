@@ -77,7 +77,10 @@ be deterministic and change the simulation only through commands.** That means:
   walk up the flower and come out of one of the holes (and the reverse). Digging never
   makes another entrance (since 2026-11-01).
 * The nest hex grid's radius scales with the species (≈ 3 workers wide; see 3.7),
-  so ants stay at real size while tile counts are the same for every species.
+  so ants stay at real size while tile counts are the same for every species: R =
+  1.5 × the basic worker's length × `NEST_HEX_SCALE`, within 5–11 mm × it (`hexRadiusFor`;
+  the scale was 1.25 from 2026-11-01, **1.10** since 2026-11-02 at the user's request).
+  A save keeps the hex size it was made with.
 
 ## 3. Simulation core
 
@@ -535,11 +538,14 @@ Three playable, AI-usable colonies, built from the user's design packages (kept 
 - **Balance notes.** Wood income: `tools/termite-income.ts` (AI colonies, three seeds, 8 min) gives a median of 1.53 wood per worker-minute against Lasius' 1.61 food (× 0.95; one Lasius seed starved and is left out of the mean). One nasute beats one Lasius soldier (44 HP, bite 5) only with about 3 s of uninterrupted fire before contact (`tools/nasute-duel.ts`: it loses with ≤ 2.6 s, wins with ≥ 3.6 s).
 - **Simplifications.** One queen and one king (polygyny and replacement reproductives are documented in the reference only); no push priority (the game has no body-push system, so majors "hold" a choke by standing in it); covered galleries (phase 9b) were cut — they would need a new surface-structure and targeting system; far termites use the kit's LOD2 mesh rather than its baked impostors (the LOD2 mesh is ~290 triangles); glue on creatures is not drawn.
 
+- **Looks and motion (realism rework, 2026-11-02; CHANGE_PLAN §22).** Render only, nasute castes only (the sickle-jaw castes share the kit and are unchanged: identical geometry hashes and pixel-identical lab renders, `docs/realism/hell-nasute/termite-hashes.md`). A per-caste `real` entry (rig texture column `REAL`) turns on: an irregular lobed gut lying under the cuticle (the segment margins run over it), sunken paler segment membranes, a mottled, finely wrinkled soft cuticle with a wet glint and deeper subsurface light (warm translucent edges), barrel-shaped antennal articles and rounder legs at LOD0, more fine setae at the tergite margins, a breathing abdomen (alive only), stronger peristaltic waves and eggs seen faintly through the queen's membrane, her plates as dark islands. The glue is stringy (`NASUTE_GLUE`: beads on a thread that sags). Palettes nudged to the photos (worker creamy amber, soldier less saturated, queen's membrane pale tan, the king's membranes darker).
+
 #### Hell ants (Haidomyrmecinae, extinct) — reference `docs/creatures/hell-ant.md`
 - Worker 5 mm (pin), soldier 6.5 mm (impale, a game caste), queen 7.6 mm. Hunters more than gatherers; slow breeding. Ability **Ambush**: every snap ready at once, and for 15 s it recharges straight after each catch (cooldown 80 s).
 - **The snap** (`sim/hellAnts.ts`): `Attack → Hunt` when small prey (ants up to the caste's `maxPreyMass`, latchable creatures up to 12 mm, never bosses, queens or the termite king) is within 0.9 body lengths of its edge and the snap is ready. **Hunt**: creep in at × 0.35 with the jaws cocked; after the wind-up (0.6 / 0.8 s) and within 0.5 body lengths it **Snaps** (2 ticks). **Hold**: the prey is pinned at the jaw–horn socket (0.5 body lengths ahead, lifted off the ground in the render), stunned, bled every 0.5 s (3.5 / 2 HP/s) and stung (slowed 2 s); soldiers first drive it onto the paddle for a 14 HP burst. Release: hold over (4 / 3 s), the prey dead (after 0.8 s of feeding), the hell ant hurt, stunned, pinned or flung (half cooldown), or the space changed; the prey is dropped dazed (0.4 s). Cooldown 5 / 7 s. Larger prey is grappled by the legs as usual; a grappling hell ant whose snap comes ready on small prey lets go and stalks it again. Snap states count as fighting everywhere (task allocation, markers, jobs).
 - **Presentation only:** the jaws close instantly (mandible easing × 60); an impale throws pale droplets and, when the camera is closer than 60 mm, jolts the camera and holds the picture back 0.08 s (single player only; the sim is untouched).
 - **Simplifications.** A held creature is pinned in place but not drawn lifted (the creature renderers have no lift).
+- **Looks and motion (realism rework, 2026-11-02; CHANGE_PLAN §22, `docs/realism/hell-nasute/`).** Render only; the sim's only change is the regenerated `sim/heightData.ts` (the hell ants' foot points moved by under 0.001 body lengths). Baked cuticle detail (`bake/recipes.ts` `HELL`: reticulate-punctate satin head and mesosoma, faintly striate pleura, a glossier shagreened gaster with pale tergite margins, smooth striate jaws and horn); 12-segment antennae (a club-ended scape, an 11-article funiculus through a spline, each article narrow at its base); club femora, slim tibiae with spurs 1-2-2, five tarsomeres and claws, a soft knee; erect setae and a fine decumbent pubescence; four trigger hairs on the worker and soldier, two on the queen; dark jaws, near black at the tips; bulging bronze eyes. The planted-feet animation set (`ANIM_V2_PREFIXES` has `hell_`: `rig.foot` and `plantHomes`); melee is the new `ATK.SNAP` (the jaws cocked wide and down, a tremble, the snap in the last 2.5 % of the wind-up, the head jerking up, a hit-stop of 7 % of the cycle, then the prey lifted) and the soldier's `ATK.IMPALE` (rear up, drive the paddle down, pull free); never a sideways jaw. Each snap emits `ANIM_SFX.SNAP` (the hell-ant crack) and a puff of dust (`animHooks.fx` → `CombatFx.dust`). The ant lab's `?amber=1` shows a unit in a block of amber (lab only, never in the game).
 
 #### Melee attack animations (all ants and termites; `render/ants/attackPoses.ts`)
 - Inspired by *Empires of the Undergrowth*, where an attack plays once per attack (attack speed = attacks per second) and special attacks reuse the basic attack's animation, so every attack lands on the same beat. Each biting unit cycles through **three attacks of exactly one attack interval each**, the jaws closing at the same point (`ATTACK_CONTACT` = 0.7 of the cycle) in all three:
@@ -725,14 +731,18 @@ Style switches to replace (`MapStyle`, `terrain.ts:5`): `terrain.ts` (relief, co
 
 * Two scenes, both seen from above with the same top-down camera rig: **surface**
   (sun, hemisphere light, fog, dappled canopy light, grass, litter props) and
-  **nest** (warm low-angle golden key light, pooled light over dug floor, deep
-  shadow in undug soil). Each has its own colour grade. The transition is a
+  **nest** (a warm-white low-angle key light, 0xffdcb4 — orange until the 2026-11-02
+  realism pass —, pooled light over dug floor, deep shadow in undug soil). Each has its own colour grade. The transition is a
   camera dive into the entrance hole and down the ramp.
 * **Nest terrain** (`render/nest/`): a chunked heightfield built from a signed
   distance field of the dug raster (blurred for organic contours): undug soil is
   a raised, dark, crumbly plateau; tunnel walls slope and round down to a
-  sunken packed-earth floor with pebble drifts along wall bases, root fibres
-  and debris. Baked cavity occlusion + SSAO darken wall feet; a blurred
+  sunken packed-earth floor. Since the realism pass (2026-11-02,
+  `docs/realism/underground.md`) the soil is drawn at the ants' scale: sand grains
+  (0.2–0.5 mm; quartz, feldspar, dark and iron-stained grains) in a neutral brown
+  silt-clay matrix, ~1 mm crumbs softened where ants walk, the diggers' pellets and soil
+  crumbs and stones with contact shadows along the wall feet, damp darker patches; walls
+  are crumbly compacted soil with mandible scrapes and the odd root. Baked cavity occlusion + SSAO darken wall feet; a blurred
   "openness" light map makes warm light pool in open areas and fall off down
   tunnels. Dust motes drift in the air.
   - **Buried stones** (undiggable hexes; user note 2026-10-25: hard to tell from
@@ -741,11 +751,12 @@ Style switches to replace (`MapStyle`, `terrain.ts:5`): `terrain.ts` (relief, co
     the warm key light so they read as neutral grey, and kept at least 62 % lit
     in the dark far from the dug area, where diggable soil fades to near black.
 * **Tile floors**: drawn in the floor shader from a per-hex data texture (type,
-  caste colour, level, group outline colour). Original procedural looks: queen
-  = pale blue-grey silk mat; worker brood = ochre cell pits; soldier brood =
-  red-brown ridged cells; major = dark crimson large pits; minim = pale orange;
-  food storage = mossy green with stored morsels and honeydew beads; fungus
-  garden = spongy white comb. Group outlines are drawn on hex edges bordering
+  caste colour, level, group outline colour). Since the realism pass they are the soil
+  first: queen = the floor plastered with smoothed pale silt (grains showing; was a
+  silk mat); brood = the soil stained with the caste's own colour and pressed with its own texture (see
+  **Caste looks** in §6);
+  food storage = the floor stained olive, honeydew beads; fungus garden = spongy white
+  comb; the stored food and the brood lie on them (`tileDecor`). Group outlines are drawn on hex edges bordering
   another group, coloured by the assigned marker. Placement ghost hex, grid
   overlay and active-tile particles (spores over fungus, shimmer over brood).
 * Post-processing (quality dependent): GTAO ambient occlusion, gentle bloom,
@@ -938,6 +949,25 @@ Every caste is a `CasteDef`: stats, morph, abilities and a **tier** (worker / so
 Equal-food battles (`tools/equal.ts`, `tools/battle.ts`) were used to tune these: soldiers beat their own species' workers for the same food, majors beat soldiers, and the wood ants' tanks + shooters beat most equal-food armies while shooters alone lose to swarms.
 
 Every caste a colony can raise has its own **brood tile type**, and a colony's build panel lists exactly those tiles. Each species also has a **nanitic** caste (a small first-brood worker) raised only on queen tiles. The Gene Thief colony gets a brood tile type for each borrowed caste. Caste mix is decided by which brood tiles the player places; there is no ratio slider.
+
+**Caste looks** (user note 2026-11-02: "make every unit tile (both ants and termites and future ones) have different
+colors and textures so they can be identifiable and different (also their UI color and look for pheromone markers and
+building so they can be distinct from each other)"; then 11:04 "make the textures look more natural realistic and
+insect like, they can use different colors just use more cleaner ones"). Each caste's brood tile has a clean colour
+from a palette of twelve clearly different hues (amber, rust, crimson, rose, violet, indigo, sky, teal, green, lime,
+bone, lavender; every pair at least ΔE 20 apart) and one of ten natural, insect-made textures worked into it: brood
+pockets, cuticle striations, packed soil pellets, wrinkled (rugose) ridges, overlapping (imbricate) scales, silk
+fibres, wax comb, a wing-vein network, layered termite carton, rows of cocoons. They are drawn as relief (ridges catch
+the light, hollows shade, the raised parts have a waxy sheen; silk the most), with only a trace of the soil's grain
+under the colour. The castes of one species never share a colour or a texture, and no two castes
+anywhere share both, so a Gene Thief or Termant nest full of stolen castes still tells them apart. The table is
+`render/casteLook.ts`; a caste with no entry (a new species or caste) gets the first free pair from a spot set by its
+name, unlike its own species in colour and texture. Nanitics look like their species' worker; queens and kings have no
+brood tiles. The same look is used everywhere the caste appears: the tile (floor shader `castePat`, the texture number
+in the tint texture's alpha), the build panel's tile buttons, Castes tab and Genome rows (a small hex of the tile with
+a dark ant on top, drawn by the same texture code), the marker panel's group cards (the same badge, and a top edge in the
+caste colour), the nest minimap and the top bar's worker and soldier figures (in the caste colour). `tests/casteLooks.ts` checks it; renders in
+`docs/realism/caste-tiles/`.
 
 ## 7. Performance plan
 

@@ -1438,6 +1438,75 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
 - Tests: `tests/termants.ts` (wood into the food store, leaves into the food store, an old wood store converted, carton
   walls paid from food, the AI plans a wall with the food).
 
+### 2026-11-02 — Underground textures realism pass; nest hexes 1.10×; a look of its own for every caste
+User notes: 2026-11-01 23:55 "use this realism prompt to fix the underground textures as well" (no prompt file came
+with it: the realism pipeline of `claude/realism/01–02` was used); 2026-11-02 01:15 "1.25x size it too big, maybe make
+it slightly smaler for underground hex", then "nvm just do 1.10x size". Branch `feature/underground-realism` from
+`main` (`18bf3d4`); `origin/main` (`f79ebd1`, Gene Thief termite soldiers) merged in. Notes:
+`docs/realism/underground.md`; shots `docs/realism/underground/` (`tests/browser/underground_realism.py`).
+- **Hex size:** `NEST_HEX_SCALE` 1.25 → 1.10 (`hexRadiusFor`); saves keep the size they were made with; protocol
+  `ud-mp-7`. Every suite passed with the smaller nests except the size check itself (`tests/notes1101.ts`, updated).
+- **Soil, render only** (`render/nest/nestTerrain.ts`, `render/environment.ts`): sand grains at real scale in four
+  mineral colours (glassy quartz tops), a neutral silt-clay matrix with greyer and redder patches, crumb structure
+  softened where ants walk and along paler worn paths, diggers' pellets, soil crumbs and a few angular stones with
+  contact shadows (most along the walls), damp patches; crumbly walls with mandible scrapes and rare roots; grains in
+  the soil top; the queen's chamber smoothed pale silt (was a blue silk mat), brood tiles the soil washed with the
+  caste colour, the food store an olive-stained floor; softer, slightly irregular group outlines; the nest key light
+  warm white (was orange) and the light pools less orange; termite floors keep more grain and relief.
+- **Blind reviews** (fresh agent, before/after shuffled as A/B, 1–10): round 2 — new preferred 8/8, "could it be a
+  macro photo" 4.25 vs ~2; round 3 — 10/10, 4.9 vs 2.0. Remaining after round 3 (addressed in round 4): flat-looking
+  tiles, printed outlines, single-colour floors, felt-like termite floors.
+- **Caste looks** (user note 10:40: "make every unit tile (both ants and termites and future ones) have different
+  colors and textures so they can be identifiable and different (also their UI color and look for pheromone markers
+  and building so they can be distinct from each other)"; 11:04 "make the textures look more natural realistic and
+  insect like, they can use different colors just use more cleaner ones"). New `render/casteLook.ts`: twelve clean,
+  clearly different colours × ten natural, insect-made textures in relief (brood pockets, cuticle striations, soil
+  pellets, rugose wrinkles, imbricate scales, silk fibres, wax comb, wing veins, termite carton, cocoons; the first
+  pass's geometric stripes, chevrons, spokes and diamonds and its grainy colour were replaced the same morning). Within a species no colour or texture repeats; no two castes anywhere share both; castes added
+  later get a free pair automatically. The brood tiles use it (floor shader `castePat`; the texture number rides in the
+  tint texture's alpha; replaces the soil wash of the realism pass), and so does the UI: build panel tile buttons,
+  Castes tab and Genome rows and the marker panel's group cards show a small hex of the tile (drawn by the same
+  texture code, `castePatternAt`) with a dark ant on top (cards also get a top edge in the caste colour); the nest minimap and top-bar figures use the colour.
+  `casteTint` now returns the caste colour. Test `tests/casteLooks.ts`; renders `docs/realism/caste-tiles/`
+  (`tests/browser/caste_tiles.py`, sheet `caste_sheet.py`).
+
+
+## 2026-11-02 — Realism rework: hell ants and nasute termites (CHANGE_PLAN §22)
+User spec `claude/realism/08-spec-hell-ants-nasute-termites.md`. Looks and animation only: every unit id, stat, ability
+and behaviour unchanged. Report: `docs/realism/hell-nasute/README.md`; rubric: `docs/realism/hell-nasute/RUBRIC.md`.
+- Research: shape numbers per unit in `docs/creatures/hell-ant.md` §7 and `docs/creatures/nasutitermes.md` §11 (the
+  user's 24 study photos and the papers), written before the geometry changed.
+- Hell ants: the `HELL` baked-detail recipe; every piece carries detail coordinates; 12-segment antennae through a spline;
+  club femora, slim tibiae, spurs 1-2-2, tarsomeres, claws, a soft knee; erect setae and a fine pubescence; four trigger
+  hairs (two on the queen); dark jaws; bronze faceted eyes; the horn's setae irregular; no ocelli on the queen (the fossil
+  record wins over the spec). User notes (10:30): the legs 1.25× longer and set as wide as the other ants', the body
+  higher; walk and idle with the other ants' planted-feet animation. Melee `ATK.SNAP` / `ATK.IMPALE` with a hit-stop, a
+  click and a puff of dust; nothing sideways. Ground check: every clip filmed at ground level (`cdir=0,0.04,1`): nothing
+  goes through the ground (corpses still sink away after drying, as every ant's do). Amber specimen lab mode.
+- Nasute termites (nasute castes only; sickle-jaw identical: hashes and 12 pixel-identical renders): `real` per caste
+  (rig column `REAL`): lobed gut under the cuticle, sunken membranes, mottled wrinkled soft cuticle, wet glint, deeper
+  subsurface light, barrel antennal articles and round legs at LOD0, more fine setae, breathing, stronger queen waves,
+  eggs seen through her membrane, her plates as dark islands; stringy glue (`NASUTE_GLUE`); palettes nudged to the photos.
+- Lab: `?light=` for termites, `?contact=1` contact shadows, `?amber=1`; anim lab clips `termites`, `royals`, `snap`
+  and `cdir=`. Renders: `tests/browser/hell_nasute_realism.py`; sheets: `tools/hell-nasute-sheets.py`.
+- Blind review, four rounds (fresh reviewer each, anchors 3 / 4 / 9, photos mixed in scoring 8.5–9.5):
+  - R1 mean 3.3. Tells: one glossy plastic per part; tube legs and faceted bead antennae; no contact shadows; the horn
+    setae a white comb; the queen an orange balloon; the king's white seams; the gut a smear.
+    Fixed: deeper hell sculpture, less clearcoat; round legs, no ball joints; irregular horn setae; round termite legs
+    and antennae; soft-cuticle mottle and wrinkles; a defined gut; darker king membranes; a paler queen with larger
+    plates; lab contact shadows and a finer ground.
+  - R2 mean 3.25. Tells: tubes and bead chains; one specular blob; a few white spike hairs; the queen's identical discs;
+    flat decal eyes; the gut painted on. Fixed: hell pubescence and more leg setae, bulging bronze eyes; barrel antennal
+    articles; the gut fading to the rim under the segment margins; queen plates as dark islands, rolls of varied tone.
+  - R3 mean 3.7 (hell close-ups 4). Tells: tubes and beads; vinyl cuticle, no translucency; white pin hairs and white
+    seams. Fixed: soldier palette less saturated, seams near the body colour, lower albedo with warm translucent edges,
+    gold hairs, wider queen plates.
+  - R4 mean 3.45 (the reviewer ±0.5). Same three tells. The 7/10 target was not reached; what is left needs heavier tools
+    (README of the report).
+- Checks: `tsc`, determinism (60 files clean), morph hashes (only the hell ants changed; re-baselined), termite kit
+  hashes (only the nasute castes changed), `sim/heightData.ts` regenerated (taller hell ants; no new underpasses),
+  climb data unchanged.
+
 ### 2026-11-02 — Finding the way up and down the slopes (layered ground)
 - User 12:08: "because of slopes some ant AI is failing to properly pathfind their way up or down a slope, can you give
   unit AI more intelligence to go around the map up or down a slope". Flow-field walks already went round by the

@@ -131,6 +131,17 @@ export class CombatFx {
   }
 
   /** React to one simulation event that happened in this scene's space. */
+  /** A puff of dust kicked up from the ground (render-only beats: a hell ant's snap), `size` in mm. */
+  dust(x: number, y: number, size: number, heightAt: HeightFn): void {
+    const r = Math.random;
+    const h = heightAt(x, y) + 0.15;
+    for (let k = 0; k < 7; k++) {
+      const a = r() * Math.PI * 2;
+      const sp = size * (2 + r() * 3);
+      this.spawn(x + Math.cos(a) * size * 0.4, h, y + Math.sin(a) * size * 0.4, Math.cos(a) * sp, size * (1.5 + r() * 2.5), Math.sin(a) * sp, 0.45 + r() * 0.3, k < 2 ? 0xb39a78 : 0x8e7658, size * (0.28 + r() * 0.2), 5, 2.5, 1.3);
+    }
+  }
+
   emit(e: SimEvent, heightAt: HeightFn): void {
     const r = Math.random;
     switch (e.t) {

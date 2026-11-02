@@ -412,7 +412,7 @@ export function ellipsoid(c: THREE.Vector3, r: THREE.Vector3, seg: number, rot?:
  * foot can follow a stance sweep of ±`sweepMax` along the body (and a turn of ±`turnMax` round its centre)
  * without the leg running out of reach; the shader steers each foot round its neutral place.
  */
-function plantHomes(rig: AntRig): void {
+export function plantHomes(rig: AntRig): void {
   const sweep = rig.length * 0.16;
   rig.home = [];
   let far = 0;

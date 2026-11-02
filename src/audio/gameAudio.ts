@@ -118,6 +118,8 @@ export class GameAudio {
     if (!audio.ctx) return;
     if (k === ANIM_SFX.GRIP) return this.want('combat.grapple_scuffle', x, y, space, { pool: 'combat', gain: 0.45, rate: 1.4 });
     if (k === ANIM_SFX.CRUNCH) return this.want('combat.chitin_crack', x, y, space, { pool: 'combat', gain: 0.55, rate: 0.85 });
+    // a hell ant's melee snap (the hunt's snap has its own sim event): the same sharp crack, a little quieter
+    if (k === ANIM_SFX.SNAP) return this.want('species.hellant_snap', x, y, space, { pool: 'combat', gain: 0.6, rate: 1.1, heat: 0.03 });
     if (k === ANIM_SFX.FLIP || k === ANIM_SFX.RIGHT) return this.want('ant.pellet_drop', x, y, space, { pool: 'work', gain: k === ANIM_SFX.FLIP ? 0.6 : 0.4, rate: 1.3 });
     if (k === ANIM_SFX.DEATH) {
       if (cause === 3) return this.want('combat.acid_splat', x, y, space, { pool: 'combat', gain: 0.4, rate: 1.2 });

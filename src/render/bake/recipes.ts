@@ -203,6 +203,36 @@ export const ECITON_QUEEN: DetailRecipe = {
   },
 };
 
+/**
+ * Hell ants (Haidomyrmecinae), realism rework 2026-11-02: amber keeps no colour but does keep the cuticle's texture —
+ * smooth and shining with scattered hair pits, the head and mesosoma finely microreticulate (a satin sheen), the
+ * mesopleura faintly striate, the gaster the glossiest; the horn and jaws smooth and finely striate lengthwise, thin
+ * enough to glow at the edges. The finish follows the living trap-jaw ants (docs/creatures/hell-ant.md §7).
+ */
+// (review round 1: "no microsculpture, one hotspot per part" — the head and mesosoma visibly reticulate-punctate and
+// satin, the gaster glossy but finely shagreened with an undulation that breaks the highlight)
+const HELL_HEAD: Sculpt = { tile: [0.9, 0.9], noise: 0.0005, reticulum: { cell: 0.022, depth: 0.0009 }, pits: { n: 30, r: 0.007, depth: 0.0016, pale: 0.15, stub: { len: 0.035, dir: -1, share: 0.6 } }, wave: { cell: 0.18, amp: 0.005 }, rough: [0.06, 0.32], roughVar: 0.09, dirt: 0.2, mottle: 0.16, cavityDark: 0.3 };
+const HELL_MESO: Sculpt = { tile: [2.2, 0.9], noise: 0.0006, reticulum: { cell: 0.024, depth: 0.0011 }, pits: { n: 34, r: 0.007, depth: 0.0016, pale: 0.15, stub: { len: 0.035, dir: -1, share: 0.6 } }, striae: { per: 34, depth: 0.002, angle: 0.25, wobble: 0.25, sides: 1 }, wave: { cell: 0.16, amp: 0.006 }, rough: [0.1, 0.36], roughVar: 0.09, dirt: 0.3, mottle: 0.2, cavityDark: 0.32 };
+const HELL_GASTER: Sculpt = { tile: [1.3, 1.3], noise: 0.0003, reticulum: { cell: 0.016, depth: 0.0004 }, pits: { n: 22, r: 0.005, depth: 0.0011, pale: 0.12, stub: { len: 0.04, dir: 1, share: 0.8 } }, wave: { cell: 0.2, amp: 0.007 }, rough: [-0.02, 0.24], roughVar: 0.08, dirt: 0.14, mottle: 0.25, cavityDark: 0.24 };
+const HELL_LEG: Sculpt = { ...FIRE_LEG, tile: [0.28, 0.7], rough: [0.04, 0.3] };
+const HELL_MAND: Sculpt = { ...FIRE_MAND, tile: [0.25, 0.6], striae: { per: 90, depth: 0.0001, angle: 0, wobble: 0.25 }, rough: [-0.06, 0.2], cavityDark: 0.18 };
+export const HELL: DetailRecipe = {
+  key: 'hell',
+  regions: {
+    [REGION.HEAD]: { sculpt: HELL_HEAD, shade: shade(1.15, 0.35, 0.45, 0.25, 0.3, { coatRough: 0.26, wear: 0.3, dust: 0.1, mid: 0.12 }), px: [512, 512] },
+    // the metanotal groove (the mesosoma is built back to front: the groove 0.47 from the back)
+    [REGION.MESO]: { sculpt: HELL_MESO, shade: shade(1.2, 0.45, 0.5, 0.24, 0.3, { coatRough: 0.3, wear: 0.3, dust: 0.16, mid: 0.12, bands: [0.47], band: [0.012, 0.3, 0.08, 0.02] }), px: [1024, 512] },
+    [REGION.WAIST]: { sculpt: FIRE_WAIST, shade: shade(0.8, 0.06, 0.3, 0.26, 0.3, { coatRough: 0.2, wear: 0.2, dust: 0.14 }), px: [256, 256] },
+    // the gaster built from the petiole back: the deep constriction, then three tergite margins, pale and translucent
+    [REGION.GASTER]: { sculpt: HELL_GASTER, shade: shade(0.95, 0.3, 0.35, 0.32, 0.45, { coatRough: 0.1, wear: 0.2, dust: 0.06, mid: 0.14, bands: [0.31, 0.535, 0.705, 0.845], band: [0.008, 0.28, 0.1, 0.022] }), px: [512, 512] },
+    [REGION.LEG]: { sculpt: HELL_LEG, shade: shade(1.0, 0.5, 0, 0.62, 0.35, { coatRough: 0.22, wear: 0.3, dust: 0.3, mid: 0.3, tipThin: 0.6 }), px: [128, 320] },
+    [REGION.TARSUS]: { sculpt: FIRE_TARSUS, shade: shade(0.9, 0.45, 0, 0.62, 0.35, { coatRough: 0.36, dust: 0.5, mid: 0.2, tipThin: 0.5 }), px: [64, 128] },
+    [REGION.ANTENNA]: { sculpt: FIRE_ANTENNA, shade: shade(0.7, 0.05, 0, 0.62, 0.35, { coatRough: 0.3, dust: 0.15, mid: 0, tipThin: 0.4 }), px: [64, 160] },
+    // the jaws and the horn: smooth, glossy, worn pale at the high points, translucent toward the tips
+    [REGION.MANDIBLE]: { sculpt: HELL_MAND, shade: shade(0.8, 0.1, 0, 0.5, 0.35, { coatRough: 0.12, wear: 0.45, dust: 0.04, tipThin: 0.7 }), px: [96, 256] },
+  },
+};
+
 /** Recipe for an ant morph (null: no baked detail yet, the material stays as before). */
 export function antRecipe(morphKey: string): DetailRecipe | null {
   if (morphKey.startsWith('fire_')) return FIRE_ANT;
@@ -214,6 +244,7 @@ export function antRecipe(morphKey: string): DetailRecipe | null {
   if (morphKey.startsWith('atta_')) return ATTA;
   if (morphKey === 'eciton_queen') return ECITON_QUEEN;
   if (morphKey.startsWith('eciton_')) return ECITON;
+  if (morphKey.startsWith('hell_')) return HELL;
   return null;
 }
 
