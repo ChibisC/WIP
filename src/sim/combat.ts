@@ -10,7 +10,7 @@ import { killAnt, releaseGrapple } from './antAI';
 import { dropCarried, setTask } from './colony';
 import { abilityMods } from './abilities';
 import { datan2, dcos, dhypot, dsin, hash01, sq } from './dmath';
-import { BALANCE, GUARD, SICKLE } from './balance';
+import { BALANCE, GUARD, SICKLE, LAYERS } from './balance';
 import { glueBurst, majorAlarm, majorCharge, nasuteAttack, acquireInRange } from './termites';
 import { startSurge, surging } from './surge';
 import { hellUpdate, isHellState, release, snapEligible, startHunt } from './hellAnts';
@@ -380,6 +380,7 @@ function findTarget(w: World, a: Ant, c: Colony, r: number): Target | null {
   const mine = a.tk === 3 && (a.state === AS.Attack || a.state === AS.Grapple) ? a.tgt : 0;
   const sickle = casteOf(a.caste).termite === 'sickle';
   const L = casteOf(a.caste).length;
+  const layered = a.space === SURFACE && !!w.terrain.layers;
   cand.length = 0;
   candD2.length = 0;
   w.enemiesNear(a.space, team, a.x, a.y, r, (o, d2) => {
@@ -401,7 +402,9 @@ function findTarget(w: World, a: Ant, c: Colony, r: number): Target | null {
     const threat = casteOf(o.caste).threat ?? 0;
     // …and ones roughly ahead, so a fight is not a constant turning about (fix brief: no spinning)
     const ahead = 1.25 - (0.25 * ((o.x - a.x) * hx + (o.y - a.y) * hy)) / Math.max(1e-3, Math.sqrt(d2));
-    const base = (d2 * (o.pinned > 0 ? 0.6 : 1) * ahead) / (1 + threat);
+    // (layered ground: a foe over a bank is a long way round by the ramps — one on its own side first)
+    const bank = layered && w.terrain.crossesCliff(a.x, a.y, o.x, o.y) ? LAYERS.crossBankScore : 1;
+    const base = (d2 * (o.pinned > 0 ? 0.6 : 1) * ahead * bank) / (1 + threat);
     // …and ones not already taken on by many nestmates for their size: each counts as `crowdLen` × our length farther
     // away (on a foe with room for `crowdRef`; less on a bigger one), so the swarm shares itself out over the foes in
     // reach — an ant right beside a crowded foe still goes to a free one a few lengths off (user 2026-11-01, 21:06).
@@ -429,8 +432,9 @@ function findTarget(w: World, a: Ant, c: Colony, r: number): Target | null {
       if (rel === 'hostile' && !fighter && d2 > 64) return false;
       // every place round it taken (and none of ours, no marker on it): something else first
       const focus = !!mOn && distToCreatureBody(cr, mOn.x, mOn.y) <= C2.focusMarkerMm;
-      if (!focus && !holdsSlotOn(a, cr.id, 4) && !creatureHasRoom(w, a, cr)) offerFull(4, cr.id, cr.x, cr.y, d2 * (rel === 'prey' ? 1.2 : 0.9));
-      else offer(4, cr.id, cr.x, cr.y, d2 * (rel === 'prey' ? 1.2 : 0.9));
+      const bank = layered && w.terrain.crossesCliff(a.x, a.y, cr.x, cr.y) ? LAYERS.crossBankScore : 1;
+      if (!focus && !holdsSlotOn(a, cr.id, 4) && !creatureHasRoom(w, a, cr)) offerFull(4, cr.id, cr.x, cr.y, d2 * bank * (rel === 'prey' ? 1.2 : 0.9));
+      else offer(4, cr.id, cr.x, cr.y, d2 * bank * (rel === 'prey' ? 1.2 : 0.9));
       return false;
     };
     if (a.space === SURFACE) w.creaturesNear(a.x, a.y, r, scan);

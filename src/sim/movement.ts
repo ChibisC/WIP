@@ -5,7 +5,7 @@ import { arrivalHash, canEnter, canLeave, entranceTop, exitHole, holeIn, passEnt
 import { casteOf } from './species';
 import { hexCoreCells } from './colony';
 import { hexSpeedOf } from './tiles';
-import { BALANCE, ECITON, NASUTE, TERMANT, TRAIL } from './balance';
+import { BALANCE, ECITON, LAYERS, NASUTE, TERMANT, TRAIL } from './balance';
 import { cartonBlocks, termantSpeedMul } from './termants';
 import { potholeMul, teamLoad } from './eciton';
 import { datan2, dcos, dhypot, dsin, hash01, sq } from './dmath';
@@ -185,6 +185,20 @@ export function moveForward(w: World, a: Ant, speed: number, dt: number): boolea
   return false;
 }
 
+/**
+ * Layered ground: walk toward (tx, ty) round the banks, down the shared surface field to the target's `LAYERS.routeCell`
+ * cell (the ramps are the only ways between levels). False when the target can't be reached that way (the caller then
+ * steers straight, and skirts what it meets).
+ */
+function routeOverBanks(w: World, a: Ant, tx: number, ty: number, dt: number, speedMul: number, rate: number): boolean {
+  const q = LAYERS.routeCell;
+  const f = w.surfFlow.field(`bank:${Math.round(tx / q)}:${Math.round(ty / q)}`, 0, [{ x: tx, y: ty }]);
+  if (!w.surfFlow.dir(f, a.x, a.y, tmp)) return false;
+  if (!skirting(a)) turnToward(a, datan2(tmp.y, tmp.x), dt, Math.min(rate, 8));
+  moveForward(w, a, antSpeed(w, a) * speedMul, dt);
+  return true;
+}
+
 /** Steer to a point; returns distance remaining. */
 export function steerTo(w: World, a: Ant, tx: number, ty: number, dt: number, speedMul = 1, rate = 8, weave = false): number {
   const dx = tx - a.x;
@@ -194,6 +208,9 @@ export function steerTo(w: World, a: Ant, tx: number, ty: number, dt: number, sp
     a.v = 0;
     return 0;
   }
+  // layered ground: a straight line over a bank is no way at all — round by the ramps, on the field to the target
+  // (user 2026-11-02 12:08: "give unit AI more intelligence to go around the map up or down a slope")
+  if (a.space === SURFACE && w.terrain.layers && d > 2 && w.terrain.crossesCliff(a.x, a.y, tx, ty) && routeOverBanks(w, a, tx, ty, dt, speedMul, rate)) return d;
   // (`weave`: a trail walk — wandering in a band until the last stretch, user 2026-11-01)
   const want = datan2(dy, dx) + (weave && d > TRAIL.weaveNearMm * 2 ? trailWeave(w, a) : 0);
   // (going round an obstacle: along its edge at a walk, not slowed for facing away from the goal)
@@ -289,6 +306,8 @@ export function steerAvoid(w: World, a: Ant, tx: number, ty: number, dt: number,
     a.v = 0;
     return 0;
   }
+  // layered ground: over a bank only by the ramps (routeOverBanks)
+  if (a.space === SURFACE && w.terrain.layers && d > 2 && w.terrain.crossesCliff(a.x, a.y, tx, ty) && routeOverBanks(w, a, tx, ty, dt, speedMul, rate)) return d;
   let want = datan2(dy, dx);
   const L = casteOf(a.caste).length;
   if (d > L * 0.8) want = avoidHeading(w, a, want, Math.min(d, BALANCE.combat21.avoidLook * L));

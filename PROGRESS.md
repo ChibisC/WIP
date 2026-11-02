@@ -1507,6 +1507,20 @@ and behaviour unchanged. Report: `docs/realism/hell-nasute/README.md`; rubric: `
   hashes (only the nasute castes changed), `sim/heightData.ts` regenerated (taller hell ants; no new underpasses),
   climb data unchanged.
 
+### 2026-11-02 — Finding the way up and down the slopes (layered ground)
+- User 12:08: "because of slopes some ant AI is failing to properly pathfind their way up or down a slope, can you give
+  unit AI more intelligence to go around the map up or down a slope". Flow-field walks already went round by the
+  ramps; what failed was everything that steers straight: chases, the last stretch to a point or a hole, a creature's
+  walk. On testTerrace (`tools/slope-probe.ts`) an ant steered at a point just over the terrace bank never got there
+  (85–120 mm short after 60 s), nor up out of the hollow; a hunting ground beetle pressed against the bank below its prey.
+- Now `steerTo`/`steerAvoid` (movement.ts) and creatures' `walkTo` go round by the ramps whenever the straight line
+  crosses a cliff (`Terrain.cliffAt`, `crossesCliff`), down a shared surface field to the target's 24 mm cell
+  (`LAYERS.routeCell`): up and down the bank in about 22 s, out of the hollow in 16–18 s. Marker squads count an ant
+  inside the circle but over a bank as not there yet (it walks round instead of wandering into the bank). Target choice
+  scores a foe over a bank 9× farther (`LAYERS.crossBankScore`), so fights start on the ant's own side. Flat maps are
+  unchanged (`crossesCliff` is false without layers).
+- Tests: `tests/story.ts` (steering over a bank up, down and out of the hollow arrives; the crossing is seen).
+
 ### 2026-11-02 — Caste looks in earth tones; tiles paid when placed, full stores stop the gathering (EotU)
 User notes 12:04 "change their colors to be more earth tone? like around grey, black, brown, sandy, grass green, dead
 grass, sky blue, and all of the above (earth tone red and purple and orange is fine too)" and 12:06 "fix the tile
