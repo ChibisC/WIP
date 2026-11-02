@@ -1567,3 +1567,21 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   16 min (its ally went to help and fell back, outmatched). Allies with the brain are more decisive both ways.
   The first version (before lost causes were left alone) did worse: helpers died in
   hopeless fights and the helper fell sooner than with the brain off.
+
+### 2026-11-02 — Kings walk round the queen and do no nest duties (user note)
+- **User note (12:20):** "the kings of termants and termites should just wander around the nanitic chamber the queen is
+  on and doesnt do nest duties, it only walks around the queen and attacks intruders." Branch `feature/kings-wander`.
+- **Before:** kings counted as workers for nest jobs (`isJobWorker`: their role is neither soldier nor major), so the
+  Termant king dug and nursed (its job came before its own routine); the termite kings were offered jobs they never
+  did. Both otherwise stood at one place beside the queen.
+- **Now** (`sim/kings.ts`, `BALANCE KING`): kings take no jobs; each walks round the queen inside her chamber (the queen's
+  tiles): a new waypoint every 9 s, 0.75 rad further round her (all the way round, then back), from a hash of his id and
+  the tick, so nothing new is stored and saves, replays and multiplayer agree; he waits there facing her (the Termant
+  king grooms her now and then). The ring: an ellipse round the Termant queen; 2.4 mm off a termite queen's long body,
+  so stopped he is beside her and the kit's ATTEND plays. Termite kings still bite intruders in the chamber first;
+  the Termant king fights through the usual combat. No new state: old saves and replays load as they were.
+- **Tests:** new `tests/kings.ts` (in `npm test`): for the Termants, Nasute and Sickle-jaw termites — no jobs, ≥ 95 % of
+  three minutes inside the chamber, moving part of the time and seen on most sides of her, an intruder in the chamber
+  attacked, determinism. `tests/royals.ts`: the king checks now follow the walk (always in the chamber; every stop
+  beside her and playing ATTEND; seen on 7 of 8 sides). `royals`, `termants`, `sickle`, `species`, `run-all`, `combat`,
+  `story`, `casteAbilities` and the determinism lint pass.
