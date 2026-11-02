@@ -188,7 +188,10 @@ export class TermiteLayer {
       u.av = v.atkVar ?? 0;
       u.as = v.atkSide ?? 1;
     }
-    if (u.aw > 0.001) applyAttackBody(attackPose(u.av, u.aq, u.as, atkP), u.aw, base.bodyLength * scale, vF, vU, vR, vP);
+    // (realism rework, user rating G4 / N6) the nasute castes play their three attacks in the kit's shader with the
+    // feet kept planted, so the whole body is not slid along the ground; the sickle-jaws keep the ant attack body
+    const realC = !!CASTES[caste].real;
+    if (u.aw > 0.001 && !realC) applyAttackBody(attackPose(u.av, u.aq, u.as, atkP), u.aw, base.bodyLength * scale, vF, vU, vR, vP);
     tmpM.makeBasis(vF, vU, vR);
     tmpQ.setFromRotationMatrix(tmpM);
     vP.addScaledVector(vU, v.lift);
@@ -235,6 +238,7 @@ export class TermiteLayer {
       }
     }
     inst.setFire(i, v.ramp ?? 0, yaw, pitch, !!v.firing);
+    if (realC && (st === AnimState.BITE || st === AnimState.RAM)) inst.setMelee(i, fighting ? u.av : 0, u.as);
     // sickle-jaw: LUNGE / HOLD, the head aimed at the victim's back (or a free target), the acid jet and fizz
     const seed = (v.id * 0.37) % 1;
     if ((st === AnimState.HOLD || st === AnimState.LUNGE) && v.aimX !== undefined && v.aimY !== undefined) this.squirt(v, u, inst, i, st, seed, adapter);

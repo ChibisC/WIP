@@ -295,6 +295,16 @@ export class TermiteInstances {
     this.aAnim2.setXYZW(i, rampFraction, aimYawOffset, aimPitchOffset, squirting ? 1 : 0);
   }
 
+  /**
+   * Realism rework (CHANGE_PLAN §22, user rating G4): the melee variant for BITE / RAM on the nasute castes
+   * (`real`): BITE 0 snap, 1 grab and tug, 2 nibbling flurry; RAM 0 lunge, 1 head swing, 2 rear and crush.
+   * side ±1 picks the swing direction. The sickle-jaw castes ignore it.
+   */
+  setMelee(i: number, variant: number, side: number) {
+    this.aAnim2.setX(i, variant);
+    this.aAnim2.setY(i, side);
+  }
+
   /** v2: STRUGGLE intensity 0..1 for a termite held by an enemy soldier (fade toward 0 as it dies) */
   setStruggle(i: number, intensity: number) {
     this.aAnim2.setX(i, intensity);

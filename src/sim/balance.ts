@@ -548,6 +548,19 @@ export const BALANCE = {
 
   // ---------------------------------------------------------------- hell ants (docs/creatures/hell-ant.md)
   snap: {
+    /**
+     * the finisher (user rating 2026-11-02, H7/H10): a hell ant's bite on an enemy ant or termite at this fraction of
+     * its health or less reaches its jaws round the neck and takes the head off — the foe dies (never a queen or king)
+     */
+    finisherHp: 0.25,
+    /**
+     * (user note 2026-11-02 12:39) the finisher lifts the foe into the air by its neck first: held up this long (s),
+     * struggling, then the head is cut off; the foe's centre is held this many hell-ant body lengths ahead plus
+     * `finisherNeck` of its own length (its head between the jaws, the body hanging back)
+     */
+    finisherLift: 1.0,
+    finisherReach: 0.5,
+    finisherNeck: 0.3,
     /** creatures up to this body length (mm) can be snapped; bigger ones are only grappled */
     preyCreatureLength: 12,
     /** damage-over-time ticks while pinned, seconds apart */
