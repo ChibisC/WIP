@@ -114,3 +114,24 @@
 .se-btns { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
 .se-btns button { font: inherit; font-family: 'Marcellus SC', Georgia, serif; font-size: 16px; letter-spacing: 0.04em; color: #efe3c8; background: linear-gradient(180deg, #2c2116, #15100b); border: 1px solid #a8844f; border-radius: 3px; padding: 8px 16px; cursor: pointer; }
 .se-btns button.main { color: #1a1008; background: linear-gradient(180deg, #e9bf6a, #b98632); border-color: #f2d79a; }
+
+/* ---- the island map for a campaign of 30–40 levels: pan and zoom, a level list by chapter */
+.island-wrap { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.island-wrap .island-map { width: 100%; height: auto; max-height: 100%; touch-action: none; cursor: grab; aspect-ratio: auto; }
+.island-zoom { position: absolute; right: 14px; top: 14px; display: flex; flex-direction: column; gap: 4px; }
+.island-zoom button { width: 30px; height: 30px; font: 600 17px Georgia, serif; color: #2c2116; background: rgba(240,230,206,0.9); border: 1px solid rgba(60,44,28,0.6); border-radius: 3px; cursor: pointer; }
+.island-zoom button:hover { background: #fff6e2; }
+.sh-side { display: flex; flex-direction: column; gap: 10px; }
+.sh-list { max-height: 32vh; overflow: auto; background: rgba(10,8,6,0.6); border: 1px solid rgba(168,132,79,0.45); border-radius: 4px; padding: 6px; flex: none; }
+.sh-ch + .sh-ch { margin-top: 6px; }
+.sh-chname { font-family: 'Marcellus SC', Georgia, serif; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #bba98a; padding: 2px 4px 4px; }
+.sh-lv { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 8px; width: 100%; text-align: left; font: inherit; font-size: 13.5px; color: #efe3c8; background: transparent; border: 1px solid transparent; border-radius: 3px; padding: 4px 6px; cursor: pointer; }
+.sh-lv:hover { border-color: rgba(168,132,79,0.6); }
+.sh-lv.on { border-color: #e0c28a; background: rgba(224,166,74,0.16); }
+.sh-lv .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-family: 'Marcellus SC', Georgia, serif; font-size: 12px; background: #8f3a22; color: #f6ead0; }
+.sh-lv.won .n { background: #6b2e1c; }
+.sh-lv.locked { color: #85775f; }
+.sh-lv.locked .n { background: #6a5f50; }
+.sh-lv .ms { display: flex; gap: 3px; }
+.sh-lv .m { width: 9px; height: 9px; border-radius: 50%; background: rgba(120,100,70,0.35); }
+.sh-lv .m.gold { background: #e2b53e; } .sh-lv .m.silver { background: #c6ccd2; } .sh-lv .m.bronze { background: #c08048; }

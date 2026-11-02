@@ -62,6 +62,7 @@ export function showStoryHub(parent: HTMLElement, start: (s: StoryStart) => void
   map.onSelect = (l) => {
     sel = l as LevelId;
     renderCard();
+    renderList();
   };
   map.onRevealed = (l) => {
     if (!c.revealed.includes(l as LevelId)) c.revealed.push(l as LevelId);
@@ -81,13 +82,30 @@ export function showStoryHub(parent: HTMLElement, start: (s: StoryStart) => void
     </div>
     <div class="sh-body">
       <div class="sh-map"></div>
-      <div class="sh-side"></div>
+      <div class="sh-side"><div class="sh-list"></div><div class="sh-cardbox"></div></div>
     </div>
     <div class="sh-page" hidden></div>
     ${done ? `<div class="sh-banner"><b>Chapter 1 complete</b><span>More of the island is coming soon.</span></div>` : ''}`;
   const mapBox = root.querySelector('.sh-map') as HTMLElement;
-  mapBox.appendChild(map.canvas);
-  const side = root.querySelector('.sh-side') as HTMLElement;
+  mapBox.appendChild(map.root);
+  const side = root.querySelector('.sh-cardbox') as HTMLElement;
+  const list = root.querySelector('.sh-list') as HTMLElement;
+  // every level by chapter (the campaign runs to 30–40 levels: the list is the quick way round the island)
+  const renderList = () => {
+    list.innerHTML = CHAPTERS.map((ch) => {
+      const rows = ch.levels
+        .map((l) => {
+          const L = STORY_LEVELS[l];
+          const rec = c.levels[l];
+          const st = rec?.won ? 'won' : isUnlocked(l) ? 'open' : 'locked';
+          const medals = rec?.won ? [rec.time, rec.losses, rec.bonus].map((m) => `<i class="m ${m}"></i>`).join('') : '';
+          return `<button class="sh-lv ${st} ${l === sel ? 'on' : ''}" data-lv="${l}"><span class="n">${L.number}</span><span class="t">${esc(L.title)}</span><span class="ms">${medals}</span></button>`;
+        })
+        .join('');
+      return `<div class="sh-ch"><div class="sh-chname">${esc(ch.name)}</div>${rows}</div>`;
+    }).join('');
+  };
+  renderList();
   const page = root.querySelector('.sh-page') as HTMLElement;
   const body = root.querySelector('.sh-body') as HTMLElement;
 
@@ -164,6 +182,14 @@ export function showStoryHub(parent: HTMLElement, start: (s: StoryStart) => void
     const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
     if (!b) return;
     const d = b.dataset;
+    if (d.lv) {
+      sel = d.lv as LevelId;
+      map.selected = sel;
+      map.focus(sel);
+      renderCard();
+      renderList();
+      return;
+    }
     if (d.tab) {
       tab = d.tab as typeof tab;
       root.querySelectorAll('.sh-tab').forEach((x) => x.classList.toggle('on', (x as HTMLElement).dataset.tab === tab));

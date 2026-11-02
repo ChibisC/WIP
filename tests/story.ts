@@ -30,6 +30,8 @@ import { Terrain, mapTerrainParams } from '../src/world/terrain';
 import { validateMap } from '../src/world/mapValidate';
 import { MAPS, PLAYABLE_MAPS } from '../src/maps';
 import { campaign, isUnlocked, recordWin, reloadCampaign, resetCampaign, slots } from '../src/game/campaign';
+import { NODES, REGIONS, capacity, nodePos, slotsOf } from '../src/story/campaign';
+import { MAP_H, MAP_W, SLOT_SPACING, inIsland, nearestRegion } from '../src/story/islandGeo';
 
 let failed = 0;
 function check(name: string, ok: boolean, info = ''): void {
@@ -324,6 +326,23 @@ for (const id of ['gardenBelow', 'fireBanks'] as const) {
   killAnt(w, w.antById.get(w.colony(0)!.queen)!);
   run(w, 60);
   check('lose: the queen dead loses the level, with its own line', missionOf(w)!.result === 'lost' && said.includes('garden.lose'));
+}
+
+// ---------------------------------------------------------------- the island map holds the whole campaign (30–40 levels)
+{
+  const short = REGIONS.filter((r) => slotsOf(r.id).length < r.slots);
+  check('island map: room for at least 40 level nodes (every region has all its slots)', capacity() >= 40 && short.length === 0, `${capacity()} slots; short: ${short.map((r) => `${r.id} ${slotsOf(r.id).length}/${r.slots}`).join(', ')}`);
+  let ok = true;
+  const all: Array<[number, number]> = [];
+  for (const r of REGIONS)
+    for (const p of slotsOf(r.id)) {
+      if (inIsland(p[0], p[1]) < 0.03 || nearestRegion(REGIONS, p[0], p[1]).r.id !== r.id) ok = false;
+      all.push(p);
+    }
+  let minD = Infinity;
+  for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) minD = Math.min(minD, Math.hypot((all[i][0] - all[j][0]) * (MAP_W / MAP_H), all[i][1] - all[j][1]));
+  check('island map: every slot is on land inside its region, and no two are closer than the label spacing', ok && minD >= SLOT_SPACING * 0.99, `closest pair ${minD.toFixed(3)} (min ${SLOT_SPACING})`);
+  check('island map: chapter 1’s nodes sit in their regions’ slots', NODES.every((n) => { const p = nodePos(n); return nearestRegion(REGIONS, p[0], p[1]).r.id === n.region; }));
 }
 
 // ---------------------------------------------------------------- campaign save
