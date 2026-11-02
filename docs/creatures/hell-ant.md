@@ -71,6 +71,33 @@ Amber does not preserve true colour. The game palette is an artistic reconstruct
 7. Hemolymph groove: on the mandibles (*L. vladi*), not the horn base.
 8. Four trigger hairs in *Ceratomyrmex* (two per side).
 
+## 7. Shape numbers for the realism rework (2026-11-02)
+
+Measured on the user's study references (CT head of *Ceratomyrmex*, amber head and drawing of *Linguamyrmex*, amber prey dorsal and lateral views with drawings, the alate *Haidomyrmex* queen in amber, two paleo-illustrations, and living *Odontomachus* and *Myrmecia* for the cuticle and stance) and on the papers above. Lengths are in head lengths **H** (head capsule without horn and mandibles), which is how the morphs are written (`hellMorphs.ts`, H = L / 5.5).
+
+| Part | Number | Source |
+|---|---|---|
+| Scape | 1.0–1.1 H (*L. vladi*: 0.94 mm scape on a 0.96 mm head) | paper; CT head |
+| Funiculus | 11 segments (12 with the scape), filiform, about 3.4 H; pedicel 0.6× the next segment, segments 2–10 equal, the apical one 1.2× | CT head (segment joints visible) |
+| Antenna carriage | scape raised 60–80° from the head's long axis, the funiculus in one even curve forward and down (no kink except the elbow) | paleo-illustrations; amber prey lateral |
+| Horn (*Ceratomyrmex*) | rises from the clypeus, reaches back over the head to 1.8 H, round in section at the base (0.15 H across), flattening to a spoon 0.16 H long | CT head; paper |
+| Paddle (*Linguamyrmex*) | 0.5 H long, 0.3 H wide, 0.08 H thick, a setose pad underneath | amber head and drawing |
+| Trigger hairs | **four** (two per side) in *Ceratomyrmex*, 0.8–1.0 H, standing forward from the face near where the mandible tips rest | paper (§3) |
+| Mandibles | slender scythes 1.8 H along the curve, 0.09 H thick at the base tapering to a point; closed at rest | CT head; drawings |
+| Eyes | oval, 0.2 H long, at mid-head, slightly bulging | paper (eye sizes, §3) |
+| Mesosoma | 2.0 H long, 0.7 H high, pronotum rounded, a clear metanotal groove at 0.45 of its length, propodeum sloping | drawings; amber lateral |
+| Petiole | node 0.32 H high on a short stalk 0.5 H long | drawings |
+| Gaster | 1.85 H long, 1.0 H high, a deep constriction after the first segment (0.2 of the radius), four tergites | drawings; §3 |
+| Legs | fore femur 1.3 H, mid 1.5 H, hind 1.8 H; tibiae about as long; tarsi 1.05–1.5 H in five tarsomeres (0.34, 0.18, 0.15, 0.13, 0.20 of the tarsus). The user's note (2026-11-02): long legs, the body carried high, the feet set as wide as the other ants' (about half a body length either side) | drawings; *Myrmecia*; the user |
+| Femur | club-shaped: thickest at 0.3 of its length (1.5× its distal end), tapering to the knee | *Myrmecia*, *Odontomachus* |
+| Tibia | slim (0.55× the femur's thickest), widening a little at the apex; spurs 1-2-2 | §3; *Myrmecia* |
+| Setae | sparse erect pale hairs on head, mesosoma dorsum and gaster (8–20 per part), denser on the gaster tip; a fringe of long setae under the horn | CT head; amber views |
+| Stance | body 1.15 H above the ground (queen 1.05 H), femora angled up and out, tibiae down and out, tarsi flat for their last three segments; walks and idles with the other ants' planted-feet animation | *Myrmecia*; illustrations; the user |
+
+**Colour and finish (reconstruction):** amber keeps no colour, so the palette is a choice. The realism pass keeps the user's warm brown and copper but makes the **mandibles dark reddish-brown to black at the tips** (readable against the body at sheet scale), the legs a warm brown-orange rather than toy orange, and the cuticle **smooth and shining with fine hair pits** (as in living trap-jaw ants), the gaster glossier than the head and mesosoma, thin edges (legs, antennae, horn tip) letting light through.
+
+**Queen:** *H. cerberus* alate: no ocelli (the game keeps none), smaller eyes, larger mesosoma with a mesoscutum and scutellum; the game's dealate keeps short wing stubs (a convention, §3). Amber specimen mode in the lab (`?amber=1`) shows any unit embedded in a polished amber block (render only).
+
 ## Sources
 - AntWiki Haidomyrmecinae: https://www.antwiki.org/wiki/Haidomyrmecinae
 - AntWiki key to genera and species: https://antwiki.org/wiki/Key_to_Haidomyrmecinae_genera_and_species

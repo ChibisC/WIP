@@ -16,16 +16,15 @@ import { BALANCE } from '../sim/balance';
 import { HEX_TYPE, HexVisual } from '../render/nest/nestTerrain';
 import { World } from '../sim/world';
 import { AS, Colony } from '../sim/types';
-import { CASTES, SPECIES, isTermiteSpecies } from '../sim/species';
+import { CASTES, isTermiteSpecies } from '../sim/species';
 import { MARKER_COLORS, markerRadius } from '../sim/markers';
 import { groupById, raisesAnts } from '../sim/tiles';
 import { antToView, blankView, corpseToView, termiteBroodToView } from './antViews';
+import { casteColour, casteLook } from '../render/casteLook';
 
-/** Floor tint of a caste's brood tile: role colour nudged toward the species colour. */
+/** Colour of a caste's brood tile and UI (render/casteLook: every caste its own colour and texture). */
 export function casteTint(caste: string): THREE.Color {
-  const cd = CASTES[caste];
-  const role = cd.role === 'soldier' || cd.role === 'major' ? 0x8a3a24 : cd.role === 'minim' ? 0xc8884a : 0x9a7040;
-  return new THREE.Color(role).lerp(new THREE.Color(SPECIES[cd.species].color), 0.3);
+  return casteColour(caste);
 }
 
 /**
@@ -131,11 +130,13 @@ export class NestView {
       // Only the player's groups carry marker outlines; rival groups get a neutral rim.
       const outline = raisesAnts(t) && gr ? (owner!.player && gr.marker >= 0 ? gr.marker + 1 : 6) : 0;
       let tint = new THREE.Color(0.5, 0.4, 0.3);
+      let pattern = 0;
       if (t.caste && t.type === 'brood') {
         if (!tints.has(t.caste)) tints.set(t.caste, casteTint(t.caste));
         tint = tints.get(t.caste)!;
+        pattern = casteLook(t.caste).patternId;
       }
-      return { type: HEX_TYPE[t.type], level: t.level, edges: raisesAnts(t) ? edges : 0, outline, tint, planned: !t.built, pend: t.pend };
+      return { type: HEX_TYPE[t.type], level: t.level, edges: raisesAnts(t) ? edges : 0, outline, tint, pattern, planned: !t.built, pend: t.pend };
     });
   }
 

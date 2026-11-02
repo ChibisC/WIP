@@ -1,4 +1,4 @@
-"""Allies helping (CHANGE_PLAN §22): a clip of an AI ally's soldiers coming to the player's rescue, for the user.
+"""Allies helping (CHANGE_PLAN §23): a clip of an AI ally's soldiers coming to the player's rescue, for the user.
 
 Meadow Pond, you a Black garden colony with an AI Black garden ally next door (the team placement puts them close) and
 a Red wood rival across the pond, everyone well grown (?developed=70). The rival's own brains are switched off; a band

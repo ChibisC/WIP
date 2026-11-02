@@ -77,7 +77,10 @@ be deterministic and change the simulation only through commands.** That means:
   walk up the flower and come out of one of the holes (and the reverse). Digging never
   makes another entrance (since 2026-11-01).
 * The nest hex grid's radius scales with the species (≈ 3 workers wide; see 3.7),
-  so ants stay at real size while tile counts are the same for every species.
+  so ants stay at real size while tile counts are the same for every species: R =
+  1.5 × the basic worker's length × `NEST_HEX_SCALE`, within 5–11 mm × it (`hexRadiusFor`;
+  the scale was 1.25 from 2026-11-01, **1.10** since 2026-11-02 at the user's request).
+  A save keeps the hex size it was made with.
 
 ## 3. Simulation core
 
@@ -420,7 +423,7 @@ attacks (wind-up pose + ground marker before each big attack).
 ### 3.11 Rival AI (`sim/colonyAI.ts` builder and forager, `sim/warAI.ts` war)
 Rival colonies run the full simulation with the same tiles, groups and markers.
 
-**Placement with allies (CHANGE_PLAN §22, `world/teamSites.ts`; user spec `claude/ai/01-spec-ai-allies-chambers.md`, 2026-11-02).** When no colony brings its own `at`, `createWorld` asks `pickTeamSites(layout, teams)` for the sites; it returns null (the old order: the balanced set for the colony count, rotated by the seed) unless some team has two or more colonies.
+**Placement with allies (CHANGE_PLAN §23, `world/teamSites.ts`; user spec `claude/ai/01-spec-ai-allies-chambers.md`, 2026-11-02).** When no colony brings its own `at`, `createWorld` asks `pickTeamSites(layout, teams)` for the sites; it returns null (the old order: the balanced set for the colony count, rotated by the seed) unless some team has two or more colonies.
 - **Land routes.** `siteRoutes` measures every pair of the map's 10 sites by a breadth-first walk over the surface hex layout (ground and walkways, from main entrance hex to main entrance hex) × the hex step; water and walls are gone round. Cached per layout.
 - **Team shape.** Teams of two or more, largest first (ties by their first colony), then the colonies alone: `2v2`, `2v1v1`, `3v3`…
 - **Authored sets first.** A map may list `teamSets[shape]` (every map has `2v2`, `2v1`, `3v1`, `2v2v2`, `2v1v1`, `3v3`); a set that passes the hard limits is used as it stands.
@@ -468,7 +471,7 @@ The default population limit is 300.
 - The tuning lives in `BALANCE.aiWar` (joint raids and shared targets in `BALANCE.aiAllies`).
 
 **Ally brain (2026-11-02, `warAI.ts` `allyTick`; called first in `warTick`, every `every` = 2 s).** Numbers in `BALANCE.aiAllies`.
-- **Danger** (`allyDanger`): the enemies' fighting weight at an ally (health × damage rate; creatures by health × bite rate × `creatureWeight`) × where they are — by its queen `locQueen` (within `queenRadius`), deep in its nest `locDeep`, at its entrance flower `locEntrance`, at its holes `locSiege`, near them on the surface `locNear` — minus its defenders' weight, plus its losses a second × `lossWeight`; × `queenMul` when its queen is hurt below `queenHurt` or enemies are by her. A human ally's **call for help** (command `callHelp`, the ✋ button by the markers; only with allies) lasts `callHelpSec` s: its danger × `callBoost`, at least `callMin`.
+- **Danger** (`allyDanger`): the enemies' fighting weight at an ally (health × damage rate; creatures by health × bite rate × `creatureWeight`) × where they are — by its queen `locQueen` (within `queenRadius`), deep in its nest `locDeep`, at its entrance flower `locEntrance`, at its holes `locSiege`, near them on the surface `locNear` — minus its defenders' weight, plus its losses a second × `lossWeight`; × `queenMul` when its queen is hurt below `queenHurt` or enemies are by her. A human ally's **call for help** (command `callHelp`, wire 25, `BUILD_ID` `ud-mp-8`; the ✋ button by the markers; only with allies) lasts `callHelpSec` s: its danger × `callBoost`, at least `callMin`.
 - **Whether.** Never while threatened at home (enemies in the nest or at the holes) or defending; never an ally whose defenders already have `allyWinningRatio` × the attackers' weight, or under `assistMinDanger`; never one farther than `assistMaxTravel` s by land route unless its queen is in danger. Several allies: the highest danger ÷ travel time. **Never a lost cause:** when all it can spare + the ally's defenders would still be under `assistMinOdds` × the attackers (`assistMinOddsQueen` with the ally's queen in danger), it keeps its fighters (a human who called for help is told so, once). Found in the 2v2 ecology runs: helpers sent into a hopeless fight died, and the helper fell sooner.
 - **How many.** Whole fighter groups, enough that help + the ally's defenders reach `assistOvermatch` × the attackers' weight, keeping a home guard of `homeGuardShare` of the weight (and at least `homeGuardMin` fighters). They go to **marker V** (help). While helping, if help + defenders fall short again (the ally's defenders dying, more enemies), more groups follow, at most every `reinforceEvery` s, still keeping the guard.
 - **Where.** While the enemy is inside the ally's nest, marker V goes on the ally's hole nearest us (it snaps down to the entrance flower); once `insideShare` of the helpers are inside, it moves onto the threat. Enemies on the surface: straight to the threat.
@@ -478,6 +481,11 @@ The default population limit is 300.
 - `help: false` turns all this and joint raids off (AI allies leave each other alone, as before). `tools/ally-probe.ts` prints the brain at work in a staged invasion (`tools/allyScenes.ts`); `tests/aiAllies.ts` checks it.
 
 ### 3.11b Species specials (Phase 12)
+- **Caste balance (2026-11-02, `docs/balance/castes.md`):** every species' workers are alike for their cost (all build
+  for 10; within ±0.18 of the black garden ant worker in equal-food fights) but keep their own shapes; soldiers are tuned
+  against the black garden ant soldier at 300 food, majors against the fire ant major at 420. Tools:
+  `tools/caste-table.ts` (the numbers), `tools/balance-matrix.ts` (equal-food fights, creature fights),
+  `tools/balance-tune.ts` (the stat scale at which a caste ties its reference).
 - **Black garden ant (Lasius):** tends aphids on the surface; root-aphid pastures in the nest trickle honeydew.
 - **Red wood ant (Formica):** acid (opener sprays; mortar and rapid sprayers). Thatch stores warm the nest, so brood grows faster.
 - **Leafcutter (Atta):** cuts leaves, with minims riding on them as hitchhikers. Fungus gardens turn the leaves into food.
@@ -549,11 +557,14 @@ Three playable, AI-usable colonies, built from the user's design packages (kept 
 - **Balance notes.** Wood income: `tools/termite-income.ts` (AI colonies, three seeds, 8 min) gives a median of 1.53 wood per worker-minute against Lasius' 1.61 food (× 0.95; one Lasius seed starved and is left out of the mean). One nasute beats one Lasius soldier (44 HP, bite 5) only with about 3 s of uninterrupted fire before contact (`tools/nasute-duel.ts`: it loses with ≤ 2.6 s, wins with ≥ 3.6 s).
 - **Simplifications.** One queen and one king (polygyny and replacement reproductives are documented in the reference only); no push priority (the game has no body-push system, so majors "hold" a choke by standing in it); covered galleries (phase 9b) were cut — they would need a new surface-structure and targeting system; far termites use the kit's LOD2 mesh rather than its baked impostors (the LOD2 mesh is ~290 triangles); glue on creatures is not drawn.
 
+- **Looks and motion (realism rework, 2026-11-02; CHANGE_PLAN §22).** Render only, nasute castes only (the sickle-jaw castes share the kit and are unchanged: identical geometry hashes and pixel-identical lab renders, `docs/realism/hell-nasute/termite-hashes.md`). A per-caste `real` entry (rig texture column `REAL`) turns on: an irregular lobed gut lying under the cuticle (the segment margins run over it), sunken paler segment membranes, a mottled, finely wrinkled soft cuticle with a wet glint and deeper subsurface light (warm translucent edges), barrel-shaped antennal articles and rounder legs at LOD0, more fine setae at the tergite margins, a breathing abdomen (alive only), stronger peristaltic waves and eggs seen faintly through the queen's membrane, her plates as dark islands. The glue is stringy (`NASUTE_GLUE`: beads on a thread that sags). Palettes nudged to the photos (worker creamy amber, soldier less saturated, queen's membrane pale tan, the king's membranes darker).
+
 #### Hell ants (Haidomyrmecinae, extinct) — reference `docs/creatures/hell-ant.md`
 - Worker 5 mm (pin), soldier 6.5 mm (impale, a game caste), queen 7.6 mm. Hunters more than gatherers; slow breeding. Ability **Ambush**: every snap ready at once, and for 15 s it recharges straight after each catch (cooldown 80 s).
 - **The snap** (`sim/hellAnts.ts`): `Attack → Hunt` when small prey (ants up to the caste's `maxPreyMass`, latchable creatures up to 12 mm, never bosses, queens or the termite king) is within 0.9 body lengths of its edge and the snap is ready. **Hunt**: creep in at × 0.35 with the jaws cocked; after the wind-up (0.6 / 0.8 s) and within 0.5 body lengths it **Snaps** (2 ticks). **Hold**: the prey is pinned at the jaw–horn socket (0.5 body lengths ahead, lifted off the ground in the render), stunned, bled every 0.5 s (3.5 / 2 HP/s) and stung (slowed 2 s); soldiers first drive it onto the paddle for a 14 HP burst. Release: hold over (4 / 3 s), the prey dead (after 0.8 s of feeding), the hell ant hurt, stunned, pinned or flung (half cooldown), or the space changed; the prey is dropped dazed (0.4 s). Cooldown 5 / 7 s. Larger prey is grappled by the legs as usual; a grappling hell ant whose snap comes ready on small prey lets go and stalks it again. Snap states count as fighting everywhere (task allocation, markers, jobs).
 - **Presentation only:** the jaws close instantly (mandible easing × 60); an impale throws pale droplets and, when the camera is closer than 60 mm, jolts the camera and holds the picture back 0.08 s (single player only; the sim is untouched).
 - **Simplifications.** A held creature is pinned in place but not drawn lifted (the creature renderers have no lift).
+- **Looks and motion (realism rework, 2026-11-02; CHANGE_PLAN §22, `docs/realism/hell-nasute/`).** Render only; the sim's only change is the regenerated `sim/heightData.ts` (the hell ants' foot points moved by under 0.001 body lengths). Baked cuticle detail (`bake/recipes.ts` `HELL`: reticulate-punctate satin head and mesosoma, faintly striate pleura, a glossier shagreened gaster with pale tergite margins, smooth striate jaws and horn); 12-segment antennae (a club-ended scape, an 11-article funiculus through a spline, each article narrow at its base); club femora, slim tibiae with spurs 1-2-2, five tarsomeres and claws, a soft knee; erect setae and a fine decumbent pubescence; four trigger hairs on the worker and soldier, two on the queen; dark jaws, near black at the tips; bulging bronze eyes. The planted-feet animation set (`ANIM_V2_PREFIXES` has `hell_`: `rig.foot` and `plantHomes`); melee is the new `ATK.SNAP` (the jaws cocked wide and down, a tremble, the snap in the last 2.5 % of the wind-up, the head jerking up, a hit-stop of 7 % of the cycle, then the prey lifted) and the soldier's `ATK.IMPALE` (rear up, drive the paddle down, pull free); never a sideways jaw. Each snap emits `ANIM_SFX.SNAP` (the hell-ant crack) and a puff of dust (`animHooks.fx` → `CombatFx.dust`). The ant lab's `?amber=1` shows a unit in a block of amber (lab only, never in the game).
 
 #### Melee attack animations (all ants and termites; `render/ants/attackPoses.ts`)
 - Inspired by *Empires of the Undergrowth*, where an attack plays once per attack (attack speed = attacks per second) and special attacks reuse the basic attack's animation, so every attack lands on the same beat. Each biting unit cycles through **three attacks of exactly one attack interval each**, the jaws closing at the same point (`ATTACK_CONTACT` = 0.7 of the cycle) in all three:
@@ -628,7 +639,7 @@ From the user's package `claude/termyrms/` (2026-10-25). An ant–termite hybrid
 
 - **Castes:** worker 5 mm (formic-acid opener, gathers wood), soldier 7 mm (glue burst; gathers and fights like an ant's soldier), king 7.5 mm (spawned beside the queen; role `king`, never in caste ratios), queen 12 mm. Ratio 85 / 15. One queen and no replacement queens (user note, 2026-10-25): when she dies the colony is lost, king or not.
 - **Genes → stolen castes:** samples credited at the store (`termantDeposit`) from enemy corpses only (size classes 1 / 2 / 4 / 7, creatures 3; pieces cut from a corpse carry their share). 12 samples (18 heavy) unlock the source species' caste from `STOLEN_CASTES`; it joins `colony.castes`, so everything about it is that species' own. Max 3; a fourth waits until one is forgotten (command `forgetCaste`: tiles refunded, living ants stay, samples to half). Tiles ×1.5. Corpses linger 25 s in Termant games so they can be carried home. Command `corpsePriority` makes workers fetch the corpses of still-short species first.
-- **Glue burst** (`glueT` on ants and creatures): +3 damage, speed ×0.4 for 3 s, formic acid ×2 meanwhile. **Wood:** separate store (cap 60) digesting into food. **Carton walls:** tile `carton`, paid in wood, 120 HP, blocks enemies (they chew it), own ants pass, wall points for upgrades.
+- **Glue burst** (`glueT` on ants and creatures): +3 damage, speed ×0.4 for 3 s, formic acid ×2 meanwhile. **One food store** (user 2026-11-02): dead wood, leaf litter and leaves go into the food store with everything else (wood at `TERMANT.wood.toFood` 0.5 food a unit, leaves 1); an old save's wood store turns into food on load. **Carton walls:** tile `carton`, paid from the food store, 120 HP, blocks enemies (they chew it), own ants pass, wall points for upgrades.
 - **Ability:** Alarm Drumming (colony alarmed 15 s, every glue burst ready; 70 s). **UI:** Genome tab, wood in the top bar, stolen names on tiles and cards. **Render:** stolen-caste amber tint (code in `aD.z`, see `antMaterial.TINT_GLSL`). **AI:** mix follows the stolen castes, forgets the least-used, carton walls when invaded, raids sooner a rival whose genes it nearly has.
 
 ### 3.12 Underground areas (`sim/areas.ts`, Revision 2)
@@ -683,7 +694,7 @@ From the user's package `claude/termyrms/` (2026-10-25). An ant–termite hybrid
 - **Refuse**: the dead and waste go to `refuseSpot` — beside the anthill, `ENTRANCE.refuseMm` beyond its holes, between the first two (the leafcutters' dump is drawn there).
 
 **Commands, saves, multiplayer.**
-- `entrance` (wire id 23) stays in the codec so old replays parse, and is always rejected ("Entrances are always open"); `speedVote` keeps 24. `BUILD_ID` is `ud-mp-6`: older builds cannot join.
+- `entrance` (wire id 23) stays in the codec so old replays parse, and is always rejected ("Entrances are always open"); `speedVote` keeps 24. `BUILD_ID` was `ud-mp-6` for this rework (`ud-mp-7` with the 1.10 × nest hexes; `ud-mp-8` with the AI allies' `callHelp`, wire 25, §3.11): older builds cannot join.
 - Save version 3. `upgradeWorldEntrances` (World constructor; again in `restoreWorld` once a binary snapshot's grids are attached) is idempotent: an older nest's extra entrances, spots and shafts are dropped (their dug hexes stay plain dug floor); the flower goes over the old main tunnel as a new nest's goes over its passage, its 7 hexes dug; a tile on one of them moves to the nearest free dug hex (or its cost is refunded) and the load log says so; ants and food stay where they are (the old tunnels stay dug); the three holes are rebuilt from the site or the fallback, keeping the old main hole's credit and cave-in. `normalizeEntrance` drops `shut` and `work` and adds `n` in a fixed order (canonical snapshots). The worker sends `entrances`, `tunnels` and `flowers` with each grid delta.
 
 **Surface models** (`render/game/entranceModels.ts`, notes in `docs/creatures/entrances.md`): one structure per colony centred between its three holes, which are alike (no main/extra sizes): black garden ants and Plagiaria — a low crater of crumbly soil pellets, the holes in its rampart (a flat stone over one); Termants — the same, carton-reinforced, carton collars in each throat; red wood ants — the thatch dome, holes in its flanks, worn trails out past each; leafcutters — a wide bare-soil mound with three big craters, leaf fragments and trails leading in, the refuse dump beside it; fire ants — the worked-soil dome (`render/game/mounds.ts`, now centred over the holes) with three small holes at its edge; army ants — the bivouac with three gaps in its skirt (the ants stream in and out of them); hell ants — three small neat holes on a minimal soil ring in leaf litter (a reconstruction); Gilded Ants — the stump with a root running out to each hole, frass below; nasute termites — the carton nest with three openings at its base, gallery tubes leading away between them; sickle-jaw termites — three small openings with soil collars in the litter. Craters and mounds of loose soil fade into the ground at their edge; grass does not grow through anthills. Meshes rebuild only when the anthill grows a size step or caves in.
@@ -739,14 +750,18 @@ Style switches to replace (`MapStyle`, `terrain.ts:5`): `terrain.ts` (relief, co
 
 * Two scenes, both seen from above with the same top-down camera rig: **surface**
   (sun, hemisphere light, fog, dappled canopy light, grass, litter props) and
-  **nest** (warm low-angle golden key light, pooled light over dug floor, deep
-  shadow in undug soil). Each has its own colour grade. The transition is a
+  **nest** (a warm-white low-angle key light, 0xffdcb4 — orange until the 2026-11-02
+  realism pass —, pooled light over dug floor, deep shadow in undug soil). Each has its own colour grade. The transition is a
   camera dive into the entrance hole and down the ramp.
 * **Nest terrain** (`render/nest/`): a chunked heightfield built from a signed
   distance field of the dug raster (blurred for organic contours): undug soil is
   a raised, dark, crumbly plateau; tunnel walls slope and round down to a
-  sunken packed-earth floor with pebble drifts along wall bases, root fibres
-  and debris. Baked cavity occlusion + SSAO darken wall feet; a blurred
+  sunken packed-earth floor. Since the realism pass (2026-11-02,
+  `docs/realism/underground.md`) the soil is drawn at the ants' scale: sand grains
+  (0.2–0.5 mm; quartz, feldspar, dark and iron-stained grains) in a neutral brown
+  silt-clay matrix, ~1 mm crumbs softened where ants walk, the diggers' pellets and soil
+  crumbs and stones with contact shadows along the wall feet, damp darker patches; walls
+  are crumbly compacted soil with mandible scrapes and the odd root. Baked cavity occlusion + SSAO darken wall feet; a blurred
   "openness" light map makes warm light pool in open areas and fall off down
   tunnels. Dust motes drift in the air.
   - **Buried stones** (undiggable hexes; user note 2026-10-25: hard to tell from
@@ -755,11 +770,12 @@ Style switches to replace (`MapStyle`, `terrain.ts:5`): `terrain.ts` (relief, co
     the warm key light so they read as neutral grey, and kept at least 62 % lit
     in the dark far from the dug area, where diggable soil fades to near black.
 * **Tile floors**: drawn in the floor shader from a per-hex data texture (type,
-  caste colour, level, group outline colour). Original procedural looks: queen
-  = pale blue-grey silk mat; worker brood = ochre cell pits; soldier brood =
-  red-brown ridged cells; major = dark crimson large pits; minim = pale orange;
-  food storage = mossy green with stored morsels and honeydew beads; fungus
-  garden = spongy white comb. Group outlines are drawn on hex edges bordering
+  caste colour, level, group outline colour). Since the realism pass they are the soil
+  first: queen = the floor plastered with smoothed pale silt (grains showing; was a
+  silk mat); brood = the soil stained with the caste's own colour and pressed with its own texture (see
+  **Caste looks** in §6);
+  food storage = the floor stained olive, honeydew beads; fungus garden = spongy white
+  comb; the stored food and the brood lie on them (`tileDecor`). Group outlines are drawn on hex edges bordering
   another group, coloured by the assigned marker. Placement ghost hex, grid
   overlay and active-tile particles (spores over fungus, shimmer over brood).
 * Post-processing (quality dependent): GTAO ambient occlusion, gentle bloom,
@@ -918,6 +934,20 @@ both modes.
 - **Multiplayer** is 2–4 players plus AI colonies on one generated map, through a lobby and invite links; last queen standing wins.
 - A multiplayer match runs at 1× and **cannot be paused** (user note).
 
+**Story mode (2026-11-02; `docs/story/DESIGN-STORY.md`).** The **Story** tab (and the title screen's Story card) opens
+the island map of *The Gene-Thief* campaign: chapter 1 is two levels for the Gene-Thief Termants on their own layered
+maps (*The Garden Below* against black garden ants, *Fire on the Banks* against tropical fire ants). A story level is a
+data file (`src/story/levels/`) played by the mission runner above (`missionDef(id)` resolves missions and levels; the
+Missions menu still lists only the two missions). It adds data-driven objectives, captions and actions on times and
+flags, a director that makes the level's creatures and enemy ants act out scenes (`sim/story/director.ts`, cues such as
+walk, hold, patrol, guard, leave, charge, release), letterboxed camera shots, difficulty (`STORY` in balance.ts), three
+medals per level and a campaign save (castes kept, slots, journal) that never touches skirmish or multiplayer.
+
+**Layered ground (2026-11-02; `world/layers.ts`, claude/maps/05-spec).** A map may raise terraces and sink hollows one
+`LAYERS.step` (34 mm) per level; their banks are cliffs that block like walls, and ramps are the only way between levels
+(≤ 25°, ≥ 40 mm wide, checked by the validator with layer reachability, dry and flooded). The two story maps use it; the
+five skirmish maps are unchanged so far (their rework is the layered-maps spec's own job).
+
 ### Caste/tile model
 Every caste is a `CasteDef`: stats, morph, abilities and a **tier** (worker / soldier / heavy). Costs are **per caste** in `BALANCE.castes` (user note 2026-10-24): every worker caste costs 10 to build, and hatch cost and grow time scale with strength (castes not listed fall back to their tier).
 
@@ -932,6 +962,25 @@ Every caste is a `CasteDef`: stats, morph, abilities and a **tier** (worker / so
 Equal-food battles (`tools/equal.ts`, `tools/battle.ts`) were used to tune these: soldiers beat their own species' workers for the same food, majors beat soldiers, and the wood ants' tanks + shooters beat most equal-food armies while shooters alone lose to swarms.
 
 Every caste a colony can raise has its own **brood tile type**, and a colony's build panel lists exactly those tiles. Each species also has a **nanitic** caste (a small first-brood worker) raised only on queen tiles. The Gene Thief colony gets a brood tile type for each borrowed caste. Caste mix is decided by which brood tiles the player places; there is no ratio slider.
+
+**Caste looks** (user note 2026-11-02: "make every unit tile (both ants and termites and future ones) have different
+colors and textures so they can be identifiable and different (also their UI color and look for pheromone markers and
+building so they can be distinct from each other)"; then 11:04 "make the textures look more natural realistic and
+insect like, they can use different colors just use more cleaner ones"). Each caste's brood tile has a clean colour
+from a palette of twelve clearly different hues (amber, rust, crimson, rose, violet, indigo, sky, teal, green, lime,
+bone, lavender; every pair at least ΔE 20 apart) and one of ten natural, insect-made textures worked into it: brood
+pockets, cuticle striations, packed soil pellets, wrinkled (rugose) ridges, overlapping (imbricate) scales, silk
+fibres, wax comb, a wing-vein network, layered termite carton, rows of cocoons. They are drawn as relief (ridges catch
+the light, hollows shade, the raised parts have a waxy sheen; silk the most), with only a trace of the soil's grain
+under the colour. The castes of one species never share a colour or a texture, and no two castes
+anywhere share both, so a Gene Thief or Termant nest full of stolen castes still tells them apart. The table is
+`render/casteLook.ts`; a caste with no entry (a new species or caste) gets the first free pair from a spot set by its
+name, unlike its own species in colour and texture. Nanitics look like their species' worker; queens and kings have no
+brood tiles. The same look is used everywhere the caste appears: the tile (floor shader `castePat`, the texture number
+in the tint texture's alpha), the build panel's tile buttons, Castes tab and Genome rows (a small hex of the tile with
+a dark ant on top, drawn by the same texture code), the marker panel's group cards (the same badge, and a top edge in the
+caste colour), the nest minimap and the top bar's worker and soldier figures (in the caste colour). `tests/casteLooks.ts` checks it; renders in
+`docs/realism/caste-tiles/`.
 
 ## 7. Performance plan
 

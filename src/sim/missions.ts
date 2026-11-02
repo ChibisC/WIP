@@ -5,6 +5,10 @@ import { SPECIES, isSoldierCaste } from './species';
 import { spawnCreature } from './creatures/creatureAI';
 import { CREATURES } from './creatures/kinds';
 import { dcos, dhypot, dsin } from './dmath';
+import type { StoryLevelDef } from './story/types';
+import { STORY_LEVELS } from '../story/levels';
+import { storyEnterStage, storyGoals, storySecond, storyWon } from './story/runner';
+import { storyText } from '../story/text';
 
 /**
  * Outdoor missions (Phase 13). A mission is a short script of stages, each
@@ -16,12 +20,15 @@ import { dcos, dhypot, dsin } from './dmath';
  * Lose when the player's queen dies; win when the last stage's goals are met.
  */
 
-export type MissionId = 'meadow' | 'forest';
+/** The two Phase 13 missions, and the story levels (sim/story; claude/story/02-spec) on the same runner. */
+export type MissionId = 'meadow' | 'forest' | StoryLevelDef['id'];
 
 export interface MissionGoal {
   text: string;
   done: boolean;
   progress: string;
+  /** a goal the stage does not need (story levels' optional objectives) */
+  optional?: boolean;
 }
 
 export interface MissionState {
@@ -54,10 +61,12 @@ interface Stage {
 
 export interface MissionDef {
   id: MissionId;
+  /** a story level: its data (the runner adds its captions, director, objectives, medals) */
+  story?: StoryLevelDef;
   title: string;
   /** the species the mission is written for (the menu default) */
   species: SpeciesId;
-  style: 'meadow' | 'forest';
+  style: 'meadow' | 'forest' | 'riverbank';
   /** an AI rival colony */
   rival?: SpeciesId;
   brief: string;
@@ -258,7 +267,35 @@ const FOREST: MissionDef = {
   ],
 };
 
-export const MISSIONS: Record<MissionId, MissionDef> = { meadow: MEADOW, forest: FOREST };
+/** The missions in the Missions menu (story levels are reached from the island map instead). */
+export const MISSIONS: Record<'meadow' | 'forest', MissionDef> = { meadow: MEADOW, forest: FOREST };
+
+/** A story level as a mission: its stages' goals and captions come from the level's data (sim/story/runner.ts). */
+function storyMission(L: StoryLevelDef): MissionDef {
+  return {
+    id: L.id,
+    story: L,
+    title: L.title,
+    species: 'termant',
+    style: 'meadow',
+    rival: Object.values(L.rivals)[0]?.species,
+    brief: L.brief,
+    stages: L.stages.map((S, i) => ({
+      name: S.name,
+      captions: [],
+      rivalRaids: S.rivalRaids,
+      enter: (w: World, c: Colony, m: MissionState) => storyEnterStage(w, m, i),
+      goals: (w: World, c: Colony, m: MissionState) => storyGoals(w, c, m, i),
+    })),
+  };
+}
+
+const STORY_MISSIONS = Object.fromEntries(Object.values(STORY_LEVELS).map((L) => [L.id, storyMission(L)])) as Record<StoryLevelDef['id'], MissionDef>;
+
+/** Any mission or story level by id. */
+export function missionDef(id: MissionId): MissionDef {
+  return (MISSIONS as Record<string, MissionDef>)[id] ?? STORY_MISSIONS[id as StoryLevelDef['id']];
+}
 
 export function missionOf(w: World): MissionState | null {
   return (w.s.mode.mission as MissionState | undefined) ?? null;
@@ -272,7 +309,7 @@ export function missionOf(w: World): MissionState | null {
 export function rivalsMayRaid(w: World): boolean {
   const m = missionOf(w);
   if (!m) return true;
-  return !!MISSIONS[m.id]?.stages[m.stage]?.rivalRaids || !!m.result;
+  return !!missionDef(m.id)?.stages[m.stage]?.rivalRaids || !!m.result;
 }
 
 export function startMission(w: World, id: MissionId, colony: number): void {
@@ -288,12 +325,13 @@ function say(w: World, text: string): void {
 export function missionSystem(w: World, dt: number): void {
   const m = missionOf(w);
   if (!m || m.result) return;
-  const def = MISSIONS[m.id];
+  const def = missionDef(m.id);
   const c = w.colony(m.colony);
   if (!def || !c) return;
   if (!c.alive) {
     m.result = 'lost';
-    say(w, 'The queen is dead, and with her the colony. The meadow will be quiet by winter.');
+    if (def.story) w.events.emit({ t: 'message', text: storyText(`${def.id}.${def.story.lose}`), kind: 'narrator', key: `${def.id}.${def.story.lose}` });
+    else say(w, 'The queen is dead, and with her the colony. The meadow will be quiet by winter.');
     return;
   }
   const st = def.stages[m.stage];
@@ -307,13 +345,17 @@ export function missionSystem(w: World, dt: number): void {
   }
   m.t += dt;
   while (m.said < st.captions.length && m.t >= st.captions[m.said][0]) say(w, st.captions[m.said++][1]);
+  if (def.story) storySecond(w, c, m);
   m.goals = st.goals(w, c, m);
-  if (m.goals.every((g) => g.done)) {
+  if (m.goals.every((g) => g.done || g.optional)) {
     m.stage++;
     m.entered = false;
     if (m.stage >= def.stages.length) {
       m.result = 'won';
-      say(w, `Mission complete. Your ${antName(c)} colony holds its ground.`);
+      if (def.story) {
+        storyWon(w);
+        w.events.emit({ t: 'message', text: storyText(`${def.id}.${def.story.win}`), kind: 'narrator', key: `${def.id}.${def.story.win}` });
+      } else say(w, `Mission complete. Your ${antName(c)} colony holds its ground.`);
     }
   }
 }

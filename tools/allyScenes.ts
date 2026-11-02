@@ -1,5 +1,5 @@
 /**
- * Scenes for the ally brain (CHANGE_PLAN §22): tests/aiAllies.ts, tools/ally-probe.ts and the browser clip.
+ * Scenes for the ally brain (CHANGE_PLAN §23): tests/aiAllies.ts, tools/ally-probe.ts and the browser clip.
  *
  * `allyInvasion`: on Meadow Pond, two allied AI colonies placed next door by the team placement (A the helper, B the
  * one invaded; or B the player's, `human`), and a rival's colony across the pond. After `settle` s of growth, a band of

@@ -70,7 +70,7 @@ export type CommandBody =
   /** multiplayer game speed: ask for or agree to 2× / 4× (every player must), or go back down at once; the current
    *  speed while a faster one is asked for is a "no" */
   | { type: 'speedVote'; speed: number }
-  /** ask the allies for help (CHANGE_PLAN §22): for a while, AI allies count this nest's danger higher (they still
+  /** ask the allies for help (CHANGE_PLAN §23): for a while, AI allies count this nest's danger higher (they still
    *  defend their own nest first) */
   | { type: 'callHelp' };
 

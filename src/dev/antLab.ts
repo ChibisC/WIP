@@ -6,14 +6,14 @@ import { ATTACK_CONTACT, AttackPose, applyAttackBody, attackPose, neutralPose } 
 import { MORPHS } from '../render/ants/morphs';
 import { PostPipeline } from '../render/post';
 import { createSurfaceEnvironment } from '../render/environment';
-import { applyLabLight, renderLabMask } from './labLight';
+import { addAmber, addContactShadows, applyLabLight, renderLabMask } from './labLight';
 import { textures } from '../render/textures';
 import { globalUniforms, patchDapple } from '../render/shaderPatch';
 import { buildTermiteGeometry } from '../render/termite/build';
 import { CasteId } from '../render/termite/castes';
 import { getTermiteMaterial, TermiteInstances, termiteTime, nasusTipLocal } from '../render/termite/material';
-import { AnimState } from '../render/termite/rig';
-import { GlueStreams } from '../render/termite/glue';
+import { AnimState, legBone } from '../render/termite/rig';
+import { GlueStreams, NASUTE_GLUE } from '../render/termite/glue';
 
 /**
  * Model review scene: ?scene=antlab&ant=lasius_worker&lod=0&cam=34&phase=0.2&pose=0
@@ -69,6 +69,18 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     m.setPosition(vP);
     return m;
   };
+  const dirs: Record<string, THREE.Vector3> = {
+    side: new THREE.Vector3(0, 0.12, 1),
+    // realism v2: a side view from a little above (field macro photos: ground behind, no horizon)
+    fside: new THREE.Vector3(0.08, 0.42, 1),
+    top: new THREE.Vector3(0.0001, 1, 0.0001),
+    front: new THREE.Vector3(1, 0.25, 0.0001),
+    back: new THREE.Vector3(-1, 0.35, 0.0001),
+    '34': new THREE.Vector3(0.7, 0.55, 0.85),
+    low: new THREE.Vector3(0.9, 0.18, 0.6),
+    under: new THREE.Vector3(0.3, -0.25, 1),
+  };
+  const contacts: Parameters<typeof addContactShadows>[2] = [];
   // termites (model kit): ?ants=termite_nasute,termite_worker&tstate=5&ramp=1&fire=1&tan=1
   const termiteKeys = keys.filter((k) => k.startsWith('termite_'));
   if (termiteKeys.length) {
@@ -80,13 +92,21 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     const widths = geos.map((g) => (g.userData.rig.bounds.max[0] - g.userData.rig.bounds.min[0]) * 1.25);
     const totalT = widths.reduce((s, x2) => s + x2, 0);
     tx = -totalT / 2;
-    const glue = new GlueStreams(8, { diameter: 0.22 });
+    const glue = new GlueStreams(8, q.get('stringy') === '0' ? { diameter: 0.22 } : NASUTE_GLUE);
     let gn = 0;
     geos.forEach((g, i) => {
       const herd = new TermiteInstances(g, 1, { glueShell: true });
       herd.count = 1;
       const mx = posed(tx + widths[i] / 2, Number(q.get('rot') || 0), g.userData.rig.bodyLength, 1);
       herd.setMatrix(0, mx);
+      {
+        // contact shadows (?contact=1): a pool under the body, a spot under each foot (from the tarsus pivots)
+        const r = g.userData.rig, bx = (r.bounds.min[0] + r.bounds.max[0]) / 2, bl = r.bodyLength;
+        const c0 = new THREE.Vector3(bx, 0, 0).applyMatrix4(mx);
+        const feet: THREE.Vector3[] = [];
+        for (let l = 0; l < 6; l++) { const b = legBone(l, 3); feet.push(new THREE.Vector3(r.pivots[b * 3], 0, r.pivots[b * 3 + 2] * 1.15).applyMatrix4(mx)); }
+        contacts.push({ x: c0.x, z: c0.z, len: (r.bounds.max[0] - r.bounds.min[0]) * 0.8, wid: bl * (r.isQueen ? 0.12 : 0.13), rot: Number(q.get('rot') || 0), feet, footR: bl * (r.isQueen ? 0.012 : 0.04) });
+      }
       const st = Number(q.get('tstate') || (g.userData.rig.isQueen ? AnimState.QUEEN : AnimState.IDLE));
       // with ?atk the kit's bite / ram is posed on the attack's contact like in the game
       const ph = atk ? Number(atkQ) - ATTACK_CONTACT + 0.25 : Number(q.get('phase') || 0.15);
@@ -110,14 +130,27 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     if (!keys.length) {
       const cam = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 5000);
       const camKind = q.get('cam') || '34';
-      const dirs2: Record<string, THREE.Vector3> = { side: new THREE.Vector3(0, 0.12, 1), top: new THREE.Vector3(0.0001, 1, 0.0001), front: new THREE.Vector3(1, 0.25, 0.0001), '34': new THREE.Vector3(0.7, 0.55, 0.85) };
       const span = Math.max(totalT, maxL);
       const dist = Number(q.get("dist") || span * 2.6);
-      const target = new THREE.Vector3(0, Number(q.get('ty') || maxL * 0.12), 0);
-      cam.position.copy(target).addScaledVector(dirs2[camKind].normalize(), dist);
+      const target = new THREE.Vector3(Number(q.get('tx') || 0), Number(q.get('ty') || maxL * 0.12), Number(q.get('tz') || 0));
+      cam.position.copy(target).addScaledVector(dirs[camKind].normalize(), dist);
       if (camKind === 'top') cam.up.set(1, 0, 0);
       cam.lookAt(target);
       const sun = env.sun;
+      // realism (CHANGE_PLAN §22): with ?light= the termites get the same lighting presets, macro ground and lens as the ants
+      const lit = q.get('light') !== null;
+      if (lit) {
+        applyLabLight(renderer, scene, env, cam, target, span, q, ground);
+        addAmber(scene, env, target, span, q, ground);
+        if (q.get('amber') !== '1') addContactShadows(scene, q, contacts);
+        const sc2 = sun.shadow.camera as THREE.OrthographicCamera;
+        sc2.left = -span;
+        sc2.right = span;
+        sc2.top = span;
+        sc2.bottom = -span;
+        sc2.updateProjectionMatrix();
+        sun.shadow.radius = Number(q.get('shadowr') || 2.5);
+      }
       sun.target.position.copy(target);
       sun.position.copy(target).addScaledVector(env.sunDir, 200);
       const post = new PostPipeline(renderer);
@@ -126,6 +159,9 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
       post.tilt = 0;
       post.settings.dofStrength = Number(q.get('dof') || 0);
       post.settings.ao = q.get('ao') !== '0';
+      if (q.get('grain')) post.settings.grade.grain = Number(q.get('grain'));
+      if (q.get('aostr')) post.settings.aoStrength = Number(q.get('aostr'));
+      if (q.get('bloom') === '0' || q.get('light') === 'studio') post.settings.bloom = false;
       post.render(scene, cam);
       post.render(scene, cam);
       (window as unknown as { __shotInfo: unknown }).__shotInfo = geos.map((g, i) => ({ key: termiteKeys[i], tris: g.userData.rig.triangles }));
@@ -165,6 +201,12 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     const rotY = Number(q.get('rot') || 0);
     mx.copy(posed(cx, rotY, b.rig.length * sc, sc));
     im.setMatrixAt(0, mx);
+    {
+      const r = b.rig as typeof b.rig & { foot?: THREE.Vector3[] };
+      const feet = (r.foot ?? r.ankle ?? []).map((f) => new THREE.Vector3(f.x, 0, f.z).applyMatrix4(mx));
+      const c0 = new THREE.Vector3(0, 0, 0).applyMatrix4(mx);
+      contacts.push({ x: c0.x, z: c0.z, len: b.rig.length * sc, wid: b.rig.length * sc * 0.11, rot: rotY, feet, footR: b.rig.length * sc * 0.025 });
+    }
     im.castShadow = true;
     im.receiveShadow = true;
     im.customDepthMaterial = depth;
@@ -198,22 +240,13 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
   const dist = Number(q.get('dist') || span * (keys.length > 1 ? 1.25 : 1.9));
   const cam = new THREE.PerspectiveCamera(Number(q.get('fov') || 30), window.innerWidth / window.innerHeight, dist * 0.02, dist * 50);
   const target = new THREE.Vector3(Number(q.get('tx') || 0), Number(q.get('ty') || maxL * 0.1), Number(q.get('tz') || 0));
-  const dirs: Record<string, THREE.Vector3> = {
-    side: new THREE.Vector3(0, 0.12, 1),
-    // realism v2: a side view from a little above (field macro photos: ground behind, no horizon)
-    fside: new THREE.Vector3(0.08, 0.42, 1),
-    top: new THREE.Vector3(0.0001, 1, 0.0001),
-    front: new THREE.Vector3(1, 0.25, 0.0001),
-    back: new THREE.Vector3(-1, 0.35, 0.0001),
-    '34': new THREE.Vector3(0.7, 0.55, 0.85),
-    low: new THREE.Vector3(0.9, 0.18, 0.6),
-    under: new THREE.Vector3(0.3, -0.25, 1),
-  };
   cam.position.copy(target).addScaledVector(dirs[camKind].normalize(), dist);
   if (camKind === 'top') cam.up.set(1, 0, 0);
   cam.lookAt(target);
   // realism v2: lighting preset, backlit test, tone mapping, macro ground (dev/labLight.ts)
   applyLabLight(renderer, scene, env, cam, target, span, q, ground);
+  addAmber(scene, env, target, span, q, ground);
+  if (q.get('amber') !== '1') addContactShadows(scene, q, contacts);
   const sun = env.sun;
   const sc = sun.shadow.camera as THREE.OrthographicCamera;
   sc.left = -span;

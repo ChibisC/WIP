@@ -1,5 +1,5 @@
 /**
- * AI colonies (CHANGE_PLAN §22, user spec claude/ai/01-spec-ai-allies-chambers.md): allies start close, EotU-style
+ * AI colonies (CHANGE_PLAN §23, user spec claude/ai/01-spec-ai-allies-chambers.md): allies start close, EotU-style
  * chambers with highways and upgrades, allies help each other unless invaded themselves, joint raids.
  *
  *   npx vite-node tests/aiAllies.ts

@@ -1,5 +1,5 @@
 /**
- * The ally brain at work (CHANGE_PLAN §22): tools/allyScenes.ts allyInvasion, printed every 2 s — the invaded ally's
+ * The ally brain at work (CHANGE_PLAN §23): tools/allyScenes.ts allyInvasion, printed every 2 s — the invaded ally's
  * danger, the helper's decision, its marker V, how many of its ants are out helping and inside the ally's nest, how many
  * fighters stay home, the invaders left.
  *   npx vite-node tools/ally-probe.ts -- [seconds=120] [band=14] [human=0] [bothInvaded=0] [seed=5] [developed=70]

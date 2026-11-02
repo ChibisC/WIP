@@ -2,7 +2,7 @@
  * Tick time on the authored maps: a 10-colony AI match (every site used) on each map, run for a
  * few minutes of game time. Prints the average, p95 and worst simulation tick and the ant count.
  * With teamSize 2 (or more), the colonies play in teams of that size (allies placed together, the ally brain and joint
- * raids at work; CHANGE_PLAN §22).
+ * raids at work; CHANGE_PLAN §23).
  *   npx vite-node tools/map-perf.ts -- [seconds=180] [maps=meadowPond,forestFloor,...] [teamSize=1]
  */
 import { EventBus } from '../src/core/events';

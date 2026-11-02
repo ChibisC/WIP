@@ -39,6 +39,7 @@ import { genesWanted, isTermant, tagPiece, termantDeposit, termantKing } from '.
 import { holdGuardLine, inGuardLine, trailTraffic } from './guardLine';
 import { crossBridge, ecitonTimers, escortPorter, holdLink, isArmyAnt, isMajor, raider, soldier, teamCarry, teamHelp } from './eciton';
 import { passiveAnt } from './arena';
+import { directAnt, directMode } from './story/director';
 
 const tmp = { x: 0, y: 0 };
 
@@ -361,6 +362,20 @@ export function antSystem(w: World, dt: number): void {
       a.v = 0;
       finish(w, a);
       continue;
+    }
+    // story levels: an ant the director plays (sim/story/director.ts) — fights first unless passive, then its cue
+    if (a.dirA !== undefined) {
+      const dm = directMode(w, a);
+      if (dm === 1 || (dm === 2 && !combatPreempt(w, a, c, dt))) {
+        if (directAnt(w, a, c, dt)) {
+          venomTick(w, a, dt);
+          finish(w, a);
+          continue;
+        }
+      } else if (dm === 2) {
+        finish(w, a);
+        continue;
+      }
     }
     // A worker on a nest job ignores food and enemies (venom still hurts).
     if (a.task === 'job') {
@@ -731,7 +746,7 @@ function searchAndCollect(w: World, a: Ant, c: Colony, dt: number, area: { x: nu
       if (f.kind === 'wood' && !eatsWood(c) && !cd.wood) return false;
       if (f.kind === 'corpse' && w.teamOf(f.colony) === (a.team ?? a.colony)) return false; // only enemies take the dead
       if (f.colony === -2) return false; // the refuse heap is avoided (hygiene)
-      if (f.kind === 'leaf' && !cd.cutLeaves) return false;
+      if (f.kind === 'leaf' && !cd.cutLeaves && !cd.wood) return false; // (Termant workers take leaves as food)
       // (a dropped load right by the ant is picked up wherever it lies, off its marker's area too: 2026-11-01, 21:48)
       const dropped = !!f.loose && d2 <= SENSE * SENSE;
       if (area && !dropped && sq(f.x - area.x) + sq(f.y - area.y) > sq(area.r * 1.6)) return false;
@@ -819,7 +834,7 @@ function looseNear(w: World, a: Ant, c: Colony, r: number): Food | null {
   let bd = r * r;
   w.foodNear(a.x, a.y, r, (f, d2) => {
     if (!f.loose || f.amount <= 0 || f.heldBy !== 0 || f.space !== a.space || f.colony === -2 || !edible(c, f)) return false;
-    if (f.kind === 'leaf' && !cd.cutLeaves) return false;
+    if (f.kind === 'leaf' && !cd.cutLeaves && !cd.wood) return false; // (Termant workers take leaves as food)
     if (d2 < bd) {
       bd = d2;
       best = f;
@@ -950,11 +965,12 @@ function deposit(w: World, a: Ant, c: Colony): void {
   else if (a.carry === Carry.Food || a.carry === Carry.Leaf) {
     const f = w.foodById.get(a.carryId);
     amount = f ? f.amount : a.carryAmt;
-    // Termants: genes from enemy corpses; wood to the wood store (termants.ts)
+    // Termants: genes from enemy corpses; wood and leaves are food too (termants.ts)
     if (c.species === 'termant') amount = termantDeposit(w, c, f, amount);
     if (f) w.removeFoodNow(f.id);
   }
-  if (a.carry === Carry.Leaf) {
+  // (Termants: termantDeposit has already priced a leaf as food: one store)
+  if (a.carry === Carry.Leaf && c.species !== 'termant') {
     if (c.species === 'atta' || c.castes.includes('atta_media')) c.fungus += amount * BALANCE.atta.leafToFungus;
     else c.food = Math.min(c.foodCap, c.food + amount * BALANCE.atta.leafAsFood);
   } else {
@@ -1397,7 +1413,7 @@ function collectUnderground(w: World, a: Ant, c: Colony, dt: number, mx: number,
       if (!edible(c, o)) continue;
       if (o.kind === 'wood' && !eatsWood(c) && !cd.wood) continue;
       if (o.kind === 'corpse' && w.teamOf(o.colony) === (a.team ?? a.colony)) continue;
-      if (o.kind === 'leaf' && !cd.cutLeaves) continue;
+      if (o.kind === 'leaf' && !cd.cutLeaves && !cd.wood) continue;
       const d2 = sq(o.x - mx) + sq(o.y - my);
       if (d2 < bd) {
         bd = d2;

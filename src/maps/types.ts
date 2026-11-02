@@ -5,7 +5,7 @@
  */
 import type { MapStyle } from '../world/terrain';
 
-export type MapId = 'meadowPond' | 'forestFloor' | 'riverbank' | 'rainforest' | 'savanna' | 'testPond';
+export type MapId = 'meadowPond' | 'forestFloor' | 'riverbank' | 'rainforest' | 'savanna' | 'testPond' | 'gardenBelow' | 'fireBanks' | 'testTerrace';
 
 /** A point in mm. */
 export type Pt = readonly [number, number];
@@ -91,6 +91,47 @@ export interface FloodZone {
 
 export type Biome = 'meadow' | 'forest' | 'riverbank' | 'rainforest' | 'savanna';
 
+/**
+ * Layered ground (claude/maps/05-spec-layered-maps.md; docs/maps/layers.md): raised terraces and sunken hollows, each
+ * flat walkable ground at its level, their edges steep banks that block like walls, joined only by ramps.
+ */
+export type EdgeStyle = 'soilBank' | 'rockLedge' | 'rootWall' | 'sandBank' | 'clayCut';
+export type RampStyle = 'soilSlope' | 'rootRamp' | 'barkSlab' | 'mossBank' | 'sandSlide' | 'stoneSteps';
+
+export interface Layer {
+  shape: Shape;
+  /** 0 = the base ground; 1, 2 terraces; −1 a sunken hollow (one step is LAYERS.step mm) */
+  level: number;
+  /** how the bank round it looks */
+  edge: EdgeStyle;
+}
+
+export interface Ramp {
+  /** from the foot (on the lower level) to the top (on the upper level); the levels are read from the layers there */
+  path: readonly Pt[];
+  /** mm, at least LAYERS.rampMinWidth */
+  width: number;
+  style: RampStyle;
+}
+
+/** A camera key of a story map's opening flight: look at `at` from `dist` mm, `yaw` rad, arriving `t` s in. */
+export interface CamKey {
+  at: Pt;
+  dist: number;
+  yaw: number;
+  t: number;
+  /** pitch bias (−0.4..0.5), default 0 */
+  pitch?: number;
+}
+
+/** Story maps: named points, paths and zones the level script refers to, and the opening camera flight. */
+export interface StoryMapData {
+  points: Record<string, Pt>;
+  paths: Record<string, readonly Pt[]>;
+  zones: Record<string, Shape>;
+  flight: CamKey[];
+}
+
 export interface MapDef {
   id: MapId;
   name: string;
@@ -113,7 +154,7 @@ export interface MapDef {
   /** balanced site sets by colony count; the 10-colony set lists every site */
   siteSets: { 2: number[][]; 3: number[][]; 4: number[][]; 10: number[][] };
   /**
-   * Hand-picked team layouts (CHANGE_PLAN §22): by team shape (group sizes, biggest first: "2v2", "2v1", "3v1",
+   * Hand-picked team layouts (CHANGE_PLAN §23): by team shape (group sizes, biggest first: "2v2", "2v1", "3v1",
    * "2v2v2", "2v1v1"), the sites of each group in that order (groups of a size in colony order, members taking their
    * group's sites in colony order). Shapes not listed are placed by the search (world/teamSites.ts).
    */
@@ -122,4 +163,9 @@ export interface MapDef {
   floods: FloodZone[];
   /** sparse per-hex type paint from the editor, applied last: [hex index, HexType] */
   overrides?: [number, number][];
+  /** layered ground: terraces and hollows (applied in order, outer first) and the ramps between them */
+  layers?: Layer[];
+  ramps?: Ramp[];
+  /** story maps (src/maps/story): set pieces, paths and the opening flight */
+  story?: StoryMapData;
 }

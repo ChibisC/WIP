@@ -1,4 +1,4 @@
-# Team sites (CHANGE_PLAN §22)
+# Team sites (CHANGE_PLAN §23)
 
 Made by `npx vite-node tools/team-sites.ts` from the maps and `world/teamSites.ts`. Routes are land routes on the map's hex layout between site entrances (water and walls go round). Limits: an ally within **33 %** of the map's width, every enemy at least **30 %** away, no enemy site between two allies. Fairness: each team's mean route to the nearest food zone, to the map's middle and to its nearest enemy (the spread between teams is what the search keeps small); in an uneven match the smaller side gets the nearer food. "authored" = the map file's `teamSets`, "search" = picked by the search. Sketches with the teams in colour: `docs/maps/team-sites/`.
 

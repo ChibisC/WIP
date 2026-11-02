@@ -1,4 +1,4 @@
-"""AI colonies' nests (CHANGE_PLAN §22): five AI colonies on Meadow Pond grown for 10, 30 and 45 minutes, each nest seen
+"""AI colonies' nests (CHANGE_PLAN §23): five AI colonies on Meadow Pond grown for 10, 30 and 45 minutes, each nest seen
 from above — EotU-style chambers of 7 or 19 hexes holding one tile type each, store chambers by the entrance, highways
 on the tunnels, upgraded tiles. Writes docs/ai/chambers/<species>_<min>min.jpg and a contact sheet sheet.jpg.
 

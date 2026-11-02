@@ -738,17 +738,101 @@ User spec (2026-11-01 22:47, "REWORK — One Wide Underground Entrance per Nest,
 ### 21.6 Verify
 `tests/entrances.ts` (replaces the extra-entrance checks in `tests/run-all.ts`, the fire-ant hole test, the rival-AI entrance defence test, `tools/entrance-check.ts`): the flower on every species' nest, connected to the queen, unbuildable; digging never opens an entrance (player and AI, 50 seeded matches); `entrance` rejected; three valid spaced holes on all five maps plus formicarium and arena; hole choice by destination, home by nearest, arrivals spread; throughput per hole and a crowd emptying faster than with one hole; invasion through any hole; defenders at the inner edge; markers on holes and the flower; collapse; old save migration. Plus the full suite (combat, underpass, swarm, trails, missions), determinism, LAN, 10-colony performance, browser shots in `docs/maps/entrances-v2/`, docs (DESIGN §3.12/§3.12b, README, `docs/creatures/entrances.md`, PROGRESS), handoff update.
 
-## 22. AI colonies — allies start close, EotU-style chambers with upgrades, allies help each other (user spec 2026-11-02)
-User spec: project doc `claude/ai/01-spec-ai-allies-chambers.md`. Branch `feature/ai-allies` from `main` (`fc6f58a`). §21 is the entrance rework (`feature/one-entrance`, in progress in another session, not merged yet): the code here works on "the nest's entrance hexes" (`isEntrance`), so it holds for today's ramps and for the 7-hex flower; it does not dig entrances. Layered maps (`claude/maps/05-spec-layered-maps.md`) are not started: site routes run on the map's hex layout, where a future layer edge is one more blocked hex type.
+## 22. Realism rework — hell ants and nasute termites (user spec 2026-11-02)
+User spec: project doc `claude/realism/08-spec-hell-ants-nasute-termites.md`. Branch `feature/realism-hell-nasute` from `main`
+(`fc6f58a`). Looks and animation only: every unit id, stat, ability and behaviour stays. References: the user's photos
+(2026-11-02: 11 hell ant images — micro-CT head, amber head and drawing of *Linguamyrmex*, the *Ceratomyrmex*-with-prey
+fossil, a winged queen in amber, *Odontomachus* and *Myrmecia* analogues, paleoart; 12 *Nasutitermes* images — live
+workers and soldiers, specimens, the alate head and wings, two royal chambers), plus the earlier *N. corniger* photos and
+the queen photos. All study-only: render-only sheets in the repo, photo-vs-render sheets to the user in chat.
 
-### 22.1 Survey (main, 2026-11-02)
+### 22.1 The last run's blockers, built in from the start (spec §2)
+1. **Antennae and legs.** Hell ants: 12 segments, elbowed, the scape ≈ the head length, a smooth spline with a gentle
+   taper, droop and a slight curl at the tip; segment joints only as faint waists. Termites: straight beaded chains
+   with a gentle curve, varied per individual. Legs: club femora (≥1.6× the tibia's girth), slim tibiae, soft knee
+   membranes, separate tarsomeres and claws; rest pose with the knees lower, tarsi under the body, small left/right
+   asymmetry.
+2. **Surfaces.** Hell ants get a baked detail recipe (they had none): satin microsculpture, a little more gloss on the
+   gaster, finely sculptured head and horn; sparse fine curved hairs through the realism setae path; a pubescence
+   sheen term driven by the setae density; transmission on thin parts. Termites (kit shader, nasute rows only): a
+   warm forward-scattering term, an irregular per-individual gut, tergite plates with stretching membranes, a fine
+   broken "wet" glint, fine pale hairs, the hard dark soldier head against the soft body, a taut queen membrane with
+   faint eggs inside.
+3. **Lighting.** Every review render in the overcast and forest-shade presets (sunny as a third), soft environment
+   light, the macro ground with contact shadows, mild depth of field. The lab's termite path gets the same lab
+   lighting the ants have.
+4. **Jaws.** Hell ant scythes with darker edges and tips, the soldier's teeth near the tips and the blade grooves,
+   large enough to read on a sheet; termite point mandibles dark-tipped.
+5. **Reviews.** A fixed rubric (shape, surface, colour, lighting, hairs, "could this be a macro photo?", 1–10 each),
+   real photos mixed in unlabeled, and 2–3 calibration anchors with known scores (earlier renders) in every round.
+
+### 22.2 Hell ants (render/ants/hellBuilder.ts, hellMorphs.ts, bake/recipes.ts)
+- Shape numbers in `docs/creatures/hell-ant.md` §7 (head lengths), from the fossils (micro-CT and amber photos,
+  the *Linguamyrmex* drawing) before any geometry change.
+- Worker (*Ceratomyrmex*): the long curved horn rising up and forward from between the antennal sockets to a spoon
+  tip; the underside setae row; four long trigger hairs (two a side) where the closed jaw tips rest; scythe jaws that
+  reach the horn tip and move only vertically; head angled down.
+- Soldier (*Linguamyrmex*): the flattened clypeal paddle with a dark, hard (not chrome) tip; grooved, toothed blades.
+- Queen (*Haidomyrmex*): bulkier mesosoma with the wing-muscle plates and wing scars, smaller eyes, a longer scape,
+  serrated jaws, a sturdier shorter horn. Ocelli: the spec asks for three; the fossil record wins (the alate
+  *H. cerberus* queen has none, docs/creatures/hell-ant.md) — none, noted in the report.
+- Body: slender mesosoma, single-node petiole, oval gaster with the deep first constriction and the sting.
+- Nanitic, brood (eggs, larvae, cocoons) and corpses follow the shared builders; checked on the sheets.
+- **Amber mode** (`?amber=1` in the ant lab, render-only): the model in a clear amber block with tint, small bubbles
+  and slight blur, posed and framed like a fossil photo, for silhouette checks.
+- Animation (`antMotion` / `attackPoses`, render-only): add the hell castes to the realism animation set (planted
+  feet, blends, deaths); hunting walk (slower, pauses, body low, head down, jaws cocked open, wide antenna sweeps),
+  normal walk faster with the jaws half closed; the snap (legs planted wide, jaws flick up in 1–2 frames, a tiny
+  hit-stop and dust puff, head rocks back, the gaster curls forward to sting), the soldier's impale (longer crouched
+  wind-up, heavier recoil), carrying clamped vertically, idles (grooming the horn and trigger hairs, antenna cleaning,
+  slow head scans), deaths by cause with the jaws dropping open. Never a sideways jaw motion.
+
+### 22.3 Nasute termites (render/termite/*, nasute castes only)
+- A per-caste realism flag in the kit's rig texture; every new shader term is gated on it, so the sickle-jaw rows
+  (and the Termant/other users of the kit) render exactly as before (pixel-compared).
+- Geometry (nasute castes): beaded antennae (14 / 13 / 15) with a gentle curve; club femora, tarsomeres and claws;
+  fine body hairs at LOD0; the six head setae on the nasute (an *N. corniger* ID feature); the major's bigger, darker
+  head with a short thick nasus; the presoldier pale and untanned; the royals fix kept.
+- Shader: forward scattering and warm transmission in the abdomen, legs and antennae; the irregular gut (darker core,
+  soft edges, per individual); membranes that stretch and compress with the abdomen; a broken wet glint; the glue as a
+  glossy, transmissive, stringy material whose threads stretch and snap.
+- Animation: short quick steps with the abdomen lagging; antennae tapping the ground ahead; breathing pulse; the
+  queen's waves (kept); the glue attack planted, aimed and pulsing with recoil (match the ramp); the major's charge,
+  head-butt and point-blank glue, and alarm drumming as rapid head-banging on the ground; workers chewing, carrying,
+  trophallaxis and grooming; glued victims struggling with legs pulling free; deaths (legs fold, the body sags, the
+  gut darkens; glue deaths stuck in place).
+
+### 22.4 Review, checks and finish
+- Sheets per unit (side, top, front, 3/4, macro) in overcast / forest / sunny → `docs/realism/<species>/` (render
+  only); mandible/horn and nasus close-ups; amber-mode sheets; photo-vs-render sheets to the user in chat.
+- Blind review rounds (fresh agent, rubric, anchors, photos mixed in): at least 3 per unit, up to 6; target 7/10;
+  below that, keep the best version and report what blocks it.
+- Clips in `docs/realism/<species>/clips/`.
+- Combat data: `npx vite-node tools/height-data.ts` after model changes; underpass, anchoring, mounting, melee
+  reach tests. Model hashes: only `hell_*` re-baselined; sickle-jaw and every other species unchanged.
+- Performance: triangle counts, `tools/anim-cost.ts`; frame-rate checks with 1000+ units go to the user's device.
+- `npm test`, determinism. Docs (`hell-ant.md`, `nasutitermes.md`, DESIGN, README, PROGRESS with every round's
+  scores), a handoff update and a report; sheets and clips to the user; **wait for approval** before merging into
+  `main` and publishing a new version of the game artifact.
+
+### 22.5 Merge rule (user note 2026-11-02 00:39; project doc `claude/handoff/00-MERGE-RULE.md`)
+When the work is done: fetch, read the newest handoff updates, merge the latest `origin/main` and any finished
+feature branches into this branch (combine both sides; never drop another agent's work), delete work that has been
+replaced (keep save migrations), run `npm ci`, `npm test`, the determinism check and the build, regenerate the
+height and climb data, re-baseline only the hell ant hashes, merge into `main`, push, and write a handoff update
+(what was merged, how conflicts were resolved, what was removed). Merge `origin/main` in along the way whenever it moves.
+
+## 23. AI colonies — allies start close, EotU-style chambers with upgrades, allies help each other (user spec 2026-11-02)
+User spec: project doc `claude/ai/01-spec-ai-allies-chambers.md`. Branch `feature/ai-allies` from `main` (`fc6f58a`). §21 is the entrance rework (merged into this branch on the way); §22 is the hell ant and nasute realism rework (another session; this section was §22 on its branch until both reached `main`): the code here works on "the nest's entrance hexes" (`isEntrance`), so it holds for today's ramps and for the 7-hex flower; it does not dig entrances. Layered maps (`claude/maps/05-spec-layered-maps.md`) are not started: site routes run on the map's hex layout, where a future layer edge is one more blocked hex type.
+
+### 23.1 Survey (main, 2026-11-02)
 - **Placement** (`mapGen.ts createWorld`): a balanced site set by seed (`SurfaceLayout.siteOrder`), then `teamSiteOrder` (sites sorted round the map centre, each team a consecutive run) only when `groupTeams` is set (multiplayer). Skirmish AI allies (team 0 with the player, `menu.ts teamOf`) get no grouping at all.
 - **Builder** (`colonyAI.ts buildTick`, every 2 s): 7-hex chambers only, kind brood or food; any caste in a brood chamber; `GROUP_SIZE` 8; tunnels 1–4 hexes kept clear of tiles; no upgrades, no highways.
 - **Upgrades** (`tiles.ts`): 6 points for level 2, 12 for 3; a same-type neighbour gives its level, soil 1, a highway its level to any tile, a highway gets the level of each built neighbour; dug floor 0. In a soil-walled 7-hex rosette the centre reaches 3 and the ring 2 (ring: 3 soil + centre + 2 ring tiles = 10 < 12); in a 19-hex hexagon every tile can reach 3 (inner first). A tunnel mouth is dug floor (0) beside an edge tile — a highway there gives it back its points.
 - **War** (`warAI.ts`, every 4 s): marker II defends home, marker III raids; marker IV is used by foraging (termite scouts, aphid tenders); **marker V is free** → the help marker. `c.intruders` (combat.ts `invasionCheck`, every second) lists enemies inside a nest.
 - **No AI difficulty** exists (only `settings.aggression`).
 
-### 22.2 Plan
+### 23.2 Plan
 1. **Allied nests close** — new `sim/teamSites.ts` (pure: map def + team shape, no seed, so the lobby preview and every client agree):
    - land routes on the map's hex layout (ground and walkways; water and walls block), breadth-first from each site's main entrance: site–site, site–nearest food zone, site–map middle (cached per map);
    - authored `MapDef.teamSets[shape]` when present (shapes `1v1`, `2v2`, `2v1`, `3v1`, `2v2v2`, `2v1v1` …), else an exhaustive search over site subsets and their split into teams (≤ ~5,000 candidates), scored: ally route ≤ `allyMaxRoute` and short, enemy route ≥ `enemyMinRoute`, no enemy between two allies, fair team spreads (food, middle, enemy), the smaller side of an uneven match gets the better food; ties by site index;
@@ -760,7 +844,7 @@ User spec: project doc `claude/ai/01-spec-ai-allies-chambers.md`. Branch `featur
 6. **Ally brain** (`warAI.ts`, every 2 s): danger of each ally (invaded, by depth; siege at its holes; losing a fight near its nest; queen in danger; loss rate); help only if not threatened at home, the ally is not winning, help arrives in time (route time) or the queen is in danger, keeping a home guard and sending only enough (`assistOvermatch`); raids give way (or redirect when it is the same enemy); highest danger ÷ travel first; hysteresis and a cooldown. Marker V: on the ally's hole first when the enemy is inside, then on the threat once the helpers are in. Messages for a human ally; a `callHelp` command (protocol bump); joint raids gather and arrive together; shared targets.
 7. **Verify**: `tests/aiAllies.ts`, `tools/econ.ts` / `tools/ecology.ts` reports, nest screenshots (`docs/ai/chambers/`), a help clip, determinism, LAN, performance, docs, handoff, merge, publish.
 
-### 22.3 Findings while building it
+### 23.3 Findings while building it
 - **Placement.** Every map's authored sets pass the limits except the 2v2v2 on Meadow Pond and Rainforest (three pairs cannot all sit within a third of the width by land with every enemy a little further off; the best placement is used and the validator reports it). The search runs once at world creation; `tools/team-sites.ts` (five maps × seven shapes, layouts and routes built from scratch) takes about 6 s in all.
 - **Chambers after the entrance rework.** The 7-hex flower took the space the old 3-hex ramp left, so the first store chamber often found no place within the old 4-hex tunnel limit: tunnels now go up to 6 hexes, every candidate's tunnel is measured (the best score + tunnel length wins), and a need with no place is skipped for a while instead of blocking every other plan.
 - **Digging order.** Designating a chamber's centre first left diggers waiting behind solid soil (Atta and Formica stalled): hexes are now designated breadth-first out from the dug floor.

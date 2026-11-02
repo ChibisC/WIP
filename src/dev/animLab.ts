@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { setBakeRenderer } from '../render/bake/detailBake';
-import { AntRenderer, AntView } from '../render/ants/antRenderer';
+import { AntRenderer, AntView, animHooks } from '../render/ants/antRenderer';
 import { animSettings } from '../render/ants/antMotion';
 import { ATTACK_CONTACT } from '../render/ants/attackPoses';
 import { POSE } from '../render/ants/antMaterial';
@@ -31,6 +31,7 @@ import type { SimEvent } from '../core/events';
  */
 
 import { MORPHS } from '../render/ants/morphs';
+import { AnimState as TS } from '../render/termite/rig';
 
 const TICK = 0.05;
 const FIRE = 'fire_minor';
@@ -233,6 +234,63 @@ function clips(): Record<string, Clip> {
         { script: attacker(-R * 0.6, -R * 0.75, 0.9, 2, 0.8, 0.7, bite) },
       ],
       cam: { tx: 0, ty: 0.3, tz: 0, dir: [0.3, 0.85, 0.6], dist: 11, fov: 30 },
+    },
+    // realism rework (CHANGE_PLAN §22.3): the nasute castes' animations side by side, each with its kit state —
+    // a worker chewing, two in trophallaxis, a soldier gluing a fire ant (the stringy glue in pulses, the ant
+    // glued and struggling), the major charging then drumming the alarm, a worker dying; all breathing
+    termites: {
+      dur: 6,
+      noScale: true,
+      ants: [
+        { morph: 'termite_worker', script: (_t, v) => Object.assign(v, { x: -7, y: -3.5, heading: 0.3, tState: TS.CHEW, tRate: 2, tan: 1 }) },
+        { morph: 'termite_worker', script: (_t, v) => Object.assign(v, { x: -8.4, y: 3, heading: 0, tState: TS.GROOM, tRate: 1, tan: 1 }) },
+        { morph: 'termite_worker', script: (_t, v) => Object.assign(v, { x: -4.6, y: 3, heading: Math.PI, tState: TS.GROOM, tRate: 1, tan: 1 }) },
+        {
+          morph: 'termite_nasute',
+          script: (t, v) => Object.assign(v, { x: 1, y: -4, heading: 0, tState: TS.FIRE, tan: 1, aimX: 9, aimY: -4, firing: t > 0.5, ramp: Math.min(1, Math.max(0, (t - 0.5) / 4)) }),
+        },
+        {
+          morph: FIRE,
+          script: (t, v) => {
+            Object.assign(v, { x: 9.4, y: -4, heading: Math.PI, antennaActivity: 1, mandible: 0.5 });
+            // glued: the glue builds up, the ant struggles less and less
+            v.glue = Math.min(1, Math.max(0, (t - 0.8) / 3));
+            v.roll = Math.sin(t * 17) * 0.25 * (1 - v.glue * 0.8);
+            v.headYaw = Math.sin(t * 11) * 0.3 * (1 - v.glue * 0.8);
+            v.pose = POSE.GRAPPLE;
+          },
+        },
+        {
+          morph: 'termite_major',
+          script: (t, v) => {
+            const run = Math.min(t, 2);
+            Object.assign(v, { x: -1 + run * 3, y: 8, heading: 0, tan: 1, tState: t < 2 ? TS.CHARGE : TS.ALARM, tRate: t < 2 ? 1.6 : 6 });
+          },
+        },
+        { morph: 'termite_worker', script: (t, v) => Object.assign(v, { x: 12, y: 3.5, heading: 2.4, tState: t < 1.5 ? TS.IDLE : TS.DEATH, tStateT: Math.min(1, Math.max(0, (t - 1.5) / 1.2)), dead: t > 1.5, tan: 1 }) },
+      ],
+      events: [2.1, 2.27, 2.44, 2.61, 3.4, 3.57, 3.74, 4.6, 4.77, 4.94].map((t) => ({ t, e: { t: 'headbang', x: 6.4, y: 8, space: -1 } as unknown as SimEvent })),
+      cam: { tx: 2, ty: 0.5, tz: 1.5, dir: [0.15, 0.85, 1], dist: 38, fov: 30 },
+    },
+    // the royal pair: the queen's slow peristaltic waves and an egg sliding out, the king attending beside her
+    royals: {
+      dur: 8,
+      noScale: true,
+      ants: [
+        { morph: 'termite_queen', script: (t, v) => Object.assign(v, { x: 0, y: 0, heading: 0, tState: TS.QUEEN, tStateT: (t % 4) / 4, tan: 1 }) },
+        { morph: 'termite_king', script: (_t, v) => Object.assign(v, { x: -2, y: 4.4, heading: -0.5, tState: TS.ATTEND, tRate: 1, tan: 1, aimX: -4, aimY: 0 }) },
+      ],
+      cam: { tx: -7, ty: 1.5, tz: 0, dir: [0.25, 0.7, 1], dist: 52, fov: 30 },
+    },
+    // realism rework: one attacker, seen from the side — the hell ants' vertical snap (variant 0: the snap; the soldier's
+    // impale), slowed by a long attack gap so the cocked jaws, the trap firing, the hit-stop and the lift read
+    snap: {
+      dur: 5,
+      ants: [
+        { morph: FIRE, script: (_t, v) => Object.assign(v, { x: 0, y: 0, heading: Math.PI * 0.5, hp: 100, antennaActivity: 1, mandible: 0.5 }) },
+        { script: attacker(R * 0.55, 0, Math.PI, 0, 1.6, 0.1) },
+      ],
+      cam: { tx: R * 0.5, ty: 0.5, tz: 0, dir: [0.06, 0.22, 1], dist: 8, fov: 30 },
     },
     // two workers walk and die (onto the back / the side)
     death: {
@@ -676,6 +734,7 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
   const fx = new CombatFx();
   scene.add(fx.group);
   const flat = () => 0;
+  animHooks.fx = (x, y, _space, size) => fx.dust(x, y, size, flat);
   const adapter = {
     toWorld: (x: number, y: number, out: THREE.Vector3) => out.set(x, 0, y),
     normal: (_x: number, _y: number, out: THREE.Vector3) => out.set(0, 1, 0),
@@ -749,6 +808,9 @@ export function runAnimLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
   };
   // camera (`cdist=` overrides the clip's distance: the same scene at another zoom)
   // (`ctx` / `ctz` move the camera's target: a close look at one actor)
+  // (`cdir=x,y,z` the camera's direction: e.g. 0,0.03,1 at ground level, to see anything going through the ground)
+  const cdir = (q.get('cdir') || '').split(',').map(Number);
+  if (cdir.length === 3 && cdir.every((v) => Number.isFinite(v))) clip.cam.dir = cdir as [number, number, number];
   const C = { ...clip.cam, dist: Number(q.get('cdist') || clip.cam.dist * kS), tx: Number(q.get('ctx') ?? clip.cam.tx * kS), ty: Number(q.get('cty') ?? clip.cam.ty * kS), tz: Number(q.get('ctz') ?? clip.cam.tz * kS) };
   // a close look at one actor's head (`follow=` its index, `crel=1`: `cdir=` in its own frame — x ahead, y up, z to its
   // right — and `cfwd=` the target that far ahead of its centre), e.g. the antennae against the head in every clip

@@ -1,7 +1,7 @@
 /**
  * Growth harness: one colony on a map, run by the builder brain, for N game
  * minutes. Prints population, food, tiles and dug hexes every minute, and the
- * nest's shape (CHANGE_PLAN §22): chambers by size and type, tile levels,
+ * nest's shape (CHANGE_PLAN §23): chambers by size and type, tile levels,
  * highways, store chambers and their distance to the entrance.
  *   npx vite-node tools/econ.ts -- lasius 30 [seed] [foodMul] [creaturesMul] [aiLevel]
  */

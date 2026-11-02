@@ -18,7 +18,7 @@ import { termantAI, woodWant } from './termants';
  * Drives every AI colony (rivals grow their nests), and the growth harness
  * that tunes the economy. Combat and marker decisions live elsewhere.
  *
- * Every couple of seconds it (CHANGE_PLAN §22; first version 2026-10-25):
+ * Every couple of seconds it (CHANGE_PLAN §23; first version 2026-10-25):
  *  1. digs the nest EotU-style: chambers of 7 hexes (a centre and its ring) or,
  *     from mid game, 19 (two rings) for its main castes and leafcutter fungus,
  *     each in solid soil walled off from the others and joined to the nest by a
@@ -119,7 +119,7 @@ function jitter(q: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Chambers (CHANGE_PLAN §22): a 7-hex rosette (radius 1) or a 19-hex hexagon (radius 2), one tile type each
+// Chambers (CHANGE_PLAN §23): a 7-hex rosette (radius 1) or a 19-hex hexagon (radius 2), one tile type each
 // ---------------------------------------------------------------------------
 
 /** The AI level (settings.aiLevel): 0 Easy … 3 Brutal, 1 by default. */
@@ -684,9 +684,9 @@ function sourceValue(w: World, c: Colony, x: number, y: number, cut: boolean, te
   w.foodNear(x, y, 34, (f) => {
     if (f.space !== SURFACE || f.heldBy || f.amount <= 0 || f.kind === 'honeydew' || f.colony === -2) return false;
     if (f.kind === 'corpse' && w.teamOf(f.colony) === w.teamOf(c.id)) return false;
-    if (f.kind === 'leaf' && !cut) return false;
+    if (f.kind === 'leaf' && !cut && c.species !== 'termant') return false;
     if (!edible(c, f)) return false;
-    v += f.kind === 'wood' && c.species === 'termant' ? f.amount * woodWant(c) : f.amount;
+    v += (f.kind === 'wood' || f.kind === 'leaf') && c.species === 'termant' ? f.amount * woodWant(c) : f.amount;
     return false;
   });
   // Leafcutters live on their fungus: leaves count for more while the garden is hungry.

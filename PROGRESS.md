@@ -1366,8 +1366,149 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
 - Docs: README (lobby line, species table), `docs/multiplayer.md` §Gene Thief. The Termants' `STOLEN_CASTES` already
   had the nasute and sickle-jaw soldiers; unchanged.
 
+### 2026-11-02 — Story mode, chapter 1: the Gene-Thief campaign, two levels on layered maps
+- User specs `claude/story/02-spec-gene-thief-chapter1-two-levels.md` and `03-spec-story-level-maps.md` (answers:
+  build the layered-ground core here, and let it take precedence where it overlaps other work; merge and publish here).
+  Design: `docs/story/DESIGN-STORY.md`; DESIGN.md §6 (story mode, layered ground).
+- **Rename**: the Termants are the **Gene-Thief Termants** everywhere players see them (`termant` stays the id). Stolen
+  castes go by the ants' own names — "Black Garden Ant Soldier", "Tropical Fire Ant Major", "Nasute Termite Soldier" —
+  never nicknames (`termants.ts stolenName`).
+- **Layered ground** (`world/layers.ts`, `MapDef.layers/ramps`, `LAYERS` in balance.ts): an authored map can raise or
+  sink areas by whole levels (34 mm a step) inside wandering banks; ramps are corridors with an eased rise. Bank faces
+  steeper than `maxWalkSlope` block (they become cliff cells of the obstacle mask), so flow fields route over the
+  ramps; ants slow going uphill (`Terrain.slopeSpeed`). The validator checks ramp width, slope, a clear centre line,
+  every level reachable dry and flooded, and that floods only fill low ground. `testTerrace` is the test map.
+- **Framework** (`sim/story/`): levels as data (`story/levels/*.ts`): actors (a creature, colony ants or a whole rival)
+  run scenes of cues (walk, path, hold, patrol, guard, follow, flee, charge, wait for a flag, release); stages hold
+  objectives (raise, fighters, build, dig, collect food, store wood, kill ants, steal a caste, raise it, kill the queen,
+  survive, kill a creature, escort, protect, reach, enter a nest; optional ones), captions on time or flags, and
+  actions (spawn, flood, food, camera shot, music, rival raid, tip). Everything is sim state in `w.s.mode.mission.story`
+  (saves, snapshots and replays carry it; the same commands give the same game). Difficulty (`STORY.difficulty`): enemy
+  stats, waves, aggression, food and rival size. Medals for time, losses and a level bonus.
+- **Client**: cinematic shots (letterbox, skippable with Esc), named captions by the narrator Dr. Elena Varga (no
+  model; captions only), music moods, the campaign save in localStorage (`ud-campaign-v1`), the chapter-end screen.
+- **The island hub** (`ui/islandMap.ts`, `ui/storyHub.ts`): Wayfarer Island with six regions and 43 level slots (the
+  campaign is planned for 30–40 levels, user 2026-11-02): pan, zoom and pinch, a level list by chapter, the genome
+  (stolen castes and the loadout for the next level), the journal, difficulty, medals.
+- **Level 1 "The Garden Below"** (`maps/story/gardenBelow.ts`, 1100 × 900 mm; meadow and flowerbed terraces, a soil
+  slope, a moss bank, stone steps and a slumped back ramp): the queen comes ashore after a storm; a ground beetle looks
+  her over; first contact with two Lasius scouts; corpses into the stores to steal the Black Garden Ant Soldier; a
+  Lasius raid; take the aphid plants and kill the queen.
+- **Level 2 "Fire on the Banks"** (`maps/story/fireBanks.ts`, 1200 × 900 mm; a clay shelf and a high sand bank over a
+  stream): a fire-ant foraging column; the swarm down the slope; steal the Tropical Fire Ant Major; the river floods the
+  low margin; take the mound by the main slope or the root at the east end. Chapter end.
+- Narration facts checked against sources (DESIGN-STORY §10); four lines corrected (the Lasius queen's 28¾ years were
+  in an entomologist's care, not a laboratory's; the Spanish galleons of the 1500s; fire-ant rafts are best known from
+  the red imported fire ant; "majors twice their length" dropped).
+- Tests: `tests/story.ts` (added to `npm test`): levels and maps validate, the director's cues, objectives, latching,
+  missed castes, medals, the campaign save, island capacity, two runs agree, snapshot restore mid-scene.
+  `tools/playtest-story.ts` plays a level with the colony AI and a scripted player.
+- Playtests after the caste balance (bot, seed 7): The Garden Below won on all four difficulties (29.6 / 48.0 / 33.7 /
+  38.4 min); Fire on the Banks won on Easy (33.2 min) and Normal (42.3 min), not in 60 min on Hard and Brutal (left to
+  people). Level 2's mound was cut down for the tougher fire ant minors (pop 18, developed 3, 10 starting workers; enemy
+  scale 0.85; 170 starting food). A story level no longer opens on the skirmish missions' briefing card.
+- Fixed on the way: the layered-ground commit gave flat authored maps a generated map's random props (a misplaced
+  `else` in `terrain.ts`).
 
-### 2026-11-02 — AI colonies: allies start close, EotU-style chambers with upgrades, allies help each other (CHANGE_PLAN §22)
+### 2026-11-02 — Caste and creature balance
+- User 00:34: "balance all current ant and termite species soldiers and workers and other castes (workers should be
+  similar in strength and stats but not the same like eotu) and buff creatures cos they are weak against ants right now".
+  Tables, method and results: `docs/balance/castes.md`; tools `tools/caste-table.ts`, `tools/balance-matrix.ts`,
+  `tools/balance-tune.ts`.
+- Equal-food fights against a reference caste (workers at 150 food, soldiers at 300, majors at 420; three seeds, both
+  sides), and a tie-point search on a stat scale, since the margins snowball. Every worker now ends within ±0.18 of the
+  black garden ant worker (before, the round-robin scores ran from −0.89 to +0.80: both termite workers lost to
+  everything, Plagiaria and leafcutter medias won almost everything); soldiers and majors within about ±0.3 of theirs.
+- Workers keep their own shapes (armoured leafcutter medias, fast army ants, venomous fire ants, slow tough termites,
+  acid-spraying Plagiaria); all build for 10.
+- The nasute's glue stream (2 → 20 dps) is the user's and stays; the nasute costs more wood instead (× 2.2).
+  Sickle-jaw soldiers win one on one and lose in groups (they hold one enemy at a time).
+- Creatures: hit points about doubled and bites up a little; the mantis strikes every 1.6 s, has armour 2 and flees at
+  10 %. Wild predators now beat 5 and 10 workers and need about 20 (the stone centipede and the mantis died to 5 before).
+  Bosses unchanged (80–120 workers or more).
+
+### 2026-11-02 — Termants: one food store for wood, leaves and food
+- User 10:47: "termants have the special ability to consume all known food resources as food (wood leaves and normal
+  food all share 1 store) fix that and push it to the game rn". Termant workers chew dead wood and leaf litter and carry
+  leaves as well as ordinary food, and all of it goes into the food store (`termants.ts termantDeposit`: wood at
+  `TERMANT.wood.toFood` 0.5 food a unit, leaves `leafToFood` 1; `diet.ts`: Termants eat every food kind). The separate
+  wood store, its digestion and the top bar's wood counter are gone; carton walls are paid from the food store (and
+  refunded as seeds like other tiles); the AI's wood want follows the food store. Save migration: an old save's wood
+  store turns into food on the next second. The story's "gather wood" goal counts wood carried in (`stats.wood`).
+- Tests: `tests/termants.ts` (wood into the food store, leaves into the food store, an old wood store converted, carton
+  walls paid from food, the AI plans a wall with the food).
+
+### 2026-11-02 — Underground textures realism pass; nest hexes 1.10×; a look of its own for every caste
+User notes: 2026-11-01 23:55 "use this realism prompt to fix the underground textures as well" (no prompt file came
+with it: the realism pipeline of `claude/realism/01–02` was used); 2026-11-02 01:15 "1.25x size it too big, maybe make
+it slightly smaler for underground hex", then "nvm just do 1.10x size". Branch `feature/underground-realism` from
+`main` (`18bf3d4`); `origin/main` (`f79ebd1`, Gene Thief termite soldiers) merged in. Notes:
+`docs/realism/underground.md`; shots `docs/realism/underground/` (`tests/browser/underground_realism.py`).
+- **Hex size:** `NEST_HEX_SCALE` 1.25 → 1.10 (`hexRadiusFor`); saves keep the size they were made with; protocol
+  `ud-mp-7`. Every suite passed with the smaller nests except the size check itself (`tests/notes1101.ts`, updated).
+- **Soil, render only** (`render/nest/nestTerrain.ts`, `render/environment.ts`): sand grains at real scale in four
+  mineral colours (glassy quartz tops), a neutral silt-clay matrix with greyer and redder patches, crumb structure
+  softened where ants walk and along paler worn paths, diggers' pellets, soil crumbs and a few angular stones with
+  contact shadows (most along the walls), damp patches; crumbly walls with mandible scrapes and rare roots; grains in
+  the soil top; the queen's chamber smoothed pale silt (was a blue silk mat), brood tiles the soil washed with the
+  caste colour, the food store an olive-stained floor; softer, slightly irregular group outlines; the nest key light
+  warm white (was orange) and the light pools less orange; termite floors keep more grain and relief.
+- **Blind reviews** (fresh agent, before/after shuffled as A/B, 1–10): round 2 — new preferred 8/8, "could it be a
+  macro photo" 4.25 vs ~2; round 3 — 10/10, 4.9 vs 2.0. Remaining after round 3 (addressed in round 4): flat-looking
+  tiles, printed outlines, single-colour floors, felt-like termite floors.
+- **Caste looks** (user note 10:40: "make every unit tile (both ants and termites and future ones) have different
+  colors and textures so they can be identifiable and different (also their UI color and look for pheromone markers
+  and building so they can be distinct from each other)"; 11:04 "make the textures look more natural realistic and
+  insect like, they can use different colors just use more cleaner ones"). New `render/casteLook.ts`: twelve clean,
+  clearly different colours × ten natural, insect-made textures in relief (brood pockets, cuticle striations, soil
+  pellets, rugose wrinkles, imbricate scales, silk fibres, wax comb, wing veins, termite carton, cocoons; the first
+  pass's geometric stripes, chevrons, spokes and diamonds and its grainy colour were replaced the same morning). Within a species no colour or texture repeats; no two castes anywhere share both; castes added
+  later get a free pair automatically. The brood tiles use it (floor shader `castePat`; the texture number rides in the
+  tint texture's alpha; replaces the soil wash of the realism pass), and so does the UI: build panel tile buttons,
+  Castes tab and Genome rows and the marker panel's group cards show a small hex of the tile (drawn by the same
+  texture code, `castePatternAt`) with a dark ant on top (cards also get a top edge in the caste colour); the nest minimap and top-bar figures use the colour.
+  `casteTint` now returns the caste colour. Test `tests/casteLooks.ts`; renders `docs/realism/caste-tiles/`
+  (`tests/browser/caste_tiles.py`, sheet `caste_sheet.py`).
+
+
+## 2026-11-02 — Realism rework: hell ants and nasute termites (CHANGE_PLAN §22)
+User spec `claude/realism/08-spec-hell-ants-nasute-termites.md`. Looks and animation only: every unit id, stat, ability
+and behaviour unchanged. Report: `docs/realism/hell-nasute/README.md`; rubric: `docs/realism/hell-nasute/RUBRIC.md`.
+- Research: shape numbers per unit in `docs/creatures/hell-ant.md` §7 and `docs/creatures/nasutitermes.md` §11 (the
+  user's 24 study photos and the papers), written before the geometry changed.
+- Hell ants: the `HELL` baked-detail recipe; every piece carries detail coordinates; 12-segment antennae through a spline;
+  club femora, slim tibiae, spurs 1-2-2, tarsomeres, claws, a soft knee; erect setae and a fine pubescence; four trigger
+  hairs (two on the queen); dark jaws; bronze faceted eyes; the horn's setae irregular; no ocelli on the queen (the fossil
+  record wins over the spec). User notes (10:30): the legs 1.25× longer and set as wide as the other ants', the body
+  higher; walk and idle with the other ants' planted-feet animation. Melee `ATK.SNAP` / `ATK.IMPALE` with a hit-stop, a
+  click and a puff of dust; nothing sideways. Ground check: every clip filmed at ground level (`cdir=0,0.04,1`): nothing
+  goes through the ground (corpses still sink away after drying, as every ant's do). Amber specimen lab mode.
+- Nasute termites (nasute castes only; sickle-jaw identical: hashes and 12 pixel-identical renders): `real` per caste
+  (rig column `REAL`): lobed gut under the cuticle, sunken membranes, mottled wrinkled soft cuticle, wet glint, deeper
+  subsurface light, barrel antennal articles and round legs at LOD0, more fine setae, breathing, stronger queen waves,
+  eggs seen through her membrane, her plates as dark islands; stringy glue (`NASUTE_GLUE`); palettes nudged to the photos.
+- Lab: `?light=` for termites, `?contact=1` contact shadows, `?amber=1`; anim lab clips `termites`, `royals`, `snap`
+  and `cdir=`. Renders: `tests/browser/hell_nasute_realism.py`; sheets: `tools/hell-nasute-sheets.py`.
+- Blind review, four rounds (fresh reviewer each, anchors 3 / 4 / 9, photos mixed in scoring 8.5–9.5):
+  - R1 mean 3.3. Tells: one glossy plastic per part; tube legs and faceted bead antennae; no contact shadows; the horn
+    setae a white comb; the queen an orange balloon; the king's white seams; the gut a smear.
+    Fixed: deeper hell sculpture, less clearcoat; round legs, no ball joints; irregular horn setae; round termite legs
+    and antennae; soft-cuticle mottle and wrinkles; a defined gut; darker king membranes; a paler queen with larger
+    plates; lab contact shadows and a finer ground.
+  - R2 mean 3.25. Tells: tubes and bead chains; one specular blob; a few white spike hairs; the queen's identical discs;
+    flat decal eyes; the gut painted on. Fixed: hell pubescence and more leg setae, bulging bronze eyes; barrel antennal
+    articles; the gut fading to the rim under the segment margins; queen plates as dark islands, rolls of varied tone.
+  - R3 mean 3.7 (hell close-ups 4). Tells: tubes and beads; vinyl cuticle, no translucency; white pin hairs and white
+    seams. Fixed: soldier palette less saturated, seams near the body colour, lower albedo with warm translucent edges,
+    gold hairs, wider queen plates.
+  - R4 mean 3.45 (the reviewer ±0.5). Same three tells. The 7/10 target was not reached; what is left needs heavier tools
+    (README of the report).
+- Checks: `tsc`, determinism (60 files clean), morph hashes (only the hell ants changed; re-baselined), termite kit
+  hashes (only the nasute castes changed), `sim/heightData.ts` regenerated (taller hell ants; no new underpasses),
+  climb data unchanged.
+
+
+### 2026-11-02 — AI colonies: allies start close, EotU-style chambers with upgrades, allies help each other (CHANGE_PLAN §23)
 User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `feature/ai-allies` from `main` (`fc6f58a`), with
 `main`'s one-entrance rework merged in on the way (`604e84d`). DESIGN §3.11 (placement, builder, war, ally brains).
 - **Allied nests start close** (`world/teamSites.ts`): whenever a team has two or more colonies (skirmish allies too, not
@@ -1391,7 +1532,7 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   just enough and more if the fight turns worse; marker V on the ally's hole, then on the fight; recalls at once when
   threatened at home; stops when clear, after heavy losses, when outmatched, after 4 min; one go per threat (no
   flip-flopping) and a cooldown; raids give way to bad trouble. Messages for a human ally; the ✋ call-for-help button (command `callHelp`, wire 25,
-  `BUILD_ID` `ud-mp-7`). Joint raids (gather short of the target, go together), shared targets.
+  `BUILD_ID` `ud-mp-8`). Joint raids (gather short of the target, go together), shared targets.
 - **Growth** (`tools/econ.ts`, one AI colony, 900 mm meadow, seed 7; ants at 10 / 20 / 30 / 45 min; `main` = `f79ebd1`):
 
   | Species | this branch | `main` | tiles by level at 45 min |

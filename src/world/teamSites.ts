@@ -1,5 +1,5 @@
 /**
- * Team-aware colony placement (CHANGE_PLAN §22, user spec claude/ai/01-spec-ai-allies-chambers.md §1): allies start as
+ * Team-aware colony placement (CHANGE_PLAN §23, user spec claude/ai/01-spec-ai-allies-chambers.md §1): allies start as
  * neighbours (a short land route between their entrances), enemies apart, the teams fairly placed against each other.
  *
  * Pure arithmetic on the map file and the team shape — no seed, no random numbers — so every client, the lobby preview

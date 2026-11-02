@@ -3,8 +3,9 @@ import { shapeDist } from './mapShapes';
 import { HEX_GROUND, HEX_WALL, HEX_WATER, HF_LAIR, HF_SHORE, SurfaceLayout } from './surfaceLayout';
 import { Terrain, mapTerrainParams } from './terrain';
 import { pickTeamSites } from './teamSites';
-import { ENTRANCE } from '../sim/balance';
-import { dhypot } from '../sim/dmath';
+import { ENTRANCE, LAYERS } from '../sim/balance';
+import { RAMP_SIDE, nearestOnPath, rampLevels } from './layers';
+import { datan, dhypot } from '../sim/dmath';
 
 /** The hard rules for every site (brief §3; docs/maps/design.md §4). */
 export const SITE_RULES = {
@@ -111,7 +112,7 @@ export function validateMap(def: MapDef, seed = 1, expectSites = 10): MapReport 
       if (n !== 10 && set.length !== n) problems.push(`a ${n}-colony site set has ${set.length} sites`);
       for (const i of set) if (i < 0 || i >= def.sites.length) problems.push(`a ${n}-colony site set names site ${i}`);
     }
-  // team layouts (CHANGE_PLAN §22): each authored set names distinct real sites; the limits are reported (some maps'
+  // team layouts (CHANGE_PLAN §23): each authored set names distinct real sites; the limits are reported (some maps'
   // shapes cannot keep every pair close and every enemy far: docs/maps/team-sites.md)
   for (const [shape, groups] of Object.entries(def.teamSets ?? {})) {
     const sizes = shape.split('v').map(Number);
@@ -201,6 +202,9 @@ export function validateMap(def: MapDef, seed = 1, expectSites = 10): MapReport 
       });
     });
   }
+  // layered ground (claude/maps/05-spec-layered-maps.md §2): ramps wide and gentle enough, one level each; every layer
+  // reachable by land from the first site; floods only on low ground
+  if (t.layers) layerChecks(t, def, problems, info, (f) => walkGrid(t, def, f), reach, nearestOk);
   // determinism: the same seed builds the same terrain
   const t2 = new Terrain(mapTerrainParams(seed, def.id, def), def);
   if (terrainHash(t) !== terrainHash(t2)) problems.push('two builds from the same seed differ');
@@ -230,4 +234,84 @@ export function terrainHash(t: Terrain): number {
     }
   }
   return h >>> 0;
+}
+
+/** The layered-ground rules (world/layers.ts). */
+function layerChecks(
+  t: Terrain,
+  def: MapDef,
+  problems: string[],
+  info: string[],
+  grid: (flooded: number) => { cw: number; ch: number; ok: Uint8Array },
+  reachFrom: (g: { cw: number; ch: number; ok: Uint8Array }, x: number, y: number) => Uint8Array,
+  nearest: (g: { cw: number; ch: number; ok: Uint8Array }, x: number, y: number, maxR?: number) => number,
+): void {
+  const F = t.layers!;
+  const np = { d: 0, s: 0, len: 0 };
+  (def.ramps ?? []).forEach((r, i) => {
+    if (r.width < LAYERS.rampMinWidth) problems.push(`ramp ${i}: ${r.width} mm wide (min ${LAYERS.rampMinWidth})`);
+    const [la, lb] = rampLevels(F, t, r);
+    if (Math.abs(lb - la) !== 1) problems.push(`ramp ${i}: joins level ${la} to level ${lb} (one step each)`);
+    // the steepest stretch along its centre line
+    nearestOnPath(r.path, r.path[0][0], r.path[0][1], np);
+    const len = (() => {
+      let l = 0;
+      for (let k = 1; k < r.path.length; k++) l += dhypot(r.path[k][0] - r.path[k - 1][0], r.path[k][1] - r.path[k - 1][1]);
+      return l;
+    })();
+    let worst = 0;
+    let blocked = 0;
+    const at = (s: number): [number, number] => {
+      let acc = 0;
+      for (let k = 1; k < r.path.length; k++) {
+        const l = dhypot(r.path[k][0] - r.path[k - 1][0], r.path[k][1] - r.path[k - 1][1]);
+        if (acc + l >= s || k === r.path.length - 1) {
+          const u = l > 0 ? Math.min(1, Math.max(0, (s - acc) / l)) : 0;
+          return [r.path[k - 1][0] + (r.path[k][0] - r.path[k - 1][0]) * u, r.path[k - 1][1] + (r.path[k][1] - r.path[k - 1][1]) * u];
+        }
+        acc += l;
+      }
+      return [r.path[0][0], r.path[0][1]];
+    };
+    for (let s = 0; s + 4 <= len; s += 4) {
+      const [x0, y0] = at(s);
+      const [x1, y1] = at(s + 4);
+      worst = Math.max(worst, Math.abs(t.heightAt(x1, y1) - t.heightAt(x0, y0)) / 4);
+      if (!t.passable(x0, y0)) blocked++;
+    }
+    if (worst > LAYERS.rampMaxSlope) problems.push(`ramp ${i}: ${(datan(worst) * 57.3).toFixed(0)}° at its steepest (max ${(datan(LAYERS.rampMaxSlope) * 57.3).toFixed(0)}°)`);
+    if (blocked) problems.push(`ramp ${i}: ${blocked} points of its centre line are blocked`);
+    info.push(`  ramp ${i} (${r.style}): level ${la} → ${lb}, ${len.toFixed(0)} mm long, ${r.width} mm wide, steepest ${(datan(worst) * 57.3).toFixed(0)}°`);
+  });
+  // every layer's top reachable from the first site, dry and in each flood
+  const s0 = t.layout!.sites[0];
+  if (!s0) return;
+  const hx = t.layout!.hex;
+  for (let f = -1; f < def.floods.length; f++) {
+    const g = grid(f);
+    const r = reachFrom(g, hx.centerX(s0.entrances[0]), hx.centerY(s0.entrances[0]));
+    (def.layers ?? []).forEach((layer, i) => {
+      // a walkable cell on the layer's top
+      let found = -1;
+      let any = false;
+      for (let k = 0; k < g.ok.length && found < 0; k++) {
+        if (!g.ok[k]) continue;
+        const x = ((k % g.cw) + 0.5) * 8;
+        const y = (Math.floor(k / g.cw) + 0.5) * 8;
+        if (t.levelAt(x, y) !== layer.level || shapeDist(layer.shape, x, y) > -LAYERS.bankW) continue;
+        any = true;
+        if (r[k]) found = k;
+      }
+      if (any && found < 0) problems.push(`layer ${i} (level ${layer.level}) cannot be reached by land from site 0${f < 0 ? '' : ` while flood zone ${f} is flooded`}`);
+    });
+    void nearest;
+  }
+  // floods fill low ground only: no flood zone over a terrace's top
+  def.floods.forEach((fz, i) => {
+    let high = 0;
+    for (let y = 4; y < t.depth; y += 8)
+      for (let x = 4; x < t.width; x += 8) if (shapeDist(fz.shape, x, y) < 0 && t.levelAt(x, y) > 0 && t.heightAt(x, y) < fz.level) high++;
+    if (high) problems.push(`flood zone ${i}: ${high} cells of raised ground under its water line`);
+  });
+  void RAMP_SIDE;
 }

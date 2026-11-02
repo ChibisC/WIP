@@ -5,7 +5,7 @@ import { JOB_NAMES } from '../sim/jobs';
 import { BALANCE } from '../sim/balance';
 import { button, el, esc, shield } from './dom';
 import { ICONS } from './icons';
-import { isTermant, stolenOf } from '../sim/termants';
+import { isTermant, stolenName, stolenOf } from '../sim/termants';
 import { arenaOf } from '../sim/arenaState';
 import { TEAM_NAMES } from '../sim/arena';
 import { TEAM_COLORS } from '../render/game/teamRings';
@@ -96,7 +96,7 @@ export class InfoCard {
     // battle arena: the unit's team
     const arenaI = arenaOf(s.world)?.teams.findIndex((t) => t.colony === col.id) ?? -1;
     const stolen = isTermant(col) && cd.species !== 'termant' ? stolenOf(a.caste) : undefined;
-    const title = stolen ? `${esc(stolen.name)} — ${esc(sp.common)} ${esc(cd.name.toLowerCase())}` : `${esc(sp.common)} — ${esc(cd.name)}`;
+    const title = stolen ? `${esc(stolenName(stolen))}` : `${esc(sp.common)} — ${esc(cd.name)}`;
     const extra =
       (stolen ? `<div class="ic-row"><span>Stolen caste</span><b>Raised by ${esc(SPECIES.termant.common)} from ${esc(sp.common)} genes</b></div>` : '') +
       ((a.glueT ?? 0) > s.world.s.tick ? `<div class="ic-row ic-warn"><span>Glued</span><b>Slowed · formic acid hurts double</b></div>` : '');

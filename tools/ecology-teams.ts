@@ -1,5 +1,5 @@
 /**
- * Teams of AI colonies (CHANGE_PLAN §22): a 2v2 of AI colonies on an authored map (placed by team, world/teamSites.ts)
+ * Teams of AI colonies (CHANGE_PLAN §23): a 2v2 of AI colonies on an authored map (placed by team, world/teamSites.ts)
  * for N minutes, with the ally brain on or off. Prints each colony's ants, deaths and kills, and its ally brain (help
  * started, why the last stopped) every 5 minutes, and who is alive at the end.
  * Lineups: `mixed` Black garden + Red wood v Fire ant + Leafcutter (the leafcutters are much the strongest), `mirror`

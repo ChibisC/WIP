@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { AntRig, buildAnt } from './antGeometry';
 import { BODY_TEX, createAntMaterials, createAntGlueShell, POSE, TINT_GLSL } from './antMaterial';
-import { AttackPose, applyAttackBody, attackPose, attackPoseV2, neutralPose } from './attackPoses';
+import { ATK, ATTACK_CONTACT, AttackPose, applyAttackBody, attackPose, attackPoseV2, neutralPose } from './attackPoses';
 import { AntMorph, MORPHS } from './morphs';
 import { ANIM_SFX, animV2, AtkPlan, attackPlan, Motion2, newMotion, newMotionOut, stepMotion } from './antMotion';
 import { addPatch, patchDapple } from '../shaderPatch';
@@ -391,7 +391,11 @@ const lerpAngle = (a: number, b: number, t: number) => {
 const damp = (a: number, b: number, k: number, dt: number) => a + (b - a) * (1 - Math.exp(-k * dt));
 
 /** Render-side sound hooks (spec 04): set by the game's audio; (ANIM_SFX.*, plane x, y, space, cause of death, morph). */
-export const animHooks: { emit: ((sfx: number, x: number, y: number, space: number, cause: number, morph: string) => void) | null } = { emit: null };
+export const animHooks: {
+  emit: ((sfx: number, x: number, y: number, space: number, cause: number, morph: string) => void) | null;
+  /** render-only effects at an animation beat: a puff of dust at (x, y) of `size` mm (the hell ants' snap) */
+  fx: ((x: number, y: number, space: number, size: number) => void) | null;
+} = { emit: null, fx: null };
 
 export interface AntSpaceAdapter {
   /** world position for plane coords */
@@ -705,6 +709,12 @@ export class AntRenderer {
           if (s.av === 3 && !s.ahi && q0 < 0.2 && q1 >= 0.2) sfx = ANIM_SFX.GRIP;
           else if (s.av === 4 && q0 < 0.3 && q1 >= 0.3) sfx = ANIM_SFX.GRIP;
           else if (s.av === 5 && q0 < 0.7 && q1 >= 0.7) sfx = ANIM_SFX.CRUNCH;
+          else if ((s.av === ATK.SNAP || s.av === ATK.IMPALE) && q0 < ATTACK_CONTACT && q1 >= ATTACK_CONTACT) {
+            // hell ants: the trap fires — a click and a puff of dust kicked up under the head
+            sfx = ANIM_SFX.SNAP;
+            const d = rig.mouth.x * scale;
+            animHooks.fx?.(x + Math.cos(h) * d, y + Math.sin(h) * d, this.space, rig.length * scale * (s.av === ATK.IMPALE ? 0.32 : 0.22));
+          }
         }
         if (sfx && animHooks.emit) animHooks.emit(sfx, x, y, this.space, v.cause ?? 0, v.morph);
         s.lastH = M.h;

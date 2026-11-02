@@ -11,7 +11,7 @@ import { rivalsMayRaid } from './missions';
 import { siteRoutes } from '../world/teamSites';
 
 /**
- * The rival AI's war (Phase 12; allies CHANGE_PLAN §22): its fighter groups defend the nest, raid rivals and help
+ * The rival AI's war (Phase 12; allies CHANGE_PLAN §23): its fighter groups defend the nest, raid rivals and help
  * allies, through the same markers a player uses.
  *
  * Every few seconds an AI colony:
@@ -235,7 +235,7 @@ export function warTick(w: World, c: Colony, dt: number): void {
   if (aggression <= 0 || w.s.time < W.firstRaid || w.s.time < b.cooldown || (!c.player && !rivalsMayRaid(w))) return;
   if ((c.aiAlly?.ally ?? -1) >= 0) return;
   const own = fighters(w, c);
-  // join an AI ally's young raid (CHANGE_PLAN §22): same target, gather and arrive together
+  // join an AI ally's young raid (CHANGE_PLAN §23): same target, gather and arrive together
   if (joinRaid(w, c, own.n)) return;
   if (own.n < W.minFighters) return;
   const tgt = pickTarget(w, c);
@@ -264,7 +264,7 @@ function endRaid(w: World, c: Colony, won: boolean): void {
 }
 
 // ---------------------------------------------------------------------------
-// Joint raids (CHANGE_PLAN §22): AI allies with spare fighters join a young raid on the same target; everyone gathers
+// Joint raids (CHANGE_PLAN §23): AI allies with spare fighters join a young raid on the same target; everyone gathers
 // short of the target and goes together once they are there (or after a while)
 // ---------------------------------------------------------------------------
 
@@ -333,7 +333,7 @@ function gatherCheck(w: World, c: Colony, gather: NonNullable<WarBrain['gather']
 }
 
 // ---------------------------------------------------------------------------
-// The ally brain (CHANGE_PLAN §22): help an ally in trouble, unless threatened at home
+// The ally brain (CHANGE_PLAN §23): help an ally in trouble, unless threatened at home
 // ---------------------------------------------------------------------------
 
 export interface AllyDanger {

@@ -15,8 +15,11 @@ export type DamageType = 'bite' | 'acid' | 'sting' | 'pure';
  */
 export const SPECIES_DISPLAY_NAME: Partial<Record<SpeciesId, string>> = {
   aurimyrmex: 'Saiy-Ants',
-  /** the user's name for the ant–termite hybrid (the brief said "Termyrms"); fallback "Chimera Ants" */
-  termant: 'Termants',
+  /**
+   * the user's name for the ant–termite hybrid (the brief said "Termyrms"; "Termants" until 2026-11-01, renamed for the
+   * story campaign, claude/story/02-spec); the internal id stays `termant`; fallback "Chimera Ants"
+   */
+  termant: 'Gene-Thief Termants',
 };
 export const SAIY_FALLBACK_NAME = 'Gilded Ants';
 export const TERMANT_FALLBACK_NAME = 'Chimera Ants';
@@ -73,7 +76,7 @@ export interface CasteDef {
   snap?: { kind: 'pin' | 'impale'; windup: number; dps: number; hold: number; cooldown: number; maxPreyMass: number; burst?: number };
   /** Saiy-Ants: can flash into the gold surge (sim/surge.ts) */
   surge?: boolean;
-  /** Termants: may gather dead wood (stored apart and digested slowly into food; sim/termants.ts) */
+  /** Termants: may gather dead wood, leaf litter and leaves, all into the one food store (sim/termants.ts) */
   wood?: boolean;
   /** Termant soldier: the point-blank glue burst from the frontal pore (sim/termants.ts) */
   glue?: { cooldown: number; slow: number; slowMul: number; damage: number; range: number };
@@ -141,13 +144,13 @@ export const CASTES: Record<string, CasteDef> = {
   // ---- Lasius niger ----
   lasius_worker: C({
     id: 'lasius_worker', species: 'lasius', name: 'Worker', role: 'worker', morph: 'lasius_worker', length: 4, speed: 16,
-    hp: 16, bite: 2.6, attackInterval: 0.9, armor: 0, carry: 3, grip: 1, mass: 1, forage: true, dig: true, nurse: true, tendAphids: true,
+    hp: 17, bite: 2.6, attackInterval: 0.9, armor: 0, carry: 3, grip: 1, mass: 1, forage: true, dig: true, nurse: true, tendAphids: true,
     acid: { range: 6, damage: 1.5, cooldown: 5, kind: 'opener' },
     cost: 6, devTime: 1, pop: 1, cocoon: true, fact: 'Lasius niger workers move from nursing to foraging as they age.',
   }),
   lasius_soldier: C({
     id: 'lasius_soldier', species: 'lasius', name: 'Soldier', role: 'soldier', morph: 'lasius_soldier', length: 4.9, speed: 15,
-    hp: 44, bite: 5, attackInterval: 0.9, armor: 1, carry: 4, grip: 2, mass: 1.8, forage: true, dig: true, nurse: false, tendAphids: true,
+    hp: 42, bite: 4.8, attackInterval: 0.9, armor: 1, carry: 4, grip: 2, mass: 1.8, forage: true, dig: true, nurse: false, tendAphids: true,
     acid: { range: 7, damage: 2.5, cooldown: 5, kind: 'opener' }, threat: 0.5,
     cost: 14, devTime: 1.2, pop: 1, cocoon: true,
     fact: 'Lasius niger has no true soldier caste, but its workers range from about 3 to 5 mm; the larger ones do more of the fighting.',
@@ -160,13 +163,13 @@ export const CASTES: Record<string, CasteDef> = {
   // ---- Formica rufa ----
   formica_worker: C({
     id: 'formica_worker', species: 'formica', name: 'Worker', role: 'worker', morph: 'formica_worker', length: 7, speed: 26,
-    hp: 26, bite: 2.4, attackInterval: 1.0, armor: 1, carry: 5, grip: 2, mass: 2.4, forage: true, tendAphids: true, dig: true, nurse: true,
+    hp: 19, bite: 2.4, attackInterval: 1.0, armor: 0.3, carry: 5, grip: 2, mass: 2.4, forage: true, tendAphids: true, dig: true, nurse: true,
     acid: { range: 10, damage: 2, cooldown: 6, kind: 'opener' },
     cost: 9, devTime: 1.25, pop: 1, cocoon: true, fact: 'Red wood ants spray formic acid by curling the gaster forward between the legs, often after biting to open a wound.',
   }),
   formica_soldier: C({
     id: 'formica_soldier', species: 'formica', name: 'Soldier', role: 'soldier', morph: 'formica_soldier', length: 8.6, speed: 22,
-    hp: 120, bite: 2.2, attackInterval: 1.1, armor: 3, carry: 6, grip: 4, mass: 4.2, forage: true, dig: true, nurse: false,
+    hp: 107, bite: 3.8, attackInterval: 1.1, armor: 2.5, carry: 6, grip: 4, mass: 4.2, forage: true, dig: true, nurse: false,
     threat: 2.5,
     cost: 20, devTime: 1.5, pop: 1, cocoon: true,
     fact: 'Formica rufa workers range from about 4.5 to 9 mm; the biggest, armoured workers wade into fights and soak up the enemy’s bites.',
@@ -198,19 +201,19 @@ export const CASTES: Record<string, CasteDef> = {
   }),
   // (user 2026-11-01: the leafcutter castes named by size — Minim, Worker, Media, Major; the unit ids stay)
   atta_media: C({
-    id: 'atta_media', species: 'atta', name: 'Worker', role: 'worker', morph: 'atta_media', length: 8, speed: 17, hp: 22, bite: 3, attackInterval: 1,
+    id: 'atta_media', species: 'atta', name: 'Worker', role: 'worker', morph: 'atta_media', length: 8, speed: 17, hp: 17, bite: 2.3, attackInterval: 1.05,
     armor: 1, carry: 3, grip: 2, mass: 2.2, forage: true, dig: true, nurse: true, cutLeaves: true,
     cost: 8, devTime: 1, pop: 1, cocoon: false, fact: 'Leafcutters cut leaf fragments sized to their body and carry them upright over their heads.',
   }),
   atta_soldier: C({
-    id: 'atta_soldier', species: 'atta', name: 'Media', role: 'soldier', morph: 'atta_soldier', length: 10.5, speed: 16, hp: 62, bite: 7, attackInterval: 1.0,
-    armor: 2, carry: 3, grip: 3, mass: 3, forage: true, dig: true, nurse: false, threat: 0.5,
+    id: 'atta_soldier', species: 'atta', name: 'Media', role: 'soldier', morph: 'atta_soldier', length: 10.5, speed: 16, hp: 50.5, bite: 5.8, attackInterval: 1.0,
+    armor: 1.5, carry: 3, grip: 3, mass: 3, forage: true, dig: true, nurse: false, threat: 0.5,
     cost: 16, devTime: 1.3, pop: 1, cocoon: false,
     fact: 'Atta workers come in a continuous range of sizes; mid-sized workers patrol the foraging trails and attack intruders.',
   }),
   atta_major: C({
-    id: 'atta_major', species: 'atta', name: 'Major', role: 'major', morph: 'atta_major', length: 14, speed: 12, hp: 220, bite: 16, attackInterval: 1.4,
-    armor: 4, carry: 6, grip: 7, mass: 12, forage: true, dig: false, nurse: false, taunt: true,
+    id: 'atta_major', species: 'atta', name: 'Major', role: 'major', morph: 'atta_major', length: 14, speed: 12, hp: 120, bite: 9.5, attackInterval: 1.4,
+    armor: 3, carry: 6, grip: 7, mass: 12, forage: true, dig: false, nurse: false, taunt: true,
     cost: 45, devTime: 2, pop: 3, cocoon: false, fact: 'Atta majors have mandibles sharp enough to slice skin; they guard trails and the nest.',
   }),
   atta_queen: C({
@@ -220,19 +223,19 @@ export const CASTES: Record<string, CasteDef> = {
   }),
   // ---- Solenopsis geminata (tropical fire ant) ----
   fire_minor: C({
-    id: 'fire_minor', species: 'solenopsis', name: 'Worker', role: 'worker', morph: 'fire_minor', length: 2.8, speed: 15, hp: 8, bite: 0.8, attackInterval: 0.8,
+    id: 'fire_minor', species: 'solenopsis', name: 'Worker', role: 'worker', morph: 'fire_minor', length: 2.8, speed: 15, hp: 13.5, bite: 1.25, attackInterval: 0.8,
     armor: 0, carry: 2.5, grip: 1, mass: 0.6, forage: true, tendAphids: true, dig: true, nurse: true,
-    sting: { dps: 1.2, duration: 6, maxStacks: 12 },
+    sting: { dps: 1.3, duration: 6, maxStacks: 12 },
     cost: 3, devTime: 0.7, pop: 0.6, cocoon: false, fact: 'Fire ants grip with their mandibles, then pivot and sting repeatedly in a circle.',
   }),
   fire_soldier: C({
-    id: 'fire_soldier', species: 'solenopsis', name: 'Soldier', role: 'soldier', morph: 'fire_minor', scale: 4 / 2.8, length: 4, speed: 14, hp: 16, bite: 1.4, attackInterval: 0.8,
+    id: 'fire_soldier', species: 'solenopsis', name: 'Soldier', role: 'soldier', morph: 'fire_minor', scale: 4 / 2.8, length: 4, speed: 14, hp: 28, bite: 2.6, attackInterval: 0.8,
     armor: 0.5, carry: 3, grip: 1.5, mass: 1, forage: true, dig: true, nurse: false, threat: 0.4,
-    sting: { dps: 1.6, duration: 6, maxStacks: 12 },
+    sting: { dps: 2.4, duration: 6, maxStacks: 12 },
     cost: 6, devTime: 0.85, pop: 0.8, cocoon: false, fact: 'Tropical fire ant workers run from about 3 to 8 mm; the mid-sized ones are quick to sting anything that disturbs the mound.',
   }),
   fire_major: C({
-    id: 'fire_major', species: 'solenopsis', name: 'Major', role: 'major', morph: 'fire_major', length: 6, speed: 11, hp: 75, bite: 6, attackInterval: 1.2, mount: 'large',
+    id: 'fire_major', species: 'solenopsis', name: 'Major', role: 'major', morph: 'fire_major', length: 6, speed: 11, hp: 95, bite: 7, attackInterval: 1.2, mount: 'large',
     armor: 2, carry: 5, grip: 3, mass: 3, forage: true, dig: true, nurse: false, threat: 0.8,
     sting: { dps: 1.8, duration: 7, maxStacks: 12 },
     cost: 14, devTime: 1.3, pop: 1.5, cocoon: false, fact: 'Solenopsis geminata majors have huge square heads and blunt mandibles built for milling seeds, which the colony stores in granaries.',
@@ -244,7 +247,7 @@ export const CASTES: Record<string, CasteDef> = {
   }),
   // ---- Eciton burchellii (army ant; claude/army-ants plan Step 1) ----
   eciton_minor: C({
-    id: 'eciton_minor', species: 'eciton', name: 'Worker', role: 'worker', morph: 'eciton_minor', length: 4, speed: 30, hp: 14, bite: 2.0, attackInterval: 0.8,
+    id: 'eciton_minor', species: 'eciton', name: 'Worker', role: 'worker', morph: 'eciton_minor', length: 4, speed: 30, hp: 19, bite: 2.6, attackInterval: 0.8,
     armor: 0, carry: 2, grip: 2, mass: 1, forage: true, dig: false, nurse: true,
     sting: { dps: 1.4, duration: 6, maxStacks: 6, every: 3 },
     cost: 5, devTime: 0.9, pop: 1, cocoon: true, fact: 'Eciton workers have eyes reduced to a single facet and find their way by pheromones. They plug potholes in the trail with their own bodies and link up into living bridges.',
@@ -256,15 +259,15 @@ export const CASTES: Record<string, CasteDef> = {
     cost: 9, devTime: 1.1, pop: 1, cocoon: true, fact: 'Porters are only about 3 % of an Eciton colony, but their long legs leave room to carry big prey slung under the body, and they lead the teams that carry the biggest items.',
   }),
   eciton_media: C({
-    id: 'eciton_media', species: 'eciton', name: 'Media', role: 'soldier', morph: 'eciton_media', length: 8, speed: 27, hp: 40, bite: 5.5, attackInterval: 1.0,
+    id: 'eciton_media', species: 'eciton', name: 'Media', role: 'soldier', morph: 'eciton_media', length: 8, speed: 27, hp: 51.5, bite: 6.2, attackInterval: 1.0,
     armor: 1, carry: 2, grip: 4, mass: 3.2, forage: true, dig: false, nurse: false,
-    sting: { dps: 1.8, duration: 6, maxStacks: 6, every: 3 },
+    sting: { dps: 2.0, duration: 6, maxStacks: 6, every: 3 },
     cost: 14, devTime: 1.25, pop: 1.2, cocoon: true, fact: 'Medias are the mid-sized army-ant workers: they escort the raid columns and help carry large prey in teams.',
   }),
   eciton_major: C({
-    id: 'eciton_major', species: 'eciton', name: 'Soldier', role: 'major', morph: 'eciton_major', length: 11, speed: 24, hp: 70, bite: 11, attackInterval: 1.1,
+    id: 'eciton_major', species: 'eciton', name: 'Soldier', role: 'major', morph: 'eciton_major', length: 11, speed: 24, hp: 92, bite: 11.2, attackInterval: 1.1,
     armor: 2, carry: 0, grip: 6, mass: 7, forage: false, dig: false, nurse: false, hook: ECITON.hook, rage: true,
-    sting: { dps: 2.0, duration: 6, maxStacks: 6, every: 3 },
+    sting: { dps: 2.1, duration: 6, maxStacks: 6, every: 3 },
     cost: 30, devTime: 1.6, pop: 2, cocoon: true, fact: 'Eciton soldiers serve almost only as defence: they stand along the raid columns with their long hooked mandibles open and never carry food.',
   }),
   eciton_queen: C({
@@ -275,8 +278,8 @@ export const CASTES: Record<string, CasteDef> = {
   // ---- Formica plagiaria (fictional custom colony) ----
   plagiaria_worker: C({
     id: 'plagiaria_worker', species: 'plagiaria', name: 'Worker', role: 'worker', morph: 'plagiaria_worker', length: 6.5, speed: 22,
-    hp: 20, bite: 3, attackInterval: 0.9, armor: 1, carry: 3, grip: 2, mass: 2, forage: true, dig: true, nurse: true,
-    acid: { range: 10, damage: 2.5, cooldown: 3.5 },
+    hp: 18, bite: 2.6, attackInterval: 0.9, armor: 0.3, carry: 3, grip: 2, mass: 2, forage: true, dig: true, nurse: true,
+    acid: { range: 10, damage: 1.5, cooldown: 5 },
     cost: 9, devTime: 1.1, pop: 1, cocoon: true,
     fact: 'Fictional species modelled on Formica sanguinea, a real ant that raids other nests for brood and raises it as its workforce.',
   }),
@@ -291,8 +294,8 @@ export const CASTES: Record<string, CasteDef> = {
     id: 'nasute_worker', species: 'nasutitermes', name: 'Worker', role: 'worker', morph: 'termite_worker', termite: 'worker',
     length: 4.2, // model kit v2.2 (was 5.5); drawn male 3.9 / female 4.5 by `variant`
     speed: 12.8, // × 0.8
-    hp: 11.2, // × 0.7 (females +10 %)
-    bite: 0.87, attackInterval: 1.0, // 0.87 dps = × 0.3, last resort only
+    hp: 20, // (balance pass 2026-11-02: was × 0.7 of the black garden ant worker; workers of every species now fight about equally for their cost)
+    bite: 2.4, attackInterval: 1.0, // (was 0.87: they still only bite back, never pick a fight)
     armor: 0, carry: 3, grip: 1, mass: 0.9, forage: true, dig: true, nurse: true,
     cost: 6, devTime: 1, pop: 1, cocoon: false,
     fact: 'Nasutitermes workers are blind, creamy and soft; the dark wood they have eaten shows through the abdomen. Large workers are female, small ones male.',
@@ -300,7 +303,7 @@ export const CASTES: Record<string, CasteDef> = {
   nasute_soldier: C({
     id: 'nasute_soldier', species: 'nasutitermes', name: 'Nasute', role: 'soldier', morph: 'termite_nasute', termite: 'nasute', mount: 'none',
     length: 5, speed: 13.6, // × 0.85
-    hp: 12.8, // × 0.8
+    hp: 12, // (balance pass 2026-11-02: was 12.8)
     bite: 0.3, attackInterval: 1.2, armor: 0, carry: 2, grip: 0.6, mass: 0.8, forage: true, dig: false, nurse: false, // gathers like an ant soldier (user note 2026-10-25)
     // the ramping glue stream: range 5 body lengths; damage per tick comes from NASUTE.ramp (sim/termites.ts)
     acid: { range: 5 * NASUTE.ramp.rangeBodyLengths, damage: 0, cooldown: 0, kind: 'ramp' }, threat: 0.3,
@@ -310,8 +313,8 @@ export const CASTES: Record<string, CasteDef> = {
   nasute_major: C({
     id: 'nasute_major', species: 'nasutitermes', name: 'Major', role: 'major', morph: 'termite_major', termite: 'major', mount: 'large',
     length: 6.5, speed: 12, // × 0.75
-    hp: 48, // × 3
-    bite: 4.33, attackInterval: 1.0, // 4.33 dps = × 1.5
+    hp: 76, // (balance pass 2026-11-02: was 48)
+    bite: 5.6, attackInterval: 1.0, // (was 4.33)
     armor: 1, carry: 3, grip: 3, mass: 3, forage: true, dig: false, nurse: false, threat: 1.5, // gathers like an ant soldier (user note 2026-10-25)
     cost: 21, devTime: 1.8, pop: 1, cocoon: false,
     fact: 'Gameplay caste borrowed from dimorphic nasutes such as N. longinasus: a bigger, broader, darker head with a short, thick nasus for ramming and point-blank glue.',
@@ -338,8 +341,8 @@ export const CASTES: Record<string, CasteDef> = {
     id: 'rhy_worker', species: 'rhynchotermes', name: 'Worker', role: 'worker', morph: 'termite_rhy_worker', termite: 'worker',
     length: 5.8, // larger than the soldier
     speed: 12.8, // × 0.8
-    hp: 12, // × 0.75
-    bite: 0.87, attackInterval: 1.0, // 0.87 dps = × 0.3, last resort only
+    hp: 21, // (balance pass 2026-11-02: was × 0.75)
+    bite: 2.4, attackInterval: 1.0, // (was 0.87: they still only bite back)
     armor: 0, carry: 3, grip: 1, mass: 1, forage: true, dig: true, nurse: true,
     cost: 6, devTime: 1, pop: 1, cocoon: false,
     fact: 'Sickle-jaw workers are stout, blind and soft, with a transparent abdomen full of dark leaf litter and a whitish spot (the fontanelle) on the head.',
@@ -347,7 +350,7 @@ export const CASTES: Record<string, CasteDef> = {
   rhy_soldier: C({
     id: 'rhy_soldier', species: 'rhynchotermes', name: 'Sickle-jaw', role: 'soldier', morph: 'termite_rhy_soldier', termite: 'sickle',
     length: 4.5, speed: 14.4, // × 0.9
-    hp: 12.8, // × 0.8
+    hp: 22, // (balance pass 2026-11-02: was 12.8; wins one on one, loses in groups: it holds one enemy at a time)
     bite: SICKLE.grab.biteDamage, attackInterval: SICKLE.acid.freeTargetBiteInterval, armor: 0, carry: 2, grip: 3, mass: 0.8,
     forage: true, dig: false, nurse: false, threat: 0.6, // gathers like an ant soldier (user note 2026-10-25)
     cost: 10, devTime: 1.4, pop: 1, cocoon: false,
@@ -371,18 +374,18 @@ export const CASTES: Record<string, CasteDef> = {
   }),
   // ---- Hell ants (Haidomyrmecinae; docs/creatures/hell-ant.md) ----
   hell_worker: C({
-    id: 'hell_worker', species: 'hell', name: 'Worker', role: 'worker', morph: 'hell_worker', length: 5, speed: 19, hp: 20, bite: 2.2, attackInterval: 1.0,
+    id: 'hell_worker', species: 'hell', name: 'Worker', role: 'worker', morph: 'hell_worker', length: 5, speed: 19, hp: 18, bite: 2.1, attackInterval: 1.0,
     armor: 0, carry: 2.5, grip: 1.5, mass: 1.3, forage: true, dig: true, nurse: true,
     sting: { dps: 1.0, duration: 5, maxStacks: 6 },
-    snap: { kind: 'pin', windup: 0.6, dps: 3.5, hold: 4, cooldown: 5, maxPreyMass: 2.2 },
+    snap: { kind: 'pin', windup: 0.6, dps: 3.0, hold: 4, cooldown: 5, maxPreyMass: 2.2 },
     cost: 8, devTime: 1.2, pop: 1, cocoon: true,
     fact: 'Modelled on Ceratomyrmex ellenbergeri (4.5–5.9 mm, Kachin amber, ~99 Ma). One fossil was caught holding a cockroach-relative nymph between its upswung jaws and horn. Colours are a reconstruction.',
   }),
   hell_soldier: C({
-    id: 'hell_soldier', species: 'hell', name: 'Soldier', role: 'soldier', morph: 'hell_soldier', length: 6.5, speed: 17, hp: 58, bite: 4, attackInterval: 1.1,
+    id: 'hell_soldier', species: 'hell', name: 'Soldier', role: 'soldier', morph: 'hell_soldier', length: 6.5, speed: 17, hp: 49, bite: 3.9, attackInterval: 1.1,
     armor: 2, carry: 3, grip: 3, mass: 2.8, forage: true, dig: true, nurse: false, threat: 1.2,
-    sting: { dps: 1.4, duration: 6, maxStacks: 6 },
-    snap: { kind: 'impale', windup: 0.8, burst: 14, dps: 2, hold: 3, cooldown: 7, maxPreyMass: 3.5 },
+    sting: { dps: 1.25, duration: 6, maxStacks: 6 },
+    snap: { kind: 'impale', windup: 0.8, burst: 12.5, dps: 1.8, hold: 3, cooldown: 7, maxPreyMass: 3.5 },
     cost: 18, devTime: 1.5, pop: 1, cocoon: true,
     fact: 'Gameplay caste modelled on Linguamyrmex: its flattened clypeal paddle had a dense core, probably reinforced with sequestered metals. No real hell ant had a soldier caste, and impaling is the game’s exaggeration of “pin and perhaps puncture”.',
   }),
@@ -395,15 +398,15 @@ export const CASTES: Record<string, CasteDef> = {
   }),
   // ---- Aurimyrmex fulgurans (fictional "Saiy-Ants"; docs/creatures/aurimyrmex-fulgurans.md) ----
   aurimyrmex_worker: C({
-    id: 'aurimyrmex_worker', species: 'aurimyrmex', name: 'Worker', role: 'worker', morph: 'saiy_worker', length: 6, speed: 22, hp: 22, bite: 2.4, attackInterval: 1.0,
-    armor: 0.5, carry: 4, grip: 2, mass: 1.8, forage: true, dig: true, nurse: true,
+    id: 'aurimyrmex_worker', species: 'aurimyrmex', name: 'Worker', role: 'worker', morph: 'saiy_worker', length: 6, speed: 22, hp: 16, bite: 1.9, attackInterval: 1.0,
+    armor: 0.2, carry: 4, grip: 2, mass: 1.8, forage: true, dig: true, nurse: true,
     surge: true, // no acid (the user's design): Saiy-Ants fight with bites only
     cost: 8, devTime: 1.15, pop: 1, cocoon: true,
     fact: 'Fictional species. Inspired by the golden tortoise beetle, whose shell can switch between metallic gold and dull red when it is disturbed.',
   }),
   aurimyrmex_soldier: C({
-    id: 'aurimyrmex_soldier', species: 'aurimyrmex', name: 'Soldier', role: 'soldier', morph: 'saiy_soldier', length: 9, speed: 19, hp: 85, bite: 6, attackInterval: 1.2,
-    armor: 2.5, carry: 5, grip: 4, mass: 4.5, forage: true, dig: true, nurse: false, threat: 2,
+    id: 'aurimyrmex_soldier', species: 'aurimyrmex', name: 'Soldier', role: 'soldier', morph: 'saiy_soldier', length: 9, speed: 19, hp: 68, bite: 5.2, attackInterval: 1.2,
+    armor: 2, carry: 5, grip: 4, mass: 4.5, forage: true, dig: true, nurse: false, threat: 2,
     surge: true,
     cost: 20, devTime: 1.5, pop: 1, cocoon: true,
     fact: 'A major worker: the same body plan with a broad, square head full of jaw muscle. Carpenter ant majors crush seeds and enemies alike.',
@@ -415,15 +418,15 @@ export const CASTES: Record<string, CasteDef> = {
   }),
   // ---- Termants (Chimaeromyrmex termitoides, fictional ant–termite hybrid; claude/termyrms plan Step 1) ----
   termant_worker: C({
-    id: 'termant_worker', species: 'termant', name: 'Worker', role: 'worker', morph: 'termant_worker', length: 5, speed: 24, hp: 18, bite: 1.8, attackInterval: 1,
-    armor: 1, carry: 4, grip: 2, mass: 1.6, forage: true, dig: true, nurse: true, wood: true,
+    id: 'termant_worker', species: 'termant', name: 'Worker', role: 'worker', morph: 'termant_worker', length: 5, speed: 24, hp: 19, bite: 2.2, attackInterval: 1,
+    armor: 0.5, carry: 4, grip: 2, mass: 1.6, forage: true, dig: true, nurse: true, wood: true,
     acid: { range: 9, damage: 2, cooldown: 6, kind: 'opener' },
     cost: 8, devTime: 1.2, pop: 1, cocoon: false,
     fact: 'Termant workers eat wood like termites and hunt like ants; the dark patch in the abdomen is wood in the gut.',
   }),
   termant_soldier: C({
-    id: 'termant_soldier', species: 'termant', name: 'Soldier', role: 'soldier', morph: 'termant_soldier', length: 7, speed: 20, hp: 42, bite: 3.2, attackInterval: 1.1,
-    armor: 2, carry: 2, grip: 3, mass: 3.2, forage: true, dig: false, nurse: false, glue: TERMANT.glue,
+    id: 'termant_soldier', species: 'termant', name: 'Soldier', role: 'soldier', morph: 'termant_soldier', length: 7, speed: 20, hp: 55.5, bite: 4.35, attackInterval: 1.1,
+    armor: 1.5, carry: 2, grip: 3, mass: 3.2, forage: true, dig: false, nurse: false, glue: TERMANT.glue,
     cost: 20, devTime: 1.6, pop: 1, cocoon: false,
     fact: "The soldier's frontal pore sprays sticky glue, like a nasute termite's — but it still bites, like an ant.",
   }),
@@ -508,8 +511,8 @@ export const SPECIES: Record<SpeciesId, SpeciesDef> = {
     id: 'termant', common: SPECIES_DISPLAY_NAME.termant ?? TERMANT_FALLBACK_NAME, scientific: 'Chimaeromyrmex termitoides', queen: 'termant_queen', king: 'termant_king', fictional: true,
     castes: ['termant_worker', 'termant_soldier'],
     ratio: { termant_worker: 0.85, termant_soldier: 0.15 }, startWorkers: 7, eggInterval: 5.5, color: '#b07a42',
-    blurb: 'Custom colony (fictional). Half ant, half termite: eats the other species and raises their castes as its own, and digests dead wood. Ants and termites are only distantly related and cannot hybridize or share genes like this.',
-    traits: ['Steals castes from eaten enemies (3 at a time)', 'Soldier glue burst; worker formic acid', 'Eats wood as well as prey', 'A king beside the one queen'],
+    blurb: 'Custom colony (fictional). Half ant, half termite: eats the other species and raises their castes as its own, and eats everything else too: dead wood, leaf litter and leaves share its one food store. Ants and termites are only distantly related and cannot hybridize or share genes like this.',
+    traits: ['Steals castes from eaten enemies (3 at a time)', 'Soldier glue burst; worker formic acid', 'Eats every food: wood, leaves, prey (one store)', 'A king beside the one queen'],
   },
 };
 

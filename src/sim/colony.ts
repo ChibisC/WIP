@@ -282,7 +282,7 @@ function developNest(w: World, c: Colony, extra: number): void {
     for (let i = 0; i < n; i++) plan.push({ type: 'brood', caste: cs });
   }
   plan.push({ type: 'food' }, { type: 'food' });
-  // an AI colony's head start follows its builder's layout: one caste (or the stores) per chamber (CHANGE_PLAN §22)
+  // an AI colony's head start follows its builder's layout: one caste (or the stores) per chamber (CHANGE_PLAN §23)
   if (c.ai) return developChambers(w, c, plan);
   // BFS outward over diggable hexes from the existing floor.
   const queen = c.tiles.find((t) => t.type === 'queen')!;

@@ -1,5 +1,5 @@
 import { casteMount } from '../sim/creatures/climb';
-import { GameSession, casteTint } from '../game/session';
+import { GameSession } from '../game/session';
 import { CASTES, SPECIES, SpeciesId } from '../sim/species';
 import { CREATURES } from '../sim/creatures/kinds';
 import { ARENA } from '../sim/balance';
@@ -7,6 +7,7 @@ import { TEAM_NAMES, arenaUnitOk } from '../sim/arena';
 import { STANCE, arenaOf } from '../sim/arenaState';
 import { TEAM_COLORS } from '../render/game/teamRings';
 import { ICONS, antSilhouette } from './icons';
+import { casteFigureColour } from '../render/casteLook';
 import { button, el, esc, shield } from './dom';
 
 /** Species in the roster, in the menu's order. */
@@ -133,7 +134,7 @@ export class ArenaPanel {
     if (this.tab === 'ants') {
       for (const cd of Object.values(CASTES)) {
         if (cd.species !== this.species || !arenaUnitOk('ant:' + cd.id)) continue;
-        const tint = '#' + casteTint(cd.id).multiplyScalar(1.35).getHexString();
+        const tint = casteFigureColour(cd.id);
         entry('ant:' + cd.id, antSilhouette(cd.role, tint), cd.name, `${cd.length} mm · ${cd.hp} hp`, `<b>${esc(SPECIES[cd.species].common)} — ${esc(cd.name)}</b>${cd.length} mm · health ${cd.hp} · bite ${cd.bite}${cd.acid ? ' · formic acid' : ''}${cd.sting ? ' · venom sting' : ''}<br>${casteMount(cd.id) === 'small' ? 'Mounts large and huge creatures' : casteMount(cd.id) === 'large' ? 'Mounts huge creatures only' : 'Cannot mount creatures'}<br>${esc(cd.fact)}<br><i>Click: ${s.arenaCount} for Team ${TEAM_NAMES[s.arenaTeam]}. Shift+click: choose for Place.</i>`);
       }
     } else {

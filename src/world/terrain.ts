@@ -5,6 +5,8 @@ import { mapDef } from '../maps';
 import { shapeBox, shapeDist, smooth01 } from './mapShapes';
 import { SurfaceLayout, surfaceLayout } from './surfaceLayout';
 import { MapObstacle, mapObstacles, twigLine } from './mapScatter';
+import { LayerFields, RAMP_SIDE, applyLayers, cliffs } from './layers';
+import { LAYERS } from '../sim/balance';
 
 /** Map styles drive generation of relief, ground cover and props. */
 export type MapStyle = 'meadow' | 'forest' | 'formicarium' | 'sandy' | 'riverbank';
@@ -205,10 +207,12 @@ export class Terrain {
     }
     // Flatten a rim so the playable edge reads cleanly.
     for (const op of p.sculpt) this.applySculpt(op, false);
-    if (map) this.shapeMap(map);
     // authored maps: their pebbles, twigs, fungi and ferns are placed from the map id (world/mapScatter.ts) once the
     // walls, walkways and water are in, and block like the props of a generated map (grass and leaves stay render-only)
+    if (map) this.shapeMap(map);
     else this.placeProps(rng);
+    // layered ground: the banks and ramp sides too steep to walk, once every height is final (world/layers.ts)
+    if (this.layers) cliffs(this.layers, this, this.heights);
     this.rebuildOverlay();
     this.rebuildWater();
     if (map) this.mapObs = mapObstacles(this, map);
@@ -221,6 +225,8 @@ export class Terrain {
 
   /** An authored map's obstacles (world/mapScatter.ts): blocked, drawn by render/mapDecor.ts. */
   mapObs: MapObstacle[] = [];
+  /** layered ground (world/layers.ts): levels, banks, ramps and the cliffs that block; null on flat maps */
+  layers: LayerFields | null = null;
 
   /**
    * An authored map's ground: height brushes, then each water body's basin (the bed sinks below
@@ -241,6 +247,8 @@ export class Terrain {
         const d = shapeDist(b.shape, x, y);
         this.heights[k] += b.amount * (d <= 0 ? 1 : 1 - smooth01(d / b.falloff));
       });
+    // terraces, hollows and the ramps between them (before the water: a stream cuts into whatever level it runs on)
+    if (map.layers?.length || map.ramps?.length) this.layers = applyLayers(map, this, this.heights, this.coverW, this.cover);
     const BANK = 24;
     // inside any water body (a stream's bank must not dam the pond it flows into)
     const inWater = (x: number, y: number) => {
@@ -490,6 +498,9 @@ export class Terrain {
       each(shapeBox(wl.shape, 0), (k, x, y) => {
         if (shapeDist(wl.shape, x, y) < 0) this.blocked[k] = 1;
       });
+    // layered ground: banks and the steep sides of ramps block like walls
+    const L = this.layers;
+    if (L) for (let k = 0; k < nx * ny; k++) if (L.cliff[k]) this.blocked[k] = 1;
     // (user 2026-11-01: walk round pebbles, twigs and other obstacles, on flat ground)
     for (const o of this.mapObs) {
       if (o.kind === 'twig') {
@@ -688,6 +699,35 @@ export class Terrain {
   /** Passable for walking creatures. */
   passable(x: number, y: number): boolean {
     return !this.isBlocked(x, y) && !this.isWater(x, y);
+  }
+
+  /** Layered ground: the level (0 base, 1, 2 terraces, −1 hollows) the ground at (x, y) stands at; 0 on flat maps. */
+  levelAt(x: number, y: number): number {
+    const L = this.layers;
+    if (!L) return 0;
+    const i = Math.min(this.nx - 1, Math.max(0, Math.round(x / this.res)));
+    const j = Math.min(this.ny - 1, Math.max(0, Math.round(y / this.res)));
+    return L.level[j * this.nx + i];
+  }
+
+  /** Layered ground: on a ramp's walkway (its core, not its sides)? */
+  onRamp(x: number, y: number): boolean {
+    const L = this.layers;
+    if (!L) return false;
+    const i = Math.min(this.nx - 1, Math.max(0, Math.round(x / this.res)));
+    const j = Math.min(this.ny - 1, Math.max(0, Math.round(y / this.res)));
+    const r = L.ramp[j * this.nx + i];
+    return r !== 0 && r < RAMP_SIDE;
+  }
+
+  /**
+   * Speed share for walking from (x, y) along the unit heading (ux, uy): `LAYERS.upSpeed` going up a ramp, else 1
+   * (down a ramp, and everywhere on flat maps, full speed).
+   */
+  slopeSpeed(x: number, y: number, ux: number, uy: number): number {
+    if (!this.layers || !this.onRamp(x, y)) return 1;
+    const up = this.walkHeight(x + ux * 2, y + uy * 2) - this.walkHeight(x, y);
+    return up > 0.3 ? LAYERS.upSpeed : 1;
   }
 
   inBounds(x: number, y: number, margin = 0): boolean {

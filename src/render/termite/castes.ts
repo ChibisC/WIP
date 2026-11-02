@@ -173,20 +173,31 @@ export interface CasteParams {
   clypeus?: number;
   /** abdomen outline: 'plump' (default), 'oval' (rounded egg) or 'long' (long slim cigar) */
   abdShape?: 'plump' | 'oval' | 'long';
+  // ---- realism rework 2026-11-02 (CHANGE_PLAN §22.3): the nasute castes only, so the sickle-jaws are unchanged ----
+  /**
+   * soft-cuticle realism: breathing (abdomen pulse amplitude), wet glint (clearcoat strength on the soft cuticle),
+   * eggs seen through the queen's membrane (0..1); also turns on the irregular gut, sunken segment membranes and
+   * the deeper subsurface light
+   */
+  real?: { breathe: number; glint: number; eggs?: number };
+  /** radial segments of the antennae at LOD0 (default the LOD's 6; realism: 10, so the beads are round) */
+  antRadial?: number;
 }
 
+// (realism rework, review round 3: "candy-orange striped abdomen with bright white segment lines", "white pin hairs" —
+// the body a little less saturated, the membranes close to it, the hairs a translucent gold)
 const SOLDIER_COLORS: CastePalette = {
   head: '#4A1E12',
   headHi: '#7A3420',
   headTip: '#8C4A26',
-  body: '#D98A3E',
-  tergite: '#B9652A',
-  inter: '#F0B472',
+  body: '#CC8A48',
+  tergite: '#B06632',
+  inter: '#DCA466',
   gut: '#3E2617',
   leg: '#DE9D52',
   legMid: '#F2C27A',
   legJoint: '#B87534',
-  hair: '#F3E6CC',
+  hair: '#D2BC92',
   mandible: '#6A3018',
   mandibleTip: '#3A160D',
 };
@@ -209,6 +220,8 @@ const ROYAL_COLORS: CastePalette = {
   wingScale: '#24160C',
 };
 
+// realism rework 2026-11-02 (CHANGE_PLAN §22.3; nasutitermes.md §11): every nasute caste has `real` (soft-cuticle realism)
+// and more fine hairs at the tergite margins (6–10 per tergite in the specimens); the sickle-jaw castes do not
 export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
   nasute: {
     id: 'nasute',
@@ -225,7 +238,10 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     ocelli: false,
     wingScales: false,
     antenna: { beads: 13, lengthFrac: 0.4, radius: 0.064 },
-    setae: { head: 6, perTergite: 5 },
+    setae: { head: 6, perTergite: 7 },
+    real: { breathe: 0.022, glint: 0.45 },
+    legRadial: 10,
+    antRadial: 10,
     legs: { length: [0.37, 0.39, 0.46], radius: 0.092, spread: 1.0 },
     clearance: 0.32,
     colors: SOLDIER_COLORS,
@@ -249,7 +265,10 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     ocelli: false,
     wingScales: false,
     antenna: { beads: 13, lengthFrac: 0.36, radius: 0.062 },
-    setae: { head: 6, perTergite: 5 },
+    setae: { head: 6, perTergite: 7 },
+    real: { breathe: 0.02, glint: 0.45 },
+    legRadial: 10,
+    antRadial: 10,
     legs: { length: [0.36, 0.38, 0.44], radius: 0.1, spread: 1.0 },
     clearance: 0.38,
     colors: { ...SOLDIER_COLORS, head: '#3A160D', headHi: '#5E2716', headTip: '#7A3E20' },
@@ -275,7 +294,10 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     wingScales: false,
     // 14 antennal articles (Fontes-style morphometrics of N. corniger workers), short
     antenna: { beads: 14, lengthFrac: 0.3, radius: 0.058 },
-    setae: { head: 0, perTergite: 4 },
+    setae: { head: 0, perTergite: 6 },
+    real: { breathe: 0.028, glint: 0.55 },
+    legRadial: 10,
+    antRadial: 10,
     legs: { length: [0.27, 0.29, 0.33], radius: 0.088, spread: 1.0 },
     clearance: 0.2,
     colors: {
@@ -283,14 +305,16 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
       head: '#BF9455',
       headHi: '#C9A062',
       headTip: '#D9B87F',
-      body: '#EED6A6',
-      tergite: '#D6A866',
-      inter: '#F7E8C8',
+      // (realism rework: the live workers in the photos are creamy amber, not white — a little deeper and warmer)
+      body: '#DDBD88',
+      tergite: '#BF8E50',
+      inter: '#F2E0BA',
       gut: '#3E2617',
-      leg: '#F1E3C2',
-      legMid: '#F8EED8',
-      legJoint: '#DCC59A',
-      hair: '#F6EAD2',
+      // (still pale cream, but warm and translucent like the photos' legs)
+      leg: '#DEC18C',
+      legMid: '#EAD3A6',
+      legJoint: '#C4A066',
+      hair: '#D8C49C',
       mandible: '#A8743C',
       mandibleTip: '#4A2410',
       suture: '#D4B47E', // faint: barely paler than the head
@@ -318,15 +342,18 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     ocelli: true,
     wingScales: true,
     antenna: { beads: 15, lengthFrac: 0.34, radius: 0.05 },
-    setae: { head: 0, perTergite: 0 },
+    setae: { head: 0, perTergite: 3 },
+    real: { breathe: 0.018, glint: 0.4 },
     legs: { length: [0.36, 0.4, 0.46], radius: 0.07, spread: 1.0 },
     clearance: 0.3,
-    colors: ROYAL_COLORS,
+    // (review round 1: "drawn white seam lines" — the king's intersegmental membranes a darker, duller tan)
+    colors: { ...ROYAL_COLORS, inter: '#8C7254' },
     translucency: 0.12,
     gut: 0.0,
     headCoat: 0.7,
     gait: { amplitude: 0.3, lift: 0.36 },
-    legRadial: 8,
+    legRadial: 10,
+    antRadial: 10,
   },
   queen: {
     id: 'queen',
@@ -343,6 +370,7 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     wingScales: true,
     antenna: { beads: 15, lengthFrac: 0.34, radius: 0.05 },
     setae: { head: 0, perTergite: 0 },
+    real: { breathe: 0.01, glint: 0.6, eggs: 1 },
     legs: { length: [0.36, 0.4, 0.46], radius: 0.07, spread: 1.0 },
     clearance: 0.3,
     // plates (tergite) and sternites (inter) of the stretched abdomen
@@ -351,8 +379,11 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     gut: 0.0,
     headCoat: 0.7,
     gait: { amplitude: 0.2, lift: 0.2 },
-    physogastric: { length: 22, width: 4.9, height: 4.9, pleat: 0.17, age: 0.5 },
-    legRadial: 8,
+    // (realism rework: the royal-chamber photos show a pale tan, grey-ivory membrane, not saturated yellow — the same
+    // ages, the kit's colours desaturated; the default age stays 0.5)
+    physogastric: { length: 22, width: 4.9, height: 4.9, pleat: 0.17, age: 0.5, plate: 0.55, ivory: '#EEE6D6', amber: '#D8BE90', honey: '#BF9866' },
+    legRadial: 10,
+    antRadial: 10,
   },
   larva: {
     id: 'larva',
@@ -369,6 +400,9 @@ export const NASUTE_CASTES: Record<NasuteCasteId, CasteParams> = {
     wingScales: false,
     antenna: { beads: 13, lengthFrac: 0.26, radius: 0.055 },
     setae: { head: 0, perTergite: 0 },
+    real: { breathe: 0.03, glint: 0.4 },
+    legRadial: 10,
+    antRadial: 10,
     legs: { length: [0.22, 0.24, 0.27], radius: 0.085, spread: 0.85 },
     clearance: 0.12,
     colors: {

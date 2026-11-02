@@ -108,7 +108,7 @@ export const FOREST_FLOOR: MapDef = {
     4: [[2, 3, 4, 5]],
     10: [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]],
   },
-  /** team layouts (CHANGE_PLAN §22; picked with tools/team-sites.ts, checked on docs/maps/team-sites/forestFloor.png) */
+  /** team layouts (CHANGE_PLAN §23; picked with tools/team-sites.ts, checked on docs/maps/team-sites/forestFloor.png) */
   teamSets: { '2v2': [[2, 5], [3, 4]], '2v1': [[2, 5], [4]], '3v1': [[2, 5, 6], [0]], '2v2v2': [[0, 9], [2, 5], [3, 4]], '2v1v1': [[3, 4], [0], [1]], '3v3': [[2, 5, 6], [3, 4, 7]] },
   zones: [
     { kind: 'food', shape: { circle: [976.8, 623.2], r: 60 }, weight: 2, name: 'fallen fruit' },

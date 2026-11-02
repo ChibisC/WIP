@@ -204,6 +204,15 @@ export interface Ant {
   cd: number;
   /** special ability cooldown (acid) */
   cd2: number;
+  /**
+   * Story director (sim/story/director.ts): the actor this ant plays (its index in the level's cast; absent when it
+   * is not directed), its place along a path (`dirW`, loops `dirL`) and a wander goal (`dirX`, `dirY`).
+   */
+  dirA?: number;
+  dirW?: number;
+  dirL?: number;
+  dirX?: number;
+  dirY?: number;
   /** marker index 0..4 the ant's group is out at, −1 = home */
   marker: number;
   /** nest entrance index used */
@@ -528,6 +537,8 @@ export interface ColonyStats {
   peakPop: number;
   /** enemy brood carried off in raids */
   stolen: number;
+  /** dead wood a Termant colony has carried into its store (the story's "gather wood" goal) */
+  wood?: number;
 }
 
 export interface Colony {
@@ -575,7 +586,7 @@ export interface Colony {
   /** AI build planner memory. Kept in state so snapshots and rejoining clients match (colonyAI). */
   /**
    * The builder brain (sim/colonyAI.ts). A chamber: its centre, radius (1: a 7-hex rosette, 2: a 19-hex hexagon), the
-   * one tile type it holds (brood: one caste). Saves from before CHANGE_PLAN §22 have `kind` only (radius 1, any caste).
+   * one tile type it holds (brood: one caste). Saves from before CHANGE_PLAN §23 have `kind` only (radius 1, any caste).
    */
   aiBuild?: {
     t: number;
@@ -594,7 +605,7 @@ export interface Colony {
   ecRaid?: EcRaid[];
   /** army ants: living bridges and pothole plugs on the raid trails (eciton.ts) */
   ecLinks?: EcLink[];
-  /** Termants (termants.ts): gene samples and stolen castes, the wood store */
+  /** Termants (termants.ts): gene samples and stolen castes; `wood` is only an old save's wood store (turned into food) */
   genome?: Genome;
   wood?: number;
   /** AI forage planner memory (colonyAI). */
@@ -610,13 +621,13 @@ export interface Colony {
     cooldown: number;
     defending: boolean;
     clearT: number;
-    /** a joint raid (CHANGE_PLAN §22): the ally whose raid this colony joined (its own id when it leads one) */
+    /** a joint raid (CHANGE_PLAN §23): the ally whose raid this colony joined (its own id when it leads one) */
     joined?: number;
     /** a joint raid's gathering point near the target and when to go anyway (s); `go` once everyone is there */
     gather?: { x: number; y: number; until: number; go: boolean };
   };
   /**
-   * The ally brain (sim/warAI.ts, CHANGE_PLAN §22): the ally being helped (−1 none), since when, how many ants were sent,
+   * The ally brain (sim/warAI.ts, CHANGE_PLAN §23): the ally being helped (−1 none), since when, how many ants were sent,
    * the stage (0 marker on the ally's entrance, 1 on the threat), how long the threat has been clear, the cooldown after
    * helping, how many times help started or stopped, the allies' deaths last seen, and the enemy colony last seen
    * attacking the team (and when).
@@ -815,7 +826,7 @@ export interface SimSettings {
   statMul: number;
   enemyStatMul: number;
   aggression: number;
-  /** AI colonies' level (CHANGE_PLAN §22): 0 Easy, 1 Normal (undefined), 2 Hard, 3 Brutal — chamber sizes and upgrades */
+  /** AI colonies' level (CHANGE_PLAN §23): 0 Easy, 1 Normal (undefined), 2 Hard, 3 Brutal — chamber sizes and upgrades */
   aiLevel?: number;
   foodRespawn: number;
   /**

@@ -36,7 +36,7 @@ const ALONE = '#f2e6c8';
 
 /**
  * A canvas `size` px on its long side showing the map from above. With `teams` (a team per colony; colony `you` is
- * yours; CHANGE_PLAN §22) and a team of two or more, each colony's site is ringed in its team's colour, allies joined by
+ * yours; CHANGE_PLAN §23) and a team of two or more, each colony's site is ringed in its team's colour, allies joined by
  * a line and the sites nobody gets dimmed — the placement the match will use (world/teamSites.ts).
  */
 export function mapPreview(def: MapDef, size = 132, teams?: Array<number | undefined>, you = 0): HTMLCanvasElement {

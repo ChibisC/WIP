@@ -1,5 +1,5 @@
 /**
- * Team layouts on the five maps (CHANGE_PLAN §22; world/teamSites.ts): for every common team shape, the sites each
+ * Team layouts on the five maps (CHANGE_PLAN §23; world/teamSites.ts): for every common team shape, the sites each
  * team gets (the map's authored set, else the search's), the land routes to the nearest ally and enemy, and the
  * fairness numbers. Writes docs/maps/team-sites.md and, for the sketches, docs/maps/team-sites/sites.json
  * (python3 tools/team-sites-sketch.py draws them on docs/maps/sketches).
@@ -28,7 +28,7 @@ export const SHAPES: Array<{ name: string; teams: Array<number | undefined> }> =
 
 const S = BALANCE.aiAllies.sites;
 const md: string[] = [];
-md.push('# Team sites (CHANGE_PLAN §22)');
+md.push('# Team sites (CHANGE_PLAN §23)');
 md.push('');
 md.push(`Made by \`npx vite-node tools/team-sites.ts\` from the maps and \`world/teamSites.ts\`. Routes are land routes on the map's hex layout between site entrances (water and walls go round). Limits: an ally within **${S.allyMaxRoute * 100} %** of the map's width, every enemy at least **${S.enemyMinRoute * 100} %** away, no enemy site between two allies. Fairness: each team's mean route to the nearest food zone, to the map's middle and to its nearest enemy (the spread between teams is what the search keeps small); in an uneven match the smaller side gets the nearer food. "authored" = the map file's \`teamSets\`, "search" = picked by the search. Sketches with the teams in colour: \`docs/maps/team-sites/\`.`);
 md.push('');

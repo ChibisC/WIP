@@ -58,11 +58,19 @@ export type SimEvent =
   | { t: 'food'; colony: number; amount: number }
   | { t: 'leafCut'; x: number; y: number }
   | { t: 'splash'; x: number; y: number; space: number }
-  | { t: 'message'; text: string; kind: 'info' | 'warn' | 'good' | 'narrator' | 'researcher'; /** the colony it is for (shown only to that colony's player); none = everyone */ colony?: number }
+  | { t: 'message'; text: string; kind: 'info' | 'warn' | 'good' | 'narrator' | 'researcher'; /** the colony it is for (shown only to that colony's player); none = everyone */ colony?: number; /** story captions: the narration key (voice lines hook on it) */ key?: string }
+  /**
+   * Story levels (sim/story): a short in-engine shot to play (camera keys: a story point name, [x, y] or { actor },
+   * or 'flight' for the map's opening flight), or a music mood. Client-side only: the simulation never waits on it.
+   */
+  | { t: 'story'; what: 'shot' | 'music'; shot?: StoryShotData; mood?: string }
   | { t: 'invasion'; colony: number }
   /** a player command was applied (ok) or ignored (why) — clears the issuer's pending feedback */
   | { t: 'command'; player: number; seq: number; type: string; ok: boolean; why?: string }
   | { t: 'wave'; index: number; total: number; label: string };
+
+/** A story shot as data (sim/story/types.ts `Shot`), kept structural here so core does not import the sim. */
+export type StoryShotData = 'flight' | { keys: Array<{ at: string | readonly [number, number] | { actor: string }; dist: number; yaw: number; t: number; pitch?: number }> };
 
 export class EventBus {
   private queue: SimEvent[] = [];

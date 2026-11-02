@@ -562,7 +562,7 @@ function digDisc(w: World, cid: number, qc: number, r: number): number[] {
   run(w9, 600);
   const c9 = w9.colony(0)!;
   check('builder colony grows (10 min; soldiers cost more; mean of 3 seeds)', (c.living + c8.living + c9.living) / 3 >= 22, `${c.living}, ${c8.living} and ${c9.living} — ${summary(w, 0)}`);
-  // EotU-style chambers (CHANGE_PLAN §22; first version 2026-10-25): 7-hex rooms (19 from mid game), each holding one tile
+  // EotU-style chambers (CHANGE_PLAN §23; first version 2026-10-25): 7-hex rooms (19 from mid game), each holding one tile
   // type (brood: one caste), joined by tunnels that carry only highways (tests/aiAllies.ts checks the rest)
   const discOf = (r: { q: number; r?: number }) => {
     const hs = [r.q];

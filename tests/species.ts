@@ -228,7 +228,7 @@ function rampRun(phases: number[], targetCaste = 'formica_soldier'): { dmg: numb
   if (fem) applyLevel(fem, 1);
   check('termite workers: male and female sizes, females +10 % health', ws.every((a) => a.variant === 0 || a.variant === 1) && (!fem || near(fem.maxHp, casteOf(fem.caste).hp * 1.1)));
   check('ramp caste uses the acid system with kind "ramp" and 5 body lengths of range', CASTES.nasute_soldier.acid?.kind === 'ramp' && CASTES.nasute_soldier.acid.range === 25);
-  check('brood costs: × 1 / 1.8 / 3.5 wood and × 1 / 1.3 / 1.8 time of the baseline worker', BALANCE.castes.nasute_soldier.build === 18 && BALANCE.castes.nasute_major.build === 35 && near(BALANCE.castes.nasute_major.grow, 32.4));
+  check('brood costs: × 1 / 2.2 / 3.5 wood and × 1 / 1.3 / 1.8 time of the baseline worker (nasute × 2.2: balance pass 2026-11-02)', BALANCE.castes.nasute_soldier.build === 22 && BALANCE.castes.nasute_major.build === 35 && near(BALANCE.castes.nasute_major.grow, 32.4));
   // a termite colony gathers wood with a forage marker
   const w3 = createWorld({ seed: 9, style: 'meadow', width: 700, depth: 700, food: 1, colonies: [{ species: 'nasutitermes', player: true, ai: true }] }, new EventBus());
   run(w3, 20 * 240);
