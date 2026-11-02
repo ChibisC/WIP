@@ -60,12 +60,31 @@ function world(seed = 5): World {
   cam.updateMatrixWorld();
   const pos = (x: number, y: number, l: number, o: THREE.Vector3) => o.set(x, l, y);
   bars.update(w, SURFACE, 1, cam, 640, pos, c, null);
-  const meshes = bars.group.children as THREE.InstancedMesh[];
-  const counts = meshes.map((m) => m.count);
-  check('health bars: over every hurt unit — ant, foe, creature — none over a unit at full health', counts[0] === 3 && counts[1] === 3, `${counts[0]} bars (3 hurt units, 1 whole)`);
-  check('level marks: one chevron for level II, two for level III, none for level I', counts[2] === 3 && counts[3] === 3, `${counts[2]} chevrons`);
+  const count = (name: string) => (bars.group.getObjectByName(name) as THREE.InstancedMesh).count;
+  check('health bars: over every hurt unit — ant, foe, creature — none over a unit at full health', count('back') === 3 && count('fill') === 3, `${count('back')} bars (3 hurt units, 1 whole)`);
+  check('level marks: one chevron for level II, two for level III, none for level I', count('chev') === 3 && count('chevBack') === 3, `${count('chev')} chevrons`);
   bars.update(w, SURFACE, 1, cam, 640, pos, c, { kind: 'ant', id: whole.id });
-  check('health bars: … and over the unit being inspected', (bars.group.children[0] as THREE.InstancedMesh).count === 4);
+  check('health bars: … and over the unit being inspected', count('back') === 4);
+  // (22:36: slimmer, more professional) the same size on screen at any zoom, a few pixels thick, and a pale trail of the
+  // health just lost that drains after a moment
+  const bar = bars.group.getObjectByName('fill') as THREE.InstancedMesh;
+  const m = new THREE.Matrix4();
+  const thick = (k: number) => {
+    bar.getMatrixAt(k, m);
+    const e = m.elements;
+    const p = new THREE.Vector3(e[12], e[13], e[14]);
+    return Math.hypot(e[4], e[5], e[6]) * (640 / (2 * Math.tan((cam.fov * Math.PI) / 360))) / cam.position.distanceTo(p);
+  };
+  const px0 = thick(0);
+  cam.position.multiplyScalar(1.6);
+  cam.updateMatrixWorld();
+  bars.update(w, SURFACE, 1, cam, 640, pos, c, null);
+  check('health bars: slim — 3 px thick on screen, near or far', Math.abs(px0 - 3) < 0.05 && Math.abs(thick(0) - 3) < 0.05, `${px0.toFixed(2)} px, ${thick(0).toFixed(2)} px zoomed out`);
+  hurt.hp -= hurt.maxHp * 0.3;
+  bars.update(w, SURFACE, 1, cam, 640, pos, c, null, 0.1);
+  const trailNow = count('trail');
+  for (let k = 0; k < 40; k++) bars.update(w, SURFACE, 1, cam, 640, pos, c, null, 0.05);
+  check('health bars: a hit leaves a pale trail of the health lost, which drains away', trailNow >= 1 && count('trail') === 0, `${trailNow} trail after the hit, ${count('trail')} 2 s later`);
   // (22:04: "titans creatures dont need a healthbar cos it already shows at the top screen anyway")
   const boss = spawnCreature(w, 'stagBeetle', SURFACE, e.sx + 140, e.sy)!;
   boss.hp = boss.maxHp * 0.5;

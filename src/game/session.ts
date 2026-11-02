@@ -1475,7 +1475,7 @@ export class GameSession {
       const owner = w.colony(colonyOfSpace(v.activeNest)) ?? null;
       if (nv) nv.overlay = this.tileOverlay;
       if (nv) nv.update(w, owner, this.player, cam, alpha, realDt, vh, v.observing ? v.observeRig.distance * 3 : v.nestRig.distance, sel, v.time, shown, this.pendingHexes());
-      if (nv) nv.bars.update(w, v.activeNest, alpha, cam, vh, (x, y, l, o) => nv.map.pos(x, y, l, o), this.player, this.inspect);
+      if (nv) nv.bars.update(w, v.activeNest, alpha, cam, vh, (x, y, l, o) => nv.map.pos(x, y, l, o), this.player, this.inspect, realDt);
       if (nv) nv.trail.update(sel, this.trailEnds(sel, v.activeNest, shown), (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.distance, v.time);
       if (nv) nv.hit.update(w, v.activeNest, this.hitboxes, (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.goal.x, v.nestRig.goal.z, v.nestRig.distance * 2);
     } else {
@@ -1508,7 +1508,7 @@ export class GameSession {
       this.surfAnts.update(list, alpha, realDt, cam, this.surfAdapter, vh);
       this.teamRings.update(w, alpha, this.surfHeight);
       this.surfFood.update(w, SURFACE, alpha, this.surfMap, (id) => this.surfAnts.holdOf(id));
-      this.surfBars.update(w, SURFACE, alpha, cam, vh, (x, y, l, o) => this.surfMap.pos(x, y, l, o), this.player, this.inspect);
+      this.surfBars.update(w, SURFACE, alpha, cam, vh, (x, y, l, o) => this.surfMap.pos(x, y, l, o), this.player, this.inspect, realDt);
       this.surfDecor.update(w, this.foodView, (f) => edible(this.player, f));
       if (this.sim.kind === 'worker') {
         const o = this.sim.takeOverlay();

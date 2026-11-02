@@ -1285,3 +1285,10 @@ wood ants' basics were 10 throughout. Notes, and what was done:
   before it was all carried home); the beetle-stack check counts the ants fighting it (a flung ant lands where it
   lands); a rider may wait past its 6 s for a place (30 % of a party rides); the mixed-squad under-pass check is two
   fights (seeds 4 and 5; seeds 3–8 give 0–3 workers under a major).
+
+### 2026-11-01 (night, 2) — Slimmer, more professional health bars
+- User 22:36: "make healthbars more slimmer and professional looking". `render/game/healthBars.ts`: sized on screen, not
+  with the zoom — 3 px thick in a 1 px dark frame (82 % opaque), 0.75 × the unit's drawn length between 20 and 56 px,
+  5 px above the unit; the fill lighter along its top (vertex shading); a hit leaves a pale trail of the health just
+  lost, which waits 0.35 s and drains at 0.8 of the bar a second; chevrons 7 px with a thin dark edge, 3 px left of the
+  bar. Tests: 3 px thick near and far; the trail appears and drains.
