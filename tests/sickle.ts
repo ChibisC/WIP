@@ -177,6 +177,12 @@ check('lunge: the grab resolves 6 ticks in (round(0.58 × 0.55 s × 20))', LUNGE
   const p = arena(w);
   const v = dummy(w, 1, big.id, p.x + 8, p.y, 1e6);
   v.task = 'idle';
+  // (a dummy: it never bites back, and stands where it was put. Since 2026-11-01 (one entrance per nest) the random
+  // draws fall otherwise: the big leafcutter soldier decapitated the soldier within a second, or edged away out of its
+  // squirting range every half second)
+  v.cd = 1e9;
+  const vx = v.x;
+  const vy = v.y;
   // (a little further back since 2026-11-01: right under the big ant's head — it crouches under now — its feet pushed
   // the soldier out of range now and then, restarting the ramp)
   const s = soldierAt(w, p.x - 1.5, p.y, v);
@@ -188,6 +194,9 @@ check('lunge: the grab resolves 6 ticks in (round(0.58 × 0.55 s × 20))', LUNGE
     if (v.heldBy === s.id || s.state === AS.Snap) grabbed = true;
     maxRamp = Math.max(maxRamp, s.rampN ?? 0);
     if (v.state !== AS.Idle && v.state !== AS.Attack) v.state = AS.Idle;
+    v.cd = 1e9;
+    v.x = v.px = vx;
+    v.y = v.py = vy;
   }
   check(`size limit: a ${big.length} mm ${big.id} (over 2 × ${L} mm) is not grabbed; it is bitten and squirted while free`, !grabbed && maxRamp > 20 && v.hp < v.maxHp, `ramp ticks ${maxRamp}`);
   // out of range: the ramp resets
@@ -299,8 +308,9 @@ check('lunge: the grab resolves 6 ticks in (round(0.58 × 0.55 s × 20))', LUNGE
 {
   // the guard line (user notes 2026-10-25): along the route the workers walk, wide, spare soldiers spread along it
   // (seed 25 since 2026-11-01: with pebbles and twigs blocking, seed 19's route came out nearly straight — no bends to
-  // follow)
-  const r = guardScene(24, 30, 25, 75);
+  // follow; seed 27 since the one-entrance rework: a crowd leaving spreads over the anthill's three holes, and on seed 25
+  // the ones from the far holes walked their first stretch outside the line)
+  const r = guardScene(24, 30, 27, 75);
   check(
     'guard line: half the sickle-jaws guard and half gather; the guards spread along the whole route, none piled at the entrance',
     r.guards >= 13 && r.gatherers >= 13 && r.atEntrance === 0 && r.arcTo - r.arcFrom > r.trail * 0.6 && r.maxGap < r.trail * 0.2,

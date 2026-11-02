@@ -58,7 +58,7 @@ export class Grass {
   mesh: THREE.InstancedMesh;
   material: THREE.MeshStandardMaterial;
 
-  constructor(terrain: Terrain, density: number, margin = 320, extra: readonly DecorClump[] = []) {
+  constructor(terrain: Terrain, density: number, margin = 320, extra: readonly DecorClump[] = [], clear: ReadonlyArray<{ x: number; y: number; r: number }> = []) {
     const rng = new Rng(terrain.params.seed + 555);
     const blades: Array<{ x: number; z: number; h: number; w: number; rot: number; lean: number; c: number; reed?: boolean; dry?: boolean }> = [];
     const style = terrain.params.style;
@@ -125,6 +125,12 @@ export class Grass {
         if (terrain.map?.biome === 'savanna') for (let k = from; k < blades.length; k++) blades[k].dry = true;
         else if ((terrain.map?.biome === 'forest' || terrain.map?.biome === 'rainforest') && rng.chance(0.75)) blades.length = from;
       }
+    }
+    // (no grass growing through the anthills)
+    if (clear.length) {
+      const keep = blades.filter((b) => !clear.some((c) => (b.x - c.x) ** 2 + (b.z - c.y) ** 2 < c.r * c.r));
+      blades.length = 0;
+      blades.push(...keep);
     }
     const geo = bladeGeometry();
     this.material = new THREE.MeshStandardMaterial({

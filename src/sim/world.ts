@@ -1,4 +1,4 @@
-import { migrateColonyEntrances, normalizeEntrance } from './entrances';
+import { upgradeWorldEntrances } from './entrances';
 import { Rng } from '../core/rng';
 import { EventBus } from '../core/events';
 import { Terrain } from '../world/terrain';
@@ -78,21 +78,19 @@ export class World {
       this.gridFlows.set(space, new NestFlow(g));
     }
     state.nests = nests;
-    state.version = Math.max(2, state.version ?? 1);
     for (const c of state.colonies) {
       if (c.team === undefined) c.team = c.id;
       c.hexSpeed = null; // a cache (and JSON turns typed arrays into plain objects)
-      // entrance tunnels, spots and throughput fields (older saves: sim/entrances.ts)
-      const g = this.grids.get(nestSpace(c.id));
-      if (g) migrateColonyEntrances(this, c, g);
-      else for (const e of c.entrances) normalizeEntrance(e, state.time);
     }
-    for (const cv of state.caves) for (const e of cv.entrances) normalizeEntrance(e, state.time);
     this.surfFlow = new SurfaceFlow(this.terrain);
     this.phero = new Pheromones(this.terrain.width, this.terrain.depth, Math.max(1, state.colonies.length));
     this.antHashSurface = new SpatialHash(this.terrain.width, this.terrain.depth, 8, 4096);
     this.foodHash = new SpatialHash(this.terrain.width, this.terrain.depth, 16, 1024);
     this.creatureHash = new SpatialHash(this.terrain.width, this.terrain.depth, 24, 256);
+    // version 3 (2026-11-01): one 7-hex entrance per nest, three surface holes per anthill (older saves: sim/entrances.ts;
+    // a binary snapshot attaches its grids after this, and restoreWorld upgrades it then)
+    upgradeWorldEntrances(this);
+    state.version = Math.max(3, state.version ?? 1);
     this.reindex();
   }
 
@@ -391,7 +389,7 @@ export class World {
 
 export function emptyState(seed: number, terrainParams: SimState['terrain']): SimState {
   return {
-    version: 2,
+    version: 3,
     tick: 0,
     time: 0,
     seed,
