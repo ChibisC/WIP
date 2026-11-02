@@ -33,6 +33,8 @@ UNITS = {
     "nasute_king": ("termite_king", 8.36, ""),
     "nasute_queen": ("termite_queen", 25.4, ""),  # (head and thorax close-ups: see OVERRIDE)
     "nasute_presoldier": ("termite_nasute", 5.0, "tan=0"),
+    # the review's calibration anchor B: the game's previous best realism ant
+    "anchor_fire": ("fire_minor", 2.96, ""),
     # the sickle-jaw termites share the kit: rendered before and after to prove they did not change
     "sickle_worker": ("termite_rhy_worker", 6.14, ""),
     "sickle_soldier": ("termite_rhy_soldier", 5.4, ""),
@@ -61,7 +63,7 @@ OVERRIDE = {
     ("sickle_queen", "34"): "cam=34&dist=50&tx=-9",
 }
 DOF = {"side": 0.5, "top": 0.4, "front": 0.7, "34": 1.0, "macro": 1.3, "jaw": 0.8}
-units = [u for u in os.environ.get("UNITS", ",".join(k for k in UNITS if not k.startswith("sickle"))).split(",") if u]
+units = [u for u in os.environ.get("UNITS", ",".join(k for k in UNITS if not k.startswith(("sickle", "anchor")))).split(",") if u]
 views = [v for v in os.environ.get("VIEWS", "side,34,macro").split(",") if v]
 lights = [l for l in os.environ.get("LIGHTS", "overcast,forest").split(",") if l]
 
