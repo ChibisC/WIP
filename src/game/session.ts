@@ -1059,6 +1059,11 @@ export class GameSession {
     this.issue({ type: 'recall' });
   }
 
+  /** Ask the allies for help (CHANGE_PLAN §22): AI allies with fighters to spare come if this nest is in danger. */
+  callHelp(): void {
+    this.issue({ type: 'callHelp' });
+  }
+
   /** Concede a multiplayer match (the queen dies; the others play on, or the last one standing wins). */
   surrender(): void {
     if (this.net && this.player.alive) this.issue({ type: 'surrender' });

@@ -633,6 +633,10 @@ export interface Colony {
     died: Record<number, number>;
     foe: number;
     foeT: number;
+    /** why the last help ended: home (threatened itself), done, fallen, losses, time */
+    why?: string;
+    /** the ally last helped: not helped again until its danger has cleared once (one go per threat, no flip-flopping) */
+    block?: number;
   };
   /** a human player's call for help to its allies (command `callHelp`): active until this game time (s) */
   helpCall?: number;

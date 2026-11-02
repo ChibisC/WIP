@@ -572,8 +572,11 @@ export const BALANCE = {
     lossWeight: 400,
     /** a creature's weight per point of health × its bite rate */
     creatureWeight: 1,
-    /** help only above this danger, and not an ally whose defenders already have this × the attackers' weight */
-    assistMinDanger: 300,
+    /**
+     * help only above this danger (one Red wood soldier weighs about 240: two at an ally's entrance, unopposed, are
+     * about 1000), and not an ally whose defenders already have this × the attackers' weight
+     */
+    assistMinDanger: 500,
     allyWinningRatio: 1.5,
     /** help only if it can get there in this long (s; the land route over the fighters' speed), unless the queen is in danger */
     assistMaxTravel: 90,
@@ -584,7 +587,7 @@ export const BALANCE = {
     assistOvermatch: 1.3,
     /** stop helping: clear (danger under clearDanger) for clearFor s, losses over assistMaxLoss of those sent, or after
      * assistMaxTime s; then a cooldown (s) */
-    clearDanger: 120,
+    clearDanger: 150,
     clearFor: 8,
     assistMaxLoss: 0.6,
     assistMaxTime: 240,
@@ -592,11 +595,11 @@ export const BALANCE = {
     /** inside the ally's nest: the marker moves from its entrance to the threat once this share of the helpers is in */
     insideShare: 0.5,
     /** a raid gives way to helping when the ally's danger is over this (or its queen is in danger, or it is the same enemy) */
-    raidValue: 1500,
+    raidValue: 4000,
     /** a human player's call for help (command callHelp): this long (s), its danger × callBoost and at least callMin */
     callHelpSec: 45,
     callBoost: 2,
-    callMin: 400,
+    callMin: 800,
     /** joint raids: an AI ally may join a raid this young (s) with at least joinMinFighters; everyone gathers gatherDist
      * mm short of the target's holes and goes when gatherShare of each one's fighters are there, or after gatherMax s */
     joinWindow: 30,

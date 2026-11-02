@@ -56,6 +56,7 @@ export class MarkerPanel {
   private collapseBtn: HTMLButtonElement;
   private aggroBtn: HTMLButtonElement;
   private abilityBtn: HTMLButtonElement;
+  private helpBtn: HTMLButtonElement;
   private arrived: { gid: number; from: DOMRect } | null = null;
 
   constructor(private s: GameSession) {
@@ -70,6 +71,7 @@ export class MarkerPanel {
     acts.append(
       button('sq', ICONS.recall, '<b>Recall all</b>Bring every group back to the home column to defend the nest (<span class="k">R</span>).', () => s.recall()),
       (this.aggroBtn = button('sq', ICONS.attack, '', () => s.toggleAggression())),
+      (this.helpBtn = button('sq', ICONS.callHelp, '', () => s.callHelp())),
       (this.abilityBtn = button('sq', abilityIcon(s.player.species), `<b>${esc(ab.name)}</b>${esc(ab.desc)}<br>Cooldown ${ab.cooldown} s.`, () => {
         const why = s.useAbility();
         if (why) s.onEvent?.({ t: 'message', text: why, kind: 'warn' });
@@ -205,6 +207,13 @@ export class MarkerPanel {
     this.aggroBtn.dataset.tip = aggressive
       ? '<b>Stance: attack</b>Ants attack any enemy they find. Click to switch to <i>defend only</i>.'
       : '<b>Stance: defend only</b>Away from the nest, ants fight only when attacked or alarmed. Click to switch to <i>attack</i>.';
+    // call allies for help (CHANGE_PLAN §22): only with allies; lit while the call lasts
+    const allies = s.world.s.colonies.some((o) => o.id !== c.id && o.alive && o.team === c.team);
+    this.helpBtn.hidden = !allies;
+    const calling = (c.helpCall ?? 0) > s.world.s.time;
+    this.helpBtn.classList.toggle('on', calling);
+    const helpTip = `<b>Call your allies</b>Ask your allies for help: for ${BALANCE.aiAllies.callHelpSec} s, AI allies count any danger to your nest higher and send fighters they can spare (never leaving their own nest open).${calling ? '<br>Called.' : ''}`;
+    if (this.helpBtn.dataset.tip !== helpTip) this.helpBtn.dataset.tip = helpTip;
     const ab = abilityOf(c);
     const ready = c.abilityCd <= 0;
     this.abilityBtn.classList.toggle('dim', !ready);
