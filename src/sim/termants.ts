@@ -6,6 +6,7 @@ import { datan2, dcos, dhypot, dsin } from './dmath';
 import { steerTo, turnToward } from './movement';
 import { completeDelete, placeTile, recomputeGroups, recomputeTileCaps, tileAnts, tileAt } from './tiles';
 import { tilePoint } from './colony';
+import { kingWander } from './kings';
 
 /**
  * Termants, Chimaeromyrmex termitoides (fictional ant–termite hybrid; claude/termyrms package; numbers in TERMANT,
@@ -338,10 +339,14 @@ export function termantKingSpot(w: World, q: Ant, out: { x: number; y: number; h
 
 const kp = { x: 0, y: 0, h: 0 }; // det-ok: scratch
 
-/** The king keeps to his place beside the queen (he fights through the usual combat, then comes back). */
+/**
+ * The king (user note 2026-11-02): no nest duties; he walks round the queen in her chamber (kings.ts) and fights
+ * intruders through the usual combat, then comes back.
+ */
 export function termantKing(w: World, a: Ant, c: Colony, dt: number): boolean {
   if (a.space !== nestSpace(c.id)) return false;
   const q = w.antById.get(c.queen);
+  if (q && q.state !== AS.Dead && q.space === a.space && kingWander(w, a, c, q, dt, true)) return true;
   if (q && q.state !== AS.Dead && q.space === a.space) termantKingSpot(w, q, kp);
   else {
     // no queen: he stays in the royal chamber

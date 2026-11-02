@@ -1157,6 +1157,23 @@ export const FLOOD = {
 };
 
 /**
+ * Kings — the Termants' and the termites' (sim/kings.ts; user note 2026-11-02): no nest duties; each walks round the queen
+ * inside her chamber (the queen's tiles) and fights intruders there. A new waypoint every `legS` s, `stepRad` further
+ * round her (`jitterRad` either way), all the way round and back; the ring's radius is `ringQ` × her length + `ringK` ×
+ * his; he walks at `speed` × his own and, waiting, grooms her `groomShare` of the time.
+ */
+export const KING = {
+  legS: 9,
+  stepRad: 0.75,
+  jitterRad: 0.3,
+  ringQ: 0.55,
+  ringK: 0.7,
+  speed: 0.55,
+  arrive: 0.8,
+  groomShare: 0.3,
+};
+
+/**
  * Nest entrances (sim/entrances.ts; claude/maps/02-spec-nest-entrances, user spec 2026-11-01 "one wide underground
  * entrance, three surface holes per anthill"; DESIGN.md "Entrances"). Each nest has one entrance: a 7-hex flower at the
  * nest's edge underground, and three holes in its anthill on the surface, all leading into it, always open.

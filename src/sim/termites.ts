@@ -1,4 +1,5 @@
 import { World } from './world';
+import { kingWander } from './kings';
 import { Ant, AS, Colony, POSE, SURFACE, nestSpace } from './types';
 import { BALANCE, NASUTE, SICKLE } from './balance';
 import { casteOf } from './species';
@@ -265,7 +266,7 @@ export function termiteTick(w: World, a: Ant, c: Colony, dt: number): boolean {
   return false;
 }
 
-/** The king: leashed to the royal chamber; bites intruders inside it; grooms the queen. */
+/** The king: leashed to the royal chamber; bites intruders inside it; otherwise walks round the queen. */
 function kingTick(w: World, a: Ant, c: Colony, dt: number): boolean {
   a.stun = 0;
   const home = nestSpace(c.id);
@@ -311,6 +312,9 @@ function kingTick(w: World, a: Ant, c: Colony, dt: number): boolean {
     a.v = 0;
     return true;
   }
+  // he walks round her in the royal chamber (user note 2026-11-02: no nest duties; kings.ts), clear of her long body
+  if (kingWander(w, a, c, q, dt, false, (x, y) => distToQueenBody(q, x, y) > cd.length * 0.45)) return true;
+  // (nowhere to walk: his old place at her side)
   kingSpot(w, q, a.caste, spot);
   if (a.state !== AS.Idle) {
     a.state = AS.Idle; // a worker feeding him leaves him as he was
