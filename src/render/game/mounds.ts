@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { World } from '../../sim/world';
-import { nestToSurface } from '../../sim/colony';
+import { anthillCentre } from '../../sim/entrances';
 import { Rng } from '../../core/rng';
 import { patchDapple } from '../shaderPatch';
 import { InstancedPool } from './instancedPool';
@@ -97,16 +97,10 @@ export class SurfaceMounds {
       if (c.species !== 'solenopsis' || !c.alive || !w.nest(c.id)) continue;
       const queens = c.tiles.filter((t) => t.type === 'queen');
       if (!queens.length) continue;
-      const g = w.nest(c.id)!;
-      let nx = 0;
-      let ny = 0;
-      for (const t of queens) {
-        const p = g.hexCenter(t.q);
-        nx += p.x / queens.length;
-        ny += p.y / queens.length;
-      }
-      const s = nestToSurface(w, c, nx, ny);
-      const r = 15 + Math.min(16, Math.sqrt(Math.max(0, c.living)) * 1.7);
+      // the dome over the nest, its three small holes at its edge (no opening in the middle: user spec 2026-11-01)
+      const s = anthillCentre(c.entrances, { x: 0, y: 0 });
+      const far = Math.max(...c.entrances.map((e) => Math.hypot(e.sx - s.x, e.sy - s.y)));
+      const r = Math.max(far * 1.08, 15 + Math.min(16, Math.sqrt(Math.max(0, c.living)) * 1.7));
       let m = this.mounds.find((x) => x.colony === c.id);
       if (!m) {
         m = { colony: c.id, x: s.x, y: s.y, r, h: r * 0.3, mesh: null, builtR: 0 };

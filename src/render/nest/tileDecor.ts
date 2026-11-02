@@ -173,9 +173,19 @@ export class TileDecor {
     }
     g.entrances.forEach((q, i) => {
       const p = g.hexCenter(q);
-      this.beams[i].position.set(p.x, 0, p.y);
-      // no daylight down a plugged or fallen-in hole
-      this.beams[i].visible = !this.terrain.isShut(q);
+      const b = this.beams[i];
+      const f = g.flowers[i];
+      if (f && f.length > 1) {
+        // a nest's wide entrance: one broad soft shaft falling across the whole flower, leaning in from its top edge
+        const top = g.hexCenter(g.tunnels[i]?.[0] ?? q);
+        b.position.set(p.x + (top.x - p.x) * 0.35, 0, p.y + (top.y - p.y) * 0.35);
+        b.scale.set(2.5, 1, 2.5);
+      } else {
+        b.position.set(p.x, 0, p.y);
+        b.scale.set(1, 1, 1);
+      }
+      // no daylight down a fallen-in entrance
+      b.visible = !this.terrain.isShut(q);
     });
     for (let i = g.entrances.length; i < this.beams.length; i++) this.beams[i].visible = false;
     // cool daylight by day, a faint blue moonlight at night
@@ -183,7 +193,7 @@ export class TileDecor {
     this.beamMat.uniforms.uCol.value.setRGB(0.92 - night * 0.6, 0.95 - night * 0.55, 1.0 - night * 0.35);
     // Tile contents change slowly: rebuild a few times a second or when tiles change.
     const day = w.s.night < 0.5;
-    const key = `${c.tileVersion}|${Math.round(c.food)}|${Math.round(c.fungus)}|${day}|${c.tiles.reduce((s, t) => s + (t.type === 'carton' ? Math.round(t.hp ?? 0) : 0), 0)}|${g.tunnels.length}`;
+    const key = `${c.tileVersion}|${Math.round(c.food)}|${Math.round(c.fungus)}|${day}|${c.tiles.reduce((s, t) => s + (t.type === 'carton' ? Math.round(t.hp ?? 0) : 0), 0)}|${g.tunnels.length}|${g.flowers.map((f) => f.length).join(',')}`;
     if (key === this.lastKey && this.tick % 20 !== 0) return;
     this.lastKey = key;
     for (const pool of [this.crumbs, this.seeds, this.fungus, this.aphids, this.needles, this.clods, this.sunBrood]) pool.begin();
@@ -234,9 +244,10 @@ export class TileDecor {
   }
 
   /**
-   * Loose bits along the sides of every entrance tunnel, matching the species' surface entrance: soil
-   * pellets everywhere, pine needles fallen in (wood ants), leaf scraps (leafcutters), carton flakes
-   * (nasute termites, Termants), pale frass (Gilded Ants), granular worked soil (fire ants).
+   * Loose bits round the sides of the entrance, matching the species' anthill: soil pellets everywhere, pine needles
+   * fallen in (wood ants), leaf scraps (leafcutters), carton flakes (nasute termites, Termants), pale frass (Gilded Ants),
+   * granular worked soil (fire ants). A nest's flower: round its rim, where the soil walls flare out (most at its top
+   * edge, under the holes; its middle worn smooth); a cave's tunnel: along its sides.
    */
   private tunnelBits(g: NestGrid, c: Colony): void {
     const sz = g.R / 7;
@@ -249,7 +260,34 @@ export class TileDecor {
       solenopsis: { pool: this.clods, cols: [0x8a6640, 0xa88458, 0x6e5034], n: 8, s: [1.0, 1.8] },
     };
     const sp = extra[c.species];
+    g.flowers.forEach((f, fi) => {
+      if (f.length < 2) return;
+      const mid = g.hexCenter(f[0]);
+      const ed = g.flowerEdges(fi);
+      for (const q of f.slice(1)) {
+        const k = ed.top.includes(q) ? 0 : ed.inner.includes(q) ? 2 : 1;
+        const rng = new Rng(q * 131 + fi * 17 + 11);
+        const ctr = g.hexCenter(q);
+        const away = Math.atan2(ctr.y - mid.y, ctr.x - mid.x);
+        const put = (pool: InstancedPool, col: number, size: number) => {
+          // (the outer side of the hex, toward the walls)
+          const a = away + rng.range(-1.3, 1.3);
+          const r = g.R * rng.range(0.3, 0.9);
+          const x = ctr.x + Math.cos(a) * r;
+          const z = ctr.y + Math.sin(a) * r;
+          this.p.set(x, this.terrain.heightAt(x, z) + size * 0.25, z);
+          this.e.set(rng.range(-0.5, 0.5), rng.range(0, 6.28), rng.range(-0.5, 0.5));
+          this.q.setFromEuler(this.e);
+          this.s.setScalar(size);
+          this.m.compose(this.p, this.q, this.s);
+          pool.add(this.m, this.c.setHex(col));
+        };
+        for (let i = 0; i < 8 - k * 2; i++) put(this.crumbs, [0x3a2a1c, 0x5a4430, 0x4a3828][i % 3], rng.range(0.8, 1.5) * sz);
+        if (sp) for (let i = 0; i < sp.n - k * 2; i++) put(sp.pool, sp.cols[i % sp.cols.length], rng.range(sp.s[0], sp.s[1]) * sz);
+      }
+    });
     g.tunnels.forEach((t, ti) => {
+      if ((g.flowers[ti]?.length ?? 0) > 1) return;
       t.forEach((q, k) => {
         const rng = new Rng(q * 131 + ti * 17 + 7);
         const ctr = g.hexCenter(q);

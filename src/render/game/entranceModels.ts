@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { World } from '../../sim/world';
 import { Colony, Entrance } from '../../sim/types';
+import { anthillCentre, refuseSpot } from '../../sim/entrances';
 import { SpeciesId } from '../../sim/species';
 import { Rng, valueNoise2 } from '../../core/rng';
 import { patchDapple } from '../shaderPatch';
@@ -9,20 +10,21 @@ import { textures } from '../textures';
 import { buildGalleryTubeGeometry, createCartonMaterial } from '../termite/carton';
 
 /**
- * Species-specific surface entrances (claude/maps/02-spec-nest-entrances §2.1; research notes in
- * docs/creatures/entrances.md). Render-only: every hole is drawn from the simulation's entrance
- * list, so it always sits where the ants go in.
+ * Species-specific anthills (claude/maps/02-spec-nest-entrances §2.1; user spec 2026-11-01 "three surface holes per
+ * anthill"; research notes in docs/creatures/entrances.md). Render-only: every hole is drawn from the simulation's
+ * entrance list (a colony's three holes, sim/entrances.ts), so it always sits where the ants go in.
  *
- * Each entrance gets an apron mesh round its hole: a crater rim, collar or plain lip of the
- * species' soil, damp and darker toward a black opening, fading into the ground at its edge.
- * Some species also raise one structure over the whole nest: a red wood ant's thatched dome
- * (holes in its flanks), a nasute termite's carton nest with covered galleries, a carpenter-like
- * Gilded Ant's rotting stump with frass, an army ant bivouac of clinging bodies, a leafcutter's
- * pale refuse dump. Loose details (soil pellets, needles, leaf bits, sawdust) are merged per
- * entrance. Everything walkable adds to `height()`, which the surface renderers add to the
- * terrain so ants climb rims and domes instead of passing through them.
+ * Each colony gets one structure over its three holes, centred between them, so they read as one nest: a black garden
+ * ant's (and a Termant's, carton-reinforced) low crater of crumbly soil with the holes in its rampart, a red wood ant's
+ * thatched dome (holes in its flanks), a leafcutter's wide bare-soil mound with its refuse dump beside it, a nasute
+ * termite's carton nest (openings at its base) with covered galleries, a Gilded Ant's rotting stump with a root out to
+ * each hole, an army ant bivouac of clinging bodies, a hell ant's minimal soil ring in leaf litter (a reconstruction);
+ * fire ants' worked-soil dome is render/game/mounds.ts. Each hole gets an apron mesh: a crater rim, collar or plain lip
+ * of the species' soil, damp and darker toward a black opening, fading into the ground at its edge. Loose details (soil
+ * pellets, needles, leaf bits, sawdust) are merged. Everything walkable adds to `height()`, which the surface renderers
+ * add to the terrain so ants climb rims and domes instead of passing through them.
  *
- * Meshes are rebuilt only when an entrance appears, grows a size step, is plugged or caves in.
+ * Meshes are rebuilt only when the anthill grows a size step or caves in.
  */
 
 type Look = 'lasius' | 'formica' | 'atta' | 'solenopsis' | 'eciton' | 'plagiaria' | 'hell' | 'aurimyrmex' | 'termant' | 'nasute' | 'sickle';
@@ -77,7 +79,7 @@ const PAL: Record<Look, Palette> = {
   sickle: { dry: 0x523c2c, damp: 0x281c12, pellet: 0x5a4232 },
 };
 
-/** Hole radius (mm) of a main entrance per look; extras are 0.8×. */
+/** Hole radius (mm) per look (an anthill's three holes alike). */
 const HOLE: Record<Look, number> = { lasius: 1.6, formica: 2.0, atta: 3.2, solenopsis: 1.2, eciton: 2.4, plagiaria: 1.8, hell: 1.4, aurimyrmex: 1.9, termant: 2.0, nasute: 2.0, sickle: 1.1 };
 
 function smooth(t: number): number {
@@ -112,6 +114,8 @@ interface Mass {
   /** profile exponent: 1 = round dome, >1 = steeper sides with a flatter top */
   k: number;
   seed: number;
+  /** a crater instead of a dome: its rampart's crest at this fraction of r, the floor inside it a third as high */
+  ring?: number;
 }
 
 function massHeight(m: Mass, x: number, y: number): number {
@@ -125,6 +129,11 @@ function massHeight(m: Mass, x: number, y: number): number {
   const rr = m.r * (1 + ang * (0.06 * Math.sin(a * 5 + m.seed) + 0.04 * Math.sin(a * 9 + m.seed * 2)));
   const t = Math.sqrt(d2) / rr;
   if (t >= 1) return 0;
+  if (m.ring) {
+    const u = t < m.ring ? (m.ring - t) / m.ring : (t - m.ring) / (1 - m.ring);
+    const crest = 1 - smooth(u);
+    return m.h * (t < m.ring ? 0.33 + 0.67 * crest : crest) * (1 + 0.08 * Math.sin(a * 7 + m.seed));
+  }
   return m.h * Math.pow(Math.max(0, 1 - Math.pow(t, 2 / m.k)), 0.5 * m.k) * (1 - ang * 0.04 + ang * 0.04 * Math.sin(a * 11 + m.seed));
 }
 
@@ -201,7 +210,7 @@ export class SurfaceEntrances {
       const dug = g ? g.dugHexCount() : 30;
       const size = Math.round(Math.min(0.8, Math.max(0, (dug - 30) / 120)) * 10) / 10;
       const living = Math.round(Math.min(1, Math.sqrt(Math.max(0, c.living)) / 18) * 5) / 5;
-      const sig = `${look}|${size}|${living}|${c.entrances.map((e) => `${e.sx.toFixed(1)},${e.sy.toFixed(1)},${e.shut ? 1 : 0}${(e.work ?? 0) > 0 ? 'w' : ''},${Math.round((e.fall ?? 0) * 4)}`).join(';')}`;
+      const sig = `${look}|${size}|${living}|${c.entrances.map((e) => `${e.sx.toFixed(1)},${e.sy.toFixed(1)},${Math.round((e.fall ?? 0) * 4)}`).join(';')}`;
       const old = this.built.get(key);
       if (old && old.sig === sig) continue;
       if (old) this.dispose(old);
@@ -233,38 +242,66 @@ export class SurfaceEntrances {
   private build(w: World, c: Colony, look: Look, s: number, living: number, sig: string, ground: (x: number, y: number) => number): Built {
     const b: Built = { sig, objs: [], holes: [], masses: [] };
     const fallC = Math.max(...c.entrances.map((e) => e.fall ?? 0));
-    const ctr = { x: c.nx, y: c.ny };
-    // ---- the nest structure first (holes sit on it)
+    // the anthill: its three holes round its centre (sim/entrances.ts), one structure over them all
+    const ctr = anthillCentre(c.entrances, { x: 0, y: 0 });
     const details: THREE.BufferGeometry[] = [];
     const massGeos: THREE.BufferGeometry[] = [];
     const cartonGeos: THREE.BufferGeometry[] = [];
     const rng = new Rng(c.id * 7919 + 101);
-    const far = Math.max(...c.entrances.map((e) => Math.hypot(e.sx - ctr.x, e.sy - ctr.y)));
-    const e0 = c.entrances[0];
-    const out0 = Math.atan2(e0.sy - ctr.y, e0.sx - ctr.x);
-    if (look === 'formica') {
-      // a thatched dome over the nest; the entrance holes open in its flanks
-      const R = Math.max(16 + living * 14, far * 1.3);
-      const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: R * 0.42 * (1 - 0.6 * fallC), k: 1.15, seed: c.id * 3 + 1 };
-      b.masses.push(m);
-      massGeos.push(massMesh(m, ground, (x, y, h, t) => thatchColour(x, y, h, t, m.seed)));
-      details.push(...thatch(m, ground, rng, Math.round(700 + R * 30)));
-      // trails worn bare, radiating out from its foot
-      for (const g of trails(ctr.x, ctr.y, R, 5, rng, ground)) {
+    const far = Math.max(4, ...c.entrances.map((e) => Math.hypot(e.sx - ctr.x, e.sy - ctr.y)));
+    const outs = c.entrances.map((e) => Math.atan2(e.sy - ctr.y, e.sx - ctr.x));
+    const pal = PAL[look];
+    const addTrails = (R: number) => {
+      // trails worn bare, running out from the foot past each hole
+      for (const g of trails(ctr.x, ctr.y, R, outs.length, rng, ground, outs)) {
         const tm = new THREE.Mesh(g, this.apronMat);
         tm.receiveShadow = true;
         tm.renderOrder = 1;
         b.objs.push(tm);
         this.group.add(tm);
       }
+    };
+    if (look === 'formica') {
+      // a thatched dome over the nest; the three holes open in its flanks
+      const R = Math.max(16 + living * 14, far * 1.3);
+      const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: R * 0.42 * (1 - 0.6 * fallC), k: 1.15, seed: c.id * 3 + 1 };
+      b.masses.push(m);
+      massGeos.push(massMesh(m, ground, (x, y, h, t) => thatchColour(x, y, h, t, m.seed)));
+      details.push(...thatch(m, ground, rng, Math.round(700 + R * 30)));
+      addTrails(R);
+    } else if (look === 'lasius' || look === 'plagiaria' || look === 'termant') {
+      // a low crater of crumbly worked soil, the three holes in its rampart (Termants: carton-reinforced)
+      const R = far * 1.5;
+      const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: (1.1 + living * 1.1) * (look === 'termant' ? 1.25 : 1) * (1 - 0.6 * fallC), k: 1, seed: c.id * 23 + 9, ring: far / R };
+      b.masses.push(m);
+      massGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed)));
+      const at = (x: number, y: number) => ground(x, y) + massHeight(m, x, y);
+      details.push(...pellets(ctr.x, ctr.y, R * 0.97, Math.round((260 + living * 260) * (1 - 0.6 * fallC)), rng, at, [pal.pellet, pal.dry, pal.damp, 0x6a5644], 0.3, 0.75));
+      if (look === 'termant') details.push(...pellets(ctr.x, ctr.y, R * 0.8, Math.round(40 + living * 40), rng, at, [0x2e2016, 0x3b2a1e, 0x4a3626], 0.45, 0.9, far * 0.5));
+    } else if (look === 'atta') {
+      // a wide bare-soil mound, its three big craters on the flanks; a pale refuse dump beside it (where the dead and the
+      // waste are dropped: entrances.ts refuseSpot)
+      const R = far * 1.7;
+      const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: (2.5 + living * 4) * (1 - 0.6 * fallC), k: 0.8, seed: c.id * 29 + 4 };
+      b.masses.push(m);
+      massGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed)));
+      const rs = refuseSpot(c, { x: 0, y: 0 });
+      const d: Mass = { x: rs.x, y: rs.y, r: 6 + living * 6, h: 1.4 + living * 1.6, k: 0.8, seed: c.id * 19 + 7 };
+      b.masses.push(d);
+      massGeos.push(massMesh(d, ground, (x, y, h, t) => refuseColour(x, y, t)));
+      details.push(...pellets(d.x, d.y, d.r * 0.95, Math.round(160 + d.r * 12), rng, (x, y) => ground(x, y) + massHeight(d, x, y), [0x9a8c74, 0x7a6e5a, 0xb0a288, 0x5a5040, 0x6a6a4a], 0.4, 1.0));
+      addTrails(R);
     } else if (look === 'nasute') {
-      // a dark carton nest round the main entrance, covered galleries running off along the ground
-      const R = 9 + living * 9;
-      const m: Mass = { x: e0.sx + Math.cos(out0) * R * 0.35, y: e0.sy + Math.sin(out0) * R * 0.35, r: R, h: R * 0.85 * (1 - 0.5 * fallC), k: 1.4, seed: c.id * 5 + 3 };
+      // a dark carton nest, its three openings at its base, covered galleries running off along the ground between them
+      const R = Math.max(9 + living * 9, far * 0.8);
+      const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: R * 0.85 * (1 - 0.5 * fallC), k: 1.4, seed: c.id * 5 + 3 };
       b.masses.push(m);
       cartonGeos.push(lobedMass(m, ground, rng));
-      for (let k = 0; k < 3; k++) {
-        const a = out0 + 1.4 + k * 1.75 + rng.range(-0.3, 0.3);
+      for (let k = 0; k < outs.length; k++) {
+        // (between hole k and the next)
+        const a0 = outs[k];
+        const a1 = outs[(k + 1) % outs.length];
+        const a = a0 + Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0)) / 2 + rng.range(-0.25, 0.25);
         const pts: THREE.Vector3[] = [];
         const L = 45 + rng.range(0, 40);
         let x = m.x + Math.cos(a) * R * 0.9;
@@ -279,45 +316,48 @@ export class SurfaceEntrances {
         cartonGeos.push(buildGalleryTubeGeometry(pts, { radius: 1.3, flatten: 0.7, lumpiness: 0.25, seed: c.id * 17 + k }));
       }
     } else if (look === 'aurimyrmex') {
-      // a rotting stump beside the main hole, pale frass spilling out in front
+      // a rotting stump in the middle, a root running out to each hole (the holes open among the roots), frass below
       const R = 9 + living * 6;
-      const m: Mass = { x: e0.sx - Math.cos(out0) * (R * 0.75 + 1.5), y: e0.sy - Math.sin(out0) * (R * 0.75 + 1.5), r: R, h: R * 1.25, k: 3.2, seed: c.id * 11 + 2 };
+      const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: R * 1.25, k: 3.2, seed: c.id * 11 + 2 };
       b.masses.push(m);
       massGeos.push(stumpMesh(m, ground, rng));
+      for (let k = 0; k < outs.length; k++) massGeos.push(rootMesh(m, outs[k] + 0.35, far + 3, ground, c.id * 13 + k));
     } else if (look === 'eciton') {
-      // the bivouac: a hanging mass of linked workers round the main hole
-      const R = 12 + living * 10;
-      const m: Mass = { x: e0.sx - Math.cos(out0) * R * 0.3, y: e0.sy - Math.sin(out0) * R * 0.3, r: R, h: R * 0.75 * (1 - 0.8 * fallC), k: 1.5, seed: c.id * 13 + 5 };
+      // the bivouac: a hanging mass of linked workers, the three ways in dark gaps at its skirt
+      const R = Math.max(12 + living * 10, far * 1.05);
+      const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: R * 0.75 * (1 - 0.8 * fallC), k: 1.5, seed: c.id * 13 + 5 };
       b.masses.push(m);
       // a dark core under the clinging bodies, so no ground shows between them
       massGeos.push(massMesh(m, ground, () => new THREE.Color(0x24120a)));
       if (fallC < 0.9) {
         // the linked workers: one instanced ant body (head, thorax, gaster, legs) many times over
-        const ants = bivouac(m, ground, rng, Math.round(500 + living * 700), this.bodyMat);
+        const ants = bivouac(m, ground, rng, Math.round(500 + living * 700), this.bodyMat, c.entrances);
         b.objs.push(ants);
         this.group.add(ants);
       }
-    } else if (look === 'atta') {
-      // a pale refuse dump to one side of the main entrance (where the waste and the dead are dropped)
-      const a = out0 + 0.9;
-      const m: Mass = { x: e0.sx + Math.cos(a) * 30, y: e0.sy + Math.sin(a) * 30, r: 6 + living * 6, h: 1.4 + living * 1.6, k: 0.8, seed: c.id * 19 + 7 };
+    } else if (look === 'hell') {
+      // (a reconstruction) a minimal ring of soil, three small neat holes on it, leaf litter round about
+      const R = far * 1.3;
+      const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: 0.45 * (1 - 0.6 * fallC), k: 1, seed: c.id * 31 + 6, ring: far / R };
       b.masses.push(m);
-      massGeos.push(massMesh(m, ground, (x, y, h, t) => refuseColour(x, y, t)));
-      details.push(...pellets(m.x, m.y, m.r * 0.95, Math.round(160 + m.r * 12), rng, (x, y) => ground(x, y) + massHeight(m, x, y), [0x9a8c74, 0x7a6e5a, 0xb0a288, 0x5a5040, 0x6a6a4a], 0.4, 1.0));
+      massGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed)));
+      details.push(...leafBits(ctr.x, ctr.y, R * 1.8, 30, rng, (x, y) => ground(x, y) + massHeight(m, x, y), [0x5a3e22, 0x7a5430, 0x4a321c, 0x6a4a2a, 0x8a6236], [2, 4.2], far * 0.2));
+    } else if (look === 'sickle') {
+      // three small openings with soil collars in the leaf litter
+      details.push(...leafBits(ctr.x, ctr.y, far * 1.9, 26, rng, ground, [0x7a5a30, 0x5e4426, 0x9a7038], [1.4, 2.8], 0));
     }
     const under = (x: number, y: number) => {
       let h = ground(x, y);
       for (const m of b.masses) h += massHeight(m, x, y);
       return h;
     };
-    // ---- each entrance: its rim, hole and loose details
+    // ---- each hole: its rim, opening and loose details (the three alike: one anthill)
     c.entrances.forEach((e, i) => {
-      const main = i === 0;
-      const k = (main ? 1 : 0.8) * Math.min(1.35, s);
-      const hr = HOLE[look] * (main ? 1 : 0.8);
+      const k = Math.min(1.35, s);
+      const hr = HOLE[look];
       const seed = c.id * 31 + i * 7 + 1;
-      const rim = rimFor(look, hr, k, seed, main);
-      const hole: Hole = { x: e.sx, y: e.sy, look, rim, plug: e.shut ? 1 : (e.work ?? 0) > 0 ? 0.5 : 0, fall: e.fall ?? 0 };
+      const rim = rimFor(look, hr, k, seed, true);
+      const hole: Hole = { x: e.sx, y: e.sy, look, rim, plug: 0, fall: e.fall ?? 0 };
       b.holes.push(hole);
       const apron = apronMesh(hole, under, PAL[look]);
       const mesh = new THREE.Mesh(apron, this.apronMat);
@@ -329,7 +369,7 @@ export class SurfaceEntrances {
       const at = (x: number, y: number) => under(x, y) + rimHeight(rim, Math.hypot(x - e.sx, y - e.sy), Math.atan2(y - e.sy, x - e.sx), hole.plug, hole.fall);
       details.push(...entranceDetails(look, e, i, rim, rng, at, ctr, k));
       if (look === 'lasius' && i === 1) details.push(flatStone(e.sx, e.sy, rim, rng, under));
-      // Termants: dark papery carton plastered round the crater's throat
+      // Termants: dark papery carton plastered round each crater's throat
       if (look === 'termant' && !hole.fall) cartonGeos.push(cartonCollar(e.sx, e.sy, rim, at, seed));
     });
     if (details.length) {
@@ -508,6 +548,65 @@ function thatchColour(x: number, y: number, h: number, t: number, seed: number):
   // the foot: worn bare soil
   if (t > 0.9) tmpC.lerp(new THREE.Color(0x2e2218), Math.min(1, (t - 0.9) / 0.12));
   return tmpC.clone();
+}
+
+/** Worked soil of a mound or crater in the species' palette: crumbly, darker and damper toward the foot. */
+function soilColour(x: number, y: number, t: number, pal: Palette, seed: number): THREE.Color {
+  const n = valueNoise2(x * 1.1, y * 1.1, seed);
+  const n2 = valueNoise2(x * 3.7, y * 3.7, seed + 2);
+  tmpC.setHex(pal.dry).lerp(new THREE.Color(pal.pellet), 0.35 * n2).multiplyScalar(0.82 + 0.3 * n);
+  if (t > 0.8) tmpC.lerp(new THREE.Color(pal.damp), Math.min(1, (t - 0.8) / 0.25) * 0.5);
+  return tmpC.clone();
+}
+
+/**
+ * A root running out from a stump's foot along the ground (heading a, out to `len` mm from the stump's middle), half
+ * buried, tapering to a point: Gilded Ants' holes open among them.
+ */
+function rootMesh(m: Mass, a: number, len: number, ground: (x: number, y: number) => number, seed: number): THREE.BufferGeometry {
+  const SEG = 10;
+  const SIDES = 7;
+  const pos: number[] = [];
+  const col: number[] = [];
+  const idx: number[] = [];
+  const bark = new THREE.Color(0x3a2a1e);
+  const r0 = m.r * 0.22;
+  const x0 = m.x + Math.cos(a) * m.r * 0.55;
+  const y0 = m.y + Math.sin(a) * m.r * 0.55;
+  const L = Math.max(4, len - m.r * 0.55);
+  for (let i = 0; i <= SEG; i++) {
+    const u = i / SEG;
+    const bend = 0.25 * Math.sin(u * 3 + seed);
+    const ax = Math.cos(a + bend * u);
+    const ay = Math.sin(a + bend * u);
+    const cx = x0 + ax * L * u;
+    const cy = y0 + ay * L * u;
+    const r = r0 * (1 - 0.85 * u) + 0.15;
+    for (let j = 0; j < SIDES; j++) {
+      const t = (j / SIDES) * Math.PI * 2;
+      const lx = -ay * Math.cos(t) * r;
+      const ly = ax * Math.cos(t) * r;
+      const x = cx + lx;
+      const y = cy + ly;
+      // (half buried: the lower half sinks into the ground)
+      pos.push(x, ground(x, y) + Math.sin(t) * r * 0.8 - r * 0.25 + (1 - u) * m.h * 0.08, y);
+      tmpC.copy(bark).multiplyScalar(0.7 + 0.4 * valueNoise2(u * 6, j, seed));
+      col.push(tmpC.r, tmpC.g, tmpC.b);
+    }
+  }
+  for (let i = 0; i < SEG; i++)
+    for (let j = 0; j < SIDES; j++) {
+      const a0 = i * SIDES + j;
+      const a1 = i * SIDES + ((j + 1) % SIDES);
+      idx.push(a0, a0 + SIDES, a1, a1, a0 + SIDES, a1 + SIDES);
+    }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
 }
 
 function refuseColour(x: number, y: number, t: number): THREE.Color {
@@ -744,12 +843,15 @@ function thatch(m: Mass, ground: (x: number, y: number) => number, rng: Rng, n: 
   return [...slivers(m.x, m.y, m.r * 0.98, n, rng, at, [0x5a3a20, 0x7a4e2a, 0x3e2814, 0x8a6036, 0x4a3018, 0x6a4024], [1.6, 3.8], 0.17), ...slivers(m.x, m.y, m.r * 0.9, Math.round(n / 40), rng, at, [0x3e2e20, 0x4e3a28], [4, 8], 0.45)];
 }
 
-/** Trails worn bare running out from a mound's foot: ribbons of packed soil, fading at their edges and ends. */
-function trails(cx: number, cy: number, R: number, n: number, rng: Rng, ground: (x: number, y: number) => number): THREE.BufferGeometry[] {
+/**
+ * Trails worn bare running out from a mound's foot: ribbons of packed soil, fading at their edges and ends (out past the
+ * holes, when their headings `angles` are given).
+ */
+function trails(cx: number, cy: number, R: number, n: number, rng: Rng, ground: (x: number, y: number) => number, angles?: number[]): THREE.BufferGeometry[] {
   const out: THREE.BufferGeometry[] = [];
   const c = new THREE.Color(0x3a2c20);
   for (let k = 0; k < n; k++) {
-    let a = (k / n) * Math.PI * 2 + rng.range(-0.4, 0.4);
+    let a = (angles ? angles[k] : (k / n) * Math.PI * 2) + rng.range(-0.4, 0.4) * (angles ? 0.3 : 1);
     let x = cx + Math.cos(a) * R * 0.92;
     let y = cy + Math.sin(a) * R * 0.92;
     const L = rng.range(40, 90);
@@ -822,8 +924,8 @@ function antBody(): THREE.BufferGeometry {
 
 let ANT_BODY: THREE.BufferGeometry | null = null;
 
-/** Army ant bivouac: hundreds of linked workers heaped over the mass, every way up, legs hooked together. */
-function bivouac(m: Mass, ground: (x: number, y: number) => number, rng: Rng, n: number, mat: THREE.Material): THREE.InstancedMesh {
+/** Army ant bivouac: hundreds of linked workers heaped over the mass, every way up, legs hooked together (none over its holes). */
+function bivouac(m: Mass, ground: (x: number, y: number) => number, rng: Rng, n: number, mat: THREE.Material, holes: readonly Entrance[] = []): THREE.InstancedMesh {
   ANT_BODY ??= antBody();
   const mesh = new THREE.InstancedMesh(ANT_BODY, mat, n);
   const M = new THREE.Matrix4();
@@ -835,8 +937,14 @@ function bivouac(m: Mass, ground: (x: number, y: number) => number, rng: Rng, n:
   for (let i = 0; i < n; i++) {
     const a = rng.range(0, Math.PI * 2);
     const d = Math.sqrt(rng.next()) * m.r * 0.98;
-    const x = m.x + Math.cos(a) * d;
-    const y = m.y + Math.sin(a) * d;
+    let x = m.x + Math.cos(a) * d;
+    let y = m.y + Math.sin(a) * d;
+    // (the ways in stay open: a body over a hole slides up the mass, away from it)
+    for (const e of holes)
+      if (Math.hypot(x - e.sx, y - e.sy) < 3.2) {
+        x = m.x + (x - m.x) * 0.7;
+        y = m.y + (y - m.y) * 0.7;
+      }
     const h = massHeight(m, x, y) * rng.range(0.9, 1.04);
     const major = i % 23 === 0;
     const s = (major ? 1.6 : 1) * rng.range(0.75, 1.1);
@@ -897,7 +1005,7 @@ function flatStone(x0: number, y0: number, rim: Rim, rng: Rng, under: (x: number
 function entranceDetails(look: Look, e: Entrance, i: number, rim: Rim, rng: Rng, at: (x: number, y: number) => number, ctr: { x: number; y: number }, k: number): THREE.BufferGeometry[] {
   const pal = PAL[look];
   const out = Math.atan2(e.sy - ctr.y, e.sx - ctr.x);
-  const fill = Math.max(e.shut ? 1 : 0, e.fall ?? 0);
+  const fill = e.fall ?? 0;
   const n = (base: number) => Math.round(base * k * (1 - 0.6 * fill));
   switch (look) {
     case 'lasius':
@@ -927,22 +1035,8 @@ function entranceDetails(look: Look, e: Entrance, i: number, rim: Rim, rng: Rng,
     case 'nasute':
       return pellets(e.sx, e.sy, rim.outR, n(24), rng, at, [0x3b2a1e, 0x2e2016], 0.3, 0.6, rim.holeR);
     case 'sickle': {
-      // tiny foraging holes with soil collars scattered in the litter round the turret
-      const parts: THREE.BufferGeometry[] = [...leafBits(e.sx, e.sy, 16, 10, rng, at, [0x7a5a30, 0x5e4426, 0x9a7038], [1.4, 2.8], rim.outR)];
-      for (let j = 0; j < 4 * (1 - fill); j++) {
-        const a = rng.range(0, Math.PI * 2);
-        const d = rng.range(7, 14);
-        const x = e.sx + Math.cos(a) * d;
-        const y = e.sy + Math.sin(a) * d;
-        const ring = coloured(new THREE.TorusGeometry(0.7, 0.32, 5, 12), pal.dry, rng.range(0.85, 1.1));
-        ring.rotateX(-Math.PI / 2);
-        ring.translate(x, at(x, y) + 0.15, y);
-        const hole = coloured(new THREE.CircleGeometry(0.55, 10), 0x060504);
-        hole.rotateX(-Math.PI / 2);
-        hole.translate(x, at(x, y) + 0.12, y);
-        parts.push(ring, hole);
-      }
-      return parts;
+      // the litter round the collar, and crumbs of the soil it is built of
+      return [...leafBits(e.sx, e.sy, 9, 6, rng, at, [0x7a5a30, 0x5e4426, 0x9a7038], [1.4, 2.8], rim.outR), ...pellets(e.sx, e.sy, rim.outR * 1.3, n(20), rng, at, [pal.pellet, pal.dry], 0.2, 0.45, rim.outR * 0.8)];
     }
     case 'eciton':
       return [];

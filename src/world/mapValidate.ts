@@ -2,6 +2,8 @@ import type { MapDef } from '../maps/types';
 import { shapeDist } from './mapShapes';
 import { HEX_GROUND, HEX_WALL, HEX_WATER, HF_LAIR, HF_SHORE, SurfaceLayout } from './surfaceLayout';
 import { Terrain, mapTerrainParams } from './terrain';
+import { ENTRANCE } from '../sim/balance';
+import { dhypot } from '../sim/dmath';
 
 /** The hard rules for every site (brief §3; docs/maps/design.md §4). */
 export const SITE_RULES = {
@@ -139,8 +141,15 @@ export function validateMap(def: MapDef, seed = 1, expectSites = 10): MapReport 
       const d = hx.hexDistance(s.centre, L.sites[j].centre);
       if (d < SITE_RULES.between) problems.push(`sites ${i} and ${j}: ${d} hexes apart (min ${SITE_RULES.between})`);
     }
+    // (an anthill's three holes: the main spot and two more; user spec 2026-11-01)
     if (s.entrances.length !== 1) problems.push(`site ${i}: ${s.entrances.length} main entrances (1)`);
-    if (s.extras.length !== 2) problems.push(`site ${i}: ${s.extras.length} extra entrance spots (2)`);
+    if (s.extras.length !== 2) problems.push(`site ${i}: ${s.extras.length} more entrance holes (2)`);
+    const holes = [...s.entrances, ...s.extras];
+    for (let a = 0; a < holes.length; a++)
+      for (let b = a + 1; b < holes.length; b++) {
+        const d = dhypot(hx.centerX(holes[a]) - hx.centerX(holes[b]), hx.centerY(holes[a]) - hx.centerY(holes[b]));
+        if (d < ENTRANCE.holeGap) problems.push(`site ${i}: entrance holes ${holes[a]} and ${holes[b]} ${d.toFixed(1)} mm apart (min ${ENTRANCE.holeGap})`);
+      }
     for (const e of [...s.entrances, ...s.extras]) {
       if (!area.includes(e)) problems.push(`site ${i}: entrance hex ${e} outside the site's footprint and ring`);
       if (L.type[e] !== HEX_GROUND || L.flags[e] & HF_SHORE) problems.push(`site ${i}: entrance hex ${e} in or next to water`);
@@ -167,7 +176,7 @@ export function validateMap(def: MapDef, seed = 1, expectSites = 10): MapReport 
       });
       for (const x of s.extras) {
         const c = cellOf(g, hx.centerX(x), hx.centerY(x));
-        if (!r[c]) problems.push(`site ${i}: extra entrance spot ${x} is not reachable by land${when}`);
+        if (!r[c]) problems.push(`site ${i}: entrance hole ${x} is not reachable by land${when}`);
       }
       foodPts.forEach(([x, y], k) => {
         const c = nearestOk(g, x, y);

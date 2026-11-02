@@ -15,6 +15,7 @@ import { CASTES } from '../src/sim/species';
 import { ECITON } from '../src/sim/balance';
 import { raidRoute, frontHalfWidth } from '../src/sim/eciton';
 import { routeAt, routeNearest, routeLength } from '../src/sim/route';
+import { nearestEntrance } from '../src/sim/movement';
 import { spawnCreature } from '../src/sim/creatures/creatureAI';
 
 export interface RaidOpts {
@@ -77,9 +78,11 @@ export function raidScene(o: RaidOpts = {}) {
   for (let i = 0; i < (o.creatures ?? 0); i++) spawnCreature(w, i % 2 ? 'pillbug' : 'cutworm', SURFACE, mx + Math.cos(i * 1.7) * 30, my + Math.sin(i * 1.7) * 30);
   placeMarker(w, c, 0, SURFACE, mx, my);
   const chamber = c.tiles.find((t) => t.type === 'queen')!;
+  // (the raiders start by the anthill's hole nearest the raid, where its route begins: an anthill has three since 2026-11-01)
+  const out = c.entrances[nearestEntrance(c, mx, my)];
   const spawn = (caste: string, n: number) => {
     for (let i = 0; i < n; i++) {
-      const a = makeAnt(w, 0, caste, SURFACE, e.sx + Math.cos(i * 2.4) * (6 + i * 0.4), e.sy + Math.sin(i * 2.4) * (6 + i * 0.4), 0);
+      const a = makeAnt(w, 0, caste, SURFACE, out.sx + Math.cos(i * 2.4) * (6 + i * 0.4), out.sy + Math.sin(i * 2.4) * (6 + i * 0.4), 0);
       a.tile = chamber.q;
       a.task = 'marker';
       a.marker = 0;

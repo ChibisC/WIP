@@ -13,7 +13,8 @@ import type { GameSetup } from '../sim/mapGen';
 import type { SpeciesId } from '../sim/species';
 import type { MapId } from '../maps/types';
 
-export const BUILD_ID = 'ud-mp-5';
+/** (6: one entrance per nest, three holes per anthill; the `entrance` command is rejected — 2026-11-01) */
+export const BUILD_ID = 'ud-mp-6';
 
 /** A lobby slot (players 0–3; the slot number is the colony id). */
 export interface Slot {

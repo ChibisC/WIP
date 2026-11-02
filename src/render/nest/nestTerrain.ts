@@ -7,7 +7,7 @@ import { valueNoise2 } from '../../core/rng';
 const SUB = 2;
 
 /** Tile type ids written into the per-hex data texture. */
-export const HEX_TYPE: Record<string, number> = { none: 0, queen: 1, brood: 2, food: 3, fungus: 4, aphid: 5, thatch: 6, entrance: 7, highway: 8, mound: 9, carton: 10, spot: 11 };
+export const HEX_TYPE: Record<string, number> = { none: 0, queen: 1, brood: 2, food: 3, fungus: 4, aphid: 5, thatch: 6, entrance: 7, highway: 8, mound: 9, carton: 10 };
 
 export interface HexVisual {
   type: number;
@@ -55,6 +55,7 @@ export class NestTerrain {
   private rampTN = 0;
   private rampE: number[] | null = null;
   private rampEN = 0;
+  private rampF: number[][] | null = null;
   readonly uniforms = {
     tSoil: { value: null as unknown as THREE.DataTexture },
     tLight: { value: null as unknown as THREE.DataTexture },
@@ -71,6 +72,9 @@ export class NestTerrain {
     uGhostCol: { value: new THREE.Color(0.5, 0.9, 0.4) },
     uMarkerCols: { value: Array.from({ length: 7 }, () => new THREE.Color()) },
     uPool: { value: 1 },
+    /** a nest's entrance flower: its centre (xy, mm) and outward direction (zw, unit); uEntR its radius (0: none, a cave) */
+    uEnt: { value: new THREE.Vector4() },
+    uEntR: { value: 0 },
     uSelected: { value: new THREE.Vector3(0, 0, 0) },
     /** 1 = a Nasute Termite nest: walls and floor are laminated carton (the model kit's palette);
      *  2 = a Sickle-Jaw Termite nest: dark, damp soil with crumbs and wet patches (the kit's damp-soil look) */
@@ -278,37 +282,41 @@ export class NestTerrain {
     const lump = t > 0.6 ? (Math.sin(px * 0.9 + Math.sin(py * 0.7) * 2) * Math.sin(py * 0.83 - px * 0.31) * 0.5 + 0.5) * this.wallH * 0.07 * (t - 0.6) * 2.5 : 0;
     const bump = (1 - t) * (Math.sin(px * 1.7 + py * 0.6) * Math.sin(py * 1.3 - px * 0.4)) * 0.12;
     let h = t * this.wallH + lump + bump;
-    // Entrance tunnels: a ramp of loose soil rising along the tunnel to the opening above;
-    // a plugged or fallen-in entrance is capped with soil instead.
+    // Entrances: a ramp of loose soil rising to the opening above — a nest's 7-hex flower as one wide slope up its spine,
+    // highest at the top edge; a cave's tunnel as a narrow one. A fallen-in entrance is capped with soil instead.
     for (const r of this.rampList()) {
       if (r.shut) {
-        const d = Math.hypot(px - r.xs[0], py - r.ys[0]) / (g.R * 1.05);
+        const d = Math.hypot(px - r.cx, py - r.cy) / r.capR;
         if (d < 1) {
           const k = 1 - d;
           h = Math.max(h, this.wallH * Math.min(1, k * 2.2) * (0.97 + 0.03 * Math.sin(px * 1.3 + py)));
         }
         continue;
       }
-      const m = rampAt(r, px, py);
-      if (m.d > g.R * 1.0) continue;
-      const lat = 1 - smooth01((m.d - g.R * 0.45) / (g.R * 0.55));
-      const u = Math.max(0, 1 - m.s / r.len);
-      const rise = this.wallH * 0.95 * Math.pow(u, 1.15);
-      h = Math.max(h, rise * lat);
+      h = Math.max(h, this.rampRise(r, px, py));
     }
     return h;
   }
 
-  /** Entrance tops the nest view reports as plugged or fallen in; re-meshes the tunnels that changed. */
+  /** The ramp's height at a point (0 off it): flat across its width, fading at its sides, rising toward the top. */
+  private rampRise(r: Ramp, px: number, py: number): number {
+    const m = rampAt(r, px, py);
+    if (m.d > r.w0 + r.w1) return 0;
+    const lat = 1 - smooth01((m.d - r.w0) / r.w1);
+    const u = Math.max(0, 1 - m.s / r.len);
+    return this.wallH * 0.95 * Math.pow(u, 1.15) * lat;
+  }
+
+  /** Entrances the nest view reports as fallen in (their underground ends); re-meshes the ones that changed. */
   setShut(tops: number[]): void {
-    const a = [...tops].sort((x, y) => x - y);
+    const a = [...new Set(tops)].sort((x, y) => x - y);
     if (a.join() === this.shutTops.join()) return;
     const changed = [...a.filter((q) => !this.shutTops.includes(q)), ...this.shutTops.filter((q) => !a.includes(q))];
     this.shutTops = a;
     const g = this.grid;
     for (const top of changed) {
       const ti = g.entrances.indexOf(top);
-      const hexes = ti >= 0 && g.tunnels[ti] ? g.tunnels[ti] : [top];
+      const hexes = ti >= 0 ? [...(g.tunnels[ti] ?? []), ...(g.flowers[ti] ?? [])] : [top];
       for (const q of hexes) for (const c of g.hexCells[q] ?? []) g.markDirty(c % g.w, Math.floor(c / g.w));
     }
     this.rampKey = '';
@@ -322,13 +330,16 @@ export class NestTerrain {
   private rampList(): Ramp[] {
     const g = this.grid;
     // cheap check (heightAt runs per vertex and per ant): the replica swaps in new arrays, the sim pushes
-    if (this.rampKey === 'ok' && this.rampT === g.tunnels && this.rampTN === g.tunnels.length && this.rampE === g.entrances && this.rampEN === g.entrances.length) return this.ramps;
+    if (this.rampKey === 'ok' && this.rampT === g.tunnels && this.rampTN === g.tunnels.length && this.rampE === g.entrances && this.rampEN === g.entrances.length && this.rampF === g.flowers) return this.ramps;
     this.rampKey = 'ok';
     this.rampT = g.tunnels;
     this.rampTN = g.tunnels.length;
     this.rampE = g.entrances;
     this.rampEN = g.entrances.length;
+    this.rampF = g.flowers;
+    this.uniforms.uEntR.value = 0;
     this.ramps = g.entrances.map((top, i) => {
+      const wide = (g.flowers[i]?.length ?? 0) > 1;
       const hexes = g.tunnels[i]?.length ? g.tunnels[i] : [top];
       const xs: number[] = [];
       const ys: number[] = [];
@@ -344,12 +355,22 @@ export class NestTerrain {
       const dl = Math.hypot(dx, dy) || 1;
       dx /= dl;
       dy /= dl;
-      const run = g.R * (n > 1 ? 0.7 : 1.2);
+      const run = g.R * (wide ? 0.9 : n > 1 ? 0.7 : 1.2);
       xs.push(xs[n - 1] + dx * run);
       ys.push(ys[n - 1] + dy * run);
       let len = 0;
       for (let k = 1; k < xs.length; k++) len += Math.hypot(xs[k] - xs[k - 1], ys[k] - ys[k - 1]);
-      return { xs, ys, len, shut: this.shutTops.includes(top) };
+      // a flower: flat across its width (the side hexes lie 1.5 R off the spine), the soil walls flaring out beyond; the
+      // cap of a fallen-in one covers all seven hexes
+      const c = g.hexCenter(top);
+      if (wide && i === 0) {
+        const ox = xs[0] - c.x;
+        const oy = ys[0] - c.y;
+        const ol = Math.hypot(ox, oy) || 1;
+        this.uniforms.uEnt.value.set(c.x, c.y, ox / ol, oy / ol);
+        this.uniforms.uEntR.value = g.R * 2.6;
+      }
+      return { xs, ys, len, shut: this.shutTops.includes(top), w0: wide ? g.R * 1.75 : g.R * 0.45, w1: wide ? g.R * 0.75 : g.R * 0.55, cx: wide ? c.x : xs[0], cy: wide ? c.y : ys[0], capR: wide ? g.R * 2.75 : g.R * 1.05 };
     });
     return this.ramps;
   }
@@ -370,11 +391,7 @@ export class NestTerrain {
     let h = 0;
     for (const r of this.rampList()) {
       if (r.shut) continue;
-      const m = rampAt(r, px, py);
-      if (m.d > this.grid.R * 1.0) continue;
-      const lat = 1 - smooth01((m.d - this.grid.R * 0.45) / (this.grid.R * 0.55));
-      const u = Math.max(0, 1 - m.s / r.len);
-      h = Math.max(h, this.wallH * 0.95 * Math.pow(u, 1.15) * lat);
+      h = Math.max(h, this.rampRise(r, px, py));
     }
     return h;
   }
@@ -537,6 +554,7 @@ const FRAG_HEADER = /* glsl */ `
 uniform sampler2D tSoil; uniform sampler2D tLight; uniform sampler2D tHex; uniform sampler2D tTint;
 uniform vec2 uRaster; uniform float uCell; uniform vec2 uHexDim; uniform float uHexR; uniform float uWallH;
 uniform float uGrid; uniform vec4 uGhost; uniform vec3 uGhostCol; uniform vec3 uMarkerCols[7]; uniform float uPool;
+uniform vec4 uEnt; uniform float uEntR;
 uniform vec3 uSelected; uniform float uTime; uniform float uCarton;
 ${NOISE_GLSL}
 vec3 worley(vec2 p){ vec2 i=floor(p), f=fract(p); float d1=8.0, d2=8.0; vec2 id=vec2(0);
@@ -767,8 +785,18 @@ if (htype > 0.5 && htype < 10.5) {
     // entrance tunnel: loose, paler soil lit from above, worn smooth along the middle where ants walk;
     // a plugged one (outline 1) is fresh dark crumbly soil
     float wornK = smoothstep(apo*0.75, apo*0.2, hd);
-    // paler loose soil toward the middle, fading into the surrounding floor at the hex edge
-    tc = mix(col, vec3(0.42,0.34,0.24)*(0.8+0.4*grain), 0.6 * smoothstep(apo*1.05, apo*0.45, hd));
+    float paleK = smoothstep(apo*1.05, apo*0.45, hd);
+    if (uEntR > 0.0) {
+      // a nest's wide entrance: one opening, not seven tiles — worn along its middle up the slope, paler loose soil
+      // over all of it, fading into the floor round its rim
+      vec2 ed = gp - uEnt.xy;
+      float er = length(ed);
+      float lat = abs(ed.x*uEnt.w - ed.y*uEnt.z);
+      wornK = smoothstep(apo*1.7, apo*0.3, lat) * smoothstep(uEntR, uEntR*0.55, er);
+      paleK = smoothstep(uEntR*1.1, uEntR*0.55, er);
+    }
+    // paler loose soil toward the middle, fading into the surrounding floor at the edge
+    tc = mix(col, vec3(0.42,0.34,0.24)*(0.8+0.4*grain), 0.6 * paleK);
     tc = mix(tc, vec3(0.50,0.41,0.29)*(0.9+0.2*vnoise(gp*0.6)), wornK*0.35);
     vec3 pw = worley(gp*1.8);
     float pellet = step(0.9, pw.z) * smoothstep(0.3, 0.1, pw.x) * (1.0 - wornK);
@@ -819,21 +847,6 @@ if (htype > 0.5 && htype < 10.5) {
     float pul = 0.55 + 0.45*sin(uTime*4.0);
     vec3 pc = pendDel > 0.5 ? vec3(0.95,0.25,0.18) : vec3(1.0,0.82,0.3);
     col = mix(col, pc, smoothstep(0.7, 0.15, edgeProx) * pul * 0.85 * floorM);
-  }
-}
-// extra-entrance spot (undug soil the Dig tool opens into a new entrance): a dashed pale rim round
-// each of its hexes and a ring of daylight-coloured pebbles round the top hex (outline 1)
-if (htype > 10.5 && htype < 11.5) {
-  float soilK = 1.0 - floorM;
-  float ang3 = atan(hl.y, hl.x);
-  float dash3 = step(0.45, fract(ang3 * 1.9099 + 0.25));
-  col = mix(col, vec3(0.80,0.72,0.52), smoothstep(0.55, 0.12, edgeProx) * dash3 * 0.7 * soilK);
-  col = mix(col, col*1.25 + vec3(0.03,0.025,0.015), 0.35 * soilK);
-  if (hout > 0.5) {
-    float rr = hd / apo;
-    float ring = smoothstep(0.1, 0.0, abs(rr - 0.5));
-    col = mix(col, vec3(0.95,0.88,0.66), ring * 0.75 * soilK);
-    col = mix(col, vec3(0.035,0.025,0.02), smoothstep(0.32, 0.18, rr) * 0.7 * soilK);
   }
 }
 // group outline on edges that border a different group (coloured by marker)
@@ -895,9 +908,15 @@ const FRAG_EMISSIVE = /* glsl */ `
   if (desig > 0.5) totalEmissiveRadiance += vec3(1.0,0.6,0.2) * smoothstep(0.9, 0.2, edgeProx) * 0.5;
   // daylight down an open entrance tunnel: strongest at the top (level 0), cool white
   if (isEnt > 0.5 && hout < 0.5) {
-    // soft-edged: a pool of light down the middle of the ramp, not a lit hexagon
+    // soft-edged: a pool of light down the middle of the ramp, not a lit hexagon; across a nest's wide entrance one shaft,
+    // brightest at its top edge
     float up = 1.0 - hlevel / 3.0;
     float core = smoothstep(apo * 1.05, apo * 0.25, hd);
+    if (uEntR > 0.0) {
+      vec2 ed = gp - uEnt.xy;
+      up = clamp(0.45 + dot(ed, uEnt.zw) / (uEntR * 1.3), 0.0, 1.0);
+      core = smoothstep(uEntR * 1.08, uEntR * 0.35, length(ed));
+    }
     totalEmissiveRadiance += diffuseColor.rgb * vec3(0.78, 0.85, 1.0) * (0.12 + 0.75 * up * up) * core;
   }
   if (uGhost.w > 0.5) {
@@ -912,6 +931,13 @@ interface Ramp {
   ys: number[];
   len: number;
   shut: boolean;
+  /** half-width (mm) of its flat middle, and of the fade at its sides */
+  w0: number;
+  w1: number;
+  /** a fallen-in cap: its centre and radius (mm) */
+  cx: number;
+  cy: number;
+  capR: number;
 }
 
 function smooth01(t: number): number {

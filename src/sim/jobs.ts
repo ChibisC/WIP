@@ -21,8 +21,9 @@ import { abdomenTipBack } from './termites';
  * worker on a job ignores food and enemies (see antAI: combat is skipped).
  */
 
+/** (2, Entrance, was the dig of an extra entrance, gone with them in the one-entrance rework: old saves dig on as Dig) */
 export const JOB = { None: 0, Dig: 1, Entrance: 2, Build: 3, Upgrade: 4, Delete: 5, Spawn: 6 } as const;
-export const JOB_NAMES = ['', 'Digging', 'Digging an entrance', 'Building a tile', 'Upgrading a tile', 'Taking a tile apart', 'Carrying an egg to a brood tile'];
+export const JOB_NAMES = ['', 'Digging', 'Digging', 'Building a tile', 'Upgrading a tile', 'Taking a tile apart', 'Carrying an egg to a brood tile'];
 
 export interface JobSpot {
   kind: number;
@@ -62,8 +63,7 @@ export function listJobs(w: World, c: Colony): JobSpot[] {
   for (let q = 0; q < N; q++) {
     if (!g.hexDesig[q] || !g.isHexDiggable(q)) continue;
     if (!g.neighbors(q).some((n) => n >= 0 && g.isHexDug(n))) continue; // unreachable: waits
-    const entrance = g.spotIndex(q) >= 0;
-    out.push({ kind: entrance ? JOB.Entrance : JOB.Dig, q, prio: entrance ? 1 : 0, max: entrance ? BALANCE.entranceDigWorkers : BALANCE.digWorkersPerHex });
+    out.push({ kind: JOB.Dig, q, prio: 0, max: BALANCE.digWorkersPerHex });
   }
   for (const t of c.tiles) {
     if (!t.built) out.push({ kind: JOB.Build, q: t.q, prio: 2, max: 1 });

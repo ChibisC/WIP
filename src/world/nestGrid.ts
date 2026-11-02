@@ -39,9 +39,8 @@ export interface NestGridSnap extends NestGridParams {
   hexDesig: Uint8Array;
   hexEntry: Int8Array;
   entrances: number[];
-  shafts: number[];
   tunnels: number[][];
-  spots: number[][];
+  flowers: number[][];
 }
 
 export interface NestGridData extends NestGridParams {
@@ -53,10 +52,10 @@ export interface NestGridData extends NestGridParams {
   hexDesig: string;
   hexEntry: string;
   entrances: number[];
-  shafts: number[];
   /** older saves have none: rebuilt from the dug corridor behind each entrance */
   tunnels?: number[][];
-  spots?: number[][];
+  /** older saves have none (sim/entrances.ts upgradeEntrances builds them) */
+  flowers?: number[][];
 }
 
 /** Hex radius for a species: tiles are about three workers wide. */
@@ -77,9 +76,11 @@ export const NEST_HEX_SCALE = 1.25;
  * the dug state for rendering, navigation and progressive excavation.
  *
  * Coordinates are mm in the nest plane: x right, y "down the screen" (maps to
- * world z). Each entrance is a short tunnel of hexes rising to a hole in the
- * surface; extra-entrance spots are marked, undug tunnels the player may dig out
- * to open one more entrance (sim/entrances.ts).
+ * world z). A colony's nest has one entrance: a 7-hex "flower" (a hex and its six
+ * neighbours) at the nest's edge, its floor ramping up to the surface along a spine
+ * (top, centre, inner hex); its three surface holes are the colony's `entrances`
+ * (sim/entrances.ts). A creature cave's entrance is a short tunnel of hexes rising to
+ * its one hole.
  */
 export class NestGrid extends HexLayout {
   // the hex geometry (cols, rows, R, H, C, widthMm, depthMm, hexCenter, hexAt, neighbors…) is HexLayout's
@@ -104,14 +105,19 @@ export class NestGrid extends HexLayout {
   hexCells: Int32Array[] = [];
   /** fine cell → hex index (−1 outside) */
   cellHex: Int32Array;
-  /** the top hex of each entrance tunnel (the ramp under the surface hole) */
+  /** the underground end of each entrance: a nest's flower centre, a cave's tunnel top */
   entrances: number[] = [];
-  /** entrance tunnels, aligned with `entrances`: hexes from the top down to the nest floor */
+  /**
+   * aligned with `entrances`: the line the floor ramps along, top first — a nest's spine through its flower (the top hex,
+   * the centre, the inner hex), a cave's tunnel down to its floor
+   */
   tunnels: number[][] = [];
-  /** the top hex of each extra-entrance spot (aligned with `spots`) */
-  shafts: number[] = [];
-  /** extra-entrance spots: undug tunnels (top first) that open a new entrance once dug out */
-  spots: number[][] = [];
+  /** aligned with `entrances`: a nest entrance's 7 hexes (centre first), empty for a cave's tunnel */
+  flowers: number[][] = [];
+  /** bumped when the entrance lists change (flowerEdges' cache) */
+  private entVer = 0;
+  private edgeVer = -1;
+  private edges: { top: number[]; inner: number[] }[] = [];
   version = 0;
   dirty = new Set<number>();
   /**
@@ -289,45 +295,69 @@ export class NestGrid extends HexLayout {
     return q >= 0 && this.hexSoil[q] !== SOIL_AIR && this.hexSoil[q] !== SOIL_STONE;
   }
 
-  /** Is q part of an entrance tunnel (its ramp hexes stay clear of tiles)? */
+  /** Is q part of an entrance (its flower or tunnel hexes stay clear of tiles)? */
   isEntrance(q: number): boolean {
     return this.tunnelIndex(q) >= 0;
   }
 
-  /** The entrance whose tunnel holds hex q, or −1. */
+  /** The entrance whose flower or tunnel holds hex q, or −1. */
   tunnelIndex(q: number): number {
+    for (let i = 0; i < this.flowers.length; i++) if (this.flowers[i].includes(q)) return i;
     for (let i = 0; i < this.tunnels.length; i++) if (this.tunnels[i].includes(q)) return i;
     return this.entrances.indexOf(q);
   }
 
-  /** The extra-entrance spot holding hex q, or −1. */
-  spotIndex(q: number): number {
-    for (let i = 0; i < this.spots.length; i++) if (this.spots[i].includes(q)) return i;
-    return -1;
-  }
-
-  /** Open an entrance whose tunnel (top first) is dug. */
-  addEntrance(tunnel: number[]): void {
-    this.entrances.push(tunnel[0]);
+  /**
+   * Add an entrance: `tunnel` the ramp line, top first (its first hex for a cave, the flower's top hex for a nest);
+   * `flower` a nest entrance's 7 hexes, centre first (its underground end), or none for a cave's tunnel.
+   */
+  addEntrance(tunnel: number[], flower: number[] = []): void {
+    this.entrances.push(flower.length ? flower[0] : tunnel[0]);
     this.tunnels.push(tunnel.slice());
+    this.flowers.push(flower.slice());
+    this.entVer++;
     this.version++;
     this.stateVersion++;
     this.desigVersion++;
   }
 
-  /** Mark an undug tunnel (top first) as an extra-entrance spot. */
-  addSpot(tunnel: number[]): void {
-    this.shafts.push(tunnel[0]);
-    this.spots.push(tunnel.slice());
+  /** Drop every entrance (save upgrades rebuild them). */
+  clearEntrances(): void {
+    this.entrances = [];
+    this.tunnels = [];
+    this.flowers = [];
+    this.entVer++;
+    this.version++;
     this.stateVersion++;
     this.desigVersion++;
   }
 
-  removeSpot(i: number): void {
-    this.shafts.splice(i, 1);
-    this.spots.splice(i, 1);
-    this.stateVersion++;
-    this.desigVersion++;
+  /**
+   * The edges of entrance i's flower: `top`, the three hexes farthest along its ramp toward the surface (ants come down
+   * and climb out there), and `inner`, the three nearest the nest (defenders hold them). A cave's tunnel: its top hex,
+   * and its bottom hex.
+   */
+  flowerEdges(i: number): { top: number[]; inner: number[] } {
+    if (this.edgeVer !== this.entVer) {
+      this.edgeVer = this.entVer;
+      this.edges = this.entrances.map((_, k) => {
+        const t = this.tunnels[k] ?? [];
+        const f = this.flowers[k] ?? [];
+        if (f.length < 2 || t.length < 2) return { top: t.slice(0, 1), inner: t.slice(-1) };
+        const a = this.hexCenter(t[t.length - 1]);
+        const b = this.hexCenter(t[0]);
+        const ux = b.x - a.x;
+        const uy = b.y - a.y;
+        // (by the projection on the ramp's direction; ties by index: the same on every client)
+        const proj = (q: number) => {
+          const p = this.hexCenter(q);
+          return p.x * ux + p.y * uy;
+        };
+        const byOut = f.slice().sort((p, q) => proj(q) - proj(p) || p - q);
+        return { top: byOut.slice(0, 3), inner: byOut.slice(-3) };
+      });
+    }
+    return this.edges[i] ?? { top: [], inner: [] };
   }
 
   /** Designated, undug and touching a dug hex. */
@@ -438,9 +468,8 @@ export class NestGrid extends HexLayout {
       hexEntry: toB64(new Uint8Array(this.hexEntry.buffer.slice(0))),
       hexTotal: toB64(new Uint8Array(this.hexTotal.buffer.slice(0))),
       entrances: [...this.entrances],
-      shafts: [...this.shafts],
       tunnels: this.tunnels.map((t) => [...t]),
-      spots: this.spots.map((t) => [...t]),
+      flowers: this.flowers.map((t) => [...t]),
     };
   }
 
@@ -457,9 +486,8 @@ export class NestGrid extends HexLayout {
       hexDesig: this.hexDesig.slice(),
       hexEntry: this.hexEntry.slice(),
       entrances: [...this.entrances],
-      shafts: [...this.shafts],
       tunnels: this.tunnels.map((t) => [...t]),
-      spots: this.spots.map((t) => [...t]),
+      flowers: this.flowers.map((t) => [...t]),
     };
   }
 
@@ -480,21 +508,18 @@ export class NestGrid extends HexLayout {
   }
 
   /**
-   * Entrance and spot lists from saved data. Older saves kept only each entrance's top hex and
-   * hidden one-hex shaft sites: the tunnel is rebuilt along the dug corridor behind the top, and
-   * each shaft grows into a spot reaching toward the nest's middle (sim/entrances.ts migrateNest
-   * then trims the spots to the colony's allowance).
+   * Entrance lists from saved data. Older saves kept only each entrance's top hex: its tunnel is rebuilt along the dug
+   * corridor behind it. Saves from before the one-entrance rework (2026-11-01) have no flowers, and may hold extra
+   * entrances and extra-entrance spots (`shafts`, `spots`, ignored here): sim/entrances.ts upgradeEntrances turns a
+   * colony nest's first tunnel into its flower and drops the rest.
    */
-  setEntranceLists(d: { entrances: number[]; shafts: number[]; tunnels?: number[][]; spots?: number[][] }): void {
+  setEntranceLists(d: { entrances: number[]; tunnels?: number[][]; flowers?: number[][] }): void {
     this.entrances = [...d.entrances];
-    this.shafts = [...d.shafts];
     if (d.tunnels && d.tunnels.length === d.entrances.length) this.tunnels = d.tunnels.map((t) => [...t]);
     else this.tunnels = this.entrances.map((top) => dugCorridor(this, top, TUNNEL_LEN));
-    if (d.spots && d.spots.length === d.shafts.length) this.spots = d.spots.map((t) => [...t]);
-    else {
-      const mid = this.hexIndex(Math.floor(this.cols / 2), Math.floor(this.rows / 2));
-      this.spots = this.shafts.map((top) => chainToward(this, top, mid, TUNNEL_LEN));
-    }
+    if (d.flowers && d.flowers.length === d.entrances.length) this.flowers = d.flowers.map((t) => [...t]);
+    else this.flowers = this.entrances.map(() => []);
+    this.entVer++;
   }
 
   static deserialize(d: NestGridData): NestGrid {
@@ -519,7 +544,7 @@ export class NestGrid extends HexLayout {
   }
 }
 
-/** Hexes in a tunnel rebuilt for an older save (ENTRANCE.tunnelLen; kept here so the world layer needs no sim import). */
+/** Hexes in a tunnel rebuilt for an older save (ENTRANCE.caveTunnelLen; kept here so the world layer needs no sim import). */
 const TUNNEL_LEN = 3;
 
 /**
