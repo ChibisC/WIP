@@ -13,7 +13,7 @@ import { World } from '../src/sim/world';
 import { AS, SURFACE, nestSpace } from '../src/sim/types';
 import { makeAnt } from '../src/sim/factory';
 import { killAnt } from '../src/sim/antAI';
-import { goToSurfacePoint } from '../src/sim/movement';
+import { goToSurfacePoint, steerTo } from '../src/sim/movement';
 import { CASTES, SPECIES } from '../src/sim/species';
 import { genomeOf, stolenName } from '../src/sim/termants';
 import { encodeState, hashState, restoreWorld } from '../src/sim/snapshot';
@@ -91,6 +91,20 @@ check('the Missions menu still lists the two missions only', Object.keys(MISSION
     if (Math.hypot(a.x - 300, a.y - 100) < 3) arrived = i;
   }
   check('layers: an ant walks round the bank and up the ramp onto the terrace (slower going up)', arrived > 0 && onCliff === 0 && w.terrain.levelAt(a.x, a.y) === 1 && slowUp, `arrived tick ${arrived}, ${onCliff} cliff samples`);
+  // straight steering (a chase, the last stretch home) over a bank goes round by the ramps (user 2026-11-02 12:08)
+  const steerOver = (sx: number, sy: number, tx: number, ty: number): number => {
+    const b = makeAnt(w, 0, 'lasius_worker', SURFACE, sx, sy, 0);
+    for (let i = 0; i < 20 * 60; i++) {
+      steerTo(w, b, tx, ty, 0.05);
+      if (Math.hypot(b.x - tx, b.y - ty) < 4) return i / 20;
+    }
+    return -1;
+  };
+  const up = steerOver(250, 235, 250, 175);
+  const down = steerOver(250, 175, 250, 235);
+  const outOf = steerOver(380, 370, 380, 300);
+  check('layers: steering at a point over a bank finds the way round by a ramp (up, down, out of the hollow)', up > 0 && down > 0 && outOf > 0, `up ${up} s, down ${down} s, out of the hollow ${outOf} s`);
+  check('layers: a foe over a bank scores as farther (crossBankScore), the crossing is seen', LAYERS.crossBankScore > 1 && w.terrain.crossesCliff(250, 235, 250, 175) && !w.terrain.crossesCliff(250, 235, 260, 260));
   // the five skirmish maps have no layers (unchanged)
   check('layers: the five skirmish maps are flat as before (no layer fields)', PLAYABLE_MAPS.every((id) => !new Terrain(mapTerrainParams(1, id)).layers));
 }

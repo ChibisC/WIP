@@ -1090,6 +1090,14 @@ export const ENTRANCE = {
  * the other, their banks too steep to walk, joined by ramps no steeper than `rampMaxSlope`.
  */
 export const LAYERS = {
+  /**
+   * Straight steering (a chase, the last stretch to a point) that would cross a bank goes round by the ramps instead,
+   * along a shared surface field to the target rounded to `routeCell` mm (user 2026-11-02 12:08: ants failed to find
+   * their way up or down a slope)
+   */
+  routeCell: 24,
+  /** a foe across a bank (the straight line to it crosses a cliff) scores as if this many times as far (squared) */
+  crossBankScore: 9,
   /** height of one level (mm): about 8–9 worker lengths */
   step: 34,
   /** horizontal width of a bank (mm): 34 mm over 12 is about 70° */

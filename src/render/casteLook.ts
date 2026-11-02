@@ -6,29 +6,30 @@ import { CASTES } from '../sim/species';
  * termites and future ones) have different colors and textures so they can be identifiable and different (also their
  * UI color and look for pheromone markers and building so they can be distinct from each other)").
  *
- * A look is a colour from a fixed palette of clearly different hues plus a texture pressed into the tile's soil. The
+ * A look is a colour from a fixed palette of clearly different earth tones plus a texture worked into the tile. The
  * castes of one species never share a colour or a texture, and no two castes anywhere share both, so a Gene Thief or
  * Termant nest full of stolen castes still tells them apart. Castes without an entry (new species, new castes) are
  * given a free pair the same way, in the order they are defined, so they stay distinct too. Render and UI only.
  */
 
 /**
- * Tile and UI colours (sRGB): clean, clear hues far apart (user note 2026-11-02 11:04: "they can use different colors
- * just use more cleaner ones"); values between lavender and crimson so they read on dark soil.
+ * Tile and UI colours (sRGB): earth tones (user note 2026-11-02 12:04: "change their colors to be more earth tone? like
+ * around grey, black, brown, sandy, grass green, dead grass, sky blue, and all of the above (earth tone red and purple
+ * and orange is fine too)"), spaced so every pair stays clearly apart (ΔE ≥ 24). Replaced the bright palette of 11:04.
  */
 export const CASTE_PALETTE = {
-  amber: 0xd9a030,
-  rust: 0xc4552c,
-  crimson: 0xb02a40,
-  rose: 0xdc7aa0,
-  violet: 0xa660c8,
-  indigo: 0x4460d4,
-  sky: 0x4cb0e0,
-  teal: 0x26a898,
-  green: 0x5aa83c,
-  lime: 0xbccc3a,
-  bone: 0xe6dcba,
-  lavender: 0xb8a8e8,
+  black: 0x34302c,
+  grey: 0x908c86,
+  slate: 0x52667c,
+  brown: 0x7a5232,
+  sand: 0xdcc495,
+  straw: 0xb09c48,
+  grass: 0x6c9a3c,
+  moss: 0x485a2c,
+  sky: 0x84b0d4,
+  red: 0xa8432e,
+  orange: 0xcc7a30,
+  purple: 0x7a4a72,
 } as const;
 export type CasteColour = keyof typeof CASTE_PALETTE;
 
@@ -42,39 +43,39 @@ export const CASTE_PATTERNS = ['pockets', 'striate', 'pellets', 'rugose', 'scale
 export type CastePattern = (typeof CASTE_PATTERNS)[number];
 
 const T: Record<string, [CasteColour, CastePattern]> = {
-  lasius_worker: ['bone', 'pockets'],
-  lasius_soldier: ['crimson', 'striate'],
-  formica_worker: ['rust', 'comb'],
-  formica_soldier: ['indigo', 'scales'],
-  formica_mortar: ['lime', 'rugose'],
+  lasius_worker: ['sand', 'pockets'],
+  lasius_soldier: ['black', 'striate'],
+  formica_worker: ['red', 'comb'],
+  formica_soldier: ['slate', 'scales'],
+  formica_mortar: ['straw', 'rugose'],
   formica_rapid: ['sky', 'veins'],
-  atta_minim: ['green', 'pellets'],
-  atta_media: ['amber', 'pockets'],
-  atta_soldier: ['rose', 'silk'],
-  atta_major: ['violet', 'cocoons'],
-  fire_minor: ['rose', 'pellets'],
-  fire_soldier: ['rust', 'scales'],
-  fire_major: ['amber', 'veins'],
-  eciton_minor: ['teal', 'carton'],
-  eciton_submajor: ['lime', 'comb'],
-  eciton_media: ['indigo', 'striate'],
-  eciton_major: ['crimson', 'silk'],
-  plagiaria_worker: ['violet', 'carton'],
-  nasute_worker: ['bone', 'carton'],
+  atta_minim: ['grass', 'pellets'],
+  atta_media: ['orange', 'pockets'],
+  atta_soldier: ['brown', 'silk'],
+  atta_major: ['purple', 'cocoons'],
+  fire_minor: ['brown', 'pellets'],
+  fire_soldier: ['red', 'scales'],
+  fire_major: ['orange', 'veins'],
+  eciton_minor: ['moss', 'carton'],
+  eciton_submajor: ['straw', 'comb'],
+  eciton_media: ['slate', 'striate'],
+  eciton_major: ['black', 'silk'],
+  plagiaria_worker: ['purple', 'carton'],
+  nasute_worker: ['sand', 'carton'],
   nasute_soldier: ['sky', 'pellets'],
-  nasute_major: ['amber', 'rugose'],
-  rhy_worker: ['lavender', 'pockets'],
-  rhy_soldier: ['rose', 'striate'],
-  hell_worker: ['teal', 'silk'],
-  hell_soldier: ['violet', 'scales'],
-  aurimyrmex_worker: ['amber', 'carton'],
-  aurimyrmex_soldier: ['indigo', 'cocoons'],
-  termant_worker: ['lavender', 'pellets'],
-  termant_soldier: ['green', 'scales'],
+  nasute_major: ['orange', 'rugose'],
+  rhy_worker: ['grey', 'pockets'],
+  rhy_soldier: ['brown', 'striate'],
+  hell_worker: ['moss', 'silk'],
+  hell_soldier: ['purple', 'scales'],
+  aurimyrmex_worker: ['orange', 'carton'],
+  aurimyrmex_soldier: ['slate', 'cocoons'],
+  termant_worker: ['grey', 'pellets'],
+  termant_soldier: ['grass', 'scales'],
 };
 
 /** Queens and kings have no brood tiles; their UI look is the royal chamber's pale silt. */
-const ROYAL: [CasteColour, CastePattern] = ['lavender', 'rugose'];
+const ROYAL: [CasteColour, CastePattern] = ['grey', 'rugose'];
 
 export interface CasteLook {
   colour: CasteColour;
@@ -401,16 +402,28 @@ export function casteSwatchUrl(caste: string): string {
 
 /**
  * The caste's badge for buttons and cards: its tile swatch (colour and texture) with the ant (or termite) on top.
- * `silhouette` is the figure's SVG markup (ui/icons antSilhouette), drawn in `BADGE_FIGURE`.
+ * `silhouette` is the figure's SVG markup (ui/icons antSilhouette), drawn in `badgeFigure(caste)`.
  */
 export function casteBadge(caste: string, silhouette: string, cls = ''): string {
   return `<span class="cbadge${cls ? ' ' + cls : ''}" style="background-image:${casteSwatchUrl(caste)}">${silhouette}</span>`;
 }
 
-/** The colour of the caste's figure where it stands alone (top bar, arena roster): its colour, lifted a little. */
-export function casteFigureColour(caste: string): string {
-  return shade(casteLook(caste).css, 1.18);
+/** Relative luminance (0–1) of an sRGB colour. */
+function luma(hex: string): number {
+  const n = parseInt(hex.slice(1), 16);
+  return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
 }
 
-/** The ant on its badge: dark, like a real ant on its coloured tile. */
-export const BADGE_FIGURE = '#1c130b';
+/**
+ * The caste's colour where it stands alone on a dark panel (top bar and arena figures, minimap tiles): its colour,
+ * lifted a little — dark earth tones (black, moss, slate, purple, brown) lifted more so they still show.
+ */
+export function casteFigureColour(caste: string): string {
+  const css = casteLook(caste).css;
+  return shade(css, luma(css) < 0.3 ? 1.45 : 1.18);
+}
+
+/** The ant on its badge: dark, like a real ant on its tile; pale on the darkest tiles so it still shows. */
+export function badgeFigure(caste: string): string {
+  return luma(casteLook(caste).css) < 0.3 ? '#efe4cc' : '#1c130b';
+}

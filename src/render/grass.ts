@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { thinLightPatch } from './ground/surfacePatch';
 import { Rng } from '../core/rng';
 import { Terrain } from '../world/terrain';
 import { addPatch, globalUniforms, patchDapple } from './shaderPatch';
@@ -168,17 +169,21 @@ export class Grass {
              float bayer[16] = float[16](0.0,8.0,2.0,10.0,12.0,4.0,14.0,6.0,3.0,11.0,1.0,9.0,15.0,7.0,13.0,5.0);
              float dither = (bayer[bi] + 0.5) / 16.0;
              float fade = smoothstep(rad*0.75, rad, dline);
-             if (vWP.y - uFocus.y > 6.0 && dither > fade && tt < L - 4.0) discard;
+             // dissolve upward (dithered over 4–16 mm) rather than a flat cut, so no blade ends in a sawn-off stub
+             float hcut = smoothstep(4.0, 16.0, vWP.y - uFocus.y) * (1.0 - fade);
+             if (dither < hcut && tt < L - 4.0) discard;
            }`,
         ],
         [
           '#include <color_fragment>',
           `#include <color_fragment>
            diffuseColor.rgb *= mix(0.42, 1.12, smoothstep(0.0, 0.7, vH));
-           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(1.25,1.12,0.7), smoothstep(0.75,1.0,vH)*0.6);`,
+           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(1.18,1.08,0.78), smoothstep(0.75,1.0,vH)*0.5);`,
         ],
       ],
     });
+    // light through the blades when the sun is behind them
+    thinLightPatch(this.material, 0.38);
     const mesh = new THREE.InstancedMesh(geo, this.material, Math.max(1, blades.length));
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -186,7 +191,8 @@ export class Grass {
     const s = new THREE.Vector3();
     const p = new THREE.Vector3();
     const col = new THREE.Color();
-    const greens = [new THREE.Color(0x4f7a2a), new THREE.Color(0x6b8f34), new THREE.Color(0x3d6626), new THREE.Color(0x8a9a44), new THREE.Color(0xa49a5a)];
+    // meadow grass: muted olive and blue-greens with the odd dry blade (real blades are far less saturated than paint)
+    const greens = [new THREE.Color(0x4a6c2e), new THREE.Color(0x5e7c38), new THREE.Color(0x3c5c2c), new THREE.Color(0x76823f), new THREE.Color(0x938c5c)];
     const reeds = [new THREE.Color(0x3f6a34), new THREE.Color(0x547a3a), new THREE.Color(0x35583a), new THREE.Color(0x6e7d48)];
     const dry = [new THREE.Color(0xb59a5a), new THREE.Color(0xc8ad6a), new THREE.Color(0x9c8650), new THREE.Color(0xa59a62), new THREE.Color(0x8a8a50)];
     blades.forEach((b, i) => {

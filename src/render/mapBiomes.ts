@@ -19,6 +19,7 @@ import { textures } from './textures';
 export { BIOME_DRESS } from '../world/mapScatter';
 export type { BiomeDress } from '../world/mapScatter';
 import type { BiomeDress } from '../world/mapScatter';
+import { DEFAULT_SUN_DIR, surfaceSunDir } from './environment';
 
 /** Day light and air per biome (applied over the default sunny sky; night is left alone). */
 export interface BiomeLight {
@@ -42,8 +43,64 @@ export const BIOME_LIGHT: Record<Biome, BiomeLight> = {
   savanna: { sun: 3.6, sunColor: 0xffdca0, hemi: 0.9, hemiSky: 0xd6e0f0, hemiGround: 0x8a6a40, fog: 1.3, fogColor: 0xdccdac, dapple: 0.25, water: 0x4a4030 },
 };
 
+/**
+ * A map's own mood over its biome's light (ground realism item 6; render only): the story maps' time of day and air.
+ *  - gardenBelow (chapter 1, level 1): the fresh morning after the storm — a low sun from the east, cool clean light,
+ *    a bright sky, a little mist, the ground still damp (render/terrainMesh.ts) and dew on the grass.
+ *  - fireBanks (chapter 1, level 2): a hot, bright, hazy day on the riverbank — a high sun, warm haze in the distance,
+ *    glare off the sand (a touch more exposure and bloom, a little less contrast).
+ */
+export interface MapMood {
+  /** sun direction (toward the sun), elevation and azimuth in degrees */
+  sunEl?: number;
+  sunAz?: number;
+  light?: Partial<BiomeLight>;
+  /** post grade over the view's own: × exposure, × contrast, × saturation, + warmth, + bloom */
+  exposure?: number;
+  contrast?: number;
+  saturation?: number;
+  warmth?: number;
+  bloom?: number;
+  /** distance haze (0..1) and its colour */
+  haze?: number;
+  hazeColor?: number;
+}
+
+export const MAP_MOOD: Record<string, MapMood> = {
+  gardenBelow: {
+    sunEl: 26,
+    sunAz: 290,
+    light: { sun: 2.7, sunColor: 0xfff1de, hemi: 1.08, hemiSky: 0xc8daf4, hemiGround: 0x4e4a2c, fog: 0.85, fogColor: 0xd9dcd2, dapple: 0.55 },
+    exposure: 1.02,
+    saturation: 1.04,
+    warmth: -0.08,
+  },
+  fireBanks: {
+    sunEl: 66,
+    sunAz: 250,
+    light: { sun: 3.4, sunColor: 0xffe2b0, hemi: 1.0, hemiSky: 0xdfe4ea, hemiGround: 0x8a7650, fog: 1.1, fogColor: 0xe2d8c0, dapple: 0.2 },
+    exposure: 1.0,
+    contrast: 0.96,
+    saturation: 0.96,
+    warmth: 0.12,
+    bloom: 0.08,
+    haze: 0.16,
+    hazeColor: 0xe6dcc6,
+  },
+};
+
+/** The mood in force (set when a surface is built: render/terrainMesh.ts), read by applyBiomeLight and the post. */
+export const currentMood: { id: string; mood: MapMood | null } = { id: '', mood: null };
+
+export function setMapMood(id: string | undefined): void {
+  currentMood.id = id ?? '';
+  currentMood.mood = (id && MAP_MOOD[id]) || null;
+}
+
 /** Set a biome's day light on the surface lights and scene (returns nothing; the night look is untouched). */
-export function applyBiomeLight(b: BiomeLight, scene: THREE.Scene, sun: THREE.DirectionalLight, hemi: THREE.HemisphereLight, baseFog: number): void {
+export function applyBiomeLight(b0: BiomeLight, scene: THREE.Scene, sun: THREE.DirectionalLight, hemi: THREE.HemisphereLight, baseFog: number): void {
+  const mood = currentMood.mood;
+  const b = mood?.light ? { ...b0, ...mood.light } : b0;
   sun.intensity = b.sun;
   sun.color.setHex(b.sunColor);
   hemi.intensity = b.hemi;
@@ -55,6 +112,14 @@ export function applyBiomeLight(b: BiomeLight, scene: THREE.Scene, sun: THREE.Di
     fog.color.setHex(b.fogColor);
   }
   globalUniforms.uDappleStrength.value = b.dapple;
+  // the sun's place in the sky (the view aims the sun and its shadows along this every frame)
+  if (surfaceSunDir) {
+    if (mood?.sunEl !== undefined) {
+      const el = (mood.sunEl * Math.PI) / 180;
+      const az = ((mood.sunAz ?? 200) * Math.PI) / 180;
+      surfaceSunDir.set(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az)).normalize();
+    } else surfaceSunDir.copy(DEFAULT_SUN_DIR);
+  }
 }
 
 // ---------------------------------------------------------------------------- geometry

@@ -1507,6 +1507,56 @@ and behaviour unchanged. Report: `docs/realism/hell-nasute/README.md`; rubric: `
   hashes (only the nasute castes changed), `sim/heightData.ts` regenerated (taller hell ants; no new underpasses),
   climb data unchanged.
 
+### 2026-11-02 — Finding the way up and down the slopes (layered ground)
+- User 12:08: "because of slopes some ant AI is failing to properly pathfind their way up or down a slope, can you give
+  unit AI more intelligence to go around the map up or down a slope". Flow-field walks already went round by the
+  ramps; what failed was everything that steers straight: chases, the last stretch to a point or a hole, a creature's
+  walk. On testTerrace (`tools/slope-probe.ts`) an ant steered at a point just over the terrace bank never got there
+  (85–120 mm short after 60 s), nor up out of the hollow; a hunting ground beetle pressed against the bank below its prey.
+- Now `steerTo`/`steerAvoid` (movement.ts) and creatures' `walkTo` go round by the ramps whenever the straight line
+  crosses a cliff (`Terrain.cliffAt`, `crossesCliff`), down a shared surface field to the target's 24 mm cell
+  (`LAYERS.routeCell`): up and down the bank in about 22 s, out of the hollow in 16–18 s. Marker squads count an ant
+  inside the circle but over a bank as not there yet (it walks round instead of wandering into the bank). Target choice
+  scores a foe over a bank 9× farther (`LAYERS.crossBankScore`), so fights start on the ant's own side. Flat maps are
+  unchanged (`crossesCliff` is false without layers).
+- Tests: `tests/story.ts` (steering over a bank up, down and out of the hollow arrives; the crossing is seen).
+
+### 2026-11-02 — Caste looks in earth tones; tiles paid when placed, full stores stop the gathering (EotU)
+User notes 12:04 "change their colors to be more earth tone? like around grey, black, brown, sandy, grass green, dead
+grass, sky blue, and all of the above (earth tone red and purple and orange is fine too)" and 12:06 "fix the tile
+system and food system. if food stores are full, units stop collecting. and building with cost automatically takes food
+away and just waits for worker to build it. if you dont have enough food you cant build it similar to eotu". Branch
+`feature/caste-earth-tones` from `main` (`14d78e9`).
+- **Earth tones** (`render/casteLook.ts`): black, grey, slate, brown, sand, dead grass (straw), grass, moss, sky, earth
+  red, burnt orange, heather purple (every pair ΔE ≥ 24, mean chroma 31 against 57 before). Each caste maps one to one
+  from its old colour, so the rules hold (no repeat within a species, no repeated pair). The textures are unchanged.
+  Pale ants on the darkest badges; dark colours lifted on the top bar, the arena roster and the minimap.
+- **Tiles paid when placed** (`sim/tiles.ts`): placing takes the food at once (`Tile.paid`) and a worker then builds
+  the ghost; `canPlaceTile` refuses what the colony can't afford ("Not enough food: needs N"; the build command returns
+  that reason, the ghost shows it). Upgrades are paid when marked (`Tile.upPaid`). Cancelling a plan or an upgrade
+  (or a delete replacing a pending upgrade) gives the food back; what doesn't fit lies as seeds on the tile.
+  Save migration: plans and upgrades saved before the change carry no flag and still pay when finished.
+- **Full stores stop the gathering** (`sim/stores.ts`): foragers at a marker don't collect (they hold it); home
+  foragers and haulers stand down; aphid tenders stop; loads already carried come home. Leafcutters cut while the
+  garden has room; the garden converts leaves only while the food store has room. The player is told once per fill.
+- Protocol `ud-mp-8`. Text in the build panel, the help page, README and DESIGN (§3.7 placement and upgrades,
+  Foraging) updated.
+- Test `tests/foodTiles.ts` (paid on placing, refused when poor, refunds, upgrades, the old-save path, a full store
+  at a marker, the notice, leafcutters, an AI colony growing for 8 min with every plan paid, determinism); the earth
+  tones in `tests/casteLooks.ts`.
+
+### 2026-11-02 — Ground realism merged (user add-on, items 1–8)
+- Branch `feature/ground-realism` (b010a9a) merged into `main` by the story agent: procedural ground layers baked on the
+  GPU at real mm sizes (`render/ground/groundBake.ts`), height-blended with stochastic tiling and close-up self-shadow
+  (`render/terrainMesh.ts`), wetness by the water, floods and storms, sculpted and dressed banks and ramps
+  (`render/ground/bankSculpt.ts`, `bankDressing.ts`), water edges, rock surfaces, the story maps' moods. Render only;
+  nothing in the simulation changed. References and colour numbers: `docs/maps/realism.md` (photos study-only, not in
+  the repo). Creature and ant visibility on every ground type: `docs/maps/realism/visibility-probe.*`
+  (`tests/browser/ground_visibility.py`).
+- The helper's review rounds ended with the container it ran in (its last pushed commit is b010a9a); the comparison sheets
+  were study-only and never in the repo. A fresh render of both story maps was compared with the user's photos in chat.
+- Merge: clean (no conflicts); all 28 suites, the determinism check and the build pass.
+
 ## 2026-11-02 (afternoon) — The user's ratings: hell ant attacks and finisher, termite melee (CHANGE_PLAN §22.6)
 From the review page (`docs/realism/hell-nasute/README.md`, round 1 of the user's ratings):
 - Hell ants: the jaws gape much wider (`openExtra` 1.45) and work open and shut; three attacks (`ATK.SNAP`, `ATK.CHOMP`,

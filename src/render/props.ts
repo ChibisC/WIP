@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GL, bakedSurfacePatch } from './ground/surfacePatch';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Rng, fbm2, valueNoise2 } from '../core/rng';
 import { Prop, Terrain } from '../world/terrain';
@@ -289,6 +290,7 @@ export class Props {
     // Pebbles: instanced, a few geometry variants.
     const stoneMat = new THREE.MeshStandardMaterial({ map: tex.stone.map, normalMap: tex.stone.normal, roughness: 0.8, metalness: 0, color: 0xffffff });
     patchDapple(stoneMat);
+    bakedSurfacePatch(stoneMat, { layer: GL.ROCK, relief: 0.8 });
     const pebbles = byKind('pebble');
     const variants = [0, 1, 2, 3].map((i) => stoneGeometry(100 + i, 2, 0.35, 0.62));
     const perVar: Prop[][] = [[], [], [], []];
@@ -340,6 +342,7 @@ export class Props {
       });
       const rockMat = new THREE.MeshStandardMaterial({ map: tex.stone.map, normalMap: tex.stone.normal, roughness: 0.85, vertexColors: true });
       patchDapple(rockMat);
+      bakedSurfacePatch(rockMat, { layer: GL.ROCK });
       const rm = new THREE.Mesh(mergeGeometries(geos), rockMat);
       rm.castShadow = rm.receiveShadow = true;
       this.group.add(rm);

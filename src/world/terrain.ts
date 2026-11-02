@@ -710,6 +710,27 @@ export class Terrain {
     return L.level[j * this.nx + i];
   }
 
+  /** Layered ground: is (x, y) on a bank or a ramp side too steep to walk (a cliff cell)? False on flat maps. */
+  cliffAt(x: number, y: number): boolean {
+    const L = this.layers;
+    if (!L) return false;
+    const i = Math.min(this.nx - 1, Math.max(0, Math.round(x / this.res)));
+    const j = Math.min(this.ny - 1, Math.max(0, Math.round(y / this.res)));
+    return L.cliff[j * this.nx + i] !== 0;
+  }
+
+  /** Layered ground: does the straight line from (x0, y0) to (x1, y1) cross a bank (a cliff cell)? */
+  crossesCliff(x0: number, y0: number, x1: number, y1: number): boolean {
+    if (!this.layers) return false;
+    const d = Math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
+    const n = Math.ceil(d / Math.max(1, this.res * 0.75));
+    for (let s = 1; s <= n; s++) {
+      const u = s / n;
+      if (this.cliffAt(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u)) return true;
+    }
+    return false;
+  }
+
   /** Layered ground: on a ramp's walkway (its core, not its sides)? */
   onRamp(x: number, y: number): boolean {
     const L = this.layers;

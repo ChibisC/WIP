@@ -207,15 +207,15 @@ export class BuildPanel {
           bt.caste,
           casteIcon(bt.caste),
           nm,
-          `<b>${esc(nm)} brood tile</b> (${tier})${esc(TILE_INFO.brood.desc)}<br>Build <b>${tileCost(c, 'brood', bt.caste)}</b> ${res} · hatch <b>${hatchCost(bt.caste)}</b> ${res} · grows in ${growTime(bt.caste)} s<br>Holds ${cap.join(' / ')} ant${cap[2] > 1 ? 's' : ''} at levels I / II / III. Adjacent ${esc(nm.toLowerCase())} tiles form one chamber = one control group.${labour}`,
+          `<b>${esc(nm)} brood tile</b> (${tier})${esc(TILE_INFO.brood.desc)}<br>Build <b>${tileCost(c, 'brood', bt.caste)}</b> ${res} (paid when placed) · hatch <b>${hatchCost(bt.caste)}</b> ${res} · grows in ${growTime(bt.caste)} s<br>Holds ${cap.join(' / ')} ant${cap[2] > 1 ? 's' : ''} at levels I / II / III. Adjacent ${esc(nm.toLowerCase())} tiles form one chamber = one control group.${labour}`,
         );
       } else {
         const info = TILE_INFO[bt.type];
         const paid = bt.type === 'carton' ? 'wood' : res;
-        add(bt.type, undefined, hexSwatch(TILE_COL[bt.type] ?? '#888'), info.name.replace("Queen's ", ''), `<b>${esc(info.name)}</b>${esc(info.desc)}<br>Build <b>${tileCost(c, bt.type)}</b> ${paid} (paid when a worker finishes it).`);
+        add(bt.type, undefined, hexSwatch(TILE_COL[bt.type] ?? '#888'), info.name.replace("Queen's ", ''), `<b>${esc(info.name)}</b>${esc(info.desc)}<br>Build <b>${tileCost(c, bt.type)}</b> ${paid}, paid when you place it; a worker then builds it.`);
       }
     }
-    add('upgrade', undefined, ICONS.upgrade, 'Upgrade', `<b>Upgrade tool</b>Click tiles to mark upgrade jobs (cost = build cost; max level III). A tile needs <b>6</b> upgrade points for level II and <b>12</b> for level III, from its neighbours: each same-type tile gives its level, each soil wall 1, each highway its level. Big compact chambers upgrade best — a 19-tile hexagon can reach level III everywhere. Upgraded ants are healed and stronger. <span class="k">U</span>`);
+    add('upgrade', undefined, ICONS.upgrade, 'Upgrade', `<b>Upgrade tool</b>Click tiles to mark upgrade jobs (cost = build cost, taken when you mark it and given back if you cancel; max level III). A tile needs <b>6</b> upgrade points for level II and <b>12</b> for level III, from its neighbours: each same-type tile gives its level, each soil wall 1, each highway its level. Big compact chambers upgrade best — a 19-tile hexagon can reach level III everywhere. Upgraded ants are healed and stronger. <span class="k">U</span>`);
     add('remove', undefined, ICONS.trash, 'Delete', `<b>Delete tool</b>Click tiles to downgrade them one level at a time; at level I the tile is removed and its ant dies. Two-thirds of the build cost is dropped as seeds that workers carry back to storage. Also clears dig marks and cancels planned tiles. <span class="k">Del</span>`);
   }
 

@@ -5,6 +5,7 @@ import { speciesHooks } from './antAI';
 import { steerTo } from './movement';
 import { makeFood } from './factory';
 import { dhypot, dsin, sq } from './dmath';
+import { foodFull, storeFullFor } from './stores';
 
 /**
  * Species foraging behaviours that go beyond picking up food:
@@ -43,8 +44,20 @@ function inArea(area: { x: number; y: number; r: number } | null, x: number, y: 
 
 function forageSense(w: World, a: Ant, dt: number, area: { x: number; y: number; r: number } | null): boolean {
   const cd = casteOf(a.caste);
+  const c = w.colony(a.colony);
+  // EotU: nothing is gathered for a full store (stores.ts) — leaves for a full garden, honeydew for a full food store
+  const leafRoom = !c || !storeFullFor(c, 'leaf');
+  const dewRoom = !c || !foodFull(c);
+  if (!leafRoom && a.tk === 2 && a.state !== AS.CutLeaf) {
+    a.tk = 0;
+    a.tgt = 0;
+  }
+  if (!dewRoom && a.tk === 5 && a.state !== AS.TendAphids) {
+    a.tk = 0;
+    a.tgt = 0;
+  }
   // --- leaf cutting -------------------------------------------------------
-  if (cd.cutLeaves) {
+  if (cd.cutLeaves && (leafRoom || a.tk === 2)) {
     if (a.tk === 2) {
       const p = plantById(w, a.tgt);
       if (!p || p.leaf < 1) {
@@ -110,7 +123,7 @@ function forageSense(w: World, a: Ant, dt: number, area: { x: number; y: number;
     }
   }
   // --- honeydew milking ---------------------------------------------------
-  if (cd.tendAphids) {
+  if (cd.tendAphids && (dewRoom || a.tk === 5)) {
     if (a.tk === 5) {
       const ap = aphidById(w, a.tgt);
       const claimed = ap && ap.owner >= 0 && ap.owner !== a.colony && ap.tendT > 0;

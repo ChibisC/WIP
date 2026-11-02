@@ -311,7 +311,7 @@ export function jobWork(w: World, a: Ant, c: Colony, dt: number, nav: JobNav): v
   if (t.progress < BALANCE.jobPoints) return;
   if (k === JOB.Build) {
     if (!completeBuild(w, c, t)) {
-      if (c.player && w.s.tick % 100 === a.id % 100) w.events.emit({ t: 'message', text: 'Not enough food to finish building — the workers are waiting.', kind: 'warn', colony: c.id });
+      if (c.player && w.s.tick % 100 === a.id % 100) w.events.emit({ t: 'message', text: 'Not enough food to finish building (planned in an older save) — the workers are waiting.', kind: 'warn', colony: c.id });
       return;
     }
   } else if (k === JOB.Upgrade) {
