@@ -180,11 +180,11 @@ with sync_playwright() as pw:
                 t1 = time.time()
                 pg.evaluate(f"() => {{ const r = window.__session.view.surfaceRig; r.jumpTo({x}, {y + 12}, 230); r.yaw = r.goalYaw = 0.6; r.pitchBias = 0; }}")
                 pg.evaluate(PLACE, [x, y, ANTS, CRS, True])
-                pg.evaluate("window.__step(6, 1/30)")
+                pg.evaluate("window.__step(2, 1/30)")
                 a_on = Image.open(__import__("io").BytesIO(pg.screenshot()))
                 pts = pg.evaluate(PROJECT, [ANTS, CRS])
                 pg.evaluate(PLACE, [x, y, ANTS, CRS, False])
-                pg.evaluate("window.__step(6, 1/30)")
+                pg.evaluate("window.__step(2, 1/30)")
                 a_off = Image.open(__import__("io").BytesIO(pg.screenshot()))
                 m = measure(a_on, a_off, pts)
                 key = f"{M}/{name}/{preset}"

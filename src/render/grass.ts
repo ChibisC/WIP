@@ -163,7 +163,9 @@ export class Grass {
              float bayer[16] = float[16](0.0,8.0,2.0,10.0,12.0,4.0,14.0,6.0,3.0,11.0,1.0,9.0,15.0,7.0,13.0,5.0);
              float dither = (bayer[bi] + 0.5) / 16.0;
              float fade = smoothstep(rad*0.75, rad, dline);
-             if (vWP.y - uFocus.y > 6.0 && dither > fade && tt < L - 4.0) discard;
+             // dissolve upward (dithered over 4–16 mm) rather than a flat cut, so no blade ends in a sawn-off stub
+             float hcut = smoothstep(4.0, 16.0, vWP.y - uFocus.y) * (1.0 - fade);
+             if (dither < hcut && tt < L - 4.0) discard;
            }`,
         ],
         [

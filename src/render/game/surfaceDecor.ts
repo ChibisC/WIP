@@ -5,6 +5,7 @@ import { InstancedPool } from './instancedPool';
 import { crumbGeometry } from './foodModels';
 import { globalUniforms, patchDapple } from '../shaderPatch';
 import { Food, SURFACE } from '../../sim/types';
+import { thinLightPatch } from '../ground/surfacePatch';
 
 /** Colour every vertex of a geometry. */
 function tint(g: THREE.BufferGeometry, hex: number): THREE.BufferGeometry {
@@ -69,9 +70,39 @@ function holeDecal(): THREE.BufferGeometry {
   return g;
 }
 
-/** Simple dicot seedling leaf (unit length along +x), slightly cupped. */
+/**
+ * A plant stem (unit height): round, gently curved, tapering, with leaf nodes; paler and redder at the foot, a
+ * fine lengthwise ribbing in the colour (ground realism item 5).
+ */
+function stemGeometry(): THREE.BufferGeometry {
+  const g = new THREE.CylinderGeometry(0.42, 0.62, 1, 10, 8);
+  g.translate(0, 0.5, 0);
+  const p = g.attributes.position;
+  const col = new Float32Array(p.count * 3);
+  const base = new THREE.Color(0x7a6a3c);
+  const mid = new THREE.Color(0x5a8236);
+  const top = new THREE.Color(0x6e9a40);
+  const c = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i);
+    const node = 1 + 0.12 * Math.exp(-((((y * 4) % 1) - 0.5) ** 2) * 60);
+    p.setX(i, p.getX(i) * node + Math.sin(y * 2.2) * 0.35 * y);
+    p.setZ(i, p.getZ(i) * node);
+    const a = Math.atan2(p.getZ(i), p.getX(i));
+    c.copy(base).lerp(mid, Math.min(1, y * 5)).lerp(top, Math.max(0, y - 0.6) / 0.4);
+    c.multiplyScalar(0.92 + 0.12 * Math.sin(a * 10));
+    col.set([c.r, c.g, c.b], i * 3);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  const ng = g.toNonIndexed();
+  ng.deleteAttribute('uv');
+  return ng;
+}
+
+/** Simple dicot seedling leaf (unit length along +x), slightly cupped; a paler midrib and veins. */
 function plantLeafGeometry(): THREE.BufferGeometry {
-  const g = new THREE.PlaneGeometry(1, 0.55, 6, 3);
+  const g = new THREE.PlaneGeometry(1, 0.55, 12, 6);
   g.translate(0.5, 0, 0);
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) {
@@ -83,7 +114,19 @@ function plantLeafGeometry(): THREE.BufferGeometry {
   }
   g.rotateX(-Math.PI / 2);
   g.computeVertexNormals();
-  return tint(g, 0xffffff);
+  const ng = tint(g, 0xffffff);
+  // midrib and side veins a little paler (the instance colour tints the whole leaf)
+  const pp = ng.attributes.position;
+  const cc = ng.attributes.color;
+  for (let i = 0; i < pp.count; i++) {
+    const x = pp.getX(i);
+    const z = pp.getZ(i);
+    const rib = Math.exp(-(z * z) * 900);
+    const vein = Math.exp(-((Math.abs(z) * 2.2 - (x % 0.18) * 1.6) ** 2) * 2500) * 0.5;
+    const k = 1 + 0.28 * Math.min(1, rib + vein);
+    cc.setXYZ(i, k, k * 1.02, k * 0.9);
+  }
+  return ng;
 }
 
 /**
@@ -116,10 +159,11 @@ export class SurfaceDecor {
     this.holes = new InstancedPool(holeDecal(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), this.group, 8, false);
     this.spoil = new InstancedPool(crumbGeometry(), vc(0.95), this.group, 256);
     this.aphids = new InstancedPool(tint(aphidGeometry(), 0xffffff), new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.35, clearcoat: 0.5, sheen: 0.3 }), this.group, 128);
-    const stem = new THREE.CylinderGeometry(0.5, 0.7, 1, 6);
-    stem.translate(0, 0.5, 0);
-    this.stems = new InstancedPool(tint(stem, 0x5f8a3a), vc(0.7), this.group, 64);
-    this.leaves = new InstancedPool(plantLeafGeometry(), vc(0.6, { side: THREE.DoubleSide }), this.group, 256);
+    this.stems = new InstancedPool(stemGeometry(), vc(0.62), this.group, 64);
+    const leafMat = vc(0.55, { side: THREE.DoubleSide });
+    // ground realism item 5: the sun shows through the leaves when it is behind them
+    thinLightPatch(leafMat, 0.45);
+    this.leaves = new InstancedPool(plantLeafGeometry(), leafMat, this.group, 256);
     const ring = new THREE.RingGeometry(0.8, 1, 40).rotateX(-Math.PI / 2);
     this.foodRings = new InstancedPool(
       ring,

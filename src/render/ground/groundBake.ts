@@ -316,11 +316,11 @@ vec4 sward(vec2 u, bool dry) {
   for (int k = 0; k < 3; k++) {
     float fk = float(k);
     float n = 3.0 + fk;
-    float th = fibres(u + fk * 0.31, n, 0.85, dry ? 0.05 + fk * 0.008 : 0.06 + fk * 0.01, dry ? 0.5 : 0.55, 51.0 + fk * 3.0);
+    float th = fibres(u + fk * 0.31, n, 1.0, dry ? 0.045 + fk * 0.008 : 0.055 + fk * 0.01, dry ? 0.5 : 0.55, 51.0 + fk * 3.0);
     if (th < 0.2) continue;
     float lv = 1.0 + fk * 0.5;
     float id = gFib.x;
-    vec3 straw = mix(vec3(0.66, 0.58, 0.42), vec3(0.50, 0.45, 0.36), id);
+    vec3 straw = mix(vec3(0.62, 0.55, 0.40), vec3(0.42, 0.39, 0.33), id) * (0.85 + 0.2 * pn(u, 9.0, 57.0 + fk));
     if (dry) straw = mix(vec3(0.72, 0.62, 0.44), vec3(0.58, 0.50, 0.36), id);
     vec3 green = mix(vec3(0.36, 0.42, 0.20), vec3(0.46, 0.49, 0.27), id);
     vec3 bc = (!dry && id > 0.82) ? green : straw;
@@ -444,20 +444,21 @@ vec4 clay(vec2 u) {
 // ledges, rootlets, pebbles set in the face, burrow holes
 vec4 bankSoil(vec2 u) {
   vec2 w = warp(u, 3.0, 0.06, 101.0);
-  float sv = pf(vec2(0.5 + w.x * 0.15, w.y), 3.0, 4, 102.0);       // the strata: iso-lines of a function of height
-  vec3 c = mix(vec3(0.33, 0.25, 0.185), vec3(0.47, 0.37, 0.27), smoothstep(0.38, 0.5, sv));
-  c = mix(c, vec3(0.55, 0.41, 0.28), smoothstep(0.6, 0.66, sv) * 0.6);
+  // the strata: iso-lines of a function of height, wandering a little along the face (all periodic on the tile)
+  float sv = pf(vec2(0.5, w.y), 3.0, 4, 102.0) + (pf(w, 2.0, 2, 112.0) - 0.5) * 0.1;
+  vec3 c = mix(vec3(0.29, 0.225, 0.17), vec3(0.42, 0.335, 0.25), smoothstep(0.38, 0.5, sv));
+  c = mix(c, vec3(0.48, 0.37, 0.27), smoothstep(0.6, 0.66, sv) * 0.6);
   c = mix(c, vec3(0.40, 0.33, 0.26), smoothstep(0.3, 0.26, sv) * 0.5);
   float ledge = smoothstep(0.012, 0.0, abs(sv - 0.5)) + smoothstep(0.012, 0.0, abs(sv - 0.63)) * 0.8 + smoothstep(0.012, 0.0, abs(sv - 0.29)) * 0.6;
   float h = pf(u, 8.0, 4, 104.0) * 0.7 + smoothstep(0.38, 0.5, sv) * 0.6 + smoothstep(0.6, 0.66, sv) * 0.4;
-  Pt cl = scatter(u * vec2(1.0, 1.3), 7.0, 2, 0.6, 0.3, 0.6, 0.45, 0.45, 0.5, 105.0);
+  Pt cl = scatter(u, 7.0, 2, 0.6, 0.3, 0.6, 0.45, 0.45, 0.5, 105.0);
   Pt cr = scatter(u, 20.0, 2, 0.7, 0.25, 0.55, 0.5, 0.4, 0.55, 106.0);
   if (cr.h + 0.25 > h) { h = cr.h + 0.25; c *= 0.88 + 0.25 * cr.id; }
   if (cl.h + 0.35 > h) { h = cl.h + 0.35 + cr.h * 0.3; c *= 0.92 + 0.2 * cl.id; }
   c *= 1.0 - min(1.0, ledge) * 0.35;
   Pt pb = scatter(u, 6.0, 1, 0.16, 0.16, 0.28, 0.6, 0.15, 0.55, 107.0);
   if (pb.h > 0.0 && pb.h + 0.6 > h) { h = pb.h + 0.6; c = mix(vec3(0.46, 0.44, 0.40), vec3(0.55, 0.47, 0.38), pb.id) * (0.85 + 0.25 * pn(u, 160.0, 108.0)); }
-  float root = fibres(u * vec2(1.0, 0.5), 6.0, 1.2, 0.018, 0.3, 109.0);
+  float root = fibres(u, 6.0, 1.2, 0.016, 0.16, 109.0);
   if (root > 0.25) { c = mix(c, mix(vec3(0.54, 0.44, 0.33), vec3(0.40, 0.31, 0.23), gFib.x), root * 0.85); h = max(h, h * 0.7 + root * 0.8); }
   Pt hole = scatter(u, 4.0, 1, 0.2, 0.07, 0.12, 0.7, 0.2, 1.0, 110.0);
   if (hole.h > 0.0) { h -= hole.h * 1.5; c *= 0.3 + 0.5 * hole.d; }
@@ -498,7 +499,7 @@ vec4 bankSand(vec2 u) {
   vec2 w = warp(u, 3.0, 0.06, 131.0);
   float lam = sin((w.y * 14.0 + pf(u, 3.0, 3, 132.0) * 2.0) * 6.2832) * 0.5 + 0.5;
   vec3 c = s.rgb * (0.86 + 0.18 * lam);
-  float slump = smoothstep(0.55, 0.8, pf(u * vec2(1.0, 0.4), 5.0, 3, 133.0));
+  float slump = smoothstep(0.55, 0.8, pf(u * vec2(1.0, 2.0), 5.0, 3, 133.0));
   c *= 1.0 - slump * 0.12;
   // a pebble band
   float pbBand = smoothstep(0.75, 0.9, pn(vec2(0.5, w.y), 4.0, 134.0));

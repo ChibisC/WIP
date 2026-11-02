@@ -80,13 +80,13 @@ export class Water {
            diffuseColor.a *= clamp(op * 1.2, 0.0, 1.0) * smoothstep(0.0, 0.3, dep);
            diffuseColor.rgb *= mix(1.3, 0.82, smoothstep(0.5, 5.0, dep));
            // the edge: a broken line of foam and scum where the water meets the shore, drifting a little
-           float edge = 1.0 - smoothstep(0.12, 1.2, dep);
+           float edge = smoothstep(0.02, 0.1, dep) * (1.0 - smoothstep(0.12, 0.55, dep));
            float fn1 = texture2D(tNoise, vWP.xz / 40.0 + vec2(uTime * 0.002, uTime * 0.0013)).r;
            float fn2 = texture2D(tNoise, vWP.xz / 20.0 - vec2(uTime * 0.004, -uTime * 0.003)).b;
-           float foam = edge * smoothstep(0.52, 0.7, fn1 * 0.55 + fn2 * 0.55);
+           float foam = edge * smoothstep(0.62, 0.8, fn1 * 0.5 + fn2 * 0.6);
            float bub = edge * step(0.975, texture2D(tNoise, vWP.xz / 70.0 + vec2(uTime * 0.001, 0.0)).a) * 0.8;
-           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.80, 0.78, 0.72), max(foam * 0.8, bub));
-           diffuseColor.a = max(diffuseColor.a, max(foam * 0.85, bub));
+           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.72, 0.66), max(foam * 0.7, bub));
+           diffuseColor.a = max(diffuseColor.a, max(foam * 0.7, bub));
            // floating specks: grit, seeds, bits of plant (no leaves), thicker toward the shore
            float speck = step(0.982, texture2D(tNoise, vWP.xz / 85.0 + 0.5).a) * (1.0 - smoothstep(0.5, 5.0, dep));
            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.17, 0.13, 0.09), speck * 0.8);

@@ -61,6 +61,8 @@ export class TerrainMesh {
     uStormWet: { value: 0 },
     uDew: { value: 0 },
     uRelief: { value: GL_RELIEF.slice() },
+    /** stochastic-tiling cells per tile, per layer */
+    uStoch: { value: GL_RELIEF.map((_, i) => (i === GL.SWARD || i === GL.DRY_SWARD ? 1.1 : i === GL.BANK_ROOT ? 1.4 : 2.6)) },
     uDetailFade: { value: 1 },
     /** 0..1: how much the gameplay-zoom ground calms its ant-sized contrast (user rule: units stay readable) */
     uReadable: { value: 1 },
@@ -527,7 +529,7 @@ precision highp sampler2DArray;
 varying vec4 vCover; varying vec4 vG1; varying vec4 vG2; varying vec3 vNW;
 uniform sampler2DArray tGA, tGN;
 uniform sampler2D tNoise, uPhero, uDesign;
-uniform vec4 uChan; uniform float uInvTile[${GL_COUNT}]; uniform float uRelief[${GL_COUNT}];
+uniform vec4 uChan; uniform float uInvTile[${GL_COUNT}]; uniform float uRelief[${GL_COUNT}]; uniform float uStoch[${GL_COUNT}];
 uniform vec4 uZoneWet; uniform float uStormWet, uDew, uDetailFade, uReadable, uDampMoss; uniform vec2 uBand; uniform float uFaceDefault;
 uniform float uPheroOn; uniform vec3 uPheroColor; uniform vec2 uMapSize;
 
@@ -541,7 +543,8 @@ vec2 gRot(vec2 v, float a) { float c = cos(a), s = sin(a); return vec2(c * v.x -
 // one layer, sampled with stochastic tiling: three randomly offset and rotated taps over a triangle grid, blended by
 // height (the dominant tap's uv and angle are kept for the self-shadow march)
 LS gLayer(float L, vec2 uv, vec2 dx, vec2 dy, bool rotate) {
-  vec2 q = uv * 2.6;
+  // the blend cells are larger on fibrous layers (long blades are not cut short where the taps change)
+  vec2 q = uv * uStoch[int(L + 0.5)];
   vec2 sk = vec2(q.x - 0.57735027 * q.y, 1.15470054 * q.y);
   vec2 b = floor(sk);
   vec3 t = vec3(fract(sk), 0.0); t.z = 1.0 - t.x - t.y;
@@ -595,20 +598,25 @@ GS groundShade() {
   float mud = smoothstep(0.55, 0.95, wetStatic) * (1.0 - sandy * 0.7) * (1.0 - trail);
   cw *= 1.0 - mud;
   // damp moss on the shady wet margin of water (not on sand), where the ground stays wet but not flooded
-  float dampMoss = smoothstep(0.18, 0.4, wetStatic) * (1.0 - smoothstep(0.55, 0.8, wetStatic)) * (1.0 - sandy) * (1.0 - trail) * uDampMoss;
+  // (patchy: moss holds in some places and not others)
+  float dampMoss = smoothstep(0.18, 0.4, wetStatic) * (1.0 - smoothstep(0.55, 0.8, wetStatic)) * (1.0 - sandy) * (1.0 - trail) * uDampMoss
+                 * smoothstep(0.35, 0.65, texture2D(tNoise, P.xz / 140.0 + 0.23).r);
   cw *= 1.0 - dampMoss * 0.7;
   float W[8]; float Ls[8];
   W[0] = cw.x; Ls[0] = uChan.x; W[1] = cw.y; Ls[1] = uChan.y; W[2] = cw.z; Ls[2] = uChan.z; W[3] = cw.w; Ls[3] = uChan.w;
   W[4] = gravel; Ls[4] = ${GL.GRAVEL}.0; W[5] = mud; Ls[5] = ${GL.MUD}.0; W[6] = trail; Ls[6] = sandy > 0.45 ? uChan.z : ${GL.TRAIL}.0;  // a sand slide wears to packed sand
   W[7] = dampMoss * 0.8; Ls[7] = ${GL.MOSS}.0;
   // the three heaviest layers only (the rest are below the height blend's reach anyway)
-  float wa = 0.02, wb = 0.02, wc = 0.02; float la = -1.0, lb = -1.0, lc = -1.0;
+  float wa = 0.02, wb = 0.02, wc = 0.02, wd = 0.0; float la = -1.0, lb = -1.0, lc = -1.0;
   for (int i = 0; i < 8; i++) {
     float w = W[i]; float l = Ls[i];
-    if (w > wa) { wc = wb; lc = lb; wb = wa; lb = la; wa = w; la = l; }
-    else if (w > wb) { wc = wb; lc = lb; wb = w; lb = l; }
-    else if (w > wc) { wc = w; lc = l; }
+    if (w > wa) { wd = wc; wc = wb; lc = lb; wb = wa; lb = la; wa = w; la = l; }
+    else if (w > wb) { wd = wc; wc = wb; lc = lb; wb = w; lb = l; }
+    else if (w > wc) { wd = wc; wc = w; lc = l; }
+    else wd = max(wd, w);
   }
+  // the third layer fades out as the fourth catches up (no seam where they swap)
+  wc *= smoothstep(wd, wd + 0.12, wc);
   vec3 alb = vec3(0.0); vec3 mean = vec3(0.0); float rough = 0.0; vec2 nrm = vec2(0.0); float cav = 0.0; float tot = 0.0;
   LS A, B, C;
   float sa = -1.0, sb = -1.0, sc_ = -1.0;
@@ -644,14 +652,30 @@ GS groundShade() {
   if (faceW > 0.01) {
     float style = floor(vG1.w * 8.0 + 0.5);
     float FL = style < 0.5 ? uFaceDefault : style < 1.5 ? ${GL.BANK_SOIL}.0 : style < 2.5 ? ${GL.ROCK}.0 : style < 3.5 ? ${GL.BANK_ROOT}.0 : style < 4.5 ? ${GL.BANK_SAND}.0 : ${GL.CLAY}.0;
-    vec2 hz = normalize(N.xz + vec2(1e-4, 0.0));
-    vec3 Tf = normalize(vec3(hz.y, 0.0, -hz.x));
-    vec3 Bf = normalize(vec3(0.0, 1.0, 0.0) - N * N.y);
+    // projected on the two vertical world planes (fixed axes, so lumps on the face never swirl the strata), blended
+    // by which way the face looks
     float it = uInvTile[int(FL)];
-    vec2 uv = vec2(dot(P, Tf), P.y) * it;
-    LS F = gLayer(FL, uv, vec2(dot(dPx, Tf), dPx.y) * it, vec2(dot(dPy, Tf), dPy.y) * it, false);
-    alb = mix(alb, F.alb, faceW); mean = mix(mean, F.mean, faceW); rough = mix(rough, F.rough, faceW); cav = mix(cav, F.cav, faceW);
-    vec3 nf = normalize(Tf * F.n.x * relief + Bf * F.n.y * relief + N);
+    vec3 Bf = normalize(vec3(0.0, 1.0, 0.0) - N * N.y);
+    float bx = abs(N.x), bz = abs(N.z);
+    float wx = smoothstep(0.38, 0.62, bx / max(bx + bz, 1e-4));
+    vec3 fAlb = vec3(0.0), fMean = vec3(0.0), fN = vec3(0.0); float fRough = 0.0, fCav = 0.0;
+    if (wx < 0.999) {
+      float sg = N.z >= 0.0 ? 1.0 : -1.0;
+      LS F = gLayer(FL, vec2(P.x * sg, P.y) * it, vec2(dPx.x * sg, dPx.y) * it, vec2(dPy.x * sg, dPy.y) * it, false);
+      vec3 T = normalize(vec3(sg, 0.0, 0.0) - N * N.x * sg);
+      float w = 1.0 - wx;
+      fAlb += F.alb * w; fMean += F.mean * w; fRough += F.rough * w; fCav += F.cav * w;
+      fN += (T * F.n.x + Bf * F.n.y) * w;
+    }
+    if (wx > 0.001) {
+      float sg = N.x >= 0.0 ? -1.0 : 1.0;
+      LS F = gLayer(FL, vec2(P.z * sg + 37.0, P.y) * it, vec2(dPx.z * sg, dPx.y) * it, vec2(dPy.z * sg, dPy.y) * it, false);
+      vec3 T = normalize(vec3(0.0, 0.0, sg) - N * N.z * sg);
+      fAlb += F.alb * wx; fMean += F.mean * wx; fRough += F.rough * wx; fCav += F.cav * wx;
+      fN += (T * F.n.x + Bf * F.n.y) * wx;
+    }
+    alb = mix(alb, fAlb, faceW); mean = mix(mean, fMean, faceW); rough = mix(rough, fRough, faceW); cav = mix(cav, fCav, faceW);
+    vec3 nf = normalize(fN * relief + N);
     nWorld = normalize(mix(nWorld, nf, faceW));
   }
 
@@ -682,7 +706,9 @@ GS groundShade() {
 #endif
 
   // ---- light baked into the ground: hollows, the foot of banks; the lip drier, crumbs spilled at the foot
-  alb *= mix(1.0, cav, 0.6 * (1.0 - read * 0.5));
+  alb *= mix(1.0, cav, 0.75 * (1.0 - read * 0.55));
+  // close up, the particles' own contrast a touch stronger (real soil: luminance std/mean 0.5–0.9)
+  alb = max(mean + (alb - mean) * (1.0 + 0.15 * (1.0 - read)), alb * 0.5);
   float ao = vG1.y;
   alb *= mix(0.62, 1.0, ao);
   // the lip: flat ground beside it dries first (paler); on the face itself the top band is the dark, root-filled
