@@ -1333,3 +1333,18 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
   decapitate the soldier within a second); the builder-growth check averages seeds 7–9 (7–11: 22, 21, 26, 24, 24).
   Found on the way: the suite runner skipped `tests/run-all.ts` (its pattern had no `-`); its "hex radius" check
   predated the 1.25 × hexes and now expects 6 × `NEST_HEX_SCALE`.
+- **Screenshot review fixes:** the fire-ant dome was built after its holes, so it covered them: the domes are now built
+  first and the anthill rebuilt when one grows, its lumps and clods keep off the holes, and the holes sit about 0.75 of
+  its radius out; hell-ant and sickle-jaw litter thinned (the user removed fallen leaves for visibility on 2026-11-01).
+  Shots: `docs/maps/entrances-v2/` (`tests/browser/entrances_v2.py`); the 2026-10-26 shots in `docs/maps/entrances/`
+  (extra entrances, plugs) removed.
+- **Checks:** `npm ci`, `npm test` (24 suites), determinism (60 files clean), `npm run build`; `tools/height-data.ts`
+  and `tools/climb-data.ts` regenerate unchanged. 10-colony tick time (`tools/map-perf.ts -- 90`): Meadow Pond 3.30 ms
+  avg / p95 7.5 (`main` 3.45 / 7.0), Forest Floor 2.56 / 5.3 (2.62 / 5.3). LAN two tabs (`tests/browser/lan.py`
+  ONLY=two): hashes match, no desync; one UI check ("asking for 2x shows the other player an Agree button") failed once
+  while the full suite ran beside it — not looked into further (speed-vote UI, untouched here).
+- **Merge (claude/handoff/00-MERGE-RULE.md):** `origin/main` had nothing new (still `fc6f58a`); `feature/story` is
+  work in progress (not merged; it branches from `fc6f58a` and touches `session.ts`, `mapGen.ts` and the termants —
+  it will need this merge); the older feature branches are already in `main` in other forms. Removed as replaced:
+  extra entrances, spots, shafts, entrance digs, plugging, the AI's extra entrance, the old entrance tests and
+  screenshots.
