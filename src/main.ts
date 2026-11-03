@@ -127,6 +127,8 @@ function startGame(): void {
         colonies.push({ species: 'lasius', player: false, ai: true, team: 0, name: 'Allied black ants', developed: 3, startWorkers: 8 });
         caves.push({ name: 'Beetle den', kind: 'lair', food: 40 });
       }
+      // ?developed=N: every colony starts grown by N tiles (test scenes and clips: tests/browser/ai_help.py)
+      if (q.get('developed')) for (const col of colonies) col.developed = Number(q.get('developed'));
       // the map grows with the number of colonies so nests are not crowded
       const size = colonies.length <= 2 ? 640 : colonies.length <= 4 ? 800 : 980;
       // (story: the campaign's traits come along; ?retry=1 — a restart from the level-end screen — skips the opening flight)
@@ -139,7 +141,14 @@ function startGame(): void {
         caves,
         food: 1.2,
         // floods only on an authored map, and only when the player turned them on (off by default)
-        settings: { creatures: q.get('creatures') ? Number(q.get('creatures')) : 1, ...((c.floods || q.get('floods')) && c.map && !mission ? { floods: true } : {}), ...(c.titanRaids === false || q.get('titans') === '0' ? { titanRaids: false } : {}) },
+        settings: {
+          creatures: q.get('creatures') ? Number(q.get('creatures')) : 1,
+          ...((c.floods || q.get('floods')) && c.map && !mission ? { floods: true } : {}),
+          // AI level (CHANGE_PLAN §23): the menu's choice, or ?ailevel=0..3
+          ...(q.get('ailevel') || (c.aiLevel !== undefined && c.aiLevel !== 1) ? { aiLevel: q.get('ailevel') ? Number(q.get('ailevel')) : c.aiLevel } : {}),
+          // titans raid nests (claude/creatures/01-spec-digging-titans.md): on unless the menu or ?titans=0 says no
+          ...(c.titanRaids === false || q.get('titans') === '0' ? { titanRaids: false } : {}),
+        },
         mission: mission?.id,
         sandbox: c.mode === 'sandbox',
         ...(q.get('titanRaid') ? { devTitanRaid: q.get('titanRaid')! } : {}),
@@ -260,7 +269,11 @@ function startGame(): void {
     setTimeout(() => ((window as unknown as { __ready: boolean }).__ready = true), 800);
   };
   if (q.get('play')) {
-    launch({ teams: Number(q.get('teams') || 2), mode: (q.get('mode') as MenuChoice['mode']) || (q.get('mission') ? 'mission' : 'skirmish'), mission: (q.get('mission') as MenuChoice['mission']) || 'meadow', species: (q.get('species') as MenuChoice['species']) || 'lasius', borrowed: (q.get('borrow') || 'formica_mortar,fire_major').split(','), ais: (q.get('rival') || '').split(',').filter(Boolean).map((sp) => ({ species: sp as MenuChoice['species'], borrowed: [], team: 'own' as const })), style: (q.get('style') as MenuChoice['style']) || (q.get('mode') === 'arena' ? 'formicarium' : 'meadow'), map: (q.get('map') as MenuChoice['map']) || undefined, quality: (q.get('q') as MenuChoice['quality']) || 'high' });
+    launch({ teams: Number(q.get('teams') || 2), mode: (q.get('mode') as MenuChoice['mode']) || (q.get('mission') ? 'mission' : 'skirmish'), mission: (q.get('mission') as MenuChoice['mission']) || 'meadow', species: (q.get('species') as MenuChoice['species']) || 'lasius', borrowed: (q.get('borrow') || 'formica_mortar,fire_major').split(','), ais: [
+        ...(q.get('rival') || '').split(',').filter(Boolean).map((sp) => ({ species: sp as MenuChoice['species'], borrowed: [], team: 'own' as const })),
+        // ?allies=: AI colonies on your team (CHANGE_PLAN §23)
+        ...(q.get('allies') || '').split(',').filter(Boolean).map((sp) => ({ species: sp as MenuChoice['species'], borrowed: [], team: 'ally' as const })),
+      ], style: (q.get('style') as MenuChoice['style']) || (q.get('mode') === 'arena' ? 'formicarium' : 'meadow'), map: (q.get('map') as MenuChoice['map']) || undefined, quality: (q.get('q') as MenuChoice['quality']) || 'high' });
     return;
   }
   const title = () => showTitle(ui, () => showMenu(ui, launch), () => mpMenu(), (bytes) => watchReplay(bytes), { slot: (sl) => void loadSlot(sl), file: (b) => void loadGame(b) }, () => storyHub());

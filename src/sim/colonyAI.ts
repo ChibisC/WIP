@@ -1,9 +1,9 @@
 import { World } from './world';
 import { AphidCluster, AS, Colony, SURFACE, TileType } from './types';
-import { CASTES, casteOf, isTermiteSpecies, tierOf } from './species';
+import { CASTES, basicCaste, casteOf, isTermiteSpecies, tierOf } from './species';
 import { designateDig } from './colony';
 import type { NestGrid } from '../world/nestGrid';
-import { buildableTiles, canPlaceTile, hatchCost, placeTile, raisesAnts, tileCost } from './tiles';
+import { MAX_TILE_LEVEL, buildableTiles, canPlaceTile, hatchCost, markUpgrade, placeTile, popUsed, raisesAnts, tileAnts, tileAt, tileCapacity, tileCost, upgradeCost, upgradeNeed, upgradePoints } from './tiles';
 import { JOB, listJobs } from './jobs';
 import { assignGroup, markerRadius, placeMarker, removeMarker } from './markers';
 import { creatureHooks } from './combat';
@@ -18,35 +18,29 @@ import { termantAI, woodWant } from './termants';
  * Drives every AI colony (rivals grow their nests), and the growth harness
  * that tunes the economy. Combat and marker decisions live elsewhere.
  *
- * Every couple of seconds it:
- *  1. digs the nest EotU-style (user note, 2026-10-25): round 7-hex chambers
- *     (a centre and its six neighbours, like the queen's chamber) for brood and
- *     for food stores, each joined to the nest by a short tunnel and walled off
- *     from the others by a hex of soil; a new chamber is planned when the free
- *     floor in the chambers runs low;
- *  2. spends food, one tile at a time, in priority order:
+ * Every couple of seconds it (CHANGE_PLAN §23; first version 2026-10-25):
+ *  1. digs the nest EotU-style: chambers of 7 hexes (a centre and its ring) or,
+ *     from mid game, 19 (two rings) for its main castes and leafcutter fungus,
+ *     each in solid soil walled off from the others and joined to the nest by a
+ *     tunnel; each holds ONE tile type (brood: one caste), so each is one
+ *     commandable group; the next chamber is planned for whatever the last
+ *     think had no room for (or whose rooms are nearly full); at most two food
+ *     store chambers, beside the entrance;
+ *  2. spends food, one tile at a time, in priority order, in its own room from
+ *     the centre outward:
  *     - a food store when the stores are nearly full (income would be wasted);
  *     - a species special tile when below its share (pastures, thatch, fungus);
  *     - a brood tile of the caste furthest below the target mix, but only when
- *       the colony can also pay to raise its ant and few tiles are still empty.
- * Groups grow to `GROUP_SIZE` tiles, then a new group is started, so the
- * colony ends up with several commandable groups like a player's.
+ *       the colony can also pay to raise its ant and few tiles are still empty;
+ *  3. lays highways on the tunnels (the entrance passage and the stores' first);
+ *  4. from mid game, upgrades tiles that have the points (`BALANCE.aiBuild`).
  */
 
 const THINK_EVERY = 2; // seconds
-const GROUP_SIZE = 8;
-const FOOD_CAP_MAX = 1600;
 
-export interface BuildBrain {
-  t: number;
-  /** the last placement found only hexes touching full groups: dig more */
-  blocked: boolean;
-  /** target fraction of brood tiles per caste */
-  mix: Record<string, number>;
-  /** planned chambers (centre hex and what goes in it) and the tunnel hexes joining them (kept clear of tiles) */
-  chambers?: Array<{ q: number; kind: 'brood' | 'food' }>;
-  tunnels?: number[];
-}
+export type BuildBrain = NonNullable<Colony['aiBuild']>;
+type Chamber = NonNullable<BuildBrain['chambers']>[number];
+type Need = { type: TileType; caste?: string };
 
 /** Target caste mix by species (fractions of brood tiles). */
 export function defaultMix(c: Colony): Record<string, number> {
@@ -124,6 +118,309 @@ function jitter(q: number): number {
   return s - Math.floor(s);
 }
 
+// ---------------------------------------------------------------------------
+// Chambers (CHANGE_PLAN §23): a 7-hex rosette (radius 1) or a 19-hex hexagon (radius 2), one tile type each
+// ---------------------------------------------------------------------------
+
+/** The AI level (settings.aiLevel): 0 Easy … 3 Brutal, 1 by default. */
+function aiLevel(w: World): number {
+  return Math.max(0, Math.min(3, Math.round(w.s.settings.aiLevel ?? 1)));
+}
+
+function chType(ch: Chamber): TileType {
+  return ch.type ?? (ch.kind === 'food' ? 'food' : 'brood');
+}
+function chR(ch: Chamber): number {
+  return ch.r ?? 1;
+}
+
+/** Hexes within r steps of q: the centre, then ring by ring (each ring in index order). */
+function disc(g: NestGrid, q: number, r: number): number[] {
+  const out = [q];
+  const seen = new Set<number>([q]);
+  let ring = [q];
+  for (let k = 0; k < r; k++) {
+    const next: number[] = [];
+    for (const h of ring)
+      for (const n of g.neighbors(h))
+        if (n >= 0 && !seen.has(n)) {
+          seen.add(n);
+          next.push(n);
+        }
+    next.sort((a, z) => a - z);
+    out.push(...next);
+    ring = next;
+  }
+  return out;
+}
+
+/** Does chamber ch hold tiles of this type (and caste)? Old saves' brood chambers take any caste. */
+function holds(ch: Chamber, type: TileType, caste?: string): boolean {
+  return chType(ch) === type && (type !== 'brood' || ch.caste === undefined || ch.caste === caste);
+}
+
+/** The founding ring round the queen's chamber (the starting floor): the colony's first worker room. */
+function founding(c: Colony, home: number): Chamber {
+  return { q: home, r: 2, type: 'brood', caste: basicCaste(c.species) };
+}
+
+/** The rooms that take a tile of this type (and caste): the founding ring for the first workers, then the chambers. */
+function roomsFor(c: Colony, b: BuildBrain, home: number, type: TileType, caste?: string): Chamber[] {
+  const out: Chamber[] = [];
+  const f = founding(c, home);
+  if (holds(f, type, caste)) out.push(f);
+  for (const ch of b.chambers ?? []) if (holds(ch, type, caste)) out.push(ch);
+  return out;
+}
+
+/** Free floor of a room, from its centre outward (inner tiles get the most upgrade points). */
+function freeIn(g: NestGrid, ch: Chamber, occupied: Set<number>): number[] {
+  return disc(g, ch.q, chR(ch)).filter((q) => g.isHexDug(q) && !g.isEntrance(q) && !occupied.has(q));
+}
+
+/** Free and still-to-dig floor of the rooms for a tile type (caste). */
+function roomFor(g: NestGrid, rooms: Chamber[], occupied: Set<number>): { free: number; coming: number } {
+  let free = 0;
+  let coming = 0;
+  for (const ch of rooms)
+    for (const q of disc(g, ch.q, chR(ch))) {
+      if (occupied.has(q) || g.isEntrance(q)) continue;
+      if (g.isHexDug(q)) free++;
+      else if (g.isHexDiggable(q)) coming++;
+    }
+  return { free, coming };
+}
+
+/** Food store chambers so far. */
+function storeChambers(b: BuildBrain): number {
+  return (b.chambers ?? []).filter((ch) => chType(ch) === 'food').length;
+}
+
+/** The colony's mid game (× the level): 19-hex chambers and upgrades start. */
+function midGame(w: World, c: Colony, from: { ants: number; time: number }): boolean {
+  const k = BALANCE.aiBuild.levelFrom[aiLevel(w)];
+  return c.living >= from.ants * k && w.s.time >= from.time * k;
+}
+
+/** One of the colony's main castes (workers for the economy, its main fighter for war): 19-hex chambers. */
+function mainCaste(c: Colony, b: BuildBrain, caste: string): boolean {
+  const share = b.mix[caste] ?? 0;
+  if (share < BALANCE.aiBuild.mainShare || CASTES[caste].species !== CASTES[basicCaste(c.species)].species) return false;
+  // the biggest share among its own kind (workers, or fighters)
+  const fight = isFighter(caste);
+  for (const [cs, f] of Object.entries(b.mix)) if (cs !== caste && isFighter(cs) === fight && c.castes.includes(cs) && f > share) return false;
+  return true;
+}
+
+/** How big the next chamber for this tile is: 19 hexes for the main castes (and leafcutter fungus) from mid game. */
+function chamberRadius(w: World, c: Colony, b: BuildBrain, need: Need): number {
+  const A = BALANCE.aiBuild;
+  if (!midGame(w, c, A.chamber19From)) return 1;
+  if (need.type === 'fungus') return 2;
+  if (need.type === 'food') return storeChambers(b) >= 1 && (c.species === 'atta' || c.living >= A.bigColony) ? 2 : 1;
+  if (need.type === 'brood' && need.caste) return mainCaste(c, b, need.caste) ? 2 : 1;
+  return 1;
+}
+
+/** Hexes of the planned tunnels and chambers (tunnels, then each room). */
+function planned(g: NestGrid, b: BuildBrain): number[] {
+  const out: number[] = [...(b.tunnels ?? [])];
+  for (const ch of b.chambers ?? []) out.push(...disc(g, ch.q, chR(ch)));
+  return out;
+}
+
+/**
+ * The planned hexes still to dig, in digging order: outward from the dug nest (a hex is dug only from a dug neighbour,
+ * so the ones touching dug floor first, then theirs…), any the walk cannot reach last.
+ */
+function digOrder(g: NestGrid, b: BuildBrain): number[] {
+  const todo = planned(g, b).filter((q) => g.isHexDiggable(q));
+  const left = new Set(todo);
+  const out: number[] = [];
+  let ring = todo.filter((q) => g.neighbors(q).some((n) => n >= 0 && g.isHexDug(n)));
+  for (const q of ring) left.delete(q);
+  while (ring.length) {
+    out.push(...ring);
+    const next: number[] = [];
+    for (const q of ring)
+      for (const n of g.neighbors(q))
+        if (n >= 0 && left.has(n)) {
+          left.delete(n);
+          next.push(n);
+        }
+    ring = next;
+  }
+  for (const q of todo) if (left.has(q)) out.push(q);
+  return out;
+}
+
+/** Every entrance hex of the nest (today's ramps; the 7-hex flower after the entrance rework). */
+function entranceHexes(g: NestGrid): number[] {
+  const out: number[] = [];
+  for (let q = 0; q < g.cols * g.rows; q++) if (g.isEntrance(q)) out.push(q);
+  return out;
+}
+
+/**
+ * Plan the next chamber, for `need`: a rosette (7) or hexagon (19) of solid soil, walled off from every other room by
+ * at least `rimGapMin` hexes of soil and no more than `rimGapMax` from the nearest, and the shortest tunnel to it from
+ * the dug nest (never through another room, never beside an entrance). Stores go within `storeNearEntrance` of the
+ * entrance. Deterministic: candidates by distance, ties by hex jitter.
+ */
+function planChamber(w: World, c: Colony, b: BuildBrain, home: number, need: Need): boolean {
+  const A = BALANCE.aiBuild;
+  const g = w.nest(c.id)!;
+  const N = g.cols * g.rows;
+  const store = need.type === 'food';
+  if (store && storeChambers(b) >= A.maxStoreChambers) return false;
+  const r = chamberRadius(w, c, b, need);
+  const size = 1 + 3 * r * (r + 1);
+  const rooms: Chamber[] = [{ q: home, r: 2 }, ...(b.chambers ?? [])];
+  const tunnels = b.tunnels ?? (b.tunnels = []);
+  const ents = entranceHexes(g);
+  const nearEnt = new Set<number>();
+  for (const e of ents) for (const n of g.neighbors(e)) if (n >= 0 && !g.isEntrance(n)) nearEnt.add(n);
+  const ok = (q: number, hs: number[]) => {
+    if (hs.length !== size || hs.some((h) => !g.isHexDiggable(h) || g.isEntrance(h) || nearEnt.has(h))) return false;
+    // carved out of solid soil, with a wall of soil all round (the tunnel will cut through it)
+    for (const h of hs) for (const n of g.neighbors(h)) if (n < 0 || g.isHexDug(n)) return false;
+    for (const t of c.tiles) if (hs.includes(t.q)) return false;
+    return true;
+  };
+  const cands: Array<{ q: number; s: number }> = [];
+  for (let q = 0; q < N; q++) {
+    let near = Infinity;
+    let tooClose = false;
+    for (const ch of rooms) {
+      const gap = g.hexDistance(q, ch.q) - r - chR(ch);
+      if (gap < A.rimGapMin) tooClose = true;
+      near = Math.min(near, gap);
+    }
+    if (tooClose || near > A.rimGapMax) continue;
+    let ent = Infinity;
+    if (store) {
+      for (const e of ents) ent = Math.min(ent, g.hexDistance(q, e) - r);
+      if (ent > A.storeNearEntrance) continue;
+    }
+    const hs = disc(g, q, r);
+    if (!ok(q, hs)) continue;
+    // stores beside the entrance (foragers drop food quickly); the rest close to the queen and the other rooms
+    cands.push({ q, s: (store ? ent : g.hexDistance(q, home)) + near * 0.5 + jitter(q) * 0.7 });
+  }
+  cands.sort((x, z) => x.s - z.s);
+  // (a tunnel may open into the founding ring or a passage, never into another chamber)
+  const blocked = new Set<number>();
+  for (const ch of b.chambers ?? []) for (const h of disc(g, ch.q, chR(ch))) blocked.add(h);
+  // every candidate's tunnel (the nearest by score first); the best of score + tunnel length wins
+  const prev = new Int32Array(N);
+  let pick: { q: number; path: number[]; s: number } | null = null;
+  for (const cand of cands.slice(0, A.planTries)) {
+    if (pick && cand.s >= pick.s) break; // (a tunnel only adds: nothing later can beat it)
+    const best = cand.q;
+    // tunnel: breadth-first from the room's rim through soil to the dug nest (not through other rooms or past an entrance)
+    const room = new Set(disc(g, best, r));
+    prev.fill(-2);
+    const queue: number[] = [];
+    for (const h of room) {
+      prev[h] = -1;
+      queue.push(h);
+    }
+    let hit = -1;
+    for (let i = 0; i < queue.length && hit < 0; i++) {
+      const q = queue[i];
+      for (const n of g.neighbors(q)) {
+        if (n < 0 || prev[n] !== -2 || blocked.has(n)) continue;
+        if (g.isHexDug(n) && !room.has(n)) {
+          if (g.isEntrance(n)) continue;
+          prev[n] = q;
+          hit = n;
+          break;
+        }
+        if (!g.isHexDiggable(n) || g.isEntrance(n) || nearEnt.has(n)) continue;
+        prev[n] = q;
+        queue.push(n);
+      }
+    }
+    if (hit < 0) continue;
+    const path: number[] = [];
+    for (let q = prev[hit]; q >= 0 && !room.has(q); q = prev[q]) path.push(q);
+    if (path.length < 1 || path.length > A.tunnelMax) continue; // a tunnel, with a wall of soil beside it
+    const s = cand.s + path.length * A.tunnelWeight;
+    if (!pick || s < pick.s) pick = { q: best, path, s };
+  }
+  if (!pick) return false;
+  (b.chambers ?? (b.chambers = [])).push(need.type === 'brood' ? { q: pick.q, r, type: 'brood', caste: need.caste } : { q: pick.q, r, type: need.type });
+  for (const q of pick.path) if (!tunnels.includes(q)) tunnels.push(q);
+  return true;
+}
+
+function isFighter(cs: string): boolean {
+  const r = CASTES[cs].role;
+  return r === 'soldier' || r === 'major';
+}
+
+/**
+ * A developed AI colony's head start (colony.ts `developNest`: rivals' and tests' grown colonies), laid out the way its
+ * builder lays a nest out: workers in the founding ring, then the stores and every other caste each in a chamber of its
+ * own, planned like the builder's, dug and filled at once (centre out). Tiles that find no room are left out.
+ */
+export function developChambers(w: World, c: Colony, plan: Array<{ type: TileType; caste?: string }>): void {
+  const g = w.nest(c.id)!;
+  const b = brainOf(c);
+  const home = homeHex(w, c);
+  const occupied = new Set(c.tiles.map((t) => t.q));
+  const dig = (q: number) => {
+    if (!g.isHexDug(q) && g.isHexDiggable(q) && !g.isEntrance(q)) g.completeHex(q);
+  };
+  const basic = basicCaste(c.species);
+  const first = (p: { type: TileType; caste?: string }) => (p.type === 'brood' && p.caste === basic ? 0 : p.type === 'food' ? 1 : 2);
+  const order = [...plan].sort((p, q) => first(p) - first(q));
+  for (const p of order) {
+    if (p.type === 'brood' && popUsed(c) + 1 > c.popLimit) continue;
+    let at = -1;
+    for (let pass = 0; pass < 2 && at < 0; pass++) {
+      for (const ch of roomsFor(c, b, home, p.type, p.caste)) {
+        for (const h of disc(g, ch.q, chR(ch))) {
+          if (occupied.has(h) || g.isEntrance(h)) continue;
+          dig(h);
+          // (a head start is free: placed instant, so not refused for its cost the way canPlaceTile would)
+          if (g.isHexDug(h)) {
+            at = h;
+            break;
+          }
+        }
+        if (at >= 0) break;
+      }
+      // no room: the next chamber for it, dug at once with its tunnel (the whole room, so the tunnel reaches its floor)
+      if (at < 0 && pass === 0) {
+        if (!planChamber(w, c, b, home, { type: p.type, caste: p.caste })) break;
+        const ch = b.chambers![b.chambers!.length - 1];
+        for (const h of [...(b.tunnels ?? []), ...disc(g, ch.q, chR(ch))]) dig(h);
+      }
+    }
+    if (at < 0 || !placeTile(w, c, p.type, at, p.caste, true)) continue;
+    occupied.add(at);
+  }
+}
+
+/** Put one tile in its own kind of room, from the room's centre outward. False when no room has a free hex. */
+function place(w: World, c: Colony, b: BuildBrain, home: number, occupied: Set<number>, type: TileType, caste?: string): boolean {
+  const g = w.nest(c.id)!;
+  for (const ch of roomsFor(c, b, home, type, caste))
+    for (const q of freeIn(g, ch, occupied)) {
+      if (canPlaceTile(w, c, type, q, caste)) continue;
+      if (placeTile(w, c, type, q, caste)) {
+        occupied.add(q);
+        return true;
+      }
+    }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// The builder's think (every 2 s)
+// ---------------------------------------------------------------------------
+
 export function buildTick(w: World, c: Colony, dt: number): void {
   if (!c.alive) return;
   const g = w.nest(c.id);
@@ -132,6 +429,7 @@ export function buildTick(w: World, c: Colony, dt: number): void {
   b.t -= dt;
   if (b.t > 0) return;
   b.t = THINK_EVERY;
+  const A = BALANCE.aiBuild;
   // Termants: the stolen castes change mid-match (the mix follows them); forgetting and carton walls
   if (c.species === 'termant') {
     b.mix = defaultMix(c);
@@ -139,9 +437,6 @@ export function buildTick(w: World, c: Colony, dt: number): void {
   }
   const home = homeHex(w, c);
   const occupied = new Set(c.tiles.map((t) => t.q));
-  const free: number[] = [];
-  const N = g.cols * g.rows;
-  for (let q = 0; q < N; q++) if (g.isHexDug(q) && !g.isEntrance(q) && !occupied.has(q)) free.push(q);
 
   // Tiles waiting for builders. Digging jobs come before building, so while
   // plans wait the frontier is not extended (or the diggers never get round
@@ -149,24 +444,45 @@ export function buildTick(w: World, c: Colony, dt: number): void {
   let unbuilt = 0;
   for (const t of c.tiles) if (!t.built) unbuilt++;
 
-  // 1. Digging: chambers joined by tunnels (planned one at a time, dug a few hexes at a time).
-  const tunnels = new Set(b.tunnels ?? []);
-  const roomFree = free.filter((q) => !tunnels.has(q));
+  // 1. Digging: one chamber planned at a time, for what the last think had no room for; dug a few hexes at a time.
   const workers = c.living;
   const wantDesig = Math.max(3, Math.min(16, 3 + Math.floor(workers / 5)));
-  // the planned hexes still to dig, nearest the dug nest first (tunnels then rooms)
   const todo = planned(g, b).filter((q) => g.isHexDiggable(q));
-  if (!todo.length && ((roomFree.length <= 3 && unbuilt < 2) || b.blocked)) {
-    const kind = nextChamberKind(c);
-    if (planChamber(w, c, b, home, kind)) b.blocked = false;
+  if (!todo.length && b.need) {
+    // no place for that chamber (the nest is crowded there): try the others for a while
+    if (!planChamber(w, c, b, home, b.need)) (b.skip ??= {})[needKey(b.need)] = w.s.time + A.planRetry;
+    b.need = null;
   }
   if (g.designatedCount < wantDesig) {
-    const plan = planned(g, b).filter((q) => g.isHexDiggable(q) && !g.hexDesig[q]);
+    const plan = digOrder(g, b).filter((q) => !g.hexDesig[q]);
     for (const q of plan.slice(0, wantDesig - g.designatedCount)) designateDig(w, c, q, true);
   }
 
-  // 2. Building (in the chambers; the tunnels stay clear).
-  if (!roomFree.length) return;
+  // 2. Building: one tile per think, in its own room. When the rooms for a tile are (nearly) full, the next chamber is
+  //    planned for it (`need`); stores past two chambers are upgraded instead.
+  const placedTile = buildOne(w, c, b, g, home, occupied, unbuilt);
+  // 3. Highways on the tunnels (they feed the chamber edges' upgrade points and speed the traffic).
+  if (!placedTile) highwayOne(w, c, b, g, home, occupied);
+  // 4. Upgrades from mid game.
+  upgradeOne(w, c, b);
+}
+
+/**
+ * Note a room shortage for the next chamber (the first one noted wins: stores, specials, brood in that order). Stores
+ * past `maxStoreChambers` are not a shortage: they are upgraded instead.
+ */
+function noteNeed(w: World, b: BuildBrain, need: Need): void {
+  if (need.type === 'food' && storeChambers(b) >= BALANCE.aiBuild.maxStoreChambers) return;
+  if ((b.skip?.[needKey(need)] ?? 0) > w.s.time) return;
+  if (!b.need) b.need = need;
+}
+
+function needKey(n: Need): string {
+  return n.caste ? `${n.type}:${n.caste}` : n.type;
+}
+
+function buildOne(w: World, c: Colony, b: BuildBrain, g: NestGrid, home: number, occupied: Set<number>, unbuilt: number): boolean {
+  const A = BALANCE.aiBuild;
   const counts: Record<string, number> = {};
   let broodTiles = 0;
   let unfilled = 0;
@@ -182,30 +498,42 @@ export function buildTick(w: World, c: Colony, dt: number): void {
   // and piling up plans (storage especially, while the store is full) used to
   // keep the builders busy and stop the colony adding brood tiles at all.
   const plannedTile = (type: string) => c.tiles.some((t) => t.type === type && !t.built);
-  // a) more storage when nearly full
-  if (food >= c.foodCap * 0.8 && c.foodCap < FOOD_CAP_MAX && !plannedTile('food')) {
-    if (place(w, c, 'food', undefined, roomFree, home)) return;
+  const roomLeft = (type: TileType, caste?: string) => roomFor(g, roomsFor(c, b, home, type, caste), occupied);
+  const tryPlace = (type: TileType, caste?: string): boolean => {
+    if (place(w, c, b, home, occupied, type, caste)) {
+      const r = roomLeft(type, caste);
+      if (r.free + r.coming <= A.nearlyFull) noteNeed(w, b, { type, caste });
+      return true;
+    }
+    // (no room at all: plan the next chamber; free floor but no tile placed means it could not pay — tiles are paid
+    // when ordered since 2026-11-02 — so no new chamber for that)
+    const r = roomLeft(type, caste);
+    if (!r.free && !r.coming) noteNeed(w, b, { type, caste });
+    return false;
+  };
+  // a) more storage when nearly full (once both store chambers are full, store upgrades take over)
+  if (food >= c.foodCap * A.storeFull && c.foodCap < A.foodCapMax && !plannedTile('food')) {
+    if (tryPlace('food')) return true;
   }
   // b) species special tiles
   for (const sp of specialTargets(c, broodTiles, counts)) {
     const have = c.tiles.filter((t) => t.type === sp.type).length;
     if (have < sp.want && !plannedTile(sp.type) && food >= tileCost(c, sp.type) + 6) {
-      if (place(w, c, sp.type, undefined, roomFree, home)) return;
+      if (tryPlace(sp.type)) return true;
     }
   }
   // c) brood: the caste furthest below its target share. Young colonies raise
   //    only workers (like real incipient colonies); fighters come once there
   //    is a workforce to feed them. Don't add tiles while brood is backed up,
   //    or while earlier plans still wait for builders.
-  if (unfilled > 1 || unbuilt >= 2) return;
+  if (unfilled > 1 || unbuilt >= 2) return false;
   let waiting = 0;
   for (const t of c.tiles) if (raisesAnts(t) && t.brood && !t.ant) waiting++;
   let nurses = 0;
   for (const [cs, n] of Object.entries(c.counts)) if (CASTES[cs].nurse) nurses += n;
-  if (waiting > 2 + nurses * 1.5) return;
+  if (waiting > 2 + nurses * 1.5) return false;
   // Keep enough food to feed the larvae already waiting on their tiles.
-  let reserve = 0;
-  for (const br of w.s.brood) if (br.colony === c.id) reserve += hatchCost(br.caste) * Math.max(0, 1 - br.t);
+  const reserve = larvaeReserve(w, c);
   let workerAnts = 0;
   for (const [cs, n] of Object.entries(c.counts)) if (!isFighter(cs)) workerAnts += n;
   const total = broodTiles + 1;
@@ -216,166 +544,119 @@ export function buildTick(w: World, c: Colony, dt: number): void {
     ranked.push({ cs, gap: frac * total - (counts[cs] ?? 0) });
   }
   ranked.sort((a, z) => z.gap - a.gap);
-  if (!ranked.length) return;
+  if (!ranked.length) return false;
   const need = (cs: string) => tileCost(c, 'brood', cs) + hatchCost(cs) + 4 + reserve;
   // Save up for the most-needed caste when it is well behind; otherwise take
   // the most-needed caste we can afford now.
   const top = ranked[0];
+  // the most-needed caste's rooms: plan its next chamber ahead when they are nearly full
+  const topRoom = roomLeft('brood', top.cs);
+  if (topRoom.free + topRoom.coming <= A.nearlyFull) noteNeed(w, b, { type: 'brood', caste: top.cs });
   const pick = food >= need(top.cs) ? top : top.gap >= 2 ? null : ranked.find((r) => r.gap > -1 && food >= need(r.cs));
-  if (!pick) return;
-  place(w, c, 'brood', pick.cs, roomFree, home);
+  if (!pick) return false;
+  return tryPlace('brood', pick.cs);
 }
 
-/** What the next chamber is for: stores when the colony's stores are a small share of its tiles, else brood. */
-function nextChamberKind(c: Colony): 'brood' | 'food' {
-  const b = brainOf(c);
-  const food = c.tiles.filter((t) => t.type === 'food').length;
-  const brood = c.tiles.filter((t) => t.type !== 'food' && t.type !== 'queen').length;
-  const foodRooms = (b.chambers ?? []).filter((r) => r.kind === 'food').length;
-  return (foodRooms === 0 && brood >= 4) || food * 4 < brood - 6 ? 'food' : 'brood';
-}
-
-/** The chamber a hex belongs to (its centre or one of the six around it). */
-function chamberOf(g: NestGrid, b: BuildBrain, q: number): { q: number; kind: 'brood' | 'food' } | null {
-  for (const r of b.chambers ?? []) if (r.q === q || g.neighbors(r.q).includes(q)) return r;
-  return null;
-}
-
-/** Hexes of the planned tunnels and chambers, in digging order (tunnels outward from the nest, then each room). */
-function planned(g: NestGrid, b: BuildBrain): number[] {
-  const out: number[] = [...(b.tunnels ?? [])];
-  for (const r of b.chambers ?? []) {
-    out.push(r.q);
-    for (const n of g.neighbors(r.q)) if (n >= 0) out.push(n);
+/** Food kept back for the larvae already waiting on their tiles. */
+function larvaeReserve(w: World, c: Colony): number {
+  let reserve = 0;
+  for (const br of w.s.brood) {
+    if (br.colony !== c.id) continue;
+    // a pre-staged larva (its tile's ant alive) grows only to BALANCE.prestage and waits there, eating nothing more until
+    // that ant dies: only the growing it still has to do counts (else a big colony's reserve outgrows its whole store,
+    // nothing is ever upgraded, and a full store stops the gathering for good)
+    const t = tileAt(c, br.tile);
+    const cap = t && tileAnts(w, t).length >= tileCapacity(t) ? BALANCE.prestage : 1;
+    reserve += hatchCost(br.caste) * Math.max(0, cap - br.t);
   }
-  return out;
+  return reserve;
 }
 
 /**
- * Plan the next chamber: a 7-hex rosette of solid soil near the nest (a hex
- * of wall between it and every other room), and the shortest tunnel to it
- * from the dug nest. Deterministic: candidates by distance, ties by hex jitter.
+ * One highway tile on the tunnels and passages: the passage from the entrance and the store chambers' tunnels first,
+ * then the mouths of the chambers that will be upgraded (19 hexes), then the rest. Never on an entrance, in a room or in
+ * the queen's chamber.
  */
-function planChamber(w: World, c: Colony, b: BuildBrain, home: number, kind: 'brood' | 'food'): boolean {
-  const g = w.nest(c.id)!;
-  const N = g.cols * g.rows;
-  const rooms = b.chambers ?? (b.chambers = []);
-  const tunnels = b.tunnels ?? (b.tunnels = []);
-  const centres = [home, ...rooms.map((r) => r.q)];
-  const rosette = (q: number) => [q, ...g.neighbors(q)];
-  const ok = (q: number) => {
-    const hs = rosette(q);
-    if (hs.length !== 7 || hs.some((h) => h < 0 || g.isEntrance(h) || !(g.isHexDiggable(h) || g.isHexDug(h)))) return false;
-    // carved out of solid soil, with a wall of soil all round (the tunnel will cut through it)
-    if (hs.some((h) => g.isHexDug(h))) return false;
-    for (const h of hs) for (const n of g.neighbors(h)) if (n >= 0 && g.isHexDug(n)) return false;
-    for (const cq of centres) if (g.hexDistance(q, cq) < 4) return false;
-    // no tiles of the colony on it
-    for (const t of c.tiles) if (hs.includes(t.q)) return false;
-    return true;
-  };
-  const cands: Array<{ q: number; s: number }> = [];
-  for (let q = 0; q < N; q++) {
-    let near = Infinity;
-    for (const cq of centres) near = Math.min(near, g.hexDistance(q, cq));
-    if (near < 4 || near > 7) continue;
-    if (!ok(q)) continue;
-    // close to the queen's chamber and to the rooms already there
-    cands.push({ q, s: g.hexDistance(q, home) + near * 0.5 + jitter(q) * 0.7 });
-  }
-  cands.sort((x, z) => x.s - z.s);
-  const blocked = new Set<number>();
-  for (const r of rooms) for (const h of rosette(r.q)) blocked.add(h);
-  const prev = new Int32Array(N);
-  for (const cand of cands.slice(0, 16)) {
-    const best = cand.q;
-    // tunnel: breadth-first from the room's rim through soil to the dug nest (not through other rooms)
-    const room = new Set(rosette(best));
-    prev.fill(-2);
-    const queue: number[] = [];
-    for (const h of room) {
-      prev[h] = -1;
-      queue.push(h);
-    }
-    let hit = -1;
-    for (let i = 0; i < queue.length && hit < 0; i++) {
-      const q = queue[i];
-      for (const n of g.neighbors(q)) {
-        if (n < 0 || prev[n] !== -2 || blocked.has(n)) continue;
-        if (g.isHexDug(n) && !room.has(n)) {
-          prev[n] = q;
-          hit = n;
-          break;
-        }
-        if (!g.isHexDiggable(n) || g.isEntrance(n)) continue;
-        prev[n] = q;
-        queue.push(n);
-      }
-    }
-    if (hit < 0) continue;
-    const path: number[] = [];
-    for (let q = prev[hit]; q >= 0 && !room.has(q); q = prev[q]) path.push(q);
-    if (path.length < 1 || path.length > 4) continue; // a short tunnel (1–4 hexes), with a wall of soil beside it
-    rooms.push({ q: best, kind });
-    for (const q of path) if (!tunnels.includes(q)) tunnels.push(q);
-    return true;
-  }
-  return false;
-}
-
-function isFighter(cs: string): boolean {
-  const r = CASTES[cs].role;
-  return r === 'soldier' || r === 'major';
-}
-
-/**
- * Put one tile on the best free hex, as close to the chamber as possible so
- * the nest stays compact. A tile joins a same-kind group only while that
- * group (including any it would merge with) stays within GROUP_SIZE; once
- * groups are full, new ones start one hex away, leaving a gap — so the
- * colony ends up with several commandable groups. Touching a full group is a
- * last resort when the free floor is plentiful but all of it borders one.
- */
-function place(w: World, c: Colony, type: TileType, caste: string | undefined, free: number[], home: number): boolean {
-  const g = w.nest(c.id)!;
-  const sizes = new Map<number, number>();
-  for (const t of c.tiles) sizes.set(t.group, (sizes.get(t.group) ?? 0) + 1);
-  let bestQ = -1;
-  let bestS = Infinity;
-  let backupQ = -1;
-  let backupS = Infinity;
-  for (const q of free) {
-    if (canPlaceTile(w, c, type, q, caste)) continue;
-    // distinct same-kind groups this tile would touch
-    const touch = new Set<number>();
+function highwayOne(w: World, c: Colony, b: BuildBrain, g: NestGrid, home: number, occupied: Set<number>): void {
+  const A = BALANCE.aiBuild;
+  if (c.living < A.highwayFrom || c.tiles.some((t) => t.type === 'highway' && !t.built)) return;
+  if (c.food < tileCost(c, 'highway') + A.highwayReserve + larvaeReserve(w, c)) return;
+  const roomOf = new Map<number, Chamber>();
+  for (const ch of [founding(c, home), ...(b.chambers ?? [])]) for (const q of disc(g, ch.q, chR(ch))) roomOf.set(q, ch);
+  const tunnels = new Set(b.tunnels ?? []);
+  let ent = entranceHexes(g);
+  if (!ent.length) ent = [home];
+  let best = -1;
+  let bs = Infinity;
+  for (let q = 0; q < g.cols * g.rows; q++) {
+    if (!g.isHexDug(q) || g.isEntrance(q) || occupied.has(q) || roomOf.has(q)) continue;
+    let mouth: Chamber | undefined;
     for (const n of g.neighbors(q)) {
-      if (n < 0) continue;
-      const t = c.tiles.find((x) => x.q === n);
-      if (t && t.type === type && t.caste === caste) touch.add(t.group);
+      const ch = n >= 0 ? roomOf.get(n) : undefined;
+      if (ch && ch.q !== home) mouth = !mouth || chR(ch) > chR(mouth) ? ch : mouth;
     }
-    let merged = 1;
-    for (const id of touch) merged += sizes.get(id) ?? 0;
-    let s = g.hexDistance(q, home) + jitter(q) * 0.5;
-    if (touch.size) s -= 3; // prefer growing a group over scattering singles
-    // its own kind of chamber: brood in brood chambers, stores in store chambers
-    const room = chamberOf(g, brainOf(c), q);
-    if (room) s += room.kind === (type === 'food' ? 'food' : 'brood') ? -4 : 3;
-    // keep the hexes beside entrance ramps clear (traffic)
-    if (g.neighbors(q).some((n) => n >= 0 && g.isEntrance(n))) s += 6;
-    if (merged <= GROUP_SIZE || (type !== 'brood' && type !== 'food')) {
-      if (s < bestS) {
-        bestS = s;
-        bestQ = q;
-      }
-    } else if (s < backupS) {
-      backupS = s;
-      backupQ = q;
+    let toEnt = Infinity;
+    for (const e of ent) toEnt = Math.min(toEnt, g.hexDistance(q, e));
+    // the passage from the entrance (dug at the start, not a tunnel) and the stores' tunnels; then the 19s' mouths
+    let s: number;
+    if (!tunnels.has(q)) s = 0 + toEnt * 0.05;
+    else if (mouth && chType(mouth) === 'food') s = 1 + toEnt * 0.05;
+    else if (mouth && chR(mouth) >= 2) s = 2;
+    else if (mouth) s = 3;
+    else s = 4 + g.hexDistance(q, home) * 0.05;
+    s += jitter(q) * 0.01;
+    if (s < bs && !canPlaceTile(w, c, 'highway', q)) {
+      bs = s;
+      best = q;
     }
   }
-  brainOf(c).blocked = bestQ < 0;
-  const q = bestQ >= 0 ? bestQ : free.length > 40 ? backupQ : -1;
-  if (q < 0) return false;
-  return !!placeTile(w, c, type, q, caste);
+  if (best >= 0 && placeTile(w, c, 'highway', best)) occupied.add(best);
+}
+
+/**
+ * One upgrade job from mid game: only tiles with the points; within each kind the 19-hex chambers' tiles first, inner
+ * tiles (most points) first; fighters first while the colony is threatened or raiding, stores once both store chambers
+ * are full, then workers, specials, highways. Food is
+ * kept back (`upgradeReserve` and the larvae's), at most `upgradesInFlight` at once, none during an invasion.
+ */
+function upgradeOne(w: World, c: Colony, b: BuildBrain): void {
+  const A = BALANCE.aiBuild;
+  const lv = aiLevel(w);
+  if (!midGame(w, c, A.upgradeFrom) || c.food < A.upgradeFrom.food || (c.intruders?.length ?? 0) > 0) return;
+  let inFlight = 0;
+  for (const t of c.tiles) if (t.pend === 1) inFlight++;
+  if (inFlight >= Math.max(1, Math.round(A.upgradesInFlight * A.levelInFlight[lv]))) return;
+  // brood comes first: keep the price of the dearest brood tile of the mix and its ant, and the larvae's food
+  let brood = 0;
+  for (const cs of Object.keys(b.mix)) if (c.castes.includes(cs)) brood = Math.max(brood, tileCost(c, 'brood', cs) + hatchCost(cs));
+  const keep = A.upgradeReserve + larvaeReserve(w, c) + brood;
+  const war = !!c.aiWar && (c.aiWar.defending || c.aiWar.target >= 0);
+  const storesFull = storeChambers(b) >= A.maxStoreChambers && c.food >= c.foodCap * A.storeFull;
+  // the 19-hex chambers first: they are the ones whose tiles can all reach level 3 (a 7's ring stops at 2)
+  const g = w.nest(c.id)!;
+  const in19 = new Set<number>();
+  for (const ch of b.chambers ?? []) if (chR(ch) >= 2) for (const q of disc(g, ch.q, chR(ch))) in19.add(q);
+  let best: (typeof c.tiles)[number] | null = null;
+  let bs = Infinity;
+  for (const t of c.tiles) {
+    if (!t.built || t.pend || t.type === 'queen' || t.type === 'carton' || t.level >= MAX_TILE_LEVEL) continue;
+    if (c.food < keep + upgradeCost(c, t)) continue;
+    let rank: number;
+    if (t.type === 'brood' && t.caste && isFighter(t.caste)) rank = war ? 0 : 3;
+    else if (t.type === 'food') rank = storesFull ? 1 : 6;
+    else if (t.type === 'brood') rank = 2;
+    else if (t.type === 'highway') rank = 5;
+    else rank = 4;
+    const pts = upgradePoints(w, c, t);
+    if (pts < upgradeNeed(t)) continue; // no wasted orders
+    // most points first (inner tiles: a 19-hex chamber's middle reaches level 3), a little ahead for lower levels
+    const s = rank * 100 - (in19.has(t.q) ? 50 : 0) - pts + t.level + jitter(t.q) * 0.01;
+    if (s < bs) {
+      bs = s;
+      best = t;
+    }
+  }
+  if (best) markUpgrade(w, c, best.q);
 }
 
 // ---------------------------------------------------------------------------
@@ -644,4 +925,3 @@ export function forageTick(w: World, c: Colony, dt: number): void {
     }
   }
 }
-

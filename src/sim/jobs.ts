@@ -38,7 +38,8 @@ const tmp = { x: 0, y: 0 };
 
 /** Can this ant take nest jobs at all? (workers and nanitics; never soldiers or the queen) */
 export function isJobWorker(c: Colony, a: Ant): boolean {
-  if (a.id === c.queen || a.state === AS.Dead) return false;
+  // (the queen, and the king: he does no nest duties, user note 2026-11-02)
+  if (a.id === c.queen || a.id === c.king || a.state === AS.Dead) return false;
   const t = tierOf(a.caste);
   return t === 'worker' || t === 'nanitic';
 }

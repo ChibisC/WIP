@@ -504,6 +504,145 @@ export const BALANCE = {
   respawnDietShare: 0.5,
 
   // ---------------------------------------------------------------- rival AI war (sim/warAI.ts)
+  /**
+   * The AI builder (sim/colonyAI.ts; CHANGE_PLAN §23): EotU-style chambers of 7 or 19 hexes, one tile type (one caste)
+   * each, highways on the tunnels, upgrades from mid game.
+   */
+  aiBuild: {
+    /** 19-hex chambers once the colony has this many ants and this much game time (s) has passed (× levelFrom) */
+    chamber19From: { ants: 45, time: 600 },
+    /** a caste counts as one of the colony's main ones (19-hex chambers) with at least this share of the mix */
+    mainShare: 0.15,
+    /** a colony this big gets a 19-hex second store chamber (leafcutters always) */
+    bigColony: 120,
+    /** soil between a new chamber's rim and the other rooms' rims: at least, and to the nearest room at most (hexes) */
+    rimGapMin: 2,
+    rimGapMax: 5,
+    /** longest tunnel to a new chamber (hexes); each hex of tunnel counts this much against a place; places tried */
+    tunnelMax: 6,
+    tunnelWeight: 0.6,
+    planTries: 80,
+    /** a chamber that found no place is not tried again for this long (s): the others go first */
+    planRetry: 60,
+    /** at most this many food store chambers, within storeNearEntrance hexes (rim) of the entrance */
+    maxStoreChambers: 2,
+    storeNearEntrance: 8,
+    /** a tile type's (caste's) chambers count as nearly full with this many free hexes or fewer: plan the next */
+    nearlyFull: 1,
+    /** stores count as full at this share of the capacity; no new store tiles past foodCapMax */
+    storeFull: 0.8,
+    foodCapMax: 2400,
+    /** highways on the tunnels once the colony has this many ants, keeping this much food after paying */
+    highwayFrom: 18,
+    highwayReserve: 12,
+    /** upgrades from mid game (× levelFrom): game time (s), ants, food in store */
+    upgradeFrom: { time: 720, ants: 50, food: 60 },
+    /**
+     * food kept back after paying an upgrade: this much, plus what the larvae on their tiles still need, plus the price
+     * of the next brood tile and its ant (brood comes first: upgrades spend the surplus)
+     */
+    upgradeReserve: 20,
+    /** upgrade jobs waiting at once (× levelInFlight, at least 1) */
+    upgradesInFlight: 2,
+    /** AI level (settings.aiLevel 0 Easy … 3 Brutal): × the mid-game thresholds, × upgrades in flight */
+    levelFrom: [1.6, 1, 0.8, 0.6],
+    levelInFlight: [0.5, 1, 1.5, 2],
+  },
+  /**
+   * Kings (termites and Termants; user note 2026-11-02): no nest duties; a slow walk round the queen inside her chamber —
+   * a new spot every `wanderS` s, `step` rad further round her, `ringMin`..`ringMax` of his length out from her body,
+   * at `walkMul` of his speed — and bites for intruders in the chamber (sim/termites.ts kingTick)
+   */
+  king: { wanderS: 7, step: 0.6, ringMin: 0.35, ringMax: 0.85, walkMul: 0.45 },
+  /** AI colonies with allies (CHANGE_PLAN §23, user spec claude/ai/01-spec-ai-allies-chambers.md) */
+  aiAllies: {
+    /** the ally brain and joint raids on (off: AI allies leave each other alone, as before; tools/ecology-teams.ts) */
+    help: true,
+    /** seconds between the ally brain's decisions */
+    every: 2,
+    /**
+     * An ally's danger (warAI.ts allyDanger): the enemies' fighting weight there (health × damage rate) × where they are,
+     * minus its defenders' weight; plus its losses a second × lossWeight; × queenMul when its queen is in danger.
+     * Where: by the queen (within queenRadius mm), deep in the nest, at its entrance (within entranceRadius of the
+     * flower), at its surface holes (siegeRadius), near them on the surface (nearRadius).
+     */
+    locQueen: 4,
+    locDeep: 3,
+    locEntrance: 2,
+    locSiege: 1.5,
+    locNear: 1,
+    queenRadius: 40,
+    entranceRadius: 30,
+    siegeRadius: 60,
+    nearRadius: 150,
+    queenHurt: 0.7,
+    queenMul: 3,
+    lossWeight: 400,
+    /** a creature's weight per point of health × its bite rate */
+    creatureWeight: 1,
+    /**
+     * help only above this danger (one Red wood soldier weighs about 240: two at an ally's entrance, unopposed, are
+     * about 1000), and not an ally whose defenders already have this × the attackers' weight
+     */
+    assistMinDanger: 500,
+    allyWinningRatio: 1.5,
+    /** help only if it can get there in this long (s; the land route over the fighters' speed), unless the queen is in danger */
+    assistMaxTravel: 90,
+    /** keep this share of the fighting weight at home (and at least homeGuardMin fighters); send enough that help +
+     * the ally's defenders reach assistOvermatch × the attackers' weight, no more */
+    homeGuardShare: 0.3,
+    homeGuardMin: 3,
+    assistOvermatch: 1.3,
+    /**
+     * a lost cause is left alone: no help when what it can spare + the ally's defenders would still be under this ×
+     * the attackers' weight (assistMinOddsQueen with the ally's queen in danger); help under way falls back when the
+     * helpers + defenders drop under assistQuitOdds × the attackers (they would only die with the ally)
+     */
+    assistMinOdds: 0.8,
+    /** while helping: more groups (still keeping the guard) at most this often (s) when help + defenders fall short */
+    reinforceEvery: 10,
+    assistMinOddsQueen: 0.5,
+    assistQuitOdds: 0.5,
+    /** stop helping: clear (danger under clearDanger) for clearFor s, losses over assistMaxLoss of those sent, or after
+     * assistMaxTime s; then a cooldown (s) */
+    clearDanger: 150,
+    clearFor: 8,
+    assistMaxLoss: 0.6,
+    assistMaxTime: 240,
+    cooldown: 30,
+    /** inside the ally's nest: the marker moves from its entrance to the threat once this share of the helpers is in */
+    insideShare: 0.5,
+    /** a raid gives way to helping when the ally's danger is over this (or its queen is in danger, or it is the same enemy) */
+    raidValue: 4000,
+    /** a human player's call for help (command callHelp): this long (s), its danger × callBoost and at least callMin */
+    callHelpSec: 45,
+    callBoost: 2,
+    callMin: 800,
+    /** joint raids: an AI ally may join a raid this young (s) with at least joinMinFighters; everyone gathers gatherDist
+     * mm short of the target's holes and goes when gatherShare of each one's fighters are there, or after gatherMax s */
+    joinWindow: 30,
+    joinMinFighters: 6,
+    gatherDist: 140,
+    gatherR: 70,
+    gatherShare: 0.6,
+    gatherMax: 120,
+    /** shared targets: an enemy seen attacking the team within foeMemory s is raided first (its score × sharedTargetMul) */
+    foeMemory: 300,
+    sharedTargetMul: 0.5,
+    /** team-aware placement (world/teamSites.ts): limits as fractions of the map's width, and the score's weights */
+    sites: {
+      /** each ally's land route to its nearest teammate at most this */
+      allyMaxRoute: 0.33,
+      /** each colony's land route to its nearest enemy at least this */
+      enemyMinRoute: 0.3,
+      /** weights: allies' routes (shorter better), the teams' spread (fairer better), the nearest enemy (farther better) */
+      wAlly: 1,
+      wFair: 2,
+      wEnemy: 0.5,
+      /** an uneven match: how much the smaller side's worse food route counts */
+      smallSideFood: 2,
+    },
+  },
   aiWar: {
     /** seconds between decisions */
     every: 4,

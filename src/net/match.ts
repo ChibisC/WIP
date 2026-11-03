@@ -86,8 +86,7 @@ export function matchSetup(players: Slot[], s: LobbySettings): GameSetup {
         name: p.name,
       };
     }),
-    // teammates start on neighbouring colony sites
-    ...(players.some((p) => cleanTeam(p.team)) ? { groupTeams: true } : {}),
+    // (teammates start on neighbouring colony sites: mapGen places any team of two or more, world/teamSites.ts)
     // neutral underground areas between the spawns
     caves: [
       { name: 'Root hollow', kind: 'cave', food: 70 },

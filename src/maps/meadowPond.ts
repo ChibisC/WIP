@@ -113,6 +113,8 @@ export const MEADOW_POND: MapDef = {
     4: [[2, 3, 4, 5]],
     10: [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]],
   },
+  /** team layouts (CHANGE_PLAN §23; picked with tools/team-sites.ts, checked on docs/maps/team-sites/meadowPond.png) */
+  teamSets: { '2v2': [[2, 7], [3, 6]], '2v1': [[2, 7], [1]], '3v1': [[2, 4, 7], [1]], '2v2v2': [[1, 3], [2, 7], [5, 8]], '2v1v1': [[2, 7], [0], [1]], '3v3': [[2, 7, 9], [3, 5, 6]] },
   zones: [
     { kind: 'food', shape: { circle: [1130, 800], r: 75 }, weight: 2, name: 'east bank' },
     { kind: 'food', shape: { circle: [470, 800], r: 75 }, weight: 2, name: 'west bank' },

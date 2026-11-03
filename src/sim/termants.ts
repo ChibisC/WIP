@@ -6,6 +6,7 @@ import { datan2, dcos, dhypot, dsin } from './dmath';
 import { steerTo, turnToward } from './movement';
 import { completeDelete, placeTile, recomputeGroups, recomputeTileCaps, tileAnts, tileAt } from './tiles';
 import { tilePoint } from './colony';
+import { kingTick } from './termites';
 
 /**
  * Termants, Chimaeromyrmex termitoides (fictional ant–termite hybrid; claude/termyrms package; numbers in TERMANT,
@@ -338,30 +339,12 @@ export function termantKingSpot(w: World, q: Ant, out: { x: number; y: number; h
 
 const kp = { x: 0, y: 0, h: 0 }; // det-ok: scratch
 
-/** The king keeps to his place beside the queen (he fights through the usual combat, then comes back). */
+/**
+ * The king (user note 2026-11-02): no nest duties; like a termite king he walks round the queen inside her chamber and
+ * bites intruders there, never leaving it (sim/termites.ts kingTick).
+ */
 export function termantKing(w: World, a: Ant, c: Colony, dt: number): boolean {
-  if (a.space !== nestSpace(c.id)) return false;
-  const q = w.antById.get(c.queen);
-  if (q && q.state !== AS.Dead && q.space === a.space) termantKingSpot(w, q, kp);
-  else {
-    // no queen: he stays in the royal chamber
-    const t = c.tiles.find((x) => x.type === 'queen');
-    if (!t) return false;
-    const p = tilePoint(w, c, t.q, 0.3);
-    kp.x = p.x;
-    kp.y = p.y;
-    kp.h = a.h;
-  }
-  const d = dhypot(kp.x - a.x, kp.y - a.y);
-  if (d > 1) {
-    if (a.state !== AS.Idle) a.state = AS.Idle;
-    steerTo(w, a, kp.x, kp.y, dt, 0.6);
-    return true;
-  }
-  a.v = 0;
-  turnToward(a, q ? datan2(q.y - a.y, q.x - a.x) : kp.h, dt, 3);
-  if (q && (w.s.tick + a.id) % 200 < 60) a.pose = POSE.GROOM_ANT;
-  return true;
+  return kingTick(w, a, c, dt);
 }
 
 
