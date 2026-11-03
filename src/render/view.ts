@@ -15,6 +15,7 @@ import { createNestEnvironment, createSurfaceEnvironment, NestLights, SurfaceLig
 import { ObserveCameraRig, SurfaceCameraRig } from './cameras';
 import { globalUniforms } from './shaderPatch';
 import { presetForBiome, setCreatureEnvTexture, setCreatureLighting } from './lightPresets';
+import { prof } from '../core/profiler';
 
 export type ViewSpace = 'surface' | 'nest';
 export type Quality = 'low' | 'medium' | 'high';
@@ -90,6 +91,8 @@ export class GameView {
   freeCam = { on: false, yaw: 0, pitch: -0.5, pos: new THREE.Vector3(), speed: 60 };
   quality: Quality = 'high';
   preset: QualityPreset = QUALITY.high;
+  /** dynamic resolution (performance pass): the share of the preset's pixel ratio rendered now (1 = all of it) */
+  renderScale = 1;
   terrain: Terrain | null = null;
   terrainMesh: TerrainMesh | null = null;
   grass: Grass | null = null;
@@ -659,7 +662,9 @@ export class GameView {
     this.applyStorm(dt);
     this.applyGrade();
     this.applyCreatureLight();
+    prof.gpuBegin();
     this.post.render(this.activeScene(), cam);
+    prof.gpuEnd();
   }
 
   /**

@@ -941,3 +941,41 @@ Built on §23 (`digInto`). Plan, as built:
    sources (DESIGN-STORY §10).
 5. Client: moonlight blend, wolf spider eyeshine, the spider burrow, map moods, the night clock, hub/Genome/end screen.
 6. Tests `tests/storyCh1.ts`; the playtest bot plays bosses and nights; browser shots `tests/browser/story_ch1_4.py`.
+
+## 25. Performance pass — faster in every mode, smooth surface ↔ underground switching, no loss of looks (user spec 2026-11-02, claude/performance/01-spec-performance-no-visual-loss.md)
+Branch `feature/performance` from `main` (`18d3d79`). Render, client and worker-message work only: the simulation's
+results never change (the determinism check, replays and every suite prove it).
+
+**Step 1 — measure first.**
+- `core/profiler.ts` (`prof`): every frame's time (animation frame to animation frame), the main thread's own time, named
+  parts (sim, msg, units, creatures, nest, fx, ui, render, prewarm), GL work counted and timed by wrapping the WebGL
+  context (shader compiles and links, texture and buffer uploads), the renderer's counts, the JS heap (Chrome), GPU time
+  (`EXT_disjoint_timer_query_webgl2`), and the hitch log: every frame over 33 ms with what happened in it.
+- F3 overlay (`ui/debugOverlay.ts`) shows all of it at 4 Hz.
+- `?bench=1` (`dev/bench.ts`, Menu → Graphics → Run the benchmark): six scenes, one page load each (so loading counts):
+  the switching test (surface → home nest → each area → surface, ten rounds, every frame), a big fight (4 × 200 ants,
+  100 creatures, 2 titans), a full nest, a story night (The Long Nights' last night), the arena at 600 units, and a
+  multiplayer-sized world. A report to copy and paste back. `tests/browser/bench.py` runs it headless.
+- The golden set before anything changes (`tests/browser/golden.py` → `docs/performance/golden/`) and a comparison tool
+  (`tools/golden-compare.py`: SSIM and per-pixel difference, side-by-side sheets).
+- Baseline numbers in `docs/performance.md`; the measurement build merged to `main` first so the user's devices can run
+  the same `?bench=1` before the optimizations land.
+
+**Step 2 — switching (top priority).** Findings from the hitch log decide the order; the plan:
+- Pre-warm while loading: every area's stage rendered once behind the loading screen (shaders, shadow variants, textures,
+  instance buffers), every ant and creature model that can appear built and compiled for every space, the effects
+  compiled; `renderer.compileAsync` where it avoids a blocking compile (KHR_parallel_shader_compile).
+- Shared model assets: one copy of each ant model's geometry, materials' programs and far-LOD impostor atlas for every
+  space (each area's renderer used to build and bake its own the first time it was shown).
+- Things that appear mid-match (a caste first raised, a creature kind first spawned, a stolen caste) are warmed in the
+  background under a small time budget per frame, as soon as the simulation shows them.
+- Inactive areas kept current at a low rate (nest meshes after digging, hex tiles), so a switch has nothing to catch up.
+- During the dive's black frames the leaving scene is not rendered at full cost; the swap's work is spread over frames.
+
+**Step 3 — every mode, no visible change.** Culling and draw-call merges where the counts say they pay; dynamic
+resolution before `autoQuality` drops a preset; allocation-free hot loops (GC in the hitch log); HUD at a few Hz;
+the worker's tick in the stress scenes; per-player tick and frame times in the multiplayer HUD; a mobile memory budget
+and a 30/60 frame cap option. Each change is checked against the golden set before it is kept.
+
+**Step 4 — verify.** Golden set, `npm test`, determinism, build, replays; final numbers (the build machine and the user's
+devices) in `docs/performance.md`; DESIGN, README, PROGRESS; handoff; merge rule; merge and publish.

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { prof } from '../../core/profiler';
 import { AntRig, buildAnt } from './antGeometry';
 import { BODY_TEX, createAntMaterials, createAntGlueShell, POSE, TINT_GLSL } from './antMaterial';
 import { ATK, ATTACK_CONTACT, AttackPose, applyAttackBody, attackPose, attackPoseV2, neutralPose } from './attackPoses';
@@ -545,9 +546,11 @@ export class AntRenderer {
   private bucket(key: string): Bucket {
     let b = this.buckets.get(key);
     if (!b) {
+      const t0 = performance.now();
       const imp = this.impostorFor(key);
       b = new Bucket(key, this.group, { geo: this.impostorGeo, mat: imp }, this.shadows);
       this.buckets.set(key, b);
+      prof.note(`ant model ${key} built for ${this.name} (${(performance.now() - t0).toFixed(0)} ms)`);
     }
     return b;
   }

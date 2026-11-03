@@ -32,6 +32,7 @@ import { Command, CommandBody } from '../sim/commands';
 import { LocalCommands } from './localCommands';
 import { LocalSim, SimHost, WorkerSim } from './simHost';
 import { AutoQuality } from './autoQuality';
+import { prof } from '../core/profiler';
 import type { NetGame } from '../net/netGame';
 import { matchWinner } from '../net/match';
 import { MISSIONS, missionDef, missionOf } from '../sim/missions';
@@ -263,6 +264,14 @@ export class GameSession {
       tick: () => this.tickOnce(),
       frame: (alpha, realDt, simDt) => this.frame(this.sim.alpha(alpha, performance.now(), this.loop.paused), realDt, simDt),
     });
+    // the frame profiler (F3, ?bench=1): every frame's parts, GL work and hitches (game/profiler.ts)
+    prof.attach(this.view.renderer);
+    (window as unknown as { __prof: unknown }).__prof = prof;
+    this.loop.onStepStart = (now) => prof.begin(now);
+    this.loop.onTicks = (ms) => {
+      if (this.sim.kind === 'local') prof.add('sim', ms);
+    };
+    this.loop.onStepEnd = () => prof.end();
     this.events.onAny((e) => {
       if (e.t === 'command') this.commands.acknowledge(e.player, e.seq);
       this.routeFx(e);
@@ -1508,6 +1517,7 @@ export class GameSession {
     const vh = window.innerHeight * v.renderer.getPixelRatio();
     const sel = this.tool === 'marker' ? this.markerSel : -1;
     const shown = this.shownMarkers();
+    let pt = performance.now();
     if (v.space === 'nest') {
       const nv = this.nests.get(v.activeNest);
       const owner = w.colony(colonyOfSpace(v.activeNest)) ?? null;
@@ -1516,6 +1526,7 @@ export class GameSession {
       if (nv) nv.bars.update(w, v.activeNest, alpha, cam, vh, (x, y, l, o) => nv.map.pos(x, y, l, o), this.player, this.inspect, realDt);
       if (nv) nv.trail.update(sel, this.trailEnds(sel, v.activeNest, shown), (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.distance, v.time);
       if (nv) nv.hit.update(w, v.activeNest, this.hitboxes, (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.goal.x, v.nestRig.goal.z, v.nestRig.distance * 2);
+      prof.add('nest', performance.now() - pt);
     } else {
       const views = this.views;
       let n = 0;
@@ -1539,7 +1550,11 @@ export class GameSession {
       this.surfMarkers.update(shown, SURFACE, this.surfHeight, v.observing ? v.observeRig.distance * 3 : v.surfaceRig.distance, (i) => markerRadius(w, this.player, i), sel, v.time);
       this.surfTrail.update(sel, this.trailEnds(sel, SURFACE, shown), this.surfHeight, v.surfaceRig.distance, v.time);
       // creatures first: climbing ants are placed on their animated legs and backs
+      prof.add('units', performance.now() - pt);
+      pt = performance.now();
       this.surfCreatures.update(w.s.creatures, SURFACE, alpha, realDt, this.surfHeight, cam, vh);
+      prof.add('creatures', performance.now() - pt);
+      pt = performance.now();
       this.surfHit.update(w, SURFACE, this.hitboxes, this.surfHeight, v.surfaceRig.goal.x, v.surfaceRig.goal.z, v.surfaceRig.distance * 2);
       this.surfCombat.update(w, SURFACE, this.combatDebug, this.surfHeight, v.surfaceRig.goal.x, v.surfaceRig.goal.z, v.surfaceRig.distance * 2);
       this.surfAnts.mount = (av, a, out) => {
@@ -1551,6 +1566,7 @@ export class GameSession {
       this.surfFood.update(w, SURFACE, alpha, this.surfMap, (id) => this.surfAnts.holdOf(id));
       this.surfBars.update(w, SURFACE, alpha, cam, vh, (x, y, l, o) => this.surfMap.pos(x, y, l, o), this.player, this.inspect, realDt);
       this.surfDecor.update(w, this.foodView, (f) => edible(this.player, f));
+      prof.add('units', performance.now() - pt);
       if (this.sim.kind === 'worker') {
         const o = this.sim.takeOverlay();
         if (o && this.pheroOn) {
@@ -1586,18 +1602,24 @@ export class GameSession {
       }
     }
     // effects run on game time (frozen while paused)
+    pt = performance.now();
     const px = (vh * 0.5) / Math.tan(THREE.MathUtils.degToRad((cam as THREE.PerspectiveCamera).fov) * 0.5);
     this.surfFx.update(simDt, this.surfHeight, px);
     for (const nv of this.nests.values()) nv.fx.update(simDt, (x, y) => nv.stage.terrain.heightAt(x, y), px);
+    prof.add('fx', performance.now() - pt);
     // a story shot steers the surface camera (input waits until it is over or skipped)
     let cineOn = false;
     if (this.cine) {
       cineOn = this.cine.update(realDt);
       if (!cineOn) this.cine = null;
     }
+    pt = performance.now();
     v.frame(realDt, !cineOn);
+    prof.add('render', performance.now() - pt);
     this.autoQuality.update(v, realDt);
+    pt = performance.now();
     this.onFrame?.();
+    prof.add('ui', performance.now() - pt);
   }
 
   // ---------------------------------------------------------------- story mode (sim/story; claude/story/02-spec)

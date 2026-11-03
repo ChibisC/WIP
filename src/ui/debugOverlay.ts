@@ -1,16 +1,17 @@
 /**
- * F3 debug overlay (multiplayer brief, Part F): frame rate and frame time,
- * simulation tick time and where the simulation runs, the tick, entity
- * counts, graphics quality, and in multiplayer the input delay, pings,
- * pending commands, waiting state, the last state hash and desync status.
+ * F3 debug overlay (multiplayer brief, Part F; a full profiler since the performance pass, core/profiler.ts): frame
+ * rate and frame time (average, p95, worst), the main thread's time and where it goes (simulation messages, units,
+ * creatures, the nest, effects, UI, render submit), GPU time where the browser can measure it, draw calls,
+ * triangles, shader programs, textures, geometries, the JS heap, the GL work since loading, and the hitch log (frames
+ * over 33 ms and what happened in them); then the simulation and, in multiplayer, the net state.
  */
 import type { GameSession } from '../game/session';
+import { prof } from '../core/profiler';
 
 export class DebugOverlay {
   private el = document.createElement('pre');
   private on = false;
-  private last = 0;
-  private frames: number[] = [];
+  private lastDraw = 0;
 
   constructor(
     private s: GameSession,
@@ -20,10 +21,11 @@ export class DebugOverlay {
     parent.appendChild(this.el);
     s.input.on('debug', () => this.toggle());
     const loop = (t: number) => {
-      if (this.last) this.frames.push(t - this.last);
-      if (this.frames.length > 120) this.frames.shift();
-      this.last = t;
-      if (this.on) this.render();
+      // (text at 4 Hz: the overlay must not cost what it measures)
+      if (this.on && t - this.lastDraw > 250) {
+        this.lastDraw = t;
+        this.render();
+      }
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
@@ -41,17 +43,26 @@ export class DebugOverlay {
   private render(): void {
     const s = this.s;
     const w = s.world;
-    const f = this.frames.length ? this.frames.slice().sort((a, b) => a - b) : [16];
-    const avg = f.reduce((a, b) => a + b, 0) / f.length;
-    const worst = f[f.length - 1];
-    const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+    const f = prof.frameMs.summary();
+    const c = prof.cpuMs.summary();
+    const n = prof.counts();
+    const gpu = prof.gpuMs.count ? `${prof.gpuMs.ema.toFixed(1)} ms` : prof.gpuSupported ? '…' : 'n/a in this browser';
+    const parts = prof
+      .partNames()
+      .map((p) => [p, prof.parts[p].ema] as const)
+      .filter(([, ms]) => ms >= 0.05)
+      .map(([p, ms]) => `${p} ${ms.toFixed(1)}`)
+      .join('  ');
+    const G = prof.glSince();
     const lines = [
-      `FPS ${(1000 / avg).toFixed(0)}  frame ${avg.toFixed(1)} ms (worst ${worst.toFixed(0)} ms of last ${f.length})`,
+      `FPS ${(1000 / Math.max(1, f.avg)).toFixed(0)}  frame ${f.avg.toFixed(1)} ms  p95 ${f.p95.toFixed(1)}  worst ${f.worst.toFixed(0)} (last ${prof.frameMs.count})  main thread ${c.avg.toFixed(1)} ms  GPU ${gpu}`,
+      `parts (ms): ${parts || '—'}`,
+      `draw calls ${n.calls}  tris ${(n.triangles / 1000).toFixed(0)}k  programs ${n.programs}  textures ${n.textures}  geometries ${n.geometries}${n.heapMB ? `  heap ${n.heapMB.toFixed(0)} MB` : ''}  sim msg ${(prof.msgBytesAvg / 1024).toFixed(0)} KB`,
+      `GL since loading: ${G.links} shader links (${G.compileMs.toFixed(0)} ms), ${G.texUploads} texture uploads (${(G.texBytes / 1048576).toFixed(1)} MB)`,
       `sim ${s.sim.kind}  tick ${s.sim.tickMs.toFixed(2)} ms  #${w.s.tick}  t=${w.s.time.toFixed(0)} s  speed ${s.loop.speed}×${s.loop.paused ? ' paused' : ''}`,
       `ants ${w.s.ants.length}  creatures ${w.s.creatures.length}  food ${w.s.food.length}  brood ${w.s.brood.length}`,
-      `quality ${s.view.quality}${s.autoQuality.enabled ? ` (auto${s.autoQuality.lastChange ? `, last ${s.autoQuality.lastChange}` : ''})` : ''}  draw calls ${s.view.renderer.info.render.calls}  tris ${(s.view.renderer.info.render.triangles / 1000).toFixed(0)}k${mem ? `  heap ${(mem.usedJSHeapSize / 1048576).toFixed(0)} MB` : ''}`,
+      `quality ${s.view.quality}${s.view.renderScale < 1 ? ` at ${Math.round(s.view.renderScale * 100)} % resolution` : ''}${s.autoQuality.enabled ? ` (auto${s.autoQuality.lastChange ? `, last ${s.autoQuality.lastChange}` : ''})` : ''}`,
       `pending commands ${s.commands.pending().length}`,
-      `climb rails and riding slots drawn (cyan)`,
     ];
     const net = s.net;
     if (net) {
@@ -66,6 +77,10 @@ export class DebugOverlay {
         `hash ${st.lastHash ? `#${st.lastHash.tick} ${st.lastHash.hash}` : '—'}  ${st.desync ? `DESYNC at #${st.desync.tick}` : 'in sync'}${st.dropped.length ? `  dropped: ${st.dropped.map((p) => net.slots[p]?.name ?? p).join(', ')}` : ''}`,
       );
     }
+    const hs = prof.hitches.slice(-6);
+    lines.push(`hitches (frames over 33 ms): ${prof.hitches.length}${hs.length ? '' : ' — none'}`);
+    for (const h of hs) lines.push(`  ${h.t.toFixed(1)} s  ${h.ms.toFixed(0)} ms (main ${h.cpu.toFixed(0)}): ${h.causes.join('; ')}`);
+    lines.push(`climb rails and riding slots drawn (cyan)`);
     this.el.textContent = lines.join('\n');
   }
 }

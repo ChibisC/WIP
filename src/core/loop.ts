@@ -23,6 +23,10 @@ export class GameLoop {
   frameMs = 16;
   tickMs = 0;
   maxTicksPerFrame = 24;
+  /** profiling hooks (game/profiler.ts): the frame starts, the ticks ran (ms), the frame ends */
+  onStepStart: ((now: number) => void) | null = null;
+  onTicks: ((ms: number) => void) | null = null;
+  onStepEnd: (() => void) | null = null;
 
   constructor(private hooks: LoopHooks) {}
 
@@ -50,6 +54,7 @@ export class GameLoop {
 
   /** Advance manually (used by tests and by the headless screenshot harness). */
   step(now: number): void {
+    this.onStepStart?.(now);
     let realDt = (now - this.last) / 1000;
     this.last = now;
     if (realDt > 0.25) realDt = 0.25;
@@ -74,8 +79,10 @@ export class GameLoop {
       else if (n >= this.maxTicksPerFrame) this.acc = 0;
       const t1 = performance.now();
       if (n > 0) this.tickMs = this.tickMs * 0.9 + ((t1 - t0) / n) * 0.1;
+      this.onTicks?.(t1 - t0);
     }
     this.hooks.frame(this.paused ? 1 : this.acc / TICK_DT, realDt, simDt);
+    this.onStepEnd?.();
   }
 
   /** Run n ticks immediately (fast-forward, tests). */
