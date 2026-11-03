@@ -617,7 +617,7 @@ export const BALANCE = {
  * The ramp values are the user's and must not change.
  */
 export const NASUTE = {
-  displayName: 'Nasute Termites',
+  displayName: 'Conehead Termites',
   // kit v2.2 (2026-10-25): the worker is small and round, 4.2 mm (male 3.9 / female 4.5), clearly smaller than the sickle-jaw's
   sizeMm: { workerFemale: 4.5, workerMale: 3.9, nasuteSoldier: 5.0, majorSoldier: 6.5, king: 8.4, queen: 25.4 },
   worker: { hpMul: 0.7, speedMul: 0.8, biteDpsMul: 0.3, femaleHpBonus: 0.1 },

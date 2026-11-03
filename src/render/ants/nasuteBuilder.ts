@@ -193,7 +193,7 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
     ttube(n, [a, a.clone().lerp(neck, 0.5), neck.clone().add(V(0.015, 0))], [th.h * 0.33 * L, th.h * 0.28 * L, th.h * 0.3 * L], S(10, 6, 4), PART.BODY, () => mix(C.thorax, C.membrane, 0.4), lk.abdomen, false, false, 1, REGION.MESO);
   }
 
-  // ---------- head ----------
+  // ---------- head (user note 2026-11-02 17:48: "redo the head geometry and mandibles based on the reference images") ----------
   const HM = new THREE.Matrix4().compose(neck, new NQ().setFromAxisAngle(new NV(0, 0, 1), hd.tilt), new NV(1, 1, 1));
   const hq = new NQ().setFromAxisAngle(new NV(0, 0, 1), hd.tilt);
   const toB = (x, y, z) => new NV(x, y, z).applyMatrix4(HM);
@@ -201,104 +201,156 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
   let mouth, headTipX, nasusTip = null, chin, jawTip;
   const hingeAt = [], tips = [], sockets = [], elbows = [];
   const headCol = (s, d) => (d > 0 ? mix(C.head, C.headTop, d * 0.65) : mix(C.head, C.headUnder, -d * 0.7));
-  if (!soldier) {
-    // a domed capsule, rounded square from above, the widest behind the middle
-    const R = S(18, 10, 6), secs = [];
-    for (let k = 0; k < R; k++) {
-      const s = k / (R - 1);
-      const env = Math.pow(Math.sin(Math.PI * Math.min(1, 0.04 + s * 0.94)), 0.55);
-      secs.push({ x: s * hL, y: 0.0 * L - 0.012 * L * s, ry: hH * 0.5 * env * (1 - 0.1 * s), rz: hW * 0.5 * env * (1 - 0.06 * ss(0.5, 1, s)), n: 2.5 });
-    }
-    const [p, ix, meta] = loft(secs, S(18, 10, 6));
+  /** a loft in head space, written to the body through the head matrix */
+  const headLoft = (secs, segs, colorAt, look, deform, reg) => {
+    const [p, ix, meta] = loft(secs, segs, deform);
     const cols = [];
-    for (let h = 0; h < secs.length; h++) for (let d = 0; d < S(18, 10, 6); d++) { const a = (d / S(18, 10, 6)) * Math.PI * 2; cols.push(headCol(h / (secs.length - 1), Math.sin(a))); }
-    cols.push(headCol(0, 0), headCol(1, 0));
+    for (let h = 0; h < secs.length; h++) for (let d = 0; d < segs; d++) { const a = (d / segs) * Math.PI * 2; cols.push(colorAt(h / (secs.length - 1), Math.sin(a), Math.cos(a))); }
+    cols.push(colorAt(0, 0, 0), colorAt(1, 0, 0));
     const pw = [];
     for (let q = 0; q < p.length; q += 3) { const v = toB(p[q], p[q + 1], p[q + 2]); pw.push(v.x, v.y, v.z); }
-    pieceRGB(n, pw, ix, PART.HEAD, cols, lk.head, 0, detOf(meta, REGION.HEAD));
-    // the postclypeus: an inflated, paler bulge on the face's top front; the labrum below it
-    blob(n, toB(hL * 0.9, hH * 0.1, 0), V(0.028, 0.024, 0.048), S(12, 6, 4), PART.HEAD, C.clypeus, lk.head, hq, 0, REGION.HEAD);
-    blob(n, toB(hL * 0.97, -hH * 0.1, 0), V(0.016, 0.018, 0.028), S(10, 6, 4), PART.HEAD, C.labrum, lk.head, hq, 0, REGION.HEAD);
-    // faint Y-shaped epicranial suture: a darker line drawn on the top
-    if (o) for (let k = 0; k < 3; k++) {
-      const a = k === 0 ? 0 : k === 1 ? 0.6 : -0.6;
-      const pts = [toB(hL * 0.2, hH * 0.5, 0), toB(hL * (0.45 + 0.1 * Math.abs(a)), hH * 0.49, Math.sin(a) * hW * 0.25)];
-      ttube(n, pts, [0.0016 * L, 0.001 * L], 3, PART.HEAD, () => mix(C.head, C.suture, 0.6), lk.head, false, false);
+    pieceRGB(n, pw, ix, PART.HEAD, cols, look, 0, reg ? detOf(meta, reg) : undefined);
+  };
+  if (!soldier) {
+    // The worker (photos: the live workers and the worker-head close-up): a glossy, translucent amber capsule, round
+    // and a little wider than long from above, the top flattened; it sits on the neck with its back overhanging the
+    // pronotum. A darker brown band across the frons and down the midline (the epicranial suture and the muscles seen
+    // through the cuticle). In front: the inflated, paler postclypeus, a pale tongue-shaped labrum over the jaws, and
+    // stout dark-tipped mandibles crossing under it.
+    const x0 = -0.32 * hL;
+    // round behind, the sides nearly parallel, the front blunt (the face), not a point
+    const R = S(24, 14, 8), secs = [];
+    for (let k = 0; k < R; k++) {
+      const s = k / (R - 1);
+      const back = s < 0.38 ? Math.sqrt(Math.max(0.0025, 1 - ((0.38 - s) / 0.38) ** 2)) : 1;
+      const front = s > 0.84 ? Math.sqrt(Math.max(0.0025, 1 - ((s - 0.84) / 0.16) ** 2)) : 1;
+      const narrow = 1 - 0.38 * ss(0.42, 1, s);
+      const env = back * front;
+      secs.push({ x: x0 + s * hL, y: 0.2 * hH - 0.16 * hH * s * s, ry: hH * 0.5 * env * (1 - 0.18 * ss(0.55, 1, s)), rz: hW * 0.5 * env * narrow, n: 2.4 });
     }
-    // mandibles: short, curved, toothed blades from the front corners, crossing at the tips when closed
+    headLoft(secs, S(20, 12, 7), (s, d, lat) => {
+      let c = headCol(s, d);
+      // the darker band: across the frons (s ~ 0.6) and down the midline toward the back, on top only
+      const top = Math.max(0, d);
+      const band = Math.exp(-((s - 0.6) ** 2) / 0.006) * (0.6 + 0.4 * Math.abs(lat)) + Math.exp(-(lat * lat) / 0.02) * ss(0.15, 0.6, s) * 0.8;
+      c = mix(c, C.headBand, 0.75 * Math.min(1, band) * top);
+      return c;
+    }, lk.head, (x, y, z) => [x, y > 0.22 * hH ? 0.22 * hH + (y - 0.22 * hH) * 0.88 : y, z], REGION.HEAD);
+    // (user notes 17:48 / 17:59: "redo the head geometry and mandibles", "fix the mandibles especially and the head")
+    // The face, front to back as in the worker-head photo: the postclypeus — a broad, swollen cushion across the front
+    // of the head, a dark line down its middle; the thin pale anteclypeus; the labrum — a large rounded tongue lying
+    // forward and down over the jaws; under it the mandibles, broad flat blades whose dark toothed tips cross below
+    // the labrum's tip (the left over the right); the pale palps hanging below (five-segment maxillary, three-segment
+    // labial).
+    const F = x0 + hL; // the capsule's front
+    // the postclypeus swells out of the face (most of it inside the capsule, so it reads as a swelling, not a disc)
+    // (wide and low: a transverse cushion across the lower face)
+    const pcC = toB(F - 0.06 * hL, -0.06 * hH, 0);
+    blob(n, pcC, new NV(0.12 * hL, 0.16 * hH, 0.3 * hW), S(18, 10, 6), PART.HEAD, C.clypeus, lk.head, hq, 0, REGION.HEAD);
+    if (lod < 2) ttube(n, [toB(F - 0.12 * hL, 0.12 * hH, 0), toB(F + 0.02 * hL, 0.08 * hH, 0), toB(F + 0.06 * hL, -0.08 * hH, 0)], [0.0018 * L, 0.002 * L, 0.0016 * L], 4, PART.HEAD, () => C.headBand, lk.head, false, false);
+    // the labrum: a broad rounded lobe from under the postclypeus, lying forward and down over the jaws
+    const lbQ = hq.clone().multiply(new NQ().setFromAxisAngle(new NV(0, 0, 1), -1.0));
+    const lbC = toB(F + 0.02 * hL, -0.3 * hH, 0);
+    blob(n, lbC, new NV(0.13 * hL, 0.035 * hH, 0.2 * hW), S(16, 8, 5), PART.HEAD, C.labrum, lk.abdomen, lbQ, 0, REGION.HEAD);
+    const lb = [lbC.clone().add(new NV(0.15 * hL, 0, 0).applyQuaternion(lbQ))];
+    // mandibles: flat blades (wide across, thin top to bottom), broad at the hinge, curving in to a hooked apical tooth
+    // with two marginal teeth on the inner edge
     const md = i.mandible;
     for (const sd of [-1, 1]) {
-      const h = toB(hL * 0.92, -hH * 0.22, sd * hW * 0.2);
       const part = sd < 0 ? PART.MAND_L : PART.MAND_R;
-      const pts = [];
-      const M = S(10, 5, 3);
+      const h = toB(F - 0.2 * hL, -0.34 * hH + (sd < 0 ? 0.012 * hH : 0), sd * hW * 0.3);
+      const M = S(14, 7, 4), pts = [], rad = [];
+      const lift = sd < 0 ? 0.01 * L : 0; // the left blade lies over the right where they cross
       for (let k = 0; k <= M; k++) {
-        const s = k / M, a = md.curve * s;
-        pts.push(h.clone().add(new NV(Math.cos(a) * md.len * L * s * 0.95, -0.01 * L * s, -sd * Math.sin(a) * md.len * L * s * 0.9 + sd * 0.002 * L)).applyQuaternion(new NQ()));
+        const s = k / M;
+        // forward, then sweeping in across the midline
+        const a = md.curve * Math.pow(s, 1.6);
+        const q = new NV(md.len * L * (s * 0.92 - 0.08 * s * s), -0.012 * L * s + lift * ss(0.5, 1, s), -sd * (md.len * L * 0.7) * (Math.sin(a) / Math.sin(md.curve)) * ss(0, 1, s));
+        pts.push(h.clone().add(q.applyQuaternion(hq)));
+        rad.push(L * md.r * (1.25 - 0.95 * ss(0.05, 1, s)) + 0.0015 * L);
       }
-      // the tips cross the midline a little
-      const rad = pts.map((_, k) => { const s = k / M; return L * md.r * (1 - 0.75 * ss(0.35, 1, s)) + 0.002 * L; });
-      ttube(n, pts, rad, S(7, 5, 3), part, (s) => mix(C.mand, C.mandTip, ss(0.4, 1, s)), lk.mandible, true, true, 0.55, REGION.MANDIBLE);
-      if (o) for (let q = 0; q < 3; q++) {
-        // marginal teeth on the inner edge
-        const k = Math.round((0.45 + 0.18 * q) * M), tn = pts[Math.min(M, k + 1)].clone().sub(pts[k - 1]).normalize(), inner = new NV(-tn.z, 0, tn.x).multiplyScalar(-sd);
-        ttube(n, [pts[k], pts[k].clone().addScaledVector(inner, 0.012 * L).addScaledVector(tn, 0.006 * L)], [rad[k] * 0.6, 0.0015 * L], 4, part, () => C.mandTip, lk.mandible, false, true);
+      ttube(n, pts, rad, S(10, 6, 4), part, (s) => mix(C.mand, C.mandTip, ss(0.5, 0.92, s)), lk.mandible, true, true, 0.38, REGION.MANDIBLE);
+      if (lod < 2) for (let q = 0; q < 2; q++) {
+        // marginal teeth: short dark cones from the inner edge, pointing in and a little forward
+        const k = Math.round((0.5 + 0.18 * q) * M), tn = pts[Math.min(M, k + 1)].clone().sub(pts[k - 1]).normalize();
+        const inner = new NV(0, sd < 0 ? -1 : 1, 0).applyQuaternion(hq).cross(tn).normalize();
+        ttube(n, [pts[k].clone().addScaledVector(inner, rad[k] * 0.6), pts[k].clone().addScaledVector(inner, rad[k] * 0.6 + 0.012 * L).addScaledVector(tn, 0.007 * L)], [rad[k] * 0.42, 0.0012 * L], 4, part, () => C.mandTip, lk.mandible, false, true, 0.6);
       }
       hingeAt.push(h); tips.push(pts[M]);
     }
-    mouth = toB(hL * 0.98, -hH * 0.2, 0);
-    chin = toB(hL * 0.7, -hH * 0.5, 0);
+    if (lod < 2) for (const sd of [-1, 1]) {
+      // the palps: pale, jointed, hanging down and forward under the jaws
+      const mp = [toB(F - 0.22 * hL, -0.42 * hH, sd * 0.22 * hW)];
+      const segs = [0.024, 0.02, 0.02, 0.018, 0.022];
+      let d = new NV(0.7, -0.55, sd * 0.25).normalize();
+      for (let k = 0; k < segs.length; k++) { d = d.clone().add(new NV(0, -0.18, 0)).normalize(); mp.push(mp[k].clone().add(d.clone().applyQuaternion(hq).multiplyScalar(segs[k] * L))); }
+      ttube(n, mp, mp.map((_, k) => (0.0055 - 0.0006 * k) * L), 5, PART.HEAD, () => C.palp, lk.abdomen, true, true);
+      const lp = [toB(F - 0.18 * hL, -0.45 * hH, sd * 0.07 * hW)];
+      let e = new NV(0.6, -0.75, sd * 0.1).normalize();
+      for (const sl of [0.016, 0.014, 0.016]) { lp.push(lp[lp.length - 1].clone().add(e.clone().applyQuaternion(hq).multiplyScalar(sl * L))); e = e.clone().add(new NV(0, -0.15, 0)).normalize(); }
+      ttube(n, lp, lp.map(() => 0.0045 * L), 5, PART.HEAD, () => C.palp, lk.abdomen, true, true);
+    }
+    mouth = toB(F + 0.05 * hL, -0.25 * hH, 0);
+    chin = toB(F - 0.25 * hL, -0.5 * hH, 0);
     jawTip = tips[0].clone().lerp(tips[1], 0.5);
-    headTipX = Math.max(tips[0].x, toB(hL * 1.02, 0, 0).x);
+    headTipX = Math.max(tips[0].x, tips[1].x, lb[0].x);
   } else {
-    // the pear-shaped soldier head: a round bulb behind, drawn forward into the nasus (a straight cone, a little up)
+    // The soldier (photos: the specimen in top, side and head views; the live soldiers): one teardrop — a round bulb
+    // behind, its back overhanging the pronotum, drawn forward with concave flanks into the nasus, the dorsal line
+    // nearly straight from the vertex to the tip, the underside sweeping up to it; glassy dark red-brown, the tip
+    // lighter and translucent. The mandibles are vestigial points hidden under the bulb.
     const nz = hd.nasus;
-    const bulb = [], br = [], bry = [];
-    const BR = S(22, 12, 7);
-    for (let k = 0; k <= BR; k++) {
-      const s = k / BR;
-      // the bulb (0 → 0.7) then the throat into the nasus base (0.7 → 1)
-      const x = s * hL;
-      // a round bulb (fullest at 0.45) that narrows smoothly into the nasus base: no collar
-      const bulbE = (q) => Math.pow(Math.sin(Math.PI * Math.min(1, 0.04 + (q / 0.45) * 0.46)), 0.6);
-      const env = s <= 0.45 ? bulbE(s) : 1 - ss(0.45, 1, s) * 0.999;
-      const rz = Math.max(nz.r0 * L, (s <= 0.45 ? env : nz.r0 * L / (hW * 0.5) + (1 - nz.r0 * L / (hW * 0.5)) * env) * hW * 0.5);
-      const ry = Math.max(nz.r0 * L, (s <= 0.45 ? env : nz.r0 * L / (hH * 0.5) + (1 - nz.r0 * L / (hH * 0.5)) * env) * hH * 0.5);
-      bulb.push(toB(x, ss(0.45, 1, s) * hH * 0.12, 0));
-      br.push(rz); bry.push(ry);
+    const HT = hL + nz.len * L, R = hW * 0.5, Ry = hH * 0.5, rT = nz.r1 * L;
+    const sc = (R * 1.02) / HT; // the bulb's centre along the head: its back is round
+    const x0 = -0.55 * R;
+    const yC = 0.42 * Ry; // the bulb's centre above the neck joint
+    const NS = S(30, 16, 8), secs = [];
+    let tip = null;
+    for (let k = 0; k < NS; k++) {
+      const s = k / (NS - 1);
+      let rz, ry, cy;
+      if (s <= sc) {
+        const f = Math.sqrt(Math.max(0, 1 - ((sc - s) / sc) ** 2));
+        rz = R * Math.max(0.05, f);
+        ry = Ry * Math.max(0.05, f);
+        cy = yC;
+      } else {
+        const u = (s - sc) / (1 - sc);
+        // concave flanks: a fast fall then a long slim cone
+        const w = Math.pow(1 - u, 1.75);
+        rz = rT + (R - rT) * w;
+        ry = rT + (Ry - rT) * w;
+        // the axis rises so the top line stays nearly straight and the underside sweeps up
+        cy = yC + (Ry - rT) * 0.55 * Math.pow(u, 0.9) + nz.up * u * nz.len * L;
+      }
+      secs.push({ x: x0 + s * HT, y: cy, ry, rz, n: 2.05 });
+      if (k === NS - 1) tip = new NV(x0 + HT + rT, cy, 0);
     }
-    pathLoft(n, bulb, br, bry, S(20, 10, 6), PART.HEAD, (s, d) => mix(headCol(s, d), C.headTop, 0.15 * ss(0.6, 1, s)), lk.head, REGION.HEAD);
-    // the nasus: from the bulb's front, a slim cone pointing forward and a little up, its tip lighter and translucent
-    const n0 = bulb[bulb.length - 1].clone();
-    const ndir = new NV(Math.cos(nz.up + hd.tilt), Math.sin(nz.up + hd.tilt), 0).normalize();
-    const NS = S(12, 6, 4), np = [], nr = [];
-    for (let k = 0; k <= NS; k++) {
-      const s = k / NS;
-      np.push(n0.clone().addScaledVector(ndir, s * nz.len * L).add(new NV(0, -nz.droop * L * s * s, 0)));
-      nr.push(L * (nz.r0 + (nz.r1 - nz.r0) * Math.pow(s, 0.8)));
-    }
-    ttube(n, np, nr, S(14, 8, 5), PART.HEAD, (s) => mix(C.head, C.nasusTip, ss(0.55, 1, s)), lk.head, false, true, 1, REGION.MANDIBLE);
-    nasusTip = np[NS].clone().addScaledVector(ndir, nr[NS]);
-    // vestigial mandibles: two small dark points under the nasus base
+    headLoft(secs, S(22, 12, 7), (s, d) => {
+      const c = headCol(s, d);
+      return mix(c, C.nasusTip, ss(0.78, 1, s) * 0.85);
+    }, lk.head, undefined, REGION.HEAD);
+    nasusTip = toB(tip.x, tip.y, 0);
+    // vestigial mandibles: two small dark points under the bulb's front
     for (const sd of [-1, 1]) {
-      const h = toB(hL * 0.62, -hH * 0.36, sd * hW * 0.12);
+      const h = toB(x0 + R * 1.6, yC - Ry * 0.82, sd * R * 0.22);
       const part = sd < 0 ? PART.MAND_L : PART.MAND_R;
-      const t = h.clone().add(V(0.035, -0.012, -sd * 0.012));
-      ttube(n, [h, h.clone().lerp(t, 0.5), t], [0.012 * L, 0.008 * L, 0.002 * L], S(6, 4, 3), part, (s) => mix(C.mand, C.mandTip, s), lk.mandible, true, true);
+      const t = h.clone().add(new NV(0.03 * L, -0.008 * L, -sd * 0.01 * L).applyQuaternion(hq));
+      ttube(n, [h, h.clone().lerp(t, 0.5), t], [0.011 * L, 0.007 * L, 0.002 * L], S(6, 4, 3), part, (s) => mix(C.mand, C.mandTip, s), lk.mandible, true, true);
       hingeAt.push(h); tips.push(t);
     }
-    // the six stiff pale setae: two on the bulb's top, two on its sides, two near the nasus base (0.25× head width)
+    // the six stiff setae: two on the vertex, two on the sides, two near the nasus base (0.25x the head width)
     if (lod < 2) {
       const sl = 0.25 * hW;
-      const sp = [
-        [0.42, 0.48, 0.12, new NV(0.1, 1, 0.25)], [0.42, 0.48, -0.12, new NV(0.1, 1, -0.25)],
-        [0.35, 0.05, 0.47, new NV(-0.1, 0.3, 1)], [0.35, 0.05, -0.47, new NV(-0.1, 0.3, -1)],
-        [0.78, 0.22, 0.14, new NV(0.3, 1, 0.4)], [0.78, 0.22, -0.14, new NV(0.3, 1, -0.4)],
-      ];
-      for (const [s, yy, zz, d] of sp) seta(n, toB(s * hL, yy * hH, zz * hW), d.normalize().applyQuaternion(hq), sl, 0.0018 * L, PART.HEAD, C.seta ?? C.hair, lk.hair);
+      const at = (s, a) => {
+        const k = Math.min(NS - 1, Math.round(s * (NS - 1))), g = secs[k];
+        return toB(g.x, g.y + Math.sin(a) * g.ry * 0.98, Math.cos(a) * g.rz * 0.98);
+      };
+      const sp = [[sc * 0.9, 1.35, new NV(0.1, 1, 0.25)], [sc * 0.9, 1.79, new NV(0.1, 1, -0.25)], [sc * 0.8, 0.25, new NV(-0.1, 0.3, 1)], [sc * 0.8, Math.PI - 0.25, new NV(-0.1, 0.3, -1)], [sc + 0.12, 1.2, new NV(0.3, 1, 0.4)], [sc + 0.12, Math.PI - 1.2, new NV(0.3, 1, -0.4)]];
+      for (const [s0, a, d] of sp) seta(n, at(s0, a), d.normalize().applyQuaternion(hq), sl, 0.0018 * L, PART.HEAD, C.seta ?? C.hair, lk.hair);
     }
-    mouth = toB(hL * 0.66, -hH * 0.36, 0);
-    chin = toB(hL * 0.45, -hH * 0.5, 0);
+    mouth = toB(x0 + R * 1.5, yC - Ry * 0.8, 0);
+    chin = toB(x0 + R, yC - Ry, 0);
     jawTip = tips[0].clone().lerp(tips[1], 0.5);
     headTipX = nasusTip.x;
   }
