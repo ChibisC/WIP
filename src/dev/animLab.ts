@@ -334,7 +334,7 @@ function clips(): Record<string, Clip> {
           morph: FIRE,
           script: (t, v) => {
             const k = (t - FIN_C) / BALANCE.snap.finisherLift;
-            Object.assign(v, { x: 0, y: 0, heading: 0, hp: 20, antennaActivity: 1, mandible: 0.6, lift: 0, pitch: 0, roll: 0, headYaw: 0 });
+            Object.assign(v, { x: 0, y: 0, heading: 0, hp: 20, antennaActivity: 1, mandible: 0.6, lift: 0, pitch: 0, roll: 0, headYaw: 0, neckBy: 0 });
             v.dead = k >= 1;
             v.cause = 9;
             if (k < 0) {
@@ -349,7 +349,7 @@ function clips(): Record<string, Clip> {
             v.x = hx * Math.min(1, Math.max(0, k / 0.3));
             if (v.dead) return;
             execHeld(k, Lh, Lv, t, 0.3, EXH);
-            Object.assign(v, { lift: EXH.lift, pitch: EXH.pitch, roll: EXH.roll, headYaw: EXH.headYaw, mandible: 0.7, pose: POSE.GRAPPLE });
+            Object.assign(v, { lift: EXH.lift, pitch: EXH.pitch, roll: EXH.roll, headYaw: EXH.headYaw, mandible: 0.7, pose: POSE.GRAPPLE, neckBy: 2 });
           },
         },
         {

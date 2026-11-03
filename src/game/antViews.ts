@@ -486,6 +486,7 @@ function speciesExtras(w: World, a: Ant, out: AntView): void {
   }
   out.snap = false;
   out.held = 0;
+  out.neckBy = 0;
   out.acid = 0;
   out.aimZ = undefined;
   out.holding = false;
@@ -516,6 +517,7 @@ function speciesExtras(w: World, a: Ant, out: AntView): void {
     out.mandible = Math.max(out.mandible, 0.7);
     out.antennaActivity = 1;
     out.pose = POSE.GRAPPLE;
+    out.neckBy = holder.id;
   } else if (a.heldBy) {
     // pinned in a hell ant's jaws: lifted off the ground at the socket, hanging nose-down, legs flailing
     const h = w.antById.get(a.heldBy);

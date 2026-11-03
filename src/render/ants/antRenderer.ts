@@ -102,6 +102,8 @@ export interface AntView {
    *  pulse (played as this attack cycle); the rage glow 0..1 (a red flush); this cycle's bite stings (army ants
    *  sting only every third bite) */
   special?: number;
+  /** the hell ants' finisher: held by the neck in this ant's jaws (its id; the renderer puts the neck on the grip) */
+  neckBy?: number;
   rageGlow?: number;
   stingNext?: boolean;
   /** fore legs raised 0..1 and the body's pitch pivot along it (fraction of L; − behind the middle): a sprayer
@@ -983,6 +985,25 @@ export class AntRenderer {
       vS.setScalar(scale);
       tmpM.compose(vP, tmpQ, vS);
       if (v.carrying && !v.carryUnder && !v.dead) this.recordHold(v.id, rig, hp, hy);
+      // the hell ants' finisher (user rating A2: "it just looks like the ant is floating, make it on the neck"): the
+      // lifting hell ant records its mandible–horn socket as posed; the foe's neck is put on it (a frame behind at most)
+      const sock = (rig as { hold?: THREE.Vector3 }).hold;
+      if (v.special === 4 && !v.dead && sock) this.recordHold(v.id, rig, hp, hy, sock);
+      if (v.neckBy && !v.dead) {
+        const jh = this.holds.get(v.neckBy);
+        if (jh && this.frame - jh.frame <= 2) {
+          _jp.copy(rig.neck).applyMatrix4(tmpM);
+          vP.x += jh.x - _jp.x;
+          vP.y += jh.y - _jp.y;
+          vP.z += jh.z - _jp.z;
+          tmpM.compose(vP, tmpQ, vS);
+          // (let go: it eases from here to where the sim has it, as from a creature's jaws)
+          s.mx = vP.x;
+          s.my = vP.y;
+          s.mz = vP.z;
+          s.wasMounted = true;
+        }
+      }
 
       // Cull + LOD by projected size
       sphere.center.copy(vP);
@@ -1059,10 +1080,10 @@ export class AntRenderer {
   }
 
   /** The point between the closed jaw tips on the posed head (pitch about the neck, then yaw), in the world (tmpM). */
-  private recordHold(id: number, rig: AntRig, hp: number, hy: number): void {
+  private recordHold(id: number, rig: AntRig, hp: number, hy: number, at?: THREE.Vector3): void {
     const jt = rig.jawTip;
-    const mx = jt ? rig.mouth.x + (jt.x - rig.mouth.x) * 0.7 : rig.mouth.x;
-    const my = jt ? (rig.mouth.y + jt.y) / 2 : rig.mouth.y;
+    const mx = at ? at.x : jt ? rig.mouth.x + (jt.x - rig.mouth.x) * 0.7 : rig.mouth.x;
+    const my = at ? at.y : jt ? (rig.mouth.y + jt.y) / 2 : rig.mouth.y;
     const dx = mx - rig.neck.x;
     const dy = my - rig.neck.y;
     const cp = Math.cos(hp);
