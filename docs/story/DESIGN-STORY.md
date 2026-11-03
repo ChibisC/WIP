@@ -2,7 +2,8 @@
 
 Specs: `claude/story/02-spec-gene-thief-chapter1-two-levels.md` (campaign, chapter 1), `claude/story/03-spec-story-level-maps.md`
 (the two maps), `claude/story/04-spec-chapter1-four-levels.md` (chapter 1 as four levels: the nights and the Spider
-Mother, traits), `claude/creatures/01-spec-digging-titans.md` (titans dig into nests; built on `feature/digging-titans`),
+Mother, traits), `claude/story/06-spec-levels-5-7-and-lengths.md` (chapter 1 as seven levels, surprise events, 30–50
+minute levels), `claude/creatures/01-spec-digging-titans.md` (titans dig into nests; built on `feature/digging-titans`),
 `claude/maps/05-spec-layered-maps.md` (layered ground; its core is built here), the long-term plan
 `claude/story/01-spec-gene-thief-campaign.md`. Inspired only by the broad Kickstarter-era idea of Empires of the
 Undergrowth (a scientist following a gene-stealing queen across an island); every name, character, line, mission and
@@ -94,7 +95,8 @@ card) and the single-player menu (**Story** tab next to Missions), and after eve
 
 ## 5. The levels
 
-Each is a data file (`src/story/levels/garden.ts`, `longNights.ts`, `fireBanks.ts`, `spiderMother.ts`) on the format in `src/sim/story/types.ts`: map,
+Each is a data file (`src/story/levels/garden.ts`, `longNights.ts`, `fireBanks.ts`, `spiderMother.ts`, `antleredKing.ts`,
+`highWater.ts`, `cartonKingdom.ts`) on the format in `src/sim/story/types.ts`: map,
 player start, rivals, creatures, aphids and plants, reward, loadout, stages (objectives, captions, scenes, events),
 level-wide scenes/captions/events on game time, the cast, medals, and the win/lose lines.
 
@@ -116,6 +118,10 @@ its far east end (the flank; a caption hints at it). No dangerous creatures (the
 Medals: time gold ≤ 20 min, silver ≤ 32; losses gold ≤ 25, silver ≤ 60; bonus "steal the Black Garden Ant Soldier before
 the first Lasius raid".
 
+Surprise events (§6): a red wood ant column crossing the garden (a visiting party); the ground beetle back, hunting the
+meadow's foragers; a strawberry fallen off the bed, and a Lasius foraging party coming for it; a hot spell; on Hard and
+Brutal an early Lasius raid once the stolen genes stage begins.
+
 ### Level 2 — "The Long Nights" (map `stonyHollow`, 1100 × 900 mm) — new 2026-11-02
 Kept the working title: it says what the level is (three nights to live through) and is our own. The colony has spread
 to a stony hollow where the meadow meets the river woods. No enemy ant species; reward: medals only. Map: level 1 = the
@@ -125,21 +131,26 @@ root ramp and a soil slope down); level 2 = a rocky knoll on the rim with the ta
 at the foot of the banks (underground areas, `sim/areas.ts` caves of kind `lair`, each with a few old kills; the
 tarantula's drawn as a silk-lined burrow). No water, no fallen leaves.
 
-**Day and night** (`StoryLevelDef.dayNight`, `sim/story/dayNight.ts`): a first day of 5½ min, days of 4 min, nights of
-3 min and a last night of 4; dusk warnings 30 s before each night (a caption and a tip), the light fading through the dusk
+**Day and night** (`StoryLevelDef.dayNight`, `sim/story/dayNight.ts`): four nights since 2026-11-03 (claude/story/06-spec
+§7: the level ran 23½ minutes) — a first day of 7 min, days of 5½ min, nights of 3½ min and a last night of 4½; dusk warnings 30 s before each night (a caption and a tip), the light fading through the dusk
 (`w.s.night` 0 → 1 over the 30 s of dusk and back at dawn: moonlight on the client, `render/view.ts`), the flags `dusk:N`, `night:N`, `dawn:N`, a clock under
-the stage name ("Day 2 · dusk in 1:40", "Night 2 of 3 · dawn in 0:55"). About 23½ minutes in all.
+the stage name ("Day 2 · dusk in 1:40", "Night 2 of 4 · dawn in 0:55"). About 38½ minutes in all.
 
 | Stage | Objectives | Scenes and set pieces |
 |---|---|---|
 | The first day | survive night 1; gather 150 food, 3 food store tiles (optional) | opening flight (the knoll → the hollow → the terrace); food in the hollow; at dusk a ground beetle comes out of a lair and crosses the hollow (the first sign; the camera follows it); at night two packs (2 ground beetles; a ground beetle and a rove beetle) come out of the two nearest lairs and climb the two ramps to hold the ramp tops till dawn |
 | The second day | survive night 2; 10 fighters, store 200 food (optional) | at dawn the hunters go home (passive, `leave` to their lairs) and the night's leftovers lie in the hollow; at dusk two wolf spiders wait at the mouths of two lairs facing the terrace (their eyes shine: eyeshine, render), then charge with the night's two packs (stone centipedes and ground beetles), from two sides |
-| The third day | survive night 3; upgrade a chamber (optional) | at night packs from every lair (beetles, a rove beetle, wolf spiders, centipedes); the red-knee tarantula leaves its burrow on the knoll, walks down the rim and across the hollow (the camera follows), digs a hole wider and walks into the nest breaking soil (`digInto`; a story titan never gives up or flees, `titanDig.ts`); keep the queen alive until dawn |
-| level-wide | — | at dawn after the third night the level is won; the tarantula walks back out (`endRaid`) to its burrow and the hunters go home |
+| The third day | survive night 3; upgrade a chamber (optional) | at night packs from every lair (beetles, a rove beetle, wolf spiders, centipedes) |
+| The fourth day | survive night 4; 18 fighters (optional) | the biggest packs; the red-knee tarantula leaves its burrow on the knoll, walks down the rim and across the hollow (the camera follows), digs a hole wider and walks into the nest breaking soil (`digInto`; a story titan never gives up or flees, `titanDig.ts`); keep the queen alive until dawn |
+| level-wide | — | at dawn after the fourth night the level is won; the tarantula walks back out (`endRaid`) to its burrow and the hunters go home |
+
+Surprise events by day (§6): a moth fallen in the hollow (day 1); a red wood ant column crossing the hollow at midday
+and a hot spell (day 2); a praying mantis hunting the hollow and a dead grasshopper (day 3); a rove beetle hunting the
+foragers and a seed drop (day 4).
 
 Hunters' health is scaled down for the level (`hp` 0.3–0.4; their counts × the difficulty's `wave`); the tarantula 0.7 ×
-the difficulty's `boss`. Medals: **food stored** at the end (the level's length is fixed: gold ≥ 300, silver ≥ 160),
-losses (gold ≤ 50, silver ≤ 110), bonus "kill the tarantula before dawn".
+the difficulty's `boss`. Medals: **food stored** at the end (the level's length is fixed: gold ≥ 360, silver ≥ 200),
+losses (gold ≤ 60, silver ≤ 130), bonus "kill the tarantula before dawn".
 
 ### Level 3 — "Fire on the Banks" (map `fireBanks`, 1200 × 900 mm)
 Unchanged gameplay, map and balance (level 2 until 2026-11-02); its opening caption now links it to the nights before.
@@ -158,7 +169,11 @@ fire ants' main route), a root ramp at the far east end (the flank), and two ram
 | 5 Take the mound | kill the fire ant queen | both ramps; the flank hint; Dr. Varga's unease line |
 
 Medals: time gold ≤ 25 min, silver ≤ 38; losses gold ≤ 40, silver ≤ 80; bonus "lose no more than 10 ants to the swarm".
-(The Mega Colony hint moved to the end of level 4.)
+(The Mega Colony hint moved to the end of level 4, and on to level 7 on 2026-11-03.)
+
+Surprise events (§6): a praying mantis waiting at the slope's foot; a fire ant scouting band on the shelf; a dead cricket
+by the river; a summer shower, then the fire ants' mating flight (fallen alates: food); a hot spell; on Hard and Brutal an
+army ant swarm raid along the river margin (a visiting party of Eciton).
 
 ### Level 4 — "The Spider Mother" (map `spiderTerrace`, 1100 × 900 mm) — new 2026-11-02, the chapter's boss
 Kept the working title. A Carolina wolf spider mother (`hogna`, a titan) owns the sandy upper terrace above the river.
@@ -167,18 +182,100 @@ silk turret rim); level 0 = the lower terrace by the river with the player's nes
 slope, a root ramp). A developed colony laid out like an AI nest (user 2026-11-02; `nest` in the level, `developPlan` in the map spec, built by
 the colony AI's own `developChambers`): the founding ring of workers round the queen, a 7-hex worker rosette, a 7-hex food
 store by the entrance, 7-hex soldier and 3-hex Lasius soldier and fire major chambers (castes the player owns), highways
-on the tunnels between them (about 29 ants, 140 food) and a short preparation (Easy 8 min, Normal 6½, Hard
-5¾, Brutal 5½) before she hunts; the light goes toward dusk when she comes out.
+on the tunnels between them (about 29 ants, 140 food), a preparation (Easy 9 min, Normal 7½, Hard 7, Brutal 6½), then her
+rounds (Easy 11 min, Normal 12, Hard 12½, Brutal 13: claude/story/06-spec §7, the level ran 14–17 minutes), then the fight
+to the end; the light goes toward dusk when she comes out.
 
 | Stage | Objectives | Scenes and set pieces |
 |---|---|---|
 | Before the hunt | prepare (the time by difficulty); 14 fighters, 50 ants (optional) | opening flight (the river → her burrow → the nest; a restart skips it, `?retry=1`); she sits at her burrow's mouth (hurt early, she answers with her own program) |
-| The Spider Mother | kill her | her rounds (a `goto` loop): out to the colony's doorstep, where her own program stalks, pounces on and drags away lone ants, then back to the burrow with her catch, and out again. **Phase 1 (100–60 %)**: hurt below 80 % she goes back to her burrow, passive, healing a little (26 s), then out again. **Phase 2 (60–30 %)**: her spiderlings spill off her back in two groups (at 60 % and 45 %; `bossCuts`). **Phase 3 (30–0 %)**: she comes for the nest, digs a hole wider and walks in breaking soil and stone (`digInto`). Pounces and her rider shake are telegraphed (wind-up, ground marker, sound); riders follow the mounting rules |
+| Her rounds | hold out (the time by difficulty); 20 fighters, 60 ants (optional) | dusk light 0.3; her rounds: out to the doorstep for 40 s (her own program stalks and pounces), back to the burrow for 75 s, out again; hurt below 80 % she rests 40 s; hurt below 60 % she stays down her burrow until the last stage; three broods of her older spiderlings disperse over the terrace (at 2½, 6½ and 10 min: 5–6 each, × the difficulty's `wave`), each hunting round a ramp for 2½ minutes, then on their own |
+| The Spider Mother | kill her | light 0.45; her rounds (a `goto` loop): out to the colony's doorstep, where her own program stalks, pounces on and drags away lone ants, then back to the burrow with her catch, and out again. **Phase 1 (100–60 %)**: hurt below 80 % she goes back to her burrow, passive, healing a little (26 s), then out again. **Phase 2 (60–30 %)**: her spiderlings spill off her back in two groups (at 60 % and 45 %; `bossCuts`). **Phase 3 (30–0 %)**: she comes for the nest, digs a hole wider and walks in breaking soil and stone (`digInto`). Pounces and her rider shake are telegraphed (wind-up, ground marker, sound); riders follow the mounting rules |
 
-Her health 0.7 × 2400 × the difficulty's `boss` (Easy 0.75, Normal 1, Hard 1.1, Brutal 1.2). Medals: time gold ≤ 12 min,
-silver ≤ 18; losses gold ≤ 35, silver ≤ 80; bonus "kill her before she digs into the nest". Reward: the trait
-**Spiderling Venom**. The ending: the win line, then (when it completes the chapter) the Mega Colony hint and "Chapter 1
-complete".
+Her health 0.7 × 2400 × the difficulty's `boss` (Easy 0.75, Normal 1, Hard 1.1, Brutal 1.2). Medals: time gold ≤ 30 min,
+silver ≤ 40; losses gold ≤ 45, silver ≤ 100; bonus "kill her before she digs into the nest". Reward: the trait
+**Spiderling Venom**. The win line now leads on to the oak woods (level 5).
+
+Surprise events (§6): before she hunts, a smaller wolf spider stalking the foragers at the slope's foot, a dead cricket, a
+hot afternoon; during her rounds a ground beetle and a fallen moth, and on Hard and Brutal a second wolf spider.
+
+### Level 5 — "The Antlered King" (map `oakWoods`, 1200 × 1000 mm) — new 2026-11-03
+Kept the working title. Old oak woods in the Forest Floor region: a clearing on the woods floor round a big oak whose
+bark weeps sap, rotting logs, mushrooms. Map: level 1 = the colony's raised shelf in the south-west (a bark slab east and
+a root ramp north down to the floor); level 1 = the old male's knoll in the north-east round an ancient stump (a wide
+soil slope, the titan's way, and a root ramp); level 0 = the woods floor and the clearing. A young colony (the founding
+ring, a 7-hex worker chamber, 4 store tiles, 3 soldier tiles). The four stag beetle sizes (§2 of the spec,
+`sim/creatures/kinds.ts`: minor, small, medium and large males) are normal creatures here; the titan is the major male.
+
+| Stage | Objectives | Scenes and set pieces |
+|---|---|---|
+| Settle the woods | raise 30, gather 150 food, 8 fighters | opening flight (the stump → the sap oak → the shelf); a minor male walks across the woods (1 min); a small male wanders the clearing (4½ min); tip: big beetles need many ants, riders bite where it can't reach |
+| The sap run | hold the sap flow with 10 ants for 90 s; gather 150 (optional) | the oak weeps sap (honeydew drops every 45 s); a small and a medium male come to the oak, face off and wrestle (`wrestle` action: jaws locked, the bigger throws the other); the loser leaves, the winner guards the sap 2½ min |
+| Rivals in the woods | hold out 8–10 min (by difficulty); kill the large male, 20 fighters (optional) | a medium male guards the root ramp's foot; the large male takes the sap, then comes to the shelf's foot; two more males wrestle in the clearing; the stump hint |
+| The Antlered King | kill him | the titan comes down from his stump along the clearing to the colony's doorstep, fighting what he meets (his own program: grab-and-toss, shoving through, rear-and-slam when enraged — telegraphed); at 45 % two lesser males come out of the woods (a wave); at 25 % he digs into the nest (`digInto`) |
+
+Surprise events: a ground beetle at the root ramp's foot, a fallen moth, a summer shower and a beetle brought down by it,
+on Hard and Brutal a small male at the shelf's foot. His health 0.85 × the titan's × the difficulty's `boss`. Medals:
+time gold ≤ 40 min, silver ≤ 52; losses gold ≤ 60, silver ≤ 140; bonus "kill him before he digs into the nest". Reward:
+the trait **Antler Plating** (`STORY.traits.antlerPlating`: +1 armour on every ant of the colony; story only).
+
+### Level 6 — "High Water" (map `floodHill`, 1200 × 1000 mm) — new 2026-11-03
+Kept the working title. A hill in the Riverbank region's flood plain: the summit (level 2, the colony), a terrace round
+it (level 1, a black garden ant colony), the hill's foot (level 0: a colony on the west side, one on an east shelf 14 mm
+higher), the low plain along the river (level −1: the best food). The river rises in four stages (four flood zones, each
+higher, story-driven, never draining): the plain, the hill's foot, the east shelf, the terrace. A nest whose doorway goes
+under starts to flood underground (`floodNests` → `sim/nestFlood.ts`: water pours in and fills the nest from its lowest
+chambers up; what is inside drowns). A colony whose turn is next goes all-in on the summit about 2 minutes before its
+flood (`allOut` → `forceAllOut`): taking the hill is its only way to live. Earlier the three raid the player normally and
+fight each other (three separate colonies). The summit never floods.
+
+| Stage | Objectives | Scenes and set pieces |
+|---|---|---|
+| The summit | before the river rises (10 min); 30 ants, store 200 (optional) | opening flight (the river → the east nest → the summit); the plain's food; a shower upriver as the warning |
+| The plain goes under | before the hill's foot floods (9 min); store 280 (optional) | the plain floods; the west colony goes all-in at 5⅔ min; another shower |
+| The hill's foot | before the east shelf floods (8 min); kill the west queen (optional) | the hill's foot floods and the west nest with it; the east colony goes all-in |
+| The east shelf | before the terrace floods (7½ min); kill the east queen (optional) | the east shelf floods and its nest; the terrace colony goes all-in |
+| The summit stands | all three colonies gone (drowned or destroyed) | the terrace and its nest flood; the scientist on the high ground |
+
+Surprise events: a ground beetle and a drowned grasshopper on the plain, a seed drop on the hill's foot, a wolf spider
+come up out of the water's way, on Hard and Brutal a red wood ant column crossing the plain. Medals: food stored (gold ≥
+420, silver ≥ 240), losses (gold ≤ 70, silver ≤ 160), bonus "destroy a colony yourself before the water takes it"
+(`deadBefore`). The water's timetable is the same on every difficulty (about 36 minutes); the difficulty scales the
+rivals.
+
+### Level 7 — "Carton Kingdom" (map `rainforestEdge`, 1200 × 1000 mm) — new 2026-11-03, the chapter's last level
+Kept the working title. The Rainforest's edge: two giant trunks on buttress roots, wet ground, a sunken hollow of puddles
+that fills in a shower (a flood zone), and on a raised shelf between the roots two allied conehead termite colonies
+(`nasutitermes`, one team: the AI allies' brain sends help to the one attacked unless the other is invaded itself) with
+their carton nests and covered galleries. No fallen-leaf dressing (user rule).
+
+| Stage | Objectives | Scenes and set pieces |
+|---|---|---|
+| The forest's edge | raise 35, gather 200; store 20 wood (optional) | opening flight (the trunks → the termite shelf → the colony); captions on carton and the galleries; tip: the allies |
+| The nasus | steal the nasute soldier, raise 4 | a shower fills the hollow, then the termites' winged alates come out (fallen alates: food); tips on the genes |
+| The first nest | destroy one of the two colonies (either) | rival raids; the other comes to help |
+| The second nest | destroy the other | — |
+
+Surprise events: a termite foraging party (workers with a soldier escort) in the hollow, a mantis at the forest's edge,
+the shower and the alates, a fallen fruit, steam after the rain (a hot spell), on Hard and Brutal an army ant swarm raid
+along the forest's edge. Medals: time gold ≤ 40 min, silver ≤ 52; losses gold ≤ 70, silver ≤ 160; bonus "steal the nasute
+soldier before the termites raid you". Reward: the **Nasute soldier** (`nasute_soldier`), kept for the campaign. The
+chapter's closing line (the Mega Colony hint) follows its win, then "Chapter 1 complete".
+
+### Surprise events (claude/story/06-spec §6)
+Each level lists a pool (`StoryLevelDef.surprises`, built with `src/story/surprises.ts`: `column`, `party`, `wanderer`,
+`windfall`, `rain`, `heat`, `earlyRaid`). When the level begins each is rolled from a hash of the seed and the level (not
+the simulation's RNG): whether it happens (its `chance` × the difficulty's `events`: Easy 0.6, Normal 1, Hard 1.3,
+Brutal 1.6; `from: 'hard'` events only on Hard and Brutal) and when in its window (game time, or after a flag such as
+`stage:2` or `dawn:1`; `until` a flag it is dropped). Firing sets `ev:<id>`; the level's scenes on that flag bring the
+party or the creature (the director plays them); its actions run (food, weather, a flood, a raid) and its caption is
+said. Big ones (columns, hunters, raids) never overlap: one due while another runs waits until it is over plus
+`STORY.eventGap` (20 s). Parties' sizes scale with the difficulty's `wave`. A **visiting party** (a species not in the
+level: red wood ants, army ants) belongs to a nestless colony made for it (`Colony.visitor`: no nest dug, no queen,
+never an AI, never lost, never lost on the surface); it follows its path fighting whatever it meets and walks off the map.
+Its dead are gene samples like any other (a stolen caste from them is kept, like any stolen caste). Weather: a shower
+(the storm light, falling rain `render/rainFX.ts`, wet ground; with `flood` on a map's flood zone), a hot spell (ants on
+the surface at `STORY.heatSpeed` 0.8 of their speed).
 
 ## 6. The framework
 
