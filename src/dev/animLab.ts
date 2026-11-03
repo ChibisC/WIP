@@ -330,6 +330,22 @@ function clips(): Record<string, Clip> {
       events: [0.5, 0.67, 0.84, 1.01, 2.4, 2.57, 2.74, 2.91, 4.3, 4.47, 4.64].map((t) => ({ t, e: { t: 'headbang', x: 18, y: 0, space: -1 } as unknown as SimEvent })),
       cam: { tx: 3, ty: 0.8, tz: 0, dir: [0.04, 0.12, 1], dist: 36, fov: 30 },
     },
+    // the conehead soldier walking at a foe, drumming in bursts as it goes (user rating K4)
+    tdrumwalk: {
+      dur: 6,
+      noScale: true,
+      ants: [
+        {
+          morph: 'termite_major',
+          script: (t, v) => {
+            Object.assign(v, { x: -8 + t * 2.6, y: 0, heading: 0, tan: 1, tState: TS.WALK, special: 0, atk: undefined });
+            if (t % 1.5 < 0.6) nasDrum(t, v);
+          },
+        },
+        { morph: FIRE, script: (t: number, v: AntView) => Object.assign(v, { x: 10, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.6 }) },
+      ],
+      cam: { tx: 0, ty: 0.8, tz: 0, dir: [0.15, 0.3, 1], dist: 26, fov: 30, follow: 0 },
+    },
     // …the nasute soldiers in melee: the nasus jab, the lunge, the rip
     tjab: {
       dur: 6,
