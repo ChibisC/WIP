@@ -199,6 +199,8 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
   const toB = (x, y, z) => new NV(x, y, z).applyMatrix4(HM);
   const hL = hd.len * L, hW = hd.w * L, hH = hd.h * L;
   let mouth, headTipX, nasusTip = null, chin, jawTip;
+  /** a point on the head's surface (soldiers: from the teardrop loft), for the antennal sockets */
+  let headSurf = null;
   const hingeAt = [], tips = [], sockets = [], elbows = [];
   const headCol = (s, d) => (d > 0 ? mix(C.head, C.headTop, d * 0.65) : mix(C.head, C.headUnder, -d * 0.7));
   /** a loft in head space, written to the body through the head matrix */
@@ -267,14 +269,15 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
         const a = md.curve * Math.pow(s, 1.6);
         const q = new NV(md.len * L * (s * 0.92 - 0.08 * s * s), -0.012 * L * s + lift * ss(0.5, 1, s), -sd * (md.len * L * 0.7) * (Math.sin(a) / Math.sin(md.curve)) * ss(0, 1, s));
         pts.push(h.clone().add(q.applyQuaternion(hq)));
-        rad.push(L * md.r * (1.25 - 0.95 * ss(0.05, 1, s)) + 0.0015 * L);
+        // (user rating W2 "fix the mandibles": broad, robust blades, not thin hooks — wide to two thirds of the way)
+        rad.push(L * md.r * (1.4 - 0.55 * ss(0.1, 0.65, s) - 0.7 * ss(0.65, 1, s)) + 0.0018 * L);
       }
       ttube(n, pts, rad, S(10, 6, 4), part, (s) => mix(C.mand, C.mandTip, ss(0.5, 0.92, s)), lk.mandible, true, true, 0.38, REGION.MANDIBLE);
       if (lod < 2) for (let q = 0; q < 2; q++) {
         // marginal teeth: short dark cones from the inner edge, pointing in and a little forward
         const k = Math.round((0.5 + 0.18 * q) * M), tn = pts[Math.min(M, k + 1)].clone().sub(pts[k - 1]).normalize();
         const inner = new NV(0, sd < 0 ? -1 : 1, 0).applyQuaternion(hq).cross(tn).normalize();
-        ttube(n, [pts[k].clone().addScaledVector(inner, rad[k] * 0.6), pts[k].clone().addScaledVector(inner, rad[k] * 0.6 + 0.012 * L).addScaledVector(tn, 0.007 * L)], [rad[k] * 0.42, 0.0012 * L], 4, part, () => C.mandTip, lk.mandible, false, true, 0.6);
+        ttube(n, [pts[k].clone().addScaledVector(inner, rad[k] * 0.6), pts[k].clone().addScaledVector(inner, rad[k] * 0.6 + 0.016 * L).addScaledVector(tn, 0.009 * L)], [rad[k] * 0.5, 0.0015 * L], 4, part, () => C.mandTip, lk.mandible, false, true, 0.6);
       }
       hingeAt.push(h); tips.push(pts[M]);
     }
@@ -331,12 +334,20 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       return mix(c, C.nasusTip, ss(0.78, 1, s) * 0.85);
     }, lk.head, undefined, REGION.HEAD);
     nasusTip = toB(tip.x, tip.y, 0);
-    // vestigial mandibles: two small dark points under the bulb's front
+    // a point on the teardrop's surface: s along the head, angle a round it (0 = the side, +pi/2 = the top), out = 1
+    headSurf = (s0, a, out = 1) => {
+      const f = Math.max(0, Math.min(NS - 1, s0 * (NS - 1))), k = Math.min(NS - 2, Math.floor(f)), t = f - k, g0 = secs[k], g1 = secs[k + 1];
+      const x = g0.x + (g1.x - g0.x) * t, y = g0.y + (g1.y - g0.y) * t, ry = g0.ry + (g1.ry - g0.ry) * t, rz = g0.rz + (g1.rz - g0.rz) * t;
+      return toB(x, y + Math.sin(a) * ry * out, Math.cos(a) * rz * out);
+    };
+    // (user rating S1/S2 "the mandibles are misplaced") vestigial mandibles: two small dark points tucked under the
+    // front of the bulb where it narrows into the nasus, pointing forward along its underside, mostly hidden
     for (const sd of [-1, 1]) {
-      const h = toB(x0 + R * 1.6, yC - Ry * 0.82, sd * R * 0.22);
+      const h = headSurf(sc + 0.06, -1.2, 0.92);
+      h.z *= sd;
       const part = sd < 0 ? PART.MAND_L : PART.MAND_R;
-      const t = h.clone().add(new NV(0.03 * L, -0.008 * L, -sd * 0.01 * L).applyQuaternion(hq));
-      ttube(n, [h, h.clone().lerp(t, 0.5), t], [0.011 * L, 0.007 * L, 0.002 * L], S(6, 4, 3), part, (s) => mix(C.mand, C.mandTip, s), lk.mandible, true, true);
+      const t = h.clone().add(new NV(0.026 * L, -0.002 * L, -sd * 0.006 * L).applyQuaternion(hq));
+      ttube(n, [h, h.clone().lerp(t, 0.5), t], [0.008 * L, 0.005 * L, 0.0015 * L], S(6, 4, 3), part, (s) => mix(C.mand, C.mandTip, s), lk.mandible, true, true, 0.6);
       hingeAt.push(h); tips.push(t);
     }
     // the six stiff setae: two on the vertex, two on the sides, two near the nasus base (0.25x the head width)
@@ -364,7 +375,10 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
     for (let q = 0; q < nB; q++) lens.push(q === 0 ? 1.7 : q === 1 ? 0.85 : 0.8 + 0.45 * (q / (nB - 1)));
     const tot = lens.reduce((a, b) => a + b, 0);
     for (const sd of [-1, 1]) {
-      const sk = toB(an.sx * hL, an.sy * hH, sd * an.sz * hW);
+      // (user ratings S1, S2, J2, J4: the soldiers' antennae came out from under the head) soldiers: on the bulb's side,
+      // low and in front of its middle, where it starts to narrow into the nasus
+      const sk = headSurf ? headSurf(an.ss ?? 0.4, -(an.sa ?? 0.45), 0.97).add(new NV(0, 0, 0)) : toB(an.sx * hL, an.sy * hH, sd * an.sz * hW);
+      if (headSurf) sk.z *= sd;
       sockets.push(sk);
       // the path: forward and out, rising a little at the scape, then curving gently down toward the tip
       const dir0 = new NV(Math.cos(an.ang), Math.sin(an.ang), sd * an.splay).normalize();

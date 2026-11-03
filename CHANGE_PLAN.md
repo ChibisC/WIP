@@ -941,3 +941,14 @@ Built on §23 (`digInto`). Plan, as built:
    sources (DESIGN-STORY §10).
 5. Client: moonlight blend, wolf spider eyeshine, the spider burrow, map moods, the night clock, hub/Genome/end screen.
 6. Tests `tests/storyCh1.ts`; the playtest bot plays bosses and nights; browser shots `tests/browser/story_ch1_4.py`.
+
+### 22.8 The user's ratings, round 3 (night)
+Scores: the finisher 8 and 8; the models 9, 9, 9; the walk 8; the worker attacks 6–7. Notes: "do nasute even have
+majors? if not just do worker, soldier (can be major model) and sprayer"; "the nasute sprayer doesn't melee, just
+sprays"; "fix the antennae and mandibles, they are misplaced" (soldiers); "fix the mandibles" (worker).
+- Castes renamed (display only, ids and rules unchanged): `nasute_major` → **Soldier**, `nasute_soldier` →
+  **Sprayer**; the stolen caste is "Conehead Termite Sprayer" (`termants.ts` `as`).
+- The sprayer shows only the glue (`attackPlan`: `termite_nasute` → `GLUE`); the sim never gave it a bite.
+- The soldiers' antennal sockets and vestigial mandibles are placed on the teardrop head's own surface
+  (`headSurf`): the sockets on the bulb's sides, low, in front of its middle; the mandibles under the nasus base.
+- The worker's mandibles: broad toothed blades (wide to two thirds of their length), satin rather than glossy.

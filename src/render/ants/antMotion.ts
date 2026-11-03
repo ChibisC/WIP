@@ -80,7 +80,13 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
       out.variant = ATK.GLUE;
       return out;
     }
-    const set = morph === 'termite_major' ? [ATK.T_CRUSH, ATK.T_DOZE, ATK.T_TOSS] : morph === 'termite_nasute' ? [ATK.T_JAB, ATK.T_LUNGE, ATK.T_RIP] : [ATK.T_TUG, ATK.T_RIP, ATK.T_LUNGE];
+    // (user rating J2 2026-11-02: "the nasute sprayer doesn't melee, just sprays" — the sim never gives it a bite; any
+    // attack cycle it shows is the glue)
+    if (morph === 'termite_nasute') {
+      out.variant = ATK.GLUE;
+      return out;
+    }
+    const set = morph === 'termite_major' ? [ATK.T_CRUSH, ATK.T_DOZE, ATK.T_TOSS] : [ATK.T_TUG, ATK.T_RIP, ATK.T_LUNGE];
     if (!v.atkSeq) out.variant = set[av];
     else {
       const pick = (k: number) => Math.floor(hs(k, 7) * 3) % 3;
