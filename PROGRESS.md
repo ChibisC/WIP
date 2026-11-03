@@ -1770,3 +1770,5 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   one sample); AO, the lip and the spill fade with the distance from the banks and ramps (they stopped at a coarse
   ring); the sun march fades with the face blend; face styles meet along a ragged line.
 - Merged with `main` (the Mimic Ant / Termants rename: the level's colony is "Termants").
+- Round 4 ratings (2026-11-03): every item 8, approved with one change — the soldier drums in bursts while walking or
+  charging at a foe (`drumWalking`; anim lab `tdrumwalk`).
