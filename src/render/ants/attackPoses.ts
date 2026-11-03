@@ -178,7 +178,7 @@ export function applyAttackBody(p: AttackPose, w: number, L: number, vF: THREE.V
 // ---------------------------------------------------------------------------------------------------------------
 
 /** Attack variants of the planted-feet pass (attackVariant in antMotion.ts picks them per species and cycle). */
-export const ATK = { LUNGE: 0, REAR: 1, CLAMP: 2, PIVOT_STING: 3, QUICK_STING: 4, CRUSH: 5, HEAD_SWING: 6, ACID: 7, TAUNT: 8, RAGE: 9, SNAP: 10, IMPALE: 11, CHOMP: 12, SLAM: 13, EXECUTE: 14, EXECUTE_P: 15, LIFT: 16 } as const;
+export const ATK = { LUNGE: 0, REAR: 1, CLAMP: 2, PIVOT_STING: 3, QUICK_STING: 4, CRUSH: 5, HEAD_SWING: 6, ACID: 7, TAUNT: 8, RAGE: 9, SNAP: 10, IMPALE: 11, CHOMP: 12, SLAM: 13, EXECUTE: 14, EXECUTE_P: 15, LIFT: 16, T_TUG: 17, T_RIP: 18, T_LUNGE: 19, T_JAB: 20, T_CRUSH: 21, T_DOZE: 22, T_TOSS: 23, DRUM: 24, GLUE: 25 } as const;
 
 type Key = Partial<Omit<AttackPose, never>>;
 const FIELDS = ['fwd', 'pitch', 'yaw', 'roll', 'headPitch', 'headYaw', 'mand', 'gaster', 'sting', 'up', 'side', 'px', 'spread', 'front', 'gYaw'] as const;
@@ -283,6 +283,41 @@ const SLAM_S: Key = { fwd: 0.1, up: 0.0, pitch: -0.02, px: 0.25, headPitch: 0.22
 const EXEC_W: Key = { fwd: 0.09, up: 0.02, pitch: -0.03, px: 0.25, headPitch: 0.12, mand: 1, gaster: 0.1, spread: 0.35 };
 const EXEC_S: Key = { fwd: 0.09, up: 0.02, pitch: -0.03, px: 0.25, headPitch: 0.12, mand: 0, spread: 0.35 };
 const EXEC_T: Key = { fwd: -0.04, up: 0.05, pitch: 0.13, px: -0.2, headPitch: 0.58, mand: 0, spread: 0.35 };
+/**
+ * Nasute termites on the ant pipeline (realism round 3, CHANGE_PLAN §22.7; the user's ratings G7, T1, T4: "dynamic and
+ * dramatic but realistic attacks and movement like the ants but realistic to termites"). Termites have no sting and no
+ * waist: they fight with the jaws, the head and their weight — workers bite and hang on, wrench and tear, soldiers
+ * squirt glue from the nasus and jab with it, majors bulldoze, crush and toss. The feet stay planted (the leg IK).
+ *  - T_TUG: lunge and clamp, then haul back twice on braced legs, the body low, the head wrenching side to side.
+ *  - T_RIP: clamp, then twist the head hard one way and the other with the whole body rolling into it (tearing).
+ *  - T_LUNGE: a quick reared snap, the body thrown forward over the front legs.
+ *  - T_JAB (soldier): head down, a fast double peck with the nasus.
+ *  - T_CRUSH (major): rear the front up, the heavy head raised, then crash down onto the foe, a hit-stop.
+ *  - T_DOZE (major): head low, drive forward hard twice like a bulldozer, the hind legs pushing.
+ *  - T_TOSS (major): scoop the head under the foe and flick it up and to the side.
+ *  - DRUM (major, the alarm): the body still on planted feet, the head hammering down on the ground and back.
+ *  - GLUE (soldier firing): braced and low, the head aimed (game/antViews.ts), each squirt jolting the body back,
+ *    the abdomen pumping and the head jerking; between squirts a small sway of the aim.
+ */
+const TTUG_W: Key = { fwd: -0.06, up: 0.02, pitch: 0.08, px: -0.2, headPitch: 0.25, mand: 1, gaster: 0.1, spread: 0.35 };
+const TTUG_S: Key = { fwd: 0.1, up: -0.02, pitch: -0.07, px: 0.25, headPitch: -0.2, mand: 0, spread: 0.35 };
+const TTUG_P: Key = { fwd: -0.1, up: -0.035, pitch: 0.05, px: -0.25, headPitch: -0.32, mand: 0, gaster: -0.1, spread: 0.5 };
+const TRIP_S: Key = { fwd: 0.08, up: -0.01, pitch: -0.05, px: 0.25, headPitch: -0.18, mand: 0, spread: 0.4 };
+const TRIP_T: Key = { fwd: 0.04, up: -0.015, yaw: 0.22, roll: 0.16, side: 0.02, headYaw: 0.6, headPitch: -0.24, mand: 0, spread: 0.45 };
+const TLUN_W: Key = { fwd: -0.08, up: 0.05, pitch: 0.2, px: -0.3, headPitch: 0.4, mand: 1, gaster: 0.15, spread: 0.35, front: 0.25 };
+const TLUN_S: Key = { fwd: 0.15, up: -0.02, pitch: -0.12, px: 0.3, headPitch: -0.3, mand: 0, spread: 0.35 };
+const TJAB_W: Key = { fwd: -0.05, up: 0.02, pitch: 0.06, headPitch: 0.15, mand: 0.4, spread: 0.35 };
+const TJAB_S: Key = { fwd: 0.09, up: -0.02, pitch: -0.08, px: 0.25, headPitch: -0.38, mand: 0.1, spread: 0.35 };
+const TCR_W: Key = { fwd: -0.08, up: 0.09, pitch: 0.3, px: -0.32, headPitch: 0.5, mand: 0.8, gaster: 0.2, spread: 0.5, front: 0.6 };
+const TCR_S: Key = { fwd: 0.12, up: -0.04, pitch: -0.1, px: 0.3, headPitch: -0.45, mand: 0, spread: 0.55 };
+const TDZ_W: Key = { fwd: -0.07, up: -0.03, pitch: -0.04, headPitch: -0.42, mand: 0.5, gaster: 0.1, spread: 0.5 };
+const TDZ_S: Key = { fwd: 0.16, up: -0.035, pitch: -0.1, px: 0.3, headPitch: -0.5, mand: 0.2, spread: 0.55 };
+const TTS_W: Key = { fwd: 0.04, up: -0.03, pitch: -0.08, px: 0.25, headPitch: -0.55, headYaw: -0.15, mand: 0.6, spread: 0.45 };
+const TTS_S: Key = { fwd: 0.02, up: 0.05, pitch: 0.15, px: -0.25, headPitch: 0.55, headYaw: 0.45, yaw: 0.12, roll: -0.08, mand: 0.2, spread: 0.45 };
+const DRUM_U: Key = { headPitch: 0.15, spread: 0.4, mand: 0.2 };
+const DRUM_D: Key = { headPitch: -0.55, up: -0.004, spread: 0.4, mand: 0.2 };
+const GLUE_B: Key = { up: -0.015, pitch: -0.03, headPitch: -0.12, gaster: 0.05, spread: 0.5, mand: 0.1 };
+const GLUE_K: Key = { fwd: -0.035, up: -0.01, pitch: 0.03, headPitch: 0.05, gaster: 0.3, spread: 0.5, mand: 0.1 };
 // the finisher's lift (user note 2026-11-02 12:39): the foe held up by the neck — head and front raised, braced on the
 // hind legs; the jaws part a little, then shear shut with a toss of the head (the cut)
 const LIFT_U: Key = { fwd: 0.0, up: 0.06, pitch: 0.16, px: -0.1, headPitch: 0.6, mand: 0, gaster: -0.1, spread: 0.4 };
@@ -346,6 +381,84 @@ export function attackPoseV2(variant: number, q: number, side: number, out: Atta
         out.headPitch += 0.012 * Math.sin(q * 200);
         out.mand = Math.min(1, out.mand + 0.03 * Math.sin(q * 240));
       }
+      return out;
+    }
+    case ATK.T_TUG: {
+      // lunge and clamp (→ the contact), then two hard hauls back, the head wrenching
+      if (q < WIND) blend({}, TTUG_W, sm(q / WIND), side, out);
+      else if (q < C) blend(TTUG_W, TTUG_S, strikeEase((q - WIND) / (C - WIND)), side, out);
+      else {
+        const k = (q - C) / (1 - C);
+        const haul = Math.sin(Math.PI * Math.min(1, k * 2)) ** 2;
+        blend(TTUG_S, TTUG_P, haul, side, out);
+        out.headYaw += 0.3 * side * Math.sin(k * Math.PI * 4) * (1 - k);
+        if (k > 0.5) mixPose(out, NEUTRAL, sm((k - 0.5) / 0.5), out);
+      }
+      return out;
+    }
+    case ATK.T_RIP: {
+      if (q < WIND) blend({}, TTUG_W, sm(q / WIND), side, out);
+      else if (q < C) blend(TTUG_W, TRIP_S, strikeEase((q - WIND) / (C - WIND)), side, out);
+      else {
+        // the twist: one way hard, back the other way, then let go
+        const k = (q - C) / (1 - C);
+        const tw = Math.sin(k * Math.PI * 2.4) * (1 - sm((k - 0.6) / 0.4));
+        blend(TRIP_S, TRIP_T, Math.abs(tw), tw >= 0 ? side : -side, out);
+        if (k > 0.75) mixPose(out, NEUTRAL, sm((k - 0.75) / 0.25), out);
+      }
+      return out;
+    }
+    case ATK.T_LUNGE:
+    case ATK.T_JAB:
+    case ATK.T_CRUSH: {
+      const W = variant === ATK.T_LUNGE ? TLUN_W : variant === ATK.T_JAB ? TJAB_W : TCR_W;
+      const K = variant === ATK.T_LUNGE ? TLUN_S : variant === ATK.T_JAB ? TJAB_S : TCR_S;
+      if (variant === ATK.T_JAB) {
+        // two fast pecks: the first at 0.4, the second on the contact
+        const p = (x: number) => Math.max(0, Math.sin(Math.PI * Math.min(1, Math.max(0, x))));
+        const j = q < 0.4 ? p((q - 0.25) / 0.15) : p((q - (C - 0.12)) / 0.24);
+        blend(W, K, j, side, out);
+        if (q < 0.2) blend({}, W, sm(q / 0.2), side, out);
+        else if (q > 0.88) mixPose(out, NEUTRAL, sm((q - 0.88) / 0.12), out);
+        return out;
+      }
+      if (q < WIND) blend({}, W, sm(q / WIND), side, out);
+      else if (q < STRIKE) blend(W, W, 1, side, out);
+      else if (q < C) blend(W, K, strikeEase((q - STRIKE) / (C - STRIKE)), side, out);
+      else if (variant === ATK.T_CRUSH && q < C + HIT_STOP) blend(K, K, 1, side, out);
+      else blend(K, {}, sm((q - C - (variant === ATK.T_CRUSH ? HIT_STOP : 0)) / (1 - C)), side, out);
+      if (q > WIND && q < STRIKE) out.headPitch += 0.015 * Math.sin(q * 170);
+      return out;
+    }
+    case ATK.T_DOZE: {
+      // head low, two hard shoves forward, the hind legs pushing
+      if (q < 0.25) blend({}, TDZ_W, sm(q / 0.25), side, out);
+      else {
+        const k = (q - 0.25) / 0.75;
+        const shove = Math.max(0, Math.sin(Math.PI * ((k * 2) % 1))) ** 1.5;
+        blend(TDZ_W, TDZ_S, shove, side, out);
+        if (k > 0.85) mixPose(out, NEUTRAL, sm((k - 0.85) / 0.15), out);
+      }
+      return out;
+    }
+    case ATK.T_TOSS: {
+      if (q < WIND) blend({}, TTS_W, sm(q / WIND), side, out);
+      else if (q < C) blend(TTS_W, TTS_S, strikeEase((q - WIND) / (C - WIND)), side, out);
+      else blend(TTS_S, {}, sm((q - C) / (1 - C)), side, out);
+      return out;
+    }
+    case ATK.DRUM: {
+      // a sharp blow down, a quick rebound (the soldier drumming the alarm on the gallery floor)
+      const d = q < 0.35 ? strikeEase(q / 0.35) : 1 - sm((q - 0.35) / 0.65);
+      blend(DRUM_U, DRUM_D, d, side, out);
+      return out;
+    }
+    case ATK.GLUE: {
+      // q runs with the squirts; between them the aim sways a little
+      const kick = q < 0.12 ? strikeEase(q / 0.12) : Math.exp(-(q - 0.12) * 9);
+      blend(GLUE_B, GLUE_K, kick, side, out);
+      out.headYaw += 0.06 * Math.sin(q * Math.PI * 2) * (1 - kick);
+      out.headPitch += -0.06 * kick;
       return out;
     }
     case ATK.LIFT: {

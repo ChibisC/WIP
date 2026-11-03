@@ -712,11 +712,14 @@ const plagiariaQueen: AntMorph = {
 import { HELL_MORPHS } from './hellMorphs';
 import { SAIY_MORPHS } from './saiyMorphs';
 import { TERMANT_MORPHS } from './termantMorphs';
+import { NASUTE_MORPHS } from './nasuteMorphs';
 
 export const MORPHS: Record<string, AntMorph> = {
   ...(HELL_MORPHS as unknown as Record<string, AntMorph>),
   ...(SAIY_MORPHS as unknown as Record<string, AntMorph>),
   ...TERMANT_MORPHS,
+  // (realism round 3: the nasute worker, soldier and major on the ant pipeline; nasuteBuilder.ts)
+  ...(NASUTE_MORPHS as unknown as Record<string, AntMorph>),
   plagiaria_worker: plagiariaWorker,
   plagiaria_queen: plagiariaQueen,
   lasius_worker: lasiusWorker,

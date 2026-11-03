@@ -24,7 +24,7 @@ import { ATK } from './attackPoses';
  */
 
 /** Which morphs use the pass (the pilot: the tropical fire ant; the rollout widens this). */
-export const ANIM_V2_PREFIXES = ['fire_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_', 'hell_'];
+export const ANIM_V2_PREFIXES = ['fire_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_', 'hell_', 'termite_worker', 'termite_nasute', 'termite_major'];
 /** Lab switch: false shows the old motion (before/after clips). */
 export const animSettings = { v2: true };
 export const animV2 = (morph: string): boolean => animSettings.v2 && ANIM_V2_PREFIXES.some((p) => morph.startsWith(p));
@@ -67,6 +67,26 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
   }
   if (v.special === 2) {
     out.variant = ATK.RAGE;
+    return out;
+  }
+  // nasute termites on the ant pipeline (realism round 3): the major's alarm drumming and the soldier's glue as attack
+  // cycles of their own (game/antViews.ts sets them); three melee attacks per caste, never the same twice running
+  if (morph === 'termite_worker' || morph === 'termite_nasute' || morph === 'termite_major') {
+    if (v.special === 5) {
+      out.variant = ATK.DRUM;
+      return out;
+    }
+    if (v.special === 6) {
+      out.variant = ATK.GLUE;
+      return out;
+    }
+    const set = morph === 'termite_major' ? [ATK.T_CRUSH, ATK.T_DOZE, ATK.T_TOSS] : morph === 'termite_nasute' ? [ATK.T_JAB, ATK.T_LUNGE, ATK.T_RIP] : [ATK.T_TUG, ATK.T_RIP, ATK.T_LUNGE];
+    if (!v.atkSeq) out.variant = set[av];
+    else {
+      const pick = (k: number) => Math.floor(hs(k, 7) * 3) % 3;
+      const i = pick(n);
+      out.variant = set[n > 0 && i === pick(n - 1) ? (i + 1) % 3 : i];
+    }
     return out;
   }
   // hell ants (user rating 2026-11-02): three attacks — the vertical snap, the chomp, the slam — never the same twice

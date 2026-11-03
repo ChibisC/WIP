@@ -6,6 +6,9 @@ import { AntMorph, MORPHS } from './morphs';
 import { ANIM_SFX, animV2, AtkPlan, attackPlan, Motion2, newMotion, newMotionOut, stepMotion } from './antMotion';
 import { addPatch, patchDapple } from '../shaderPatch';
 import { TermiteLayer } from '../termite/termiteLayer';
+import { NASUTE_ANT_PATH } from './nasuteMorphs';
+import { GlueStreams, NASUTE_GLUE } from '../termite/glue';
+import { termiteTime } from '../termite/material';
 import { BALANCE } from '../../sim/balance';
 
 /**
@@ -485,6 +488,9 @@ export interface JawHold {
   frame: number;
 }
 const _jp = new THREE.Vector3();
+const _gt = new THREE.Vector3();
+const _ga = new THREE.Vector3();
+const _gn = new THREE.Vector3();
 const _jf = new THREE.Vector3();
 
 export class AntRenderer {
@@ -511,6 +517,9 @@ export class AntRenderer {
   private renderer: THREE.WebGLRenderer;
   /** Nasute Termites (model kit): views with a `termite_*` morph */
   termites: TermiteLayer | null = null;
+  /** the nasute soldiers on the ant pipeline: their glue streams from the nasus tip (realism round 3) */
+  private nasGlue: GlueStreams | null = null;
+  private nasGlueN = 0;
   /** climbing ants: placed on the creature's animated leg or body (set by the session) */
   mount: MountFn | null = null;
   /** the space these ants are in (for the sound hooks; set by the session) */
@@ -658,9 +667,12 @@ export class AntRenderer {
     st.lod[0] = st.lod[1] = st.lod[2] = 0;
     this.termites?.begin(dt);
     if (this.termites) this.termites.mount = this.mount;
+    this.nasGlueN = 0;
+    // (the glue's pulses run on the termite clock: the kit layer advances it when there is one)
+    if (this.nasGlue && !this.termites) termiteTime.value += dt;
 
     for (const v of views) {
-      if (v.morph.startsWith('termite_')) {
+      if (v.morph.startsWith('termite_') && !NASUTE_ANT_PATH.has(v.morph)) {
         if (!this.termites) {
           this.termites = new TermiteLayer();
           this.termites.mount = this.mount;
@@ -989,6 +1001,23 @@ export class AntRenderer {
       // lifting hell ant records its mandible–horn socket as posed; the foe's neck is put on it (a frame behind at most)
       const sock = (rig as { hold?: THREE.Vector3 }).hold;
       if (v.special === 4 && !v.dead && sock) this.recordHold(v.id, rig, hp, hy, sock);
+      // a nasute soldier squirting (the ant pipeline): the glue from its nasus tip to the target
+      const nt = (rig as { nasusTip?: THREE.Vector3 }).nasusTip;
+      if (nt && v.firing && !v.dead && v.aimX !== undefined && v.aimY !== undefined) {
+        if (!this.nasGlue) {
+          this.nasGlue = new GlueStreams(64, NASUTE_GLUE);
+          this.group.add(this.nasGlue.mesh);
+        }
+        if (this.nasGlueN < this.nasGlue.capacity) {
+          this.recordHold(-v.id, rig, hp, hy, nt);
+          const tip = this.holds.get(-v.id)!;
+          _gt.set(tip.x, tip.y, tip.z);
+          adapter.toWorld(v.aimX, v.aimY, _ga);
+          adapter.normal(v.aimX, v.aimY, _gn);
+          _ga.addScaledVector(_gn, 1.2);
+          this.nasGlue.set(this.nasGlueN++, _gt, _ga, v.ramp ?? 0, true, (v.id * 0.618) % 1);
+        }
+      }
       if (v.neckBy && !v.dead) {
         const jh = this.holds.get(v.neckBy);
         if (jh && this.frame - jh.frame <= 2) {
@@ -1069,6 +1098,10 @@ export class AntRenderer {
     }
     for (const b of this.buckets.values()) b.commitShell();
     this.termites?.end();
+    if (this.nasGlue) {
+      this.nasGlue.count = this.nasGlueN;
+      this.nasGlue.commit();
+    }
     // Forget animation state of ants not seen for a while.
     if (this.frame % 120 === 0) for (const [id, s] of this.anim) if (this.frame - s.seen > 240) this.anim.delete(id);
   }
@@ -1108,7 +1141,7 @@ export class AntRenderer {
 
   /** Approximate world position of an ant's mandible tips (for carried items). */
   mouthWorld(morph: string): THREE.Vector3 {
-    if (morph.startsWith('termite_')) return new THREE.Vector3(1.5, 0.8, 0);
+    if (morph.startsWith('termite_') && !NASUTE_ANT_PATH.has(morph)) return new THREE.Vector3(1.5, 0.8, 0);
     return this.bucket(morph).rig.mouth;
   }
 }
