@@ -24,11 +24,11 @@ with sync_playwright() as p:
         time.sleep(0.5)
     # a wolf spider in the hollow, the story clock at the middle of the first night (moonlight), still
     sp = pg.evaluate("""() => { const s = window.__session, w = s.world;
-      w.s.time = 330 + 60;
+      w.s.time = 420 + 60;
       const c = w.s.creatures.find((x) => x.kind === 'wolfSpider') ?? null;
       return c ? { x: c.x, y: c.y, h: c.h } : null; }""")
     if not sp:
-        pg.evaluate("() => { const w = window.__session.world; const m = w.s.mode.mission; m.stage = 1; m.entered = false; w.s.time = 330 + 180 + 240 - 10; }")
+        pg.evaluate("() => { const w = window.__session.world; const m = w.s.mode.mission; m.stage = 1; m.entered = false; w.s.time = 420 + 210 + 330 - 10; }")
         for _ in range(10):
             pg.evaluate("() => { const w = window.__session.world; for (let i = 0; i < 40; i++) { w.step(0.05); w.events.drain(); } }")
         sp = pg.evaluate("() => { const c = window.__session.world.s.creatures.find((x) => x.kind === 'wolfSpider' && !x.dead); return c ? { x: c.x, y: c.y, h: c.h } : null; }")
