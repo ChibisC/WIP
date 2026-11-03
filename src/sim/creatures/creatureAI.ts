@@ -1558,13 +1558,15 @@ function scolopendra(w: World, cr: Creature, k: CreatureKind, dt: number): void 
 }
 
 function hogna(w: World, cr: Creature, k: CreatureKind, dt: number): void {
-  const p = bossPhase(w, cr, ['Stalk and pounce', 'Spiderlings scatter', 'Frenzy sprints'], [0.66, 0.33]);
-  // the spiderlings drop off her back and attack (twice)
+  // (a story's boss may set its own cuts: the Spider Mother's are 60 % and 30 %, claude/story/04-spec §3)
+  const story = cr.data.cut1 !== undefined;
+  const p = bossPhase(w, cr, ['Stalk and pounce', 'Spiderlings scatter', 'Frenzy sprints'], story ? [cr.data.cut1!, cr.data.cut2 ?? 0.3] : [0.66, 0.33]);
+  // the spiderlings drop off her back and attack (twice: in the story, both in the brood phase, the second halfway through it)
   if (p >= 1 && !cr.data.brood1) {
     cr.data.brood1 = 1;
     scatterSpiderlings(w, cr, 8);
   }
-  if (p >= 2 && !cr.data.brood2) {
+  if ((story ? hurtFrac(cr) < (cr.data.cut1! + (cr.data.cut2 ?? 0.3)) / 2 : p >= 2) && !cr.data.brood2) {
     cr.data.brood2 = 1;
     scatterSpiderlings(w, cr, 6);
   }

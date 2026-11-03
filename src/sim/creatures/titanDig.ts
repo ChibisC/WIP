@@ -17,7 +17,7 @@ import { storyOf } from '../story/state';
  *     stores): every soil or stone hex its body touches opens at once (`NestGrid.breakHex`); built tiles, the queen's
  *     chamber and the flower are dug floor already, so nothing of them breaks; it bites ants in reach, standing still while
  *     it does;
- *  4. walks back out the way it came below `fleeHealth`, after `maxStay` s, once the queen is dead, or when a story says
+ *  4. walks back out the way it came below `fleeHealth`, after `maxStay` s (neither for a story's titan), once the queen is dead, or when a story says
  *     so (`endTitanRaid`); killed underground, its carcass stays in the nest as food.
  * The widened hole stays a breach (any titan walks in without digging) until the colony repairs it (`repairSec`).
  * State lives on the creature (`data.raid…`) and the entrance (`breach`, `breachBy`, `repair`): saves and lockstep carry it.
@@ -141,7 +141,8 @@ export function titanRaidTick(w: World, cr: Creature, k: CreatureKind, dt: numbe
   if (!g) return finishRaid(w, cr, k);
   if (ph === RAID.Inside) {
     cr.data.rin = (cr.data.rin ?? 0) + dt;
-    if (leaving || frac < TITAN_DIG.fleeHealth || (cr.data.rin ?? 0) >= TITAN_DIG.maxStay) {
+    // (a story's titan stays until its script sends it out — dawn — or it dies: claude/story/04-spec)
+    if (leaving || (!(cr.data.rstory ?? 0) && (frac < TITAN_DIG.fleeHealth || (cr.data.rin ?? 0) >= TITAN_DIG.maxStay))) {
       cr.data.rph = RAID.Leave;
       return true;
     }

@@ -12,6 +12,10 @@ import type { TileType } from '../types';
 export type Difficulty = 'easy' | 'normal' | 'hard' | 'brutal';
 export const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'brutal'];
 
+/** Every story level id, in campaign order (src/story/campaign.ts has the nodes and the unlock rules). */
+export const STORY_LEVEL_IDS = ['garden', 'longNights', 'fireBanks', 'spiderMother'] as const;
+export type StoryLevelId = (typeof STORY_LEVEL_IDS)[number];
+
 /** A named point of the map's story data, or a point in mm. */
 export type Where = string | Pt;
 
@@ -27,13 +31,20 @@ export type Objective = (
   | { type: 'stealCaste'; caste: string }
   | { type: 'raiseCaste'; caste: string; n: number }
   | { type: 'killQueen'; rival: string }
-  | { type: 'surviveTime'; s: number }
+  /** hold out `s` seconds (or per difficulty: a boss level's preparation) */
+  | { type: 'surviveTime'; s: number | Partial<Record<Difficulty, number>> }
   | { type: 'surviveWave'; actor: string }
   | { type: 'killCreature'; actor: string }
   | { type: 'escort'; actor: string; to: Where; r?: number }
   | { type: 'protect'; actor: string; s: number }
   | { type: 'reach'; at: Where; r: number; n: number }
   | { type: 'enterNest'; rival: string; n: number }
+  /** the level's day/night clock (`dayNight`): met at dawn after night `n` */
+  | { type: 'surviveNight'; n: number }
+  /** chambers (tiles) upgraded to level 2 or more */
+  | { type: 'upgrade'; n: number; tile?: TileType }
+  /** food in the stores now (not gathered since the stage began) */
+  | { type: 'storeFood'; amount: number }
 ) & {
   text?: string;
   /** shown, never needed to finish the stage */
@@ -80,7 +91,11 @@ export type Cue =
    * a titan digs into a colony's nest (sim/creatures/titanDig.ts): `into` a rival's key or 'player'; by hole `hole` (else the
    * nearest); done once it is inside (or its raid ended). It never gives up digging; `endRaid` sends it out.
    */
-  | { digInto: string; hole?: number; flag?: string; timeout?: number };
+  | { digInto: string; hole?: number; flag?: string; timeout?: number }
+  /** go back to cue `goto` of this scene (a loop: a hunter's rounds) */
+  | { goto: number }
+  /** rest on the spot (or walking there first), healing `heal` of its health a second, for `s` seconds */
+  | { rest: Where; s: number; heal?: number; flag?: string };
 
 /** A sequence of cues for one or more actors (each member walks it; group cues finish when the living members do). */
 export interface Scene {
@@ -95,6 +110,10 @@ export interface Scene {
 export interface ActorDef {
   /** a creature kind (sim/creatures/kinds.ts) */
   creature?: string;
+  /** a group of creatures: [kind, how many] (a night's hunters); with `wave`, the counts scale with the difficulty */
+  creatures?: Array<[string, number]>;
+  /** creatures: spread over these story points in turn (the lairs they come out of; `at` is then unused) */
+  from?: string[];
   /** ants of a story colony: [caste, how many] (`colony`: a rival key, or 'player') */
   ants?: Array<[string, number]>;
   colony?: string;
@@ -115,6 +134,15 @@ export interface ActorDef {
   passive?: boolean;
   /** the name objectives use ("the swarm") */
   label?: string;
+  /**
+   * A boss's health marks (fractions, falling): the flag `hp:<actor>:<percent>` is set as its health drops below each
+   * (e.g. `hp:mother:30`; scenes and captions wait on them), and `killed:<actor>` when it dies.
+   */
+  phases?: number[];
+  /** a boss's own phase cuts (fractions of health) in place of its kind's (the wolf spider mother: [0.6, 0.3]) */
+  bossCuts?: [number, number];
+  /** a boss roams toward this point when no ant is near (its hunting goal; default: where it appeared) */
+  goal?: Where;
 }
 
 /** A caption: a key into the level's narration text, said `at` seconds into the stage or once a flag is set. */
@@ -139,6 +167,8 @@ export type Action =
   | { do: 'shot'; shot: Shot | 'flight' }
   | { do: 'music'; mood: 'calm' | 'tense' | 'swarm' | 'assault' }
   | { do: 'raid'; rival: string }
+  /** the light changes now (the day/night clock does this on its own; a level may also force it): 0 day … 1 night */
+  | { do: 'night'; level: number }
   /** a titan raiding a nest (digInto) walks back out and leaves (dawn) */
   | { do: 'endRaid'; actor: string }
   /** a gameplay tip (a note, not narration): key into the text file (`tip.<key>`) */
@@ -178,18 +208,50 @@ export type Bonus =
   /** steal `caste` before `flag` is set (e.g. before the first raid) */
   | { type: 'stealBefore'; caste: string; flag: string; text: string }
   /** lose no more than `max` ants from the moment `actor` (a wave) appears until it is beaten */
-  | { type: 'waveLosses'; actor: string; max: number; text: string };
+  | { type: 'waveLosses'; actor: string; max: number; text: string }
+  /** kill `actor` (a creature) before `flag` is set (e.g. before dawn, before it digs into the nest) */
+  | { type: 'killBefore'; actor: string; flag: string; text: string };
 
 export interface Medals {
-  /** game seconds: gold at or under [0], silver at or under [1], else bronze */
-  time: [number, number];
+  /**
+   * The first medal: game seconds (gold at or under [0], silver at or under [1], else bronze) — or, on a level whose
+   * length is fixed (the nights), `food`: food in the stores at the end (gold at or over [0], silver at or over [1]).
+   */
+  time?: [number, number];
+  food?: [number, number];
   /** ants lost: gold at or under [0], silver at or under [1], else bronze */
   losses: [number, number];
   bonus: Bonus;
 }
 
+/**
+ * A level's own day and night (the island's night hunters): the light (`w.s.night`) and the flags `dusk:N` (the warning,
+ * `dusk` s before), `night:N` and `dawn:N` follow from game time. The first day lasts `first` s, later days `day` s,
+ * nights `night` s; dusk and dawn fade over `fade` s. After `nights` nights the clock stops at day.
+ */
+export interface DayNight {
+  first: number;
+  day: number;
+  night: number;
+  /** the last night's length when it differs (the longest night, with its titan) */
+  lastNight?: number;
+  dusk: number;
+  fade: number;
+  nights: number;
+}
+
+/** Wild creature lairs as underground areas (sim/areas.ts caves): the dens the night hunters come out of. */
+export interface LairDef {
+  name: string;
+  /** a story point: the lair's mouth on the surface */
+  at: string;
+  food: number;
+  /** drawn as a spider's silk-lined burrow with a turret rim (render) instead of a stony den */
+  look?: 'den' | 'burrow';
+}
+
 export interface StoryLevelDef {
-  id: 'garden' | 'fireBanks';
+  id: StoryLevelId;
   chapter: number;
   /** "Level 1" … */
   number: number;
@@ -208,8 +270,8 @@ export interface StoryLevelDef {
   /** aphid clusters and leafy plants placed in the map's zones */
   aphids: number;
   plants: number;
-  /** the caste a win keeps for the campaign */
-  reward: { caste: string };
+  /** a win keeps for the campaign: a stolen caste, a trait (STORY.traits), or neither (medals only) */
+  reward: { caste?: string; trait?: string };
   /** stolen castes may be brought in (slot rules: src/story/campaign.ts) */
   loadout: boolean;
   stages: StoryStage[];
@@ -222,4 +284,10 @@ export interface StoryLevelDef {
   /** narration keys (src/story/text: the level's own keys are `<id>.<key>`) said on a loss and on the win */
   lose: string;
   win: string;
+  /** the level's own day and night */
+  dayNight?: DayNight;
+  /** creature lairs as underground areas */
+  lairs?: LairDef[];
+  /** the player's nest comes pre-built with this many tiles (a developed colony) */
+  developed?: number;
 }

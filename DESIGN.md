@@ -935,13 +935,19 @@ both modes.
 - A multiplayer match runs at 1× and **cannot be paused** (user note).
 
 **Story mode (2026-11-02; `docs/story/DESIGN-STORY.md`).** The **Story** tab (and the title screen's Story card) opens
-the island map of *The Gene-Thief* campaign: chapter 1 is two levels for the Gene-Thief Termants on their own layered
-maps (*The Garden Below* against black garden ants, *Fire on the Banks* against tropical fire ants). A story level is a
+the island map of *The Gene-Thief* campaign: chapter 1 is four levels for the Gene-Thief Termants on their own layered
+maps (*The Garden Below* against black garden ants, *The Long Nights* — survive three nights of the island's night
+hunters and a red-knee tarantula that digs into the nest —, *Fire on the Banks* against tropical fire ants, and the boss
+*The Spider Mother*, a wolf spider titan in three phases whose win gives the trait Spiderling Venom). A story level is a
 data file (`src/story/levels/`) played by the mission runner above (`missionDef(id)` resolves missions and levels; the
 Missions menu still lists only the two missions). It adds data-driven objectives, captions and actions on times and
 flags, a director that makes the level's creatures and enemy ants act out scenes (`sim/story/director.ts`, cues such as
-walk, hold, patrol, guard, leave, charge, release), letterboxed camera shots, difficulty (`STORY` in balance.ts), three
-medals per level and a campaign save (castes kept, slots, journal) that never touches skirmish or multiplayer.
+walk, hold, patrol, guard, leave, charge, rest, a loop, digInto, release), letterboxed camera shots, difficulty (`STORY`
+in balance.ts), a level's own day and night (`sim/story/dayNight.ts`: the light `w.s.night`, moonlight and wolf spiders'
+eyeshine on the client, dusk/night/dawn flags, a clock on the goals panel), wild-creature lairs as underground areas,
+three medals per level and a campaign save (castes kept, slots, traits, journal; progress by level id) that never
+touches skirmish or multiplayer. **Traits** (`STORY.traits`, `sim/story/traits.ts`) are story-only colony bonuses from
+bosses, carried on the player's colony (`Colony.traits`) into every story level.
 
 **Layered ground (2026-11-02; `world/layers.ts`, claude/maps/05-spec).** A map may raise terraces and sink hollows one
 `LAYERS.step` (34 mm) per level; their banks are cliffs that block like walls, and ramps are the only way between levels

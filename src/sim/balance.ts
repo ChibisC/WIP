@@ -1142,14 +1142,15 @@ export const LAYERS = {
  * Story mode (claude/story/02-spec; sim/story, docs/story/DESIGN-STORY.md). Difficulty multipliers (every one here):
  * `enemyStat` scales enemy ants' and creatures' health and damage (`settings.enemyStatMul`), `wave` the size of
  * scripted attack waves, `aggression` the rival AI's raid margin and the war AI (`settings.aggression`), `food` the
- * player's starting food, `rival` the rival colonies' head start (developed nest and starting workers).
+ * player's starting food, `rival` the rival colonies' head start (developed nest and starting workers), `boss` a story
+ * boss's health (titans: the tarantula of the nights, the Spider Mother; gentler than `enemyStat`, which bosses skip).
  */
 export const STORY = {
   difficulty: {
-    easy: { enemyStat: 0.75, wave: 0.6, aggression: 0.6, food: 1.6, rival: 0.7 },
-    normal: { enemyStat: 1, wave: 1, aggression: 1, food: 1, rival: 1 },
-    hard: { enemyStat: 1.2, wave: 1.35, aggression: 1.3, food: 0.85, rival: 1.25 },
-    brutal: { enemyStat: 1.4, wave: 1.7, aggression: 1.6, food: 0.7, rival: 1.5 },
+    easy: { enemyStat: 0.75, wave: 0.6, aggression: 0.6, food: 1.6, rival: 0.7, boss: 0.75 },
+    normal: { enemyStat: 1, wave: 1, aggression: 1, food: 1, rival: 1, boss: 1 },
+    hard: { enemyStat: 1.2, wave: 1.35, aggression: 1.3, food: 0.85, rival: 1.25, boss: 1.1 },
+    brutal: { enemyStat: 1.4, wave: 1.7, aggression: 1.6, food: 0.7, rival: 1.5, boss: 1.2 },
   },
   /** stolen-caste slots: one to start, one more per boss beaten (later chapters) */
   slots: { start: 1, perBoss: 1 },
@@ -1165,4 +1166,19 @@ export const STORY = {
   waveBeaten: 0.8,
   /** a guarding actor chases what came within its radius at most this far beyond it (mm) */
   guardLeash: 40,
+  /**
+   * Traits (claude/story/04-spec §4): permanent colony-wide bonuses in story mode, earned from titans and mega colonies,
+   * kept in the campaign save and given to the player's colony in every story level (`Colony.traits`); never in skirmish
+   * or multiplayer. Only Spiderling Venom is built (chapter 1); the rest are planned for later chapters.
+   *  - spiderlingVenom: every bite of the player's ants (on an ant or a creature, riders too) adds a venom stack of
+   *    `dps` for `duration` s, up to `maxStacks` (a little, stacking a little).
+   */
+  traits: {
+    spiderlingVenom: { name: 'Spiderling Venom', from: 'The Spider Mother', desc: 'Your ants’ bites carry a little spider venom: a weak poison that stacks a little.', dps: 0.6, duration: 4, maxStacks: 3, built: true },
+    antlerPlating: { name: 'Antler Plating', from: 'a stag beetle titan', desc: 'More armour for all your ants.', built: false },
+    forcipuleStrike: { name: 'Forcipule Strike', from: 'a giant centipede titan', desc: 'Soldiers’ first bite in a fight deals bonus damage.', built: false },
+    irritatingHairs: { name: 'Irritating Hairs', from: 'the red-knee tarantula, as a boss', desc: 'Enemies that attack your soldiers are briefly slowed.', built: false },
+    ambushReflex: { name: 'Ambush Reflex', from: 'a giant mantis titan', desc: 'Attack speed bonus for the first seconds of each fight.', built: false },
+    fungalLarder: { name: 'Fungal Larder', from: 'the leafcutter mega colony', desc: 'Food stores hold more.', built: false },
+  } as Record<string, { name: string; from: string; desc: string; dps?: number; duration?: number; maxStacks?: number; built: boolean }>,
 };

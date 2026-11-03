@@ -1575,3 +1575,43 @@ away and just waits for worker to build it. if you dont have enough food you can
 - Tests: `tests/titans.ts` (in `npm test`): dig time, warning, breach, walking in, soil and stone breaking, tiles kept,
   reaching the queen, leaving, stagger and set-back, giving up, story raids, repair, the toggle, peace period, the cap,
   the mantis, determinism. Clips: `tests/browser/titan_dig.py` → `docs/creatures/digging/`.
+
+### 2026-11-02 — Chapter 1 becomes four levels: The Long Nights and The Spider Mother
+User spec `claude/story/04-spec-chapter1-four-levels.md` (decisions: survive the nights, no enemy ants, a titan on the last
+night; the boss is the wolf spider mother; its reward a trait only). Branch `feature/story-ch1-4` from `main`, with
+`feature/digging-titans` (0337c8a, another agent's) merged in for `digInto`; protocol `ud-mp-9` (main's food tiles and the
+titans' raid setting had each taken 8). Design: `docs/story/DESIGN-STORY.md` §3–6, §8, §10.
+- **Order** Garden Below → The Long Nights → Fire on the Banks → The Spider Mother (`story/campaign.ts`; new nodes at the
+  meadow's east edge and on the riverbank's upper slot). The two old levels keep gameplay, maps and balance; Fire on the
+  Banks is level 3 with a line linking it to the nights; the chapter's closing hint moved to the Spider Mother; the
+  chapter-complete note comes when all four are won (the last level's `ending` line).
+- **Save** (`game/campaign.ts`): progress by level id; a level is open when the one before is won or when it is won
+  already, so an old two-level save keeps Fire on the Banks open and is offered The Spider Mother at once; `traits`.
+- **The Long Nights** (`story/levels/longNights.ts`, map `maps/story/stonyHollow.ts`): its own day and night
+  (`sim/story/dayNight.ts`: `w.s.night`, flags `dusk:N`/`night:N`/`dawn:N`, a clock on the goals panel), five lairs as
+  underground areas (`caves`, the tarantula's drawn as a burrow), each night's hunters in two packs that come out of the
+  lairs and hold the two ramp tops till dawn, then go home; at dusk a ground beetle crosses the hollow and wolf spiders
+  wait at the lair mouths (eyeshine); on the last (longer) night the red-knee tarantula comes off its knoll, digs a hole
+  wider and walks into the nest. Win at dawn. Medals: food stored, losses, kill the tarantula before dawn.
+- **The Spider Mother** (`story/levels/spiderMother.ts`, map `maps/story/spiderTerrace.ts`): a developed colony
+  (`developed`), a preparation by difficulty, dusk light when she hunts; her rounds (a `goto` loop) to the colony's
+  doorstep and back to her burrow; below 80 % she rests in her burrow, below 60 % and 45 % her spiderlings spill, below
+  30 % she digs into the nest. Reward: the trait **Spiderling Venom** (`STORY.traits`, `sim/story/traits.ts`: every bite
+  of the player's ants adds a small venom stack; story only, on `Colony.traits`). A restart skips the opening flight.
+- **Framework**: objectives `surviveNight`, `upgrade`, `storeFood`, `surviveTime` per difficulty; cues `rest`, `goto`
+  (with the titans' `digInto`); actions `night`, `endRaid`; actors as creature groups out of several lairs (`creatures`,
+  `from`), health marks (`phases` → `hp:<actor>:<percent>`, `killed:<actor>`), `bossCuts`, `goal`; the bonus
+  `killBefore`; a food medal; `STORY.difficulty.*.boss`; the director runs on after a win.
+- **Fixes**: `charge` and `flee` cues were skipped at once (the actor went straight to its next cue); they now take their
+  time. The two old levels' waves were balanced on the old behaviour, so their scripts now say `mode: 'aggressive'` then
+  their guard (they play exactly as before); their critters really flee now (visual). Directed creatures slide round
+  pebbles instead of turning on the spot against them. A story titan's raid ignores `fleeHealth` and `maxStay` (it
+  leaves when the script says — dawn — or dies).
+- Render: moonlight on the surface at night (`render/view.ts`), wolf spiders' eyeshine (`creatureRenderer.ts`), the
+  spider burrow with a silk turret (`surfaceDecor.ts`), moods for both maps (`mapBiomes.ts`); UI: the hub's reward line
+  (caste, trait or medals only), traits on the Genome screen, the food medal, trait rewards on the end screen.
+- Tests: `tests/storyCh1.ts` (in `npm test`); `tests/story.ts` campaign check updated. Playtests (`tools/playtest-story.ts`
+  now plays bosses and nights): The Long Nights won on all four difficulties; The Spider Mother won Easy, Normal, Hard
+  and Brutal on seed 11 (not seed 7). Fire on the Banks plays as on `main` (within the bot's noise). The Garden Below's
+  Normal run (seed 7) does not finish in 60 min on `main` either: its balance moved with the food-tile economy (not retuned
+  here). Browser: `tests/browser/story_ch1_4.py` → `docs/story/shots/ch1_4/`.

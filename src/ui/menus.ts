@@ -1,3 +1,4 @@
+import { firstMedal, lossesNeed } from '../story/medalText';
 import { TOUCH } from '../core/device';
 import { GameSession } from '../game/session';
 import { Action, ACTION_LABELS, DEFAULT_BINDINGS } from '../core/input';
@@ -427,7 +428,7 @@ export class Menus {
           el(
             'p',
             '',
-            `<b>Time:</b> <b class="medal gold">gold</b> within ${Math.round(md.time[0] / 60)} minutes, <b class="medal silver">silver</b> within ${Math.round(md.time[1] / 60)}. <b>Losses:</b> gold at ${md.losses[0]} ants lost or fewer, silver at ${md.losses[1]}. <b>Bonus:</b> ${esc(md.bonus.text)}.`,
+            `<b>${esc(firstMedal(md).name)}:</b> ${esc(firstMedal(md).need)}. <b>Losses:</b> ${esc(lossesNeed(md))}. <b>Bonus:</b> ${esc(md.bonus.text)}.`,
           ),
         );
       else box.appendChild(el('p', '', `Finish within 25 minutes of game time for <b class="medal gold">gold</b>, 40 for <b class="medal silver">silver</b>; any finish earns <b class="medal bronze">bronze</b>.${best ? ` Your best: <b class="medal ${best.medal}">${best.medal}</b> in ${fmtTime(best.time)}.` : ''}`));

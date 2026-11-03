@@ -1,19 +1,20 @@
 import type { StoryLevelDef } from '../../sim/story/types';
 
 /**
- * Chapter 1, level 2 — "Fire on the Banks" (claude/story/02-spec §5; map src/maps/story/fireBanks.ts). A young queen
- * from the garden colony founds a fresh nest on the river's middle shelf (the simplest opening that fits the story
- * and the engine). Tropical fire ants own the high bank. Steal: the Tropical Fire Ant Major. Loadout: the Black
- * Garden Ant Soldier (one slot) or nothing.
+ * Chapter 1, level 3 — "Fire on the Banks" (claude/story/02-spec §5; map src/maps/story/fireBanks.ts; level 2 until
+ * 2026-11-02, when the nights came before it — 04-spec §1: its gameplay, map and balance unchanged). A young queen from
+ * the colony founds a fresh nest on the river's middle shelf (the simplest opening that fits the story and the
+ * engine). Tropical fire ants own the high bank. Steal: the Tropical Fire Ant Major. Loadout: the Black Garden Ant
+ * Soldier (one slot) or nothing.
  */
 export const FIRE_BANKS_LEVEL: StoryLevelDef = {
   id: 'fireBanks',
   chapter: 1,
-  number: 2,
+  number: 3,
   title: 'Fire on the Banks',
   region: 'riverbank',
   map: 'fireBanks',
-  brief: 'A young queen from the garden colony settles on the river shelf, below a mound of tropical fire ants. Hold off their swarm, steal their majors, ride out the river’s rise and take the mound.',
+  brief: 'A young queen from the colony that came through the long nights settles on the river shelf, below a mound of tropical fire ants. Hold off their swarm, steal their majors, ride out the river’s rise and take the mound.',
   player: { site: 0, startWorkers: 3, startFood: 170, name: 'Gene-Thief Termants' },
   // (2026-11-02 caste balance: fire ant minors are tougher now, so the mound holds fewer of them; was 4 / 12 / 55)
   rivals: { fire: { species: 'solenopsis', site: 1, name: 'Tropical fire ants', developed: 3, startWorkers: 10, popLimit: 18 } },
@@ -75,8 +76,10 @@ export const FIRE_BANKS_LEVEL: StoryLevelDef = {
         { on: 'beaten:swarm', actions: [{ do: 'music', mood: 'calm' }] },
       ],
       scenes: [
-        { actor: 'majors', cues: [{ holdAt: 'slopeTop', face: 'playerNest', anim: 'threat', s: 16 }, { flag: 'swarmGo' }, { charge: 'playerNest' }, { guard: 'playerNest', r: 80, s: 30 }, { release: true }] },
-        { actor: 'swarm', cues: [{ anim: 'threat', s: 16 }, { waitFlag: 'swarmGo', timeout: 30 }, { charge: 'playerNest' }, { guard: 'playerNest', r: 80, s: 40 }, { release: true }] },
+        // (`mode: 'aggressive'` then the guard: how these played and were balanced while a charge cue was skipped at once —
+        // kept so the level plays exactly as before, 04-spec §1; the guard walks them down to the nest fighting)
+        { actor: 'majors', cues: [{ holdAt: 'slopeTop', face: 'playerNest', anim: 'threat', s: 16 }, { flag: 'swarmGo' }, { mode: 'aggressive' }, { guard: 'playerNest', r: 80, s: 30 }, { release: true }] },
+        { actor: 'swarm', cues: [{ anim: 'threat', s: 16 }, { waitFlag: 'swarmGo', timeout: 30 }, { mode: 'aggressive' }, { guard: 'playerNest', r: 80, s: 40 }, { release: true }] },
       ],
     },
     {

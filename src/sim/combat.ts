@@ -20,6 +20,7 @@ import { climbCap } from './creatures/climb';
 import { afterBite, guardRush, hookMul } from './eciton';
 import { acidMulOn, glueBurst as termantGlue, termantArmorMul } from './termants';
 import { underOrder } from './markers';
+import { traitOnBite } from './story/traits';
 
 /**
  * Swarm combat: target acquisition, grappling (latching onto legs/antennae of
@@ -1371,6 +1372,7 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       }
       w.events.emit({ t: 'bite', x: o.x, y: o.y, space: o.space, strength: cd.bite / 10, by: a.caste, on: 'ant', gold: surging(a) || undefined });
       casteOnBite(w, a);
+      if ((o.state as AS) !== AS.Dead) traitOnBite(w, c, o);
       if (cd.sting && stingNow(a, cd.sting)) {
         applyVenom(w, o, cd.sting.dps * (a.power || 1), cd.sting.duration, cd.sting.maxStacks);
         w.events.emit({ t: 'sting', x: o.x, y: o.y, space: o.space, by: a.caste });
@@ -1427,6 +1429,7 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     }
     w.events.emit({ t: 'bite', x: a.x, y: a.y, space: a.space, strength: cd.bite / 10, by: a.caste, on: 'creature', gold: surging(a) || undefined });
     casteOnBite(w, a);
+    if (!cr.dead) traitOnBite(w, c, cr);
     if (cd.sting && stingNow(a, cd.sting)) {
       applyVenom(w, cr, cd.sting.dps * (a.power || 1), cd.sting.duration, cd.sting.maxStacks * 3);
       w.events.emit({ t: 'sting', x: a.x, y: a.y, space: a.space, by: a.caste });

@@ -105,16 +105,40 @@ export function spawnActor(w: World, st: StoryState, i: number): void {
   const face = def.face ? wherePt(w, def.face) : null;
   const h = face ? datan2(face[1] - at[1], face[0] - at[0]) : 0;
   const directed = def.directed !== false;
-  if (def.creature) {
+  if (def.creature || def.creatures) {
     act.kind = 0;
-    const p = nearestWalkable(w, at[0], at[1]) ?? { x: at[0], y: at[1] };
-    const cr = spawnCreature(w, def.creature, SURFACE, p.x, p.y);
-    if (def.hp) cr.hp = cr.maxHp = cr.maxHp * def.hp;
-    cr.h = cr.ph = h;
-    cr.homeX = p.x;
-    cr.homeY = p.y;
-    if (directed) cr.data.dirA = i + 1;
-    act.ids = [cr.id];
+    const group: Array<[string, number]> = def.creature ? [[def.creature, 1]] : def.creatures!;
+    const mul = def.wave ? STORY.difficulty[st.diff].wave : 1;
+    const from = def.from?.length ? def.from.map((f) => wherePt(w, f)) : [at];
+    let k = 0;
+    for (const [kind, n0] of group) {
+      const n = def.creature ? 1 : Math.max(1, Math.round(n0 * mul));
+      for (let j = 0; j < n; j++, k++) {
+        // a group comes out of its lairs in turn, loosely clustered at each
+        const src = from[k % from.length];
+        const o = spreadOf(Math.floor(k / from.length));
+        const p = nearestWalkable(w, src[0] + o.x * 2, src[1] + o.y * 2) ?? { x: src[0], y: src[1] };
+        const cr = spawnCreature(w, kind, SURFACE, p.x, p.y);
+        // a level's own scale on its health; a boss (spawned at its kind's health) also takes the difficulty's `boss`
+        const hpMul = (def.hp ?? 1) * (creatureKind(kind)?.boss ? STORY.difficulty[st.diff].boss : 1);
+        if (hpMul !== 1) cr.hp = cr.maxHp = cr.maxHp * hpMul;
+        if (def.bossCuts) {
+          cr.data.cut1 = def.bossCuts[0];
+          cr.data.cut2 = def.bossCuts[1];
+        }
+        cr.h = cr.ph = face ? datan2(face[1] - p.y, face[0] - p.x) : h;
+        cr.homeX = p.x;
+        cr.homeY = p.y;
+        if (def.goal) {
+          const g = wherePt(w, def.goal);
+          cr.data.gx = g[0];
+          cr.data.gy = g[1];
+        }
+        if (directed) cr.data.dirA = i + 1;
+        act.ids.push(cr.id);
+      }
+    }
+    if (def.wave) setFlag(st, `wave:${act.name}`);
   } else if (def.ants) {
     act.kind = 1;
     const colony = def.colony === 'player' ? (player?.id ?? 0) : (st.rivals[def.colony ?? ''] ?? -1);
@@ -227,15 +251,26 @@ function enterCue(w: World, st: StoryState, sc: StoryScene): void {
     const act = st.actors[sc.actor];
     sc.t = 0;
     for (const e of members(w, act)) resetMember(e);
+    if ('goto' in cue) {
+      // a loop (a hunter's rounds): back to an earlier cue
+      sc.cue = Math.max(0, cue.goto);
+      continue;
+    }
     if ('mode' in cue) act.mode = cue.mode === 'passive' ? 1 : cue.mode === 'aggressive' ? 2 : 0;
     else if ('flag' in cue && Object.keys(cue).length === 1) setFlag(st, cue.flag!);
     else if ('release' in cue) {
       releaseActor(w, st, sc.actor);
       sc.done = true;
       return;
-    } else if ('charge' in cue) act.mode = 2;
-    else if ('flee' in cue) act.mode = 1;
-    else if ('digInto' in cue) {
+    } else if ('charge' in cue) {
+      // (these two set the actor's behaviour and then take time — walking — like any other: 2026-11-02, they were
+      // skipped at once, so a wave went straight to its next cue and fleeing creatures straight to theirs)
+      act.mode = 2;
+      return;
+    } else if ('flee' in cue) {
+      act.mode = 1;
+      return;
+    } else if ('digInto' in cue) {
       // titans dig into the nest (they never give up: a story script); the cue waits until they are in
       const col = cue.digInto === 'player' ? (w.s.colonies.find((c) => c.player)?.id ?? 0) : (st.rivals[cue.digInto] ?? -1);
       for (const e of members(w, act)) if (!('caste' in e)) startTitanRaid(w, e as Creature, col, cue.hole ?? -1, true);
@@ -319,7 +354,7 @@ export function directorTick(w: World, st: StoryState, stage: number, stageT: nu
     else if ('digInto' in cue) done = alive.every((e) => 'caste' in e || ((e as Creature).data.rph ?? 0) >= RAID.Inside || !((e as Creature).data.raid ?? 0));
     else if ('guard' in cue) done = cue.s !== undefined && sc.t >= cue.s;
     else if ('patrol' in cue && cue.loops === undefined) done = sc.t >= (cue.s ?? 1e9);
-    else if (!walking(cue) && ('holdAt' in cue || 'anim' in cue || 'wander' in cue || 'follow' in cue)) done = sc.t >= (cue as { s: number }).s;
+    else if (!walking(cue) && ('holdAt' in cue || 'anim' in cue || 'wander' in cue || 'follow' in cue || 'rest' in cue)) done = sc.t >= (cue as { s: number }).s;
     else if (!walking(cue) && 'face' in cue) done = sc.t >= 1;
     else {
       let n = 0;
@@ -501,8 +536,8 @@ export function directAnt(w: World, a: Ant, c: Colony, dt: number): boolean {
     }
     return true;
   }
-  if ('holdAt' in cue || 'anim' in cue || 'face' in cue) {
-    const at = 'holdAt' in cue && cue.holdAt !== undefined ? wherePt(w, cue.holdAt) : null;
+  if ('holdAt' in cue || 'anim' in cue || 'face' in cue || 'rest' in cue) {
+    const at = 'holdAt' in cue && cue.holdAt !== undefined ? wherePt(w, cue.holdAt) : 'rest' in cue ? wherePt(w, cue.rest) : null;
     if (at && dhypot(at[0] + o.x - a.x, at[1] + o.y - a.y) > STORY.arriveMm + 1) {
       antWalk(w, a, at[0] + o.x, at[1] + o.y, at[0], at[1], key, speed, dt);
       return true;
@@ -625,6 +660,17 @@ export function directCreature(w: World, cr: Creature, dt: number): boolean {
     }
     return true;
   }
+  if ('rest' in cue) {
+    // back to its den (or a resting place) and still there, getting its strength back
+    const p = wherePt(w, cue.rest);
+    if (dhypot(p[0] - cr.x, p[1] - cr.y) > STORY.arriveMm + 3) {
+      walk(p[0], p[1], k.speed);
+      return true;
+    }
+    cr.v = 0;
+    if (cue.heal && !cr.dead) cr.hp = Math.min(cr.maxHp, cr.hp + cr.maxHp * cue.heal * dt);
+    return true;
+  }
   if ('holdAt' in cue || 'anim' in cue || 'face' in cue) {
     const at = 'holdAt' in cue && cue.holdAt !== undefined ? wherePt(w, cue.holdAt) : null;
     if (at && dhypot(at[0] - cr.x, at[1] - cr.y) > STORY.arriveMm + 2) {
@@ -717,16 +763,31 @@ function crWalk(w: World, cr: Creature, x: number, y: number, speed: number, dt:
   const diff = angleDiff(cr.h, want);
   cr.h += Math.max(-4 * dt, Math.min(4 * dt, diff));
   const step = Math.min(speed * Math.max(0.25, dcos(diff)) * dt, d);
+  const free = (x: number, y: number) => w.terrain.inBounds(x, y, 4) && w.terrain.passable(x, y);
   const nx = cr.x + dcos(cr.h) * step;
   const ny = cr.y + dsin(cr.h) * step;
-  if (w.terrain.inBounds(nx, ny, 4) && w.terrain.passable(nx, ny)) {
+  if (free(nx, ny)) {
     cr.x = nx;
     cr.y = ny;
     cr.v = step / Math.max(dt, 1e-3);
-  } else {
-    cr.h += (dsin(cr.id) > 0 ? 1 : -1) * 4 * dt;
-    cr.v = 0;
+    return d;
   }
+  // blocked (a pebble, a rock's edge): slide round it — the first free heading either side of the one it wants (2026-11-02:
+  // it only turned on the spot, and re-aimed into the same pebble the next tick)
+  const side = dsin(cr.id) > 0 ? 1 : -1;
+  for (const off of [0.6, -0.6, 1.2, -1.2, 1.8, -1.8]) {
+    const hh = cr.h + off * side;
+    const sx = cr.x + dcos(hh) * step;
+    const sy = cr.y + dsin(hh) * step;
+    if (!free(sx, sy)) continue;
+    cr.x = sx;
+    cr.y = sy;
+    cr.h += Math.max(-4 * dt, Math.min(4 * dt, angleDiff(cr.h, hh)));
+    cr.v = step / Math.max(dt, 1e-3);
+    return d;
+  }
+  cr.h += side * 4 * dt;
+  cr.v = 0;
   return d;
 }
 

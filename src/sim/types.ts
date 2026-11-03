@@ -575,6 +575,8 @@ export interface Colony {
   king?: number;
   /** castes this colony can raise (one brood tile type each) */
   castes: string[];
+  /** story mode only: the campaign's traits (STORY.traits, sim/story/traits.ts), e.g. Spiderling Venom on every bite */
+  traits?: string[];
   tiles: Tile[];
   groups: NestGroup[];
   nextGroupId: number;
@@ -773,6 +775,8 @@ export interface CaveDef {
   /** surface centre (entrances sit around it) */
   nx: number;
   ny: number;
+  /** story lairs: drawn as a spider's silk-lined burrow with a turret rim (render) */
+  look?: 'den' | 'burrow';
 }
 
 export interface SimSettings {

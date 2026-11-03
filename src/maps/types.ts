@@ -5,7 +5,7 @@
  */
 import type { MapStyle } from '../world/terrain';
 
-export type MapId = 'meadowPond' | 'forestFloor' | 'riverbank' | 'rainforest' | 'savanna' | 'testPond' | 'gardenBelow' | 'fireBanks' | 'testTerrace';
+export type MapId = 'meadowPond' | 'forestFloor' | 'riverbank' | 'rainforest' | 'savanna' | 'testPond' | 'gardenBelow' | 'fireBanks' | 'stonyHollow' | 'spiderTerrace' | 'testTerrace';
 
 /** A point in mm. */
 export type Pt = readonly [number, number];

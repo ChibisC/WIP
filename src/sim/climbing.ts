@@ -3,6 +3,7 @@ import { Ant, AS, Colony, Creature, POSE } from './types';
 import { BALANCE } from './balance';
 import { casteOf } from './species';
 import { applyVenom, biteGap, biteMul, damageCreature, flingAnt } from './combat';
+import { traitOnBite } from './story/traits';
 import { steerTo } from './movement';
 import { canMount, claimSlot, climbCap, climbDef, colonyOn, fightsFromGround, freeSlot, nearestOnRail, railPoint, slotPoint } from './creatures/climb';
 import { datan2, dcos, dhypot, dsin } from './dmath';
@@ -200,6 +201,7 @@ function riderAttack(w: World, a: Ant, c: Colony, cr: Creature): void {
   if (cd.bite > 0) {
     damageCreature(w, cr, cd.bite * biteMul(w, a, c) * CB.damageMul, 'bite', a);
     w.events.emit({ t: 'bite', x: a.x, y: a.y, space: a.space, strength: Math.min(1, (cd.bite / 10) * 1.4), by: a.caste, on: 'creature', riding: true });
+    if (!cr.dead) traitOnBite(w, c, cr);
   }
   if (cd.sting && cd.species === 'solenopsis') {
     applyVenom(w, cr, cd.sting.dps * (a.power || 1), cd.sting.duration, cd.sting.maxStacks * 3);

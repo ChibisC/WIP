@@ -1,3 +1,4 @@
+import type { StoryLevelId } from '../sim/story/types';
 import { SPECIES, SpeciesId, BORROWABLE, CASTES, borrowName } from '../sim/species';
 import type { MapId } from '../maps/types';
 import { MAPS, PLAYABLE_MAPS } from '../maps';
@@ -41,7 +42,7 @@ export interface MenuChoice {
   /** battle arena: 2–4 teams */
   teams?: number;
   /** story mode: the level, difficulty and loadout chosen on the island map (with mode 'story'; none opens the map) */
-  story?: { level: 'garden' | 'fireBanks'; difficulty: 'easy' | 'normal' | 'hard' | 'brutal'; loadout: string[] };
+  story?: { level: StoryLevelId; difficulty: 'easy' | 'normal' | 'hard' | 'brutal'; loadout: string[] };
 }
 
 /** AI colonies beside you: the authored maps have ten colony sites */
@@ -135,7 +136,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
     const arenaFloors: Array<[MapStyle, string]> = [['formicarium', 'Formicarium'], ['meadow', 'Meadow'], ['forest', 'Forest floor'], ['sandy', 'Sandy scrub']];
     const arenaBody = `<h2>Teams</h2><div class="opt-row">${[2, 3, 4].map((n) => `<button class="chip ${choice.teams === n ? 'on' : ''}" data-teams="${n}">${n} teams</button>`).join('')}<span class="dim">Red, Blue${(choice.teams ?? 2) > 2 ? ', Green' : ''}${(choice.teams ?? 2) > 3 ? ', Gold' : ''} — fill them with any ants and creatures once the arena opens</span></div>
            <h2>Arena floor</h2><div class="opt-row">${arenaFloors.map(([id, n]) => `<button class="chip ${arenaStyle === id ? 'on' : ''}" data-afloor="${id}">${n}</button>`).join('')}</div>`;
-    const storyBody = `<h2>The Gene-Thief</h2><p class="dim">A storm carries a Gene-Thief Termant queen to Wayfarer Island, where ants and other creatures from across the world live side by side. Level by level her colony spreads inland, defeating each species it meets and stealing its castes. Chapter 1: two levels, with more of the island to come.</p>`;
+    const storyBody = `<h2>The Gene-Thief</h2><p class="dim">A storm carries a Gene-Thief Termant queen to Wayfarer Island, where ants and other creatures from across the world live side by side. Level by level her colony spreads inland, defeating each species it meets and stealing its castes. Chapter 1: four levels and a boss, with more of the island to come.</p>`;
     const body =
       choice.mode === 'story'
         ? storyBody

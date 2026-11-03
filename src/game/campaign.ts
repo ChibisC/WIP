@@ -1,5 +1,5 @@
 import type { Difficulty, StoryLevelDef } from '../sim/story/types';
-import type { MedalTier } from '../sim/story/runner';
+import type { MedalTier, StoryMedals } from '../sim/story/runner';
 import { NODES, slotsFor } from '../story/campaign';
 
 /**
@@ -8,6 +8,11 @@ import { NODES, slotsFor } from '../story/campaign';
  * browser (like the profile); autosaved when a level is won. It only ever feeds a story level's setup, so story
  * progress never touches skirmish or multiplayer. Storage may be missing or throw: then the campaign runs from
  * memory for this visit.
+ *
+ * Progress is kept by level id, never by position, so reordering the chapter (2026-11-02: four levels, the nights second
+ * and Fire on the Banks third) keeps every save's medals and castes. A level is open when every level before it is won,
+ * or when it is won already: an old save that beat Fire on the Banks keeps it open, and the Spider Mother (after it)
+ * opens straight away; The Long Nights opens from the garden as for a new player (the friendlier rule, 04-spec §1).
  */
 
 type LevelId = StoryLevelDef['id'];
@@ -15,7 +20,10 @@ type LevelId = StoryLevelDef['id'];
 export interface LevelRecord {
   won: boolean;
   plays: number;
-  /** best tier per medal (kept separately: the best time and the fewest losses may come from different plays) */
+  /**
+   * best tier per medal (kept separately: the best time and the fewest losses may come from different plays); `time` is
+   * the first medal, food stored on a level of fixed length (The Long Nights)
+   */
   time: MedalTier;
   losses: MedalTier;
   bonus: MedalTier;
@@ -46,13 +54,15 @@ export interface CampaignSave {
   journal: JournalEntry[];
   /** paths already shown revealed on the island map (the reveal animation plays once) */
   revealed: LevelId[];
+  /** traits earned from bosses (STORY.traits; story only) */
+  traits: string[];
 }
 
 const KEY = 'ud-campaign-v1';
 let mem: CampaignSave | null = null; // the cached save (this page's copy of browser storage)
 
 function blank(): CampaignSave {
-  return { version: 1, levels: {}, castes: [], bosses: 0, difficulty: {}, loadout: {}, journal: [], revealed: [] };
+  return { version: 1, levels: {}, castes: [], bosses: 0, difficulty: {}, loadout: {}, journal: [], revealed: [], traits: [] };
 }
 
 export function campaign(): CampaignSave {
@@ -99,7 +109,7 @@ export function isUnlocked(level: LevelId): boolean {
   const n = NODES.find((x) => x.level === level);
   if (!n) return false;
   const c = campaign();
-  return n.after.every((p) => c.levels[p]?.won);
+  return !!c.levels[level]?.won || n.after.every((p) => c.levels[p]?.won);
 }
 
 export function slots(): number {
@@ -114,10 +124,11 @@ const DIFF_RANK: Record<Difficulty, number> = { easy: 0, normal: 1, hard: 2, bru
 export function recordWin(
   level: LevelId,
   diff: Difficulty,
-  medals: { time: MedalTier; losses: MedalTier; bonus: MedalTier; seconds: number; lost: number },
+  medals: StoryMedals,
   stolen: string[],
   shot: { caste: string; url?: string } | null,
-): { newCastes: string[]; firstWin: boolean } {
+  trait?: string,
+): { newCastes: string[]; firstWin: boolean; newTrait: boolean } {
   const c = campaign();
   const old = c.levels[level];
   const firstWin = !old?.won;
@@ -133,12 +144,14 @@ export function recordWin(
   };
   const newCastes = stolen.filter((cs) => !c.castes.includes(cs));
   c.castes.push(...newCastes);
+  const newTrait = !!trait && !c.traits.includes(trait);
+  if (trait && newTrait) c.traits.push(trait);
   const page = c.journal.find((j) => j.level === level);
   const date = new Date().toISOString().slice(0, 10);
   if (!page) c.journal.push({ level, date, caste: shot?.caste ?? '', shot: shot?.url });
   else if (shot?.url && (!page.shot || newCastes.length)) Object.assign(page, { date, caste: shot.caste, shot: shot.url });
   saveCampaign();
-  return { newCastes, firstWin };
+  return { newCastes, firstWin, newTrait };
 }
 
 /** A level was played and lost (a play counted). */

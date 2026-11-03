@@ -9,8 +9,11 @@ import type { MissionGoal, MissionState } from '../missions';
 import { StoryState, actorIndex, hasFlag, setFlag, storyOf } from './state';
 import { directorTick, endActorRaid, forceRaid, levelOf, members, spawnActor, wherePt } from './director';
 import { StageBase, stageGoals } from './objectives';
-import type { Action, Difficulty, StoryLevelDef, TimedAction } from './types';
+import type { Action, Difficulty, StoryLevelId, TimedAction } from './types';
+import { dayNightAt, dayNightFlags } from './dayNight';
 import { storyLevel } from '../../story/levels';
+import { mapDef } from '../../maps';
+import type { StoryLevelDef } from './types';
 import { storyText } from '../../story/text';
 
 /**
@@ -20,8 +23,11 @@ import { storyText } from '../../story/text';
  * objective and the medals. Everything is in `w.s.mode.mission.story` (state.ts).
  */
 
-/** The game setup of a story level: its map, colonies, difficulty and the stolen castes brought in. */
-export function storySetup(level: StoryLevelDef['id'], diff: Difficulty, loadout: string[], seed: number): GameSetup {
+/**
+ * The game setup of a story level: its map, colonies, difficulty and the stolen castes brought in; `more.traits` the
+ * campaign's traits (story only), `more.retry` a restart (the opening flight is skipped).
+ */
+export function storySetup(level: StoryLevelId, diff: Difficulty, loadout: string[], seed: number, more: { traits?: string[]; retry?: boolean } = {}): GameSetup {
   const L = storyLevel(level);
   const D = STORY.difficulty[diff];
   const rivals = Object.values(L.rivals);
@@ -33,21 +39,28 @@ export function storySetup(level: StoryLevelDef['id'], diff: Difficulty, loadout
     map: L.map,
     siteSet: 0,
     colonies: [
-      { species: 'termant', player: true, ai: false, team: 0, name: L.player.name, startWorkers: L.player.startWorkers, startFood: Math.round(L.player.startFood * D.food), borrowed: L.loadout ? loadout : undefined },
+      { species: 'termant', player: true, ai: false, team: 0, name: L.player.name, startWorkers: L.player.startWorkers, startFood: Math.round(L.player.startFood * D.food), borrowed: L.loadout ? loadout : undefined, ...(L.developed ? { developed: L.developed } : {}) },
       ...rivals.map((r) => ({ species: r.species, player: false, ai: true, name: r.name, developed: Math.max(0, Math.round(r.developed * D.rival)), startWorkers: Math.max(1, Math.round(r.startWorkers * D.rival)), ...(r.popLimit ? { popLimit: Math.round(r.popLimit * D.rival) } : {}) })),
     ],
-    caves: [],
+    // the night hunters' lairs: dens under the banks (underground areas with a few old kills; story points name them)
+    caves: (L.lairs ?? []).map((l) => ({ name: l.name, kind: 'lair' as const, at: { x: lairPt(L.map, l.at)[0], y: lairPt(L.map, l.at)[1] }, food: l.food, size: 2, look: l.look })),
     food: 1.3,
     aphids: L.aphids,
     plants: L.plants,
     settings: { creatures: L.creatures, enemyStatMul: D.enemyStat * (L.enemyStat ?? 1), aggression: D.aggression },
     mission: level,
-    story: { difficulty: diff, loadout: L.loadout ? loadout : [] },
+    story: { difficulty: diff, loadout: L.loadout ? loadout : [], ...(more.traits?.length ? { traits: [...more.traits] } : {}), ...(more.retry ? { retry: true } : {}) },
   };
 }
 
+function lairPt(map: StoryLevelDef['map'], at: string): readonly [number, number] {
+  const p = mapDef(map).story?.points[at];
+  if (!p) throw new Error(`Unknown story point: ${at}`);
+  return p;
+}
+
 /** Set up a story level's state (after the colonies exist; from mapGen.createWorld). */
-export function initStory(w: World, m: MissionState, level: StoryLevelDef['id'], diff: Difficulty, loadout: string[]): void {
+export function initStory(w: World, m: MissionState, level: StoryLevelId, diff: Difficulty, loadout: string[], more: { traits?: string[]; retry?: boolean } = {}): void {
   const L = storyLevel(level);
   const c = w.colony(m.colony)!;
   const rivals: Record<string, number> = {};
@@ -71,8 +84,12 @@ export function initStory(w: World, m: MissionState, level: StoryLevelDef['id'],
     bonus: 0,
     endT: 0,
     log: [],
+    ...(more.traits?.length ? { traits: [...more.traits] } : {}),
+    ...(more.retry ? { retry: 1 } : {}),
   };
   (m as MissionState & { story?: StoryState }).story = st;
+  // the campaign's traits (story only: sim/story/traits.ts)
+  if (more.traits?.length) c.traits = [...more.traits];
   // the stolen castes brought in: raised from the start (Genome tab: stolen)
   if (isTermant(c)) {
     const G = genomeOf(c);
@@ -125,7 +142,12 @@ function act(w: World, st: StoryState, a: Action): void {
       return;
     }
     case 'shot':
+      // a restart skips the opening flight (the boss rule: straight to the preparation)
+      if (st.retry && a.shot === 'flight') return;
       w.events.emit({ t: 'story', what: 'shot', shot: a.shot });
+      return;
+    case 'night':
+      w.s.night = Math.max(0, Math.min(1, a.level));
       return;
     case 'music':
       w.events.emit({ t: 'story', what: 'music', mood: a.mood });
@@ -201,16 +223,16 @@ function levelFire(w: World, st: StoryState): void {
 export function storySystem(w: World, dt: number): void {
   const st = storyOf(w);
   const m = w.s.mode.mission as MissionState | undefined;
-  if (!st || !m || m.result) return;
+  // (after a win the director goes on — actors walk off, a titan leaves at dawn — for "keep playing here")
+  if (!st || !m || m.result === 'lost') return;
+  const D = levelOf(st).dayNight;
+  if (D) w.s.night = dayNightAt(D, w.s.time).light;
   directorTick(w, st, m.stage, m.t, dt);
 }
 
-/** Once a second (from missionSystem, after the stage's clock moved on): flags from the world, timed things, the bonus. */
-export function storySecond(w: World, c: Colony, m: MissionState): void {
-  const st = storyOf(w);
-  if (!st) return;
+/** Flags the world sets (each second, before the captions and actions that wait on them). */
+function worldFlags(w: World, st: StoryState, c: Colony): void {
   const L = levelOf(st);
-  // flags the world sets
   if (isTermant(c)) for (const cs of genomeOf(c).stolen) setFlag(st, `caste:${cs}`);
   for (const [k, id] of Object.entries(st.rivals)) {
     const r = w.colony(id);
@@ -218,6 +240,26 @@ export function storySecond(w: World, c: Colony, m: MissionState): void {
     if (!r.alive) setFlag(st, `dead:${k}`);
     if (r.aiWar && r.aiWar.target === c.id) setFlag(st, `raid:${k}`);
   }
+  // the day/night clock
+  if (L.dayNight) for (const f of dayNightFlags(L.dayNight, w.s.time)) setFlag(st, f);
+  // a boss's health marks: hp:<actor>:<percent>
+  st.actors.forEach((act) => {
+    const marks = L.actors[act.name]?.phases;
+    if (!marks || !act.spawned || act.kind !== 0) return;
+    const cr = w.creatureById.get(act.ids[0]);
+    if (!cr) return;
+    const f = cr.dead ? 0 : cr.hp / Math.max(1, cr.maxHp);
+    for (const p of marks) if (f < p) setFlag(st, `hp:${act.name}:${Math.round(p * 100)}`);
+    if (cr.dead && !cr.data.gone) setFlag(st, `killed:${act.name}`);
+  });
+}
+
+/** Once a second (from missionSystem, after the stage's clock moved on): flags from the world, timed things, the bonus. */
+export function storySecond(w: World, c: Colony, m: MissionState): void {
+  const st = storyOf(w);
+  if (!st) return;
+  const L = levelOf(st);
+  worldFlags(w, st, c);
   storyFire(w, st, m, m.stage, m.t);
   levelFire(w, st);
   // the bonus objective
@@ -233,6 +275,9 @@ export function storySecond(w: World, c: Colony, m: MissionState): void {
         if (lost > B.max) st.bonus = -1;
         else if (act.beaten) st.bonus = 1;
       }
+    } else if (B.type === 'killBefore') {
+      if (hasFlag(st, `killed:${B.actor}`)) st.bonus = st.flags.indexOf(`killed:${B.actor}`) < st.flags.indexOf(B.flag) || !hasFlag(st, B.flag) ? 1 : -1;
+      else if (hasFlag(st, B.flag)) st.bonus = -1;
     }
   }
 }
@@ -251,17 +296,29 @@ export function storyWon(w: World): void {
   const st = storyOf(w);
   if (!st) return;
   st.endT = w.s.time;
+  const c = w.s.colonies.find((o) => o.player);
+  st.endFood = Math.floor(c?.food ?? 0);
   if (st.bonus === 0) {
     const B = levelOf(st).medals.bonus;
-    // a bonus never decided by the end (the wave never came, the caste never stolen) is lost
-    st.bonus = B.type === 'stealBefore' && hasFlag(st, `caste:${B.caste}`) ? 1 : -1;
+    // a bonus never decided by the end (the wave never came, the caste never stolen, the titan alive) is lost
+    st.bonus = (B.type === 'stealBefore' && hasFlag(st, `caste:${B.caste}`)) || (B.type === 'killBefore' && hasFlag(st, `killed:${B.actor}`)) ? 1 : -1;
   }
 }
 
 export type MedalTier = 'gold' | 'silver' | 'bronze' | 'none';
 
-/** The three medals of a won level: time, losses and the bonus objective. */
-export function storyMedals(w: World): { time: MedalTier; losses: MedalTier; bonus: MedalTier; seconds: number; lost: number } | null {
+export interface StoryMedals {
+  /** the first medal: time — or food stored, on a level of fixed length (`food` set) */
+  time: MedalTier;
+  losses: MedalTier;
+  bonus: MedalTier;
+  seconds: number;
+  lost: number;
+  food?: number;
+}
+
+/** The three medals of a won level: time (or food stored), losses and the bonus objective. */
+export function storyMedals(w: World): StoryMedals | null {
   const st = storyOf(w);
   const c = w.s.colonies.find((o) => o.player);
   if (!st || !c) return null;
@@ -269,7 +326,9 @@ export function storyMedals(w: World): { time: MedalTier; losses: MedalTier; bon
   const seconds = st.endT || w.s.time;
   const lost = c.stats.died - st.died0;
   const tier = (v: number, [g, s]: [number, number]): MedalTier => (v <= g ? 'gold' : v <= s ? 'silver' : 'bronze');
-  return { time: tier(seconds, M.time), losses: tier(lost, M.losses), bonus: st.bonus > 0 ? 'gold' : 'none', seconds, lost };
+  const food = st.endFood ?? Math.floor(c.food);
+  const first: MedalTier = M.food ? (food >= M.food[0] ? 'gold' : food >= M.food[1] ? 'silver' : 'bronze') : tier(seconds, M.time ?? [1e9, 1e9]);
+  return { time: first, losses: tier(lost, M.losses), bonus: st.bonus > 0 ? 'gold' : 'none', seconds, lost, ...(M.food ? { food } : {}) };
 }
 
 /** The stolen castes this level gave (stolen in it, not brought in). */

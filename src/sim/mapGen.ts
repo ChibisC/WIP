@@ -23,7 +23,7 @@ import { edible } from './diet';
 import { datan2, dcos, dhypot, dsin } from './dmath';
 import { creatureSystem, ecologySystem, registerCreatureHooks } from './creatures/creatureAI';
 import { MissionId, missionOf, missionSystem, startMission } from './missions';
-import type { Difficulty } from './story/types';
+import type { Difficulty, StoryLevelId } from './story/types';
 import { initStory, storySystem } from './story/runner';
 import { ecitonSystem } from './eciton';
 import { termantSystem } from './termants';
@@ -67,8 +67,8 @@ export interface GameSetup {
   mission?: MissionId;
   /** dev and browser shots: a titan of this kind starts beside the player's anthill and digs straight in (titanDig.ts) */
   devTitanRaid?: string;
-  /** a story level (sim/story): the difficulty and the stolen castes brought in (the level is `mission`) */
-  story?: { difficulty: Difficulty; loadout: string[] };
+  /** a story level (sim/story): the difficulty, the stolen castes brought in, the campaign's traits, a restart (the level is `mission`) */
+  story?: { difficulty: Difficulty; loadout: string[]; traits?: string[]; retry?: boolean };
   /** sandbox game: the sandbox commands (spawn, fill stores, toggles) are allowed */
   sandbox?: boolean;
   /** battle arena (sim/arena.ts): the colonies are the teams; no economy */
@@ -188,7 +188,7 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
     createColony(w, opts);
   });
   if (setup.mission) startMission(w, setup.mission, w.s.colonies.find((c) => c.player)?.id ?? 0);
-  if (setup.mission && setup.story) initStory(w, missionOf(w)!, setup.mission as 'garden' | 'fireBanks', setup.story.difficulty, setup.story.loadout);
+  if (setup.mission && setup.story) initStory(w, missionOf(w)!, setup.mission as StoryLevelId, setup.story.difficulty, setup.story.loadout, setup.story);
   if (setup.devTitanRaid) {
     const p = w.s.colonies.find((c) => c.player);
     const e = p?.entrances[0];

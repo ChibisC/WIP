@@ -35,7 +35,8 @@ export const GARDEN: StoryLevelDef = {
     {
       actor: 'raiders',
       at: 600,
-      cues: [{ holdAt: 'stoneSteps', anim: 'threat', s: 4 }, { flag: 'raidComing' }, { charge: 'playerNest' }, { guard: 'playerNest', r: 70, s: 45 }, { release: true }],
+      // (`mode: 'aggressive'` then the guard: as this played while a charge cue was skipped at once — kept unchanged)
+      cues: [{ holdAt: 'stoneSteps', anim: 'threat', s: 4 }, { flag: 'raidComing' }, { mode: 'aggressive' }, { guard: 'playerNest', r: 70, s: 45 }, { release: true }],
     },
   ],
   say: [{ key: 'raid1', on: 'raidComing' }],

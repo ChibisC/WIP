@@ -28,6 +28,8 @@ import { recordLoss, recordWin, campaign } from '../game/campaign';
 import { CHAPTERS } from '../story/campaign';
 import { storyText } from '../story/text';
 import { showStoryEnd } from './storyEnd';
+import { firstMedal, lossesNeed } from '../story/medalText';
+import { dayNightAt, dayNightLabel } from '../sim/story/dayNight';
 import './story.css';
 
 /** what the touch cancel button names */
@@ -257,10 +259,15 @@ export class GameUI {
     this.goals.style.display = m && !m.result ? '' : 'none';
     if (!m) return;
     const info = this.s.missionInfo();
-    const key = JSON.stringify([info.stage, info.goals]);
+    // a level with nights: the clock and the night count (sim/story/dayNight.ts)
+    const st = storyOf(this.s.world);
+    const D = st ? missionDef(m.id).story?.dayNight : undefined;
+    const t = this.s.world.s.time;
+    const clock = D ? `<div class="gm-clock ${dayNightAt(D, t).night ? '' : 'day'}">${dayNightAt(D, t).night ? '☾' : '☀'} ${esc(dayNightLabel(D, t))}</div>` : '';
+    const key = JSON.stringify([info.stage, info.goals, clock]);
     if (key === this.goalsKey) return;
     this.goalsKey = key;
-    this.goals.innerHTML = `<div class="gm-stage">${esc(info.stage ?? '')}</div>${info.goals.map((g) => `<div class="gm-goal ${g.done ? 'done' : ''}"><span>${g.done ? '✓' : '○'} ${esc(g.text)}</span><b>${esc(g.progress)}</b></div>`).join('')}`;
+    this.goals.innerHTML = `<div class="gm-stage">${esc(info.stage ?? '')}</div>${clock}${info.goals.map((g) => `<div class="gm-goal ${g.done ? 'done' : ''}"><span>${g.done ? '✓' : '○'} ${esc(g.text)}</span><b>${esc(g.progress)}</b></div>`).join('')}`;
   }
 
   /** A narrator caption: shown above the panels, for long enough to read it. */
@@ -317,38 +324,45 @@ export class GameUI {
     this.audio.stinger(won);
     const nav = (q: string) => (location.href = `${location.pathname}?${q}`);
     const hub = () => nav('story=1');
-    const retry = () => nav(`story=${L.id}&diff=${st?.diff ?? 'normal'}${st?.loadout.length ? `&loadout=${st.loadout.join(',')}` : ''}`);
+    // a restart skips the opening flight (the boss rule: straight to the preparation)
+    const retry = () => nav(`story=${L.id}&diff=${st?.diff ?? 'normal'}${st?.loadout.length ? `&loadout=${st.loadout.join(',')}` : ''}&retry=1`);
+    const caste = L.reward.caste;
     if (!won) {
       recordLoss(L.id);
-      showStoryEnd(this.root, { won, title: L.title, newCastes: [], reward: L.reward.caste, rewardStolen: false, quote: storyText(`${L.id}.${L.lose}`), chapterDone: false }, { hub, retry, keep: () => {} });
+      showStoryEnd(this.root, { won, title: L.title, newCastes: [], reward: caste, rewardStolen: false, trait: L.reward.trait, quote: storyText(`${L.id}.${L.lose}`), chapterDone: false }, { hub, retry, keep: () => {} });
       return;
     }
     const medals = storyMedals(w)!;
     const stolen = storyStolen(w, st?.loadout ?? []);
-    const rewardStolen = s.player.castes.includes(L.reward.caste) && !(st?.loadout ?? []).includes(L.reward.caste);
+    const rewardStolen = !!caste && s.player.castes.includes(caste) && !(st?.loadout ?? []).includes(caste);
     const chapter = CHAPTERS.find((c) => c.levels.includes(L.id));
     const wasDone = !!chapter && chapter.levels.every((l) => campaign().levels[l]?.won);
+    const first = firstMedal(L.medals);
     // the screen first (it covers the canvas), then the photograph (one render to the canvas, read back)
     const info = {
       won,
       title: L.title,
       medals,
-      medalText: { time: `gold under ${Math.round(L.medals.time[0] / 60)} min`, losses: '', bonus: L.medals.bonus.text },
+      medalText: { first: first.name, time: first.need, losses: lossesNeed(L.medals), bonus: L.medals.bonus.text },
       newCastes: [] as string[],
-      reward: L.reward.caste,
+      reward: caste,
       rewardStolen,
+      trait: L.reward.trait,
+      newTrait: false,
       shot: undefined as string | undefined,
       quote: storyText(`${L.id}.${L.win}`),
       chapterDone: false,
     };
-    const shot = rewardStolen ? s.portrait(L.reward.caste) : undefined;
-    const r = recordWin(L.id, st?.diff ?? 'normal', medals, stolen, rewardStolen ? { caste: L.reward.caste, url: shot } : null);
+    const shot = rewardStolen && caste ? s.portrait(caste) : undefined;
+    const r = recordWin(L.id, st?.diff ?? 'normal', medals, stolen, rewardStolen && caste ? { caste, url: shot } : null, L.reward.trait);
     info.newCastes = r.newCastes;
+    info.newTrait = r.newTrait;
     info.shot = shot;
     const nowDone = !!chapter && chapter.levels.every((l) => campaign().levels[l]?.won);
-    if (nowDone && !wasDone) {
+    if (nowDone && !wasDone && chapter) {
       info.chapterDone = true;
-      info.quote = `${info.quote} ${storyText(`${L.id}.ending`)}`.trim();
+      // the chapter's closing line belongs to its last level (whichever level completed the chapter)
+      info.quote = `${info.quote} ${storyText(`${chapter.levels[chapter.levels.length - 1]}.ending`)}`.trim();
     }
     showStoryEnd(this.root, info, { hub, retry, keep: () => {} });
   }

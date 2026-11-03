@@ -1528,6 +1528,9 @@ export class GameSession {
       const t = w.terrain;
       this.mounds.update(w, this.terrainHeight);
       this.view.storm = stormLevel(w.s.flood);
+      // a story level's night (its own day/night clock, sim/story/dayNight.ts): moonlight; wolf spiders' eyeshine
+      this.view.nightLevel = w.s.night ?? 0;
+      this.surfCreatures.night = w.s.night ?? 0;
       this.surfMarkers.update(shown, SURFACE, this.surfHeight, v.observing ? v.observeRig.distance * 3 : v.surfaceRig.distance, (i) => markerRadius(w, this.player, i), sel, v.time);
       this.surfTrail.update(sel, this.trailEnds(sel, SURFACE, shown), this.surfHeight, v.surfaceRig.distance, v.time);
       // creatures first: climbing ants are placed on their animated legs and backs

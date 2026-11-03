@@ -69,6 +69,12 @@ export interface StoryState {
   endT: number;
   /** a dev log of cues that timed out or could not run */
   log: string[];
+  /** the campaign's traits the player's colony has (STORY.traits; also on the colony: `Colony.traits`) */
+  traits?: string[];
+  /** a restart: the opening flight is skipped (the boss rule: straight to the preparation) */
+  retry?: number;
+  /** the player's food in the stores at the win (the food medal) */
+  endFood?: number;
 }
 
 export function storyOf(w: World): StoryState | null {

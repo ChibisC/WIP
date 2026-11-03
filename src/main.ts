@@ -37,7 +37,9 @@ import { ManualRtcTransport, installLanGuard } from './net/lanTransport';
 import { openHostDialog, showLanJoin } from './ui/lanCodes';
 import { showStoryHub } from './ui/storyHub';
 import { storySetup } from './sim/story/runner';
-import { missionOf } from './sim/missions';
+import { STORY_LEVEL_IDS, type StoryLevelId } from './sim/story/types';
+import { nightLen, nightStart } from './sim/story/dayNight';
+import { missionDef, missionOf } from './sim/missions';
 import { campaign } from './game/campaign';
 import { makeAnt } from './sim/factory';
 import { SURFACE } from './sim/types';
@@ -127,7 +129,8 @@ function startGame(): void {
       }
       // the map grows with the number of colonies so nests are not crowded
       const size = colonies.length <= 2 ? 640 : colonies.length <= 4 ? 800 : 980;
-      const setup: GameSetup = c.mode === 'story' && c.story ? storySetup(c.story.level, c.story.difficulty, c.story.loadout, Number(q.get('seed') || Math.floor(Math.random() * 1e6))) : {
+      // (story: the campaign's traits come along; ?retry=1 — a restart from the level-end screen — skips the opening flight)
+      const setup: GameSetup = c.mode === 'story' && c.story ? storySetup(c.story.level, c.story.difficulty, c.story.loadout, Number(q.get('seed') || Math.floor(Math.random() * 1e6)), { traits: q.get('traits') !== null ? (q.get('traits') || '').split(',').filter(Boolean) : campaign().traits, retry: !!q.get('retry') }) : {
         seed: Number(q.get('seed') || Math.floor(Math.random() * 1e6)),
         style: mission ? mission.style : c.style,
         width: size,
@@ -170,6 +173,9 @@ function startGame(): void {
         if (m) {
           m.stage = Math.max(0, Number(q.get('stage')));
           m.entered = false;
+          // a level with its own nights: the clock jumps to that stage's morning (the dawn after night N)
+          const D = missionDef(m.id).story?.dayNight;
+          if (D && m.stage > 0) s.world.s.time = nightStart(D, m.stage) + nightLen(D, m.stage) + 1;
         }
         const extra = Number(q.get('ants') || 0);
         const e0 = s.player.entrances[0];
@@ -527,12 +533,13 @@ function startGame(): void {
   // ?story=1: the island map (a level's end screen comes back here); ?story=<level>[&diff=…&loadout=…]: that level
   const storyParam = q.get('story');
   if (storyParam === '1') return storyHub();
-  if (storyParam === 'garden' || storyParam === 'fireBanks') {
+  if ((STORY_LEVEL_IDS as readonly string[]).includes(storyParam ?? '')) {
+    const level = storyParam as StoryLevelId;
     const cs = campaign();
-    const diff = (q.get('diff') as NonNullable<MenuChoice['story']>['difficulty']) || cs.difficulty[storyParam] || 'normal';
+    const diff = (q.get('diff') as NonNullable<MenuChoice['story']>['difficulty']) || cs.difficulty[level] || 'normal';
     const loadout = (q.get('loadout') || '').split(',').filter(Boolean);
+    launch({ mode: 'story', story: { level, difficulty: diff, loadout }, mission: 'meadow', species: 'termant', borrowed: [], ais: [], style: 'meadow', quality: (q.get('q') as MenuChoice['quality']) || settings().quality });
     if (!q.get('shot')) history.replaceState(null, '', location.pathname);
-    launch({ mode: 'story', story: { level: storyParam, difficulty: diff, loadout }, mission: 'meadow', species: 'termant', borrowed: [], ais: [], style: 'meadow', quality: (q.get('q') as MenuChoice['quality']) || settings().quality });
     return;
   }
 

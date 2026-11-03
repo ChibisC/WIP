@@ -17,11 +17,13 @@ import { CASTES } from '../src/sim/species';
 import { storyMedals, storySetup } from '../src/sim/story/runner';
 import { storyOf } from '../src/sim/story/state';
 import { wherePt } from '../src/sim/story/director';
-import type { Difficulty } from '../src/sim/story/types';
+import type { Difficulty, StoryLevelId } from '../src/sim/story/types';
+import { actorIndex } from '../src/sim/story/state';
+import { members } from '../src/sim/story/director';
 import { genomeOf } from '../src/sim/termants';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
-const level = (args[0] ?? 'garden') as 'garden' | 'fireBanks';
+const level = (args[0] ?? 'garden') as StoryLevelId;
 const diff = (args[1] ?? 'normal') as Difficulty;
 const minutes = Number(args[2] ?? 60);
 const seed = Number(args[3] ?? 7);
@@ -29,9 +31,14 @@ const loadout = (args[4] ?? '').split(',').filter(Boolean);
 const ASSIST = 4;
 /** the army a player would wait for before the final assault */
 const ARMY = Number(process.env.ARMY ?? 45);
+/** …and before going out after a boss on the surface */
+const BOSS_ARMY = Number(process.env.BOSS_ARMY ?? 40);
+/** …and how far from the nest it goes after the night's hunters */
+const NIGHT_R = Number(process.env.NIGHT_R ?? 130);
 
 const ev = new EventBus();
-const setup = storySetup(level, diff, loadout, seed);
+// TRAITS=spiderlingVenom: play with the campaign's traits
+const setup = storySetup(level, diff, loadout, seed, { traits: (process.env.TRAITS ?? '').split(',').filter(Boolean) });
 // ESTAT=x: try another enemy scale on top of the level's and the difficulty's (balancing)
 if (process.env.ESTAT && setup.settings) setup.settings.enemyStatMul = (setup.settings.enemyStatMul ?? 1) * Number(process.env.ESTAT);
 const w = createWorld(setup, ev);
@@ -143,6 +150,58 @@ for (let t = 0; t < minutes * 1200; t++) {
       if (q && inside) target = { space: q.space, x: q.x, y: q.y };
       else if (pushing) target = { space: SURFACE, x: hole.sx, y: hole.sy };
       else target = { space: SURFACE, x: stage.x, y: stage.y };
+    } else if (o.type === 'killCreature') {
+      // a boss: in the nest, everyone onto it at once; on the surface, an army gathered in front of the nest first, then
+      // all together onto it (falling back to rebuild below 45 % of the army it set out with), as a player would
+      const act = st.actors[actorIndex(st, o.actor)];
+      const boss = act ? members(w, act)[0] : undefined;
+      if (!boss) continue;
+      if (boss.space !== SURFACE) {
+        target = { space: boss.space, x: boss.x, y: boss.y };
+        continue;
+      }
+      if (assaulting) {
+        assaulting = c.living > assaultStart * 0.45;
+        if (!assaulting) (pushing = false), (gatherT = 0);
+      } else if (c.living >= Math.max(BOSS_ARMY, regroupTo)) {
+        assaulting = true;
+        assaultStart = c.living;
+        regroupTo = Math.round(assaultStart * 0.9);
+      }
+      if (!assaulting) continue;
+      const home = c.entrances[0];
+      const stage = { x: home.sx + (boss.x - home.sx) * 0.25, y: home.sy + (boss.y - home.sy) * 0.25 };
+      if (!pushing) {
+        let near = 0;
+        let out = 0;
+        for (const a of w.s.ants)
+          if (a.colony === c.id && a.state !== AS.Dead && a.task === 'marker' && a.marker === ASSIST) {
+            out++;
+            if (a.space === SURFACE && Math.hypot(a.x - stage.x, a.y - stage.y) < 60) near++;
+          }
+        gatherT++;
+        if ((out && near >= out * 0.6) || gatherT > 18) pushing = true;
+      }
+      target = pushing ? { space: SURFACE, x: boss.x, y: boss.y } : { space: SURFACE, x: stage.x, y: stage.y };
+    } else if (o.type === 'surviveNight' && c.living >= 12) {
+      // the nights: a titan in the nest first; else the nearest hunter at the door (a careful player's defence: no
+      // sorties to the ramps in the dark; NIGHT_R=220 for a bolder one)
+      const home = c.entrances[0];
+      let best = Infinity;
+      for (const cr of w.s.creatures) {
+        if (cr.dead) continue;
+        if (cr.space === nestSpace(c.id)) {
+          target = { space: cr.space, x: cr.x, y: cr.y };
+          best = -1;
+          break;
+        }
+        if (cr.space !== SURFACE) continue;
+        const d = Math.hypot(cr.x - home.sx, cr.y - home.sy);
+        if (d < best && d < NIGHT_R) {
+          best = d;
+          target = { space: SURFACE, x: cr.x, y: cr.y };
+        }
+      }
     }
   }
   if (target) {

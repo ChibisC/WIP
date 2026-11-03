@@ -34,7 +34,7 @@ export interface LevelNode {
   chapter: number;
   /** levels that must be won first (the path is drawn from the first) */
   after: Array<StoryLevelDef['id']>;
-  /** a boss level gives a stolen-caste slot (later chapters) */
+  /** a boss level (chapter 1's gives a trait only; from later chapters a boss also gives a stolen-caste slot) */
   boss?: boolean;
 }
 
@@ -52,13 +52,20 @@ export const REGIONS: Region[] = [
   { id: 'heart', name: "The Island's Heart", at: [0.52, 0.5], color: '#7a6248', slots: 4, chapter: 5, blurb: 'An old caldera in the middle of the island. Nobody goes there.' },
 ];
 
+/**
+ * Chapter 1 runs Garden Below → The Long Nights → Fire on the Banks → The Spider Mother (claude/story/04-spec §1). The
+ * nights are at the meadow's east edge where it meets the river woods (between the garden and the river); the spider
+ * mother's terrace is the riverbank's sandy upper slot, north of the fire ants' bank.
+ */
 export const NODES: LevelNode[] = [
   { level: 'garden', region: 'meadow', slot: 1, chapter: 1, after: [] },
-  { level: 'fireBanks', region: 'riverbank', slot: 2, chapter: 1, after: ['garden'] },
+  { level: 'longNights', region: 'meadow', slot: 4, chapter: 1, after: ['garden'] },
+  { level: 'fireBanks', region: 'riverbank', slot: 2, chapter: 1, after: ['longNights'] },
+  { level: 'spiderMother', region: 'riverbank', slot: 6, chapter: 1, after: ['fireBanks'], boss: true },
 ];
 
-/** The chapters (the hub's banner and level list, the chapter-end screen). */
-export const CHAPTERS = [{ n: 1, name: 'Chapter 1 — Landfall', levels: ['garden', 'fireBanks'] as Array<StoryLevelDef['id']> }];
+/** The chapters (the hub's banner and level list, the chapter-end screen; its last level carries the ending line). */
+export const CHAPTERS = [{ n: 1, name: 'Chapter 1 — Landfall', levels: ['garden', 'longNights', 'fireBanks', 'spiderMother'] as Array<StoryLevelDef['id']> }];
 
 const slotCache = new Map<string, Array<[number, number]>>();
 
