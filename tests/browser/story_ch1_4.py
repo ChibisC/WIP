@@ -149,7 +149,7 @@ with sync_playwright() as p:
         pg.evaluate("() => { const s = window.__session; s.showArea(s.world.s.colonies[0].id + 1); }")
         pg.evaluate("window.__step(80, 0.05)")
         if a:
-            cam(pg, a["x"], a["y"], 220, 0.0, 0.3, "nest")
+            cam(pg, a["x"], a["y"], 430, 0.0, 0.4, "nest")
         pg.evaluate("window.__step(40, 0.05)")
         shot(pg, "nights_tarantula_nest")
     if "spider" in ONLY:
