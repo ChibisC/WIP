@@ -1572,3 +1572,13 @@ From the review page (`docs/realism/hell-nasute/README.md`, round 1 of the user'
   feet planted (N6); the soldier sways its aim and recoils with each squirt.
 - Anim lab: `finisher` (the lift and the cut), `tfight` (the workers' three bites and the soldier), `tram` (the majors'
   three rams and the alarm). Clips in `docs/realism/hell-ants/clips/` and `docs/realism/nasutitermes/clips/`.
+
+## 2026-11-02 (evening) — The user's ratings, round 2: the finisher on the neck; the nasute termites redone (CHANGE_PLAN §22.7)
+- The finisher's foe is held by the neck: its neck is put on the hell ant's mandible–horn socket every frame (A2).
+- The nasute worker, soldier and major are rebuilt from the photos on the ant pipeline (`nasuteBuilder.ts`), so they
+  walk and fight with the ants' animation: three termite attacks per caste (workers tug, rip, lunge; soldiers jab,
+  lunge, rip; majors crush, bulldoze, toss), the glue spray with the head aimed and a recoil per squirt, the alarm
+  drum with the feet planted, hit reactions and deaths. King, queen, larvae and sickle-jaws stay on the kit.
+- Anim lab: `tfight` (workers, the soldier gluing), `tjab` (soldiers), `tram` (majors, the drum); the ant lab renders
+  the three castes on the ant path. Clips in `docs/realism/nasutitermes/clips/`.
+- Checks: `tsc`; `npm test` all suites; the determinism check; height data regenerated.

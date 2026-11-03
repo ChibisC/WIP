@@ -843,3 +843,27 @@ Scores: hell ants 9–10 for the looks (the amber 10, the lineup 10), the attack
   crush; `TermiteInstances.setMelee` picks it. The body moves with the legs compensating so the feet stay put
   (termiteLayer no longer slides the whole nasute body). The soldier sways its aim and each squirt jolts it back,
   squeezes the abdomen and dips the head.
+
+### 22.7 The user's ratings, round 2: the finisher on the neck; the nasute termites redone (2026-11-02 evening)
+Round 2 scores: the hell ant finisher 8 (worker) and 7 (soldier: "it just looks like the ant is floating, make it on
+the neck"), the attacks 8–9; the termite attacks 4–6 ("redo the termite models based on the reference images and give
+them dynamic and dramatic but realistic attacks and movement like the ants but realistic to termites"; "fix the models
+for nasute workers so that it can do more dynamic and dramatic but realistic attacks"; "same with the soldiers").
+- **The finisher on the neck:** the lifting hell ant records its mandible–horn socket (`rig.hold`) as posed each frame
+  (`recordHold` with the point), and the renderer moves the foe so its neck (`rig.neck`) sits on it (`AntView.neckBy`).
+- **The nasute worker, soldier and major on the ant pipeline:** a new builder (`render/ants/nasuteBuilder.ts`,
+  morphs `nasuteMorphs.ts` under the sim's keys `termite_worker`, `termite_nasute`, `termite_major`), so they get the
+  ants' animation: planted-feet walking and idles, full-body attack poses, hit reactions, deaths by cause, the
+  finisher's decapitation. The king, the queen, the larvae and the sickle-jaw termites stay on the kit
+  (`NASUTE_ANT_PATH` routes). Shapes from the photos (nasutitermes.md §11): no waist; a saddle pronotum; a soft
+  ten-segment abdomen with pale membranes and the gut showing through; long slender splayed legs with four
+  tarsomeres; straight beaded antennae (14 worker, 13 soldier); the worker's domed head with crossing mandibles and the
+  postclypeus; the soldier's glassy pear head drawn into the nasus, vestigial mandibles, six setae. Baked soft-cuticle
+  detail (`recipes.ts` `NASUTE_W`, `NASUTE_S`).
+- **Termite attacks** (`attackPoses.ts`): workers T_TUG (clamp and haul back), T_RIP (clamp and twist), T_LUNGE (reared
+  snap); soldiers T_JAB (double nasus peck), T_LUNGE, T_RIP; majors T_CRUSH (rear and crash down, hit-stop), T_DOZE
+  (bulldoze), T_TOSS (scoop and flick). Never the same twice running. The soldier's glue is an attack cycle of its own
+  (`GLUE`, special 6: braced, the head aimed at the target, each squirt jolting it back) with the glue stream from the
+  nasus tip (`GlueStreams` in the ant renderer); the major's alarm is `DRUM` (special 5: the head hammering, the feet
+  planted). Views: `antViews.nasuteAntPath` (worker sizes, glue, drum, chewing).
+- Height data regenerated for the new models (sim data only).
