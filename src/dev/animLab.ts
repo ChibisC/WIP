@@ -303,7 +303,7 @@ function clips(): Record<string, Clip> {
       ants: [
         ...[0, 1, 2].flatMap((k) => [
           { morph: 'termite_worker', script: ((s: AntScript): AntScript => (t, v) => { s(t, v); Object.assign(v, { tState: TS.BITE, tan: 1 }); })(attacker(-9 + k * 7, 0, 0, k, 1.2, 0.2 + k * 0.3)) },
-          { morph: FIRE, script: (t: number, v: AntView) => Object.assign(v, { x: -9 + k * 7 + 2.6, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: POSE.GRAPPLE, roll: Math.sin(t * 13 + k) * 0.12 }) },
+          { morph: FIRE, script: (t: number, v: AntView) => Object.assign(v, { x: -9 + k * 7 + 3.3, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: POSE.GRAPPLE, roll: Math.sin(t * 13 + k) * 0.12 }) },
         ]),
         {
           morph: 'termite_nasute',
@@ -323,7 +323,7 @@ function clips(): Record<string, Clip> {
       ants: [
         ...[0, 1, 2].flatMap((k) => [
           { morph: 'termite_major', script: ((s: AntScript): AntScript => (t, v) => { s(t, v); Object.assign(v, { tState: TS.RAM, tan: 1 }); })(attacker(-11 + k * 8.5, 0, 0, k, 1.4, 0.3 + k * 0.3)) },
-          { morph: FIRE, script: (t: number, v: AntView) => Object.assign(v, { x: -11 + k * 8.5 + 3.4, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: POSE.GRAPPLE, roll: Math.sin(t * 11 + k) * 0.12 }) },
+          { morph: FIRE, script: (t: number, v: AntView) => Object.assign(v, { x: -11 + k * 8.5 + 4.6, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: POSE.GRAPPLE, roll: Math.sin(t * 11 + k) * 0.12 }) },
         ]),
         { morph: 'termite_major', script: (t, v) => { Object.assign(v, { x: 15, y: 0, heading: 0, tan: 1, tState: TS.ALARM, tRate: 6 }); nasDrum(t, v); } },
       ],
@@ -336,7 +336,7 @@ function clips(): Record<string, Clip> {
       noScale: true,
       ants: [0, 1, 2].flatMap((k) => [
         { morph: 'termite_nasute', script: ((s: AntScript): AntScript => (t, v) => { s(t, v); Object.assign(v, { tState: TS.BITE, tan: 1 }); })(attacker(-9 + k * 7, 0, 0, k, 1.2, 0.2 + k * 0.3)) },
-        { morph: FIRE, script: (t: number, v: AntView) => Object.assign(v, { x: -9 + k * 7 + 3, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: POSE.GRAPPLE, roll: Math.sin(t * 12 + k) * 0.12 }) },
+        { morph: FIRE, script: (t: number, v: AntView) => Object.assign(v, { x: -9 + k * 7 + 3.9, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: POSE.GRAPPLE, roll: Math.sin(t * 12 + k) * 0.12 }) },
       ]),
       cam: { tx: -2, ty: 0.6, tz: 0, dir: [0.04, 0.12, 1], dist: 28, fov: 30 },
     },
