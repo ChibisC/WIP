@@ -1584,20 +1584,20 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   flip-flopping) and a cooldown; raids give way to bad trouble. Messages for a human ally; the ✋ call-for-help button (command `callHelp`, wire 25,
   `BUILD_ID` `ud-mp-9`). Joint raids (gather short of the target, go together), shared targets.
 - **Growth** (`tools/econ.ts`, one AI colony, 900 mm meadow, seed 7; ants at 10 / 20 / 30 / 45 min; measured on the
-  final merge against `main` `ccaba9d`, both with main's caste balance and tiles paid when placed):
+  final branch against `main` `ccaba9d`, both with main's caste balance and EotU food rules):
 
   | Species | this branch | `main` | tiles by level at 45 min |
   |---|---|---|---|
-  | Black garden | 22 / 64 / 122 / 206 | 24 / 65 / 123 / 148 | 179 / 44 / 62 |
-  | Leafcutter | 39 / 80 / 123 / 179 | 37 / 67 / 89 / 96 | 21 / 71 / 176 |
-  | Red wood | 26 / 68 / 125 / 194 | 28 / 67 / 120 / 166 | 254 / 18 / 10 |
-  | Fire ant | 19 / 33 / 56 / 89 | 20 / 35 / 51 / 68 | 138 / 0 / 0 |
-  | Army ant | 23 / 48 / 81 / 81 | 22 / 51 / 68 / 68 | 122 / 0 / 0 |
+  | Black garden | 26 / 76 / 137 / 218 | 24 / 65 / 123 / 148 | 218 / 48 / 39 |
+  | Leafcutter | 40 / 81 / 123 / 183 | 37 / 67 / 89 / 96 | 14 / 72 / 184 |
+  | Red wood | 26 / 69 / 104 / 143 | 28 / 67 / 120 / 166 | 195 / 12 / 0 |
+  | Fire ant | 19 / 37 / 58 / 82 | 20 / 35 / 51 / 68 | 120 / 0 / 0 |
+  | Army ant | 26 / 63 / 92 / 97 | 22 / 51 / 68 / 68 | 131 / 0 / 0 |
 
-  The same in the first 20 minutes, ahead from 30 (the stores and upgrades keep growing past where the old builder
-  stopped). Fire ants and army ants upgrade nothing by 45 min (their food goes to brood first; they reach mid game
-  late). The army-ant stall at 81 is older than this work (main stops at 68; their foragers stop going out). Before
-  main's caste balance (`f79ebd1`) the fire ants started slower here; that gap is gone.
+  Level with `main` early, ahead from 30 min (the stores and upgrades keep growing where the old builder stopped),
+  except the Red wood ants: over seeds 7–9 they end level (45 min: 143 / 162 / 157 here, 166 / 143 / 171 on `main`)
+  and upgrade little. Fire ants and army ants upgrade nothing by 45 min (food to brood first; they reach mid game
+  late). The army-ant stall is older than this work (their foragers stop going out; on `main` at 68 ants).
 - **Nests** (`tests/browser/ai_nests.py` → `docs/ai/chambers/`, five AI colonies on Meadow Pond in peace, at 10, 30 and
   45 min, with `sheet.jpg`): 7-hex chambers at 10 min; 19-hex chambers, highways and level II–III tiles from 30 min.
 - **Help clip** (`tests/browser/ai_help.py` → `docs/ai/allies_help.mp4` and stills): your nest invaded by a band of Red
