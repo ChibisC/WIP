@@ -1733,3 +1733,5 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
 - Checks: `tsc`; `npm test` all suites; the determinism check; height data regenerated.
 - User notes 17:47–17:59: renamed Conehead Termites; legs at their real length; the worker's head and mandibles and
   the soldier's teardrop head redone from the photos.
+- Round 3 ratings (night): castes now Worker, Soldier (the former major) and Sprayer (the nasute; glue only); the
+  soldiers' antennae and mandibles placed on the head's surface; the worker's mandibles broad toothed blades.
