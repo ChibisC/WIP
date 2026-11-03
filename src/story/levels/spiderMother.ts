@@ -21,8 +21,17 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
   region: 'riverbank',
   map: 'spiderTerrace',
   brief: 'Above the river, the sandy terrace belongs to a huge wolf spider mother carrying her young. The colony is ready, but only just: prepare, and when she digs her way in, finish her fast.',
-  player: { site: 0, startWorkers: 22, startFood: 280, name: 'Termants' },
-  developed: 10,
+  // a developed colony laid out like an AI nest (user 2026-11-02): the founding ring of workers round the queen, a worker
+  // chamber, a soldier chamber and a store chamber by the entrance (7-hex rosettes), the passage and tunnels paved; a
+  // stolen caste brought in gets a small chamber of its own
+  player: { site: 0, startWorkers: 12, startFood: 280, name: 'Termants' },
+  nest: [
+    { type: 'brood', caste: 'termant_worker', n: 7 },
+    { type: 'food', n: 7 },
+    { type: 'brood', caste: 'termant_soldier', n: 7 },
+    { type: 'brood', caste: 'lasius_soldier', n: 3 },
+    { type: 'brood', caste: 'fire_major', n: 3 },
+  ],
   rivals: {},
   creatures: 0,
   aphids: 0,

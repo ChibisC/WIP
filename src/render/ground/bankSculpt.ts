@@ -205,19 +205,29 @@ export function buildBankSculpt(t: Terrain, f: GroundFields): THREE.BufferGeomet
     P[v * 3 + 2] = y + dz;
     uv[v * 2] = x / 70;
     uv[v * 2 + 1] = y / 70;
-    const k4 = s * 4;
-    cover[v * 4] = t.coverW[k4] / 255;
-    cover[v * 4 + 1] = t.coverW[k4 + 1] / 255;
-    cover[v * 4 + 2] = t.coverW[k4 + 2] / 255;
-    cover[v * 4 + 3] = t.coverW[k4 + 3] / 255;
-    g1[v * 4] = f.wet[s];
-    g1[v * 4 + 1] = f.ao[s];
-    g1[v * 4 + 2] = f.trail[s];
+    // the smooth fields read between the samples (as the heightfield mesh's triangles do along the border), so the
+    // patch's fine vertices show no 4 mm steps and its border no seam; the face style and flood zone stay nearest
+    const fx = Math.min(nx - 1, Math.max(0, x / res));
+    const fy = Math.min(ny - 1, Math.max(0, y / res));
+    const i0 = Math.min(nx - 2, Math.floor(fx));
+    const j0 = Math.min(ny - 2, Math.floor(fy));
+    const u = fx - i0;
+    const w = fy - j0;
+    const q00 = j0 * nx + i0;
+    const q10 = q00 + 1;
+    const q01 = q00 + nx;
+    const q11 = q01 + 1;
+    const lerp4 = (a: ArrayLike<number>, st: number, c: number) =>
+      (a[q00 * st + c] * (1 - u) + a[q10 * st + c] * u) * (1 - w) + (a[q01 * st + c] * (1 - u) + a[q11 * st + c] * u) * w;
+    for (let c = 0; c < 4; c++) cover[v * 4 + c] = lerp4(f.cover, 4, c);
+    g1[v * 4] = lerp4(f.wet, 1, 0);
+    g1[v * 4 + 1] = lerp4(f.ao, 1, 0);
+    g1[v * 4 + 2] = lerp4(f.trail, 1, 0);
     g1[v * 4 + 3] = f.face[s] / 8;
     g2[v * 4] = f.zone[s];
-    g2[v * 4 + 1] = f.gravel[s];
-    g2[v * 4 + 2] = f.rim[s];
-    g2[v * 4 + 3] = f.spill[s];
+    g2[v * 4 + 1] = lerp4(f.gravel, 1, 0);
+    g2[v * 4 + 2] = lerp4(f.rim, 1, 0);
+    g2[v * 4 + 3] = lerp4(f.spill, 1, 0);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(P, 3));

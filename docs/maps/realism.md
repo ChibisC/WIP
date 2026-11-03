@@ -69,8 +69,12 @@ a calm mid-tone so units stand out. Measured by `tests/browser/ground_visibility
   and a grass thatch on meadows, red laterite and dry thatch on the savanna, humus and moss in forests, sand and
   gravel by rivers), plus mud along water, a worn walkway on ramps (packed sand on sand slides), the bank faces by edge
   style and damp moss on wet margins. The three heaviest layers are blended by height; each is sampled with
-  stochastic tiling (three offset, rotated taps over a triangle grid), so no tile ever repeats, and three scales of
-  colour drift break up the large areas. Close up, the sun is marched through the dominant layer's height so crumbs
+  stochastic tiling (three offset, rotated taps over a triangle grid; each lattice vertex keeps one offset and one
+  angle, so the taps never turn at a triangle edge), so no tile ever repeats, and three scales of colour drift break
+  up the large areas. A layer near the 0.02 cut of the top three fades in and out with its weight (its height too),
+  so layer edges never show as lines along the mesh's triangles; the cover is softened once (`groundFields().cover`)
+  and read by both the heightfield mesh and the bank sculpt (bilinear), and beyond the map's edge the edge's ground
+  turns into the surrounding land over 140 mm (2026-11-02, the user's "cutoff on the map"). Close up, the sun is marched through the dominant layer's height so crumbs
   and pebbles shade the ground beside them.
 - **Wetness**: mud band and damp margin from the distance to water; flood zones while flooded and draining for ~2½
   minutes after; storms wet everything a little, drying over ~4 minutes; the garden map starts damp with dew.

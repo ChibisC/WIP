@@ -35,7 +35,8 @@ const SURF = {
   // soft and waxy, a wet glint on top, light passing through
   abdomen: { rough: 0.36, coat: 0.5, sheen: 0.6 },
   leg: { rough: 0.44, coat: 0.25, sheen: 0.4 },
-  mandible: { rough: 0.3, coat: 0.6, sheen: 0.05 },
+  // (a satin, not a mirror: the open blade caught the sky and flashed white)
+  mandible: { rough: 0.42, coat: 0.3, sheen: 0.05 },
   hair: { rough: 0.6, coat: 0.1, sheen: 0.2 },
 };
 const GLASSY = { rough: 0.12, coat: 1, sheen: 0.05 };
@@ -71,7 +72,7 @@ const soldier = {
   // the bulb 0.23 L long and 0.22 L wide, its top 1.2x the thorax height; the nasus 0.16 L, tip radius 0.012 L
   head: { len: 0.23, w: 0.22, h: 0.2, tilt: 0.04, neck: 0.015, neckY: 0.03, nasus: { len: 0.16, r0: 0.035, r1: 0.011, up: 0.06, droop: 0.0 } },
   mandible: { len: 0.03, curve: 0.4, r: 0.01, open: 0.4 },
-  antenna: { beads: 13, len: 0.42, r: 0.0105, sx: 0.5, sy: -0.35, sz: 0.3, ang: 0.3, splay: 0.6, droop: 0.55 },
+  antenna: { beads: 13, len: 0.42, r: 0.0105, sx: 0.5, sy: 0.05, sz: 0.32, ang: 0.3, splay: 0.6, droop: 0.55 },
   legs: {
     thick: 0.015,
     pairs: [

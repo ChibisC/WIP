@@ -297,6 +297,10 @@ export interface StoryLevelDef {
   dayNight?: DayNight;
   /** creature lairs as underground areas */
   lairs?: LairDef[];
-  /** the player's nest comes pre-built with this many tiles (a developed colony) */
-  developed?: number;
+  /**
+   * the player's nest comes pre-built (a developed colony), tile by tile, laid out the way the AI builds: one caste per
+   * chamber (7-hex rosettes), the stores by the entrance, the passage and tunnels paved with highways. The founding ring
+   * round the queen holds `player.startWorkers` worker tiles (at most 12). A caste not brought in is left out.
+   */
+  nest?: Array<{ type: TileType; caste?: string; n: number }>;
 }

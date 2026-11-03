@@ -39,7 +39,7 @@ with sync_playwright() as p:
     names = dict(chips)
     check('the Mimic Ant borrow chips include the three termite soldiers', all(i in ids for i in ['nasute_soldier', 'nasute_major', 'rhy_soldier']), ','.join(ids))
     check('no termite worker or royal chips', not any(i in ids for i in ['nasute_worker', 'rhy_worker', 'nasute_queen', 'nasute_king', 'rhy_queen', 'rhy_king']))
-    check('chips are named species + caste', names.get('nasute_soldier') == 'Conehead Termite Soldier' and names.get('nasute_major') == 'Conehead Termite Major' and names.get('rhy_soldier') == 'Sickle-Jaw Termite Soldier' and names.get('formica_mortar') == 'Red Wood Mortar', f"{names.get('nasute_soldier')} / {names.get('rhy_soldier')}")
+    check('chips are named species + caste', names.get('nasute_soldier') == 'Conehead Termite Sprayer' and names.get('nasute_major') == 'Conehead Termite Soldier' and names.get('rhy_soldier') == 'Sickle-Jaw Termite Soldier' and names.get('formica_mortar') == 'Red Wood Mortar', f"{names.get('nasute_soldier')} / {names.get('rhy_soldier')}")
     pg.click('[data-borrow="nasute_soldier"]')
     pg.click('[data-borrow="rhy_soldier"]')
     on = pg.evaluate("() => [...document.querySelectorAll('[data-borrow].on')].map((b) => b.dataset.borrow)")
