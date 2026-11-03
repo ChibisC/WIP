@@ -80,7 +80,7 @@ export interface StoryState {
    * after the level's start or its `after` flag), the game time it fires (−1 until its anchor flag is set), 1 once fired
    * or skipped
    */
-  surp?: Array<{ i: number; off: number; at: number; done: number }>;
+  surp?: Array<{ i: number; id: string; off: number; at: number; done: number }>;
   /** a big surprise keeps the map busy until this game time */
   bigUntil?: number;
   /** visiting parties' nestless colonies (visitor key → colony id) */

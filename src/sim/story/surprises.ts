@@ -34,7 +34,7 @@ export function rollSurprises(w: World, st: StoryState, L: StoryLevelDef): void 
     const p = Math.min(1, (ev.chance ?? 1) * D.events);
     if (hash01(w.s.seed, `${L.id}:${ev.id}:go`) >= p) return;
     const off = ev.window[0] + hash01(w.s.seed, `${L.id}:${ev.id}:at`) * Math.max(0, ev.window[1] - ev.window[0]);
-    st.surp!.push({ i, off: Math.round(off), at: ev.after ? -1 : Math.round(off), done: 0 });
+    st.surp!.push({ i, id: ev.id, off: Math.round(off), at: ev.after ? -1 : Math.round(off), done: 0 });
   });
 }
 
