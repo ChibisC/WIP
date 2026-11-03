@@ -20,7 +20,7 @@ import { climbCap } from './creatures/climb';
 import { afterBite, guardRush, hookMul } from './eciton';
 import { acidMulOn, glueBurst as termantGlue, termantArmorMul } from './termants';
 import { underOrder } from './markers';
-import { traitOnBite } from './story/traits';
+import { traitArmor, traitOnBite } from './story/traits';
 
 /**
  * Swarm combat: target acquisition, grappling (latching onto legs/antennae of
@@ -122,8 +122,10 @@ export function damageAnt(w: World, t: Ant, amount: number, type: DamageType, sr
   // A king (termites, Termants) takes no damage at all; he dies only with his queen (killAnt).
   if (cd.role === 'king') return;
   let dmg = amount;
-  if (type === 'bite') dmg = Math.max(amount * 0.3, amount - cd.armor);
-  else if (type === 'acid') dmg = Math.max(amount * 0.75, amount - cd.armor * 0.25);
+  // (a story trait's extra armour: Antler Plating; none outside story levels)
+  const armor = cd.armor + traitArmor(c);
+  if (type === 'bite') dmg = Math.max(amount * 0.3, amount - armor);
+  else if (type === 'acid') dmg = Math.max(amount * 0.75, amount - armor * 0.25);
   if (t.pinned > 0 && type !== 'pure') dmg *= 1.5;
   // Termants: formic acid on a glued target; harder shells from beetle genes
   if (type === 'acid') dmg *= acidMulOn(w, t.glueT);

@@ -10,6 +10,9 @@ import { GARDEN_BELOW } from './story/gardenBelow';
 import { FIRE_BANKS } from './story/fireBanks';
 import { STONY_HOLLOW } from './story/stonyHollow';
 import { SPIDER_TERRACE } from './story/spiderTerrace';
+import { OAK_WOODS } from './story/oakWoods';
+import { FLOOD_HILL } from './story/floodHill';
+import { RAINFOREST_EDGE } from './story/rainforestEdge';
 
 export type { MapDef, MapId } from './types';
 
@@ -28,6 +31,9 @@ export const MAPS: Partial<Record<MapId, MapDef>> = {
   fireBanks: FIRE_BANKS,
   stonyHollow: STONY_HOLLOW,
   spiderTerrace: SPIDER_TERRACE,
+  oakWoods: OAK_WOODS,
+  floodHill: FLOOD_HILL,
+  rainforestEdge: RAINFOREST_EDGE,
 };
 
 /** The maps offered in menus and the lobby, in order. */

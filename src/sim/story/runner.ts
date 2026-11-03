@@ -1,5 +1,5 @@
 import type { World } from '../world';
-import { Colony, FloodState, SURFACE } from '../types';
+import { AS, Colony, FloodState, SURFACE } from '../types';
 import { FLOOD, STORY } from '../balance';
 import { makeFood } from '../factory';
 import { genomeOf, isTermant } from '../termants';
@@ -41,7 +41,7 @@ export function storySetup(level: StoryLevelId, diff: Difficulty, loadout: strin
     siteSet: 0,
     colonies: [
       { species: 'termant', player: true, ai: false, team: 0, name: L.player.name, startWorkers: L.player.startWorkers, startFood: Math.round(L.player.startFood * D.food), borrowed: L.loadout ? loadout : undefined, ...(L.nest ? { developPlan: L.nest } : {}) },
-      ...rivals.map((r) => ({ species: r.species, player: false, ai: true, name: r.name, developed: Math.max(0, Math.round(r.developed * D.rival)), startWorkers: Math.max(1, Math.round(r.startWorkers * D.rival)), ...(r.popLimit ? { popLimit: Math.round(r.popLimit * D.rival) } : {}) })),
+      ...rivals.map((r) => ({ species: r.species, player: false, ai: true, name: r.name, developed: Math.max(0, Math.round(r.developed * D.rival)), startWorkers: Math.max(1, Math.round(r.startWorkers * D.rival)), ...(r.popLimit ? { popLimit: Math.round(r.popLimit * D.rival) } : {}), ...(r.team !== undefined ? { team: r.team } : {}) })),
     ],
     // the night hunters' lairs: dens under the banks (underground areas with a few old kills; story points name them)
     caves: (L.lairs ?? []).map((l) => ({ name: l.name, kind: 'lair' as const, at: { x: lairPt(L.map, l.at)[0], y: lairPt(L.map, l.at)[1] }, food: l.food, size: 2, look: l.look })),
@@ -191,6 +191,7 @@ export function storyEnterStage(w: World, m: MissionState, stage: number): void 
   const st = storyOf(w);
   if (!st) return;
   st.latched = [];
+  st.hold = [];
   st.firedSay = [];
   st.firedScene = [];
   st.firedEvent = [];
@@ -269,12 +270,29 @@ function worldFlags(w: World, st: StoryState, c: Colony): void {
   });
 }
 
+/** The stage's `hold` objectives: a second more where enough of the player's ants are there, else back to zero. */
+function holdTick(w: World, st: StoryState, c: Colony, stage: number): void {
+  const S = levelOf(st).stages[stage];
+  S?.objectives.forEach((o, i) => {
+    if (o.type !== 'hold') return;
+    const h = (st.hold ??= []);
+    const p = wherePt(w, o.at);
+    let n = 0;
+    w.antsNear(SURFACE, p[0], p[1], o.r, (a) => {
+      if (a.colony === c.id && a.state !== AS.Dead) n++;
+      return false;
+    });
+    h[i] = n >= o.n ? (h[i] ?? 0) + 1 : 0;
+  });
+}
+
 /** Once a second (from missionSystem, after the stage's clock moved on): flags from the world, timed things, the bonus. */
 export function storySecond(w: World, c: Colony, m: MissionState): void {
   const st = storyOf(w);
   if (!st) return;
   const L = levelOf(st);
   worldFlags(w, st, c);
+  holdTick(w, st, c, m.stage);
   storyFire(w, st, m, m.stage, m.t);
   levelFire(w, st);
   surprisesSecond(w, st, L, (a) => act(w, st, a), (key) => {
@@ -296,6 +314,10 @@ export function storySecond(w: World, c: Colony, m: MissionState): void {
     } else if (B.type === 'killBefore') {
       if (hasFlag(st, `killed:${B.actor}`)) st.bonus = st.flags.indexOf(`killed:${B.actor}`) < st.flags.indexOf(B.flag) || !hasFlag(st, B.flag) ? 1 : -1;
       else if (hasFlag(st, B.flag)) st.bonus = -1;
+    } else if (B.type === 'deadBefore') {
+      // a colony destroyed before the water reached its nest (won), or every colony's nest flooded first (lost)
+      if (B.rivals.some((k) => hasFlag(st, `dead:${k}`) && (!hasFlag(st, `nestFlood:${k}`) || st.flags.indexOf(`dead:${k}`) < st.flags.indexOf(`nestFlood:${k}`)))) st.bonus = 1;
+      else if (B.rivals.every((k) => hasFlag(st, `nestFlood:${k}`))) st.bonus = -1;
     }
   }
 }

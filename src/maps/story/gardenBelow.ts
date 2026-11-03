@@ -131,7 +131,7 @@ export const GARDEN_BELOW: MapDef = {
     points: {
       // surprise events (claude/story/06-spec §6): where parties and wanderers come on and go off, windfalls
       evEast: [1086, 780],
-      evSouth: [480, 886],
+      evSouth: [560, 884],
       berryDrop: [720, 690],
       queenShore: [300, 708],
       queenGate: [362, 620],

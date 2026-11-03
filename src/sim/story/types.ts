@@ -13,7 +13,7 @@ export type Difficulty = 'easy' | 'normal' | 'hard' | 'brutal';
 export const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'brutal'];
 
 /** Every story level id, in campaign order (src/story/campaign.ts has the nodes and the unlock rules). */
-export const STORY_LEVEL_IDS = ['garden', 'longNights', 'fireBanks', 'spiderMother'] as const;
+export const STORY_LEVEL_IDS = ['garden', 'longNights', 'fireBanks', 'spiderMother', 'antleredKing', 'highWater', 'cartonKingdom'] as const;
 export type StoryLevelId = (typeof STORY_LEVEL_IDS)[number];
 
 /** A named point of the map's story data, or a point in mm. */
@@ -31,6 +31,8 @@ export type Objective = (
   | { type: 'stealCaste'; caste: string }
   | { type: 'raiseCaste'; caste: string; n: number }
   | { type: 'killQueen'; rival: string }
+  /** `n` of these rival colonies gone (their queens dead: killed, or drowned), in any order */
+  | { type: 'killQueens'; rivals: string[]; n: number }
   /** hold out `s` seconds (or per difficulty: a boss level's preparation) */
   | { type: 'surviveTime'; s: number | Partial<Record<Difficulty, number>> }
   | { type: 'surviveWave'; actor: string }
@@ -45,6 +47,8 @@ export type Objective = (
   | { type: 'upgrade'; n: number; tile?: TileType }
   /** food in the stores now (not gathered since the stage began) */
   | { type: 'storeFood'; amount: number }
+  /** keep `n` ants within `r` mm of a point for `s` seconds without a break (a landmark held: the sap run) */
+  | { type: 'hold'; at: Where; r: number; n: number; s: number; name?: string }
 ) & {
   text?: string;
   /** shown, never needed to finish the stage */
@@ -163,7 +167,7 @@ export type Action =
   | { do: 'spawn'; actor: string }
   | { do: 'flood'; zone: number }
   | { do: 'flag'; flag: string }
-  | { do: 'food'; at: Where; kind: 'insect' | 'berry' | 'seed'; from: string; scale: number; n?: number; spread?: number }
+  | { do: 'food'; at: Where; kind: 'insect' | 'berry' | 'seed' | 'honeydew'; from: string; scale: number; n?: number; spread?: number }
   | { do: 'shot'; shot: Shot | 'flight' }
   | { do: 'music'; mood: 'calm' | 'tense' | 'swarm' | 'assault' }
   | { do: 'raid'; rival: string }
@@ -178,6 +182,12 @@ export type Action =
    * flood zones) or a hot spell (ants on the surface walk slower: STORY.heatSpeed)
    */
   | { do: 'weather'; rain?: number; heat?: number }
+  /** two male stag beetles (creature actors) lock jaws and wrestle now; the bigger tends to throw the other */
+  | { do: 'wrestle'; a: string; b: string }
+  /** a rival colony goes all-in on the player's queen (no retreat): its nest is about to flood (High Water) */
+  | { do: 'allOut'; rival: string }
+  /** the nests whose entrances are under water now start to flood underground (sim/nestFlood.ts) */
+  | { do: 'floodNests' }
   /** a toast (a short note in the message log, not narration): key into the level's text (`<level>.<key>`) */
   | { do: 'note'; key: string; kind?: 'warn' | 'good' | 'info' };
 
@@ -208,6 +218,8 @@ export interface RivalDef {
   startWorkers: number;
   /** population limit (× the difficulty's `rival`): keeps a level's rival beatable */
   popLimit?: number;
+  /** allies share a team (the AI allies' brain: they help each other); default a team of its own */
+  team?: number;
 }
 
 /** A bonus objective: the third medal. */
@@ -217,7 +229,9 @@ export type Bonus =
   /** lose no more than `max` ants from the moment `actor` (a wave) appears until it is beaten */
   | { type: 'waveLosses'; actor: string; max: number; text: string }
   /** kill `actor` (a creature) before `flag` is set (e.g. before dawn, before it digs into the nest) */
-  | { type: 'killBefore'; actor: string; flag: string; text: string };
+  | { type: 'killBefore'; actor: string; flag: string; text: string }
+  /** destroy one of these rival colonies before its nest floods (`dead:<rival>` before `nestFlood:<rival>`) */
+  | { type: 'deadBefore'; rivals: string[]; text: string };
 
 export interface Medals {
   /**

@@ -1334,10 +1334,12 @@ export const STORY = {
    */
   traits: {
     spiderlingVenom: { name: 'Spiderling Venom', from: 'The Spider Mother', desc: 'Your ants’ bites carry a little spider venom: a weak poison that stacks a little.', dps: 0.6, duration: 4, maxStacks: 3, built: true },
-    antlerPlating: { name: 'Antler Plating', from: 'a stag beetle titan', desc: 'More armour for all your ants.', built: false },
+    // antlerPlating (The Antlered King, chapter 1 level 5): every ant of the colony has `armor` more armour (bites lose
+    // that much more; acid a quarter of it, as with an ant's own armour)
+    antlerPlating: { name: 'Antler Plating', from: 'The Antlered King', desc: 'Harder shells: every one of your ants has a little more armour.', armor: 1, built: true },
     forcipuleStrike: { name: 'Forcipule Strike', from: 'a giant centipede titan', desc: 'Soldiers’ first bite in a fight deals bonus damage.', built: false },
     irritatingHairs: { name: 'Irritating Hairs', from: 'the red-knee tarantula, as a boss', desc: 'Enemies that attack your soldiers are briefly slowed.', built: false },
     ambushReflex: { name: 'Ambush Reflex', from: 'a giant mantis titan', desc: 'Attack speed bonus for the first seconds of each fight.', built: false },
     fungalLarder: { name: 'Fungal Larder', from: 'the leafcutter mega colony', desc: 'Food stores hold more.', built: false },
-  } as Record<string, { name: string; from: string; desc: string; dps?: number; duration?: number; maxStacks?: number; built: boolean }>,
+  } as Record<string, { name: string; from: string; desc: string; dps?: number; duration?: number; maxStacks?: number; armor?: number; built: boolean }>,
 };

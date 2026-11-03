@@ -85,6 +85,8 @@ export interface StoryState {
   bigUntil?: number;
   /** visiting parties' nestless colonies (visitor key → colony id) */
   visitors?: Record<string, number>;
+  /** the current stage's `hold` objectives: seconds held without a break, by objective index */
+  hold?: number[];
 }
 
 export function storyOf(w: World): StoryState | null {
