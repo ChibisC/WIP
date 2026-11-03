@@ -90,6 +90,14 @@ export class World {
     // version 3 (2026-11-01): one 7-hex entrance per nest, three surface holes per anthill (older saves: sim/entrances.ts;
     // a binary snapshot attaches its grids after this, and restoreWorld upgrades it then)
     upgradeWorldEntrances(this);
+    // names from saves before 2026-11-02 (user note 23:47): the Gene-Thief Termants are the Termants, the Gene Thief
+    // Ant the Mimic Ant (display only; ids unchanged)
+    for (const c of state.colonies)
+      if (c.name && /gene[ -]?thie/i.test(c.name))
+        c.name = c.name
+          .replace(/Gene-Thief Termant/g, 'Termant')
+          .replace(/gene[ -]?thief ant/gi, (m) => (m[0] === 'G' ? 'Mimic Ant' : 'mimic ant'))
+          .replace(/gene[ -]?thie(f|ves)/gi, (m) => (m[0] === 'G' ? 'Mimic Ant' : 'mimic ant') + (/ves$/i.test(m) ? 's' : ''));
     state.version = Math.max(3, state.version ?? 1);
     this.reindex();
   }

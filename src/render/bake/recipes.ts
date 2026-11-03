@@ -261,7 +261,7 @@ export const NASUTE_S: DetailRecipe = { key: 'nasute_s', regions: nasRegions(NAS
 export function antRecipe(morphKey: string): DetailRecipe | null {
   if (morphKey.startsWith('fire_')) return FIRE_ANT;
   if (morphKey.startsWith('lasius_')) return LASIUS;
-  // (the Gene Thief ant is a Formica — modelled on F. sanguinea: the same microreticulate head and mesosoma, a dull pubescent gaster)
+  // (the Mimic ant is a Formica — modelled on F. sanguinea: the same microreticulate head and mesosoma, a dull pubescent gaster)
   if (morphKey.startsWith('formica_') || morphKey.startsWith('plagiaria_')) return FORMICA;
   // (overnight pass: the major's head smooth and shining, every other caste matte and tuberculate)
   if (morphKey === 'atta_minim') return ATTA_MINIM;

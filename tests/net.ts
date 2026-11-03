@@ -15,7 +15,7 @@ import { SURFACE } from '../src/sim/types';
 import { LocalHub, LocalEndpoint } from '../src/net/transport';
 import { NetGame, NetSim } from '../src/net/netGame';
 import { Slot, packControl, unpack } from '../src/net/messages';
-import { DEFAULT_LOBBY, GENE_THIEF_DEFAULT, TEAM_BASE, matchPlayers, matchSetup, matchWinner, teamsBlocker } from '../src/net/match';
+import { DEFAULT_LOBBY, MIMIC_DEFAULT, TEAM_BASE, matchPlayers, matchSetup, matchWinner, teamsBlocker } from '../src/net/match';
 import { Lobby } from '../src/net/lobby';
 import { BORROWABLE } from '../src/sim/species';
 import { dhypot } from '../src/sim/dmath';
@@ -276,9 +276,9 @@ const t0 = Date.now();
   check('surrender: a colony that is out can no longer give orders', clients[1].applied === before + 1 && !clients[1].sim.w.colony(1)!.alive);
 }
 
-// ---------------------------------------------------------------- teams and the Gene Thief
+// ---------------------------------------------------------------- teams and the Mimic Ant
 {
-  // 2 v 2 on Meadow Pond: the host and a Gene Thief player (Red) against two AIs (Blue), one a Gene Thief
+  // 2 v 2 on Meadow Pond: the host and a Mimic Ant player (Red) against two AIs (Blue), one a Mimic Ant
   const team = (s: Slot, t: number, borrowed?: string[]) => ({ ...s, team: t, ...(borrowed ? { borrowed } : {}) });
   const slots = [
     team(slot('human', 'Host', 'lasius', 'p0', 't0'), 1),
@@ -290,9 +290,9 @@ const t0 = Date.now();
   hub.latency = () => 40;
   const { clients, setup } = makeMatch(hub, 2, { slots, map: 'meadowPond' });
   check('teams: lobby teams become simulation teams (Red, Red, Blue, Blue) — the map then places each team together (tests/aiAllies.ts)', JSON.stringify(setup.colonies.map((c) => c.team)) === JSON.stringify([TEAM_BASE + 1, TEAM_BASE + 1, TEAM_BASE + 2, TEAM_BASE + 2]));
-  check("Gene Thief: the player's picks are kept (unknown castes dropped), an AI with no picks gets the default pair", JSON.stringify(setup.colonies[1].borrowed) === JSON.stringify(['atta_major', 'hell_soldier']) && JSON.stringify(setup.colonies[3].borrowed) === JSON.stringify(GENE_THIEF_DEFAULT), JSON.stringify(setup.colonies.map((c) => c.borrowed)));
+  check("Mimic Ant: the player's picks are kept (unknown castes dropped), an AI with no picks gets the default pair", JSON.stringify(setup.colonies[1].borrowed) === JSON.stringify(['atta_major', 'hell_soldier']) && JSON.stringify(setup.colonies[3].borrowed) === JSON.stringify(MIMIC_DEFAULT), JSON.stringify(setup.colonies.map((c) => c.borrowed)));
   const w = clients[0].sim.w;
-  check('Gene Thief: the borrowed castes are raised by that colony on every client', clients.every((c) => ['atta_major', 'hell_soldier'].every((id) => c.sim.w.colony(1)!.castes.includes(id))) && !w.colony(0)!.castes.includes('atta_major'), w.colony(1)!.castes.join(','));
+  check('Mimic Ant: the borrowed castes are raised by that colony on every client', clients.every((c) => ['atta_major', 'hell_soldier'].every((id) => c.sim.w.colony(1)!.castes.includes(id))) && !w.colony(0)!.castes.includes('atta_major'), w.colony(1)!.castes.join(','));
   // teammates on neighbouring sites: each colony's nearest other colony is its teammate
   const nests = w.s.colonies.map((c) => ({ id: c.id, team: c.team, x: c.entrances[0].sx, y: c.entrances[0].sy }));
   const nearestIsMate = nests.every((a) => {
@@ -303,7 +303,7 @@ const t0 = Date.now();
   check('teams: allies are not enemies (teamOf)', w.teamOf(0) === w.teamOf(1) && w.teamOf(2) === w.teamOf(3) && w.teamOf(0) !== w.teamOf(2));
   await run(hub, clients, 20_000);
   const cmp = compareHashes(clients[0], clients[1]);
-  check('teams: a 2 v 2 match with Gene Thieves stays in sync', cmp.diff < 0 && cmp.common >= 3 && clients.every((c) => !c.game.status().desync), `${cmp.common} checkpoints`);
+  check('teams: a 2 v 2 match with Mimic Ants stays in sync', cmp.diff < 0 && cmp.common >= 3 && clients.every((c) => !c.game.status().desync), `${cmp.common} checkpoints`);
   check('teams: no winner while both teams have a queen', matchWinner(w) === -1);
   for (const c of clients) for (const id of [2, 3]) c.sim.w.colony(id)!.alive = false;
   check('teams: when one team is out, the other team wins together', clients.every((c) => matchWinner(c.sim.w) === TEAM_BASE + 1));
@@ -311,7 +311,7 @@ const t0 = Date.now();
   check('teams: a team still wins with one of its queens left', matchWinner(w) === TEAM_BASE + 1);
 }
 
-// ---------------------------------------------------------------- the lobby: teams and Gene Thief picks are checked by the host
+// ---------------------------------------------------------------- the lobby: teams and Mimic Ant picks are checked by the host
 {
   const hub = new LocalHub();
   const hostEp = hub.connect('h', 'h');
@@ -336,7 +336,7 @@ const t0 = Date.now();
   check("lobby: the host can move a player to another team but not change their species", host.slots[1].team === 3 && host.slots[1].species === 'plagiaria');
   host.setSlot(2, { kind: 'ai', species: 'plagiaria' });
   const ai = host.slots[2];
-  check('lobby: a Gene Thief AI steals two or three castes, all borrowable', ai.kind === 'ai' && (ai.borrowed?.length ?? 0) >= 2 && (ai.borrowed?.length ?? 0) <= 3 && ai.borrowed!.every((id) => BORROWABLE.includes(id)), JSON.stringify(ai.borrowed));
+  check('lobby: a Mimic Ant AI steals two or three castes, all borrowable', ai.kind === 'ai' && (ai.borrowed?.length ?? 0) >= 2 && (ai.borrowed?.length ?? 0) <= 3 && ai.borrowed!.every((id) => BORROWABLE.includes(id)), JSON.stringify(ai.borrowed));
   host.setMine({ team: 3 });
   host.setSlot(2, { team: 3 });
   check('lobby: everyone on one team cannot start', host.startBlocker().startsWith('Everyone is on Team'), host.startBlocker());

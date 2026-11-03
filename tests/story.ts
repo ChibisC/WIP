@@ -64,7 +64,7 @@ function toStage(w: World, n: number): void {
 }
 
 // ---------------------------------------------------------------- rename, names
-check('rename: the Termants show as "Gene-Thief Termants"; the internal id stays termant', SPECIES.termant.common === 'Gene-Thief Termants' && SPECIES.termant.id === 'termant');
+check('rename: the Termants show as "Termants"; the internal id stays termant', SPECIES.termant.common === 'Termants' && SPECIES.termant.id === 'termant');
 check('stolen castes by their ant names', stolenName('lasius_soldier') === 'Black Garden Ant Soldier' && stolenName('fire_major') === 'Tropical Fire Ant Major');
 check('the Missions menu still lists the two missions only', Object.keys(MISSIONS).join() === 'meadow,forest' && missionDef('meadow').title === 'A Meadow Kingdom');
 
@@ -143,7 +143,7 @@ for (const id of ['gardenBelow', 'fireBanks'] as const) {
   const c = w.colony(0)!;
   const r = w.colony(1)!;
   const st = storyOf(w)!;
-  check('setup: Gene-Thief Termants at site 0, the black garden ants at site 1, story state with the cast', c.species === 'termant' && c.player && r.species === 'lasius' && st.rivals.lasius === 1 && st.actors.length === Object.keys(STORY_LEVELS.garden.actors).length);
+  check('setup: Termants at site 0, the black garden ants at site 1, story state with the cast', c.species === 'termant' && c.player && r.species === 'lasius' && st.rivals.lasius === 1 && st.actors.length === Object.keys(STORY_LEVELS.garden.actors).length);
   check('setup: no wild creatures in the first level; the opening cast is on the map', w.s.settings.creatures === 0 && st.actors.filter((a) => a.spawned).map((a) => a.name).join() === 'queen,beetle,cutworm,tenders,tenders2');
   const e = level('garden', 'easy');
   const b = level('garden', 'brutal');

@@ -10,7 +10,7 @@
  * Prints a win table and each species' win rate, kills and peak size. PART=k/n plays every n-th game starting at k
  * (run n processes side by side), OUT writes each game's result as JSON lines; `tools/tournament-merge.ts` merges them.
  * FOCUS=<species> plays only that species' games.
- * The Gene Thief borrows the menu's default castes (Red Wood Ant mortar, fire-ant major).
+ * The Mimic Ant borrows the menu's default castes (Red Wood Ant mortar, fire-ant major).
  */
 import { EventBus } from '../src/core/events';
 import { createWorld } from '../src/sim/mapGen';

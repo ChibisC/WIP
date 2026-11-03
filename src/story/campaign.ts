@@ -3,7 +3,7 @@ import { STORY } from '../sim/balance';
 import { MAP_H, MAP_W, regionSlots } from './islandGeo';
 
 /**
- * The Gene-Thief campaign as data (claude/story/02-spec §3–4; docs/story/DESIGN-STORY.md): the island's regions as
+ * The Termants campaign as data (claude/story/02-spec §3–4; docs/story/DESIGN-STORY.md): the island's regions as
  * the hub draws them, the level nodes on it, the paths between them, the chapters, and the unlock and slot rules.
  *
  * Built for the whole campaign, about 30–40 levels (user, 2026-11-02): each region has a fixed number of node slots

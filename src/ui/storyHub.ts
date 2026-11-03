@@ -82,7 +82,7 @@ export function showStoryHub(parent: HTMLElement, start: (s: StoryStart) => void
   const done = chapter.levels.every((l) => c.levels[l]?.won);
   root.innerHTML = `
     <div class="sh-top">
-      <div class="sh-title"><span class="sh-kicker">The Gene-Thief</span><b>${esc(chapter.name)}</b></div>
+      <div class="sh-title"><span class="sh-kicker">The Termants</span><b>${esc(chapter.name)}</b></div>
       <div class="sh-tabs">
         <button class="sh-tab on" data-tab="island">Island</button>
         <button class="sh-tab" data-tab="genome">Genome</button>
@@ -167,7 +167,7 @@ export function showStoryHub(parent: HTMLElement, start: (s: StoryStart) => void
     page.innerHTML = `<div class="sh-sheet"><h2>Genome</h2>
       <h3>Traits</h3><p class="sh-dim">Permanent gifts from the island’s titans: every story level, all your ants. They never come into skirmish or multiplayer.</p>
       <div class="sh-genome">${traits}</div><h3>Stolen castes</h3>
-      <p class="sh-dim">Castes the Gene-Thief Termants have stolen and kept for the campaign. Bring up to <b>${slots()}</b> into a level (one more slot for every boss beaten, in later chapters).</p>
+      <p class="sh-dim">Castes the Termants have stolen and kept for the campaign. Bring up to <b>${slots()}</b> into a level (one more slot for every boss beaten, in later chapters).</p>
       <div class="sh-genome">${STOLEN_CASTES.map((e) => {
         const cd = CASTES[e.caste];
         const sp = SPECIES[e.source];
@@ -188,7 +188,7 @@ export function showStoryHub(parent: HTMLElement, start: (s: StoryStart) => void
       return `<div class="sh-jpage">
         <div class="sh-jhead"><b>${esc(storyText(`journal.${n.level}.title`))}</b><span>${esc(j?.date ?? '')}</span></div>
         ${j?.shot ? `<img alt="" src="${j.shot}">` : L.reward.caste ? `<div class="sh-jsil">${antSilhouette(CASTES[L.reward.caste].role, '#7a5c38')}<span>${c.castes.includes(L.reward.caste) ? 'No photograph taken' : 'The caste was not stolen: replay the level to take it.'}</span></div>` : ''}
-        ${j?.caste ? `<div class="sh-jcap">${esc(stolenName(j.caste))}, raised by the Gene-Thief Termants</div>` : ''}
+        ${j?.caste ? `<div class="sh-jcap">${esc(stolenName(j.caste))}, raised by the Termants</div>` : ''}
         <p>${esc(storyText(`journal.${n.level}.body`))}</p>
         <p class="sh-jnote">${esc(storyText(`journal.${n.level}.note`))}</p>
       </div>`;

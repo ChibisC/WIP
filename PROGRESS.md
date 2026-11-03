@@ -76,7 +76,7 @@
 - `GameSession` (src/game/session.ts): World + fixed 20 Hz loop + GameView, instanced ants in both spaces (surface heightfield adapter, nest back-wall adapter following the cavity SDF), food, brood, nest decor and chamber lights, surface decor (entrance holes with growing spoil rings, aphid colonies on stems, leaf plants, rally flags), pheromone overlay texture.
 - Player commands: hex dig painting, room tiles (food, nursery, refuse, fungus, per-caste development rooms), clear tool, worker/soldier rally markers, recall, speed and pause, nest/surface dive.
 - Nest shader: honeycomb seams on dug floors, per-room floor tints, hex hover preview (valid/invalid) with reason tooltip.
-- HUD (src/ui/hud.ts) and start menu (src/ui/menu.ts): species, Gene Thief caste picks, rival colony, map style, quality.
+- HUD (src/ui/hud.ts) and start menu (src/ui/menu.ts): species, Mimic Ant caste picks, rival colony, map style, quality.
 - `tools/package-artifact.py` packages `dist/` as a shareable prototype page.
 - Not yet in: creatures/bosses (Phase 7), species abilities and rival AI behaviour (Phase 8), modes (Phase 9), audio/settings/save (Phase 10).
 
@@ -137,7 +137,7 @@ The design changed before Phase 5 was finished; see `CHANGE_PLAN.md` for the ful
   - Red wood ant: acid barrage.
   - Leafcutter: stridulation.
   - Fire ant: stinging frenzy.
-  - Gene Thief: propaganda substance.
+  - Mimic Ant: propaganda substance.
 - **Build panel.**
   - Tiles tab: dig, one brood tile per caste, food, species tiles, remove.
   - Castes tab: stats and real facts for each caste.
@@ -443,7 +443,7 @@ The design changed before Phase 5 was finished; see `CHANGE_PLAN.md` for the ful
   - Known balance item: red wood ant AIs tend to win AI-only games quickly (`tools/ecology.ts`).
 
 ## 2026-10-24 — Single-player teams and AI colonies; Phase 13 first pass (missions, skirmish, sandbox)
-- **Teams and up to six AI colonies** in single-player (user note), including Gene Thief AIs with chosen or random stolen castes. The map grows with the colony count; up to eight area tabs (Shift+1–8).
+- **Teams and up to six AI colonies** in single-player (user note), including Mimic Ant AIs with chosen or random stolen castes. The map grows with the colony count; up to eight area tabs (Shift+1–8).
 - **Online prototype:** published as a link (single-player; it updates in place) and as a zip; `netlify.toml` for automatic deploys from a repository.
 - **Step 2 checklist ticked** (CHANGE_PLAN §10.3). Only the deployed two-network test is left, and it needs the user.
 - **Phase 13, first pass:**
@@ -712,7 +712,7 @@ User request (`claude/maps/02-spec-nest-entrances.md`; decision `claude/maps/03-
 - **Tunnels.** Every entrance (and cave mouth) is a 3-hex tunnel rising to its hole: no tiles on it, highway speed, a ramp graded along it, loose soil worn smooth down the middle, species debris along the sides (needles, leaf scraps, carton flakes, frass, granular soil), daylight down it (cool by day, faint at night).
 - **Throughput.** Each entrance passes 10 ants a second (in and out together); the rest wait at the hole or at the top of the tunnel. Crowds still all get through (tests).
 - **Closing and collapse.** Delete on an extra entrance plugs it with soil (4 s; command `entrance`, wire id 23); Dig on a plugged one opens it again; the main entrance never closes. A fallen colony's entrances cave in over a minute.
-- **Surface models** for all eleven colony kinds: crumbly pellet craters (black garden ants, one extra under a flat stone), a thatched dome with holes in its flanks and worn trails (red wood ants), wide orange craters with leaf scraps and a refuse dump (leafcutters), small granular collars beside the dome (fire ants), a bivouac of linked bodies (army ants), a neat hole in litter (hell ants, a reconstruction), a rotting stump with frass (Gilded Ants), a carton-plastered crater (Termants), a lobed carton nest with covered galleries (nasute termites), tiny turrets and foraging holes in litter (sickle-jaw termites), a low crater with plant bits (Gene Thief). Ants walk over rims and domes. Screenshots in `docs/maps/entrances/` (`tests/browser/entrance_renders.py`).
+- **Surface models** for all eleven colony kinds: crumbly pellet craters (black garden ants, one extra under a flat stone), a thatched dome with holes in its flanks and worn trails (red wood ants), wide orange craters with leaf scraps and a refuse dump (leafcutters), small granular collars beside the dome (fire ants), a bivouac of linked bodies (army ants), a neat hole in litter (hell ants, a reconstruction), a rotting stump with frass (Gilded Ants), a carton-plastered crater (Termants), a lobed carton nest with covered galleries (nasute termites), tiny turrets and foraging holes in litter (sickle-jaw termites), a low crater with plant bits (Mimic Ant). Ants walk over rims and domes. Screenshots in `docs/maps/entrances/` (`tests/browser/entrance_renders.py`).
 - **UI.** Cursor tip on any surface entrance (area, owner, main/extra, open/closed/caving in, ants at the hole); minimap greys closed entrances and shows your spots; Dig and Delete tool tips explain entrances.
 - **Saves.** Older saves load: tunnels rebuilt along the dug corridor, shafts turned into spots up to the allowance, entrances the player had already opened kept.
 - **Tests** (`npm test`): tunnels and tile blocking, spots and the whole-spot dig, no entrance from ordinary digging, opening on the site's spots (both, on dry ground), the entrance dig job, closing and reopening (and the main one refusing), the wire format, throughput (6–10 a second) and a crowd getting home, collapse, old-save migration, the AI's extra entrance.
@@ -727,13 +727,13 @@ User report: on https://chibisc.github.io/WIP/ neither LAN nor online connected;
 ## 2026-10-26 — Fix: in-game buttons did nothing in multiplayer
 User report: multiplayer connected, but the buttons didn't work in the match. The multiplayer HUD (`ui/netHud.ts`: chat, the "Waiting for…" banner) is a full-screen layer marked `pointer-events: none`, but the rule `#ui > *:not(.gui) { pointer-events: auto }` outranked it, so the invisible layer covered the screen and swallowed clicks on every button (single-player has no HUD layer, so it was unaffected). The rule now has zero specificity (`:where(…)`), so a layer's own `pointer-events: none` wins; the HUD's chat box, Mute and banner buttons keep `auto`. The browser tests had missed it because they press in-game buttons with `dispatch_event`, which skips hit-testing: `tests/browser/mp_local.py` now checks that real clicks reach every in-game button on every tab, and (at its end) that real mouse clicks on Mute chat and Dig respond. On this 2-CPU sandbox the three software-rendered tabs of `mp_local.py` are too slow to finish reliably (a guest stalls past 30 s and is dropped, which reloads it); a two-tab version of the same click checks passed (0 of 47–49 buttons blocked; Mute, Dig, an area tab and Menu respond to real clicks).
 
-## 2026-10-26 — Multiplayer: teams, Gene Thief picks, map cards, eight slots
-User request (after confirming multiplayer works): teams, proper Gene Thief integration and map selection in multiplayer. Docs: README "Multiplayer and invite links", docs/multiplayer.md §6.
+## 2026-10-26 — Multiplayer: teams, Mimic Ant picks, map cards, eight slots
+User request (after confirming multiplayer works): teams, proper Mimic Ant integration and map selection in multiplayer. Docs: README "Multiplayer and invite links", docs/multiplayer.md §6.
 - **Teams:** Red, Blue, Green, Gold or no team per slot (players pick their own, the host arranges everyone). Teammates are allies in the simulation (no fighting each other; the war AI and brood raids skip them), start on neighbouring colony sites (`groupTeams`, `teamSiteOrder` in `sim/mapGen.ts`), and win together; the results screen names the winning team. Everyone on one team cannot start.
 - **Eight slots** (was four): players and AI colonies, on the five ten-site maps.
-- **Gene Thief:** its player (or the host, for an AI) picks the stolen castes in the lobby from all 21 borrowable castes; the host checks the picks; the colony raises exactly those (every multiplayer Gene Thief used to get the same two). Gene Thief AIs get two or three at random.
+- **Mimic Ant:** its player (or the host, for an AI) picks the stolen castes in the lobby from all 21 borrowable castes; the host checks the picks; the colony raises exactly those (every multiplayer Mimic Ant used to get the same two). Mimic Ant AIs get two or three at random.
 - **Map cards** with sketches in the lobby (host picks, guests see it), floods on/off.
-- **Tests:** `tests/net.ts` (+15: teams to simulation teams, Gene Thief picks and cleaning, teammates on neighbouring sites, a 2 v 2 lockstep match with Gene Thieves in sync, team victory, lobby validation of teams and castes, the one-team blocker); `tests/browser/mp_teams.py` (15 checks, real clicks: eight slots, map cards with sketches, the Gene Thief picker, teams and the blocker, then the match on both tabs with the same teams and castes, allies, buttons reachable, the Castes tab listing the stolen caste). Screenshots `docs/multiplayer/teams-*.png`.
+- **Tests:** `tests/net.ts` (+15: teams to simulation teams, Mimic Ant picks and cleaning, teammates on neighbouring sites, a 2 v 2 lockstep match with Mimic Ants in sync, team victory, lobby validation of teams and castes, the one-team blocker); `tests/browser/mp_teams.py` (15 checks, real clicks: eight slots, map cards with sketches, the Mimic Ant picker, teams and the blocker, then the match on both tabs with the same teams and castes, allies, buttons reachable, the Castes tab listing the stolen caste). Screenshots `docs/multiplayer/teams-*.png`.
 
 ## 2026-10-26 — Realism pass, pilot: fire ant worker textures, stag beetle rebuilt (awaiting approval)
 User spec: project doc `claude/realism/01-spec-realism-pass.md` (pilot first, then stop for approval). Branch `feature/realism`; details and screenshots in `docs/realism/` (README, `before/`, `pilot/`).
@@ -1349,10 +1349,10 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
   extra entrances, spots, shafts, entrance digs, plugging, the AI's extra entrance, the old entrance tests and
   screenshots.
 
-## 2026-11-02 — Gene Thief Ant: the termite soldiers are borrowable (user note)
+## 2026-11-02 — Mimic Ant: the termite soldiers are borrowable (user note)
 - **User note:** "gene thief ants also have the termite caste soldiers." `BORROWABLE` (`src/sim/species.ts`) now keeps the
   termite soldier castes — Nasute (`nasute_soldier`), Nasute Major (`nasute_major`) and Sickle-jaw (`rhy_soldier`) —
-  so a Gene Thief Ant colony (`plagiaria`) can pick them in the skirmish menu and the multiplayer lobby, for a player
+  so a Mimic Ant colony (`plagiaria`) can pick them in the skirmish menu and the multiplayer lobby, for a player
   or an AI (`randomBorrowed` draws from the same list). 24 borrowable castes (was 21). Termite workers and royals stay
   out. The sim already branches on the caste, not the colony's species (the Termants raise the same castes), so no
   other code changed: the termite soldiers hatch from their own brood tiles, keep their models, abilities and sounds.
@@ -1360,17 +1360,18 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
   repeats the species') — "Nasute Termite Soldier", "Nasute Termite Major", "Sickle-Jaw Termite Soldier", and the
   ant labels unchanged ("Red Wood Mortar"). Used by `ui/menu.ts` and `ui/multiplayer.ts`.
 - **Tests:** `tests/species.ts` — the three castes are borrowable and termite workers/royals are not; a developed
-  Gene Thief AI with them raises nasute and sickle-jaw soldiers within 6 sim minutes; determinism (two runs, same
-  hash). Browser: `tests/browser/gene_thief_termites.py` (chips present, named, toggling; shot
-  `docs/multiplayer/gene-thief-termites.png`). `npm test` (24 suites) and `check-determinism` clean.
-- Docs: README (lobby line, species table), `docs/multiplayer.md` §Gene Thief. The Termants' `STOLEN_CASTES` already
+  Mimic Ant AI with them raises nasute and sickle-jaw soldiers within 6 sim minutes; determinism (two runs, same
+  hash). Browser: `tests/browser/mimic_termites.py` (chips present, named, toggling; shot
+  `docs/multiplayer/mimic-termites.png`). `npm test` (24 suites) and `check-determinism` clean.
+- Docs: README (lobby line, species table), `docs/multiplayer.md` §Mimic Ant. The Termants' `STOLEN_CASTES` already
   had the nasute and sickle-jaw soldiers; unchanged.
 
-### 2026-11-02 — Story mode, chapter 1: the Gene-Thief campaign, two levels on layered maps
+### 2026-11-02 — Story mode, chapter 1: the Termants campaign, two levels on layered maps
 - User specs `claude/story/02-spec-gene-thief-chapter1-two-levels.md` and `03-spec-story-level-maps.md` (answers:
   build the layered-ground core here, and let it take precedence where it overlaps other work; merge and publish here).
   Design: `docs/story/DESIGN-STORY.md`; DESIGN.md §6 (story mode, layered ground).
-- **Rename**: the Termants are the **Gene-Thief Termants** everywhere players see them (`termant` stays the id). Stolen
+- **Names**: the Termants' display name is one config value (`termant` stays the id; renamed for the campaign, then
+  back to **Termants** on 2026-11-02). Stolen
   castes go by the ants' own names — "Black Garden Ant Soldier", "Tropical Fire Ant Major", "Nasute Termite Soldier" —
   never nicknames (`termants.ts stolenName`).
 - **Layered ground** (`world/layers.ts`, `MapDef.layers/ramps`, `LAYERS` in balance.ts): an authored map can raise or
@@ -1442,7 +1443,7 @@ three holes share it, always open. Branch `feature/one-entrance` from `main` (`f
 User notes: 2026-11-01 23:55 "use this realism prompt to fix the underground textures as well" (no prompt file came
 with it: the realism pipeline of `claude/realism/01–02` was used); 2026-11-02 01:15 "1.25x size it too big, maybe make
 it slightly smaler for underground hex", then "nvm just do 1.10x size". Branch `feature/underground-realism` from
-`main` (`18bf3d4`); `origin/main` (`f79ebd1`, Gene Thief termite soldiers) merged in. Notes:
+`main` (`18bf3d4`); `origin/main` (`f79ebd1`, Mimic Ant termite soldiers) merged in. Notes:
 `docs/realism/underground.md`; shots `docs/realism/underground/` (`tests/browser/underground_realism.py`).
 - **Hex size:** `NEST_HEX_SCALE` 1.25 → 1.10 (`hexRadiusFor`); saves keep the size they were made with; protocol
   `ud-mp-7`. Every suite passed with the smaller nests except the size check itself (`tests/notes1101.ts`, updated).
@@ -1695,7 +1696,7 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   The first version (before lost causes were left alone) did worse: helpers died in
   hopeless fights and the helper fell sooner than with the brain off.
 - **Checks** (final merge): `npm test` 29 suites, all passing; `check-determinism` 68 files clean; `npm run build`.
-- **Merges** (claude/handoff/00-MERGE-RULE.md): `origin/main` six times on the way (entrance rework, Gene Thief
+- **Merges** (claude/handoff/00-MERGE-RULE.md): `origin/main` six times on the way (entrance rework, Mimic Ant
   termite soldiers, story chapter 1, layered ground, caste balance, Termants' one food store, underground realism,
   hell ant and nasute realism, earth-tone caste looks, tiles paid when placed, layered-ground pathfinding, ground
   realism). This plan became CHANGE_PLAN §23 (main's §22 is the hell ant and nasute rework); the protocol is
@@ -1735,3 +1736,37 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   the soldier's teardrop head redone from the photos.
 - Round 3 ratings (night): castes now Worker, Soldier (the former major) and Sprayer (the nasute; glue only); the
   soldiers' antennae and mandibles placed on the head's surface; the worker's mandibles broad toothed blades.
+
+### 2026-11-02 (late) — No more "Gene Thief": the Mimic Ant and the Termants
+- **User note** (23:47): "every mention of gene-theif rename it to Mimic ants or termants".
+- The custom colony that borrows castes in the lobby (`plagiaria`, *Formica plagiaria*) is the **Mimic Ant**; the
+  ant–termite hybrid of the story is the **Termants** again (no epithet), and the campaign is **The Termants**. Every
+  player-facing string, comment, test, tool and doc in the repo (README, DESIGN, docs/, this log and CHANGE_PLAN) says so;
+  `GENE_THIEF_DEFAULT` is `MIMIC_DEFAULT`; `tests/browser/gene_thief_termites.py` is `mimic_termites.py` and the
+  lobby screenshots `mimic-termites.png`, `teams-guest-mimic.png`, `teams-match-mimic.png`. Ids, saves and the
+  protocol are unchanged (`plagiaria`, `termant`); colony names in older saves are renamed as they load (World
+  constructor; `tests/termants.ts`). Left as they are: the user's own quoted words, and the file names of
+  the project specs (`claude/story/01-spec-gene-thief-campaign.md`, `02-spec-gene-thief-chapter1-two-levels.md`).
+- Checks: `npm test` (31 suites) and `check-determinism`, the build; the browser
+  check `mimic_termites.py` (the species card says Mimic Ant, the story tab "The Termants", no "Gene Thief" on either
+  screen). Its older chip-name check expects "Conehead Termite Soldier" for `nasute_soldier`, which main's conehead
+  rework now names "Nasute" — not part of this change.
+
+## 2026-11-03 — The Spider Mother's nest like an AI nest; the ground blends without seams
+- **User notes** (2026-11-02): "fix the chamber in level 4 to have an actual hex chamber set up like the ai"; "make the
+  ground textures blend better cos i see a cutoff on the map".
+- **Level 4 nest** (`feature/story-l4-chambers`): the level's `nest` plan (`StoryLevelDef.nest` → `ColonySpec.developPlan`
+  → `ColonyOptions.developPlan`) is laid out by the colony AI's own `developChambers` plus `developHighways` (new: the
+  dug tunnels and passages outside the chambers paved with highways): the founding ring of workers round the queen, a
+  7-hex worker rosette, a 7-hex food store by the entrance, a 7-hex soldier chamber and 3-hex chambers for the stolen
+  Lasius soldiers and fire majors. 12 starting workers (the plan's brood adds the rest: about 29 ants, 140 food).
+  Replays (tools/playtest-story.ts, on the branch): won on Easy / Normal / Hard (8–9 min), Brutal one seed of two (as before).
+- **Ground seams** (`feature/ground-blend`, render only): the stochastic tiling gave each lattice vertex its angle from
+  its corner slot, so every tap turned at every triangle edge — straight seams across all the ground on every map (the
+  cutoff). Now one angle per vertex. Also: a layer near the top-three cut fades in and out with its weight and its
+  height (it popped in at a line along the mesh's triangles); bare ground blends in where nothing is laid; the cover is
+  softened once and shared with the bank sculpt, which now reads every smooth field bilinearly (it had 4 mm steps and a
+  seam at its border); beyond the map's edge the edge's ground turns into the land round it over 140 mm (it switched in
+  one sample); AO, the lip and the spill fade with the distance from the banks and ramps (they stopped at a coarse
+  ring); the sun march fades with the face blend; face styles meet along a ragged line.
+- Merged with `main` (the Mimic Ant / Termants rename: the level's colony is "Termants").

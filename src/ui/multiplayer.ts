@@ -46,7 +46,7 @@ export function showTitle(parent: HTMLElement, single: () => void, multi: () => 
      <p class="tag">An ant colony strategy game rooted in real biology</p>
      <div class="continue-row"></div>
      <div class="title-modes">
-       ${story ? '<button class="mode-card story" data-m="story"><b>Story</b><p>The Gene-Thief: a castaway queen on Wayfarer Island steals the weapons of every species she meets. Chapter 1.</p></button>' : ''}
+       ${story ? '<button class="mode-card story" data-m="story"><b>Story</b><p>The Termants: a castaway queen on Wayfarer Island steals the weapons of every species she meets. Chapter 1.</p></button>' : ''}
        <button class="mode-card" data-m="single"><b>Single-player</b><p>Missions, skirmish against AI colonies, and the sandbox. Your own pace: pause and speed up any time.</p></button>
        <button class="mode-card" data-m="multi"><b>Multiplayer</b><p>2–4 players and AI colonies on one map. Create a game and send the invite link. Last queen standing wins. The match runs at 1× and cannot be paused.</p></button>
      </div>
@@ -340,7 +340,7 @@ export class LobbyView {
         const ping = s.kind === 'human' && i !== 0 ? `${s.ping || '—'} ms` : '';
         const ready = s.kind === 'human' ? (s.ready ? '<span class="lb-ready">Ready</span>' : '<span class="dim">Not ready</span>') : s.kind === 'ai' ? '<span class="lb-ready">Ready</span>' : '';
         const row = `<tr class="${mine ? 'mine' : ''}"><td>${i + 1}</td><td>${color}</td><td>${who}</td><td>${species}</td><td>${team}</td><td>${addBtn}${kindSel}${colorBtn}</td><td data-ping="${i}">${ping}</td><td>${ready}</td></tr>`;
-        // a Gene Thief raises the castes picked here (its own player, or the host for an AI)
+        // a Mimic Ant raises the castes picked here (its own player, or the host for an AI)
         if (!filled || s.species !== 'plagiaria') return row;
         const got = s.borrowed ?? [];
         const thief = editSpecies

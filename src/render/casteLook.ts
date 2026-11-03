@@ -7,7 +7,7 @@ import { CASTES } from '../sim/species';
  * UI color and look for pheromone markers and building so they can be distinct from each other)").
  *
  * A look is a colour from a fixed palette of clearly different earth tones plus a texture worked into the tile. The
- * castes of one species never share a colour or a texture, and no two castes anywhere share both, so a Gene Thief or
+ * castes of one species never share a colour or a texture, and no two castes anywhere share both, so a Mimic Ant or
  * Termant nest full of stolen castes still tells them apart. Castes without an entry (new species, new castes) are
  * given a free pair the same way, in the order they are defined, so they stay distinct too. Render and UI only.
  */

@@ -15,7 +15,7 @@ export type AiTeam = 'own' | 'ally' | 2 | 3 | 4;
 
 export interface AiChoice {
   species: SpeciesId;
-  /** Gene Thief AIs: the castes it borrowed */
+  /** Mimic Ant AIs: the castes it borrowed */
   borrowed: string[];
   team: AiTeam;
 }
@@ -55,7 +55,7 @@ export function teamOf(t: AiTeam): number | undefined {
   return t === 'own' ? undefined : t === 'ally' ? 0 : 10 + t;
 }
 
-/** Two or three borrowed castes for a Gene Thief AI, picked at random. */
+/** Two or three borrowed castes for a Mimic Ant AI, picked at random. */
 export function randomBorrowed(): string[] {
   const pool = [...BORROWABLE];
   const out: string[] = [];
@@ -66,7 +66,7 @@ export function randomBorrowed(): string[] {
 
 const PLAYABLE: SpeciesId[] = ['lasius', 'formica', 'atta', 'solenopsis', 'eciton', 'nasutitermes', 'rhynchotermes', 'hell', 'aurimyrmex', 'termant', 'plagiaria'];
 
-/** Prototype start screen: species, Gene Thief caste picks, AI colonies and their teams, map and quality. */
+/** Prototype start screen: species, Mimic Ant caste picks, AI colonies and their teams, map and quality. */
 const thumbs = new Map<string, HTMLCanvasElement>();
 
 export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): void {
@@ -125,7 +125,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       : '';
     const q = (['auto', 'low', 'medium', 'high'] as Array<Quality | 'auto'>).map((id) => `<button class="chip ${choice.quality === id ? 'on' : ''}" data-q="${id}">${id[0].toUpperCase() + id.slice(1)}</button>`).join('');
     const modes: Array<[GameMode, string, string]> = [
-      ['story', 'Story', 'The Gene-Thief campaign: a castaway queen and the island’s species'],
+      ['story', 'Story', 'The Termants campaign: a castaway queen and the island’s species'],
       ['mission', 'Missions', 'Story missions with a narrator and a boss at the end'],
       ['skirmish', 'Skirmish', 'You against 1 to 9 AI colonies on one of five maps, in teams if you like'],
       ['sandbox', 'Sandbox', 'No rules: spawn creatures and bosses, infinite food'],
@@ -143,7 +143,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
     const arenaFloors: Array<[MapStyle, string]> = [['formicarium', 'Formicarium'], ['meadow', 'Meadow'], ['forest', 'Forest floor'], ['sandy', 'Sandy scrub']];
     const arenaBody = `<h2>Teams</h2><div class="opt-row">${[2, 3, 4].map((n) => `<button class="chip ${choice.teams === n ? 'on' : ''}" data-teams="${n}">${n} teams</button>`).join('')}<span class="dim">Red, Blue${(choice.teams ?? 2) > 2 ? ', Green' : ''}${(choice.teams ?? 2) > 3 ? ', Gold' : ''} — fill them with any ants and creatures once the arena opens</span></div>
            <h2>Arena floor</h2><div class="opt-row">${arenaFloors.map(([id, n]) => `<button class="chip ${arenaStyle === id ? 'on' : ''}" data-afloor="${id}">${n}</button>`).join('')}</div>`;
-    const storyBody = `<h2>The Gene-Thief</h2><p class="dim">A storm carries a Gene-Thief Termant queen to Wayfarer Island, where ants and other creatures from across the world live side by side. Level by level her colony spreads inland, defeating each species it meets and stealing its castes. Chapter 1: four levels and a boss, with more of the island to come.</p>`;
+    const storyBody = `<h2>The Termants</h2><p class="dim">A storm carries a Termant queen to Wayfarer Island, where ants and other creatures from across the world live side by side. Level by level her colony spreads inland, defeating each species it meets and stealing its castes. Chapter 1: four levels and a boss, with more of the island to come.</p>`;
     const body =
       choice.mode === 'story'
         ? storyBody
