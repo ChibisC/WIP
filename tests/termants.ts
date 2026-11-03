@@ -245,6 +245,34 @@ const cmd = (w: World, body: Parameters<typeof applyCommand>[1]) => applyCommand
   check('carton walls are paid from the food store', tileCost(c, 'carton') === TERMANT.cartonWall.cost);
 }
 
+// ---- the king does no nest duties (user note 2026-11-02): he walks round the queen in her chamber, bites intruders there
+{
+  const w = world('lasius', true, 3);
+  const c = w.colony(0)!;
+  const king = w.antById.get(c.king ?? -1)!;
+  const queen = w.antById.get(c.queen)!;
+  const g = w.nest(0)!;
+  const inChamber = (x: number, y: number) => tileAt(c, g.hexAt(x, y))?.type === 'queen';
+  let jobs = 0;
+  let out = 0;
+  let walked = 0;
+  let px = king.x;
+  let py = king.y;
+  for (let t = 0; t < 20 * 180; t++) {
+    w.step(0.05);
+    w.events.drain();
+    if (king.task === 'job') jobs++;
+    if (!inChamber(king.x, king.y)) out++;
+    walked += Math.hypot(king.x - px, king.y - py);
+    px = king.x;
+    py = king.y;
+  }
+  const near = makeAnt(w, 1, 'lasius_worker', nestSpace(0), queen.x + 5, queen.y + 2, 0);
+  w.reindex();
+  for (let t = 0; t < 20 * 25 && near.state !== AS.Dead; t++) w.step(0.05);
+  check('the king takes no nest jobs, keeps inside the queen\'s chamber and walks round her (3 min, an AI colony)', jobs === 0 && out === 0 && walked > 60, `${jobs} ticks on a job, ${out} outside the chamber, walked ${walked.toFixed(0)} mm`);
+  check('the king sees off an intruder beside the queen (with any nestmates there)', near.state === AS.Dead);
+}
 // ---- the king (user note 2026-10-25): never targeted, no damage, a weak bite, dies with the queen; one queen, no replacement
 {
   const w = world('lasius');

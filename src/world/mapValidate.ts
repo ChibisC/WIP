@@ -2,6 +2,7 @@ import type { MapDef } from '../maps/types';
 import { shapeDist } from './mapShapes';
 import { HEX_GROUND, HEX_WALL, HEX_WATER, HF_LAIR, HF_SHORE, SurfaceLayout } from './surfaceLayout';
 import { Terrain, mapTerrainParams } from './terrain';
+import { pickTeamSites } from './teamSites';
 import { ENTRANCE, LAYERS } from '../sim/balance';
 import { RAMP_SIDE, nearestOnPath, rampLevels } from './layers';
 import { datan, dhypot } from '../sim/dmath';
@@ -111,6 +112,14 @@ export function validateMap(def: MapDef, seed = 1, expectSites = 10): MapReport 
       if (n !== 10 && set.length !== n) problems.push(`a ${n}-colony site set has ${set.length} sites`);
       for (const i of set) if (i < 0 || i >= def.sites.length) problems.push(`a ${n}-colony site set names site ${i}`);
     }
+  // team layouts (CHANGE_PLAN §23): each authored set names distinct real sites; the limits are reported (some maps'
+  // shapes cannot keep every pair close and every enemy far: docs/maps/team-sites.md)
+  for (const [shape, groups] of Object.entries(def.teamSets ?? {})) {
+    const sizes = shape.split('v').map(Number);
+    const flat = groups.flat();
+    if (groups.length !== sizes.length || groups.some((g, i) => g.length !== sizes[i])) problems.push(`team set ${shape}: groups of ${groups.map((g) => g.length).join('/')}`);
+    if (new Set(flat).size !== flat.length || flat.some((i) => i < 0 || i >= def.sites.length)) problems.push(`team set ${shape}: names sites ${flat.join(', ')}`);
+  }
   // the hexes that count as water/shore, walls/lairs
   const wet = L.hexesWith(0).filter((q) => L.type[q] === HEX_WATER || (L.flags[q] & HF_SHORE) !== 0);
   const hard = L.hexesWith(0).filter((q) => L.type[q] === HEX_WALL || (L.flags[q] & HF_LAIR) !== 0);
@@ -158,6 +167,14 @@ export function validateMap(def: MapDef, seed = 1, expectSites = 10): MapReport 
     }
     info.push(`  site ${i}: hex ${s.centre} (${hx.centerX(s.centre).toFixed(0)}, ${hx.centerY(s.centre).toFixed(0)}), ${dw} hexes to water, ${dh} to a wall or lair, relief ${(hi - lo).toFixed(1)} mm`);
   });
+  for (const [shape] of Object.entries(def.teamSets ?? {})) {
+    const teams: Array<number | undefined> = [];
+    shape.split('v').map(Number).forEach((n, gi) => {
+      for (let k = 0; k < n; k++) teams.push(n > 1 ? gi : undefined);
+    });
+    const p = pickTeamSites(L, teams);
+    if (p) info.push(`  team set ${shape}: sites ${p.sites.join(' ')}, allies ${p.ally.map((x) => (Number.isFinite(x) ? Math.round(x) : '-')).join('/')} mm, nearest enemies ${p.enemy.map((x) => Math.round(x)).join('/')} mm${p.violations.length ? ' — ' + p.violations.join('; ') : ''}`);
+  }
   // land connectivity: every entrance reaches every other site and every food zone, dry and during each flood
   const foodPts = def.zones.filter((z) => z.kind === 'food').map((z) => zoneCentre(z.shape));
   for (let f = -1; f < def.floods.length; f++) {

@@ -4,7 +4,7 @@
  */
 import { BORROWABLE, CASTES, SPECIES, borrowName } from '../sim/species';
 import { Lobby, LOBBY_SPECIES, SLOT_COUNT } from '../net/lobby';
-import { LOBBY_TEAMS, TEAM_COLORS, TEAM_NAMES, cleanTeam } from '../net/match';
+import { LOBBY_TEAMS, TEAM_COLORS, TEAM_NAMES, cleanTeam, matchPlayers, simTeam } from '../net/match';
 import { mapPreview } from './mapPreview';
 import type { MapStyle } from '../world/terrain';
 import { SaveRecord, SaveSlot, describeSave, listSaves, slotName } from '../game/saves';
@@ -17,7 +17,7 @@ const COLORS = ['#d9a441', '#d0554a', '#5b8ed6', '#4fb595', '#b072d6', '#e07a3c'
 /** "Red Wood Mortar", "Nasute Termite Soldier": a borrowable caste's species and caste name */
 const casteName = borrowName;
 /** map card thumbnails, drawn once per map */
-const thumbs = new Map<MapId, HTMLCanvasElement>();
+const thumbs = new Map<string, HTMLCanvasElement>();
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -403,8 +403,13 @@ export class LobbyView {
     </div>`;
     this.root.querySelectorAll<HTMLElement>('[data-thumb]').forEach((el) => {
       const id = el.dataset.thumb as MapId;
-      let c = thumbs.get(id);
-      if (!c) thumbs.set(id, (c = mapPreview(MAPS[id]!, 110)));
+      // the lobby's teams on the map (CHANGE_PLAN §23): teammates next door, each team ringed, your site the biggest ring
+      const players = matchPlayers(L.slots);
+      const teams = players.map((p) => simTeam(p));
+      const you = players.indexOf(L.slots[L.you]);
+      const key = `${id}|${teams.map((t) => t ?? '-').join(',')}|${you}`;
+      let c = thumbs.get(key);
+      if (!c) thumbs.set(key, (c = mapPreview(MAPS[id]!, 110, teams, Math.max(0, you))));
       el.appendChild(c);
     });
     const log = this.root.querySelector('.lb-chat');

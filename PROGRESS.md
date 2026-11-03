@@ -1572,3 +1572,87 @@ From the review page (`docs/realism/hell-nasute/README.md`, round 1 of the user'
   feet planted (N6); the soldier sways its aim and recoils with each squirt.
 - Anim lab: `finisher` (the lift and the cut), `tfight` (the workers' three bites and the soldier), `tram` (the majors'
   three rams and the alarm). Clips in `docs/realism/hell-ants/clips/` and `docs/realism/nasutitermes/clips/`.
+
+
+### 2026-11-02 — AI colonies: allies start close, EotU-style chambers with upgrades, allies help each other (CHANGE_PLAN §23)
+User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `feature/ai-allies` from `main` (`fc6f58a`), with
+`main`'s one-entrance rework merged in on the way (`604e84d`). DESIGN §3.11 (placement, builder, war, ally brains).
+- **Allied nests start close** (`world/teamSites.ts`): whenever a team has two or more colonies (skirmish allies too, not
+  only the lobby), its sites come from the map's authored `teamSets` for the team shape (all five maps have 2v2, 2v1,
+  3v1, 2v2v2, 2v1v1, 3v3), else an exhaustive search over the 10 sites by land route on the hex layout (water and walls
+  gone round; on layered ground, up the ramps): allies within 33 % of the map's width, enemies beyond 30 %, the teams' food and middle routes even, the
+  smaller side of an uneven match the better food. No seed in it, so every client agrees and the lobby's map cards ring
+  each team's sites (yours green). Validator lines, `tools/team-sites.ts` → `docs/maps/team-sites.md` with sketches.
+  Known: Meadow Pond's and Rainforest's 2v2v2 cannot meet both limits (the best placement is used and reported).
+  Removed as replaced: `teamSiteOrder`, the `groupTeams` flag.
+- **Chambers** (`colonyAI.ts` builder, rewritten): 7-hex rosettes and, from mid game, 19-hex hexagons for the main
+  castes and fungus; one tile type (one caste) per chamber, filled from the centre out; walled apart by soil, joined by
+  the shortest tunnel; at most two store chambers beside the entrance, then store upgrades; highways on the tunnels and
+  the passage (stores' and the 19s' mouths first); upgrades from mid game (19s first, most points first, fighters first
+  in war, brood paid first); AI level Easy / Normal / Hard / Brutal (menu chips, `?ailevel=`). A developed head start
+  (menu rivals start `developed: 6`) is laid out the same way. Removed as replaced: the 7-hex-only chambers, bare
+  tunnels, groups of 8, the scattered developed tiles.
+- **Ally brain** (`warAI.ts allyTick`, every 2 s): an ally's danger from the enemies' weight there by where they are
+  (by the queen worst), its defenders, its losses, its queen; help only when not threatened at home, the ally is not
+  winning anyway, it is close enough (or its queen is in danger) and the cause is not lost; keeps a home guard, sends
+  just enough and more if the fight turns worse; marker V on the ally's hole, then on the fight; recalls at once when
+  threatened at home; stops when clear, after heavy losses, when outmatched, after 4 min; one go per threat (no
+  flip-flopping) and a cooldown; raids give way to bad trouble. Messages for a human ally; the ✋ call-for-help button (command `callHelp`, wire 25,
+  `BUILD_ID` `ud-mp-9`). Joint raids (gather short of the target, go together), shared targets.
+- **Growth** (`tools/econ.ts`, one AI colony, 900 mm meadow, seed 7; ants at 10 / 20 / 30 / 45 min; measured on the
+  final branch against `main` `ccaba9d`, both with main's caste balance and EotU food rules):
+
+  | Species | this branch | `main` | tiles by level at 45 min |
+  |---|---|---|---|
+  | Black garden | 26 / 76 / 137 / 218 | 24 / 65 / 123 / 148 | 218 / 48 / 39 |
+  | Leafcutter | 40 / 81 / 123 / 183 | 37 / 67 / 89 / 96 | 14 / 72 / 184 |
+  | Red wood | 26 / 69 / 104 / 143 | 28 / 67 / 120 / 166 | 195 / 12 / 0 |
+  | Fire ant | 19 / 37 / 58 / 82 | 20 / 35 / 51 / 68 | 120 / 0 / 0 |
+  | Army ant | 26 / 63 / 92 / 97 | 22 / 51 / 68 / 68 | 131 / 0 / 0 |
+
+  Level with `main` early, ahead from 30 min (the stores and upgrades keep growing where the old builder stopped),
+  except the Red wood ants: over seeds 7–9 they end level (45 min: 143 / 162 / 157 here, 166 / 143 / 171 on `main`)
+  and upgrade little. Fire ants and army ants upgrade nothing by 45 min (food to brood first; they reach mid game
+  late). The army-ant stall is older than this work (their foragers stop going out; on `main` at 68 ants).
+- **Nests** (`tests/browser/ai_nests.py` → `docs/ai/chambers/`, five AI colonies on Meadow Pond in peace, at 10, 30 and
+  45 min, with `sheet.jpg`): 7-hex chambers at 10 min; 19-hex chambers, highways and level II–III tiles from 30 min.
+- **Help clip** (`tests/browser/ai_help.py` → `docs/ai/allies_help.mp4` and stills): your nest invaded by a band of Red
+  wood soldiers, the AI ally's soldiers marching over, down your entrance and onto the fight, then home.
+- **2v2 ecology** (`tools/ecology-teams.ts`, Meadow Pond, 45 min, wild creatures on; Black garden + Red wood v Fire ant
+  + Leafcutter, the leafcutters by far the strongest), ally brain off → on, when each colony fell:
+
+  | seed | Black garden | Red wood | Fire ant | Leafcutter |
+  |---|---|---|---|---|
+  | 1 | 16.9 → 23.9 min | 20.9 min → alive (59 ants) | 9.9 → 11.3 min | alive → alive |
+  | 2 | 31.9 → 44.4 min | alive (1 ant) → alive (63 ants) | 10.2 → 11.7 min | alive → alive |
+  | 3 | 14.4 → 27.2 min | 31.5 → 31.0 min | 10.5 → 16.9 min | alive → alive |
+
+  With the brain on, the Black garden and Fire ant colonies lasted longer in every seed, and the Red wood colony came
+  through two games it lost or barely survived without it (in the third it fell half a minute sooner); help started 2–7 times a game; every help was one start and one stop (no flip-flopping); stops were "done",
+  "fallen", "outmatched" and "home". A mirror line-up (Black garden + Red wood on both sides), seeds 1–2: seed 1, off
+  — both Black garden colonies fell at about 10.5 min (wild creatures), on — one of them came through (204 ants at the
+  end); seed 2, off — everyone alive at 45 min, on — team 1 raided team 2's Red wood colony together and took it at
+  16 min (its ally went to help and fell back, outmatched). Allies with the brain are more decisive both ways.
+  The first version (before lost causes were left alone) did worse: helpers died in
+  hopeless fights and the helper fell sooner than with the brain off.
+- **Checks** (final merge): `npm test` 29 suites, all passing; `check-determinism` 68 files clean; `npm run build`.
+- **Merges** (claude/handoff/00-MERGE-RULE.md): `origin/main` six times on the way (entrance rework, Gene Thief
+  termite soldiers, story chapter 1, layered ground, caste balance, Termants' one food store, underground realism,
+  hell ant and nasute realism, earth-tone caste looks, tiles paid when placed, layered-ground pathfinding, ground
+  realism). This plan became CHANGE_PLAN §23 (main's §22 is the hell ant and nasute rework); the protocol is
+  `ud-mp-9` (main's 7 and 8 plus `callHelp`). Main's tiles-paid-when-placed refused a developed head start's tiles,
+  so AI rivals started empty until the head start was placed instant.
+
+### 2026-11-02 — Kings do no nest duties: they walk round the queen in her chamber
+- **User note** (15:21): "the kings of termants and termites should just wander around the nanitic chamber the queen
+  is on and doesnt do nest duties, it only walks around the queen and attacks intruders."
+- **Found:** every king counted as a worker for the nest jobs (`isJobWorker`: his caste's tier is "worker"). The
+  Termant king carried eggs and tended the queen like a worker (in 4 min: 527 ticks carrying brood, out of the royal
+  chamber for 678 ticks, up to 67 mm from the queen); a termite king was handed a job every few seconds and stood
+  still at his one spot (0 mm walked), holding a job slot the workers then could not take.
+- **Now** (`jobs.ts isJobWorker`, `termites.ts kingTick`, shared by the Termant king; `BALANCE.king`): no king takes
+  a nest job (an old save's job is dropped); he walks round his queen inside her seven tiles — a new spot on a ring
+  round her body every 6 s, a little further round each time, at 0.45 of his speed, pausing there to tap and groom her
+  (the termite kit's ATTEND) — and bites intruders inside the chamber. In 4 min: no ticks out of the chamber,
+  300–365 mm walked, at most 11 mm (Termant) or 25 mm (termites) from the queen's centre; an intruder dropped beside
+  the queen is killed and one at the entrance is left alone. No random draws (a hash of his id and the time).

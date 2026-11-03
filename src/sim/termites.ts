@@ -6,6 +6,7 @@ import { damageAnt, damageCreature, creatureHooks, friendlyCreature, isEnemyAnt 
 import { killAnt, goToNestPoint, foodAt } from './antAI';
 import { antSpeed, faceToward, moveForward, steerTo, turnToward, goHome, goToSurfacePoint, homeField, nearestEntrance } from './movement';
 import { tileAt } from './tiles';
+import { endJob } from './jobs';
 import { tilePoint } from './colony';
 import { datan2, dcos, dhypot, dsin, sq } from './dmath';
 import { TERMITE_ROYALS } from './termiteRoyalData';
@@ -265,13 +266,22 @@ export function termiteTick(w: World, a: Ant, c: Colony, dt: number): boolean {
   return false;
 }
 
-/** The king: leashed to the royal chamber; bites intruders inside it; grooms the queen. */
-function kingTick(w: World, a: Ant, c: Colony, dt: number): boolean {
+/**
+ * A king — the termites' and the Termants' (user note 2026-11-02): no nest duties. He walks round his queen inside her
+ * chamber (her seven tiles) and bites intruders there; he never leaves it. Every `BALANCE.king.wanderS` s he takes a
+ * new spot beside her, a little further round her each time (a hash of his id and the time, no random draws), walks
+ * there slowly and stands tapping and grooming her until the next.
+ */
+export function kingTick(w: World, a: Ant, c: Colony, dt: number): boolean {
   a.stun = 0;
+  if (a.task === 'job') {
+    endJob(w, a, c); // (a job from an old save: kings do none now)
+    a.task = 'idle';
+  }
   const home = nestSpace(c.id);
   if (a.space !== home) return false;
+  const g = w.nest(c.id);
   const inChamber = (x: number, y: number) => {
-    const g = w.nest(c.id);
     if (!g) return false;
     const t = tileAt(c, g.hexAt(x, y));
     return !!t && t.type === 'queen';
@@ -304,27 +314,93 @@ function kingTick(w: World, a: Ant, c: Colony, dt: number): boolean {
     }
     return true;
   }
-  // otherwise stand beside the queen (two separate bodies: by her side, not on her); the renderer
-  // plays ATTEND there: antennae tapping her, a grooming bout now and then
-  const q = w.antById.get(c.queen);
-  if (!q || q.state === AS.Dead || q.space !== a.space) {
-    a.v = 0;
-    return true;
-  }
-  kingSpot(w, q, a.caste, spot);
   if (a.state !== AS.Idle) {
     a.state = AS.Idle; // a worker feeding him leaves him as he was
     a.st = 0;
   }
   a.pose = POSE.NONE;
-  // repositioning: a slow, careful walk (half speed); a nudge from a nestmate does not set him off
+  const q = w.antById.get(c.queen);
+  if (!q || q.state === AS.Dead || q.space !== a.space) {
+    // no queen: he stays in the royal chamber
+    const t = c.tiles.find((x) => x.type === 'queen');
+    if (t && !inChamber(a.x, a.y)) {
+      const p = tilePoint(w, c, t.q, 0.3);
+      goToNestPoint(w, a, c, p.x, p.y, dt, BALANCE.king.walkMul);
+    } else a.v = 0;
+    return true;
+  }
+  if (!kingWanderSpot(w, a, c, q, spot, inChamber)) {
+    if (cd.termite) kingSpot(w, q, a.caste, spot);
+    else {
+      spot.x = a.x;
+      spot.y = a.y;
+    }
+  }
   const d = dhypot(spot.x - a.x, spot.y - a.y);
-  if (d > (a.v > 0 ? 0.5 : Math.max(0.8, cd.length * 0.15))) goToNestPoint(w, a, c, spot.x, spot.y, dt, 0.5);
-  else {
+  // (the last few mm steered straight in: goToNestPoint stops steering inside 1.2 mm and would let him drift on)
+  if (d > (a.v > 0 ? 0.5 : Math.max(0.8, cd.length * 0.15))) {
+    if (d < 6) steerTo(w, a, spot.x, spot.y, dt, BALANCE.king.walkMul);
+    else goToNestPoint(w, a, c, spot.x, spot.y, dt, BALANCE.king.walkMul);
+  } else {
+    // standing by her: face her (the renderer plays a termite king's ATTEND; a Termant king grooms her now and then)
     a.v = 0;
-    faceToward(a, a.x + dcos(spot.h), a.y + dsin(spot.h), dt);
+    turnToward(a, datan2(q.y - a.y, q.x - a.x), dt, 3);
+    if (!cd.termite && (w.s.tick + a.id) % 200 < 60) a.pose = POSE.GROOM_ANT;
   }
   return true;
+}
+
+/** A small integer hash in [0, 1) (no random draws: the king's walk must not shift the simulation's random numbers). */
+function kingHash(a: number, b: number): number {
+  let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x632be5ab, 0xc2b2ae35);
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+  h ^= h >>> 12;
+  return (h >>> 0) / 4294967296;
+}
+
+/**
+ * The king's spot for this stretch of his walk: on a ring round his queen's body (an ellipse along her abdomen for a
+ * termite queen, round her body for an ant queen), `ringMin`..`ringMax` of his length out from it, a `step` further
+ * round her than the last; only where it is walkable and inside her chamber. False when none fits.
+ */
+function kingWanderSpot(w: World, a: Ant, c: Colony, q: Ant, out: { x: number; y: number; h: number }, inChamber: (x: number, y: number) => boolean): boolean {
+  const K = BALANCE.king;
+  const KL = casteOf(a.caste).length;
+  let ax: number, ay: number, bx: number, by: number, r: number;
+  if (isTermiteQueen(q)) {
+    queenBody(q, qb);
+    ({ ax, ay, bx, by, r } = qb);
+  } else {
+    const QL = casteOf(q.caste).length;
+    ax = q.x + dcos(q.h) * QL * 0.35;
+    ay = q.y + dsin(q.h) * QL * 0.35;
+    bx = q.x - dcos(q.h) * QL * 0.35;
+    by = q.y - dsin(q.h) * QL * 0.35;
+    r = QL * 0.16;
+  }
+  const cx = (ax + bx) / 2;
+  const cy = (ay + by) / 2;
+  const half = dhypot(bx - ax, by - ay) / 2;
+  const ux = half > 0 ? (bx - ax) / (2 * half) : dcos(q.h);
+  const uy = half > 0 ? (by - ay) / (2 * half) : dsin(q.h);
+  const slot = Math.floor((w.s.tick + a.id * 53) / Math.max(1, Math.round(K.wanderS * 20)));
+  const dir = kingHash(a.id, 0) < 0.5 ? 1 : -1;
+  for (let k = 0; k < 8; k++) {
+    const th = dir * slot * K.step + (kingHash(a.id, slot) - 0.5) * K.step * 0.5 + k * 0.7;
+    const m = KL * (K.ringMin + (K.ringMax - K.ringMin) * kingHash(a.id + 1, slot * 8 + k));
+    const ea = half + r + m;
+    const eb = r + m;
+    const x = cx + ux * ea * dcos(th) - uy * eb * dsin(th);
+    const y = cy + uy * ea * dcos(th) + ux * eb * dsin(th);
+    // well inside the chamber (his body too, so his walk from spot to spot keeps inside it)
+    const e = KL * 0.45;
+    if (!inChamber(x, y) || !inChamber(x + e, y) || !inChamber(x - e, y) || !inChamber(x, y + e) || !inChamber(x, y - e) || !w.walkable(a.space, x, y)) continue;
+    out.x = x;
+    out.y = y;
+    out.h = a.h;
+    return true;
+  }
+  return false;
 }
 
 const spot = { x: 0, y: 0, h: 0 }; // det-ok: scratch

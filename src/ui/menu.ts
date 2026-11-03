@@ -34,6 +34,8 @@ export interface MenuChoice {
   map?: MapId;
   /** storms flood the authored map's low ground (off by default) */
   floods?: boolean;
+  /** AI colonies' level (CHANGE_PLAN §23): 0 Easy, 1 Normal (default), 2 Hard, 3 Brutal */
+  aiLevel?: number;
   /** 'auto' follows the frame rate, starting from high */
   quality: Quality | 'auto';
   /** battle arena: 2–4 teams */
@@ -62,7 +64,7 @@ export function randomBorrowed(): string[] {
 const PLAYABLE: SpeciesId[] = ['lasius', 'formica', 'atta', 'solenopsis', 'eciton', 'nasutitermes', 'rhynchotermes', 'hell', 'aurimyrmex', 'termant', 'plagiaria'];
 
 /** Prototype start screen: species, Gene Thief caste picks, AI colonies and their teams, map and quality. */
-const thumbs = new Map<MapId, HTMLCanvasElement>();
+const thumbs = new Map<string, HTMLCanvasElement>();
 
 export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): void {
   const choice: MenuChoice = { mode: 'mission', mission: 'meadow', species: 'lasius', borrowed: ['formica_mortar', 'fire_major'], ais: [{ species: 'formica', borrowed: [], team: 'own' }], style: 'meadow', quality: settings().quality, teams: 2 };
@@ -100,7 +102,12 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
           <div class="opt-row">${spChips}</div><div class="opt-row">${teamChips}</div>${thief}</div>`;
       })
       .join('');
-    const rivals = `${aiRows || `<p class="dim">${choice.mode === 'sandbox' ? 'No AI colonies: the meadow is yours.' : 'Add at least one AI colony.'}</p>`}<div class="opt-row">${choice.ais.length < MAX_AI ? '<button class="chip" data-aiadd="1">+ Add an AI colony</button>' : ''}<span class="dim">${choice.ais.length} of ${MAX_AI} · you are on Team 1; colonies on your team are allies</span></div>`;
+    // AI level (CHANGE_PLAN §23): how soon AI colonies dig 19-hex chambers and upgrade their tiles
+    const lvNames = ['Easy', 'Normal', 'Hard', 'Brutal'];
+    const lvTips = ['builds small chambers and upgrades late and little', 'the standard rival', 'big chambers and upgrades sooner', 'big chambers and upgrades soonest, more at once'];
+    const lv = choice.aiLevel ?? 1;
+    const levelRow = choice.ais.length ? `<div class="opt-row"><span class="dim">AI level:</span>${lvNames.map((n, i) => `<button class="chip ${lv === i ? 'on' : ''}" data-ailevel="${i}" data-tip="<b>${n}</b>AI colonies: ${lvTips[i]}.">${n}</button>`).join('')}</div>` : '';
+    const rivals = `${aiRows || `<p class="dim">${choice.mode === 'sandbox' ? 'No AI colonies: the meadow is yours.' : 'Add at least one AI colony.'}</p>`}<div class="opt-row">${choice.ais.length < MAX_AI ? '<button class="chip" data-aiadd="1">+ Add an AI colony</button>' : ''}<span class="dim">${choice.ais.length} of ${MAX_AI} · you are on Team 1; colonies on your team are allies (they come to help when your nest is in danger)</span></div>${levelRow}`;
     // the five authored maps (the old random styles stay in the code for missions, tests and old saves)
     if (!choice.map) choice.map = PLAYABLE_MAPS[0];
     const map = `<div class="map-grid">${PLAYABLE_MAPS.map((id) => {
@@ -156,8 +163,11 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
     // map thumbnails, drawn once from the map data
     root.querySelectorAll<HTMLElement>('[data-thumb]').forEach((el) => {
       const id = el.dataset.thumb as MapId;
-      let c = thumbs.get(id);
-      if (!c) thumbs.set(id, (c = mapPreview(MAPS[id]!, 124)));
+      // your line-up's teams on the map (CHANGE_PLAN §23): allies next door, each team ringed in its colour
+      const teams = choice.mode === 'skirmish' ? [0, ...choice.ais.map((a) => teamOf(a.team))] : undefined;
+      const key = `${id}|${teams?.map((t) => t ?? '-').join(',') ?? ''}`;
+      let c = thumbs.get(key);
+      if (!c) thumbs.set(key, (c = mapPreview(MAPS[id]!, 124, teams)));
       el.appendChild(c);
     });
   };
@@ -206,6 +216,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       delete choice.map;
     } else if (d.map) choice.map = d.map as MapId;
     else if (d.floods) choice.floods = d.floods === '1';
+    else if (d.ailevel) choice.aiLevel = Number(d.ailevel);
     else if (d.q) choice.quality = d.q as Quality | 'auto';
     else if (t.classList.contains('go')) {
       if (t.disabled) return;
