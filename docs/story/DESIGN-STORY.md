@@ -164,7 +164,10 @@ Medals: time gold ≤ 25 min, silver ≤ 38; losses gold ≤ 40, silver ≤ 80; 
 Kept the working title. A Carolina wolf spider mother (`hogna`, a titan) owns the sandy upper terrace above the river.
 Map: level 1 = the terrace (sand and short grass, rocks) with her burrow in the middle (a den under the sand drawn with a
 silk turret rim); level 0 = the lower terrace by the river with the player's nest; three ramps up (a sand slide, a soil
-slope, a root ramp). A developed colony (10 tiles, 22 workers) and a short preparation (Easy 8 min, Normal 6½, Hard
+slope, a root ramp). A developed colony laid out like an AI nest (user 2026-11-02; `nest` in the level, `developPlan` in the map spec, built by
+the colony AI's own `developChambers`): the founding ring of workers round the queen, a 7-hex worker rosette, a 7-hex food
+store by the entrance, 7-hex soldier and 3-hex Lasius soldier and fire major chambers (castes the player owns), highways
+on the tunnels between them (about 29 ants, 140 food) and a short preparation (Easy 8 min, Normal 6½, Hard
 5¾, Brutal 5½) before she hunts; the light goes toward dusk when she comes out.
 
 | Stage | Objectives | Scenes and set pieces |
