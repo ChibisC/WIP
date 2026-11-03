@@ -1,0 +1,169 @@
+import type { StoryLevelDef } from '../../sim/story/types';
+
+/**
+ * Chapter 1, level 2 — "The Long Nights" (claude/story/04-spec-chapter1-four-levels.md §2; map
+ * src/maps/story/stonyHollow.ts). The colony has spread to the stony hollow where the meadow meets the river woods.
+ * Days are calm: build, gather, prepare. Each night the island's night hunters come out of their lairs in the banks, in
+ * bigger waves; on the third night a Mexican red-knee tarantula digs into the nest (digging titans:
+ * claude/creatures/01-spec-digging-titans.md). Survive three nights. No enemy ant species; reward: medals only.
+ *
+ * Clock (`dayNight`): a first day of 5½ min, nights of 3 min (the last, with its titan, 4 min), days of 4 min between,
+ * dusk warnings 30 s before; the level runs about 23 minutes. The waves' counts scale with the difficulty (`wave`), their health with the level's `hp` and
+ * the difficulty's enemy stat; the tarantula with the difficulty's enemy stat (story bosses, director.ts).
+ */
+export const LONG_NIGHTS_LEVEL: StoryLevelDef = {
+  id: 'longNights',
+  chapter: 1,
+  number: 2,
+  title: 'The Long Nights',
+  region: 'meadow',
+  map: 'stonyHollow',
+  brief: 'The colony has spread to a stony hollow at the edge of the river woods. By day, build and gather. By night the hunters come out of their lairs in the banks, more each time. Survive three nights.',
+  player: { site: 0, startWorkers: 8, startFood: 240, name: 'Gene-Thief Termants' },
+  rivals: {},
+  creatures: 0,
+  aphids: 0,
+  plants: 6,
+  reward: {},
+  loadout: true,
+  dayNight: { first: 330, day: 240, night: 180, lastNight: 240, dusk: 30, fade: 30, nights: 3 },
+  lairs: [
+    { name: 'Beetle den', at: 'lairNW', food: 30 },
+    { name: 'Centipede crevice', at: 'lairN', food: 30 },
+    { name: 'Spider hole', at: 'lairE', food: 30 },
+    { name: 'Rove beetle den', at: 'lairSE', food: 30 },
+    { name: 'Tarantula burrow', at: 'tarantulaBurrow', food: 50, look: 'burrow' },
+  ],
+  actors: {
+    duskBeetle: { creature: 'groundBeetle', at: 'lairN', spawn: 'action', passive: true, hp: 0.6, label: 'a ground beetle' },
+    // each night's hunters come in two packs, one up each ramp to the terrace (they hold the ramp tops till dawn)
+    night1n: { creatures: [['groundBeetle', 2]], from: ['lairNW'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, label: 'the first night’s hunters' },
+    night1e: { creatures: [['groundBeetle', 1], ['rove', 1]], from: ['lairSE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, label: 'the first night’s hunters' },
+    eyes: { creatures: [['wolfSpider', 2]], from: ['lairN', 'lairE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, passive: true, label: 'the wolf spiders' },
+    night2n: { creatures: [['lithobius', 1], ['groundBeetle', 1]], from: ['lairN', 'lairNW'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, label: 'the second night’s hunters' },
+    night2e: { creatures: [['lithobius', 1], ['groundBeetle', 1]], from: ['lairE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, label: 'the second night’s hunters' },
+    night3n: { creatures: [['groundBeetle', 1], ['wolfSpider', 1], ['lithobius', 1]], from: ['lairNW', 'lairN'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.35, label: 'the third night’s hunters' },
+    night3e: { creatures: [['rove', 1], ['wolfSpider', 1], ['groundBeetle', 1]], from: ['lairE', 'lairSE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.35, label: 'the third night’s hunters' },
+    tarantula: { creature: 'tarantula', at: 'tarantulaBurrow', face: 'knollFoot', spawn: 'action', hp: 0.7, phases: [0.5], label: 'the red-knee tarantula' },
+  },
+  stages: [
+    {
+      name: 'The first day',
+      objectives: [
+        { type: 'surviveNight', n: 1 },
+        { type: 'collectFood', amount: 150, optional: true },
+        { type: 'build', tile: 'food', n: 3, optional: true, text: 'Build 3 food store tiles' },
+      ],
+      say: [
+        { key: 'intro1', at: 0.5 },
+        { key: 'intro2', at: 7 },
+        { key: 'hollow', at: 45 },
+        { key: 'lairs', at: 120 },
+        { key: 'dusk1', on: 'dusk:1' },
+        { key: 'beetle', on: 'beetleSeen' },
+        { key: 'night1', on: 'night:1' },
+        { key: 'closeUp', on: 'closeUp' },
+      ],
+      events: [
+        { actions: [{ do: 'shot', shot: 'flight' }, { do: 'music', mood: 'calm' }] },
+        { at: 2, actions: [{ do: 'food', at: 'dawnFood', kind: 'insect', from: 'grasshopper', scale: 1.8 }] },
+        { at: 2, actions: [{ do: 'food', at: 'hollowWest', kind: 'seed', from: '', scale: 1.1, n: 10, spread: 26 }] },
+        { at: 30, actions: [{ do: 'tip', key: 'nights' }] },
+        { on: 'dusk:1', actions: [{ do: 'spawn', actor: 'duskBeetle' }, { do: 'music', mood: 'tense' }, { do: 'tip', key: 'dusk' }] },
+        { on: 'beetleSeen', actions: [{ do: 'shot', shot: { keys: [{ at: { actor: 'duskBeetle' }, dist: 140, yaw: 0.7, t: 0 }, { at: { actor: 'duskBeetle' }, dist: 120, yaw: 1.1, t: 5 }] } }] },
+        { on: 'night:1', actions: [{ do: 'spawn', actor: 'night1n' }, { do: 'spawn', actor: 'night1e' }, { do: 'music', mood: 'swarm' }] },
+      ],
+      scenes: [
+        // the first sign: a ground beetle crosses the hollow at dusk, then goes to ground in the far den
+        { actor: 'duskBeetle', on: 'dusk:1', cues: [{ wait: 3 }, { flag: 'beetleSeen' }, { path: 'duskCrossing', speed: 0.6 }, { leave: 'lairNW' }] },
+        { actor: 'night1n', on: 'night:1', cues: [{ charge: 'rampNorthTop', timeout: 90 }, { flag: 'closeUp' }, { guard: 'rampNorthTop', r: 80 }] },
+        { actor: 'night1e', on: 'night:1', cues: [{ charge: 'rampEastTop', timeout: 90 }, { guard: 'rampEastTop', r: 80 }] },
+      ],
+    },
+    {
+      name: 'The second day',
+      objectives: [
+        { type: 'surviveNight', n: 2 },
+        { type: 'fighters', n: 10, optional: true },
+        { type: 'storeFood', amount: 200, optional: true },
+      ],
+      say: [
+        { key: 'dawn1', at: 1 },
+        { key: 'day2', at: 50 },
+        { key: 'dusk2', on: 'dusk:2' },
+        { key: 'eyes', on: 'eyesSeen' },
+        { key: 'night2', on: 'night:2' },
+        { key: 'centipede', on: 'centipedes' },
+      ],
+      events: [
+        { actions: [{ do: 'music', mood: 'calm' }, { do: 'food', at: 'dawnFood', kind: 'insect', from: 'cricket', scale: 1.7 }] },
+        { at: 3, actions: [{ do: 'food', at: 'dawnFood2', kind: 'insect', from: 'moth', scale: 1.5 }] },
+        { on: 'dusk:2', actions: [{ do: 'spawn', actor: 'eyes' }, { do: 'music', mood: 'tense' }, { do: 'tip', key: 'dusk' }] },
+        { on: 'eyesSeen', actions: [{ do: 'shot', shot: { keys: [{ at: 'lairN', dist: 150, yaw: 2.9, t: 0, pitch: -0.15 }, { at: 'lairE', dist: 160, yaw: 2.4, t: 5, pitch: -0.15 }] } }] },
+        { on: 'night:2', actions: [{ do: 'spawn', actor: 'night2n' }, { do: 'spawn', actor: 'night2e' }, { do: 'music', mood: 'swarm' }] },
+      ],
+      scenes: [
+        // dawn: the first night's hunters go back to their dens
+        { actor: 'night1n', cues: [{ mode: 'passive' }, { leave: 'nest' }] },
+        { actor: 'night1e', cues: [{ mode: 'passive' }, { leave: 'nest' }] },
+        // dusk: eyes at the lair mouths, watching the terrace, then the wave
+        { actor: 'eyes', on: 'dusk:2', cues: [{ face: 'playerNest' }, { flag: 'eyesSeen' }, { waitFlag: 'night:2', timeout: 40 }, { mode: 'normal' }, { charge: 'rampEastTop', timeout: 90 }, { guard: 'rampEastTop', r: 80 }] },
+        { actor: 'night2n', on: 'night:2', cues: [{ wait: 8 }, { flag: 'centipedes' }, { charge: 'rampNorthTop', timeout: 90 }, { guard: 'rampNorthTop', r: 80 }] },
+        { actor: 'night2e', on: 'night:2', cues: [{ wait: 8 }, { charge: 'rampEastTop', timeout: 90 }, { guard: 'rampEastTop', r: 80 }] },
+      ],
+    },
+    {
+      name: 'The third day',
+      objectives: [
+        { type: 'surviveNight', n: 3 },
+        { type: 'upgrade', n: 1, optional: true, text: 'Upgrade a chamber' },
+      ],
+      say: [
+        { key: 'dawn2', at: 1 },
+        { key: 'unease', at: 70 },
+        { key: 'dusk3', on: 'dusk:3' },
+        { key: 'night3', on: 'night:3' },
+        { key: 'tarantula1', on: 'tarantulaOut' },
+        { key: 'tarantula2', on: 'tarantulaDigs' },
+        { key: 'tarantulaIn', on: 'tarantulaIn' },
+        { key: 'tarantulaHurt', on: 'hp:tarantula:50' },
+        { key: 'tarantulaDead', on: 'killed:tarantula' },
+      ],
+      events: [
+        { actions: [{ do: 'music', mood: 'calm' }, { do: 'food', at: 'dawnFood', kind: 'insect', from: 'beetle', scale: 1.9 }] },
+        { at: 3, actions: [{ do: 'food', at: 'dawnFood2', kind: 'insect', from: 'grasshopper', scale: 1.6 }] },
+        { on: 'dusk:3', actions: [{ do: 'music', mood: 'tense' }, { do: 'tip', key: 'dusk' }] },
+        { on: 'night:3', actions: [{ do: 'spawn', actor: 'night3n' }, { do: 'spawn', actor: 'night3e' }, { do: 'music', mood: 'swarm' }] },
+        { on: 'tarantulaOut', actions: [{ do: 'music', mood: 'assault' }, { do: 'shot', shot: { keys: [{ at: { actor: 'tarantula' }, dist: 260, yaw: 0.6, t: 0 }, { at: { actor: 'tarantula' }, dist: 240, yaw: 0.9, t: 6 }] } }] },
+        { on: 'tarantulaDigs', actions: [{ do: 'tip', key: 'titanDig' }] },
+      ],
+      scenes: [
+        { actor: 'eyes', cues: [{ mode: 'passive' }, { leave: 'nest' }] },
+        { actor: 'night2n', cues: [{ mode: 'passive' }, { leave: 'nest' }] },
+        { actor: 'night2e', cues: [{ mode: 'passive' }, { leave: 'nest' }] },
+        { actor: 'night3n', on: 'night:3', cues: [{ charge: 'rampNorthTop', timeout: 90 }, { guard: 'rampNorthTop', r: 80 }] },
+        { actor: 'night3e', on: 'night:3', cues: [{ charge: 'rampEastTop', timeout: 90 }, { guard: 'rampEastTop', r: 80 }] },
+        // the titan of the last night: out of its burrow on the knoll, down to the hollow and into the nest
+        {
+          actor: 'tarantula',
+          on: 'night:3',
+          cues: [{ face: 'knollFoot' }, { wait: 4 }, { flag: 'tarantulaOut' }, { path: 'tarantulaWay', speed: 1.6, timeout: 150 }, { flag: 'tarantulaDigs' }, { digInto: 'player', flag: 'tarantulaIn', timeout: 300 }, { release: true }],
+        },
+      ],
+    },
+  ],
+  // dawn after the third night: the hunters go home and the tarantula climbs out and back to its knoll ("keep playing")
+  events: [{ on: 'dawn:3', actions: [{ do: 'endRaid', actor: 'tarantula' }, { do: 'music', mood: 'calm' }] }],
+  scenes: [
+    { actor: 'night3n', on: 'dawn:3', cues: [{ mode: 'passive' }, { leave: 'nest' }] },
+    { actor: 'night3e', on: 'dawn:3', cues: [{ mode: 'passive' }, { leave: 'nest' }] },
+    { actor: 'tarantula', on: 'dawn:3', cues: [{ mode: 'passive' }, { leave: 'tarantulaBurrow' }] },
+  ],
+  medals: {
+    food: [300, 160],
+    losses: [50, 110],
+    bonus: { type: 'killBefore', actor: 'tarantula', flag: 'dawn:3', text: 'Kill the tarantula before dawn' },
+  },
+  win: 'win',
+  lose: 'lose',
+};

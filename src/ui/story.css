@@ -26,6 +26,12 @@
 .sh-dim { color: #a99878 !important; font-size: 12px !important; }
 .sh-steal { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(168,132,79,0.4); border-radius: 3px; padding: 7px 10px; margin: 4px 0 2px; }
 .sh-steal svg, .sh-steal .ant-sil { width: 34px; height: 34px; }
+/* a trait or a night level in place of a caste's silhouette */
+.sh-trait { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; font-size: 22px; color: #d6b072; border: 1px solid rgba(168,132,79,0.45); border-radius: 50%; background: rgba(0,0,0,0.25); }
+.sh-gene:not(.on) .sh-trait { color: #5b4c3a; }
+/* on the Genome's paper sheet the trait badge is ink, not the dark card's gold */
+.sh-sheet .sh-trait { color: #8a5a22; background: rgba(201,164,106,0.22); border-color: rgba(122,84,40,0.5); }
+
 .sh-steal span { display: block; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #a99878; }
 .sh-steal b { font-family: 'Marcellus SC', Georgia, serif; font-weight: 500; font-size: 16px; }
 .sh-medal { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 9px; padding: 5px 0; border-bottom: 1px solid rgba(168,132,79,0.15); }

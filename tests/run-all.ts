@@ -562,11 +562,26 @@ function digDisc(w: World, cid: number, qc: number, r: number): number[] {
   run(w9, 600);
   const c9 = w9.colony(0)!;
   check('builder colony grows (10 min; soldiers cost more; mean of 3 seeds)', (c.living + c8.living + c9.living) / 3 >= 22, `${c.living}, ${c8.living} and ${c9.living} — ${summary(w, 0)}`);
-  // EotU-style (2026-10-25): round 7-hex chambers for brood and stores, joined by short tunnels kept clear of tiles
-  const rooms = (c.aiBuild?.chambers ?? []).filter((r) => [r.q, ...g.neighbors(r.q)].every((h) => h >= 0 && g.isHexDug(h)));
-  const furnished = rooms.filter((r) => [r.q, ...g.neighbors(r.q)].filter((h) => tileAt(c, h)).length >= 4);
-  const tunnelsClear = (c.aiBuild?.tunnels ?? []).every((q) => !tileAt(c, q));
-  check('builder digs 7-hex chambers joined by short tunnels, and fills them', dug > dug0 && rooms.length >= 1 && furnished.length >= 1 && tunnelsClear, `${dug0} → ${dug} hexes; ${rooms.length} chambers dug (${furnished.length} furnished) of ${(c.aiBuild?.chambers ?? []).length} planned; tunnels ${(c.aiBuild?.tunnels ?? []).length} hexes, clear ${tunnelsClear}`);
+  // EotU-style chambers (CHANGE_PLAN §23; first version 2026-10-25): 7-hex rooms (19 from mid game), each holding one tile
+  // type (brood: one caste), joined by tunnels that carry only highways (tests/aiAllies.ts checks the rest)
+  const discOf = (r: { q: number; r?: number }) => {
+    const hs = [r.q];
+    let ring = [r.q];
+    for (let k = 0; k < (r.r ?? 1); k++) {
+      const nx: number[] = [];
+      for (const h of ring) for (const n of g.neighbors(h)) if (n >= 0 && !hs.includes(n)) (hs.push(n), nx.push(n));
+      ring = nx;
+    }
+    return hs;
+  };
+  const rooms = (c.aiBuild?.chambers ?? []).filter((r) => discOf(r).every((h) => g.isHexDug(h)));
+  const furnished = rooms.filter((r) => discOf(r).some((h) => tileAt(c, h)));
+  const oneType = rooms.every((r) => discOf(r).every((h) => {
+    const t = tileAt(c, h);
+    return !t || (t.type === (r.type ?? (r.kind === 'food' ? 'food' : 'brood')) && (!r.caste || t.caste === r.caste));
+  }));
+  const tunnelsOk = (c.aiBuild?.tunnels ?? []).every((q) => !tileAt(c, q) || tileAt(c, q)!.type === 'highway');
+  check('builder digs chambers joined by tunnels (highways only), one tile type each, and fills them', dug > dug0 && rooms.length >= 1 && furnished.length >= 1 && oneType && tunnelsOk, `${dug0} → ${dug} hexes; ${rooms.length} chambers dug (${furnished.length} in use, one type each ${oneType}) of ${(c.aiBuild?.chambers ?? []).length} planned; tunnels ${(c.aiBuild?.tunnels ?? []).length} hexes, highways only ${tunnelsOk}`);
   check('builder places brood tiles in several groups (mean of 2 seeds)', (broodTiles + tiles8) / 2 >= 17 && groups >= 3 && groups8 >= 3, `${broodTiles} and ${tiles8} tiles, ${groups} and ${groups8} groups`);
   check('eggs are carried to tiles, grow as larvae and hatch', hatchedTracked >= 10, `${hatchedTracked} tracked from carried egg to adult`);
   check('workers carry eggs from the queen', (seen.CarryBrood ?? 0) > 0, `${seen.CarryBrood ?? 0} samples`);

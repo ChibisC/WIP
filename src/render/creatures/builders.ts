@@ -13,7 +13,16 @@ import { stagBeetle2 } from './stagBeetle';
  */
 
 /** Creature states (mirror of sim/creatures/creatureAI.ts CS; render must not import sim AI). */
-export const ST = { Wander: 0, Chase: 1, Attack: 2, Flee: 3, Rolled: 4, Curled: 5, Freeze: 6, Pounce: 7, WindUp: 8, Eat: 9, Display: 10, Lurk: 11, Hide: 12, Coil: 13, Whip: 14, Rear: 15, Flick: 16, Leap: 17, Strike: 18, Lift: 19 } as const;
+export const ST = { Wander: 0, Chase: 1, Attack: 2, Flee: 3, Rolled: 4, Curled: 5, Freeze: 6, Pounce: 7, WindUp: 8, Eat: 9, Display: 10, Lurk: 11, Hide: 12, Coil: 13, Whip: 14, Rear: 15, Flick: 16, Leap: 17, Strike: 18, Lift: 19, Dig: 20 } as const;
+
+/**
+ * A titan digging a nest's hole wider (sim/creatures/titanDig.ts, CS.Dig) is drawn with the pose of its digging style:
+ * rakers (spiders) work fangs and front legs as in an attack, squeezers (centipedes) writhe as in a whip, bulldozers (the
+ * stag beetle) shove with the head and mandibles as in its strike.
+ */
+export function digPose(style: 'rake' | 'squeeze' | 'bulldoze' | undefined): number {
+  return style === 'squeeze' ? ST.Whip : style === 'bulldoze' ? ST.Strike : ST.Attack;
+}
 
 export interface CrPose {
   /** body length (mm) */

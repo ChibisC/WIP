@@ -4,7 +4,7 @@
  */
 import { BORROWABLE, CASTES, SPECIES, borrowName } from '../sim/species';
 import { Lobby, LOBBY_SPECIES, SLOT_COUNT } from '../net/lobby';
-import { LOBBY_TEAMS, TEAM_COLORS, TEAM_NAMES, cleanTeam } from '../net/match';
+import { LOBBY_TEAMS, TEAM_COLORS, TEAM_NAMES, cleanTeam, matchPlayers, simTeam } from '../net/match';
 import { mapPreview } from './mapPreview';
 import type { MapStyle } from '../world/terrain';
 import { SaveRecord, SaveSlot, describeSave, listSaves, slotName } from '../game/saves';
@@ -17,7 +17,7 @@ const COLORS = ['#d9a441', '#d0554a', '#5b8ed6', '#4fb595', '#b072d6', '#e07a3c'
 /** "Red Wood Mortar", "Nasute Termite Soldier": a borrowable caste's species and caste name */
 const casteName = borrowName;
 /** map card thumbnails, drawn once per map */
-const thumbs = new Map<MapId, HTMLCanvasElement>();
+const thumbs = new Map<string, HTMLCanvasElement>();
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -361,13 +361,16 @@ export class LobbyView {
         ? `<div class="opt-row"><span class="dim">Floods:</span><button class="chip ${!st.floods ? 'on' : ''}" data-a="floods" data-v="0">Off</button><button class="chip ${st.floods ? 'on' : ''}" data-a="floods" data-v="1">On: storms flood the low ground now and then</button></div>`
         : `<p class="dim">Floods ${st.floods ? 'on' : 'off'}.</p>`
       : '';
+    const titans = host
+      ? `<div class="opt-row"><span class="dim">Titans raid nests:</span><button class="chip ${st.titanRaids !== false ? 'on' : ''}" data-a="titans" data-v="1">On: now and then a titan digs into a nest</button><button class="chip ${st.titanRaids === false ? 'on' : ''}" data-a="titans" data-v="0">Off</button></div>`
+      : `<p class="dim">Titans raid nests: ${st.titanRaids !== false ? 'on' : 'off'}.</p>`;
     const settings = host
-      ? `${mapCards}${floods}<div class="lb-settings">
+      ? `${mapCards}${floods}${titans}<div class="lb-settings">
           <label>Seed <input class="mp-input small" data-f="seed" value="${st.seed}"></label>
           <label>Food <select data-f="food">${[0.6, 1.2, 2].map((f) => `<option value="${f}" ${f === st.food ? 'selected' : ''}>${f === 0.6 ? 'Scarce' : f === 1.2 ? 'Normal' : 'Plenty'}</option>`).join('')}</select></label>
           <label>Population cap <select data-f="pop">${[150, 300, 500].map((p) => `<option value="${p}" ${p === st.popLimit ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
         </div>`
-      : `${mapCards}${floods}<p class="dim">Seed ${st.seed} · food ${st.food === 0.6 ? 'scarce' : st.food === 1.2 ? 'normal' : 'plenty'} · population cap ${st.popLimit} · no pausing · speed 1×</p>`;
+      : `${mapCards}${floods}${titans}<p class="dim">Seed ${st.seed} · food ${st.food === 0.6 ? 'scarce' : st.food === 1.2 ? 'normal' : 'plenty'} · population cap ${st.popLimit} · no pausing · speed 1×</p>`;
     const me = L.slots[L.you];
     const blocker = host ? L.startBlocker() : '';
     const chat = L.chat
@@ -403,8 +406,13 @@ export class LobbyView {
     </div>`;
     this.root.querySelectorAll<HTMLElement>('[data-thumb]').forEach((el) => {
       const id = el.dataset.thumb as MapId;
-      let c = thumbs.get(id);
-      if (!c) thumbs.set(id, (c = mapPreview(MAPS[id]!, 110)));
+      // the lobby's teams on the map (CHANGE_PLAN §23): teammates next door, each team ringed, your site the biggest ring
+      const players = matchPlayers(L.slots);
+      const teams = players.map((p) => simTeam(p));
+      const you = players.indexOf(L.slots[L.you]);
+      const key = `${id}|${teams.map((t) => t ?? '-').join(',')}|${you}`;
+      let c = thumbs.get(key);
+      if (!c) thumbs.set(key, (c = mapPreview(MAPS[id]!, 110, teams, Math.max(0, you))));
       el.appendChild(c);
     });
     const log = this.root.querySelector('.lb-chat');
@@ -451,6 +459,7 @@ export class LobbyView {
       if (i === L.you) L.setMine({ borrowed: got });
       else L.setSlot(i, { borrowed: got });
     } else if (a === 'floods') L.setSettings({ floods: b.dataset.v === '1' });
+    else if (a === 'titans') L.setSettings({ titanRaids: b.dataset.v === '1' });
     else if (b.dataset.map && L.isHost) L.setSettings({ map: b.dataset.map as MapId, style: 'meadow' });
   }
 

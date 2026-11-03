@@ -822,6 +822,27 @@ replaced (keep save migrations), run `npm ci`, `npm test`, the determinism check
 height and climb data, re-baseline only the hell ant hashes, merge into `main`, push, and write a handoff update
 (what was merged, how conflicts were resolved, what was removed). Merge `origin/main` in along the way whenever it moves.
 
+## 23. Titans dig into nests (user spec 2026-11-02, claude/creatures/01-spec-digging-titans.md)
+Survey: creatures already live in any space (`cr.space`; the renderer, health bars and effects draw by space; ants find
+creature targets underground through `w.s.creatures`; `invasionCheck` counts creatures in a nest as intruders, and the
+war AI defends against hostile creatures at the holes or inside). Nest ground is the fine raster (soil types, 255 stone)
+with a hex layer; cells only go solid → air, logged for the flow fields. Holes are `Colony.entrances` (three per anthill,
+one flower underground).
+Plan, as built:
+1. Data: `CreatureKind.dig` per titan; `TITAN_DIG` in balance.ts (hole work, stagger, set-back, give-up, underground
+   speed, break margin, flee, stay, repair, raids, warning, breach look).
+2. Sim (`sim/creatures/titanDig.ts`): a raid state on the creature (`data.raid/rph/rhole/rprog/rstag/rhp/rin/…`) and on
+   the entrance (`breach`, `breachBy`, `repair`; optional, so old saves load as before); `titanRaidTick` before the
+   director and the creature programs; `titanRaidSystem` once a second (repairs, skirmish raids). `NestGrid.breakHex`
+   opens a hex, stone included. Riders change space with the titan.
+3. Story: cue `digInto` (a rival's key or 'player', a hole) and action `endRaid` (dawn).
+4. Client: event `titanDig` (warn, dig, breach, enter, break, leave): clickable warning toast (jumps the camera), area
+   alert, rumble and digging shake, soil spray and clods (`combatFx`), sounds; the breach crater (`entranceModels`); each
+   style's digging pose (`builders.digPose`).
+5. Lobby: "Titans raid nests" (menu and multiplayer lobby, `settings.titanRaids`), protocol `ud-mp-8`.
+6. Tests `tests/titans.ts`; clips `tests/browser/titan_dig.py`.
+Not done here: the ally brain's titan danger (on `feature/ai-allies`, not in `main` yet — noted for that work).
+
 ### 22.6 The user's ratings, round 1 (review page, 2026-11-02 afternoon)
 Scores: hell ants 9–10 for the looks (the amber 10, the lineup 10), the attacks 7–8; the nasutes 8–9. Asked for:
 - **H8 / H9 — the jaws:** open much wider when attacking (`hellMorphs` `openExtra` 0.55 → 1.45) and open and close
@@ -873,3 +894,50 @@ for nasute workers so that it can do more dynamic and dramatic but realistic att
   band across the frons, the postclypeus swelling across the lower face with a dark midline, the labrum lying over
   flat toothed mandibles that cross (the left over the right), the maxillary and labial palps; the soldier and major:
   one teardrop loft, the bulb overhanging the thorax and sweeping with concave flanks into the nasus.
+
+## 23. AI colonies — allies start close, EotU-style chambers with upgrades, allies help each other (user spec 2026-11-02)
+User spec: project doc `claude/ai/01-spec-ai-allies-chambers.md`. Branch `feature/ai-allies` from `main` (`fc6f58a`). §21 is the entrance rework (merged into this branch on the way); §22 is the hell ant and nasute realism rework (another session; this section was §22 on its branch until both reached `main`): the code here works on "the nest's entrance hexes" (`isEntrance`), so it holds for today's ramps and for the 7-hex flower; it does not dig entrances. Layered maps (`claude/maps/05-spec-layered-maps.md`) are not started: site routes run on the map's hex layout, where a future layer edge is one more blocked hex type.
+
+### 23.1 Survey (main, 2026-11-02)
+- **Placement** (`mapGen.ts createWorld`): a balanced site set by seed (`SurfaceLayout.siteOrder`), then `teamSiteOrder` (sites sorted round the map centre, each team a consecutive run) only when `groupTeams` is set (multiplayer). Skirmish AI allies (team 0 with the player, `menu.ts teamOf`) get no grouping at all.
+- **Builder** (`colonyAI.ts buildTick`, every 2 s): 7-hex chambers only, kind brood or food; any caste in a brood chamber; `GROUP_SIZE` 8; tunnels 1–4 hexes kept clear of tiles; no upgrades, no highways.
+- **Upgrades** (`tiles.ts`): 6 points for level 2, 12 for 3; a same-type neighbour gives its level, soil 1, a highway its level to any tile, a highway gets the level of each built neighbour; dug floor 0. In a soil-walled 7-hex rosette the centre reaches 3 and the ring 2 (ring: 3 soil + centre + 2 ring tiles = 10 < 12); in a 19-hex hexagon every tile can reach 3 (inner first). A tunnel mouth is dug floor (0) beside an edge tile — a highway there gives it back its points.
+- **War** (`warAI.ts`, every 4 s): marker II defends home, marker III raids; marker IV is used by foraging (termite scouts, aphid tenders); **marker V is free** → the help marker. `c.intruders` (combat.ts `invasionCheck`, every second) lists enemies inside a nest.
+- **No AI difficulty** exists (only `settings.aggression`).
+
+### 23.2 Plan
+1. **Allied nests close** — new `sim/teamSites.ts` (pure: map def + team shape, no seed, so the lobby preview and every client agree):
+   - land routes on the map's hex layout (ground and walkways; water and walls block), breadth-first from each site's main entrance: site–site, site–nearest food zone, site–map middle (cached per map);
+   - authored `MapDef.teamSets[shape]` when present (shapes `1v1`, `2v2`, `2v1`, `3v1`, `2v2v2`, `2v1v1` …), else an exhaustive search over site subsets and their split into teams (≤ ~5,000 candidates), scored: ally route ≤ `allyMaxRoute` and short, enemy route ≥ `enemyMinRoute`, no enemy between two allies, fair team spreads (food, middle, enemy), the smaller side of an uneven match gets the better food; ties by site index;
+   - `mapGen`: whenever a team has 2+ colonies (skirmish allies too); validator + `tools/team-sites.ts` → `docs/maps/team-sites.md`; authored sets for the five maps; lobby and skirmish map cards colour each team's sites.
+2. **Chambers** (`colonyAI.ts`): a chamber is a 7-hex rosette or a 19-hex hexagon in solid soil, walled off, one tile type (one caste) each, filled from the centre out; 19s from mid game (`chamber19From`) for the main castes and leafcutter fungus; at most 2 store chambers within `storeNearEntrance` of the entrance, then store upgrades; one chamber = one group. Old saves: chambers of kind brood/food are read as before.
+3. **Highways** on every tunnel hex (the mouth beside a chamber first, entrance → stores → queen first), never on entrance hexes, in chambers or in the queen's chamber.
+4. **Upgrades** from `upgradeFrom` (time, ants, food): inner tiles first, soldiers before raids or when threatened, workers, stores once both store chambers are full, highways; only tiles with the points; `upgradeReserve` food kept, `upgradesInFlight` at once, none during an invasion.
+5. **AI level** `settings.aiLevel` (0 Easy … 3 Brutal, default 1) scales when 19s and upgrades start and how many run; a skirmish menu choice.
+6. **Ally brain** (`warAI.ts`, every 2 s): danger of each ally (invaded, by depth; siege at its holes; losing a fight near its nest; queen in danger; loss rate); help only if not threatened at home, the ally is not winning, help arrives in time (route time) or the queen is in danger, keeping a home guard and sending only enough (`assistOvermatch`); raids give way (or redirect when it is the same enemy); highest danger ÷ travel first; hysteresis and a cooldown. Marker V: on the ally's hole first when the enemy is inside, then on the threat once the helpers are in. Messages for a human ally; a `callHelp` command (protocol bump); joint raids gather and arrive together; shared targets.
+7. **Verify**: `tests/aiAllies.ts`, `tools/econ.ts` / `tools/ecology.ts` reports, nest screenshots (`docs/ai/chambers/`), a help clip, determinism, LAN, performance, docs, handoff, merge, publish.
+
+### 23.3 Findings while building it
+- **Placement.** Every map's authored sets pass the limits except the 2v2v2 on Meadow Pond and Rainforest (three pairs cannot all sit within a third of the width by land with every enemy a little further off; the best placement is used and the validator reports it). The search runs once at world creation; `tools/team-sites.ts` (five maps × seven shapes, layouts and routes built from scratch) takes about 6 s in all.
+- **Chambers after the entrance rework.** The 7-hex flower took the space the old 3-hex ramp left, so the first store chamber often found no place within the old 4-hex tunnel limit: tunnels now go up to 6 hexes, every candidate's tunnel is measured (the best score + tunnel length wins), and a need with no place is skipped for a while instead of blocking every other plan.
+- **Digging order.** Designating a chamber's centre first left diggers waiting behind solid soil (Atta and Formica stalled): hexes are now designated breadth-first out from the dug floor.
+- **Upgrades.** Ranking by tile kind alone never reached level III; ranking by upgrade points (inner tiles of 19-hex chambers first) does. Upgrades must not starve growth: the dearest brood tile and its ant are kept back.
+- **Developed head starts.** Menu rivals start `developed: 6`; the old `developNest` scattered those tiles round the founding ring (mixed castes, stores outside any chamber, visible in the first nest renders). They are now laid out in the builder's chambers, each dug whole with its tunnel (a half-dug chamber cut its tiles off from the nurses and stopped growth).
+- **The ally brain.** Danger weights are in fighting-weight units (a Red wood soldier ≈ 240). Helping the same threat again right after leaving it made helpers flip-flop: an ally helped and left is now blocked until its danger has cleared once. In the 2v2 ecology runs the first version sent helpers into hopeless fights (the leafcutters' raids) and the helper fell sooner than without the brain: it now leaves lost causes alone (`assistMinOdds`), falls back when outmatched and reinforces a fight going worse. Joint raids timed out while gathering because the leader counted fighters still at home: it now counts only the groups sent.
+- **After main's EotU food rules** (tiles paid when placed, full stores stop the gathering): a developed head start was refused for its cost (placed instant now), and the upgrade reserve counted every paused pre-staged larva's whole growth, outgrowing the store — nothing upgraded, the full store stopped the gathering, a crowded game's Red wood colony stopped at 88 ants (now only the growing still to do counts).
+- **Not this branch's:** the army-ant AI stalls (in `tools/econ.ts` on `main` `f79ebd1` at 22 ants from about 10 min; after main's caste balance, at 68 on `main` and 81 here from about 30 min): its foragers stop going out. Left for the army-ant work.
+
+## 24. Chapter 1 becomes four levels (user spec 2026-11-02, claude/story/04-spec-chapter1-four-levels.md)
+Built on §23 (`digInto`). Plan, as built:
+1. Order and save: `story/campaign.ts` nodes Garden → The Long Nights → Fire on the Banks → The Spider Mother; the save
+   keeps progress by level id (open = the one before won, or won already); `traits` in the save.
+2. Data: `STORY_LEVEL_IDS`; `StoryLevelDef.dayNight`, `lairs`, `developed`, `reward.trait`; objectives `surviveNight`,
+   `upgrade`, `storeFood`, `surviveTime` per difficulty; cues `rest`, `goto`; actions `night`, `endRaid`; actors with
+   creature groups (`creatures`, `from`), `phases`, `bossCuts`, `goal`; bonus `killBefore`; food medal; `STORY.traits`,
+   `STORY.difficulty.*.boss`.
+3. Sim: `sim/story/dayNight.ts` (light and flags from game time), `sim/story/traits.ts` (Spiderling Venom on bites,
+   `Colony.traits`), lairs as caves, story titans that stay until dawn or death, the hogna's story cuts.
+4. Levels and maps: `longNights` on `stonyHollow`, `spiderMother` on `spiderTerrace`; narration and journal pages with
+   sources (DESIGN-STORY §10).
+5. Client: moonlight blend, wolf spider eyeshine, the spider burrow, map moods, the night clock, hub/Genome/end screen.
+6. Tests `tests/storyCh1.ts`; the playtest bot plays bosses and nights; browser shots `tests/browser/story_ch1_4.py`.

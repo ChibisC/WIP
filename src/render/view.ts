@@ -62,6 +62,12 @@ export interface NestStage {
  * post-processing and the nest ↔ surface transition. Game-specific renderers
  * add their objects to `surfaceScene` or a nest stage's scene.
  */
+/** a story level's night (render only): moonlight, the night sky's light, the ground's bounce, the air */
+const MOON = new THREE.Color(0.55, 0.66, 1.0);
+const NIGHT_SKY = new THREE.Color(0.2, 0.27, 0.48);
+const NIGHT_GROUND = new THREE.Color(0.05, 0.05, 0.06);
+const NIGHT_AIR = new THREE.Color(0.05, 0.065, 0.11);
+
 export class GameView {
   renderer: THREE.WebGLRenderer;
   surfaceScene = new THREE.Scene();
@@ -106,9 +112,16 @@ export class GameView {
   /** 0..1: a storm over the map (floods): darker, greyer, mistier light (set by the session each frame) */
   storm = 0;
   private stormShown = 0;
+  /** 0..1: a story level's night (`w.s.night`, its own day/night clock): moonlight, set by the session each frame */
+  nightLevel = 0;
+  private nightShown = 0;
   private dayFog = 0;
   private daySun = 0;
   private dayHemi = 0;
+  private daySunColor = new THREE.Color();
+  private dayHemiSky = new THREE.Color();
+  private dayHemiGround = new THREE.Color();
+  private dayFogColor = new THREE.Color();
   /** which image-based light the creature materials have now (realism v2: render/lightPresets.ts) */
   private crLight = '';
 
@@ -213,6 +226,10 @@ export class GameView {
     this.dayFog = fog && 'density' in fog ? fog.density : 0;
     this.daySun = this.surfaceLights.sun.intensity;
     this.dayHemi = this.surfaceLights.hemi.intensity;
+    this.daySunColor.copy(this.surfaceLights.sun.color);
+    this.dayHemiSky.copy(this.surfaceLights.hemi.color);
+    this.dayHemiGround.copy(this.surfaceLights.hemi.groundColor);
+    if (fog) this.dayFogColor.copy(fog.color);
     this.rebuildGrass();
     const r = this.surfaceRig;
     r.heightAt = (x, z) => terrain.walkHeight(Math.min(Math.max(x, 0), terrain.width), Math.min(Math.max(z, 0), terrain.depth));
@@ -665,26 +682,46 @@ export class GameView {
     }
   }
 
-  /** Ease the storm look in and out: dimmer sun, more fog (render only). */
+  /**
+   * Ease the storm and the night in and out (render only): a storm dims the sun and thickens the fog; a story level's
+   * night turns the sun into a cool, low moonlight, the sky light down and blue, the air dark — dark enough to read as
+   * night, light enough that the units stay readable (the ground realism rule: nothing hides a creature).
+   */
   private applyStorm(dt: number): void {
     const k = Math.min(1, dt * 0.6);
     this.stormShown += (this.storm - this.stormShown) * k;
+    this.nightShown += (this.nightLevel - this.nightShown) * Math.min(1, dt * 1.5);
     if (this.night || this.daySun <= 0) return;
     const s = this.stormShown;
-    this.surfaceLights.sun.intensity = this.daySun * (1 - 0.6 * s);
-    this.surfaceLights.hemi.intensity = this.dayHemi * (1 - 0.25 * s);
+    const n = this.nightShown;
+    const L = this.surfaceLights;
+    L.sun.intensity = this.daySun * (1 - 0.6 * s) * (1 - 0.85 * n);
+    L.hemi.intensity = this.dayHemi * (1 - 0.25 * s) * (1 - 0.6 * n);
+    // the image-based light (the sky's reflection on everything, the ground included) goes down with the sky
+    this.surfaceScene.environmentIntensity = 1 - 0.72 * n;
+    if (n > 0.001 || this.nightTint) {
+      L.sun.color.copy(this.daySunColor).lerp(MOON, n);
+      L.hemi.color.copy(this.dayHemiSky).lerp(NIGHT_SKY, n);
+      L.hemi.groundColor.copy(this.dayHemiGround).lerp(NIGHT_GROUND, n);
+      this.nightTint = n > 0.001;
+    }
     const fog = this.surfaceScene.fog as THREE.FogExp2 | null;
-    if (fog && 'density' in fog && this.dayFog > 0) fog.density = this.dayFog * (1 + 1.4 * s);
+    if (fog && 'density' in fog && this.dayFog > 0) {
+      fog.density = this.dayFog * (1 + 1.4 * s) * (1 + 0.5 * n);
+      fog.color.copy(this.dayFogColor).lerp(NIGHT_AIR, n * 0.85);
+    }
   }
+  private nightTint = false;
 
   private applyGrade(): void {
     const g = this.post.settings.grade;
     if (this.space === 'surface') {
       const s = this.stormShown;
-      g.exposure = this.night ? 1.25 : 1.0 - 0.12 * s;
-      g.saturation = this.night ? 0.7 : 1.08 - 0.35 * s;
+      const n = this.nightShown;
+      g.exposure = this.night ? 1.25 : (1.0 - 0.12 * s) * (1 + 0.18 * n);
+      g.saturation = this.night ? 0.7 : (1.08 - 0.35 * s) * (1 - 0.42 * n);
       g.contrast = 1.06;
-      g.warmth = this.night ? -0.6 : 0.25 - 0.55 * s;
+      g.warmth = this.night ? -0.6 : 0.25 - 0.55 * s - 0.95 * n;
       g.vignette = 0.32;
       g.lift.setRGB(0.008, 0.007, 0.004);
     } else {

@@ -1,3 +1,5 @@
+import { spawnCreature } from './creatures/creatureAI';
+import { startTitanRaid, titanRaidSystem } from './creatures/titanDig';
 import { separationSystem } from './separation';
 import { casteAbilitySystem } from './casteAbilities';
 import { EventBus } from '../core/events';
@@ -11,6 +13,7 @@ import { broodSystem } from './brood';
 import { antSystem } from './antAI';
 import { foodSystem } from './food';
 import { invasionCheck, projectileSystem } from './combat';
+import { pickTeamSites } from '../world/teamSites';
 import { makeFood } from './factory';
 import { aphidClaims, registerSpeciesAI } from './speciesAI';
 import { SURFACE, SimState } from './types';
@@ -21,7 +24,7 @@ import { edible } from './diet';
 import { datan2, dcos, dhypot, dsin } from './dmath';
 import { creatureSystem, ecologySystem, registerCreatureHooks } from './creatures/creatureAI';
 import { MissionId, missionOf, missionSystem, startMission } from './missions';
-import type { Difficulty } from './story/types';
+import type { Difficulty, StoryLevelId } from './story/types';
 import { initStory, storySystem } from './story/runner';
 import { ecitonSystem } from './eciton';
 import { termantSystem } from './termants';
@@ -63,8 +66,10 @@ export interface GameSetup {
   settings?: Partial<SimState['settings']>;
   /** single-player mission script (sim/missions.ts) */
   mission?: MissionId;
-  /** a story level (sim/story): the difficulty and the stolen castes brought in (the level is `mission`) */
-  story?: { difficulty: Difficulty; loadout: string[] };
+  /** dev and browser shots: a titan of this kind starts beside the player's anthill and digs straight in (titanDig.ts) */
+  devTitanRaid?: string;
+  /** a story level (sim/story): the difficulty, the stolen castes brought in, the campaign's traits, a restart (the level is `mission`) */
+  story?: { difficulty: Difficulty; loadout: string[]; traits?: string[]; retry?: boolean };
   /** sandbox game: the sandbox commands (spawn, fill stores, toggles) are allowed */
   sandbox?: boolean;
   /** battle arena (sim/arena.ts): the colonies are the teams; no economy */
@@ -73,32 +78,6 @@ export interface GameSetup {
   map?: MapId;
   /** which of the map's balanced site sets for this colony count (default: chosen by the seed) */
   siteSet?: number;
-  /** multiplayer teams: colonies sharing a `team` start on neighbouring sites of the balanced set */
-  groupTeams?: boolean;
-}
-
-/**
- * Teams on neighbouring sites: the chosen sites in order around the map's centre, each team taking a
- * run of consecutive ones (bigger teams first), colonies without a team the rest. Pure arithmetic on
- * the map file and the setup, so every client gets the same answer.
- */
-export function teamSiteOrder(sites: number[], centres: Array<{ x: number; y: number }>, cx: number, cy: number, teams: Array<number | undefined>): number[] {
-  const around = sites.map((site, k) => ({ site, a: datan2(centres[k].y - cy, centres[k].x - cx) })).sort((p, q) => p.a - q.a || p.site - q.site);
-  const groups = new Map<number, number[]>();
-  teams.forEach((t, i) => {
-    if (t === undefined) return;
-    const g = groups.get(t);
-    if (g) g.push(i);
-    else groups.set(t, [i]);
-  });
-  const ordered = [...groups.entries()].sort((p, q) => q[1].length - p[1].length || p[1][0] - q[1][0]);
-  const out: number[] = new Array(teams.length).fill(-1);
-  let k = 0;
-  for (const [, members] of ordered) for (const i of members) out[i] = around[k++].site;
-  teams.forEach((t, i) => {
-    if (out[i] < 0) out[i] = around[k++].site;
-  });
-  return out;
 }
 
 /** Register all simulation systems in update order. */
@@ -131,6 +110,8 @@ export function registerSystems(w: World): void {
     { name: 'invasion', fn: (ww) => invasionCheck(ww), every: 20 },
     { name: 'lost', fn: lostRouteSystem, every: 20 },
     { name: 'creatures', fn: creatureSystem },
+    // titans digging into nests: skirmish raids, breach repairs (sim/creatures/titanDig.ts)
+    { name: 'titanRaids', fn: (ww) => titanRaidSystem(ww), every: 20 },
     { name: 'separation', fn: separationSystem, every: 2 },
     { name: 'ecology', fn: ecologySystem, every: 20 },
     { name: 'mission', fn: missionSystem, every: 20 },
@@ -163,10 +144,10 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
   // Place colonies: on an authored map on its sites (a balanced set), else far apart on dry ground.
   const L = w.terrain.layout;
   let sites = L ? L.siteOrder(setup.colonies.length, setup.siteSet ?? -1, setup.seed) : null;
-  if (sites && L && setup.groupTeams && sites.length === setup.colonies.length) {
-    const centres = sites.map((site) => ({ x: L.hex.centerX(L.sites[site].centre), y: L.hex.centerY(L.sites[site].centre) }));
-    sites = teamSiteOrder(sites, centres, w.terrain.width / 2, w.terrain.depth / 2, setup.colonies.map((c) => c.team));
-  }
+  // teams (CHANGE_PLAN §23): allies on neighbouring sites, enemies apart, the teams fairly placed — the map's authored
+  // set for the team shape, else the best of every assignment (world/teamSites.ts); not for hand-placed colonies
+  const placed = L && setup.colonies.every((c) => !c.at) ? pickTeamSites(L, setup.colonies.map((c) => c.team)) : null;
+  if (placed) sites = placed.sites;
   const spots = sites ? [] : colonySpots(w, setup.colonies.length, rng);
   let nextSite = 0;
   setup.colonies.forEach((spec, i) => {
@@ -182,7 +163,17 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
     createColony(w, opts);
   });
   if (setup.mission) startMission(w, setup.mission, w.s.colonies.find((c) => c.player)?.id ?? 0);
-  if (setup.mission && setup.story) initStory(w, missionOf(w)!, setup.mission as 'garden' | 'fireBanks', setup.story.difficulty, setup.story.loadout);
+  if (setup.mission && setup.story) initStory(w, missionOf(w)!, setup.mission as StoryLevelId, setup.story.difficulty, setup.story.loadout, setup.story);
+  if (setup.devTitanRaid) {
+    const p = w.s.colonies.find((c) => c.player);
+    const e = p?.entrances[0];
+    if (p && e) {
+      const a = datan2(e.sy - p.ny, e.sx - p.nx);
+      w.terrain.clearArea(e.sx - 70, e.sy - 70, e.sx + 70, e.sy + 70);
+      const cr = spawnCreature(w, setup.devTitanRaid, SURFACE, e.sx + dcos(a) * 70, e.sy + dsin(a) * 70);
+      startTitanRaid(w, cr, p.id, 0);
+    }
+  }
   if (setup.sandbox) w.s.mode.sandbox = true;
   if (setup.arena) setupArena(w);
 

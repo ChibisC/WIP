@@ -37,7 +37,9 @@ import { ManualRtcTransport, installLanGuard } from './net/lanTransport';
 import { openHostDialog, showLanJoin } from './ui/lanCodes';
 import { showStoryHub } from './ui/storyHub';
 import { storySetup } from './sim/story/runner';
-import { missionOf } from './sim/missions';
+import { STORY_LEVEL_IDS, type StoryLevelId } from './sim/story/types';
+import { nightLen, nightStart } from './sim/story/dayNight';
+import { missionDef, missionOf } from './sim/missions';
 import { campaign } from './game/campaign';
 import { makeAnt } from './sim/factory';
 import { SURFACE } from './sim/types';
@@ -125,9 +127,12 @@ function startGame(): void {
         colonies.push({ species: 'lasius', player: false, ai: true, team: 0, name: 'Allied black ants', developed: 3, startWorkers: 8 });
         caves.push({ name: 'Beetle den', kind: 'lair', food: 40 });
       }
+      // ?developed=N: every colony starts grown by N tiles (test scenes and clips: tests/browser/ai_help.py)
+      if (q.get('developed')) for (const col of colonies) col.developed = Number(q.get('developed'));
       // the map grows with the number of colonies so nests are not crowded
       const size = colonies.length <= 2 ? 640 : colonies.length <= 4 ? 800 : 980;
-      const setup: GameSetup = c.mode === 'story' && c.story ? storySetup(c.story.level, c.story.difficulty, c.story.loadout, Number(q.get('seed') || Math.floor(Math.random() * 1e6))) : {
+      // (story: the campaign's traits come along; ?retry=1 — a restart from the level-end screen — skips the opening flight)
+      const setup: GameSetup = c.mode === 'story' && c.story ? storySetup(c.story.level, c.story.difficulty, c.story.loadout, Number(q.get('seed') || Math.floor(Math.random() * 1e6)), { traits: q.get('traits') !== null ? (q.get('traits') || '').split(',').filter(Boolean) : campaign().traits, retry: !!q.get('retry') }) : {
         seed: Number(q.get('seed') || Math.floor(Math.random() * 1e6)),
         style: mission ? mission.style : c.style,
         width: size,
@@ -136,9 +141,17 @@ function startGame(): void {
         caves,
         food: 1.2,
         // floods only on an authored map, and only when the player turned them on (off by default)
-        settings: { creatures: q.get('creatures') ? Number(q.get('creatures')) : 1, ...((c.floods || q.get('floods')) && c.map && !mission ? { floods: true } : {}) },
+        settings: {
+          creatures: q.get('creatures') ? Number(q.get('creatures')) : 1,
+          ...((c.floods || q.get('floods')) && c.map && !mission ? { floods: true } : {}),
+          // AI level (CHANGE_PLAN §23): the menu's choice, or ?ailevel=0..3
+          ...(q.get('ailevel') || (c.aiLevel !== undefined && c.aiLevel !== 1) ? { aiLevel: q.get('ailevel') ? Number(q.get('ailevel')) : c.aiLevel } : {}),
+          // titans raid nests (claude/creatures/01-spec-digging-titans.md): on unless the menu or ?titans=0 says no
+          ...(c.titanRaids === false || q.get('titans') === '0' ? { titanRaids: false } : {}),
+        },
         mission: mission?.id,
         sandbox: c.mode === 'sandbox',
+        ...(q.get('titanRaid') ? { devTitanRaid: q.get('titanRaid')! } : {}),
         ...(c.map && !mission ? { map: c.map, siteSet: q.get('sites') ? Number(q.get('sites')) : undefined } : {}),
       };
       if (!q.get('play')) updateSettings({ quality: c.quality });
@@ -169,6 +182,9 @@ function startGame(): void {
         if (m) {
           m.stage = Math.max(0, Number(q.get('stage')));
           m.entered = false;
+          // a level with its own nights: the clock jumps to that stage's morning (the dawn after night N)
+          const D = missionDef(m.id).story?.dayNight;
+          if (D && m.stage > 0) s.world.s.time = nightStart(D, m.stage) + nightLen(D, m.stage) + 1;
         }
         const extra = Number(q.get('ants') || 0);
         const e0 = s.player.entrances[0];
@@ -253,7 +269,11 @@ function startGame(): void {
     setTimeout(() => ((window as unknown as { __ready: boolean }).__ready = true), 800);
   };
   if (q.get('play')) {
-    launch({ teams: Number(q.get('teams') || 2), mode: (q.get('mode') as MenuChoice['mode']) || (q.get('mission') ? 'mission' : 'skirmish'), mission: (q.get('mission') as MenuChoice['mission']) || 'meadow', species: (q.get('species') as MenuChoice['species']) || 'lasius', borrowed: (q.get('borrow') || 'formica_mortar,fire_major').split(','), ais: (q.get('rival') || '').split(',').filter(Boolean).map((sp) => ({ species: sp as MenuChoice['species'], borrowed: [], team: 'own' as const })), style: (q.get('style') as MenuChoice['style']) || (q.get('mode') === 'arena' ? 'formicarium' : 'meadow'), map: (q.get('map') as MenuChoice['map']) || undefined, quality: (q.get('q') as MenuChoice['quality']) || 'high' });
+    launch({ teams: Number(q.get('teams') || 2), mode: (q.get('mode') as MenuChoice['mode']) || (q.get('mission') ? 'mission' : 'skirmish'), mission: (q.get('mission') as MenuChoice['mission']) || 'meadow', species: (q.get('species') as MenuChoice['species']) || 'lasius', borrowed: (q.get('borrow') || 'formica_mortar,fire_major').split(','), ais: [
+        ...(q.get('rival') || '').split(',').filter(Boolean).map((sp) => ({ species: sp as MenuChoice['species'], borrowed: [], team: 'own' as const })),
+        // ?allies=: AI colonies on your team (CHANGE_PLAN §23)
+        ...(q.get('allies') || '').split(',').filter(Boolean).map((sp) => ({ species: sp as MenuChoice['species'], borrowed: [], team: 'ally' as const })),
+      ], style: (q.get('style') as MenuChoice['style']) || (q.get('mode') === 'arena' ? 'formicarium' : 'meadow'), map: (q.get('map') as MenuChoice['map']) || undefined, quality: (q.get('q') as MenuChoice['quality']) || 'high' });
     return;
   }
   const title = () => showTitle(ui, () => showMenu(ui, launch), () => mpMenu(), (bytes) => watchReplay(bytes), { slot: (sl) => void loadSlot(sl), file: (b) => void loadGame(b) }, () => storyHub());
@@ -526,12 +546,13 @@ function startGame(): void {
   // ?story=1: the island map (a level's end screen comes back here); ?story=<level>[&diff=…&loadout=…]: that level
   const storyParam = q.get('story');
   if (storyParam === '1') return storyHub();
-  if (storyParam === 'garden' || storyParam === 'fireBanks') {
+  if ((STORY_LEVEL_IDS as readonly string[]).includes(storyParam ?? '')) {
+    const level = storyParam as StoryLevelId;
     const cs = campaign();
-    const diff = (q.get('diff') as NonNullable<MenuChoice['story']>['difficulty']) || cs.difficulty[storyParam] || 'normal';
+    const diff = (q.get('diff') as NonNullable<MenuChoice['story']>['difficulty']) || cs.difficulty[level] || 'normal';
     const loadout = (q.get('loadout') || '').split(',').filter(Boolean);
+    launch({ mode: 'story', story: { level, difficulty: diff, loadout }, mission: 'meadow', species: 'termant', borrowed: [], ais: [], style: 'meadow', quality: (q.get('q') as MenuChoice['quality']) || settings().quality });
     if (!q.get('shot')) history.replaceState(null, '', location.pathname);
-    launch({ mode: 'story', story: { level: storyParam, difficulty: diff, loadout }, mission: 'meadow', species: 'termant', borrowed: [], ais: [], style: 'meadow', quality: (q.get('q') as MenuChoice['quality']) || settings().quality });
     return;
   }
 

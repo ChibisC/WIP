@@ -21,6 +21,8 @@ export const ICONS = {
   food: svg(`<path d="M12 3c4 4 6 7.4 6 10.3A6 6 0 0 1 6 13.3C6 10.4 8 7 12 3z"/><path d="M12 9.5c-1.6 1.6-2.4 3.2-2.4 4.6" opacity=".7"/>`),
   pop: svg(`<circle cx="8" cy="9" r="2.6"/><circle cx="16" cy="9" r="2.6"/><path d="M3.5 19c.6-3 2.4-4.6 4.5-4.6S11.9 16 12.5 19M11.5 19c.6-3 2.4-4.6 4.5-4.6s3.9 1.6 4.5 4.6"/>`),
   recall: svg(`<polygon points="${hexPts(12, 13.5, 6.5)}"/><path d="M20 4.5a9 9 0 0 0-14 1"/><path d="M5.2 2.5L6 5.6 9 4.8"/>`),
+  /** call allies for help: two nests joined, a signal rising from one */
+  callHelp: svg(`<polygon points="${hexPts(7, 15, 4.2)}"/><polygon points="${hexPts(17, 15, 4.2)}"/><path d="M11.2 15h1.6"/><path d="M7 8.5a5 5 0 0 1 3.5-4M4.5 7.5a8 8 0 0 1 5-5.5"/>`),
   attack: svg(`<path d="M5 19c1-6 4-10.5 9-13.5-1.2 3-1.6 5.6-1.2 8"/><path d="M19 19c-1-6-4-10.5-9-13.5 1.2 3 1.6 5.6 1.2 8"/><path d="M8 20l2-2M16 20l-2-2"/>`),
   defend: svg(`<path d="M12 3l7 2.8v5.4c0 4.4-3 7.7-7 9.3-4-1.6-7-4.9-7-9.3V5.8z"/><polygon points="${hexPts(12, 11.5, 3.3)}" opacity=".8"/>`),
   acid: svg(`<path d="M12 3c3.2 4.2 5 7.4 5 10a5 5 0 0 1-10 0c0-2.6 1.8-5.8 5-10z"/><path d="M9.8 14.2a2.4 2.4 0 0 0 2.2 2.3"/><path d="M5 6l1.2 1.2M19 6l-1.2 1.2M4 11h1.6M20 11h-1.6" opacity=".7"/>`),

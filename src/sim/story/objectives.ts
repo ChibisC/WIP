@@ -7,6 +7,7 @@ import { dhypot } from '../dmath';
 import type { MissionGoal } from '../missions';
 import { StoryState, actorIndex, hasFlag } from './state';
 import { members, wherePt, levelOf } from './director';
+import { dayNightAt } from './dayNight';
 import type { Objective } from './types';
 
 /**
@@ -24,6 +25,11 @@ export interface StageBase {
 }
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+/** A time given per difficulty (a boss level's preparation) or one for all. */
+function secs(st: StoryState, s: number | Partial<Record<string, number>>): number {
+  return typeof s === 'number' ? s : (s[st.diff] ?? s.normal ?? 0);
+}
 
 function count(have: number, need: number): { done: boolean; progress: string } {
   return { done: have >= need, progress: `${Math.min(Math.floor(have), need)}/${need}` };
@@ -57,7 +63,7 @@ export function objectiveText(w: World, st: StoryState, o: Objective): string {
     case 'killQueen':
       return `Kill the ${rival(o.rival).toLowerCase()} queen`;
     case 'surviveTime':
-      return `Hold out for ${mmss(o.s)}`;
+      return `Hold out for ${mmss(secs(st, o.s))}`;
     case 'surviveWave':
       return `Survive ${label(o.actor)}`;
     case 'killCreature':
@@ -70,6 +76,12 @@ export function objectiveText(w: World, st: StoryState, o: Objective): string {
       return `Take ${typeof o.at === 'string' ? o.at : 'the ground'} with ${o.n} ants`;
     case 'enterNest':
       return `Send ${o.n} ants into the ${rival(o.rival).toLowerCase()} nest`;
+    case 'surviveNight':
+      return `Survive night ${o.n}`;
+    case 'upgrade':
+      return `Upgrade ${o.n} ${o.tile ? `${TILE_INFO[o.tile]?.name.toLowerCase() ?? o.tile} ` : ''}tile${o.n > 1 ? 's' : ''}`;
+    case 'storeFood':
+      return `Store ${o.amount} food`;
   }
 }
 
@@ -118,8 +130,10 @@ export function evalObjective(w: World, c: Colony, st: StoryState, base: StageBa
       const dead = !r || !r.alive;
       return { done: dead, progress: dead ? 'dead' : 'alive' };
     }
-    case 'surviveTime':
-      return { done: base.t >= o.s, progress: `${mmss(Math.min(base.t, o.s))}/${mmss(o.s)}` };
+    case 'surviveTime': {
+      const n = secs(st, o.s);
+      return { done: base.t >= n, progress: `${mmss(Math.min(base.t, n))}/${mmss(n)}` };
+    }
     case 'surviveWave': {
       const ai = actorIndex(st, o.actor);
       const act = st.actors[ai];
@@ -164,6 +178,18 @@ export function evalObjective(w: World, c: Colony, st: StoryState, base: StageBa
       for (const a of w.s.ants) if (a.colony === c.id && a.space === space && a.state !== AS.Dead) n++;
       return count(n, o.n);
     }
+    case 'surviveNight': {
+      if (hasFlag(st, `dawn:${o.n}`)) return { done: true, progress: 'dawn' };
+      const D = levelOf(st).dayNight;
+      if (!D) return { done: false, progress: '' };
+      const d = dayNightAt(D, w.s.time);
+      // (by day the clock above the goals counts down to dusk; here only the last minutes before the night and the night)
+      return { done: false, progress: d.n === o.n && d.night ? `dawn in ${mmss(d.left)}` : d.n === o.n && d.left <= D.dusk ? `night in ${mmss(d.left)}` : '' };
+    }
+    case 'upgrade':
+      return count(c.tiles.filter((t) => t.built && t.level >= 2 && (!o.tile || t.type === o.tile)).length, o.n);
+    case 'storeFood':
+      return count(c.food, o.amount);
   }
 }
 

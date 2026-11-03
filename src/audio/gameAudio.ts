@@ -197,6 +197,16 @@ export class GameAudio {
         return;
       case 'spoil':
         return this.want('ant.pellet_drop', e.x, e.y, e.space, { pool: 'work', gain: 0.7 });
+      case 'titanDig':
+        // a titan digging into a nest: the warning and the breach as heavy slams, its digging as footfalls and soil, the
+        // ground breaking round it underground as soil grains
+        if (e.phase === 'warn' || e.phase === 'breach') return this.want('boss.slam', e.x, e.y, e.space, { pool: 'creature', gain: 0.8, reach: 6, important: true, heat: 0.4 });
+        if (e.phase === 'dig') {
+          this.want('boss.footstep', e.x, e.y, e.space, { pool: 'creature', gain: 0.8, reach: 4, heat: 0.05 });
+          return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 1 });
+        }
+        if (e.phase === 'break') return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 0.9, heat: 0.02 });
+        return;
       case 'bite':
         return this.bite(e);
       case 'sting': {

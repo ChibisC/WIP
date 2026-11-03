@@ -1557,6 +1557,65 @@ away and just waits for worker to build it. if you dont have enough food you can
   were study-only and never in the repo. A fresh render of both story maps was compared with the user's photos in chat.
 - Merge: clean (no conflicts); all 28 suites, the determinism check and the build pass.
 
+### 2026-11-02 — Titans dig into nests
+- User spec `claude/creatures/01-spec-digging-titans.md` (the game's own twist: in EotU titans never enter nests).
+  Plan: `CHANGE_PLAN.md` §23. Design: DESIGN.md §3.10 "Titans dig into nests".
+- `sim/creatures/titanDig.ts`: a raiding titan walks to one of the colony's three holes (warning `TITAN_DIG.warnSec`
+  before), digs it wider (`holeWork` ÷ its dig speed: the tarantula 25 s, the wolf spider mother 27 s, the giant
+  centipede 40 s, the stag beetle 67 s undefended; every hit staggers it to 45 % pace, a heavy one knocks work back, it
+  gives up below 35 % health), then walks into the nest and straight through the ground to the queen: every soil or
+  stone hex its body touches opens at once (`NestGrid.breakHex`), built tiles never break. It bites what is in reach,
+  leaves below 25 % health, after 3 minutes or once the queen is dead; the breach (a wide raw crater) is repaired over 2
+  minutes. The giant mantis never digs.
+- Skirmish and multiplayer: "Titans raid nests" (on by default) in the single-player menu and the lobby; after 12
+  minutes, now and then a titan off its 8-minute cooldown raids a colony within 70 cm (weighted by ants and food), one at
+  a time. Protocol `ud-mp-8`. Story: director cue `digInto` and action `endRaid`.
+- Client: a warning toast that jumps the camera to the hole when clicked, the area tab alert, a rumble and digging
+  shake, soil thrown out at the hole and clods underground, sounds, each digging style's pose.
+- Tests: `tests/titans.ts` (in `npm test`): dig time, warning, breach, walking in, soil and stone breaking, tiles kept,
+  reaching the queen, leaving, stagger and set-back, giving up, story raids, repair, the toggle, peace period, the cap,
+  the mantis, determinism. Clips: `tests/browser/titan_dig.py` → `docs/creatures/digging/`.
+
+### 2026-11-02 — Chapter 1 becomes four levels: The Long Nights and The Spider Mother
+User spec `claude/story/04-spec-chapter1-four-levels.md` (decisions: survive the nights, no enemy ants, a titan on the last
+night; the boss is the wolf spider mother; its reward a trait only). Branch `feature/story-ch1-4` from `main`, with
+`feature/digging-titans` (0337c8a, another agent's) merged in for `digInto`; protocol `ud-mp-9` (main's food tiles and the
+titans' raid setting had each taken 8). Design: `docs/story/DESIGN-STORY.md` §3–6, §8, §10.
+- **Order** Garden Below → The Long Nights → Fire on the Banks → The Spider Mother (`story/campaign.ts`; new nodes at the
+  meadow's east edge and on the riverbank's upper slot). The two old levels keep gameplay, maps and balance; Fire on the
+  Banks is level 3 with a line linking it to the nights; the chapter's closing hint moved to the Spider Mother; the
+  chapter-complete note comes when all four are won (the last level's `ending` line).
+- **Save** (`game/campaign.ts`): progress by level id; a level is open when the one before is won or when it is won
+  already, so an old two-level save keeps Fire on the Banks open and is offered The Spider Mother at once; `traits`.
+- **The Long Nights** (`story/levels/longNights.ts`, map `maps/story/stonyHollow.ts`): its own day and night
+  (`sim/story/dayNight.ts`: `w.s.night`, flags `dusk:N`/`night:N`/`dawn:N`, a clock on the goals panel), five lairs as
+  underground areas (`caves`, the tarantula's drawn as a burrow), each night's hunters in two packs that come out of the
+  lairs and hold the two ramp tops till dawn, then go home; at dusk a ground beetle crosses the hollow and wolf spiders
+  wait at the lair mouths (eyeshine); on the last (longer) night the red-knee tarantula comes off its knoll, digs a hole
+  wider and walks into the nest. Win at dawn. Medals: food stored, losses, kill the tarantula before dawn.
+- **The Spider Mother** (`story/levels/spiderMother.ts`, map `maps/story/spiderTerrace.ts`): a developed colony
+  (`developed`), a preparation by difficulty, dusk light when she hunts; her rounds (a `goto` loop) to the colony's
+  doorstep and back to her burrow; below 80 % she rests in her burrow, below 60 % and 45 % her spiderlings spill, below
+  30 % she digs into the nest. Reward: the trait **Spiderling Venom** (`STORY.traits`, `sim/story/traits.ts`: every bite
+  of the player's ants adds a small venom stack; story only, on `Colony.traits`). A restart skips the opening flight.
+- **Framework**: objectives `surviveNight`, `upgrade`, `storeFood`, `surviveTime` per difficulty; cues `rest`, `goto`
+  (with the titans' `digInto`); actions `night`, `endRaid`; actors as creature groups out of several lairs (`creatures`,
+  `from`), health marks (`phases` → `hp:<actor>:<percent>`, `killed:<actor>`), `bossCuts`, `goal`; the bonus
+  `killBefore`; a food medal; `STORY.difficulty.*.boss`; the director runs on after a win.
+- **Fixes**: `charge` and `flee` cues were skipped at once (the actor went straight to its next cue); they now take their
+  time. The two old levels' waves were balanced on the old behaviour, so their scripts now say `mode: 'aggressive'` then
+  their guard (they play exactly as before); their critters really flee now (visual). Directed creatures slide round
+  pebbles instead of turning on the spot against them. A story titan's raid ignores `fleeHealth` and `maxStay` (it
+  leaves when the script says — dawn — or dies).
+- Render: moonlight on the surface at night (`render/view.ts`), wolf spiders' eyeshine (`creatureRenderer.ts`), the
+  spider burrow with a silk turret (`surfaceDecor.ts`), moods for both maps (`mapBiomes.ts`); UI: the hub's reward line
+  (caste, trait or medals only), traits on the Genome screen, the food medal, trait rewards on the end screen.
+- Tests: `tests/storyCh1.ts` (in `npm test`); `tests/story.ts` campaign check updated. Playtests (`tools/playtest-story.ts`
+  now plays bosses and nights): The Long Nights won on all four difficulties; The Spider Mother won Easy, Normal, Hard
+  and Brutal on seed 11 (not seed 7). Fire on the Banks plays as on `main` (within the bot's noise). The Garden Below's
+  Normal run (seed 7) does not finish in 60 min on `main` either: its balance moved with the food-tile economy (not retuned
+  here). Browser: `tests/browser/story_ch1_4.py` → `docs/story/shots/ch1_4/`.
+
 ## 2026-11-02 (afternoon) — The user's ratings: hell ant attacks and finisher, termite melee (CHANGE_PLAN §22.6)
 From the review page (`docs/realism/hell-nasute/README.md`, round 1 of the user's ratings):
 - Hell ants: the jaws gape much wider (`openExtra` 1.45) and work open and shut; three attacks (`ATK.SNAP`, `ATK.CHOMP`,
@@ -1572,6 +1631,96 @@ From the review page (`docs/realism/hell-nasute/README.md`, round 1 of the user'
   feet planted (N6); the soldier sways its aim and recoils with each squirt.
 - Anim lab: `finisher` (the lift and the cut), `tfight` (the workers' three bites and the soldier), `tram` (the majors'
   three rams and the alarm). Clips in `docs/realism/hell-ants/clips/` and `docs/realism/nasutitermes/clips/`.
+
+
+### 2026-11-02 — AI colonies: allies start close, EotU-style chambers with upgrades, allies help each other (CHANGE_PLAN §23)
+User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `feature/ai-allies` from `main` (`fc6f58a`), with
+`main`'s one-entrance rework merged in on the way (`604e84d`). DESIGN §3.11 (placement, builder, war, ally brains).
+- **Allied nests start close** (`world/teamSites.ts`): whenever a team has two or more colonies (skirmish allies too, not
+  only the lobby), its sites come from the map's authored `teamSets` for the team shape (all five maps have 2v2, 2v1,
+  3v1, 2v2v2, 2v1v1, 3v3), else an exhaustive search over the 10 sites by land route on the hex layout (water and walls
+  gone round; on layered ground, up the ramps): allies within 33 % of the map's width, enemies beyond 30 %, the teams' food and middle routes even, the
+  smaller side of an uneven match the better food. No seed in it, so every client agrees and the lobby's map cards ring
+  each team's sites (yours green). Validator lines, `tools/team-sites.ts` → `docs/maps/team-sites.md` with sketches.
+  Known: Meadow Pond's and Rainforest's 2v2v2 cannot meet both limits (the best placement is used and reported).
+  Removed as replaced: `teamSiteOrder`, the `groupTeams` flag.
+- **Chambers** (`colonyAI.ts` builder, rewritten): 7-hex rosettes and, from mid game, 19-hex hexagons for the main
+  castes and fungus; one tile type (one caste) per chamber, filled from the centre out; walled apart by soil, joined by
+  the shortest tunnel; at most two store chambers beside the entrance, then store upgrades; highways on the tunnels and
+  the passage (stores' and the 19s' mouths first); upgrades from mid game (19s first, most points first, fighters first
+  in war, brood paid first); AI level Easy / Normal / Hard / Brutal (menu chips, `?ailevel=`). A developed head start
+  (menu rivals start `developed: 6`) is laid out the same way. Removed as replaced: the 7-hex-only chambers, bare
+  tunnels, groups of 8, the scattered developed tiles.
+- **Ally brain** (`warAI.ts allyTick`, every 2 s): an ally's danger from the enemies' weight there by where they are
+  (by the queen worst), its defenders, its losses, its queen; help only when not threatened at home, the ally is not
+  winning anyway, it is close enough (or its queen is in danger) and the cause is not lost; keeps a home guard, sends
+  just enough and more if the fight turns worse; marker V on the ally's hole, then on the fight; recalls at once when
+  threatened at home; stops when clear, after heavy losses, when outmatched, after 4 min; one go per threat (no
+  flip-flopping) and a cooldown; raids give way to bad trouble. Messages for a human ally; the ✋ call-for-help button (command `callHelp`, wire 25,
+  `BUILD_ID` `ud-mp-9`). Joint raids (gather short of the target, go together), shared targets.
+- **Growth** (`tools/econ.ts`, one AI colony, 900 mm meadow, seed 7; ants at 10 / 20 / 30 / 45 min; measured on the
+  final branch against `main` `ccaba9d`, both with main's caste balance and EotU food rules):
+
+  | Species | this branch | `main` | tiles by level at 45 min |
+  |---|---|---|---|
+  | Black garden | 26 / 76 / 137 / 218 | 24 / 65 / 123 / 148 | 218 / 48 / 39 |
+  | Leafcutter | 40 / 81 / 123 / 183 | 37 / 67 / 89 / 96 | 14 / 72 / 184 |
+  | Red wood | 26 / 69 / 104 / 143 | 28 / 67 / 120 / 166 | 195 / 12 / 0 |
+  | Fire ant | 19 / 37 / 58 / 82 | 20 / 35 / 51 / 68 | 120 / 0 / 0 |
+  | Army ant | 26 / 63 / 92 / 97 | 22 / 51 / 68 / 68 | 131 / 0 / 0 |
+
+  Level with `main` early, ahead from 30 min (the stores and upgrades keep growing where the old builder stopped),
+  except the Red wood ants: over seeds 7–9 they end level (45 min: 143 / 162 / 157 here, 166 / 143 / 171 on `main`)
+  and upgrade little. Fire ants and army ants upgrade nothing by 45 min (food to brood first; they reach mid game
+  late). The army-ant stall is older than this work (their foragers stop going out; on `main` at 68 ants).
+- **Nests** (`tests/browser/ai_nests.py` → `docs/ai/chambers/`, five AI colonies on Meadow Pond in peace, at 10, 30 and
+  45 min, with `sheet.jpg`): 7-hex chambers at 10 min; 19-hex chambers, highways and level II–III tiles from 30 min.
+- **Help clip** (`tests/browser/ai_help.py` → `docs/ai/allies_help.mp4` and stills): your nest invaded by a band of Red
+  wood soldiers, the AI ally's soldiers marching over, down your entrance and onto the fight, then home.
+- **2v2 ecology** (`tools/ecology-teams.ts`, Meadow Pond, 45 min, wild creatures on; Black garden + Red wood v Fire ant
+  + Leafcutter, the leafcutters by far the strongest), ally brain off → on, when each colony fell:
+
+  | seed | Black garden | Red wood | Fire ant | Leafcutter |
+  |---|---|---|---|---|
+  | 1 | 16.9 → 23.9 min | 20.9 min → alive (59 ants) | 9.9 → 11.3 min | alive → alive |
+  | 2 | 31.9 → 44.4 min | alive (1 ant) → alive (63 ants) | 10.2 → 11.7 min | alive → alive |
+  | 3 | 14.4 → 27.2 min | 31.5 → 31.0 min | 10.5 → 16.9 min | alive → alive |
+
+  With the brain on, the Black garden and Fire ant colonies lasted longer in every seed, and the Red wood colony came
+  through two games it lost or barely survived without it (in the third it fell half a minute sooner); help started 2–7 times a game; every help was one start and one stop (no flip-flopping); stops were "done",
+  "fallen", "outmatched" and "home". A mirror line-up (Black garden + Red wood on both sides), seeds 1–2: seed 1, off
+  — both Black garden colonies fell at about 10.5 min (wild creatures), on — one of them came through (204 ants at the
+  end); seed 2, off — everyone alive at 45 min, on — team 1 raided team 2's Red wood colony together and took it at
+  16 min (its ally went to help and fell back, outmatched). Allies with the brain are more decisive both ways.
+  The first version (before lost causes were left alone) did worse: helpers died in
+  hopeless fights and the helper fell sooner than with the brain off.
+- **Checks** (final merge): `npm test` 29 suites, all passing; `check-determinism` 68 files clean; `npm run build`.
+- **Merges** (claude/handoff/00-MERGE-RULE.md): `origin/main` six times on the way (entrance rework, Gene Thief
+  termite soldiers, story chapter 1, layered ground, caste balance, Termants' one food store, underground realism,
+  hell ant and nasute realism, earth-tone caste looks, tiles paid when placed, layered-ground pathfinding, ground
+  realism). This plan became CHANGE_PLAN §23 (main's §22 is the hell ant and nasute rework); the protocol is
+  `ud-mp-9` (main's 7 and 8 plus `callHelp`). Main's tiles-paid-when-placed refused a developed head start's tiles,
+  so AI rivals started empty until the head start was placed instant.
+
+### 2026-11-02 — Kings do no nest duties: they walk round the queen in her chamber
+- **User note** (15:21): "the kings of termants and termites should just wander around the nanitic chamber the queen
+  is on and doesnt do nest duties, it only walks around the queen and attacks intruders."
+- **Found:** every king counted as a worker for the nest jobs (`isJobWorker`: his caste's tier is "worker"). The
+  Termant king carried eggs and tended the queen like a worker (in 4 min: 527 ticks carrying brood, out of the royal
+  chamber for 678 ticks, up to 67 mm from the queen); a termite king was handed a job every few seconds and stood
+  still at his one spot (0 mm walked), holding a job slot the workers then could not take.
+- **Now** (`jobs.ts isJobWorker`, `termites.ts kingTick`, shared by the Termant king; `BALANCE.king`): no king takes
+  a nest job (an old save's job is dropped); he walks round his queen inside her seven tiles — a new spot on a ring
+  round her body every 6 s, a little further round each time, at 0.45 of his speed, pausing there to tap and groom her
+  (the termite kit's ATTEND) — and bites intruders inside the chamber. In 4 min: no ticks out of the chamber,
+  300–365 mm walked, at most 11 mm (Termant) or 25 mm (termites) from the queen's centre; an intruder dropped beside
+  the queen is killed and one at the entrance is left alone. No random draws (a hash of his id and the time).
+- Merged with `main` twice more on the way (the hell ant finisher and nasute melee; then the AI allies, which took
+  protocol 9 too: now `ud-mp-10`). After the AI allies, on Normal: The Long Nights won (23.6 min), The Spider Mother won
+  (8.6 min), Fire on the Banks won (seed 21, 42.1 min); The Garden Below seed 11 now does not finish in 60 min either (it
+  won in 14.5 min before) — its rival plays with the new colony AI; not retuned here (flagged in the handoff). The night
+  look got darker (the sky's image light dims too; the light fades through the 30 s dusk) and the eyeshine sits on the
+  big front eyes (`tests/browser/eyeshine.py`).
 
 ## 2026-11-02 (evening) — The user's ratings, round 2: the finisher on the neck; the nasute termites redone (CHANGE_PLAN §22.7)
 - The finisher's foe is held by the neck: its neck is put on the hell ant's mandible–horn socket every frame (A2).

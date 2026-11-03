@@ -20,10 +20,13 @@ The title screen has **Story**, **Single-player** and **Multiplayer**.
 
 - **Story — *The Gene-Thief*** (chapter 1): a storm washes a Gene-Thief Termant queen ashore on Wayfarer Island. On the
   island map pick a level, a difficulty (Easy, Normal, Hard, Brutal) and the stolen castes to bring (one slot); steal
-  each species' caste from its dead and keep it by winning. *The Garden Below* (black garden ants: steal the Black
-  Garden Ant Soldier) opens *Fire on the Banks* (tropical fire ants: steal the Tropical Fire Ant Major). Each level has
-  its own map with terraces and ramps, narration by a field scientist, short skippable camera shots (Esc), three medals
-  (time, losses, a bonus objective) and a field-journal page. Progress is kept in this browser.
+  each species' caste from its dead and keep it by winning. Four levels in order: *The Garden Below* (black garden ants:
+  steal the Black Garden Ant Soldier), *The Long Nights* (survive three nights of the island's night hunters; on the last
+  a red-knee tarantula digs into your nest), *Fire on the Banks* (tropical fire ants: steal the Tropical Fire Ant Major)
+  and *The Spider Mother* (a wolf spider titan in three phases; win the trait Spiderling Venom: your ants' bites carry a
+  little venom in every story level). Each level has its own map with terraces and ramps, narration by a field
+  scientist, short skippable camera shots (Esc), three medals (time or food stored, losses, a bonus objective) and a
+  field-journal page. Progress is kept in this browser.
 
 - **Single-player**, at your own pace, in four tabs: **Missions** (two story missions, *A Meadow Kingdom* and *The Forest Floor*, with a narrator, staged goals and a boss finale), **Skirmish** (you against 1–9 AI colonies on one of five authored maps — Meadow Pond, Forest Floor, Riverbank, Rainforest, Savanna — in teams; win when every rival queen falls), **Sandbox** (no rules: place any creature or boss, fill the stores, infinite food, wild creatures on or off) and **Battle Arena** (2–4 teams — Red, Blue, Green, Gold: drop any ants, termites or creatures in, 1–50 at a time and level I–III, round a team's corner or where you click; each team charges, holds or stands passive; the last team standing wins the round. Slow motion down to ¼×, climb rails and hitboxes make climbing easy to watch: put a passive stag beetle in the middle and send ants at it). You can pause (P) and change speed (− / =).
 - **Maps:** **Meadow Pond**, the first hand-made map (1.6 × 1.6 m: a lily pond, two streams with stepping stones, rocks, ten colony sites), or a random map in one of four styles. Four more hand-made maps are on the way.
@@ -32,8 +35,8 @@ The title screen has **Story**, **Single-player** and **Multiplayer**.
 ### Multiplayer and invite links
 1. **Create game** gives you a six-letter room code and an invite link (`…/?room=ABCDEF`). Press **Copy link** and send it.
 2. Friends open the link and land in the lobby. Each player picks a name, species, colour and team, then clicks **Ready**. A **Gene Thief** player also picks the castes it steals (any of the 24 borrowable castes, the termite soldiers included; each needs its own room tile).
-3. The host can set each of the eight slots to Open, Closed or AI (and pick an AI's species, team and, for a Gene Thief AI, its castes), move anyone to another team, pick the map from the map cards (everyone sees the choice), and set the seed, food, floods and population cap.
-   - **Teams:** Red, Blue, Green, Gold or no team. Teammates never fight each other, start on neighbouring colony sites, and win together when theirs is the last team with a living queen. Everyone on one team cannot start.
+3. The host can set each of the eight slots to Open, Closed or AI (and pick an AI's species, team and, for a Gene Thief AI, its castes), move anyone to another team, pick the map from the map cards (everyone sees the choice), and set the seed, food, floods, whether titans raid nests (on by default: now and then a titan digs one of a colony's holes wider and walks into its nest breaking the ground it touches) and population cap.
+   - **Teams:** Red, Blue, Green, Gold or no team. Teammates never fight each other, start on neighbouring colony sites (the map cards show each team's sites), help each other when an AI is on the team, and win together when theirs is the last team with a living queen. Everyone on one team cannot start.
 
    ![A lobby with teams, a Gene Thief and the map cards](docs/multiplayer/teams-lobby-host.png)
 4. The host starts the match once everyone is ready.
@@ -180,11 +183,13 @@ npx vite-node tests/royals.ts                                       # termite ro
 npx vite-node tests/sickle.ts                                       # Sickle-Jaw Termites: the ramp, holds, rescue, one soldier per victim, size limit, miss, alarm, king, AI, litter, determinism
 npx vite-node tests/eciton.ts                                       # army ants: castes and old ids, diet, swarm front, lanes, porters, Soldier posts, bridges, plugs, hook, pinning, models unchanged, determinism
 npx vite-node tests/story.ts                                        # story mode and layered ground: rename, banks and ramps, both story maps, setup by difficulty and loadout, the director's scenes, every objective type, bonus and medals, a caste missed, the campaign save, determinism
-npx vite-node tools/playtest-story.ts -- garden normal 50 7          # a story level played headless by the colony AI plus a scripted player (level, difficulty, minutes, seed, loadout)
+npx vite-node tests/storyCh1.ts                                     # chapter 1 as four levels: order and save rule, the new maps, the nights' clock, hunters and tarantula, the Spider Mother's phases, Spiderling Venom, determinism
+npx vite-node tools/playtest-story.ts -- garden normal 50 7          # a story level played headless by the colony AI plus a scripted player (level: garden, longNights, fireBanks, spiderMother; difficulty, minutes, seed, loadout)
+npx vite-node tests/titans.ts                                       # titans digging into nests (hole, breach, breaking ground, raids)
 npx vite-node tools/caste-table.ts                                   # every caste's numbers (-- creatures: the creatures')
 npx vite-node tools/balance-matrix.ts -- refs 300                     # equal-food fights v a reference caste (refw / refs / refm / creatures; docs/balance/castes.md)
 npx vite-node tools/balance-tune.ts -- lasius_soldier 300 atta_soldier # the stat scale at which a caste ties the reference
-# dev: ?story=1 the island map; ?story=garden&stage=2&ants=30 a level from any stage (with extra ants); &nocine=1 no camera shots
+# dev: ?story=1 the island map; ?story=garden&stage=2&ants=30 a level from any stage (with extra ants); &nocine=1 no camera shots; &retry=1 a restart (no opening flight); &traits=spiderlingVenom (or &traits= for none) instead of the campaign's
 npx vite-node tests/termants.ts                                     # Termants: genes from enemy corpses only, unlock, cost ×1.5, max 3, forget, glue and acid, wood, carton walls, one queen and no replacement, AI, determinism
 npx vite-node tests/animation.ts                                    # animation pass (render only): planted feet, variety, idles, hits, deaths, flings
 npx vite-node tools/anim-cost.ts -- 1040                            # the animation controller's CPU cost per frame for a crowd
@@ -195,6 +200,7 @@ npx vite-node tools/anim-cost.ts -- 1040                            # the animat
 # hell ants and nasute termites (realism rework 2026-11-02): clip=termites (the nasute castes' states), clip=royals; &ant=hell_worker for the snap
 # ant lab extras: &light= now lights termites too; &contact=1 contact shadows; &amber=1 a unit in a block of amber (lab only, never in the game)
 python3 tests/browser/hell_nasute_realism.py docs/realism/hell-nasute/renders   # lab renders per unit, view and light (UNITS, VIEWS, LIGHTS; with_server.sh)
+npx vite-node tests/aiAllies.ts                                     # AI with allies: team placement on the five maps, 7/19-hex one-type chambers, stores, highways, upgrades, the ally brain (help, guard, recall, lost causes, call for help), joint raids, determinism
 npx vite-node tests/fights.ts                                       # guard line, room in a fight, foes shared out, creatures apart, calm after a fight, marker orders (no attacking / gathering / climbing)
 npx vite-node tools/postfight.ts -- ant:lasius_soldier 20           # what fighters do once their foes are dead (zigzags, stop-start, states)
 npx vite-node tools/fightspread.ts -- ant:lasius_soldier 24 ant:formica_soldier 24   # how spread out a melee is, second by second
@@ -235,12 +241,17 @@ tests/browser/with_server.sh python3 tests/browser/sickle_renders.py  # Sickle-J
 tests/browser/with_server.sh python3 tests/browser/eciton_renders.py  # the five army-ant models and four poses, a raid at close and far zoom, posts, a bridge, a plug
 tests/browser/with_server.sh python3 tests/browser/mobile.py        # iPhone / iPad emulation: compact layout, touch gestures, tap / long press, build drawer, maps, tooltips, arena
 tests/browser/with_server.sh python3 tests/browser/termant_renders.py # the four Termant castes, the stolen-caste tint, stolen ants in the game, the queen and king, a carton wall, the Genome tab
-npx vite-node tools/econ.ts -- lasius 24 7 1 1                      # AI economy over N minutes [seed foodMul creaturesMul]
+npx vite-node tools/econ.ts -- lasius 24 7 1 1                      # AI economy and nest shape over N minutes [seed foodMul creaturesMul aiLevel]
 npx vite-node tools/ecology.ts -- 20 1.5                            # creature balance: 4 colonies with wild creatures
+npx vite-node tools/ecology-teams.ts -- 45 1 1 meadowPond 1 mixed   # a 2v2 of AI colonies [seed help(0/1) map creatures lineup(mixed/mirror/swap)]
+npx vite-node tools/ally-probe.ts -- 120 14                         # the ally brain at work in a staged invasion [seconds band human bothInvaded seed developed]
+npx vite-node tools/team-sites.ts                                   # every map's team placements (land routes, limits) → docs/maps/team-sites.md
+tests/browser/with_server.sh python3 tests/browser/ai_nests.py      # AI nests from above at 10/30/45 min → docs/ai/chambers/ (and sheet.jpg)
+tests/browser/with_server.sh python3 tests/browser/ai_help.py       # clip: an AI ally's soldiers come to your nest's rescue → docs/ai/allies_help.mp4
 npx vite-node tools/battle.ts -- formica_soldier:2,formica_rapid:2 fire_minor:16 60
 npx vite-node tools/equal.ts -- fire_major fire_soldier 150         # how many of each the same food buys
 python3 tools/crsheet.py out.jpg "wolfSpider|wolf spider;mantis|mantis|state=11"   # creature model sheet (?scene=crlab)
 ```
 Sound: `?scene=sounds` is the sound board (every sound with its takes, file or stand-in, and a soundscape mixer). `docs/audio/` has the sound list for gathering recordings, the attributions and how the audio works. `npm run audio:process` turns recordings in `audio-src/recordings/` into game files.
 
-Dev URLs: `?scene=crlab&kinds=stagBeetle,tarantula` (creature viewer: `state`, `st`, `walk`, `dead`, `eaten`, `cam`), `?play=1&spawn=wolfSpider:2,mantis` (creatures beside your entrance; add `&rival=formica&battle=lasius_soldier:14&climbdebug=1` to watch them climbed; `&hitboxes=1` draws every hitbox, as F3 does; `&combatdebug=1` the combat debug view: anchored, blocked, backing off, going round, slots), `?stress=1`, `?scene=determinism`, `?netsim=lat,jit,loss`, `?delay=N`, `?worker=0`.
+Dev URLs: `?scene=crlab&kinds=stagBeetle,tarantula` (creature viewer: `state`, `st`, `walk`, `dead`, `eaten`, `cam`), `?play=1&spawn=wolfSpider:2,mantis` (creatures beside your entrance; add `&rival=formica&battle=lasius_soldier:14&climbdebug=1` to watch them climbed; `&hitboxes=1` draws every hitbox, as F3 does; `&combatdebug=1` the combat debug view: anchored, blocked, backing off, going round, slots), `?play=1&allies=lasius&rival=formica&developed=70` (an AI ally and a rival, everyone well grown; `&ailevel=0..3` the AI level), `?stress=1`, `?scene=determinism`, `?netsim=lat,jit,loss`, `?delay=N`, `?worker=0`.

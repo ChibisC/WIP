@@ -9,6 +9,8 @@ import { STOLEN_CASTES, stolenName } from '../sim/termants';
 import { CASTES, SPECIES } from '../sim/species';
 import { antSilhouette } from './icons';
 import { esc } from './dom';
+import { STORY } from '../sim/balance';
+import { firstMedal, lossesNeed } from '../story/medalText';
 
 /**
  * The campaign hub (claude/story/02-spec §3): the island map with the chapter's level nodes, and beside it the
@@ -46,6 +48,14 @@ function nodeViews(): NodeView[] {
       title: L.title,
     };
   });
+}
+
+/** What a level's win keeps: a stolen caste, a trait, or medals only. */
+function rewardLine(L: StoryLevelDef): string {
+  if (L.reward.caste) return `<div class="sh-steal">${antSilhouette(CASTES[L.reward.caste].role, '#c9a46a')}<div><span>Steal</span><b>${esc(stolenName(L.reward.caste))}</b></div></div>`;
+  const T = L.reward.trait ? STORY.traits[L.reward.trait] : undefined;
+  if (T) return `<div class="sh-steal"><div class="sh-trait">✦</div><div><span>Boss · a trait for the campaign</span><b>${esc(T.name)}</b></div></div>`;
+  return `<div class="sh-steal"><div class="sh-trait">☾</div><div><span>Survive</span><b>Medals only</b></div></div>`;
 }
 
 export function showStoryHub(parent: HTMLElement, start: (s: StoryStart) => void, back: () => void): void {
@@ -131,10 +141,10 @@ export function showStoryHub(parent: HTMLElement, start: (s: StoryStart) => void
         <div class="sh-kicker">Level ${L.number} · ${esc(region.name)}</div>
         <h2>${esc(L.title)}</h2>
         <p>${esc(L.brief)}</p>
-        <div class="sh-steal">${antSilhouette(CASTES[L.reward.caste].role, '#c9a46a')}<div><span>Steal</span><b>${esc(stolenName(L.reward.caste))}</b></div></div>
-        <h3>Medals ${rec?.won ? `<span>best ${mmss(rec.bestSeconds)}, ${rec.bestLost} lost</span>` : ''}</h3>
-        ${medal('Time', rec?.time ?? 'none', `gold under ${mmss(M.time[0])}, silver ${mmss(M.time[1])}`)}
-        ${medal('Losses', rec?.losses ?? 'none', `gold at ${M.losses[0]} ants lost or fewer, silver ${M.losses[1]}`)}
+        ${rewardLine(L)}
+        <h3>Medals ${rec?.won ? `<span>${M.food ? '' : `best ${mmss(rec.bestSeconds)}, `}${rec.bestLost} lost</span>` : ''}</h3>
+        ${medal(firstMedal(M).name, rec?.time ?? 'none', firstMedal(M).need)}
+        ${medal('Losses', rec?.losses ?? 'none', lossesNeed(M))}
         ${medal('Bonus', rec?.bonus ?? 'none', M.bonus.text)}
         <h3>Difficulty</h3>
         <div class="sh-chips">${DIFFICULTIES.map((d) => `<button class="sh-chip ${d === diff ? 'on' : ''}" data-diff="${d}" title="${esc(DIFF_TIPS[d])}">${DIFF_NAMES[d]}</button>`).join('')}</div>
@@ -146,7 +156,17 @@ export function showStoryHub(parent: HTMLElement, start: (s: StoryStart) => void
 
   const renderGenome = () => {
     const kept = new Set(c.castes);
+    // traits (story only): the bosses' gifts, built ones first, the planned ones as unknowns
+    const traits = Object.entries(STORY.traits)
+      .filter(([id, t]) => t.built || c.traits.includes(id))
+      .map(([id, t]) => {
+        const has = c.traits.includes(id);
+        return `<div class="sh-gene ${has ? 'on' : ''}"><div class="sh-trait">✦</div><div><b>${has ? esc(t.name) : 'Unknown trait'}</b><span>${has ? esc(t.desc) : `From ${esc(t.from)}`}</span></div></div>`;
+      })
+      .join('');
     page.innerHTML = `<div class="sh-sheet"><h2>Genome</h2>
+      <h3>Traits</h3><p class="sh-dim">Permanent gifts from the island’s titans: every story level, all your ants. They never come into skirmish or multiplayer.</p>
+      <div class="sh-genome">${traits}</div><h3>Stolen castes</h3>
       <p class="sh-dim">Castes the Gene-Thief Termants have stolen and kept for the campaign. Bring up to <b>${slots()}</b> into a level (one more slot for every boss beaten, in later chapters).</p>
       <div class="sh-genome">${STOLEN_CASTES.map((e) => {
         const cd = CASTES[e.caste];
@@ -167,7 +187,7 @@ export function showStoryHub(parent: HTMLElement, start: (s: StoryStart) => void
       if (!c.levels[n.level]?.won) return `<div class="sh-jpage blank"><b>${esc(L.title)}</b><span>Not yet written.</span></div>`;
       return `<div class="sh-jpage">
         <div class="sh-jhead"><b>${esc(storyText(`journal.${n.level}.title`))}</b><span>${esc(j?.date ?? '')}</span></div>
-        ${j?.shot ? `<img alt="" src="${j.shot}">` : `<div class="sh-jsil">${antSilhouette(CASTES[L.reward.caste].role, '#7a5c38')}<span>${c.castes.includes(L.reward.caste) ? 'No photograph taken' : 'The caste was not stolen: replay the level to take it.'}</span></div>`}
+        ${j?.shot ? `<img alt="" src="${j.shot}">` : L.reward.caste ? `<div class="sh-jsil">${antSilhouette(CASTES[L.reward.caste].role, '#7a5c38')}<span>${c.castes.includes(L.reward.caste) ? 'No photograph taken' : 'The caste was not stolen: replay the level to take it.'}</span></div>` : ''}
         ${j?.caste ? `<div class="sh-jcap">${esc(stolenName(j.caste))}, raised by the Gene-Thief Termants</div>` : ''}
         <p>${esc(storyText(`journal.${n.level}.body`))}</p>
         <p class="sh-jnote">${esc(storyText(`journal.${n.level}.note`))}</p>

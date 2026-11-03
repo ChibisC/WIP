@@ -182,6 +182,34 @@ export class SurfaceDecor {
   }
 
   /** `foodView`: ring the food the viewer's colony can gather (`canEat`; others are not highlighted). */
+  /**
+   * A wolf spider's or tarantula's burrow (render only): a dark hole about 2 cm across, its mouth lined with pale silk,
+   * and round it a low turret of sand grains and grass bits bound with silk, a little higher than the ground.
+   */
+  private burrow(x0: number, y0: number, h: (x: number, y: number) => number, seed: number): void {
+    const r = 9;
+    this.p.set(x0, h(x0, y0) + 0.2, y0);
+    this.s.set(r, 1, r);
+    this.m.compose(this.p, this.q.identity(), this.s);
+    this.holes.add(this.m);
+    const rng = new Rng(seed);
+    for (let k = 0; k < 90; k++) {
+      const a = (k / 90) * Math.PI * 2 + rng.range(-0.05, 0.05);
+      // two rings: the silk lip at the mouth (pale) and the turret wall of sand and grass bits round it
+      const lip = k % 3 === 0;
+      const d = lip ? r + 0.3 + rng.range(0, 0.6) : r + 1 + Math.abs(rng.gauss()) * 1.8;
+      const x = x0 + Math.cos(a) * d;
+      const y = y0 + Math.sin(a) * d;
+      const sz = lip ? rng.range(0.9, 1.5) : rng.range(1.2, 2.4);
+      this.p.set(x, h(x, y) + (lip ? 0.5 : sz * 0.45 + rng.range(0, 1.2)), y);
+      this.e.set(rng.range(0, 6), a, rng.range(0, 6));
+      this.q.setFromEuler(this.e);
+      this.s.set(sz, sz * (lip ? 0.35 : 0.8), sz);
+      this.m.compose(this.p, this.q, this.s);
+      this.spoil.add(this.m, lip ? this.c.setHSL(0.11, 0.08, rng.range(0.62, 0.76), THREE.SRGBColorSpace) : this.c.setHSL(rng.chance(0.3) ? 0.2 : 0.1, rng.chance(0.3) ? 0.3 : 0.16, rng.range(0.32, 0.5), THREE.SRGBColorSpace));
+    }
+  }
+
   update(w: World, foodView = false, canEat?: (f: Food) => boolean): void {
     const t = w.terrain;
     const h = (x: number, y: number) => t.walkHeight(Math.min(Math.max(x, 0), t.width), Math.min(Math.max(y, 0), t.depth));
@@ -199,6 +227,11 @@ export class SurfaceDecor {
     // Caves and lairs: a wider hollow ringed with weathered stones and old leaf litter
     for (const cv of w.s.caves) {
       cv.entrances.forEach((e, i) => {
+        // a big spider's burrow (story lairs, `look: 'burrow'`): a wide hole with a turret rim of silk-bound sand and grass
+        if (cv.look === 'burrow') {
+          this.burrow(e.sx, e.sy, h, cv.space * 977 + i * 31 + 5);
+          return;
+        }
         const r = cv.kind === 'lair' ? 3.6 : 3.2;
         this.p.set(e.sx, h(e.sx, e.sy) + 0.15, e.sy);
         this.s.set(r, 1, r);

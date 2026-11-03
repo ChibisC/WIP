@@ -117,6 +117,8 @@ export const RIVERBANK: MapDef = {
     4: [[0, 5, 6, 9], [1, 4, 7, 8]],
     10: [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]],
   },
+  /** team layouts (CHANGE_PLAN §23; picked with tools/team-sites.ts, checked on docs/maps/team-sites/riverbank.png) */
+  teamSets: { '2v2': [[0, 1], [4, 5]], '2v1': [[3, 4], [7]], '3v1': [[2, 3, 4], [7]], '2v2v2': [[0, 1], [4, 5], [8, 9]], '2v1v1': [[4, 5], [1], [9]], '3v3': [[1, 2, 3], [7, 8, 9]] },
   zones: [
     { kind: 'food', shape: { circle: [200, 619.5], r: 55 }, weight: 2, name: 'washed up' },
     { kind: 'food', shape: { circle: [700, 680.9], r: 55 }, weight: 2, name: 'washed up' },

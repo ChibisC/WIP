@@ -25,6 +25,7 @@ import { spawnCreature } from './creatures/creatureAI';
 import { CREATURES } from './creatures/kinds';
 import { surgeGroup } from './surge';
 import { arenaClear, arenaSpawn, arenaStance } from './arena';
+import { BALANCE } from './balance';
 
 export type CommandBody =
   | { type: 'placeMarker'; i: number; space: number; x: number; y: number }
@@ -68,7 +69,10 @@ export type CommandBody =
   | { type: 'entrance'; i: number; close: boolean }
   /** multiplayer game speed: ask for or agree to 2× / 4× (every player must), or go back down at once; the current
    *  speed while a faster one is asked for is a "no" */
-  | { type: 'speedVote'; speed: number };
+  | { type: 'speedVote'; speed: number }
+  /** ask the allies for help (CHANGE_PLAN §23): for a while, AI allies count this nest's danger higher (they still
+   *  defend their own nest first) */
+  | { type: 'callHelp' };
 
 export type CommandType = CommandBody['type'];
 
@@ -106,6 +110,7 @@ const TYPE_IDS: Record<CommandType, number> = {
   markerOrder: 22,
   entrance: 23,
   speedVote: 24,
+  callHelp: 25,
 };
 const TYPE_NAMES: CommandType[] = [];
 for (const [k, v] of Object.entries(TYPE_IDS)) TYPE_NAMES[v] = k as CommandType;
@@ -195,6 +200,12 @@ export function applyCommand(w: World, cmd: Command): string | null {
     case 'recall':
       recallAll(w, c);
       return null;
+    case 'callHelp': {
+      if (!w.s.colonies.some((o) => o.id !== c.id && o.alive && o.team === c.team)) return 'You have no allies to call';
+      c.helpCall = w.s.time + BALANCE.aiAllies.callHelpSec;
+      if (c.player) w.events.emit({ t: 'message', text: 'You called your allies for help: AI allies with fighters to spare will come if your nest is in danger.', kind: 'info', colony: c.id });
+      return null;
+    }
     case 'useAbility':
       return useAbility(w, c);
     case 'surgeGroup':
@@ -576,6 +587,7 @@ function readBody(r: Cursor): CommandBody {
     case 'useAbility':
     case 'surrender':
     case 'sandboxFood':
+    case 'callHelp':
       return { type };
     case 'sandboxSpawn':
       return { type, kind: r.str(), space: r.u16(), x: r.f32(), y: r.f32() };

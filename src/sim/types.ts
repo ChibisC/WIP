@@ -456,6 +456,14 @@ export interface Entrance {
   fall?: number;
   /** ants through this hole so far, either way (its traffic, for the tooltip) */
   n?: number;
+  /**
+   * A titan dug this hole wider (titanDig.ts; claude/creatures/01-spec-digging-titans.md): 1 while it is a breach (any titan
+   * walks in without digging), 0 or absent once repaired. `breachBy` the titan in it now (0 none); `repair` 0 → 1 as the
+   * colony rebuilds the rim once no titan uses it. It stays the colony's hole throughout (ants pass as before).
+   */
+  breach?: number;
+  breachBy?: number;
+  repair?: number;
 }
 
 /** One of the five pheromone markers (I–V). */
@@ -569,6 +577,8 @@ export interface Colony {
   king?: number;
   /** castes this colony can raise (one brood tile type each) */
   castes: string[];
+  /** story mode only: the campaign's traits (STORY.traits, sim/story/traits.ts), e.g. Spiderling Venom on every bite */
+  traits?: string[];
   tiles: Tile[];
   groups: NestGroup[];
   nextGroupId: number;
@@ -593,7 +603,21 @@ export interface Colony {
   /** movement factor per nest hex (tiles slow, highways speed up); rebuilt with the tiles */
   hexSpeed: Float32Array | null;
   /** AI build planner memory. Kept in state so snapshots and rejoining clients match (colonyAI). */
-  aiBuild?: { t: number; blocked: boolean; mix: Record<string, number>; chambers?: Array<{ q: number; kind: 'brood' | 'food' }>; tunnels?: number[] };
+  /**
+   * The builder brain (sim/colonyAI.ts). A chamber: its centre, radius (1: a 7-hex rosette, 2: a 19-hex hexagon), the
+   * one tile type it holds (brood: one caste). Saves from before CHANGE_PLAN §23 have `kind` only (radius 1, any caste).
+   */
+  aiBuild?: {
+    t: number;
+    blocked: boolean;
+    mix: Record<string, number>;
+    chambers?: Array<{ q: number; kind?: 'brood' | 'food'; r?: number; type?: TileType; caste?: string }>;
+    tunnels?: number[];
+    /** the tile the last think had no room for: the next chamber is for it */
+    need?: { type: TileType; caste?: string } | null;
+    /** needs whose chamber found no place, by "type" or "type:caste": not tried again until this game time (s) */
+    skip?: Record<string, number>;
+  };
   /** enemies inside the nest, refreshed every second by the invasion check (combat) */
   intruders?: Array<{ x: number; y: number }>;
   /** army ants: the swarm raid at each marker (eciton.ts) */
@@ -608,7 +632,48 @@ export interface Colony {
   homeOrders?: { noAttack?: boolean; noGather?: boolean; noClimb?: boolean };
   aiForage?: { t: number; age: number; target: { x: number; y: number } | null; queenOut: boolean; scoutT?: number; scouted?: boolean; enemyAt?: number };
   /** rival AI war planner (sim/warAI.ts): raid target (−1 none), fighters at the start, raid age, cooldown until (game time), defending and seconds clear */
-  aiWar?: { t: number; target: number; start: number; age: number; cooldown: number; defending: boolean; clearT: number };
+  aiWar?: {
+    t: number;
+    target: number;
+    start: number;
+    age: number;
+    cooldown: number;
+    defending: boolean;
+    clearT: number;
+    /** a joint raid (CHANGE_PLAN §23): the ally whose raid this colony joined (its own id when it leads one) */
+    joined?: number;
+    /** a joint raid's gathering point near the target and when to go anyway (s); `go` once everyone is there */
+    gather?: { x: number; y: number; until: number; go: boolean };
+  };
+  /**
+   * The ally brain (sim/warAI.ts, CHANGE_PLAN §23): the ally being helped (−1 none), since when, how many ants were sent,
+   * the stage (0 marker on the ally's entrance, 1 on the threat), how long the threat has been clear, the cooldown after
+   * helping, how many times help started or stopped, the allies' deaths last seen, and the enemy colony last seen
+   * attacking the team (and when).
+   */
+  aiAlly?: {
+    t: number;
+    ally: number;
+    since: number;
+    sent: number;
+    stage: number;
+    clearT: number;
+    cooldown: number;
+    flips: number;
+    died: Record<number, number>;
+    foe: number;
+    foeT: number;
+    /** why the last help ended: home (threatened itself), done, fallen, losses, outmatched, time */
+    why?: string;
+    /** when groups were last sent (reinforcements at most every `reinforceEvery` s) */
+    sentT?: number;
+    /** the human ally's call for help (its helpCall) already answered with "can't spare enough" */
+    told?: number;
+    /** the ally last helped: not helped again until its danger has cleared once (one go per threat, no flip-flopping) */
+    block?: number;
+  };
+  /** a human player's call for help to its allies (command `callHelp`): active until this game time (s) */
+  helpCall?: number;
   /** fungus garden capacity (Atta) */
   fungusCap: number;
   /** attack anything (true) or defend only (false) */
@@ -767,6 +832,8 @@ export interface CaveDef {
   /** surface centre (entrances sit around it) */
   nx: number;
   ny: number;
+  /** story lairs: drawn as a spider's silk-lined burrow with a turret rim (render) */
+  look?: 'den' | 'burrow';
 }
 
 export interface SimSettings {
@@ -774,6 +841,8 @@ export interface SimSettings {
   creatures?: number;
   /** authored maps: storms flood the map's flood zones (off unless the match turns it on) */
   floods?: boolean;
+  /** skirmish and multiplayer: titans now and then dig into a nest (titanDig.ts); undefined = on, false = never */
+  titanRaids?: boolean;
   queenDeathLoses: boolean;
   fog: boolean;
   autoWaves: boolean;
@@ -782,6 +851,8 @@ export interface SimSettings {
   statMul: number;
   enemyStatMul: number;
   aggression: number;
+  /** AI colonies' level (CHANGE_PLAN §23): 0 Easy, 1 Normal (undefined), 2 Hard, 3 Brutal — chamber sizes and upgrades */
+  aiLevel?: number;
   foodRespawn: number;
   /**
    * Multiplayer game speed (1, 2 or 4; undefined = 1): faster only when every player agrees (`speedVote`). Each

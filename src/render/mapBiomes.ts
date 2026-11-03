@@ -47,7 +47,7 @@ export const BIOME_LIGHT: Record<Biome, BiomeLight> = {
  * A map's own mood over its biome's light (ground realism item 6; render only): the story maps' time of day and air.
  *  - gardenBelow (chapter 1, level 1): the fresh morning after the storm — a low sun from the east, cool clean light,
  *    a bright sky, a little mist, the ground still damp (render/terrainMesh.ts) and dew on the grass.
- *  - fireBanks (chapter 1, level 2): a hot, bright, hazy day on the riverbank — a high sun, warm haze in the distance,
+ *  - fireBanks (chapter 1, level 3): a hot, bright, hazy day on the riverbank — a high sun, warm haze in the distance,
  *    glare off the sand (a touch more exposure and bloom, a little less contrast).
  */
 export interface MapMood {
@@ -86,6 +86,31 @@ export const MAP_MOOD: Record<string, MapMood> = {
     bloom: 0.08,
     haze: 0.16,
     hazeColor: 0xe6dcc6,
+  },
+  // The Long Nights (chapter 1, level 2): a late afternoon at the edge of the river woods — a low, warm sun through the
+  // trees (dappled), a little mist in the hollow; the level's own nights darken it to moonlight (render/view.ts)
+  stonyHollow: {
+    sunEl: 22,
+    sunAz: 235,
+    light: { sun: 2.3, sunColor: 0xffdcae, hemi: 0.92, hemiSky: 0xb4c2da, hemiGround: 0x3c3626, fog: 1.05, fogColor: 0xbcb8a8, dapple: 0.8 },
+    exposure: 1.0,
+    saturation: 0.97,
+    warmth: 0.08,
+    haze: 0.08,
+    hazeColor: 0xc8c4b4,
+  },
+  // The Spider Mother (chapter 1, level 4): the sandy terrace in the evening — a low golden sun, long shadows, warm haze;
+  // the light goes toward dusk when she comes out to hunt (the level's `night` action)
+  spiderTerrace: {
+    sunEl: 15,
+    sunAz: 262,
+    light: { sun: 2.7, sunColor: 0xffca94, hemi: 0.95, hemiSky: 0xc8cde2, hemiGround: 0x7c6644, fog: 1.1, fogColor: 0xe2caa8, dapple: 0.2 },
+    exposure: 1.0,
+    contrast: 1.0,
+    saturation: 1.0,
+    warmth: 0.18,
+    haze: 0.12,
+    hazeColor: 0xe8d0aa,
   },
 };
 

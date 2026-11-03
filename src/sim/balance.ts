@@ -504,6 +504,145 @@ export const BALANCE = {
   respawnDietShare: 0.5,
 
   // ---------------------------------------------------------------- rival AI war (sim/warAI.ts)
+  /**
+   * The AI builder (sim/colonyAI.ts; CHANGE_PLAN §23): EotU-style chambers of 7 or 19 hexes, one tile type (one caste)
+   * each, highways on the tunnels, upgrades from mid game.
+   */
+  aiBuild: {
+    /** 19-hex chambers once the colony has this many ants and this much game time (s) has passed (× levelFrom) */
+    chamber19From: { ants: 45, time: 600 },
+    /** a caste counts as one of the colony's main ones (19-hex chambers) with at least this share of the mix */
+    mainShare: 0.15,
+    /** a colony this big gets a 19-hex second store chamber (leafcutters always) */
+    bigColony: 120,
+    /** soil between a new chamber's rim and the other rooms' rims: at least, and to the nearest room at most (hexes) */
+    rimGapMin: 2,
+    rimGapMax: 5,
+    /** longest tunnel to a new chamber (hexes); each hex of tunnel counts this much against a place; places tried */
+    tunnelMax: 6,
+    tunnelWeight: 0.6,
+    planTries: 80,
+    /** a chamber that found no place is not tried again for this long (s): the others go first */
+    planRetry: 60,
+    /** at most this many food store chambers, within storeNearEntrance hexes (rim) of the entrance */
+    maxStoreChambers: 2,
+    storeNearEntrance: 8,
+    /** a tile type's (caste's) chambers count as nearly full with this many free hexes or fewer: plan the next */
+    nearlyFull: 1,
+    /** stores count as full at this share of the capacity; no new store tiles past foodCapMax */
+    storeFull: 0.8,
+    foodCapMax: 2400,
+    /** highways on the tunnels once the colony has this many ants, keeping this much food after paying */
+    highwayFrom: 18,
+    highwayReserve: 12,
+    /** upgrades from mid game (× levelFrom): game time (s), ants, food in store */
+    upgradeFrom: { time: 720, ants: 50, food: 60 },
+    /**
+     * food kept back after paying an upgrade: this much, plus what the larvae on their tiles still need, plus the price
+     * of the next brood tile and its ant (brood comes first: upgrades spend the surplus)
+     */
+    upgradeReserve: 20,
+    /** upgrade jobs waiting at once (× levelInFlight, at least 1) */
+    upgradesInFlight: 2,
+    /** AI level (settings.aiLevel 0 Easy … 3 Brutal): × the mid-game thresholds, × upgrades in flight */
+    levelFrom: [1.6, 1, 0.8, 0.6],
+    levelInFlight: [0.5, 1, 1.5, 2],
+  },
+  /**
+   * Kings (termites and Termants; user note 2026-11-02): no nest duties; a slow walk round the queen inside her chamber —
+   * a new spot every `wanderS` s, `step` rad further round her, `ringMin`..`ringMax` of his length out from her body,
+   * at `walkMul` of his speed — and bites for intruders in the chamber (sim/termites.ts kingTick)
+   */
+  king: { wanderS: 7, step: 0.6, ringMin: 0.35, ringMax: 0.85, walkMul: 0.45 },
+  /** AI colonies with allies (CHANGE_PLAN §23, user spec claude/ai/01-spec-ai-allies-chambers.md) */
+  aiAllies: {
+    /** the ally brain and joint raids on (off: AI allies leave each other alone, as before; tools/ecology-teams.ts) */
+    help: true,
+    /** seconds between the ally brain's decisions */
+    every: 2,
+    /**
+     * An ally's danger (warAI.ts allyDanger): the enemies' fighting weight there (health × damage rate) × where they are,
+     * minus its defenders' weight; plus its losses a second × lossWeight; × queenMul when its queen is in danger.
+     * Where: by the queen (within queenRadius mm), deep in the nest, at its entrance (within entranceRadius of the
+     * flower), at its surface holes (siegeRadius), near them on the surface (nearRadius).
+     */
+    locQueen: 4,
+    locDeep: 3,
+    locEntrance: 2,
+    locSiege: 1.5,
+    locNear: 1,
+    queenRadius: 40,
+    entranceRadius: 30,
+    siegeRadius: 60,
+    nearRadius: 150,
+    queenHurt: 0.7,
+    queenMul: 3,
+    lossWeight: 400,
+    /** a creature's weight per point of health × its bite rate */
+    creatureWeight: 1,
+    /**
+     * help only above this danger (one Red wood soldier weighs about 240: two at an ally's entrance, unopposed, are
+     * about 1000), and not an ally whose defenders already have this × the attackers' weight
+     */
+    assistMinDanger: 500,
+    allyWinningRatio: 1.5,
+    /** help only if it can get there in this long (s; the land route over the fighters' speed), unless the queen is in danger */
+    assistMaxTravel: 90,
+    /** keep this share of the fighting weight at home (and at least homeGuardMin fighters); send enough that help +
+     * the ally's defenders reach assistOvermatch × the attackers' weight, no more */
+    homeGuardShare: 0.3,
+    homeGuardMin: 3,
+    assistOvermatch: 1.3,
+    /**
+     * a lost cause is left alone: no help when what it can spare + the ally's defenders would still be under this ×
+     * the attackers' weight (assistMinOddsQueen with the ally's queen in danger); help under way falls back when the
+     * helpers + defenders drop under assistQuitOdds × the attackers (they would only die with the ally)
+     */
+    assistMinOdds: 0.8,
+    /** while helping: more groups (still keeping the guard) at most this often (s) when help + defenders fall short */
+    reinforceEvery: 10,
+    assistMinOddsQueen: 0.5,
+    assistQuitOdds: 0.5,
+    /** stop helping: clear (danger under clearDanger) for clearFor s, losses over assistMaxLoss of those sent, or after
+     * assistMaxTime s; then a cooldown (s) */
+    clearDanger: 150,
+    clearFor: 8,
+    assistMaxLoss: 0.6,
+    assistMaxTime: 240,
+    cooldown: 30,
+    /** inside the ally's nest: the marker moves from its entrance to the threat once this share of the helpers is in */
+    insideShare: 0.5,
+    /** a raid gives way to helping when the ally's danger is over this (or its queen is in danger, or it is the same enemy) */
+    raidValue: 4000,
+    /** a human player's call for help (command callHelp): this long (s), its danger × callBoost and at least callMin */
+    callHelpSec: 45,
+    callBoost: 2,
+    callMin: 800,
+    /** joint raids: an AI ally may join a raid this young (s) with at least joinMinFighters; everyone gathers gatherDist
+     * mm short of the target's holes and goes when gatherShare of each one's fighters are there, or after gatherMax s */
+    joinWindow: 30,
+    joinMinFighters: 6,
+    gatherDist: 140,
+    gatherR: 70,
+    gatherShare: 0.6,
+    gatherMax: 120,
+    /** shared targets: an enemy seen attacking the team within foeMemory s is raided first (its score × sharedTargetMul) */
+    foeMemory: 300,
+    sharedTargetMul: 0.5,
+    /** team-aware placement (world/teamSites.ts): limits as fractions of the map's width, and the score's weights */
+    sites: {
+      /** each ally's land route to its nearest teammate at most this */
+      allyMaxRoute: 0.33,
+      /** each colony's land route to its nearest enemy at least this */
+      enemyMinRoute: 0.3,
+      /** weights: allies' routes (shorter better), the teams' spread (fairer better), the nearest enemy (farther better) */
+      wAlly: 1,
+      wFair: 2,
+      wEnemy: 0.5,
+      /** an uneven match: how much the smaller side's worse food route counts */
+      smallSideFood: 2,
+    },
+  },
   aiWar: {
     /** seconds between decisions */
     every: 4,
@@ -1089,6 +1228,39 @@ export const ENTRANCE = {
  * Layered ground (claude/maps/05-spec-layered-maps.md; world/layers.ts, docs/maps/layers.md): terraces one `step` above
  * the other, their banks too steep to walk, joined by ramps no steeper than `rampMaxSlope`.
  */
+/**
+ * Titans dig into nests (claude/creatures/01-spec-digging-titans.md, user 2026-11-02; the game's own twist: in EotU titans
+ * never enter nests). A titan digs one surface hole wider (`holeWork` ÷ its `dig.speed` seconds; slowed to `hitSlow` of
+ * its pace for `staggerSec` after any hit, set back `heavyBack` of the work by a hit of `heavyFrac` of its health or more;
+ * it gives up below `giveUpHealth`), then walks into the nest at `undergroundSpeed` × its speed: every soil or stone hex
+ * its body touches (its body radius + `breakMargin` mm) opens at once. It leaves below `fleeHealth`, after `maxStay` s,
+ * or once the queen is dead. The breach (the widened hole) is repaired by the colony over `repairSec` s once the titan
+ * is gone. Skirmish ("Titans raid nests", on by default): after `peaceMin` minutes, a titan raids at most every
+ * `raidCooldown` minutes (a `raidChance` a minute once off cooldown), a colony within `raidRange` mm (weighted by its
+ * ants and food), at most `maxRaiding` titans at once; the colony is warned `warnSec` s before the titan reaches the hole.
+ */
+export const TITAN_DIG = {
+  holeWork: 40,
+  hitSlow: 0.45,
+  staggerSec: 1.2,
+  heavyFrac: 0.06,
+  heavyBack: 0.15,
+  giveUpHealth: 0.35,
+  undergroundSpeed: 0.8,
+  breakMargin: 1.5,
+  fleeHealth: 0.25,
+  maxStay: 180,
+  repairSec: 120,
+  peaceMin: 12,
+  raidCooldown: 8,
+  raidChance: 0.35,
+  raidRange: 700,
+  maxRaiding: 1,
+  warnSec: 25,
+  /** the widened hole's radius as drawn (mm; render only — the breach is still the colony's hole) */
+  breachHoleMm: 10,
+};
+
 export const LAYERS = {
   /**
    * Straight steering (a chase, the last stretch to a point) that would cross a bank goes round by the ramps instead,
@@ -1122,14 +1294,15 @@ export const LAYERS = {
  * Story mode (claude/story/02-spec; sim/story, docs/story/DESIGN-STORY.md). Difficulty multipliers (every one here):
  * `enemyStat` scales enemy ants' and creatures' health and damage (`settings.enemyStatMul`), `wave` the size of
  * scripted attack waves, `aggression` the rival AI's raid margin and the war AI (`settings.aggression`), `food` the
- * player's starting food, `rival` the rival colonies' head start (developed nest and starting workers).
+ * player's starting food, `rival` the rival colonies' head start (developed nest and starting workers), `boss` a story
+ * boss's health (titans: the tarantula of the nights, the Spider Mother; gentler than `enemyStat`, which bosses skip).
  */
 export const STORY = {
   difficulty: {
-    easy: { enemyStat: 0.75, wave: 0.6, aggression: 0.6, food: 1.6, rival: 0.7 },
-    normal: { enemyStat: 1, wave: 1, aggression: 1, food: 1, rival: 1 },
-    hard: { enemyStat: 1.2, wave: 1.35, aggression: 1.3, food: 0.85, rival: 1.25 },
-    brutal: { enemyStat: 1.4, wave: 1.7, aggression: 1.6, food: 0.7, rival: 1.5 },
+    easy: { enemyStat: 0.75, wave: 0.6, aggression: 0.6, food: 1.6, rival: 0.7, boss: 0.75 },
+    normal: { enemyStat: 1, wave: 1, aggression: 1, food: 1, rival: 1, boss: 1 },
+    hard: { enemyStat: 1.2, wave: 1.35, aggression: 1.3, food: 0.85, rival: 1.25, boss: 1.1 },
+    brutal: { enemyStat: 1.4, wave: 1.7, aggression: 1.6, food: 0.7, rival: 1.5, boss: 1.2 },
   },
   /** stolen-caste slots: one to start, one more per boss beaten (later chapters) */
   slots: { start: 1, perBoss: 1 },
@@ -1145,4 +1318,19 @@ export const STORY = {
   waveBeaten: 0.8,
   /** a guarding actor chases what came within its radius at most this far beyond it (mm) */
   guardLeash: 40,
+  /**
+   * Traits (claude/story/04-spec §4): permanent colony-wide bonuses in story mode, earned from titans and mega colonies,
+   * kept in the campaign save and given to the player's colony in every story level (`Colony.traits`); never in skirmish
+   * or multiplayer. Only Spiderling Venom is built (chapter 1); the rest are planned for later chapters.
+   *  - spiderlingVenom: every bite of the player's ants (on an ant or a creature, riders too) adds a venom stack of
+   *    `dps` for `duration` s, up to `maxStacks` (a little, stacking a little).
+   */
+  traits: {
+    spiderlingVenom: { name: 'Spiderling Venom', from: 'The Spider Mother', desc: 'Your ants’ bites carry a little spider venom: a weak poison that stacks a little.', dps: 0.6, duration: 4, maxStacks: 3, built: true },
+    antlerPlating: { name: 'Antler Plating', from: 'a stag beetle titan', desc: 'More armour for all your ants.', built: false },
+    forcipuleStrike: { name: 'Forcipule Strike', from: 'a giant centipede titan', desc: 'Soldiers’ first bite in a fight deals bonus damage.', built: false },
+    irritatingHairs: { name: 'Irritating Hairs', from: 'the red-knee tarantula, as a boss', desc: 'Enemies that attack your soldiers are briefly slowed.', built: false },
+    ambushReflex: { name: 'Ambush Reflex', from: 'a giant mantis titan', desc: 'Attack speed bonus for the first seconds of each fight.', built: false },
+    fungalLarder: { name: 'Fungal Larder', from: 'the leafcutter mega colony', desc: 'Food stores hold more.', built: false },
+  } as Record<string, { name: string; from: string; desc: string; dps?: number; duration?: number; maxStacks?: number; built: boolean }>,
 };

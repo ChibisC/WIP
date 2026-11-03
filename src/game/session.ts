@@ -291,6 +291,18 @@ export class GameSession {
           if (!this.net) this.loop.hitStop(big ? 0.05 : 0.033);
         }
       }
+      // a titan digging into a nest: a low rumble as it closes in (the warning), the ground jolting as it digs and as the
+      // soil breaks round it underground — scaled by how close the camera is
+      if (e.t === 'titanDig') {
+        const surf = this.view.space === 'surface';
+        if (e.phase === 'warn' && e.colony === this.player.id && surf) this.view.surfaceRig.shake = Math.max(this.view.surfaceRig.shake, 0.35 * shakeK);
+        else if ((e.phase === 'dig' || e.phase === 'breach') && surf) {
+          const rig = this.view.surfaceRig;
+          const zoomK = Math.min(1, 420 / Math.max(1, rig.distance));
+          if (Math.hypot(rig.target.x - e.x, rig.target.z - e.y) < rig.distance * 1.5) rig.shake = Math.max(rig.shake, (e.phase === 'breach' ? 0.5 : 0.18) * zoomK * shakeK);
+        }
+        if (e.phase === 'enter' || e.phase === 'breach') this.alert(e.space);
+      }
       if (e.t === 'story' && e.what === 'shot' && e.shot) this.playShot(e.shot);
       if (e.t === 'message' && e.colony !== undefined && e.colony !== this.player.id) return; // another player's message
       this.onEvent?.(e);
@@ -1064,6 +1076,11 @@ export class GameSession {
     this.issue({ type: 'recall' });
   }
 
+  /** Ask the allies for help (CHANGE_PLAN §23): AI allies with fighters to spare come if this nest is in danger. */
+  callHelp(): void {
+    this.issue({ type: 'callHelp' });
+  }
+
   /** Concede a multiplayer match (the queen dies; the others play on, or the last one standing wins). */
   surrender(): void {
     if (this.net && this.player.alive) this.issue({ type: 'surrender' });
@@ -1516,6 +1533,9 @@ export class GameSession {
       const t = w.terrain;
       this.mounds.update(w, this.terrainHeight);
       this.view.storm = stormLevel(w.s.flood);
+      // a story level's night (its own day/night clock, sim/story/dayNight.ts): moonlight; wolf spiders' eyeshine
+      this.view.nightLevel = w.s.night ?? 0;
+      this.surfCreatures.night = w.s.night ?? 0;
       this.surfMarkers.update(shown, SURFACE, this.surfHeight, v.observing ? v.observeRig.distance * 3 : v.surfaceRig.distance, (i) => markerRadius(w, this.player, i), sel, v.time);
       this.surfTrail.update(sel, this.trailEnds(sel, SURFACE, shown), this.surfHeight, v.surfaceRig.distance, v.time);
       // creatures first: climbing ants are placed on their animated legs and backs

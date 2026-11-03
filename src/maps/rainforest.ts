@@ -107,6 +107,8 @@ export const RAINFOREST: MapDef = {
     4: [[0, 1, 2, 3]],
     10: [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]],
   },
+  /** team layouts (CHANGE_PLAN §23; picked with tools/team-sites.ts, checked on docs/maps/team-sites/rainforest.png) */
+  teamSets: { '2v2': [[7, 8], [6, 9]], '2v1': [[7, 8], [9]], '3v1': [[2, 7, 8], [6]], '2v2v2': [[1, 5], [6, 9], [7, 8]], '2v1v1': [[7, 8], [6], [5]], '3v3': [[2, 7, 8], [3, 6, 9]] },
   zones: [
     { kind: 'food', shape: { circle: [620, 620], r: 55 }, weight: 2, name: 'fallen fruit' },
     { kind: 'food', shape: { circle: [880, 880], r: 55 }, weight: 2, name: 'fallen fruit' },

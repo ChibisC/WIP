@@ -378,6 +378,13 @@ export function antSystem(w: World, dt: number): void {
         continue;
       }
     }
+    // The Termant king: no nest duties (a job from an old save is dropped); he walks round the queen in her chamber and
+    // bites intruders there (user note 2026-11-02; a termite king does the same through termiteTick)
+    if (a.id === c.king && isTermant(c) && termantKing(w, a, c, dt)) {
+      venomTick(w, a, dt);
+      finish(w, a);
+      continue;
+    }
     // A worker on a nest job ignores food and enemies (venom still hurts).
     if (a.task === 'job') {
       if (venomTick(w, a, dt)) continue;
@@ -386,10 +393,6 @@ export function antSystem(w: World, dt: number): void {
       continue;
     }
     if (combatPreempt(w, a, c, dt)) {
-      finish(w, a);
-      continue;
-    }
-    if (a.id === c.king && isTermant(c) && termantKing(w, a, c, dt)) {
       finish(w, a);
       continue;
     }

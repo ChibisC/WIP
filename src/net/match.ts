@@ -86,15 +86,14 @@ export function matchSetup(players: Slot[], s: LobbySettings): GameSetup {
         name: p.name,
       };
     }),
-    // teammates start on neighbouring colony sites
-    ...(players.some((p) => cleanTeam(p.team)) ? { groupTeams: true } : {}),
+    // (teammates start on neighbouring colony sites: mapGen places any team of two or more, world/teamSites.ts)
     // neutral underground areas between the spawns
     caves: [
       { name: 'Root hollow', kind: 'cave', food: 70 },
       { name: 'Beetle den', kind: 'lair', food: 40 },
     ],
     food: s.food,
-    settings: { queenDeathLoses: true, statMul: 1, enemyStatMul: 1, creatures: 1, ...(s.map && s.floods ? { floods: true } : {}) },
+    settings: { queenDeathLoses: true, statMul: 1, enemyStatMul: 1, creatures: 1, ...(s.map && s.floods ? { floods: true } : {}), ...(s.titanRaids === false ? { titanRaids: false } : {}) },
     ...(s.map ? { map: s.map } : {}),
   };
 }

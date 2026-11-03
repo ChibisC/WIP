@@ -300,6 +300,20 @@ export class CombatFx {
         // a leafcutter major's taunt (sim/casteAbilities.ts): a ring across its reach
         this.ring(e.x, e.y, e.radius, heightAt);
         break;
+      case 'titanDig': {
+        // a titan digging into a nest (sim/creatures/titanDig.ts): soil thrown out behind it at the hole; a burst at the
+        // breach; underground, clods bursting from each hex its body breaks
+        const h = heightAt(e.x, e.y) + 0.4;
+        const n = e.phase === 'dig' ? 10 : e.phase === 'breach' ? 40 : e.phase === 'break' ? 6 : 0;
+        for (let k = 0; k < n; k++) {
+          const a = r() * Math.PI * 2;
+          const sp = e.phase === 'breach' ? 18 + r() * 20 : e.phase === 'dig' ? 8 + r() * 14 : 5 + r() * 8;
+          const col = r() < 0.4 ? 0x6e5a40 : r() < 0.5 ? 0x8a7458 : 0x5a4836;
+          this.spawn(e.x + Math.cos(a) * 3, h, e.y + Math.sin(a) * 3, Math.cos(a) * sp, 6 + r() * 12, Math.sin(a) * sp, 0.6 + r() * 0.6, col, 0.6 + r() * 0.9, 14, 2.4, 1.6);
+        }
+        if (e.phase === 'breach') this.ring(e.x, e.y, 18, heightAt);
+        break;
+      }
       case 'slam': {
         // a ring of dust thrown out across the slam radius, and a flash of the warning colour
         const h = heightAt(e.x, e.y) + 0.4;

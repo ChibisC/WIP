@@ -293,6 +293,9 @@
 .sb-kind { font: inherit; font-size: calc(13 * var(--u)); color: var(--ink); background: var(--well); border: 1px solid var(--bronze-lo); border-radius: calc(3 * var(--u)); padding: calc(3 * var(--u)) calc(5 * var(--u)); max-width: calc(220 * var(--u)); }
 .goals-mini { position: absolute; left: calc(8 * var(--u)); top: calc(92 * var(--u)); width: calc(300 * var(--u)); padding: calc(7 * var(--u)) calc(11 * var(--u)); display: flex; flex-direction: column; gap: calc(3 * var(--u)); pointer-events: none; font-size: calc(13 * var(--u)); }
 .gm-stage { font-family: var(--head-font); font-size: calc(14 * var(--u)); color: var(--bronze-hi); margin-bottom: calc(2 * var(--u)); }
+/* the day/night clock (story levels with nights: sim/story/dayNight.ts) */
+.gm-clock { font-size: calc(12 * var(--u)); letter-spacing: 0.04em; color: #b9c6ea; margin-bottom: calc(2 * var(--u)); }
+.gm-clock.day { color: #e6cf98; }
 .gm-goal { display: flex; justify-content: space-between; gap: calc(8 * var(--u)); color: var(--ink); font-variant-numeric: tabular-nums; }
 .gm-goal b { font-weight: 500; color: var(--ink-dim); }
 .gm-goal.done { color: var(--good); }

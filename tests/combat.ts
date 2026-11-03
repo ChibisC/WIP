@@ -10,6 +10,7 @@ import { EventBus } from '../src/core/events';
 import { NEST_HEX_SCALE } from '../src/world/nestGrid';
 import { createWorld } from '../src/sim/mapGen';
 import { Ant, AS, SURFACE } from '../src/sim/types';
+import { distToQueenBody } from '../src/sim/termites';
 import { makeAnt } from '../src/sim/factory';
 import { spawnCreature } from '../src/sim/creatures/creatureAI';
 import { BALANCE } from '../src/sim/balance';
@@ -327,10 +328,10 @@ const steps = (w: ReturnType<typeof createWorld>, sec: number) => {
     w.step(0.05);
     w.events.drain();
     if (intruder.tgt === k.id && (intruder.state === AS.Attack || intruder.state === AS.Grapple)) targeted = true;
-    if (t > 100) minGap = Math.min(minGap, Math.hypot(k.x - q.x, k.y - q.y));
+    if (t > 100) minGap = Math.min(minGap, distToQueenBody(q, k.x, k.y));
   }
   check('termite king: never targeted by intruders (they go for the queen)', !targeted);
-  check('termite king: stands beside the queen, a separate body, not inside her', minGap > CASTES.nasute_queen.length * 0.2, `${minGap.toFixed(1)} mm from her`);
+  check('termite king: beside the queen, a separate body, never inside her', minGap > 0, `${minGap.toFixed(1)} mm from her side at the closest`);
 }
 {
   // eggs: the queen holds them inside; a worker walks to the tip of her abdomen and pulls one out

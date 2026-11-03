@@ -4,7 +4,7 @@ import { ClimbRec, Rig } from './rig';
 import { CLIMB_DATA } from '../../sim/creatures/climbData';
 import { BALANCE } from '../../sim/balance';
 import type { AntView, MountOut } from '../ants/antRenderer';
-import { BUILDERS, CHAINS, CrPose, EXTENT, STRIDE } from './builders';
+import { BUILDERS, CHAINS, CrPose, EXTENT, ST, STRIDE, digPose } from './builders';
 import { followChain, TRAIL_CAP, TRAIL_RELAX, TRAIL_STEP } from './chainTrail';
 import type { Creature } from '../../sim/types';
 import { CREATURES } from '../../sim/creatures/kinds';
@@ -54,6 +54,9 @@ const BLOB: Record<string, number> = {
 };
 
 const BLOB_SURF = { rough: 0.6, gloss: 0.2, pattern: 0, scale: 1 };
+/** creatures whose eyes shine back at night (wolf spiders: the tapetum behind the big front eyes) */
+const EYESHINE = new Set(['wolfSpider', 'hogna']);
+const EYESHINE_MAX = 64;
 
 const _s = new THREE.Vector3();
 const _fx = new THREE.Vector3();
@@ -96,6 +99,12 @@ export class CreatureRenderer {
   private dbgPos: Float32Array = new Float32Array(0);
   private dbgCol: Float32Array = new Float32Array(0);
   private dbgN = 0;
+
+  /** 0..1: a story level's night (set by the session): wolf spiders' eyes shine back at the camera (eyeshine) */
+  night = 0;
+  private glints: THREE.Points | null = null;
+  private glintPos = new Float32Array(EYESHINE_MAX * 3);
+  private glintCol = new Float32Array(EYESHINE_MAX * 3);
 
   constructor(name = 'creatures') {
     this.group = this.batch.group;
@@ -210,8 +219,8 @@ export class CreatureRenderer {
       p.hz = hz;
       p.phase = a.phase;
       p.amp = amp;
-      p.state = cr.state;
-      p.st = cr.st;
+      p.state = cr.state === ST.Dig ? digPose(CREATURES[cr.kind]?.dig?.style) : cr.state;
+      p.st = cr.state === ST.Dig ? cr.st % 1.2 : cr.st;
       p.dead = cr.dead;
       p.deadT = cr.deadT;
       p.eaten = cr.data.eaten ?? 0;
@@ -246,11 +255,87 @@ export class CreatureRenderer {
     b.end();
     this.stats.instances = b.count;
     this.flushDebug();
+    this.eyeshine(creatures, space, alpha, ground, camera);
     // forget creatures that are gone
     if (this.frame % 60 === 0) {
       for (const [id, a] of this.anim) if (this.frame - a.seen > 120) this.anim.delete(id);
       for (const [id, r] of this.recs) if (this.frame - r.frame > 120) this.recs.delete(id);
     }
+  }
+
+  /**
+   * Eyeshine (render only; claude/story/04-spec §2, "wolf spider eyes appearing at the lair mouths"): at night a wolf
+   * spider's big front eyes send light back toward the camera from the tapetum behind the retina — two pale green-white
+   * glints, bright when it faces the camera, gone when it looks away. Drawn as additive points over the bodies.
+   */
+  private eyeshine(creatures: ReadonlyArray<Creature>, space: number, alpha: number, ground: GroundFn, camera: THREE.Camera | null): void {
+    if (this.night < 0.05 || !camera || typeof document === 'undefined') {
+      if (this.glints) this.glints.visible = false;
+      return;
+    }
+    if (!this.glints) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(this.glintPos, 3));
+      g.setAttribute('color', new THREE.BufferAttribute(this.glintCol, 3));
+      const c = document.createElement('canvas');
+      c.width = c.height = 32;
+      const x = c.getContext('2d')!;
+      const gr = x.createRadialGradient(16, 16, 0, 16, 16, 16);
+      gr.addColorStop(0, 'rgba(255,255,255,1)');
+      gr.addColorStop(0.25, 'rgba(255,255,255,0.55)');
+      gr.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = gr;
+      x.fillRect(0, 0, 32, 32);
+      const m = new THREE.PointsMaterial({ size: 1.6, sizeAttenuation: true, map: new THREE.CanvasTexture(c), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      this.glints = new THREE.Points(g, m);
+      this.glints.frustumCulled = false;
+      this.glints.renderOrder = 5;
+      this.group.add(this.glints);
+    }
+    let n = 0;
+    const cp = camera.position;
+    for (const cr of creatures) {
+      if (n >= EYESHINE_MAX || cr.space !== space || cr.dead || !EYESHINE.has(cr.kind)) continue;
+      const L = cr.scale || CREATURES[cr.kind]?.length || 10;
+      const x = cr.px + (cr.x - cr.px) * alpha;
+      const z = cr.py + (cr.y - cr.py) * alpha;
+      let dh = cr.h - cr.ph;
+      dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+      const h = cr.ph + dh * alpha;
+      const fx = Math.cos(h);
+      const fz = Math.sin(h);
+      // the two big front eyes (render/creatures/builders.ts spider: 0.435 L forward, 0.25 L up, ±0.035 L), at their surface
+      const ex = x + fx * L * 0.465;
+      const ez = z + fz * L * 0.465;
+      const ey = ground(x, z) + L * 0.25;
+      // facing the camera: the eyes shine back; side on or away: nothing
+      const tx = cp.x - ex;
+      const tz = cp.z - ez;
+      const tl = Math.hypot(tx, tz) || 1;
+      const face = (fx * tx + fz * tz) / tl;
+      const k = Math.max(0, (face - 0.15) / 0.85) * this.night;
+      if (k <= 0.02) continue;
+      // (each glint a little in front of the head's surface, toward the camera, so the head itself never hides it; grass
+      // and stones in front still do)
+      const cy = cp.y - ey;
+      const cl = Math.hypot(tx, cy, tz) || 1;
+      const lift = L * 0.05;
+      for (const side of [-1, 1]) {
+        if (n >= EYESHINE_MAX) break;
+        this.glintPos[n * 3] = ex - fz * side * L * 0.035 + (tx / cl) * lift;
+        this.glintPos[n * 3 + 1] = ey + (cy / cl) * lift;
+        this.glintPos[n * 3 + 2] = ez + fx * side * L * 0.035 + (tz / cl) * lift;
+        this.glintCol[n * 3] = 0.78 * k;
+        this.glintCol[n * 3 + 1] = 0.95 * k;
+        this.glintCol[n * 3 + 2] = 0.72 * k;
+        n++;
+      }
+    }
+    const g = this.glints.geometry;
+    g.setDrawRange(0, n);
+    (g.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    (g.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+    this.glints.visible = n > 0;
   }
 
   private recOf(id: number): ClimbRec & { full: boolean } {

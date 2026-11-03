@@ -143,6 +143,8 @@ export interface CaveOptions {
   food?: number;
   /** hex radius (defaults to the size used for a 4 mm worker) */
   R?: number;
+  /** story lairs: how its mouth is drawn (a stony den, or a spider's burrow with a silk turret) */
+  look?: 'den' | 'burrow';
 }
 
 /**
@@ -191,7 +193,7 @@ export function createCave(w: World, o: CaveOptions): number {
   }
   g.addEntrance(path.slice(-ENTRANCE.caveTunnelLen).reverse());
   w.addGrid(space, g);
-  const def: CaveDef = { space, name: o.name, kind: o.kind, entrances: [makeEntrance(entQ, o.at.x, o.at.y, w.time)], nx: o.at.x, ny: o.at.y + 20 };
+  const def: CaveDef = { space, name: o.name, kind: o.kind, entrances: [makeEntrance(entQ, o.at.x, o.at.y, w.time)], nx: o.at.x, ny: o.at.y + 20, ...(o.look ? { look: o.look } : {}) };
   w.s.caves.push(def);
   // Food on the cavern floor: a seed cache, and a dead insect or two.
   let left = o.food ?? (o.kind === 'cave' ? 60 : 40);

@@ -5,7 +5,7 @@
  */
 import type { MapStyle } from '../world/terrain';
 
-export type MapId = 'meadowPond' | 'forestFloor' | 'riverbank' | 'rainforest' | 'savanna' | 'testPond' | 'gardenBelow' | 'fireBanks' | 'testTerrace';
+export type MapId = 'meadowPond' | 'forestFloor' | 'riverbank' | 'rainforest' | 'savanna' | 'testPond' | 'gardenBelow' | 'fireBanks' | 'stonyHollow' | 'spiderTerrace' | 'testTerrace';
 
 /** A point in mm. */
 export type Pt = readonly [number, number];
@@ -153,6 +153,12 @@ export interface MapDef {
   sites: Site[];
   /** balanced site sets by colony count; the 10-colony set lists every site */
   siteSets: { 2: number[][]; 3: number[][]; 4: number[][]; 10: number[][] };
+  /**
+   * Hand-picked team layouts (CHANGE_PLAN §23): by team shape (group sizes, biggest first: "2v2", "2v1", "3v1",
+   * "2v2v2", "2v1v1"), the sites of each group in that order (groups of a size in colony order, members taking their
+   * group's sites in colony order). Shapes not listed are placed by the search (world/teamSites.ts).
+   */
+  teamSets?: Record<string, number[][]>;
   zones: Zone[];
   floods: FloodZone[];
   /** sparse per-hex type paint from the editor, applied last: [hex index, HexType] */

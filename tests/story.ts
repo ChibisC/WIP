@@ -22,7 +22,7 @@ import { storyMedals, storySetup, storyStolen } from '../src/sim/story/runner';
 import { storyOf, hasFlag } from '../src/sim/story/state';
 import { members, wherePt } from '../src/sim/story/director';
 import { evalObjective } from '../src/sim/story/objectives';
-import type { Objective, StoryLevelDef } from '../src/sim/story/types';
+import type { Objective, StoryLevelDef, StoryLevelId } from '../src/sim/story/types';
 import { STORY_LEVELS } from '../src/story/levels';
 import { EN } from '../src/story/text/en';
 import { STORY, LAYERS } from '../src/sim/balance';
@@ -45,7 +45,7 @@ const run = (w: World, ticks: number) => {
     w.events.drain();
   }
 };
-const level = (id: 'garden' | 'fireBanks', diff: 'easy' | 'normal' | 'hard' | 'brutal' = 'normal', loadout: string[] = [], seed = 5, ev = new EventBus()) => createWorld(storySetup(id, diff, loadout, seed), ev);
+const level = (id: StoryLevelId, diff: 'easy' | 'normal' | 'hard' | 'brutal' = 'normal', loadout: string[] = [], seed = 5, ev = new EventBus()) => createWorld(storySetup(id, diff, loadout, seed), ev);
 /** Run until a flag is set (or a limit in seconds); returns the game time it was set, −1 if never. */
 function until(w: World, flag: string, secs: number): number {
   const st = storyOf(w)!;
@@ -365,7 +365,7 @@ for (const id of ['gardenBelow', 'fireBanks'] as const) {
   reloadCampaign();
   check('campaign: a new campaign opens level 1 only, one stolen-caste slot', isUnlocked('garden') && !isUnlocked('fireBanks') && slots() === 1 && campaign().castes.length === 0);
   const r = recordWin('garden', 'normal', { time: 'silver', losses: 'gold', bonus: 'none', seconds: 1500, lost: 12 }, ['lasius_soldier'], { caste: 'lasius_soldier' });
-  check('campaign: a win keeps the caste, opens level 2 and writes a journal page', r.firstWin && r.newCastes.join() === 'lasius_soldier' && isUnlocked('fireBanks') && campaign().journal.length === 1);
+  check('campaign: a win keeps the caste, opens level 2 (The Long Nights) and writes a journal page', r.firstWin && r.newCastes.join() === 'lasius_soldier' && isUnlocked('longNights') && !isUnlocked('fireBanks') && campaign().journal.length === 1);
   recordWin('garden', 'hard', { time: 'gold', losses: 'bronze', bonus: 'gold', seconds: 1100, lost: 40 }, ['lasius_soldier'], null);
   const rec = campaign().levels.garden!;
   check('campaign: replays keep the best of each medal, the fastest time and the hardest difficulty', rec.time === 'gold' && rec.losses === 'gold' && rec.bonus === 'gold' && rec.bestSeconds === 1100 && rec.hardest === 'hard' && campaign().castes.length === 1);
