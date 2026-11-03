@@ -74,6 +74,8 @@ export class TerrainMesh {
   /** wetness left in each flood zone after it drains (0..1) and when it was last flooded (s, performance clock) */
   private zoneWet = [0, 0, 0, 0];
   private stormWet = 0;
+  /** a story level's rain shower is falling (set by the session each frame): the ground wets as in a storm */
+  raining = false;
   private lastT = 0;
 
   constructor(private terrain: Terrain, margin = 320) {
@@ -171,7 +173,7 @@ export class TerrainMesh {
       } else this.zoneWet[i] = Math.max(0, this.zoneWet[i] - dt / 150); // drains in about 2½ minutes
     }
     const floor = this.terrain.map?.id === 'gardenBelow' ? 0.2 : 0;
-    this.stormWet = flooding ? Math.min(0.55, this.stormWet + dt * 0.1) : Math.max(floor, this.stormWet - dt / 240);
+    this.stormWet = flooding || this.raining ? Math.min(0.55, this.stormWet + dt * 0.1) : Math.max(floor, this.stormWet - dt / 240);
     this.groundUniforms.uZoneWet.value.set(this.zoneWet[0], this.zoneWet[1], this.zoneWet[2], this.zoneWet[3]);
     this.groundUniforms.uStormWet.value = this.stormWet;
   }

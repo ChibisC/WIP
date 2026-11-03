@@ -4,6 +4,7 @@ import { Input } from '../core/input';
 import { Terrain } from '../world/terrain';
 import { NestGrid } from '../world/nestGrid';
 import { TerrainMesh } from './terrainMesh';
+import { RainFX } from './rainFX';
 import { Grass } from './grass';
 import { MapDecor } from './mapDecor';
 import { BIOME_LIGHT, applyBiomeLight } from './mapBiomes';
@@ -100,6 +101,8 @@ export class GameView {
   water: Water | null = null;
   surfaceLights: SurfaceLights;
   worldGroup = new THREE.Group();
+  /** falling rain while a storm or a story shower is on (render only) */
+  readonly rain = new RainFX();
   private transition: Transition | null = null;
   /** area → area cut: fade to black, swap, fade back */
   private areaFade: { t: number; swapped: boolean; swap: () => void } | null = null;
@@ -144,6 +147,7 @@ export class GameView {
     this.post = new PostPipeline(this.renderer);
     this.surfaceLights = createSurfaceEnvironment(this.renderer, this.surfaceScene);
     this.surfaceScene.add(this.worldGroup);
+    this.surfaceScene.add(this.rain.lines);
     this.fadeEl = document.createElement('div');
     this.fadeEl.className = 'view-fade';
     document.getElementById('app')!.appendChild(this.fadeEl);
@@ -657,6 +661,8 @@ export class GameView {
     this.post.tilt = this.observing ? 0.15 : this.space === 'surface' ? 0.55 : 0.45;
     this.post.settings.dofStrength = this.observing ? 1.2 : 1;
     this.applyStorm(dt);
+    const rig = this.observing ? null : this.surfaceRig;
+    this.rain.update(this.space === 'surface' ? this.stormShown : 0, rig ? rig.target : this.observeRig.smoothSubject, rig ? rig.distance : this.observeRig.distance * 3, this.time);
     this.applyGrade();
     this.applyCreatureLight();
     this.post.render(this.activeScene(), cam);
