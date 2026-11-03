@@ -403,6 +403,27 @@ export function developChambers(w: World, c: Colony, plan: Array<{ type: TileTyp
   }
 }
 
+/**
+ * Highways on a developed head start's passage and tunnels, as the builder paves them later in a game (`highwayOne`):
+ * every dug hex outside the rooms and the entrance flower, placed instant and free. For a player's developed nest
+ * (story levels), so it starts the way an AI nest looks a little way into a game.
+ */
+export function developHighways(w: World, c: Colony): number {
+  const g = w.nest(c.id);
+  if (!g) return 0;
+  const b = brainOf(c);
+  const home = homeHex(w, c);
+  const roomOf = new Set<number>();
+  for (const ch of [founding(c, home), ...(b.chambers ?? [])]) for (const q of disc(g, ch.q, chR(ch))) roomOf.add(q);
+  const occupied = new Set(c.tiles.map((t) => t.q));
+  let n = 0;
+  for (let q = 0; q < g.cols * g.rows; q++) {
+    if (!g.isHexDug(q) || g.isEntrance(q) || occupied.has(q) || roomOf.has(q)) continue;
+    if (placeTile(w, c, 'highway', q, undefined, true)) n++;
+  }
+  return n;
+}
+
 /** Put one tile in its own kind of room, from the room's centre outward. False when no room has a free hex. */
 function place(w: World, c: Colony, b: BuildBrain, home: number, occupied: Set<number>, type: TileType, caste?: string): boolean {
   const g = w.nest(c.id)!;
