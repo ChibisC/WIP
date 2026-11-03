@@ -438,22 +438,36 @@ export class GameView {
     this.areaFade = { t: 0, swapped: false, swap };
   }
 
+  /** the fade's opacity (performance pass: while it is fully opaque the scene under it is not drawn) */
+  private fadeK = 0;
+
+  private setFade(k: number): void {
+    if (k === this.fadeK) return;
+    this.fadeK = k;
+    this.fadeEl.style.opacity = String(k);
+  }
+
+  /** The fade covers the view completely: the frame under it would not be seen. */
+  get fadedOut(): boolean {
+    return this.fadeK >= 0.999;
+  }
+
   private updateAreaFade(dt: number): void {
     const f = this.areaFade!;
     f.t += dt;
     const OUT = 0.2;
     const IN = 0.32;
     if (!f.swapped) {
-      this.fadeEl.style.opacity = String(Math.min(1, f.t / OUT));
+      this.setFade(Math.min(1, f.t / OUT));
       if (f.t >= OUT) {
         f.swapped = true;
         f.swap();
         f.t = 0;
       }
     } else {
-      this.fadeEl.style.opacity = String(Math.max(0, 1 - f.t / IN));
+      this.setFade(Math.max(0, 1 - f.t / IN));
       if (f.t >= IN) {
-        this.fadeEl.style.opacity = '0';
+        this.setFade(0);
         this.areaFade = null;
       }
     }
@@ -474,7 +488,7 @@ export class GameView {
         this.nestRig.goal.set(tr.entranceNest.x, 0, tr.entranceNest.y);
         this.nestRig.goalDistance = THREE.MathUtils.lerp(this.nestRig.goalDistance, this.nestRig.minDist * 1.2, e * 0.25);
       }
-      this.fadeEl.style.opacity = String(Math.min(1, e * 1.1));
+      this.setFade(Math.min(1, e * 1.1));
       if (t >= 0.5) {
         tr.swapped = true;
         this.space = tr.to;
@@ -490,11 +504,11 @@ export class GameView {
       }
     } else {
       const k = (t - 0.5) / 0.5;
-      this.fadeEl.style.opacity = String(Math.max(0, 1 - k * 1.4));
+      this.setFade(Math.max(0, 1 - k * 1.4));
     }
     if (t >= 1) {
       this.transition = null;
-      this.fadeEl.style.opacity = '0';
+      this.setFade(0);
     }
   }
 
@@ -682,6 +696,10 @@ export class GameView {
     this.applyStorm(dt);
     this.applyGrade();
     this.applyCreatureLight();
+    // Behind a fully opaque fade (the dive's and the area cut's black frames, the swap's frame among them) nothing is
+    // drawn: the leaving scene costs nothing while the swap's own work runs, and the new scene's first draw moves to
+    // the next frame (performance pass, spec §2)
+    if (this.fadedOut) return;
     prof.gpuBegin();
     this.post.render(this.activeScene(), cam);
     prof.gpuEnd();

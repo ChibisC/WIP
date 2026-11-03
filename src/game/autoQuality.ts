@@ -5,6 +5,14 @@
  */
 import type { GameView, Quality } from '../render/view';
 import { TOUCH } from '../core/device';
+import { prof } from '../core/profiler';
+
+/**
+ * The phone and tablet GPU memory budget (performance pass): the browser shares the device's memory with the page,
+ * and an iPhone's Safari drops a WebGL context well before the desktop would. Over it, the preset steps down (render
+ * targets and the shadow map shrink); it does not come back up until well under it. MB, estimated (core/profiler.ts).
+ */
+export const MOBILE_GPU_BUDGET_MB = 600;
 
 const ORDER: Quality[] = ['low', 'medium', 'high'];
 
@@ -18,16 +26,33 @@ export class AutoQuality {
   /** last change, for the debug overlay */
   lastChange = '';
 
-  /** Call every frame with the real frame time (s). */
-  update(view: GameView, realDt: number): void {
+  private memT = 0;
+
+  /**
+   * Call every frame with the real frame time (s) and the frame cap in force (0 none). Under a cap the frame time
+   * cannot fall below the cap's, so "fast" is judged by the main thread's own time instead.
+   */
+  update(view: GameView, realDt: number, cap = 0): void {
     if (!this.enabled || realDt <= 0 || realDt > 0.5) return; // ignore tab switches and loading hitches
     const ms = realDt * 1000;
     this.ema = this.ema * 0.9 + ms * 0.1;
     const i = ORDER.indexOf(view.quality);
-    if (this.ema > 18) {
+    // the phone memory budget comes first
+    const mem = TOUCH ? prof.gpuMB() : 0;
+    this.memT = mem > MOBILE_GPU_BUDGET_MB ? this.memT + realDt : 0;
+    if (this.memT > 2 && i > 0) {
+      view.setQuality(ORDER[i - 1]);
+      this.lastChange = `down to ${ORDER[i - 1]} (GPU memory ${mem.toFixed(0)} MB, over the ${MOBILE_GPU_BUDGET_MB} MB budget)`;
+      this.memT = 0;
+      return;
+    }
+    // (frame-time targets: 60 fps, or the cap's rate)
+    const target = cap > 0 ? 1000 / cap : 1000 / 60;
+    const fast = cap > 0 ? this.ema < target * 1.03 && prof.cpuMs.ema < target * 0.45 : this.ema < target * 0.66;
+    if (this.ema > target * 1.08) {
       this.slowT += realDt;
       this.fastT = 0;
-    } else if (this.ema < 11) {
+    } else if (fast && mem < MOBILE_GPU_BUDGET_MB * 0.75) {
       this.fastT += realDt;
       this.slowT = 0;
     } else {

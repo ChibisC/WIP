@@ -35,11 +35,21 @@ export function TINT_GLSL(code: string): string {
   return `if (${code} > 0.5 && ${code} < 1.5) diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.15, 0.95, 0.7) + vec3(0.05, 0.026, 0.004), ${k});`;
 }
 
+/**
+ * LOD cross-fade (performance pass): while an ant changes model, both are drawn, each in the pixels the other leaves
+ * (the same per-pixel noise, split at the fade's level), so the change dissolves instead of popping. 0 = drawn whole.
+ */
+export function LOD_FADE_GLSL(v: string): string {
+  return `if (${v} != 0.0) { float lodN = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))); if (${v} > 0.0 ? lodN >= ${v} : lodN < -${v}) discard; }`;
+}
+
 const ANIM_HEADER = /* glsl */ `
 attribute float aPart;
 attribute vec4 aSurf;
 attribute vec4 aA; attribute vec4 aB; attribute vec4 aC; attribute vec4 aD;
 attribute vec4 aE; // Saiy-Ants: gold 0..1, ripple dir ±1, exhausted 0..1, hair sway −1..1
+attribute float aF; // LOD cross-fade (performance pass): 0 whole; t > 0 only the pixels below t; −t those at or above t
+varying float vFade;
 varying vec4 vGold;
 uniform float uMandVert; uniform float uMandSwing; uniform float uMandOpen; uniform vec3 uCrest;
 uniform vec3 uLegCoxa[6]; uniform vec3 uLegKnee[6]; uniform vec3 uLegAnkle[6]; uniform vec3 uLegAxis[6]; uniform vec3 uLegFoot[6]; uniform vec3 uLegHome[6];
@@ -137,6 +147,7 @@ vec3 animP = position;
   float bodyUp = stanceW * uGait.w * 0.06 - bT3.y * uGait.w * 0.08;
   vec3 UP = vec3(0.0, 1.0, 0.0);
   vec3 RIGHT = vec3(0.0, 0.0, 1.0);
+  vFade = aF;
   vSurf = aSurf; vLocal = position / uGait.w; vTint = floor((aD.z + 2.0) / 4.0); vColorVar = aD.z - 4.0 * vTint;
   vPartF = aPart;
 
@@ -416,6 +427,7 @@ vec3 animP = position;
 
 const FRAG_HEADER = /* glsl */ `
 varying vec4 vSurf; varying vec3 vLocal; varying float vColorVar; varying float vTint; varying vec4 vGold; uniform float uGoldTime;
+varying float vFade;
 varying float vHit;
 varying float vRage;
 varying float vDry;
@@ -462,6 +474,7 @@ export function antPatch(): ShaderPatch {
       [
         '#include <color_fragment>',
         `#include <color_fragment>
+         ${LOD_FADE_GLSL('vFade')}
          diffuseColor.rgb *= 1.0 + vColorVar * 0.14;
          if (uReal > 0.5) {
            // each ant a little different: hue and saturation as well as value

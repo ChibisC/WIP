@@ -70,6 +70,28 @@ interface GlWork {
   bufMs: number;
 }
 
+/** Bytes per pixel of a sized internal format (WebGL 2), 4 when not known. */
+function bppOf(gl: WebGL2RenderingContext, f: number): number {
+  switch (f) {
+    case gl.R8:
+      return 1;
+    case gl.RG8:
+    case gl.R16F:
+    case gl.DEPTH_COMPONENT16:
+      return 2;
+    case gl.RGBA16F:
+    case gl.RG32F:
+      return 8;
+    case gl.RGBA32F:
+      return 16;
+    case gl.R32F:
+    case gl.RG16F:
+      return 4;
+    default:
+      return 4;
+  }
+}
+
 const blankGl = (): GlWork => ({ compiles: 0, links: 0, compileMs: 0, texUploads: 0, texBytes: 0, texMs: 0, bufBytes: 0, bufMs: 0 });
 
 export const HITCH_MS = 33;
@@ -108,6 +130,13 @@ export class Profiler {
   private queries: WebGLQuery[] = [];
   private queryOpen: WebGLQuery | null = null;
   gpuSupported = false;
+  /** live GPU memory, estimated (bytes): textures, renderbuffers, buffers */
+  mem = { tex: 0, rb: 0, buf: 0 };
+
+  /** The GPU memory estimate in MB. */
+  gpuMB(): number {
+    return (this.mem.tex + this.mem.rb + this.mem.buf) / 1048576;
+  }
 
   /** Watch a renderer's context: GL calls are counted and timed, and GPU time is measured where supported. */
   attach(renderer: THREE.WebGLRenderer): void {
@@ -160,6 +189,83 @@ export class Profiler {
     };
     wrap('bufferData', buf);
     wrap('bufferSubData', buf);
+    // GPU memory, estimated (performance pass, the mobile budget): the size given for each live texture, renderbuffer
+    // and buffer, tracked through their binds, uploads and deletes
+    const mem = this.mem;
+    let unit = 0;
+    const boundTex = new Map<number, unknown>();
+    const boundBuf = new Map<number, unknown>();
+    let boundRb: unknown = null;
+    const setSize = (kind: 'tex' | 'rb' | 'buf', map: Map<unknown, number>, o: unknown, bytes: number) => {
+      if (!o) return;
+      mem[kind] += bytes - (map.get(o) ?? 0);
+      map.set(o, bytes);
+    };
+    const drop = (kind: 'tex' | 'rb' | 'buf', map: Map<unknown, number>) => (_ms: number, a: unknown[]) => {
+      const n = map.get(a[0]);
+      if (n !== undefined) {
+        mem[kind] -= n;
+        map.delete(a[0]);
+      }
+    };
+    const texSizes = new Map<unknown, number>();
+    const rbSizes = new Map<unknown, number>();
+    const bufSizes = new Map<unknown, number>();
+    wrap('activeTexture', (_ms, a) => (unit = (a[0] as number) - gl.TEXTURE0));
+    wrap('bindTexture', (_ms, a) => boundTex.set(unit * 65536 + (a[0] as number), a[1]));
+    wrap('bindBuffer', (_ms, a) => boundBuf.set(a[0] as number, a[1]));
+    wrap('bindRenderbuffer', (_ms, a) => (boundRb = a[1]));
+    wrap('deleteTexture', drop('tex', texSizes));
+    wrap('deleteBuffer', drop('buf', bufSizes));
+    wrap('deleteRenderbuffer', drop('rb', rbSizes));
+    const texTarget = (t: number) => (t >= gl.TEXTURE_CUBE_MAP_POSITIVE_X && t <= gl.TEXTURE_CUBE_MAP_NEGATIVE_Z ? gl.TEXTURE_CUBE_MAP : t);
+    const faces = (t: number) => (t === gl.TEXTURE_CUBE_MAP ? 6 : 1);
+    wrap('texStorage2D', (_ms, a) => {
+      const t = a[0] as number;
+      const levels = a[1] as number;
+      setSize('tex', texSizes, boundTex.get(unit * 65536 + t), (a[3] as number) * (a[4] as number) * bppOf(gl, a[2] as number) * faces(t) * (levels > 1 ? 4 / 3 : 1));
+    });
+    wrap('texStorage3D', (_ms, a) => {
+      setSize('tex', texSizes, boundTex.get(unit * 65536 + (a[0] as number)), (a[3] as number) * (a[4] as number) * (a[5] as number) * bppOf(gl, a[2] as number) * ((a[1] as number) > 1 ? 4 / 3 : 1));
+    });
+    wrap('texImage2D', (_ms, a) => {
+      if (a[1] !== 0) return; // (mip levels: counted as a third on top of level 0)
+      const t = a[0] as number;
+      const key = unit * 65536 + texTarget(t);
+      let w = 0;
+      let h = 0;
+      let type = 0;
+      if (a.length >= 8) {
+        w = a[3] as number;
+        h = a[4] as number;
+        type = a[7] as number;
+      } else {
+        const o = a[5] as { width?: number; height?: number } | null;
+        w = o?.width ?? 0;
+        h = o?.height ?? 0;
+        type = a[4] as number;
+      }
+      const bpp = type === gl.FLOAT ? 16 : type === gl.HALF_FLOAT ? 8 : 4;
+      const o = boundTex.get(key);
+      const f = texTarget(t) === gl.TEXTURE_CUBE_MAP ? 6 : 1;
+      // (a cube map's faces arrive one by one: each sets a sixth)
+      setSize('tex', texSizes, o, f === 6 ? Math.max(texSizes.get(o) ?? 0, w * h * bpp * 6) : w * h * bpp);
+    });
+    wrap('generateMipmap', (_ms, a) => {
+      const o = boundTex.get(unit * 65536 + (a[0] as number));
+      const n = texSizes.get(o);
+      if (o && n !== undefined && !mipped.has(o)) {
+        mipped.add(o);
+        setSize('tex', texSizes, o, (n * 4) / 3);
+      }
+    });
+    const mipped = new WeakSet<object>();
+    wrap('renderbufferStorage', (_ms, a) => setSize('rb', rbSizes, boundRb, (a[2] as number) * (a[3] as number) * bppOf(gl, a[1] as number)));
+    wrap('renderbufferStorageMultisample', (_ms, a) => setSize('rb', rbSizes, boundRb, (a[1] as number) * (a[3] as number) * (a[4] as number) * bppOf(gl, a[2] as number)));
+    wrap('bufferData', (_ms, a) => {
+      const x = a[1];
+      setSize('buf', bufSizes, boundBuf.get(a[0] as number), ArrayBuffer.isView(x) ? x.byteLength : typeof x === 'number' ? x : 0);
+    });
     const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2') as { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number } | null;
     if (ext) {
       this.ext = ext;

@@ -1741,7 +1741,7 @@ export class GameSession {
     pt = performance.now();
     v.frame(realDt, !cineOn);
     prof.add('render', performance.now() - pt);
-    this.autoQuality.update(v, realDt);
+    this.autoQuality.update(v, realDt, this.loop.frameCap);
     pt = performance.now();
     this.onFrame?.();
     prof.add('ui', performance.now() - pt);

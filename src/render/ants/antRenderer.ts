@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { prof } from '../../core/profiler';
+import { camCuts } from '../cameras';
 import { AntRig, buildAnt } from './antGeometry';
-import { BODY_TEX, createAntMaterials, createAntGlueShell, POSE, TINT_GLSL } from './antMaterial';
+import { BODY_TEX, createAntMaterials, createAntGlueShell, LOD_FADE_GLSL, POSE, TINT_GLSL } from './antMaterial';
 import { ATK, ATTACK_CONTACT, AttackPose, applyAttackBody, attackPose, attackPoseV2, neutralPose } from './attackPoses';
 import { AntMorph, MORPHS } from './morphs';
 import { ANIM_SFX, animV2, AtkPlan, attackPlan, Motion2, newMotion, newMotionOut, stepMotion } from './antMotion';
@@ -190,7 +191,16 @@ interface AnimState {
   ahi?: boolean;
   aho?: boolean;
   piv?: number;
+  /** LOD cross-fade (performance pass): the LOD shown, the one fading out (−1 none), the fade 0..1, last frame drawn */
+  lod?: number;
+  lodFrom?: number;
+  lodT?: number;
+  lodSeen?: number;
 }
+
+/** LOD cross-fade length (s) and the hysteresis round each switching size (×/÷) */
+const LOD_FADE = 0.25;
+const LOD_HYST = 1.06;
 
 const LOD_NAMES = ['lod0', 'lod1', 'imp'] as const;
 
@@ -211,7 +221,7 @@ const impostorCache = new Map<string, THREE.MeshStandardMaterial>();
 
 class Bucket {
   meshes: THREE.InstancedMesh[] = [];
-  attrs: Array<{ a: THREE.InstancedBufferAttribute; b: THREE.InstancedBufferAttribute; c: THREE.InstancedBufferAttribute; d: THREE.InstancedBufferAttribute; e: THREE.InstancedBufferAttribute }> = [];
+  attrs: Array<{ a: THREE.InstancedBufferAttribute; b: THREE.InstancedBufferAttribute; c: THREE.InstancedBufferAttribute; d: THREE.InstancedBufferAttribute; e: THREE.InstancedBufferAttribute; f: THREE.InstancedBufferAttribute }> = [];
   counts = [0, 0, 0];
   capacity = [0, 0, 0];
   rig: AntRig;
@@ -245,7 +255,8 @@ class Bucket {
     }
     const geo = this.geos[l].clone();
     const mk = () => new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4).setUsage(THREE.DynamicDrawUsage);
-    const at = { a: mk(), b: mk(), c: mk(), d: mk(), e: mk() };
+    const at = { a: mk(), b: mk(), c: mk(), d: mk(), e: mk(), f: new THREE.InstancedBufferAttribute(new Float32Array(cap), 1).setUsage(THREE.DynamicDrawUsage) };
+    geo.setAttribute('aF', at.f);
     geo.setAttribute('aA', at.a);
     geo.setAttribute('aB', at.b);
     geo.setAttribute('aC', at.c);
@@ -395,6 +406,9 @@ const atkP = neutralPose({} as AttackPose);
 const plan: AtkPlan = { variant: 0, holdIn: false, holdOut: false, piv: 0 };
 
 const tmpM = new THREE.Matrix4();
+/** the far impostor's matrix when its on-screen size is clamped up (LOD cross-fade: the near model keeps tmpM) */
+const tmpMb = new THREE.Matrix4();
+const vSb = new THREE.Vector3();
 const tmpQ = new THREE.Quaternion();
 const vF = new THREE.Vector3();
 const vU = new THREE.Vector3();
@@ -515,6 +529,7 @@ export class AntRenderer {
   group = new THREE.Group();
   private buckets = new Map<string, Bucket>();
   private anim = new Map<number, AnimState>();
+  private lastCut = -1;
   private frame = 0;
   /**
    * Carried loads (render only): where each carrying ant's jaws are this frame — the posed head (its pitch and yaw
@@ -665,20 +680,21 @@ export class AntRenderer {
     addPatch(mat, {
       key: 'impostor',
       uniforms: { uSpan: { value: span } },
-      vertexHeader: 'attribute vec4 aA; attribute vec4 aD; attribute vec4 aE; uniform float uSpan; varying vec2 vGoldI; varying float vTintI;',
-      fragmentHeader: 'varying vec2 vGoldI; varying float vTintI;',
+      vertexHeader: 'attribute vec4 aA; attribute vec4 aD; attribute vec4 aE; attribute float aF; uniform float uSpan; varying vec2 vGoldI; varying float vTintI; varying float vFadeI;',
+      fragmentHeader: 'varying vec2 vGoldI; varying float vTintI; varying float vFadeI;',
       // far away a Saiy-Ant in its gold surge still reads as a gold speck; exhausted ones look dull
       fragment: [
         [
           '#include <map_fragment>',
           `#include <map_fragment>
+           ${LOD_FADE_GLSL('vFadeI')}
            diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.78, 0.55, 0.16), vec3(1.0, 0.84, 0.38), dot(diffuseColor.rgb, vec3(0.33)) * 1.6), clamp(vGoldI.x, 0.0, 1.0) * 0.85);
            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * 0.8, vGoldI.y * 0.5);
            ${TINT_GLSL('vTintI')}`,
         ],
       ],
       vertex: [
-        ['#include <begin_vertex>', 'vGoldI = vec2(abs(aE.x), aE.z); vTintI = floor((aD.z + 2.0) / 4.0);\n#include <begin_vertex>'],
+        ['#include <begin_vertex>', 'vGoldI = vec2(abs(aE.x), aE.z); vTintI = floor((aD.z + 2.0) / 4.0); vFadeI = aF;\n#include <begin_vertex>'],
         [
           '#include <uv_vertex>',
           `#include <uv_vertex>
@@ -702,6 +718,9 @@ export class AntRenderer {
    */
   update(views: AntView[], alpha: number, dt: number, camera: THREE.PerspectiveCamera, adapter: AntSpaceAdapter, viewportH: number): void {
     this.frame++;
+    // a camera cut (jumpTo) shows every ant at its LOD at once: nothing to cross-fade from
+    const cut = camCuts.n !== this.lastCut;
+    this.lastCut = camCuts.n;
     for (const b of this.buckets.values()) {
       b.counts.fill(0);
       b.shellN.fill(0);
@@ -1091,41 +1110,82 @@ export class AntRenderer {
       if (!frustum.intersectsSphere(sphere)) continue;
       const dist = Math.max(1e-3, camPos.distanceTo(vP));
       const px = (rig.length * scale * pxPerMmAt1) / dist;
-      let lod = px > this.lod0Px / this.lodScale ? 0 : px > this.lod1Px / this.lodScale ? 1 : 2;
-      if (v.selected && lod === 2) lod = 1;
-      if (lod === 2 && px < this.minImpostorPx) {
-        // Keep swarms readable when zoomed far out: clamp the on-screen size.
-        const boost = Math.min(4, this.minImpostorPx / Math.max(px, 0.5));
-        vS.setScalar(scale * boost);
-        tmpM.compose(vP, tmpQ, vS);
+      const T0 = this.lod0Px / this.lodScale;
+      const T1 = this.lod1Px / this.lodScale;
+      let want = px > T0 ? 0 : px > T1 ? 1 : 2;
+      if (v.selected && want === 2) want = 1;
+      // LOD cross-fade (performance pass): a change of model dissolves over LOD_FADE seconds (both drawn, each in the
+      // other's dithered pixels) instead of popping; a little hysteresis keeps an ant at a switching size from
+      // flickering. An ant that just came into view, a camera cut and a new space take the LOD at once, as before.
+      if (s.lod === undefined || s.lodSeen !== this.frame - 1 || cut) {
+        s.lod = want;
+        s.lodFrom = -1;
+        s.lodT = 1;
+      } else if (want !== s.lod) {
+        const edge = want < s.lod ? (s.lod === 2 ? T1 : T0) : s.lod === 0 ? T0 : T1;
+        const hold = want < s.lod ? px < edge * LOD_HYST : px > edge / LOD_HYST;
+        if (!hold || (v.selected && s.lod === 2)) {
+          if (s.lodFrom === want && s.lodT! < 1) {
+            s.lodFrom = s.lod;
+            s.lodT = 1 - s.lodT!;
+          } else {
+            s.lodFrom = s.lod;
+            s.lodT = 0;
+          }
+          s.lod = want;
+        }
       }
-      let n = b.counts[lod];
-      if (n >= b.capacity[lod]) {
-        b.alloc(lod, b.capacity[lod] * 2, this.shadows);
+      if (s.lodT! < 1) {
+        s.lodT = Math.min(1, s.lodT! + dt / LOD_FADE);
+        if (s.lodT >= 1) s.lodFrom = -1;
       }
-      const mesh = b.meshes[lod];
-      const at = b.attrs[lod];
-      n = b.counts[lod]++;
-      mesh.setMatrixAt(n, tmpM);
-      if (lod < 2 && b.bodyTex[lod]) {
-        if (M) b.writeBody(lod, n, bodyBuf);
-        else b.writeBody(lod, n, zeroBody);
+      s.lodSeen = this.frame;
+      const lod = s.lod;
+      const glueAt = lod < 2 ? lod : s.lodFrom! >= 0 && s.lodFrom! < 2 ? s.lodFrom! : -1;
+      // the shown LOD, then the one fading out (aF: 0 whole; t > 0 the pixels below t; −t the pixels at or above t)
+      for (let pass = 0; pass < 2; pass++) {
+        const l = pass === 0 ? lod : s.lodFrom!;
+        if (l < 0) break;
+        const fade = s.lodFrom! < 0 ? 0 : pass === 0 ? Math.max(0.002, s.lodT!) : -s.lodT!;
+        let m = tmpM;
+        if (l === 2 && px < this.minImpostorPx) {
+          // Keep swarms readable when zoomed far out: clamp the on-screen size.
+          const boost = Math.min(4, this.minImpostorPx / Math.max(px, 0.5));
+          vSb.setScalar(scale * boost);
+          m = tmpMb.compose(vP, tmpQ, vSb);
+        }
+        let n = b.counts[l];
+        if (n >= b.capacity[l]) {
+          b.alloc(l, b.capacity[l] * 2, this.shadows);
+        }
+        const mesh = b.meshes[l];
+        const at = b.attrs[l];
+        n = b.counts[l]++;
+        mesh.setMatrixAt(n, m);
+        if (l < 2 && b.bodyTex[l]) {
+          if (M) b.writeBody(l, n, bodyBuf);
+          else b.writeBody(l, n, zeroBody);
+        }
+        at.f.setX(n, fade);
+        at.a.setXYZW(n, s.phase, s.amp, hy, hp);
+        at.b.setXYZW(n, mo, act * 0.3 + (v.antennaPitch > 0.5 ? 0.6 : 0) + (M ? M.antSpread : 0), s.ap, s.wave);
+        // pose id + 0.99 × its weight; the hit flash
+        // (the rage glow rides in the same channel: + 2 × its level 0..10 — user rating E7: a glow in the body, not the
+        // whole ant turned red)
+        at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, (M ? M.flash : 0) + 2 * Math.round(Math.min(1, Math.max(0, v.rageGlow ?? 0)) * 10));
+        // colour variation −1..1, plus 4 × the Termant tint code (decoded in the shader); the planted feet's stance sweep
+        at.d.setXYZW(n, M ? M.deathLeg : s.death, M ? M.Dh : 0, Math.max(-1, Math.min(1, v.colorVar)) + 4 * (v.tint ?? 0), s.pph);
+        // gold × ripple direction, the planted feet's turn per stance, exhausted, hair sway
+        at.e.setXYZW(n, (v.gold ?? 0) * ((v.goldDir ?? 1) < 0 ? -1 : 1), M ? M.Ps : 0, v.exhausted ?? 0, s.sw ?? 0);
+        // termite glue clinging to the ant (render only), on one of the two while they cross-fade
+        if (pass === 0) {
+          // eases in, wears off slowly; a sickle-jaw's acid uses the same wet shell (the kit's acid and glue colours
+          // are nearly the same pale amber)
+          const gw = Math.max(v.glue ?? 0, v.acid ?? 0);
+          s.gl = damp(s.gl ?? 0, gw, gw > (s.gl ?? 0) ? 4 : 0.6, dt);
+        }
+        if (l === glueAt && s.gl! > 0.02) b.addShell(l, n, s.gl!);
       }
-      at.a.setXYZW(n, s.phase, s.amp, hy, hp);
-      at.b.setXYZW(n, mo, act * 0.3 + (v.antennaPitch > 0.5 ? 0.6 : 0) + (M ? M.antSpread : 0), s.ap, s.wave);
-      // pose id + 0.99 × its weight; the hit flash
-      // (the rage glow rides in the same channel: + 2 × its level 0..10 — user rating E7: a glow in the body, not the
-      // whole ant turned red)
-      at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, (M ? M.flash : 0) + 2 * Math.round(Math.min(1, Math.max(0, v.rageGlow ?? 0)) * 10));
-      // colour variation −1..1, plus 4 × the Termant tint code (decoded in the shader); the planted feet's stance sweep
-      at.d.setXYZW(n, M ? M.deathLeg : s.death, M ? M.Dh : 0, Math.max(-1, Math.min(1, v.colorVar)) + 4 * (v.tint ?? 0), s.pph);
-      // gold × ripple direction, the planted feet's turn per stance, exhausted, hair sway
-      at.e.setXYZW(n, (v.gold ?? 0) * ((v.goldDir ?? 1) < 0 ? -1 : 1), M ? M.Ps : 0, v.exhausted ?? 0, s.sw ?? 0);
-      // termite glue clinging to the ant (render only): eases in, wears off slowly; a sickle-jaw's acid uses the
-      // same wet shell (the kit's acid and glue colours are nearly the same pale amber)
-      const gw = Math.max(v.glue ?? 0, v.acid ?? 0);
-      s.gl = damp(s.gl ?? 0, gw, gw > (s.gl ?? 0) ? 4 : 0.6, dt);
-      if (s.gl > 0.02 && lod < 2) b.addShell(lod, n, s.gl);
       st.drawn++;
       st.lod[lod]++;
     }
@@ -1138,11 +1198,11 @@ export class AntRenderer {
         if (b.counts[l] > 0) {
           mesh.instanceMatrix.needsUpdate = true;
           const at = b.attrs[l];
-          at.a.needsUpdate = at.b.needsUpdate = at.c.needsUpdate = at.d.needsUpdate = at.e.needsUpdate = true;
+          at.a.needsUpdate = at.b.needsUpdate = at.c.needsUpdate = at.d.needsUpdate = at.e.needsUpdate = at.f.needsUpdate = true;
           const bt = b.bodyTex[l];
           if (bt) bt.needsUpdate = true;
           // Only upload the used range.
-          for (const attr of [mesh.instanceMatrix, at.a, at.b, at.c, at.d, at.e]) {
+          for (const attr of [mesh.instanceMatrix, at.a, at.b, at.c, at.d, at.e, at.f]) {
             attr.clearUpdateRanges();
             attr.addUpdateRange(0, b.counts[l] * attr.itemSize);
           }

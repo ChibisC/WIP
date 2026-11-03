@@ -57,7 +57,7 @@ export class DebugOverlay {
     const lines = [
       `FPS ${(1000 / Math.max(1, f.avg)).toFixed(0)}  frame ${f.avg.toFixed(1)} ms  p95 ${f.p95.toFixed(1)}  worst ${f.worst.toFixed(0)} (last ${prof.frameMs.count})  main thread ${c.avg.toFixed(1)} ms  GPU ${gpu}`,
       `parts (ms): ${parts || '—'}`,
-      `draw calls ${n.calls}  tris ${(n.triangles / 1000).toFixed(0)}k  programs ${n.programs}  textures ${n.textures}  geometries ${n.geometries}${n.heapMB ? `  heap ${n.heapMB.toFixed(0)} MB` : ''}  sim msg ${(prof.msgBytesAvg / 1024).toFixed(0)} KB`,
+      `draw calls ${n.calls}  tris ${(n.triangles / 1000).toFixed(0)}k  programs ${n.programs}  textures ${n.textures}  geometries ${n.geometries}${n.heapMB ? `  heap ${n.heapMB.toFixed(0)} MB` : ''}  GPU memory ≈ ${prof.gpuMB().toFixed(0)} MB  sim msg ${(prof.msgBytesAvg / 1024).toFixed(0)} KB`,
       `GL since loading: ${G.links} shader links (${G.compileMs.toFixed(0)} ms), ${G.texUploads} texture uploads (${(G.texBytes / 1048576).toFixed(1)} MB)`,
       `sim ${s.sim.kind}  tick ${s.sim.tickMs.toFixed(2)} ms  #${w.s.tick}  t=${w.s.time.toFixed(0)} s  speed ${s.loop.speed}×${s.loop.paused ? ' paused' : ''}`,
       `ants ${w.s.ants.length}  creatures ${w.s.creatures.length}  food ${w.s.food.length}  brood ${w.s.brood.length}`,
