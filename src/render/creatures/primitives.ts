@@ -277,21 +277,39 @@ export class PrimitiveBatch {
     this.count = 0;
   }
 
-  /** A sculpted part instance (see registerPart). */
-  addPart(name: string, m: THREE.Matrix4, color: THREE.ColorRepresentation | THREE.Color, surf: Surface): void {
+  private partPool(name: string): Pool | undefined {
     let p = this.parts.get(name);
     if (!p) {
       const def = PART_DEFS.get(name);
-      if (!def) return;
+      if (!def) return undefined;
       let mat = this.partMats.get(def.family);
       if (!mat) this.partMats.set(def.family, (mat = partMaterial(def.family)));
       p = new Pool(partGeometry(name), mat, this.depth, 64);
       p.name = name;
       p.mesh.name = name;
       p.mesh.castShadow = this.pools.ell.mesh.castShadow;
+      p.mesh.visible = false;
       this.parts.set(name, p);
       this.group.add(p.mesh);
     }
+    return p;
+  }
+
+  /** Build every sculpted part's pool now (performance pass: while loading, not when a boss first walks in). */
+  prepare(): number {
+    let n = 0;
+    for (const name of PART_DEFS.keys())
+      if (!this.parts.has(name)) {
+        this.partPool(name);
+        n++;
+      }
+    return n;
+  }
+
+  /** A sculpted part instance (see registerPart). */
+  addPart(name: string, m: THREE.Matrix4, color: THREE.ColorRepresentation | THREE.Color, surf: Surface): void {
+    const p = this.partPool(name);
+    if (!p) return;
     if (p.n >= p.cap) p.ensure(p.n + 1, this.group);
     const i = p.n++;
     p.mesh.setMatrixAt(i, m);
@@ -319,11 +337,21 @@ export class PrimitiveBatch {
   }
 
   end(): void {
-    for (const p of [...Object.values(this.pools), ...this.parts.values()]) {
-      p.mesh.count = p.n;
-      p.mesh.instanceMatrix.needsUpdate = true;
-      if (p.mesh.instanceColor) p.mesh.instanceColor.needsUpdate = true;
-      p.mat.needsUpdate = true;
+    for (const p of Object.values(this.pools)) this.commit(p);
+    for (const p of this.parts.values()) this.commit(p);
+  }
+
+  /** Upload only the instances drawn this frame; an empty pool is hidden and uploads nothing (performance pass). */
+  private commit(p: Pool): void {
+    const m = p.mesh;
+    m.count = p.n;
+    m.visible = p.n > 0;
+    if (!p.n) return;
+    for (const a of [m.instanceMatrix, m.instanceColor, p.mat]) {
+      if (!a) continue;
+      a.clearUpdateRanges();
+      a.addUpdateRange(0, p.n * a.itemSize);
+      a.needsUpdate = true;
     }
   }
 }

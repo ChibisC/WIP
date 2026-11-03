@@ -33,6 +33,8 @@ import { LocalCommands } from './localCommands';
 import { LocalSim, SimHost, WorkerSim } from './simHost';
 import { AutoQuality } from './autoQuality';
 import { prof } from '../core/profiler';
+import { overviewCamera, warmScene } from '../render/prewarm';
+import { STOLEN_CASTES } from '../sim/termants';
 import type { NetGame } from '../net/netGame';
 import { matchWinner } from '../net/match';
 import { MISSIONS, missionDef, missionOf } from '../sim/missions';
@@ -337,6 +339,120 @@ export class GameSession {
     this.loop.start();
   }
 
+  // ---------------------------------------------------------------- pre-warming (performance pass, CHANGE_PLAN §25)
+
+  /** ant models already asked for in every space's renderer (the background warm-up's bookkeeping) */
+  private warmed = new Set<string>();
+  private warmQueue: string[] = [];
+  private warmCheckAt = 0;
+
+  /** Every ant and termite model that can appear in this match: every colony's castes and royals, and stolen castes. */
+  private matchMorphs(): Set<string> {
+    const out = new Set<string>();
+    const add = (cs: string) => {
+      const m = CASTES[cs]?.morph;
+      if (m) out.add(m);
+    };
+    for (const c of this.world.s.colonies) {
+      for (const cd of Object.values(CASTES)) if (cd.species === c.species) out.add(cd.morph);
+      for (const cs of c.castes) add(cs);
+      if (c.species === 'termant') for (const e of STOLEN_CASTES) add(e.caste);
+      if (isTermiteSpecies(c.species)) out.add(c.species === 'rhynchotermes' ? 'termite_rhy_larva' : 'termite_larva');
+    }
+    return out;
+  }
+
+  private antRenderers(): AntRenderer[] {
+    return [this.surfAnts, ...[...this.nests.values()].map((nv) => nv.ants)];
+  }
+
+  /**
+   * Pre-warm everything behind the loading screen: build every model that can appear in every area, fill each
+   * area's buffers once, and draw every scene once off screen (shaders compiled and first drawn, textures uploaded,
+   * shadow maps made), so the first switch to an area costs what the tenth does. `progress` gets the steps.
+   */
+  async prewarm(progress?: (done: number, total: number) => void): Promise<void> {
+    const t0 = performance.now();
+    const v = this.view;
+    const w = this.world;
+    const morphs = this.matchMorphs();
+    const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+    const steps: Array<() => void> = [];
+    for (const r of this.antRenderers()) steps.push(() => void r.prepare(morphs));
+    steps.push(() => {
+      this.surfCreatures.prepare();
+      for (const nv of this.nests.values()) nv.creatures.prepare();
+    });
+    const vh = window.innerHeight * v.renderer.getPixelRatio();
+    for (const [space, nv] of this.nests)
+      steps.push(() => {
+        const g = w.nestOf(space)!;
+        const cam = overviewCamera(g.widthMm, g.depthMm);
+        const owner = w.colony(colonyOfSpace(space)) ?? null;
+        nv.update(w, owner, this.player, cam, 1, 0, vh, g.R * 16, -1, v.time, this.player.markers, []);
+        warmScene(v.renderer, nv.stage.scene, cam);
+      });
+    steps.push(() => {
+      const t = w.terrain;
+      warmScene(v.renderer, v.surfaceScene, overviewCamera(t.width, t.depth));
+    });
+    for (const m of morphs) this.warmed.add(m);
+    for (let i = 0; i < steps.length; i++) {
+      steps[i]();
+      progress?.(i + 1, steps.length);
+      await tick();
+    }
+    prof.note(`pre-warm ${(performance.now() - t0).toFixed(0)} ms (${steps.length} steps, ${morphs.size} models)`);
+    this.prewarmMs = performance.now() - t0;
+  }
+
+  /** time the pre-warm took (ms; the benchmark reports it) */
+  prewarmMs = 0;
+
+  private areaRR = 0;
+
+  /**
+   * Areas not on screen are kept current at a low rate (performance pass): one a few times a second rebuilds its nest
+   * mesh after digging and its tiles, while the frame has room, so showing it later has nothing to catch up on.
+   */
+  private keepAreasCurrent(): void {
+    if (this.frameNo % 6 !== 0 || prof.cpuMs.ema > 12) return;
+    const list = [...this.nests.values()];
+    const v = this.view;
+    for (let k = 0; k < list.length; k++) {
+      const nv = list[this.areaRR++ % list.length];
+      if (v.space === 'nest' && nv.space === v.activeNest) continue;
+      const t0 = performance.now();
+      nv.stage.terrain.update();
+      nv.updateHexes(this.world, this.world.colony(colonyOfSpace(nv.space)) ?? null);
+      prof.add('nest', performance.now() - t0);
+      return;
+    }
+  }
+
+  /**
+   * In play: a model the match did not have at loading (a stolen caste, a borrowed one) is built in every space in the
+   * background, one renderer a frame, as soon as the simulation has it — before the player can look at it.
+   */
+  private warmNew(): void {
+    if (this.frameNo < this.warmCheckAt && !this.warmQueue.length) return;
+    if (!this.warmQueue.length) {
+      this.warmCheckAt = this.frameNo + 30;
+      for (const m of this.matchMorphs()) if (!this.warmed.has(m)) this.warmQueue.push(m);
+      return;
+    }
+    const t0 = performance.now();
+    const m = this.warmQueue[0];
+    for (const r of this.antRenderers()) {
+      if (r.has(m)) continue;
+      r.prepare([m]);
+      if (performance.now() - t0 > 4) return; // (the rest next frame)
+    }
+    this.warmQueue.shift();
+    this.warmed.add(m);
+    prof.add('prewarm', performance.now() - t0);
+  }
+
   /** One simulation tick (false: it cannot run yet — multiplayer is waiting for a player's packets). */
   private tickOnce(): boolean {
     if (this.net) return this.net.tryTick();
@@ -378,6 +494,8 @@ export class GameSession {
     this.revealAreas = false;
     this.loop.speed = 1;
     this.commands.remote = (cmd) => net.issue(cmd);
+    // (each player's tick and frame times travel with the pings: slow clients show in the HUD — performance pass)
+    net.perfOf = () => [Math.round(this.sim.tickMs * 10) / 10, Math.round(prof.frameMs.ema * 10) / 10];
     net.onLog = (text) => this.onEvent?.({ t: 'message', text, kind: 'info' });
     net.onChat = (from, text) => this.onChat?.(from, text);
   }
@@ -1501,6 +1619,7 @@ export class GameSession {
     const w = this.world;
     const v = this.view;
     this.frameNo++;
+    const f0 = performance.now();
     this.netFrame();
     this.events.drain();
     if (this.frameNo % 30 === 0) this.autosave();
@@ -1518,6 +1637,11 @@ export class GameSession {
     const sel = this.tool === 'marker' ? this.markerSel : -1;
     const shown = this.shownMarkers();
     let pt = performance.now();
+    // (the net, the event queue, autosave, the camera follow, hover and the area tabs)
+    prof.add('events', pt - f0);
+    this.warmNew();
+    this.keepAreasCurrent();
+    pt = performance.now();
     if (v.space === 'nest') {
       const nv = this.nests.get(v.activeNest);
       const owner = w.colony(colonyOfSpace(v.activeNest)) ?? null;

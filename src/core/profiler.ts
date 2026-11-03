@@ -73,7 +73,7 @@ interface GlWork {
 const blankGl = (): GlWork => ({ compiles: 0, links: 0, compileMs: 0, texUploads: 0, texBytes: 0, texMs: 0, bufBytes: 0, bufMs: 0 });
 
 export const HITCH_MS = 33;
-const PARTS = ['sim', 'msg', 'units', 'creatures', 'nest', 'fx', 'ui', 'render', 'prewarm'] as const;
+const PARTS = ['sim', 'msg', 'events', 'units', 'creatures', 'nest', 'fx', 'ui', 'render', 'prewarm'] as const;
 export type Part = (typeof PARTS)[number];
 
 export class Profiler {
@@ -81,6 +81,8 @@ export class Profiler {
   frame = 0;
   private t0 = performance.now();
   private frameStart = 0;
+  /** the real clock at the frame's start (the frame clock can be virtual: the screenshot harness steps it) */
+  private cpuStart = 0;
   private lastFrameAt = 0;
   readonly frameMs = new Stat();
   readonly cpuMs = new Stat();
@@ -168,6 +170,7 @@ export class Profiler {
   /** Start of a frame (the game loop's animation frame). */
   begin(now = performance.now()): void {
     this.frameStart = now;
+    this.cpuStart = performance.now();
     for (const p of PARTS) this.cur[p] = 0;
     // worker frames arrive between animation frames: they count toward the next one
     this.cur.msg = this.pendingMsg;
@@ -227,9 +230,9 @@ export class Profiler {
   }
 
   /** End of a frame: record it, and log it when it was a hitch. */
-  end(now = performance.now()): void {
+  end(): void {
     this.frame++;
-    const cpu = now - this.frameStart;
+    const cpu = performance.now() - this.cpuStart;
     const dt = this.lastFrameAt ? this.frameStart - this.lastFrameAt : 16.7;
     this.lastFrameAt = this.frameStart;
     this.frameMs.push(dt);

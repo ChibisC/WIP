@@ -29,16 +29,16 @@ with sync_playwright() as p:
     areas = pg.evaluate("() => window.__session.areaTabs().map((t) => t.space)")
 
     def frames(label, n=4):
+        mark = pg.evaluate("() => window.__prof ? window.__prof.hitches.length : 0")
         out = []
         for i in range(n):
             t = time.time()
             pg.evaluate("window.__step(1, 1/30)")
             out.append(round((time.time() - t) * 1000))
-        h = pg.evaluate("() => { const p = window.__profHook; return p ? p.hitches.slice(-2).map((h) => h.causes.join('; ')) : []; }")
+        h = pg.evaluate(f"() => {{ const p = window.__prof; return p ? p.hitches.slice({mark}).slice(0, 2).map((h) => Math.round(h.cpu) + ' ms: ' + h.causes.join('; ')) : []; }}")
         print(f"{label:28s} frames {out}  {h}", flush=True)
         return out
 
-    pg.evaluate("() => { window.__profHook = window.__prof; }")
     frames("surface (warm)", 3)
     res = {}
     for rnd in range(2):

@@ -246,6 +246,8 @@ export class TermiteInstances {
   }
   set count(n: number) {
     this.mesh.count = n;
+    // (empty: hidden, so the renderer does not bind it every frame — performance pass)
+    this.group.visible = n > 0;
     if (this.shell) this.shell.count = n;
   }
 

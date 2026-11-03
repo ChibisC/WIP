@@ -158,6 +158,9 @@ export class GameView {
   setQuality(q: Quality): void {
     this.quality = q;
     this.preset = QUALITY[q];
+    // (a new preset starts at its full resolution)
+    this.renderScale = 1;
+    this.post.sharpen = 0;
     const p = this.preset;
     this.renderer.shadowMap.enabled = p.shadows;
     this.surfaceLights.sun.castShadow = p.shadows;
@@ -187,10 +190,27 @@ export class GameView {
     if (this.terrain && this.grass) this.rebuildGrass();
   }
 
+  /**
+   * Dynamic resolution (performance pass): the lowest share of the preset's pixel ratio slow frames may take before the
+   * preset itself steps down — never below about 0.85 device pixels per screen pixel, where ants stop reading clearly.
+   */
+  get minRenderScale(): number {
+    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio);
+    return Math.min(1, Math.max(0.75, 0.85 / pr));
+  }
+
+  setRenderScale(k: number): void {
+    const s = Math.max(this.minRenderScale, Math.min(1, k));
+    if (Math.abs(s - this.renderScale) < 0.01) return;
+    this.renderScale = s;
+    this.post.sharpen = s < 0.999 ? Math.min(0.6, (1 - s) * 2.2) : 0;
+    this.resize();
+  }
+
   resize(): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio);
+    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio) * this.renderScale;
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
     this.canvas.style.width = w + 'px';

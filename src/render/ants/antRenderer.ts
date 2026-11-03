@@ -194,6 +194,21 @@ interface AnimState {
 
 const LOD_NAMES = ['lod0', 'lod1', 'imp'] as const;
 
+/**
+ * One copy of each ant model for every area (performance pass): the built geometry and rig per morph and detail, and
+ * the far-LOD impostor atlas per morph. Each area's renderer used to build and bake its own the first time the area
+ * was shown — seconds of work at the moment of a switch on a slow machine. Buckets clone the geometry (they add their
+ * instance attributes) and make their own materials (their own uniforms), so sharing changes nothing drawn.
+ */
+const builtCache = new Map<string, ReturnType<typeof buildAnt>>();
+function builtAnt(m: AntMorph, detail: 0 | 1): ReturnType<typeof buildAnt> {
+  const k = `${m.key}|${detail}`;
+  let b = builtCache.get(k);
+  if (!b) builtCache.set(k, (b = buildAnt(m, detail, 3)));
+  return b;
+}
+const impostorCache = new Map<string, THREE.MeshStandardMaterial>();
+
 class Bucket {
   meshes: THREE.InstancedMesh[] = [];
   attrs: Array<{ a: THREE.InstancedBufferAttribute; b: THREE.InstancedBufferAttribute; c: THREE.InstancedBufferAttribute; d: THREE.InstancedBufferAttribute; e: THREE.InstancedBufferAttribute }> = [];
@@ -210,8 +225,8 @@ class Bucket {
 
   constructor(public key: string, private group: THREE.Group, impostor: { geo: THREE.BufferGeometry; mat: THREE.Material }, shadows: boolean) {
     this.morph = MORPHS[key];
-    const b0 = buildAnt(this.morph, 0, 3);
-    const b1 = buildAnt(this.morph, 1, 3);
+    const b0 = builtAnt(this.morph, 0);
+    const b1 = builtAnt(this.morph, 1);
     this.rig = b1.rig;
     const m0 = createAntMaterials(b0.rig, true, key);
     const m1 = createAntMaterials(b1.rig, true, key);
@@ -239,6 +254,7 @@ class Bucket {
     const mesh = new THREE.InstancedMesh(geo, this.mats[l], cap);
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     mesh.count = 0;
+    mesh.visible = false;
     mesh.frustumCulled = false;
     mesh.castShadow = shadows && l < 2;
     mesh.receiveShadow = l < 2;
@@ -330,6 +346,7 @@ class Bucket {
       const mesh = this.shell[l];
       if (!mesh) continue;
       mesh.count = this.shellN[l];
+      mesh.visible = mesh.count > 0;
       if (!mesh.count) continue;
       const at = this.shellAt[l]!;
       mesh.instanceMatrix.needsUpdate = true;
@@ -539,6 +556,33 @@ export class AntRenderer {
     this.buckets.forEach((b) => b.setShadows(on));
   }
 
+  /**
+   * Build every model in `morphs` now (performance pass, CHANGE_PLAN §25): while loading, or in the background when a
+   * new caste appears, instead of at the moment an area is first shown. Empty models are hidden, so this costs no draws.
+   */
+  prepare(morphs: Iterable<string>): number {
+    let n = 0;
+    for (const m of morphs) {
+      if (m.startsWith('termite_') && !NASUTE_ANT_PATH.has(m)) {
+        if (!this.termites) {
+          this.termites = new TermiteLayer();
+          this.termites.mount = this.mount;
+          this.group.add(this.termites.group);
+        }
+        n += this.termites.prepare(m);
+      } else if (MORPHS[m] && !this.buckets.has(m)) {
+        this.bucket(m);
+        n++;
+      }
+    }
+    return n;
+  }
+
+  /** Has this renderer built `morph` yet? */
+  has(morph: string): boolean {
+    return morph.startsWith('termite_') && !NASUTE_ANT_PATH.has(morph) ? !!this.termites?.has(morph) : this.buckets.has(morph);
+  }
+
   rig(morph: string): AntRig {
     return this.bucket(morph).rig;
   }
@@ -557,10 +601,13 @@ export class AntRenderer {
 
   /** Render the ant from above into an 8-frame gait atlas used by far LOD quads. */
   private impostorFor(key: string): THREE.MeshStandardMaterial {
-    let mat = this.impostorMats.get(key);
-    if (mat) return mat;
+    let mat = this.impostorMats.get(key) ?? impostorCache.get(key);
+    if (mat) {
+      this.impostorMats.set(key, mat);
+      return mat;
+    }
     const morph = MORPHS[key];
-    const built = buildAnt(morph, 1, 3);
+    const built = builtAnt(morph, 1);
     const { material } = createAntMaterials(built.rig, false, key);
     const cols = 4;
     const rows = 2;
@@ -645,6 +692,7 @@ export class AntRenderer {
       ],
     });
     this.impostorMats.set(key, mat);
+    impostorCache.set(key, mat);
     return mat;
   }
 
@@ -1085,6 +1133,8 @@ export class AntRenderer {
       for (let l = 0; l < 3; l++) {
         const mesh = b.meshes[l];
         mesh.count = b.counts[l];
+        // (an empty model is hidden: the renderer would still bind its program and uniforms every frame)
+        mesh.visible = b.counts[l] > 0;
         if (b.counts[l] > 0) {
           mesh.instanceMatrix.needsUpdate = true;
           const at = b.attrs[l];

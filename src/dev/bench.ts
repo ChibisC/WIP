@@ -42,6 +42,8 @@ interface SceneResult {
   title: string;
   /** page start to the session's first frame (ms) */
   loadMs: number;
+  /** of which the pre-warm (ms) */
+  prewarmMs: number;
   secs: number;
   frames: number;
   fps: number;
@@ -244,6 +246,7 @@ function collect(s: GameSession, def: SceneDef, loadMs: number, secs: number, sw
     id: def.id,
     title: def.title,
     loadMs: Math.round(loadMs),
+    prewarmMs: Math.round(s.prewarmMs),
     secs,
     frames: arr.count,
     fps: +(1000 / Math.max(1, f.avg)).toFixed(1),
@@ -354,7 +357,7 @@ function fmtScene(r: SceneResult): string[] {
     .join(', ');
   const out = [
     `## ${r.title}`,
-    `load ${(r.loadMs / 1000).toFixed(1)} s · ${r.frames} frames · ${r.fps} FPS · frame avg ${r.frameAvg} ms, p95 ${r.p95}, worst ${r.worst} · over 33 ms: ${r.over33}, over 50 ms: ${r.over50}`,
+    `load ${(r.loadMs / 1000).toFixed(1)} s (pre-warm ${((r.prewarmMs ?? 0) / 1000).toFixed(1)} s) · ${r.frames} frames · ${r.fps} FPS · frame avg ${r.frameAvg} ms, p95 ${r.p95}, worst ${r.worst} · over 33 ms: ${r.over33}, over 50 ms: ${r.over50}`,
     `main thread ${r.cpuAvg} ms (${parts}) · GPU ${r.gpuAvg ?? 'n/a'} ms · sim tick ${r.tickMs} ms, msg ${r.msgKB} KB`,
     `draw calls ${r.calls} · tris ${(r.tris / 1000).toFixed(0)}k · programs ${r.programs} · textures ${r.textures} · geometries ${r.geometries} · heap ${r.heapMB} MB · ${r.ants} ants, ${r.creatures} creatures · quality ${r.quality}`,
     `GL during the run: ${r.glLinks} shader links, ${r.glUploads} texture uploads`,

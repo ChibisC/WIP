@@ -75,6 +75,11 @@ export class DebugOverlay {
         `pings ${pings || '—'}`,
         `queued ${net.lockstep.queued}  sent to #${net.lockstep.lastSent}  lead ${net.lockstep.lead()}${st.waitingFor.length ? `  WAITING for ${st.waitingFor.map((p) => net.slots[p]?.name ?? p).join(', ')} ${(st.waitingMs / 1000).toFixed(1)} s` : ''}`,
         `hash ${st.lastHash ? `#${st.lastHash.tick} ${st.lastHash.hash}` : '—'}  ${st.desync ? `DESYNC at #${st.desync.tick}` : 'in sync'}${st.dropped.length ? `  dropped: ${st.dropped.map((p) => net.slots[p]?.name ?? p).join(', ')}` : ''}`,
+        `players (tick / frame ms): ${
+          Object.entries(st.perf)
+            .map(([p, [t, f]]) => `${net.slots[Number(p)]?.name ?? p} ${t.toFixed(1)} / ${f.toFixed(0)}`)
+            .join(', ') || '—'
+        }`,
       );
     }
     const hs = prof.hitches.slice(-6);

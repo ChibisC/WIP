@@ -106,6 +106,11 @@ export class CreatureRenderer {
   private glintPos = new Float32Array(EYESHINE_MAX * 3);
   private glintCol = new Float32Array(EYESHINE_MAX * 3);
 
+  /** Build every creature part now (performance pass, CHANGE_PLAN §25). */
+  prepare(): number {
+    return this.batch.prepare();
+  }
+
   constructor(name = 'creatures') {
     this.group = this.batch.group;
     this.group.name = name;

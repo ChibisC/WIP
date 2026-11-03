@@ -60,7 +60,7 @@ else if (scene === 'sounds' && q.get('render')) void renderScenario(q.get('rende
 else if (scene === 'sounds') runSoundBoard(document.getElementById('ui')!);
 else if (scene === 'determinism') runDeterminismPage(q);
 else if (q.get('bench') && !q.get('bscene')) startBench(document.getElementById('ui')!, q);
-else if (q.get('stress')) runStressPage(canvas, document.getElementById('ui')!, q);
+else if (q.get('stress')) void runStressPage(canvas, document.getElementById('ui')!, q);
 else startGame();
 
 /**
@@ -91,6 +91,17 @@ function runDeterminismPage(params: URLSearchParams): void {
   }, 50);
 }
 
+/**
+ * Pre-warm a new match behind its loading screen (performance pass, CHANGE_PLAN §25): every model, buffer, shader and
+ * texture of every area, so the first switch underground is as smooth as the tenth. The label shows the progress.
+ */
+async function prewarm(s: GameSession, label: HTMLElement | null): Promise<void> {
+  const base = label?.textContent ?? '';
+  await s.prewarm((d, n) => {
+    if (label) label.textContent = `${base} ${Math.round((d / n) * 100)} %`;
+  });
+}
+
 /** Prototype game bootstrap: start menu → GameSession + HUD. ?play=1 skips the menu. */
 function startGame(): void {
   const ui = document.getElementById('ui')!;
@@ -101,7 +112,7 @@ function startGame(): void {
     load.className = 'loading';
     load.textContent = c.mode === 'story' ? 'Washing ashore…' : 'Excavating the founding chamber…';
     ui.appendChild(load);
-    setTimeout(() => {
+    setTimeout(async () => {
       if (c.mode === 'arena') return launchArena(c, load);
       const colonies: GameSetup['colonies'] = [{ species: c.species, player: true, ai: false, borrowed: c.species === 'plagiaria' ? c.borrowed : undefined, team: 0 }];
       // a mission brings its own map and rival; skirmish and sandbox use the menu's line-up
@@ -158,6 +169,7 @@ function startGame(): void {
       };
       if (!q.get('play')) updateSettings({ quality: c.quality });
       const s = new GameSession(canvas, setup, c.quality === 'auto' ? AUTO_START : c.quality);
+      await prewarm(s, load);
       s.build = BUILD_ID;
       s.autoQuality.enabled = c.quality === 'auto';
       if (q.get('reveal')) s.revealAreas = true;
@@ -229,7 +241,7 @@ function startGame(): void {
     }, 30);
   };
   /** Battle arena (sim/arena.ts): one colony per team (nests out of the way), an empty field, no economy. */
-  const launchArena = (c: MenuChoice, load: HTMLElement) => {
+  const launchArena = async (c: MenuChoice, load: HTMLElement) => {
     const n = Math.max(2, Math.min(4, c.teams ?? 2));
     const L = arenaLayout(ARENA.size, n);
     const setup: GameSetup = {
@@ -248,6 +260,7 @@ function startGame(): void {
     };
     if (!q.get('play')) updateSettings({ quality: c.quality });
     const s = new GameSession(canvas, setup, c.quality === 'auto' ? AUTO_START : c.quality);
+    await prewarm(s, load);
     s.build = BUILD_ID;
     s.autoQuality.enabled = c.quality === 'auto';
     (window as unknown as { __session: GameSession }).__session = s;
@@ -318,7 +331,7 @@ function startGame(): void {
       title();
       return failToast(e instanceof Error ? e.message : String(e));
     }
-    setTimeout(() => {
+    setTimeout(async () => {
       const qc = settings().quality;
       let s: GameSession;
       try {
@@ -328,6 +341,7 @@ function startGame(): void {
         title();
         return failToast(`This save could not be opened${snap.header.build !== BUILD_ID ? ' (it is from another version of the game)' : ''}: ${e instanceof Error ? e.message : String(e)}`);
       }
+      await prewarm(s, wait);
       s.build = BUILD_ID;
       s.autoQuality.enabled = qc === 'auto';
       (window as unknown as { __session: GameSession }).__session = s;
@@ -351,8 +365,9 @@ function startGame(): void {
       return title();
     }
     const wait = loading('Loading the replay…');
-    setTimeout(() => {
+    setTimeout(async () => {
       const s = new GameSession(canvas, r.snapshot ? { snapshot: r.snapshot } : r.header.setup!, mpQuality, r.header.local);
+      await prewarm(s, wait);
       s.autoQuality.enabled = !q.get('q');
       if (q.get('worker') !== '0') s.useWorker();
       s.playReplay(r.commands, r.header.ticks, r.header.finalHash);
@@ -414,7 +429,7 @@ function startGame(): void {
       // Build the match after this message handler returns: the lobby keeps whatever arrives meanwhile.
       const wait = loading(info.kind === 'start' ? 'Founding the colonies…' : 'Rejoining the match…');
       setTimeout(() => {
-        startMatch(info, lobby);
+        void startMatch(info, lobby);
         wait.remove();
       }, 30);
     };
@@ -508,7 +523,7 @@ function startGame(): void {
   };
 
   const mpQuality = (q.get('q') as 'low' | 'medium' | 'high' | null) || AUTO_START;
-  const startMatch = (info: StartInfo, lobby: Lobby) => {
+  const startMatch = async (info: StartInfo, lobby: Lobby) => {
     const transport = lobby.transport;
     let s: GameSession;
     let net: NetGame;
@@ -546,6 +561,9 @@ function startGame(): void {
           : { rejoin: () => lanRejoinPage() }
         : {},
     );
+    const wait = loading('Preparing the colony…');
+    await prewarm(s, wait);
+    wait.remove();
     s.start();
     setTimeout(() => (w.__ready = true), 800);
   };

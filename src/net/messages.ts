@@ -67,8 +67,9 @@ export type Control =
   | { t: 'refused'; reason: string }
   // in game
   | { t: 'ping'; at: number }
-  | { t: 'pong'; at: number }
-  | { t: 'delay'; d: number; pings?: Record<number, number> }
+  /** (perf: the replying player's simulation tick and frame times, ms — performance pass: slow clients show) */
+  | { t: 'pong'; at: number; perf?: [number, number] }
+  | { t: 'delay'; d: number; pings?: Record<number, number>; perf?: Record<number, [number, number]> }
   | { t: 'hash'; tick: number; hash: string; player: number }
   | { t: 'desync'; tick: number; hashes: Record<string, string> }
   | { t: 'drop'; player: number; fromTick: number }

@@ -1,7 +1,7 @@
 /**
- * Automatic graphics quality (performance brief, Part A): steps the preset
- * down when frames stay slow, and back up (never above where it started)
- * when they stay fast.
+ * Automatic graphics quality (performance brief, Part A; dynamic resolution since the performance pass): when frames
+ * stay slow it lowers the render resolution a step at a time, and only at the floor steps the preset down; when they
+ * stay fast, resolution comes back first, then the preset (never above where it started).
  */
 import type { GameView, Quality } from '../render/view';
 import { TOUCH } from '../core/device';
@@ -34,11 +34,23 @@ export class AutoQuality {
       this.slowT = 0;
       this.fastT = 0;
     }
-    if (this.slowT > 3 && i > 0) {
+    // Dynamic resolution first (performance pass): a slow stretch lowers the render resolution a step (a light sharpening
+    // keeps edges crisp) down to the view's floor; only then does the preset step down. Fast again: resolution first.
+    if (this.slowT > 1.5 && view.renderScale > view.minRenderScale + 0.01) {
+      view.setRenderScale(view.renderScale - 0.1);
+      this.lastChange = `resolution down to ${Math.round(view.renderScale * 100)} % (${this.ema.toFixed(0)} ms frames)`;
+      this.slowT = 0;
+      this.ema = 15;
+    } else if (this.slowT > 3 && i > 0) {
       view.setQuality(ORDER[i - 1]);
       this.lastChange = `down to ${ORDER[i - 1]} (${this.ema.toFixed(0)} ms frames)`;
       this.slowT = 0;
       this.ema = 14;
+    } else if (this.fastT > 6 && view.renderScale < 0.999) {
+      view.setRenderScale(view.renderScale + 0.1);
+      this.lastChange = `resolution up to ${Math.round(view.renderScale * 100)} % (${this.ema.toFixed(0)} ms frames)`;
+      this.fastT = 0;
+      this.ema = 12;
     } else if (this.fastT > 12 && i < ORDER.indexOf(this.ceiling)) {
       view.setQuality(ORDER[i + 1]);
       this.lastChange = `up to ${ORDER[i + 1]} (${this.ema.toFixed(0)} ms frames)`;

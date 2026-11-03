@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { prof } from '../../core/profiler';
 import { NEST_CHUNK, NestGrid, SOIL_AIR, SOIL_STONE } from '../../world/nestGrid';
 import { addPatch, globalUniforms, NOISE_GLSL, WORLD_POS_PATCH } from '../shaderPatch';
 import { valueNoise2 } from '../../core/rng';
@@ -478,6 +479,8 @@ export class NestTerrain {
   update(force = false): void {
     const g = this.grid;
     if (!force && g.dirty.size === 0) return;
+    const t0 = performance.now();
+    const n = g.dirty.size;
     if (g.version !== this.builtVersion || force) {
       this.computeSignedDistance();
       this.builtVersion = g.version;
@@ -485,6 +488,12 @@ export class NestTerrain {
     this.updateMaps();
     for (const ci of g.dirty) this.buildChunk(ci);
     g.dirty.clear();
+    prof.note(`nest mesh: ${n} chunks rebuilt (${(performance.now() - t0).toFixed(0)} ms)`);
+  }
+
+  /** Chunks waiting to be rebuilt (the session keeps areas that are not shown current at a low rate). */
+  get dirty(): number {
+    return this.grid.dirty.size;
   }
 
   setShadows(on: boolean): void {

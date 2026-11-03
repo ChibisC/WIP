@@ -14,7 +14,7 @@ import type { Quality } from '../render/view';
 import { animSettings } from '../render/ants/antMotion';
 import { runBenchScene } from './bench';
 
-export function runStressPage(canvas: HTMLCanvasElement, ui: HTMLElement, q: URLSearchParams): void {
+export async function runStressPage(canvas: HTMLCanvasElement, ui: HTMLElement, q: URLSearchParams): Promise<void> {
   const per = Number(q.get('ants') || 400);
   const nCr = Number(q.get('creatures') || 100);
   const secs = Number(q.get('secs') || 60);
@@ -32,11 +32,14 @@ export function runStressPage(canvas: HTMLCanvasElement, ui: HTMLElement, q: URL
       for (let i = 0; i < k; i++) s.loop.step((vt += dt * 1000));
     };
     s.view.surfaceRig.jumpTo(s.world.terrain.width / 2, s.world.terrain.depth / 2, 260);
+    await s.prewarm();
     s.loop.step(vt);
     s.loop.step((vt += 16));
     (window as unknown as { __ready: boolean }).__ready = true;
     return;
   }
+  // (behind no loading screen here: the page is a test)
+  await s.prewarm();
   if (q.get('worker') !== '0') s.useWorker();
   new GameUI(s, ui);
   const dbg = new DebugOverlay(s, ui);
