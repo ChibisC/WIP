@@ -867,3 +867,9 @@ for nasute workers so that it can do more dynamic and dramatic but realistic att
   nasus tip (`GlueStreams` in the ant renderer); the major's alarm is `DRUM` (special 5: the head hammering, the feet
   planted). Views: `antViews.nasuteAntPath` (worker sizes, glue, drum, chewing).
 - Height data regenerated for the new models (sim data only).
+- **User notes 17:47–17:59:** the species is renamed **Conehead Termites** (`NASUTE.displayName`; ids unchanged); the
+  legs cut to their real length from the specimen sheet (hind femur ~0.18 L, short and stout, the body lower); the
+  heads and mandibles redone from the photos — the worker: a round, glossy capsule, blunt in front, with the darker
+  band across the frons, the postclypeus swelling across the lower face with a dark midline, the labrum lying over
+  flat toothed mandibles that cross (the left over the right), the maxillary and labial palps; the soldier and major:
+  one teardrop loft, the bulb overhanging the thorax and sweeping with concave flanks into the nasus.

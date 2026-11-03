@@ -1582,3 +1582,5 @@ From the review page (`docs/realism/hell-nasute/README.md`, round 1 of the user'
 - Anim lab: `tfight` (workers, the soldier gluing), `tjab` (soldiers), `tram` (majors, the drum); the ant lab renders
   the three castes on the ant path. Clips in `docs/realism/nasutitermes/clips/`.
 - Checks: `tsc`; `npm test` all suites; the determinism check; height data regenerated.
+- User notes 17:47–17:59: renamed Conehead Termites; legs at their real length; the worker's head and mandibles and
+  the soldier's teardrop head redone from the photos.
