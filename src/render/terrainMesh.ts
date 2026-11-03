@@ -188,6 +188,12 @@ export class TerrainMesh {
     const g1 = this.geo.attributes.g1.array as Float32Array;
     const g2 = this.geo.attributes.g2.array as Float32Array;
     const F = groundFields(t);
+    const biome = t.map?.biome;
+    const outsideCover: number[] | null =
+      biome === 'savanna' ? [0.35, 0.1, 0.55, 0]
+      : biome === 'forest' || biome === 'rainforest' ? [0.2, 0.25, 0, 0.55]
+      : t.params.style !== 'formicarium' && t.params.style !== 'sandy' ? [0.25, 0.6, 0, 0.15]
+      : null;
     for (let j = 0; j < this.ny; j++)
       for (let i = 0; i < this.nx; i++) {
         const k = j * this.nx + i;
@@ -199,14 +205,15 @@ export class TerrainMesh {
         const cj = Math.round(Math.min(Math.max(z, 0), t.depth) / t.res);
         const s = cj * t.nx + ci;
         const k4 = s * 4;
-        const biome = t.map?.biome;
-        if (!inside && biome === 'savanna') cover.set([0.35, 0.1, 0.55, 0], k * 4);
-        else if (!inside && (biome === 'forest' || biome === 'rainforest')) cover.set([0.2, 0.25, 0, 0.55], k * 4);
-        else if (!inside && t.params.style !== 'formicarium' && t.params.style !== 'sandy') cover.set([0.25, 0.6, 0, 0.15], k * 4);
-        else cover.set([t.coverW[k4] / 255, t.coverW[k4 + 1] / 255, t.coverW[k4 + 2] / 255, t.coverW[k4 + 3] / 255], k * 4);
-        const fade = inside ? 1 : Math.max(0, 1 - Math.hypot(x - Math.min(Math.max(x, 0), t.width), z - Math.min(Math.max(z, 0), t.depth)) / 40);
+        // beyond the map's edge: the edge's own ground carried outward, turning into the land around over 140 mm (no
+        // line along the edge, user 2026-11-02 "i see a cutoff on the map")
+        const d = inside ? 0 : Math.hypot(x - Math.min(Math.max(x, 0), t.width), z - Math.min(Math.max(z, 0), t.depth));
+        const out = inside ? null : outsideCover;
+        const fo = out ? sstep(0, 140, d) : 0;
+        for (let c = 0; c < 4; c++) cover[k * 4 + c] = F.cover[k4 + c] + ((out ? out[c] : 0) - F.cover[k4 + c]) * fo;
+        const fade = 1 - sstep(0, 60, d);
         g1[k * 4] = F.wet[s] * fade;
-        g1[k * 4 + 1] = inside ? F.ao[s] : 1;
+        g1[k * 4 + 1] = F.ao[s] + (1 - F.ao[s]) * sstep(0, 40, d);
         g1[k * 4 + 2] = F.trail[s] * fade;
         g1[k * 4 + 3] = F.face[s] / 8;
         g2[k * 4] = inside ? F.zone[s] : 0;
@@ -214,16 +221,7 @@ export class TerrainMesh {
         g2[k * 4 + 2] = F.rim[s] * fade;
         g2[k * 4 + 3] = F.spill[s] * fade;
       }
-    // Soften cover transitions with a small box blur.
-    const tmp = new Float32Array(cover);
-    for (let pass = 0; pass < 2; pass++) {
-      for (let j = 1; j < this.ny - 1; j++)
-        for (let i = 1; i < this.nx - 1; i++) {
-          const k = j * this.nx + i;
-          for (let c = 0; c < 4; c++) tmp[k * 4 + c] = (cover[k * 4 + c] * 4 + cover[(k - 1) * 4 + c] + cover[(k + 1) * 4 + c] + cover[(k - this.nx) * 4 + c] + cover[(k + this.nx) * 4 + c]) / 8;
-        }
-      cover.set(tmp);
-    }
+    // (the cover is softened once, in groundFields, so the bank sculpt's border shows exactly the same cover)
     for (const a of ['position', 'cover', 'g1', 'g2']) this.geo.attributes[a].needsUpdate = true;
     if (heightsChanged) {
       this.buildSculpt();
@@ -297,6 +295,8 @@ export interface GroundFields {
   spill: Float32Array;
   /** samples that belong to a sculpted bank face (cliff bands and ramp sides, grown by one sample) */
   sculpt: Uint8Array;
+  /** the four cover weights 0..1, softened (a small blur): the heightfield mesh and the bank sculpt both read these */
+  cover: Float32Array;
 }
 
 const fieldCache = new WeakMap<Terrain, { key: number; f: GroundFields }>();
@@ -317,31 +317,12 @@ export function groundFields(t: Terrain): GroundFields {
     rim: new Float32Array(n),
     spill: new Float32Array(n),
     sculpt: new Uint8Array(n),
+    cover: softCover(t),
   };
   // ---- distance to water (chamfer), in mm
   const D = new Float32Array(n).fill(1e9);
   for (let k = 0; k < n; k++) if (t.water[k] > t.heights[k] + t.overlay[k] + 0.2) D[k] = 0;
-  const S2 = Math.SQRT2;
-  for (let j = 0; j < ny; j++)
-    for (let i = 0; i < nx; i++) {
-      const k = j * nx + i;
-      let d = D[k];
-      if (i > 0) d = Math.min(d, D[k - 1] + 1);
-      if (j > 0) d = Math.min(d, D[k - nx] + 1);
-      if (i > 0 && j > 0) d = Math.min(d, D[k - nx - 1] + S2);
-      if (i < nx - 1 && j > 0) d = Math.min(d, D[k - nx + 1] + S2);
-      D[k] = d;
-    }
-  for (let j = ny - 1; j >= 0; j--)
-    for (let i = nx - 1; i >= 0; i--) {
-      const k = j * nx + i;
-      let d = D[k];
-      if (i < nx - 1) d = Math.min(d, D[k + 1] + 1);
-      if (j < ny - 1) d = Math.min(d, D[k + nx] + 1);
-      if (i < nx - 1 && j < ny - 1) d = Math.min(d, D[k + nx + 1] + S2);
-      if (i > 0 && j < ny - 1) d = Math.min(d, D[k + nx - 1] + S2);
-      D[k] = d;
-    }
+  chamfer(D, nx, ny);
   const sm = (a: number, b: number, v: number) => {
     const u = Math.max(0, Math.min(1, (v - a) / (b - a)));
     return u * u * (3 - 2 * u);
@@ -408,14 +389,17 @@ export function groundFields(t: Terrain): GroundFields {
         for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) grown[k + dj * nx + di] = 1;
       }
     f.sculpt = grown;
-    // ---- height-field AO, the lip and the spill (8 directions, 3 distances)
+    // ---- height-field AO, the lip and the spill (8 directions, 3 distances), near layered ground only (elsewhere the
+    // ground is open): they fade out smoothly with the distance (samples) from the nearest bank, cliff or ramp, past
+    // the 7-sample reach of the AO, so there is no ring where they stop (user 2026-11-02 "i see a cutoff")
+    const near = layeredDistance(L, nx, ny);
     const H = (i: number, j: number) => t.heights[Math.min(ny - 1, Math.max(0, j)) * nx + Math.min(nx - 1, Math.max(0, i))];
     const DIRS = 8;
     for (let j = 0; j < ny; j++)
       for (let i = 0; i < nx; i++) {
         const k = j * nx + i;
-        // only near layered ground (elsewhere the ground is open)
-        if (!L.bank[k] && !L.ramp[k] && !L.cliff[k] && !nearBank(L, nx, ny, i, j)) continue;
+        const band = 1 - sm(7, 12, near[k]);
+        if (band <= 0) continue;
         const h0 = H(i, j);
         let occ = 0;
         let sum = 0;
@@ -431,10 +415,12 @@ export function groundFields(t: Terrain): GroundFields {
           }
           occ += Math.min(1, Math.max(0, best) * 0.8);
         }
-        f.ao[k] = 1 - Math.min(0.55, (occ / DIRS) * 0.9);
+        f.ao[k] = 1 - Math.min(0.55, (occ / DIRS) * 0.9) * band;
         const lap = sum / DIRS - h0;
-        f.rim[k] = sm(1.0, 5.0, -lap) * (L.bank[k] || L.cliff[k] ? 1 : 0.6);
-        f.spill[k] = sm(1.0, 5.0, lap) * (L.cliff[k] ? 0.4 : 1);
+        // (the lip and the spill belong to the banks: they keep to the old reach, fading over its last samples)
+        const lipBand = 1 - sm(4, 8, near[k]);
+        f.rim[k] = sm(1.0, 5.0, -lap) * (L.bank[k] || L.cliff[k] ? 1 : 0.6) * lipBand;
+        f.spill[k] = sm(1.0, 5.0, lap) * (L.cliff[k] ? 0.4 : 1) * lipBand;
       }
     // ---- ramps: a worn, compacted walkway down the middle where the traffic goes
     for (const r of m?.ramps ?? []) {
@@ -465,15 +451,66 @@ export function groundFields(t: Terrain): GroundFields {
   return f;
 }
 
-function nearBank(L: NonNullable<Terrain['layers']>, nx: number, ny: number, i: number, j: number): boolean {
-  for (let dj = -6; dj <= 6; dj += 3)
-    for (let di = -6; di <= 6; di += 3) {
-      const ii = i + di;
-      const jj = j + dj;
-      if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
-      if (L.cliff[jj * nx + ii]) return true;
+/** Distance (samples, chamfer) from the nearest bank, cliff or ramp sample. */
+function layeredDistance(L: NonNullable<Terrain['layers']>, nx: number, ny: number): Float32Array {
+  const n = nx * ny;
+  const D = new Float32Array(n).fill(1e9);
+  for (let k = 0; k < n; k++) if (L.bank[k] || L.ramp[k] || L.cliff[k]) D[k] = 0;
+  chamfer(D, nx, ny);
+  return D;
+}
+
+/** Two-pass chamfer distance (1, √2) in place: 0 at the sources. */
+function chamfer(D: Float32Array, nx: number, ny: number): void {
+  const S2 = Math.SQRT2;
+  for (let j = 0; j < ny; j++)
+    for (let i = 0; i < nx; i++) {
+      const k = j * nx + i;
+      let d = D[k];
+      if (i > 0) d = Math.min(d, D[k - 1] + 1);
+      if (j > 0) d = Math.min(d, D[k - nx] + 1);
+      if (i > 0 && j > 0) d = Math.min(d, D[k - nx - 1] + S2);
+      if (i < nx - 1 && j > 0) d = Math.min(d, D[k - nx + 1] + S2);
+      D[k] = d;
     }
-  return false;
+  for (let j = ny - 1; j >= 0; j--)
+    for (let i = nx - 1; i >= 0; i--) {
+      const k = j * nx + i;
+      let d = D[k];
+      if (i < nx - 1) d = Math.min(d, D[k + 1] + 1);
+      if (j < ny - 1) d = Math.min(d, D[k + nx] + 1);
+      if (i < nx - 1 && j < ny - 1) d = Math.min(d, D[k + nx + 1] + S2);
+      if (i > 0 && j < ny - 1) d = Math.min(d, D[k + nx - 1] + S2);
+      D[k] = d;
+    }
+}
+
+/** The cover weights 0..1, softened with a small blur (about 3 mm across, the same in mm on 2 mm and 4 mm samples). */
+function softCover(t: Terrain): Float32Array {
+  const { nx, ny, res } = t;
+  const n = nx * ny;
+  let a = new Float32Array(n * 4);
+  for (let q = 0; q < n * 4; q++) a[q] = t.coverW[q] / 255;
+  let b = new Float32Array(n * 4);
+  const passes = Math.max(2, Math.round(2 * (4 / res) * (4 / res)));
+  for (let pass = 0; pass < passes; pass++) {
+    for (let j = 0; j < ny; j++)
+      for (let i = 0; i < nx; i++) {
+        const k = j * nx + i;
+        const l = i > 0 ? k - 1 : k;
+        const r = i < nx - 1 ? k + 1 : k;
+        const u = j > 0 ? k - nx : k;
+        const d = j < ny - 1 ? k + nx : k;
+        for (let c = 0; c < 4; c++) b[k * 4 + c] = (a[k * 4 + c] * 4 + a[l * 4 + c] + a[r * 4 + c] + a[u * 4 + c] + a[d * 4 + c]) / 8;
+      }
+    [a, b] = [b, a];
+  }
+  return a;
+}
+
+function sstep(a: number, b: number, v: number): number {
+  const u = Math.max(0, Math.min(1, (v - a) / (b - a)));
+  return u * u * (3 - 2 * u);
 }
 
 /** Terrain cells (i, j → the quad to i+1, j+1) the bank sculpt replaces. */
@@ -552,7 +589,12 @@ LS gLayer(float L, vec2 uv, vec2 dx, vec2 dy, bool rotate) {
   if (t.z > 0.0) { w = vec3(t.z, t.y, t.x); v1 = b; v2 = b + vec2(0.0, 1.0); v3 = b + vec2(1.0, 0.0); }
   else { w = vec3(-t.z, 1.0 - t.y, 1.0 - t.x); v1 = b + vec2(1.0); v2 = b + vec2(1.0, 0.0); v3 = b + vec2(0.0, 1.0); }
   vec2 o1 = gHash(v1 + L * 7.1), o2 = gHash(v2 + L * 7.1), o3 = gHash(v3 + L * 7.1);
-  float a1 = rotate ? o1.y * 6.2832 : 0.0, a2 = rotate ? o2.x * 6.2832 : 0.0, a3 = rotate ? o3.y * 6.2832 : 0.0;
+  // each lattice vertex keeps one angle whichever corner of whichever triangle it is (it took its angle from the
+  // corner's slot before, so a tap turned at every triangle edge: the straight seams across the ground, user
+  // 2026-11-02 "i see a cutoff on the map")
+  float a1 = rotate ? gHash(v1 + L * 7.1 + 19.19).x * 6.2832 : 0.0;
+  float a2 = rotate ? gHash(v2 + L * 7.1 + 19.19).x * 6.2832 : 0.0;
+  float a3 = rotate ? gHash(v3 + L * 7.1 + 19.19).x * 6.2832 : 0.0;
   vec2 u1 = gRot(uv, a1) + o1, u2 = gRot(uv, a2) + o2, u3 = gRot(uv, a3) + o3;
   vec4 A1 = textureGrad(tGA, vec3(u1, L), gRot(dx, a1), gRot(dy, a1));
   vec4 A2 = textureGrad(tGA, vec3(u2, L), gRot(dx, a2), gRot(dy, a2));
@@ -615,7 +657,8 @@ GS groundShade() {
     W[i] = clamp(w + n * 1.1 * w * (1.0 - w) * 2.0, 0.0, 1.0);
   }
   // the three heaviest layers only (the rest are below the height blend's reach anyway)
-  float wa = 0.02, wb = 0.02, wc = 0.02, wd = 0.0; float la = -1.0, lb = -1.0, lc = -1.0;
+  float wa = 0.02, wb = 0.02, wc = 0.02, wd = 0.0; float la = -1.0, lb = -1.0, lc = -1.0; float wmax = 0.0;
+  for (int i = 0; i < 8; i++) wmax = max(wmax, W[i]);
   for (int i = 0; i < 8; i++) {
     float w = W[i]; float l = Ls[i];
     if (w > wa) { wd = wc; wc = wb; lc = lb; wb = wa; lb = la; wa = w; la = l; }
@@ -627,18 +670,25 @@ GS groundShade() {
   wc *= smoothstep(wd, wd + 0.12, wc);
   vec3 alb = vec3(0.0); vec3 mean = vec3(0.0); float rough = 0.0; vec2 nrm = vec2(0.0); float cav = 0.0; float tot = 0.0;
   LS A, B, C;
+  // A layer's pebbles and tufts push through the others by height (score = weight + height), but a layer only just in
+  // the top three (its weight near the 0.02 cut) has its height and its share brought down to nothing there: it
+  // comes and goes smoothly instead of at a line along the mesh's triangles (user 2026-11-02 "i see a cutoff")
+  float ra = smoothstep(0.02, 0.12, wa), rb = smoothstep(0.02, 0.12, wb), rc = smoothstep(0.02, 0.12, wc);
   float sa = -1.0, sb = -1.0, sc_ = -1.0;
-  if (la >= 0.0) { float it = uInvTile[int(la)]; A = gLayer(la, P.xz * it, dPx.xz * it, dPy.xz * it, true); sa = wa + A.h * 0.55; }
-  if (lb >= 0.0) { float it = uInvTile[int(lb)]; B = gLayer(lb, P.xz * it, dPx.xz * it, dPy.xz * it, true); sb = wb + B.h * 0.55; }
-  if (lc >= 0.0) { float it = uInvTile[int(lc)]; C = gLayer(lc, P.xz * it, dPx.xz * it, dPy.xz * it, true); sc_ = wc + C.h * 0.55; }
+  if (la >= 0.0) { float it = uInvTile[int(la)]; A = gLayer(la, P.xz * it, dPx.xz * it, dPy.xz * it, true); sa = wa + A.h * 0.55 * ra; }
+  if (lb >= 0.0) { float it = uInvTile[int(lb)]; B = gLayer(lb, P.xz * it, dPx.xz * it, dPy.xz * it, true); sb = wb + B.h * 0.55 * rb; }
+  if (lc >= 0.0) { float it = uInvTile[int(lc)]; C = gLayer(lc, P.xz * it, dPx.xz * it, dPy.xz * it, true); sc_ = wc + C.h * 0.55 * rc; }
   float best = max(sa, max(sb, sc_));
-  float ka = sa < 0.0 ? 0.0 : max(sa - (best - 0.28), 0.0);
-  float kb = sb < 0.0 ? 0.0 : max(sb - (best - 0.28), 0.0);
-  float kc = sc_ < 0.0 ? 0.0 : max(sc_ - (best - 0.28), 0.0);
-  tot = ka + kb + kc;
+  float ka = sa < 0.0 ? 0.0 : max(sa - (best - 0.28), 0.0) * ra;
+  float kb = sb < 0.0 ? 0.0 : max(sb - (best - 0.28), 0.0) * rb;
+  float kc = sc_ < 0.0 ? 0.0 : max(sc_ - (best - 0.28), 0.0) * rc;
+  // bare ground where nothing is laid at all (blended in, not switched)
+  float kf = 0.28 * (1.0 - smoothstep(0.02, 0.12, wmax));
+  tot = ka + kb + kc + kf;
   float domL = 0.0; vec2 domUv = vec2(0.0); float domA = 0.0; float domH = 0.0;
   if (tot < 1e-4) { alb = vec3(0.12, 0.09, 0.07); mean = alb; rough = 0.9; cav = 1.0; tot = 1.0; }
   else {
+    if (kf > 0.0) { alb += vec3(0.12, 0.09, 0.07) * kf; mean += vec3(0.12, 0.09, 0.07) * kf; rough += 0.9 * kf; cav += kf; }
     if (ka > 0.0) { alb += A.alb * ka; mean += A.mean * ka; rough += A.rough * ka; nrm += A.n * ka; cav += A.cav * ka; }
     if (kb > 0.0) { alb += B.alb * kb; mean += B.mean * kb; rough += B.rough * kb; nrm += B.n * kb; cav += B.cav * kb; }
     if (kc > 0.0) { alb += C.alb * kc; mean += C.mean * kc; rough += C.rough * kc; nrm += C.n * kc; cav += C.cav * kc; }
@@ -658,7 +708,8 @@ GS groundShade() {
   relief *= 1.0 - wet * 0.45;
   nWorld = normalize(T0 * nrm.x * relief + B0 * nrm.y * relief + N);
   if (faceW > 0.01) {
-    float style = floor(vG1.w * 8.0 + 0.5);
+    // (where two styles meet, the change is moved about by noise, not drawn along the mesh's triangles)
+    float style = floor(vG1.w * 8.0 + 0.5 + (tn.a + tn2.a) * 0.45);
     float FL = style < 0.5 ? uFaceDefault : style < 1.5 ? ${GL.BANK_SOIL}.0 : style < 2.5 ? ${GL.ROCK}.0 : style < 3.5 ? ${GL.BANK_ROOT}.0 : style < 4.5 ? ${GL.BANK_SAND}.0 : ${GL.CLAY}.0;
     // projected on the two vertical world planes (fixed axes, so lumps on the face never swirl the strata), blended
     // by which way the face looks
@@ -708,7 +759,7 @@ GS groundShade() {
         float hk = textureLod(tGN, vec3(domUv + dir * d, domL), 0.0).b * rel;
         occ = max(occ, (hk - h0 - d * tanE) / (0.25 + d * 0.3));
       }
-      sunVis = 1.0 - clamp(occ, 0.0, 1.0) * (1.0 - smoothstep(120.0, 220.0, dCam)) * (1.0 - wet * 0.3);
+      sunVis = 1.0 - clamp(occ, 0.0, 1.0) * (1.0 - smoothstep(120.0, 220.0, dCam)) * (1.0 - wet * 0.3) * (1.0 - smoothstep(0.3, 0.5, faceW));
     }
   }
 #endif
