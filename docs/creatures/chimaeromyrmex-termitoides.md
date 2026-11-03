@@ -7,7 +7,7 @@ From the user's package `claude/termyrms/02-reference-termants.md` (copied befor
 ## 1. Identity
 - Display name: one config value, `SPECIES_DISPLAY_NAME.termant = "Termants"` (fallback `"Chimera Ants"`). The user's brief was titled "Termyrms"; the user later fixed the name to **Termants** — use Termants everywhere, and never hard-code it outside the config value.
 - Scientific name: *Chimaeromyrmex termitoides* — Greek *chimaira* (chimera) + *myrmex* (ant), Latin *termitoides* (termite-like). Internal id `termant`; castes `termant_worker`, `termant_soldier`, `termant_queen`, `termant_king`; morph keys the same.
-- Not related to the game's existing **Gene Thief Ant** (`plagiaria`, *Formica plagiaria*), which borrows castes chosen in the lobby. Termants earn castes during the match by eating other species. The two share the "borrowed castes" machinery.
+- Not related to the game's existing **Mimic Ant** (`plagiaria`, *Formica plagiaria*), which borrows castes chosen in the lobby. Termants earn castes during the match by eating other species. The two share the "borrowed castes" machinery.
 
 ## 2. Fictional biology (for the in-game info card)
 - Lives in rotting logs on the forest floor. Imagined to have evolved by absorbing genetic material from the insects it eats — which is how it became part ant, part termite, and why it keeps changing.

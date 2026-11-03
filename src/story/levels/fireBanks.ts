@@ -15,7 +15,7 @@ export const FIRE_BANKS_LEVEL: StoryLevelDef = {
   region: 'riverbank',
   map: 'fireBanks',
   brief: 'A young queen from the colony that came through the long nights settles on the river shelf, below a mound of tropical fire ants. Hold off their swarm, steal their majors, ride out the river’s rise and take the mound.',
-  player: { site: 0, startWorkers: 3, startFood: 170, name: 'Gene-Thief Termants' },
+  player: { site: 0, startWorkers: 3, startFood: 170, name: 'Termants' },
   // (2026-11-02 caste balance: fire ant minors are tougher now, so the mound holds fewer of them; was 4 / 12 / 55)
   rivals: { fire: { species: 'solenopsis', site: 1, name: 'Tropical fire ants', developed: 3, startWorkers: 10, popLimit: 18 } },
   enemyStat: 0.85,

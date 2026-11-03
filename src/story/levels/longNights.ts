@@ -19,7 +19,7 @@ export const LONG_NIGHTS_LEVEL: StoryLevelDef = {
   region: 'meadow',
   map: 'stonyHollow',
   brief: 'The colony has spread to a stony hollow at the edge of the river woods. By day, build and gather. By night the hunters come out of their lairs in the banks, more each time. Survive three nights.',
-  player: { site: 0, startWorkers: 8, startFood: 240, name: 'Gene-Thief Termants' },
+  player: { site: 0, startWorkers: 8, startFood: 240, name: 'Termants' },
   rivals: {},
   creatures: 0,
   aphids: 0,

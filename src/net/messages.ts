@@ -38,7 +38,7 @@ export interface Slot {
   token: string;
   /** team 1–4 (colonies on one team are allies and win together); 0 = no team (everyone for themselves) */
   team: number;
-  /** Gene Thief (species plagiaria): the castes it raises besides its own workers (sim/species.ts BORROWABLE) */
+  /** Mimic Ant (species plagiaria): the castes it raises besides its own workers (sim/species.ts BORROWABLE) */
   borrowed?: string[];
 }
 

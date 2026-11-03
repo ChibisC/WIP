@@ -10,7 +10,7 @@ import { BALANCE, NASUTE } from './balance';
 import { assignJobs, isJobWorker } from './jobs';
 import { applyGroupOrders } from './markers';
 import { abilityActive, abilityTick } from './abilities';
-import { buildTick, developChambers, forageTick } from './colonyAI';
+import { buildTick, developChambers, developHighways, forageTick } from './colonyAI';
 import { warTick } from './warAI';
 import { dcos, dhypot, dsin, sq } from './dmath';
 import { digFlower, entranceTick, flowerOver, placeHoles } from './entrances';
@@ -83,6 +83,12 @@ export interface ColonyOptions {
   popLimit?: number;
   /** pre-built larger nest (rival AI head start): number of extra brood tiles */
   developed?: number;
+  /**
+   * a pre-built nest given tile by tile (story levels' developed player nests; user 2026-11-02 "an actual hex chamber set
+   * up like the ai"): laid out the way the AI builds — one caste per chamber, the stores by the entrance — with the passage
+   * and tunnels paved (colonyAI.ts `developChambers`, `developHighways`)
+   */
+  developPlan?: Array<{ type: TileType; caste?: string; n: number }>;
   /** team: colonies on the same team are allies (default: a team of its own) */
   team?: number;
   /** the authored map's site index the colony stands on */
@@ -198,6 +204,13 @@ export function createColony(w: World, o: ColonyOptions): Colony {
     for (const q of minims) placeTile(w, c, 'brood', q, 'atta_minim', true);
   }
   if (o.developed) developNest(w, c, o.developed);
+  if (o.developPlan) {
+    // (a caste the colony cannot raise — a stolen caste not brought in — is left out)
+    const plan: Array<{ type: TileType; caste?: string }> = [];
+    for (const p of o.developPlan) if (!p.caste || c.castes.includes(p.caste)) for (let i = 0; i < p.n; i++) plan.push({ type: p.type, caste: p.caste });
+    developChambers(w, c, plan);
+    developHighways(w, c);
+  }
   recomputeGroups(w, c);
   recomputeTileCaps(c);
 

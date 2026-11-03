@@ -19,17 +19,17 @@ export { TEAM_NAMES };
 /** the battle arena's team colours (render/game/teamRings.ts), kept here so the lobby needs no renderer */
 export const TEAM_COLORS = ['#d9473f', '#3f7fd9', '#4fb04a', '#e0b130'];
 
-/** The castes a Gene Thief starts with when nobody picked any (the old fixed multiplayer choice). */
-export const GENE_THIEF_DEFAULT = ['formica_mortar', 'fire_major'];
+/** The castes a Mimic Ant starts with when nobody picked any (the old fixed multiplayer choice). */
+export const MIMIC_DEFAULT = ['formica_mortar', 'fire_major'];
 
-/** Only castes a Gene Thief can raise, each once, in BORROWABLE order. */
+/** Only castes a Mimic Ant can raise, each once, in BORROWABLE order. */
 export function cleanBorrowed(list: unknown): string[] {
   if (!Array.isArray(list)) return [];
   const want = new Set(list.filter((x): x is string => typeof x === 'string'));
   return BORROWABLE.filter((id) => want.has(id));
 }
 
-/** Two or three castes for a Gene Thief AI (the host picks them in the lobby; everyone gets the result). */
+/** Two or three castes for a Mimic Ant AI (the host picks them in the lobby; everyone gets the result). */
 export function pickBorrowed(rand: () => number = Math.random): string[] {
   const pool = [...BORROWABLE];
   const out: string[] = [];
@@ -77,8 +77,8 @@ export function matchSetup(players: Slot[], s: LobbySettings): GameSetup {
         species: p.species,
         player: p.kind === 'human',
         ai: p.kind === 'ai',
-        // the Gene Thief raises the castes its player (or the host, for an AI) picked in the lobby
-        borrowed: p.species === 'plagiaria' ? (borrowed.length ? borrowed : [...GENE_THIEF_DEFAULT]) : undefined,
+        // the Mimic Ant raises the castes its player (or the host, for an AI) picked in the lobby
+        borrowed: p.species === 'plagiaria' ? (borrowed.length ? borrowed : [...MIMIC_DEFAULT]) : undefined,
         team: simTeam(p),
         developed: 3,
         startWorkers: 10,

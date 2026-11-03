@@ -85,7 +85,7 @@ The change request says Phases 1–4 are complete. In fact the codebase is furth
    - Fire ant 5 mm.
    - Black garden ant 6 mm.
    - Army ant 6 mm.
-   - Gene Thief 9.75 mm.
+   - Mimic Ant 9.75 mm.
    - Red wood ant and leafcutter 10.5 mm.
 
    The fine navigation raster scales with it, about 3.5 cells per hex radius. So nests of every species have the same tile count and performance, and ants stay at real size.
@@ -113,8 +113,8 @@ Phases 1–4 are done. The rest builds on the new systems.
 | **9** | **EotU revision: brood, jobs, upgrades, underground areas** | See §9. Done before creatures, which had just started. |
 | **10** | **Architecture upgrade: performance + deterministic multiplayer (up to 4 colonies)** | See §10 (user brief, 2026-10-24). Done before more gameplay is built on the simulation. Creatures were paused for it. |
 | **11** | **Creatures and bosses** | All creatures from the notes, with rigs, gaits and AI. Bosses are the stag beetle, tarantula, Scolopendra, giant mantis and Hogna mother, with telegraphed phases. The table and behaviour programs are already written (`sim/creatures/`); they must become deterministic (dmath) and command-driven before they are switched on. |
-| **12** | **Playable species and their special tiles** | Lasius: aphid tending and a **root-aphid pasture** tile. Formica: acid and a **thatch** tile (warmer nest, faster brood). Atta: leaf cutting, minim hitchhikers and the **fungus garden** tile. Solenopsis: venom, a mound with no central entrance, and a **sun-warmed brood mound** tile (workers move brood up into the warm mound, so it develops faster). Gene Thief: brood tiles for any borrowed caste. Plus the rival AI's tile and marker logic. |
-| **13** | **Game modes** | Main menu: **Single-player** and **Multiplayer** (user note). Single-player has sandbox first, then skirmish (1–3 AI), then the **two outdoor missions** with narrator captions and boss finales. The custom Gene Thief colony is selectable in all of them. Formicarium is a map style only (see §4.1). **Multiplayer** has the lobby and matches (2–4 players plus AI slots) from Phase 10. |
+| **12** | **Playable species and their special tiles** | Lasius: aphid tending and a **root-aphid pasture** tile. Formica: acid and a **thatch** tile (warmer nest, faster brood). Atta: leaf cutting, minim hitchhikers and the **fungus garden** tile. Solenopsis: venom, a mound with no central entrance, and a **sun-warmed brood mound** tile (workers move brood up into the warm mound, so it develops faster). Mimic Ant: brood tiles for any borrowed caste. Plus the rival AI's tile and marker logic. |
+| **13** | **Game modes** | Main menu: **Single-player** and **Multiplayer** (user note). Single-player has sandbox first, then skirmish (1–3 AI), then the **two outdoor missions** with narrator captions and boss finales. The custom Mimic Ant colony is selectable in all of them. Formicarium is a map style only (see §4.1). **Multiplayer** has the lobby and matches (2–4 players plus AI slots) from Phase 10. |
 | **14** | **Audio, menus, saving** | Main/pause menus, settings and key bindings, Web Audio synthesis, save/load, info cards, observe camera polish. (No upgrade tree: cut, see §4.12.) Saves and replays reuse Phase 10's snapshots and command logs. |
 | **15** | **Polish, balancing, performance** | Playtest every mode. Hit 1,000+ ants at 60 FPS. Bug sweep. README. Definition of Done check. |
 
@@ -176,7 +176,7 @@ Phases 1–4 are done. The rest builds on the new systems.
 ## 8. Updated Definition of Done
 
 The project is complete only when:
-- [ ] The game launches to a main menu and every mode is playable start to finish: **sandbox, skirmish and the two outdoor missions with boss finales**. The Gene Thief custom colony is selectable in each.
+- [ ] The game launches to a main menu and every mode is playable start to finish: **sandbox, skirmish and the two outdoor missions with boss finales**. The Mimic Ant custom colony is selectable in each.
 - [ ] Every creature is recognizable as its real species from its look, movement and behaviour, and holds up in the close-up observe camera.
 - [ ] Reference notes exist in `docs/creatures/` for every species.
 - [ ] The **top-down nest** can be dug by marking soil. The dug floor grows outward with rounded tunnel walls and warm pooled light.
@@ -199,7 +199,7 @@ The project is complete only when:
   - tooltips on everything.
 - [ ] Foraging with visible pheromone trails works automatically, along with grooming, trophallaxis and brood care.
 - [ ] Combat works, with grappling, damage types, alarm response and nest invasions through tunnels.
-- [ ] At least four playable species, plus the Gene Thief custom colony, play differently and behave like their real counterparts.
+- [ ] At least four playable species, plus the Mimic Ant custom colony, play differently and behave like their real counterparts.
 - [ ] Saving/loading, settings and audio work.
 - [ ] Performance targets are met: 1,000+ ants plus dozens of creatures at 60 FPS on a mid-range laptop.
 - [ ] `README.md` explains how to run the game and lists all controls.
@@ -385,7 +385,7 @@ The full design is in **docs/multiplayer.md**, and the baseline numbers and prof
 - Bosses only appear through `?spawn=` until the missions (Phase 13) stage them.
 
 ## 12. Phase 12 — playable species and their special tiles, rival AI (done 2026-10-24)
-Already in place from Revision 2: Lasius root-aphid pastures and aphid tending, Formica thatch and acid (mortar and rapid sprayers), Atta leaf cutting, minim hitchhikers and fungus gardens, Solenopsis venom, Gene Thief borrowed castes.
+Already in place from Revision 2: Lasius root-aphid pastures and aphid tending, Formica thatch and acid (mortar and rapid sprayers), Atta leaf cutting, minim hitchhikers and fungus gardens, Solenopsis venom, Mimic Ant borrowed castes.
 
 To do, in this order:
 1. **Fire ant mound** (Solenopsis; real biology: a mound of worked soil with no central opening, entered through foraging tunnels that surface away from it; workers carry brood up into the sun-warmed upper mound in the day and down again at night).
@@ -941,6 +941,17 @@ Built on §23 (`digInto`). Plan, as built:
    sources (DESIGN-STORY §10).
 5. Client: moonlight blend, wolf spider eyeshine, the spider burrow, map moods, the night clock, hub/Genome/end screen.
 6. Tests `tests/storyCh1.ts`; the playtest bot plays bosses and nights; browser shots `tests/browser/story_ch1_4.py`.
+
+### 22.8 The user's ratings, round 3 (night)
+Scores: the finisher 8 and 8; the models 9, 9, 9; the walk 8; the worker attacks 6–7. Notes: "do nasute even have
+majors? if not just do worker, soldier (can be major model) and sprayer"; "the nasute sprayer doesn't melee, just
+sprays"; "fix the antennae and mandibles, they are misplaced" (soldiers); "fix the mandibles" (worker).
+- Castes renamed (display only, ids and rules unchanged): `nasute_major` → **Soldier**, `nasute_soldier` →
+  **Sprayer**; the stolen caste is "Conehead Termite Sprayer" (`termants.ts` `as`).
+- The sprayer shows only the glue (`attackPlan`: `termite_nasute` → `GLUE`); the sim never gave it a bite.
+- The soldiers' antennal sockets and vestigial mandibles are placed on the teardrop head's own surface
+  (`headSurf`): the sockets on the bulb's sides, low, in front of its middle; the mandibles under the nasus base.
+- The worker's mandibles: broad toothed blades (wide to two thirds of their length), satin rather than glossy.
 
 ## 25. Performance pass — faster in every mode, smooth surface ↔ underground switching, no loss of looks (user spec 2026-11-02, claude/performance/01-spec-performance-no-visual-loss.md)
 Branch `feature/performance` from `main` (`18d3d79`). Render, client and worker-message work only: the simulation's

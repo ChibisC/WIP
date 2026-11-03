@@ -16,7 +16,7 @@ import { invasionCheck, projectileSystem } from './combat';
 import { pickTeamSites } from '../world/teamSites';
 import { makeFood } from './factory';
 import { aphidClaims, registerSpeciesAI } from './speciesAI';
-import { SURFACE, SimState } from './types';
+import { SURFACE, SimState, TileType } from './types';
 import { CaveOptions, createCave, lostRouteSystem } from './areas';
 import { SpeciesId, SPECIES } from './species';
 import { BALANCE, NASUTE, SICKLE } from './balance';
@@ -37,6 +37,8 @@ export interface ColonySpec {
   ai: boolean;
   borrowed?: string[];
   developed?: number;
+  /** a pre-built nest given tile by tile, laid out like the AI's (colony.ts `developPlan`; story levels) */
+  developPlan?: Array<{ type: TileType; caste?: string; n: number }>;
   startWorkers?: number;
   startFood?: number;
   /** population limit (brood tile slots) */
@@ -159,7 +161,7 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
       at = { x: L.hex.centerX(q), y: L.hex.centerY(q) };
     }
     at ??= spots[i];
-    const opts: ColonyOptions = { species: spec.species, player: spec.player, ai: spec.ai, borrowed: spec.borrowed, nx: at.x, ny: at.y, developed: spec.developed, startWorkers: spec.startWorkers, startFood: spec.startFood, popLimit: spec.popLimit, name: spec.name, team: spec.team, site };
+    const opts: ColonyOptions = { species: spec.species, player: spec.player, ai: spec.ai, borrowed: spec.borrowed, nx: at.x, ny: at.y, developed: spec.developed, developPlan: spec.developPlan, startWorkers: spec.startWorkers, startFood: spec.startFood, popLimit: spec.popLimit, name: spec.name, team: spec.team, site };
     createColony(w, opts);
   });
   if (setup.mission) startMission(w, setup.mission, w.s.colonies.find((c) => c.player)?.id ?? 0);

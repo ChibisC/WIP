@@ -12,7 +12,7 @@ import { isEnemyAnt } from './combat';
  *  - Fire ant: stinging frenzy — attacks and stings come much faster.
  *  - Termants: alarm drumming — soldiers drum like termites; the colony is alarmed like ants and every glue burst is
  *    ready at once.
- *  - Gene Thief: propaganda substance — like slave-making Formica, raiders spray Dufour's-gland
+ *  - Mimic Ant: propaganda substance — like slave-making Formica, raiders spray Dufour's-gland
  *    secretions that throw defenders into confusion.
  */
 export interface AbilityDef {

@@ -4,7 +4,7 @@
  * The host creates a room: a six-letter code that becomes the invite link
  * `?room=CODE`. Guests open the link and join; the host gives each a free
  * slot. There are eight slots, each open, closed, AI or a player (name,
- * species, colour, team, a Gene Thief's borrowed castes, ping, ready). The
+ * species, colour, team, a Mimic Ant's borrowed castes, ping, ready). The
  * host picks the map, seed, food and population cap and can arrange teams;
  * everyone readies up and the host starts the match. Chat works here and in
  * the match.
@@ -14,7 +14,7 @@
  * answered with a `resync` instead of the lobby.
  */
 import { Control, BUILD_ID, LobbySettings, Slot, packControl, unpack } from './messages';
-import { DEFAULT_LOBBY, GENE_THIEF_DEFAULT, cleanBorrowed, cleanTeam, matchPlayers, matchSetup, pickBorrowed, teamsBlocker } from './match';
+import { DEFAULT_LOBBY, MIMIC_DEFAULT, cleanBorrowed, cleanTeam, matchPlayers, matchSetup, pickBorrowed, teamsBlocker } from './match';
 import type { Transport } from './transport';
 import type { SpeciesId } from '../sim/species';
 
@@ -147,8 +147,8 @@ export class Lobby {
         const { kind: _k, ...patch } = c.patch;
         void _k;
         Object.assign(s, cleanPatch(patch));
-        // a Gene Thief always raises something: the default pair until its player picks
-        if (s.species === 'plagiaria' && !s.borrowed?.length) s.borrowed = [...GENE_THIEF_DEFAULT];
+        // a Mimic Ant always raises something: the default pair until its player picks
+        if (s.species === 'plagiaria' && !s.borrowed?.length) s.borrowed = [...MIMIC_DEFAULT];
         this.publish();
         break;
       }
@@ -210,13 +210,13 @@ export class Lobby {
 
   // ------------------------------------------------------------------ actions
 
-  /** Change your own slot (name, species, colour, team, a Gene Thief's castes, ready). */
+  /** Change your own slot (name, species, colour, team, a Mimic Ant's castes, ready). */
   setMine(patch: Partial<Pick<Slot, 'name' | 'species' | 'color' | 'ready' | 'team' | 'borrowed'>>): void {
     if (this.you < 0) return;
     if (this.isHost) {
       const s = this.slots[this.you];
       Object.assign(s, cleanPatch(patch));
-      if (s.species === 'plagiaria' && !s.borrowed?.length) s.borrowed = [...GENE_THIEF_DEFAULT];
+      if (s.species === 'plagiaria' && !s.borrowed?.length) s.borrowed = [...MIMIC_DEFAULT];
       this.publish();
     } else this.send({ t: 'setSlot', slot: this.you, patch });
   }
@@ -243,7 +243,7 @@ export class Lobby {
     if (s.kind === 'ai') {
       s.name = 'AI colony';
       s.ready = true;
-      // a Gene Thief AI steals two or three castes, picked here so every player gets the same ones
+      // a Mimic Ant AI steals two or three castes, picked here so every player gets the same ones
       if (s.species === 'plagiaria' && !s.borrowed?.length) s.borrowed = pickBorrowed();
     } else {
       s.name = '';
