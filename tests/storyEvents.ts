@@ -20,6 +20,7 @@ import { MAPS } from '../src/maps';
 import { validateMap } from '../src/world/mapValidate';
 import { Terrain, mapTerrainParams } from '../src/world/terrain';
 import { encodeState, hashState, restoreWorld } from '../src/sim/snapshot';
+import { damageAnt } from '../src/sim/combat';
 import { EN } from '../src/story/text/en';
 import type { Difficulty, StoryLevelId } from '../src/sim/story/types';
 
@@ -196,6 +197,41 @@ const rolled = (id: StoryLevelId, diff: Difficulty, seed: number) => {
   check('high water: the summit is the highest site; the three nests stand at three different heights below it', h[0] > h[1] && h[0] > h[2] && h[0] > h[3] && new Set([Math.round(h[1]), Math.round(h[2]), Math.round(h[3])]).size === 3 && lv[0] === 2, h.map((x) => x.toFixed(0)).join(' / '));
   const F = MAPS.floodHill!.floods;
   check('high water: four water stages, each higher; the last one under the summit', F.length === 4 && F.every((f, i) => i === 0 || f.level > F[i - 1].level) && F[3].level < h[0] - 10 && F[3].level > Math.max(h[1], h[2], h[3]));
+}
+
+// ---------------------------------------------------------------- the new levels' set-up
+{
+  const hw = level('highWater', 'normal', 5);
+  const st = storyOf(hw)!;
+  const lasius = Object.values(st.rivals).map((id) => hw.colony(id)!);
+  check('high water: three black garden ant colonies, each on its own (they fight each other too)', lasius.length === 3 && lasius.every((c) => c.species === 'lasius') && new Set(lasius.map((c) => c.team)).size === 3 && lasius.every((c) => c.team !== hw.colony(0)!.team));
+  const t = hw.terrain;
+  const p = hw.colony(0)!;
+  check('high water: the colony nests on the summit', t.levelAt(p.nx, p.ny) === 2);
+  check('high water: the water rises in stages (the plain, the foot, the east shelf, the terrace)', STORY_LEVELS.highWater.stages.map((S) => (S.events ?? []).flatMap((e) => e.actions).find((a) => a.do === 'flood')).filter(Boolean).map((a) => (a as { zone: number }).zone).join() === '0,1,2,3');
+  const ck = level('cartonKingdom', 'normal', 5);
+  const sk = storyOf(ck)!;
+  const tm = Object.values(sk.rivals).map((id) => ck.colony(id)!);
+  check('carton kingdom: two conehead termite colonies, allies (one team), not the colony’s', tm.length === 2 && tm.every((c) => c.species === 'nasutitermes') && tm[0].team === tm[1].team && tm[0].team !== ck.colony(0)!.team);
+  check('carton kingdom: the reward is the glue-squirting Sprayer, kept for the campaign', STORY_LEVELS.cartonKingdom.reward.caste === 'nasute_soldier');
+  const ak = STORY_LEVELS.antleredKing;
+  check('antlered king: four stages, the titan last; the reward is Antler Plating (built, story only)', ak.stages.length === 4 && ak.actors.king.creature === 'stagBeetle' && ak.reward.trait === 'antlerPlating' && !!STORY.traits.antlerPlating.built);
+  check('antlered king: the four stag beetle sizes are in the cast', ['stagMinor', 'stagSmall', 'stagMedium', 'stagLarge'].every((k) => Object.values(ak.actors).some((a) => a.creature === k)));
+}
+
+// ---------------------------------------------------------------- Antler Plating
+{
+  const w = level('garden', 'normal', 5);
+  const plated = createWorld(storySetup('garden', 'normal', [], 5, { traits: ['antlerPlating'] }), new EventBus());
+  const hit = (x: World) => {
+    const a = makeAnt(x, 0, 'termant_worker', SURFACE, 300, 640, 0);
+    const hp0 = a.hp;
+    damageAnt(x, a, 5, 'bite', null);
+    return hp0 - a.hp;
+  };
+  const d0 = hit(w);
+  const d1 = hit(plated);
+  check('trait: Antler Plating takes armour off every bite on the colony’s ants', d1 < d0 && Math.abs(d0 - d1 - (STORY.traits.antlerPlating.armor ?? 0)) < 0.01, `${d0.toFixed(2)} → ${d1.toFixed(2)}`);
 }
 
 // ---------------------------------------------------------------- the hold objective (the sap run)
