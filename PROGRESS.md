@@ -1749,3 +1749,23 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   check `mimic_termites.py` (the species card says Mimic Ant, the story tab "The Termants", no "Gene Thief" on either
   screen). Its older chip-name check expects "Conehead Termite Soldier" for `nasute_soldier`, which main's conehead
   rework now names "Nasute" — not part of this change.
+
+## 2026-11-03 — The Spider Mother's nest like an AI nest; the ground blends without seams
+- **User notes** (2026-11-02): "fix the chamber in level 4 to have an actual hex chamber set up like the ai"; "make the
+  ground textures blend better cos i see a cutoff on the map".
+- **Level 4 nest** (`feature/story-l4-chambers`): the level's `nest` plan (`StoryLevelDef.nest` → `ColonySpec.developPlan`
+  → `ColonyOptions.developPlan`) is laid out by the colony AI's own `developChambers` plus `developHighways` (new: the
+  dug tunnels and passages outside the chambers paved with highways): the founding ring of workers round the queen, a
+  7-hex worker rosette, a 7-hex food store by the entrance, a 7-hex soldier chamber and 3-hex chambers for the stolen
+  Lasius soldiers and fire majors. 12 starting workers (the plan's brood adds the rest: about 29 ants, 140 food).
+  Replays on the merged main: won on Easy / Normal / Hard (8–9 min), Brutal one seed of two (as before).
+- **Ground seams** (`feature/ground-blend`, render only): the stochastic tiling gave each lattice vertex its angle from
+  its corner slot, so every tap turned at every triangle edge — straight seams across all the ground on every map (the
+  cutoff). Now one angle per vertex. Also: a layer near the top-three cut fades in and out with its weight and its
+  height (it popped in at a line along the mesh's triangles); bare ground blends in where nothing is laid; the cover is
+  softened once and shared with the bank sculpt, which now reads every smooth field bilinearly (it had 4 mm steps and a
+  seam at its border); beyond the map's edge the edge's ground turns into the land round it over 140 mm (it switched in
+  one sample); AO, the lip and the spill fade with the distance from the banks and ramps (they stopped at a coarse
+  ring); the sun march fades with the face blend; face styles meet along a ragged line.
+- Merged with `main` (the Mimic Ant / Termants rename: the level's colony is "Termants").
+
