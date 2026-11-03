@@ -115,7 +115,7 @@ export const EN: Record<string, string> = {
   'spiderMother.stalker': 'Another wolf spider, a smaller one, working the slope where her foragers come and go.',
   'spiderMother.beetle': 'A ground beetle out on the terrace, nosing along the foragers’ trail.',
   'spiderMother.heat': 'The sand is hot enough to hurt. Her foragers cross it fast and rest in the shade of every stem.',
-  'spiderMother.win': 'The spider mother is dead. Her venom is in the colony now, in every bite. Beyond the river the land rises into old oak woods, and the colony is already looking at them.',
+  'spiderMother.win': 'The spider mother is dead, and her venom is in the colony now, in every bite. Beyond the river the land rises into old oak woods, and the colony is already looking at them.',
   'spiderMother.lose': 'The queen is dead. The terrace belongs to the spider again.',
   // ------------------------------------------------------------------ Tips (gameplay, shown as notes, not narration)
   'tip.dig': 'Tip: the Build panel (bottom right) has Dig. Paint soil for workers to dig out, then lay brood and store tiles in the space.',

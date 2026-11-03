@@ -441,7 +441,8 @@ export function upgradeEntrances(w: World, c: Colony, g: NestGrid): string[] {
 export function upgradeWorldEntrances(w: World): void {
   for (const c of w.s.colonies) {
     const g = w.nest(c.id);
-    if (!g) {
+    // (a story level's visiting party has no nest dug and no entrances: nothing to upgrade)
+    if (!g || c.visitor) {
       for (const e of c.entrances) normalizeEntrance(e, w.time);
       continue;
     }
