@@ -258,6 +258,15 @@ function worldFlags(w: World, st: StoryState, c: Colony): void {
   }
   // the day/night clock
   if (L.dayNight) for (const f of dayNightFlags(L.dayNight, w.s.time)) setFlag(st, f);
+  // a boss's health floor ends with its flag (the fight to the death)
+  st.actors.forEach((act) => {
+    const F = L.actors[act.name]?.floor;
+    if (!F || !act.spawned || act.kind !== 0 || !hasFlag(st, F.until)) return;
+    for (const id of act.ids) {
+      const cr = w.creatureById.get(id);
+      if (cr?.data.hpFloor !== undefined) delete cr.data.hpFloor;
+    }
+  });
   // a boss's health marks: hp:<actor>:<percent>
   st.actors.forEach((act) => {
     const marks = L.actors[act.name]?.phases;

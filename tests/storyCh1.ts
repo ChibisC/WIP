@@ -239,7 +239,7 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
     run(x, 30);
     return missionOf(x)!.goals[0]?.progress ?? '';
   };
-  check('spider mother: the preparation is longer on Easy than on Brutal (6½–9 min)', prep('easy').endsWith('9:00') && prep('brutal').endsWith('6:30'), `${prep('easy')} / ${prep('brutal')}`);
+  check('spider mother: the preparation is longer on Easy than on Brutal (8½–10 min)', prep('easy').endsWith('10:00') && prep('brutal').endsWith('8:30'), `${prep('easy')} / ${prep('brutal')}`);
   const mom = members(w, actor(w, 'mother'))[0] as Creature;
   const burrow = wherePt(w, 'burrowEdge');
   run(w, 20 * 20);
@@ -257,7 +257,24 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
   }
   check('spider mother: on her rounds she comes down toward the nest and goes back to her burrow', farR > 100 && backR < 40 && w.s.night > 0.2, `${farR.toFixed(0)} then ${backR.toFixed(0)} mm from the burrow`);
   check('spider mother: a brood of her older spiderlings disperses over the terrace during her rounds', hasFlag(st, 'hatchA') && members(w, actor(w, 'broodA')).length >= 3);
-  check('spider mother: her rounds last 11–13 minutes by difficulty', JSON.stringify(STORY_LEVELS.spiderMother.stages[1].objectives[0]) === JSON.stringify({ type: 'surviveTime', s: { easy: 660, normal: 720, hard: 750, brutal: 780 }, text: 'Hold out while she hunts the colony' }));
+  check('spider mother: her rounds last 14–16 minutes by difficulty', JSON.stringify(STORY_LEVELS.spiderMother.stages[1].objectives[0]) === JSON.stringify({ type: 'surviveTime', s: { easy: 840, normal: 900, hard: 930, brutal: 960 }, text: 'Hold out while she hunts the colony' }));
+  // on her rounds she can be driven off but not killed (a health floor until the last stage)
+  {
+    const wf = level('spiderMother', 'normal', 8);
+    const mf = missionOf(wf)!;
+    mf.stage = 1;
+    mf.entered = false;
+    run(wf, 20 * 30);
+    const mo = members(wf, actor(wf, 'mother'))[0] as Creature;
+    damageCreature(wf, mo, mo.maxHp * 2, 'pure', null);
+    run(wf, 20 * 2);
+    check('spider mother: on her rounds she can’t be killed (hurt to 55 % at most), only driven down her burrow', !mo.dead && Math.abs(mo.hp / mo.maxHp - 0.55) < 0.01, `${(mo.hp / mo.maxHp).toFixed(2)}`);
+    mf.stage = 2;
+    mf.entered = false;
+    run(wf, 20 * 3);
+    damageCreature(wf, mo, mo.maxHp * 2, 'pure', null);
+    check('spider mother: …and in the last stage she can (the floor ends with the stage)', mo.dead);
+  }
   // the hunt to the end
   m.stage = 2;
   m.entered = false;

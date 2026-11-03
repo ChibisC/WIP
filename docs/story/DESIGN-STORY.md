@@ -182,14 +182,15 @@ silk turret rim); level 0 = the lower terrace by the river with the player's nes
 slope, a root ramp). A developed colony laid out like an AI nest (user 2026-11-02; `nest` in the level, `developPlan` in the map spec, built by
 the colony AI's own `developChambers`): the founding ring of workers round the queen, a 7-hex worker rosette, a 7-hex food
 store by the entrance, 7-hex soldier and 3-hex Lasius soldier and fire major chambers (castes the player owns), highways
-on the tunnels between them (about 29 ants, 140 food), a preparation (Easy 9 min, Normal 7½, Hard 7, Brutal 6½), then her
-rounds (Easy 11 min, Normal 12, Hard 12½, Brutal 13: claude/story/06-spec §7, the level ran 14–17 minutes), then the fight
-to the end; the light goes toward dusk when she comes out.
+on the tunnels between them (about 29 ants, 140 food), a preparation (Easy 10 min, Normal 9½, Hard 9, Brutal 8½), then her
+rounds (Easy 14 min, Normal 15, Hard 15½, Brutal 16: claude/story/06-spec §7, the level ran 14–17 minutes), then the fight
+to the end; the light goes toward dusk when she comes out. On her rounds she can be hurt but not killed: at 55 % of her
+health she is hurt no further until the last stage (`ActorDef.floor`), and below 60 % she stays down her burrow.
 
 | Stage | Objectives | Scenes and set pieces |
 |---|---|---|
 | Before the hunt | prepare (the time by difficulty); 14 fighters, 50 ants (optional) | opening flight (the river → her burrow → the nest; a restart skips it, `?retry=1`); she sits at her burrow's mouth (hurt early, she answers with her own program) |
-| Her rounds | hold out (the time by difficulty); 20 fighters, 60 ants (optional) | dusk light 0.3; her rounds: out to the doorstep for 40 s (her own program stalks and pounces), back to the burrow for 75 s, out again; hurt below 80 % she rests 40 s; hurt below 60 % she stays down her burrow until the last stage; three broods of her older spiderlings disperse over the terrace (at 2½, 6½ and 10 min: 5–6 each, × the difficulty's `wave`), each hunting round a ramp for 2½ minutes, then on their own |
+| Her rounds | hold out (the time by difficulty); 20 fighters, 60 ants (optional) | dusk light 0.3; her rounds: out to the doorstep for 40 s (her own program stalks and pounces), back to the burrow for 75 s, out again; hurt below 80 % she rests 40 s; hurt below 60 % she stays down her burrow until the last stage; four broods of her older spiderlings disperse over the terrace (at 2½, 6½, 10 and 13 min: 5–6 each, × the difficulty's `wave`), each hunting round a ramp for 2½ minutes, then on their own |
 | The Spider Mother | kill her | light 0.45; her rounds (a `goto` loop): out to the colony's doorstep, where her own program stalks, pounces on and drags away lone ants, then back to the burrow with her catch, and out again. **Phase 1 (100–60 %)**: hurt below 80 % she goes back to her burrow, passive, healing a little (26 s), then out again. **Phase 2 (60–30 %)**: her spiderlings spill off her back in two groups (at 60 % and 45 %; `bossCuts`). **Phase 3 (30–0 %)**: she comes for the nest, digs a hole wider and walks in breaking soil and stone (`digInto`). Pounces and her rider shake are telegraphed (wind-up, ground marker, sound); riders follow the mounting rules |
 
 Her health 0.7 × 2400 × the difficulty's `boss` (Easy 0.75, Normal 1, Hard 1.1, Brutal 1.2). Medals: time gold ≤ 30 min,

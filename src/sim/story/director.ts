@@ -132,6 +132,7 @@ export function spawnActor(w: World, st: StoryState, i: number): void {
           cr.data.cut1 = def.bossCuts[0];
           cr.data.cut2 = def.bossCuts[1];
         }
+        if (def.floor && !st.flags.includes(def.floor.until)) cr.data.hpFloor = cr.maxHp * def.floor.hp;
         cr.h = cr.ph = face ? datan2(face[1] - p.y, face[0] - p.x) : h;
         cr.homeX = p.x;
         cr.homeY = p.y;

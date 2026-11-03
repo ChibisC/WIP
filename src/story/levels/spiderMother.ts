@@ -55,11 +55,13 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
   loadout: true,
   lairs: [{ name: 'The spider’s burrow', at: 'burrow', food: 60, look: 'burrow' }],
   actors: {
-    mother: { creature: 'hogna', at: 'burrowEdge', face: 'playerNest', goal: 'playerNest', hp: 0.7, phases: [0.8, 0.6, 0.3], bossCuts: [0.6, 0.3], label: 'the Spider Mother' },
+    // (on her rounds she can be hurt but not killed: at 55 % she is hurt no further until the last stage, `stage:2`)
+    mother: { creature: 'hogna', at: 'burrowEdge', face: 'playerNest', goal: 'playerNest', hp: 0.7, phases: [0.8, 0.6, 0.3], bossCuts: [0.6, 0.3], floor: { hp: 0.55, until: 'stage:2' }, label: 'the Spider Mother' },
     // her older young, dispersing: groups of spiderlings that hunt round the terrace on their own
     broodA: { creatures: [['spiderling', 5]], at: 'eggA', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
     broodB: { creatures: [['spiderling', 5]], at: 'eggB', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
     broodC: { creatures: [['spiderling', 6]], at: 'eggC', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
+    broodD: { creatures: [['spiderling', 6]], at: 'eggA', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
     ...EV.actors,
   },
   surprises: EV.surprises,
@@ -69,7 +71,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
     {
       name: 'Before the hunt',
       objectives: [
-        { type: 'surviveTime', s: { easy: 540, normal: 450, hard: 420, brutal: 390 }, text: 'Prepare: she hunts at dusk' },
+        { type: 'surviveTime', s: { easy: 600, normal: 570, hard: 540, brutal: 510 }, text: 'Prepare: she hunts at dusk' },
         { type: 'fighters', n: 14, optional: true },
         { type: 'raise', n: 50, optional: true, text: 'Raise 50 ants' },
       ],
@@ -91,7 +93,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
     {
       name: 'Her rounds',
       objectives: [
-        { type: 'surviveTime', s: { easy: 660, normal: 720, hard: 750, brutal: 780 }, text: 'Hold out while she hunts the colony' },
+        { type: 'surviveTime', s: { easy: 840, normal: 900, hard: 930, brutal: 960 }, text: 'Hold out while she hunts the colony' },
         { type: 'fighters', n: 20, optional: true },
         { type: 'raise', n: 60, optional: true, text: 'Raise 60 ants' },
       ],
@@ -109,6 +111,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
         { at: 150, actions: [{ do: 'spawn', actor: 'broodA' }, { do: 'flag', flag: 'hatchA' }] },
         { at: 390, actions: [{ do: 'spawn', actor: 'broodB' }] },
         { at: 600, actions: [{ do: 'spawn', actor: 'broodC' }] },
+        { at: 780, actions: [{ do: 'spawn', actor: 'broodD' }] },
       ],
       scenes: [
         // her rounds: down to the colony's doorstep, where whatever comes near her she stalks and pounces on with her own
@@ -122,6 +125,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
         { actor: 'broodA', on: 'hatchA', cues: [{ walkTo: 'rampMidFoot', timeout: 120 }, { guard: 'rampMidFoot', r: 80, s: 150 }, { release: true }] },
         { actor: 'broodB', at: 390, cues: [{ walkTo: 'rampWestTop', timeout: 120 }, { guard: 'rampWestTop', r: 80, s: 150 }, { release: true }] },
         { actor: 'broodC', at: 600, cues: [{ walkTo: 'nestApproach', timeout: 120 }, { guard: 'nestApproach', r: 80, s: 150 }, { release: true }] },
+        { actor: 'broodD', at: 780, cues: [{ walkTo: 'rampMidFoot', timeout: 120 }, { guard: 'rampMidFoot', r: 80, s: 150 }, { release: true }] },
       ],
     },
     {

@@ -147,6 +147,11 @@ export interface ActorDef {
   bossCuts?: [number, number];
   /** a boss roams toward this point when no ant is near (its hunting goal; default: where it appeared) */
   goal?: Where;
+  /**
+   * a boss's health floor (a fraction of its health) until a flag is set: hurt to it, it is hurt no further for now (the
+   * Spider Mother can't be killed on her rounds, only driven down her burrow; the fight to the death is the last stage)
+   */
+  floor?: { hp: number; until: string };
 }
 
 /** A caption: a key into the level's narration text, said `at` seconds into the stage or once a flag is set. */

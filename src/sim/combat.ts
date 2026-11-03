@@ -198,6 +198,9 @@ export function damageCreature(w: World, cr: Creature, amount: number, type: Dam
   else if (type === 'acid') dmg = Math.max(amount * 0.7, amount - armor * 0.25) * acidMulOn(w, cr.glueT);
   // mount bonus (EotU): enough ants on its back and it takes more damage from everyone
   if (mountBonus(cr)) dmg *= BALANCE.mount.bonusMul;
+  // a story boss's health floor for a stage (sim/story director: `ActorDef.floor`): hurt to it, no further for now
+  const floor = cr.data.hpFloor ?? 0;
+  if (floor > 0 && cr.hp - dmg < floor) dmg = Math.max(0, cr.hp - floor);
   cr.hp -= dmg;
   creatureHooks.onDamaged?.(w, cr, src, dmg);
   if (cr.hp <= 0) {
