@@ -42,6 +42,7 @@ import { bindingsOf, settings } from './profile';
 import { antToView, blankView, corpseToView } from './antViews';
 import { NestView, casteTint } from './nestView';
 import { TeamRings } from '../render/game/teamRings';
+import { DigRings } from '../render/game/digRings';
 import { HealthBars } from '../render/game/healthBars';
 import { arenaOf } from '../sim/arenaState';
 import { TEAM_NAMES } from '../sim/arena';
@@ -157,6 +158,8 @@ export class GameSession {
   private surfCreatures = new CreatureRenderer('surfaceCreatures');
   /** battle arena: a ring in the team colour under every unit */
   private teamRings = new TeamRings();
+  /** a titan's dig progress over the hole it digs (everyone sees it) */
+  private digRings = new DigRings();
   /** health bars and level chevrons over hurt or inspected units (user 2026-11-01, 21:36) */
   private surfBars = new HealthBars('surfaceHealthBars');
   /** debug overlay: the sim's hitboxes (F3, or ?hitboxes=1; game/hitboxOverlay.ts) */
@@ -229,7 +232,7 @@ export class GameSession {
     this.surfAnts = new AntRenderer(this.view.renderer, 'surfaceAnts');
     this.surfAnts.lodScale = this.view.preset.lodScale;
     this.surfAnts.space = SURFACE;
-    this.view.surfaceScene.add(this.teamRings.group, this.surfBars.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfTrail.group, this.surfFx.group);
+    this.view.surfaceScene.add(this.teamRings.group, this.digRings.group, this.surfBars.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfTrail.group, this.surfFx.group);
     // Pheromone overlay texture.
     const ph = w.phero;
     this.pheroData = new Uint8Array(ph.w * ph.h * 4);
@@ -299,7 +302,8 @@ export class GameSession {
         else if ((e.phase === 'dig' || e.phase === 'breach') && surf) {
           const rig = this.view.surfaceRig;
           const zoomK = Math.min(1, 420 / Math.max(1, rig.distance));
-          if (Math.hypot(rig.target.x - e.x, rig.target.z - e.y) < rig.distance * 1.5) rig.shake = Math.max(rig.shake, (e.phase === 'breach' ? 0.5 : 0.18) * zoomK * shakeK);
+          // (the jolts grow as the hole opens: claude/creatures/02-spec §3)
+          if (Math.hypot(rig.target.x - e.x, rig.target.z - e.y) < rig.distance * 1.5) rig.shake = Math.max(rig.shake, (e.phase === 'breach' ? 0.5 : 0.12 + 0.16 * (e.prog ?? 0)) * zoomK * shakeK);
         }
         if (e.phase === 'enter' || e.phase === 'breach') this.alert(e.space);
       }
@@ -1548,6 +1552,7 @@ export class GameSession {
       };
       this.surfAnts.update(list, alpha, realDt, cam, this.surfAdapter, vh);
       this.teamRings.update(w, alpha, this.surfHeight);
+      this.digRings.update(w, this.surfHeight);
       this.surfFood.update(w, SURFACE, alpha, this.surfMap, (id) => this.surfAnts.holdOf(id));
       this.surfBars.update(w, SURFACE, alpha, cam, vh, (x, y, l, o) => this.surfMap.pos(x, y, l, o), this.player, this.inspect, realDt);
       this.surfDecor.update(w, this.foodView, (f) => edible(this.player, f));

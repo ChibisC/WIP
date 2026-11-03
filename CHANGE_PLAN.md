@@ -941,3 +941,86 @@ Built on §23 (`digInto`). Plan, as built:
    sources (DESIGN-STORY §10).
 5. Client: moonlight blend, wolf spider eyeshine, the spider burrow, map moods, the night clock, hub/Genome/end screen.
 6. Tests `tests/storyCh1.ts`; the playtest bot plays bosses and nights; browser shots `tests/browser/story_ch1_4.py`.
+
+## 25. Story titans get inside; titans open holes more easily (user specs 2026-11-03: claude/story/05-spec-story-titans-get-inside.md, claude/creatures/02-spec-easier-titan-holes.md)
+
+### 25.1 Why the story titans never got in (evidence, before any change: `main` `762d7c3`)
+`tools/titan-raid-probe.ts` (the probe: `tools/titanProbe.ts`) starts each level at its titan's moment and logs the
+titan every tick (`raid`, `rph`, `rprog`, `rstag`, health, space, position, its scene and cue, its creature state,
+riders, `hitT`, the actor's mode). The army is 60 Termants (⅔ soldiers) on marker V; the spider mother is put at 31.5 %
+(the 80 % and 60 % marks pass), and the last blow comes from the army (or a single blow undefended). Normal, seed 5:
+
+| level / setup | the dig cue began | digging from | inside | what happened |
+|---|---|---|---|---|
+| Long Nights / none | 0 s | 30 s | **55 s** | in (25 s of digging) |
+| Long Nights / army at the hole | 0 s | 50 s (39 % left) | never | **died at the hole** after 9 s of digging (rprog never reached 1: hit every tick, 45 % pace, knock-backs) |
+| Long Nights / army on it (no climbing) | 0 s | never | never | **died on the approach**, 30 mm short of its digging spot: latched ants, glue and grip slowed it to 1.7 mm/s (14 % of its speed) for 60 s while 60 ants chewed through 2 030 hp; the raid tick never bites on the approach |
+| Long Nights / riders | never | never | never | **died before its dig cue began**: on its path cue, every hit hands it to its own program (`hitT` > 0), so it stood and fought on the hollow's floor with 12 riders and died 45 s later |
+| Long Nights / army in its way, not attacking | 0 s | 23 s | 48 s | in |
+| Spider Mother / none | 0 s | 16 s | **43 s** | in (27 s of digging) |
+| Spider Mother / army at the hole | 0 s | 17 s (23 %) | never | **died at the hole** after 5.5 s |
+| Spider Mother / army on it | 0 s | 24 s (17 %) | never | **died at the hole** after 20 s |
+| Spider Mother / riders | 0 s | 23 s (11 %) | never | **died at the hole** after 16 s |
+| Spider Mother / army in its way | 0 s | 16 s | 43 s | in |
+| Spider Mother / from her burrow | 0 s | 16 s | 43 s | in |
+
+Even 20 ants at the hole killed both on Easy (the tarantula after 42 s of digging, the spider after 6 s); 20 on Brutal let
+the tarantula in after 56 s of digging. `tools/playtest-story.ts` (its bot fights at the door) on Normal, seed 7: the
+tarantula was killed after `tarantulaDigs` without `tarantulaIn`; the spider mother after `hp:mother:30` without
+`motherIn` — neither ever got in.
+
+The six suspects of the spec:
+1. **The cue gives up silently — confirmed by reading, not the cause here.** `enterCue` ignores `startTitanRaid`'s
+   result and the done check counts "not raiding" (`!data.raid`) as done, so a failed start or a raid ended early
+   (death aside) would move the scene on at once. In these runs the start never failed: creatures never go into caves in
+   this code (lairs are drawn holes; the titans stand at them on the surface), so `space !== SURFACE` cannot happen yet.
+   Fixed anyway (§25.2).
+2. **It dies or stalls at the hole — confirmed: the main cause.** Under attack it digs at `hitSlow` 45 % all the time
+   (any hit restarts the 1.2 s stagger) and heavy ticks knock progress back 15 %; the spider starts at 30 % health.
+   Before the hole, the approach crawls (latched grip floor 35 % × Termant glue × being held) and never fights back.
+3. **The spider's timeout — ruled out.** `digInto` is not a walking cue, so its `timeout: 300` never applied; the
+   `release` after it only clears the director's links (the raid goes on). Removed all the same.
+4. **Something else drives it — partly.** During the raid nothing else moves it (the raid tick runs first and returns
+   true in every phase), but *before* the dig cue the tarantula's path cue hands it to its own program whenever hit, so
+   an army on the hollow's floor stops it there and kills it. A later scene could also replace the dig scene (none does
+   today).
+5. **It can't reach the hole — partly.** The approach uses `walkTo`: straight at the hole (the banks' route only when the
+   line crosses a cliff), turning on the spot when blocked — no sliding round a pebble, no re-route. Not seen to block
+   here, but it can; and the crawl of (2).
+6. **`leaving` / `finishRaid` early — ruled out** (queen and colony alive in every run).
+
+### 25.2 Plan, as built
+Story (spec A; story raids only, skirmish unchanged):
+1. **The dig cue owns the titan.** A story actor with a dig-in ahead (`digInto` in its running scene, not yet inside)
+   is *locked*: a new scene for it waits until it is in (then the newest waiting one starts); nothing ends its raid but
+   death or the level's own `endRaid` (dawn). Boss phase events (the spiderlings, captions) still happen.
+2. **Start reliably.** In a cave (a lair) it first walks out of it to the surface; any other failure retries every
+   second and logs why (`story.log`, the dev view). Done only when inside (`rph ≥ Inside`) or dead.
+3. **Always reach the hole.** Story approaches walk the surface route field (round banks, up ramps), slide round
+   obstacles, push through ants (a floor on its pace whatever holds it: `STORY.titanRaid.minPace`) and re-route
+   (sidestep) after `stuckSec` without progress.
+4. **Digging can't be stalled.** Story pace ≥ `minPace`, no knock-backs, and a cap per difficulty (`digCap`): it
+   breaks through by then whatever happens.
+5. **It can't die before it gets in.** A locked titan's health stops at `hpFloor` (10 %) until it is inside (bites,
+   acid, venom, floods); the boss bar shows a lock and the floor's mark meanwhile.
+6. **The levels.** The tarantula walks its path to the hollow without stopping to fight (passive on the way, its path cue
+   shorter), then digs in; the spider mother rushes straight to the nest at 30 % (`digInto` `speed`), no timeout, the
+   release only once she is in. A breakthrough caption ("It's in the nest!") and a dig ring over the hole.
+7. **Fair.** The fight inside: measured (the queen's time to die with the army inside), tuned in the level data per
+   difficulty (`STORY.titanRaid.queenBite`: the titan's bite on the queen). The spider's bonus becomes "kill her within
+   N s of breaking in" (`killWithin`, N by difficulty); "kill the tarantula before dawn" stays.
+
+All modes (spec B):
+8. **Faster base digging**: `holeWork` lowered and the stag beetle's dig speed raised (undefended: tarantula and wolf
+   spider mother ≈ 10 s, centipede ≈ 15 s, stag beetle ≈ 20 s), times scaled a little by the titan's own size.
+9. **Defence slows by damage rate**, not by "any hit": a smoothed damage per second ÷ its health; pace = floor + (1 −
+   floor) ÷ (1 + (rate ÷ `slowRate`)²) — a few ants barely matter, a big army nears the floor (55 % in skirmish,
+   `STORY.titanRaid.minPace` in story).
+10. **Checkpoints** at 25 / 50 / 75 %: a heavy blow knocks a little back (`heavyBack` 8 %), never below the last one.
+11. **Memory**: partial progress stays on the hole for `holeMemorySec` (60 s); an open breach is still walked into.
+12. **Readable**: the hole's stages in the anthill model (rim crumbling, wider crater, soil fountaining, the breach —
+    sized to the titan), a progress ring over the hole for everyone, the warning toast with the time to breakthrough,
+    the rumble rising with progress.
+13. Verify: `tests/titans.ts`, `tests/storyCh1.ts` (both levels × four difficulties × no defence / army at the hole /
+    riders / from its burrow), `tools/titan-holes.ts` (before/after table: `docs/creatures/titans.md`), the playtests,
+    browser clips (`docs/story/shots/`), determinism, LAN, docs, handoff, merge, publish.
