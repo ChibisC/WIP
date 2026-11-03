@@ -10,7 +10,7 @@
  */
 import { ColumnReader } from '../sim/columns';
 import { World } from '../sim/world';
-import { Ant, Brood, Creature, Food, Projectile } from '../sim/types';
+import { Ant, Brood, Colony, Creature, Food, Projectile } from '../sim/types';
 import { FrameMsg } from '../worker/protocol';
 
 export class Replica {
@@ -45,14 +45,15 @@ export class Replica {
     s.host = sl.host;
     s.mode = sl.mode;
     Object.assign(s.settings, sl.settings);
+    // (the slow state comes as deltas: only what changed since the last frame, merged over this copy; worker/slowDelta.ts)
     for (const c of sl.colonies) {
       const ex = w.colonyById.get(c.id);
       if (ex) Object.assign(ex, c);
-      else s.colonies.push(c);
+      else s.colonies.push(c as Colony);
     }
-    s.caves = sl.caves;
-    s.aphids = sl.aphids;
-    s.plants = sl.plants;
+    if (sl.caves) s.caves = sl.caves;
+    if (sl.aphids) s.aphids = sl.aphids;
+    if (sl.plants) s.plants = sl.plants;
     // floods: the sim's water lives in the worker; raise (or drain) this copy of the terrain to match
     if (sl.flood) {
       s.flood = sl.flood;

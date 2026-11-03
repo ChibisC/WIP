@@ -7,6 +7,7 @@ import { ColumnAlloc, ColumnWriter, columnBuffers } from '../sim/columns';
 import { SharedPool } from './sharedPool';
 import { World } from '../sim/world';
 import { FrameMsg, GridDelta } from './protocol';
+import { SlowDelta } from './slowDelta';
 
 export class FrameBuilder {
   private ants = new ColumnWriter();
@@ -19,6 +20,8 @@ export class FrameBuilder {
   overlayColony = -1;
   private overlayVer = -1;
   private frame = 0;
+  /** the colonies, caves, aphids and plants go as deltas (performance pass) */
+  private slow = new SlowDelta();
   /** shared ring buffers (cross-origin isolated pages), else null */
   private pool: SharedPool | null;
 
@@ -85,10 +88,10 @@ export class FrameBuilder {
         host: s.host,
         mode: s.mode,
         settings: s.settings,
-        colonies: s.colonies,
-        caves: s.caves,
-        aphids: s.aphids,
-        plants: s.plants,
+        colonies: this.slow.colonyDelta(s.colonies),
+        caves: this.slow.part('caves', s.caves),
+        aphids: this.slow.part('aphids', s.aphids),
+        plants: this.slow.part('plants', s.plants),
         ...(s.flood ? { flood: s.flood } : {}),
       },
       ants,

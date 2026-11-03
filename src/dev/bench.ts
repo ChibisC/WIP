@@ -162,6 +162,8 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
   const secs = Number(q.get('bsecs') || st.secs);
   const v = s.view;
   s.autoQuality.enabled = false;
+  // (measured uncapped: the frame cap would hide what the device can do)
+  s.loop.frameCap = 0;
   const finish = (sw?: SwitchResult) => {
     const r = collect(s, def, loadMs, secs, sw);
     st.results.push(r);

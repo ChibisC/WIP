@@ -41,7 +41,7 @@ import { MISSIONS, missionDef, missionOf } from '../sim/missions';
 import { restoreWorld } from '../sim/snapshot';
 import { commandsByTick, encodeReplay } from './replay';
 import { SaveHeader, SaveRecord, SaveSlot, encodeSave, putSave } from './saves';
-import { bindingsOf, settings } from './profile';
+import { bindingsOf, frameCapOf, settings } from './profile';
 import { antToView, blankView, corpseToView } from './antViews';
 import { NestView, casteTint } from './nestView';
 import { TeamRings } from '../render/game/teamRings';
@@ -336,6 +336,7 @@ export class GameSession {
   }
 
   start(): void {
+    this.loop.frameCap = frameCapOf(settings());
     this.loop.start();
   }
 

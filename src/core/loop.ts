@@ -23,6 +23,10 @@ export class GameLoop {
   frameMs = 16;
   tickMs = 0;
   maxTicksPerFrame = 24;
+  /** frame cap (performance pass): 0 follows the display; 30 or 60 skips animation frames to hold that rate (battery,
+   *  heat on phones). The simulation is unchanged: ticks follow real time either way. */
+  frameCap = 0;
+  private lastShown = 0;
   /** profiling hooks (game/profiler.ts): the frame starts, the ticks ran (ms), the frame ends */
   onStepStart: ((now: number) => void) | null = null;
   onTicks: ((ms: number) => void) | null = null;
@@ -37,6 +41,12 @@ export class GameLoop {
     const step = (now: number) => {
       if (!this.running) return;
       this.rafId = requestAnimationFrame(step);
+      if (this.frameCap > 0) {
+        const every = 1000 / this.frameCap;
+        // (a 2 ms allowance: a 60 Hz display's frames land at 16.6 ms ± jitter and must not be skipped at a 60 cap)
+        if (now - this.lastShown < every - 2) return;
+        this.lastShown = now - this.lastShown > every * 3 ? now : this.lastShown + every;
+      }
       this.step(now);
     };
     this.rafId = requestAnimationFrame(step);
