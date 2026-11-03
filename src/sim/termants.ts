@@ -43,7 +43,7 @@ export interface StolenCaste {
 /** Data only: one entry per source species (entries whose caste is not in the game are skipped). */
 export const STOLEN_CASTES: StolenCaste[] = [
   { source: 'hell', caste: 'hell_soldier', heavy: true },
-  { source: 'nasutitermes', caste: 'nasute_soldier', heavy: false, as: 'Soldier' },
+  { source: 'nasutitermes', caste: 'nasute_soldier', heavy: false, as: 'Sprayer' },
   { source: 'rhynchotermes', caste: 'rhy_soldier', heavy: false, as: 'Soldier' },
   { source: 'solenopsis', caste: 'fire_major', heavy: true },
   { source: 'aurimyrmex', caste: 'aurimyrmex_soldier', heavy: false },

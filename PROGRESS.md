@@ -1734,6 +1734,8 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
 - Checks: `tsc`; `npm test` all suites; the determinism check; height data regenerated.
 - User notes 17:47–17:59: renamed Conehead Termites; legs at their real length; the worker's head and mandibles and
   the soldier's teardrop head redone from the photos.
+- Round 3 ratings (night): castes now Worker, Soldier (the former major) and Sprayer (the nasute; glue only); the
+  soldiers' antennae and mandibles placed on the head's surface; the worker's mandibles broad toothed blades.
 
 ### 2026-11-02 (late) — No more "Gene Thief": the Mimic Ant and the Termants
 - **User note** (23:47): "every mention of gene-theif rename it to Mimic ants or termants".
@@ -1768,4 +1770,5 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   one sample); AO, the lip and the spill fade with the distance from the banks and ramps (they stopped at a coarse
   ring); the sun march fades with the face blend; face styles meet along a ragged line.
 - Merged with `main` (the Mimic Ant / Termants rename: the level's colony is "Termants").
-
+- Round 4 ratings (2026-11-03): every item 8, approved with one change — the soldier drums in bursts while walking or
+  charging at a foe (`drumWalking`; anim lab `tdrumwalk`).
