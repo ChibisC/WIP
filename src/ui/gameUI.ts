@@ -230,7 +230,8 @@ export class GameUI {
     else if (e.t === 'queenHurt' && e.colony === pid) this.toasts.push('The queen is under attack!', 'warn', 'queen');
     // a titan digging toward the nest (sim/creatures/titanDig.ts): click to look
     else if (e.t === 'titanDig' && e.colony === pid && (e.phase === 'warn' || e.phase === 'breach')) {
-      const name = creatureKind(e.kind)?.name.toLowerCase() ?? 'titan';
+      // (lower case for the sentence, but a proper name keeps its capital: "Mexican red-knee tarantula", "Carolina wolf spider")
+      const name = (creatureKind(e.kind)?.name ?? 'titan').replace(/^(?!(?:Mexican|Carolina)\b)([A-Z])/, (c) => c.toLowerCase());
       const text = e.phase === 'warn' ? `${/^[aeiou]/.test(name) ? 'An' : 'A'} ${name} is digging toward your nest! Click to look.` : `The ${name} has broken into the nest!`;
       this.toasts.push(text, 'warn', `titan:${e.phase}`, () => this.s.jumpTo(e.phase === 'warn' ? 'surface' : 'nest', e.x, e.y, e.phase === 'warn' ? undefined : e.space));
     }
