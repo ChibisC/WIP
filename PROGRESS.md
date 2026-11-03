@@ -1715,3 +1715,9 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   (the termite kit's ATTEND) — and bites intruders inside the chamber. In 4 min: no ticks out of the chamber,
   300–365 mm walked, at most 11 mm (Termant) or 25 mm (termites) from the queen's centre; an intruder dropped beside
   the queen is killed and one at the entrance is left alone. No random draws (a hash of his id and the time).
+- Merged with `main` twice more on the way (the hell ant finisher and nasute melee; then the AI allies, which took
+  protocol 9 too: now `ud-mp-10`). After the AI allies, on Normal: The Long Nights won (23.6 min), The Spider Mother won
+  (8.6 min), Fire on the Banks won (seed 21, 42.1 min); The Garden Below seed 11 now does not finish in 60 min either (it
+  won in 14.5 min before) — its rival plays with the new colony AI; not retuned here (flagged in the handoff). The night
+  look got darker (the sky's image light dims too; the light fades through the 30 s dusk) and the eyeshine sits on the
+  big front eyes (`tests/browser/eyeshine.py`).

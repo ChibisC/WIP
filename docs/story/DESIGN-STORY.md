@@ -253,7 +253,9 @@ rebuild) and the nights (a titan in the nest first, else a hunter at the door �
 The nights' length is fixed (23½ min). The bot's Spider Mother fights are short (about two minutes from the hunt: an army
 of 50–70 against her); a person who lets her hunt the doorstep loses many more ants. On Brutal she is a coin toss for the
 bot. Garden Below is not retuned here (04-spec: its balance is not to change); its bot result moved with another branch's
-economy change, flagged in the handoff.
+economy change, flagged in the handoff. After the AI-allies merge (the new colony AI plays the rivals and the bot): Long
+Nights won, Spider Mother won 8.6 min, Fire on the Banks won (seed 21: 42.1 min); Garden Below seed 11 no longer finishes
+in 60 min — a retune of the garden is the next balance job.
 
 The caste balance made fire ant minors much tougher (13.5 health, was 8), so level 2's mound holds fewer ants (pop 18,
 developed 3, 10 starting workers; was 55 / 4 / 12) under a level enemy scale of 0.85 (`StoryLevelDef.enemyStat`), and
