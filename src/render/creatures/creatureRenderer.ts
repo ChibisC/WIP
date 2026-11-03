@@ -286,7 +286,7 @@ export class CreatureRenderer {
       gr.addColorStop(1, 'rgba(255,255,255,0)');
       x.fillStyle = gr;
       x.fillRect(0, 0, 32, 32);
-      const m = new THREE.PointsMaterial({ size: 2.2, sizeAttenuation: true, map: new THREE.CanvasTexture(c), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      const m = new THREE.PointsMaterial({ size: 1.6, sizeAttenuation: true, map: new THREE.CanvasTexture(c), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
       this.glints = new THREE.Points(g, m);
       this.glints.frustumCulled = false;
       this.glints.renderOrder = 5;
@@ -304,9 +304,10 @@ export class CreatureRenderer {
       const h = cr.ph + dh * alpha;
       const fx = Math.cos(h);
       const fz = Math.sin(h);
-      const ex = x + fx * L * 0.22;
-      const ez = z + fz * L * 0.22;
-      const ey = ground(x, z) + L * 0.13;
+      // the two big front eyes (render/creatures/builders.ts spider: 0.435 L forward, 0.25 L up, ±0.035 L), at their surface
+      const ex = x + fx * L * 0.465;
+      const ez = z + fz * L * 0.465;
+      const ey = ground(x, z) + L * 0.25;
       // facing the camera: the eyes shine back; side on or away: nothing
       const tx = cp.x - ex;
       const tz = cp.z - ez;
@@ -314,11 +315,16 @@ export class CreatureRenderer {
       const face = (fx * tx + fz * tz) / tl;
       const k = Math.max(0, (face - 0.15) / 0.85) * this.night;
       if (k <= 0.02) continue;
+      // (each glint a little in front of the head's surface, toward the camera, so the head itself never hides it; grass
+      // and stones in front still do)
+      const cy = cp.y - ey;
+      const cl = Math.hypot(tx, cy, tz) || 1;
+      const lift = L * 0.05;
       for (const side of [-1, 1]) {
         if (n >= EYESHINE_MAX) break;
-        this.glintPos[n * 3] = ex - fz * side * L * 0.045;
-        this.glintPos[n * 3 + 1] = ey;
-        this.glintPos[n * 3 + 2] = ez + fx * side * L * 0.045;
+        this.glintPos[n * 3] = ex - fz * side * L * 0.035 + (tx / cl) * lift;
+        this.glintPos[n * 3 + 1] = ey + (cy / cl) * lift;
+        this.glintPos[n * 3 + 2] = ez + fx * side * L * 0.035 + (tz / cl) * lift;
         this.glintCol[n * 3] = 0.78 * k;
         this.glintCol[n * 3 + 1] = 0.95 * k;
         this.glintCol[n * 3 + 2] = 0.72 * k;
