@@ -301,7 +301,7 @@ export const CASTES: Record<string, CasteDef> = {
     fact: 'Nasutitermes workers are blind, creamy and soft; the dark wood they have eaten shows through the abdomen. Large workers are female, small ones male.',
   }),
   nasute_soldier: C({
-    id: 'nasute_soldier', species: 'nasutitermes', name: 'Nasute', role: 'soldier', morph: 'termite_nasute', termite: 'nasute', mount: 'none',
+    id: 'nasute_soldier', species: 'nasutitermes', name: 'Sprayer', role: 'soldier', morph: 'termite_nasute', termite: 'nasute', mount: 'none',
     length: 5, speed: 13.6, // × 0.85
     hp: 12, // (balance pass 2026-11-02: was 12.8)
     bite: 0.3, attackInterval: 1.2, armor: 0, carry: 2, grip: 0.6, mass: 0.8, forage: true, dig: false, nurse: false, // gathers like an ant soldier (user note 2026-10-25)
@@ -311,7 +311,7 @@ export const CASTES: Record<string, CasteDef> = {
     fact: 'A nasute squirts sticky, noxious terpenes from the cone on its head (the nasus). Its mandibles are mere points: it cannot bite, and workers must feed it.',
   }),
   nasute_major: C({
-    id: 'nasute_major', species: 'nasutitermes', name: 'Major', role: 'major', morph: 'termite_major', termite: 'major', mount: 'large',
+    id: 'nasute_major', species: 'nasutitermes', name: 'Soldier', role: 'major', morph: 'termite_major', termite: 'major', mount: 'large',
     length: 6.5, speed: 12, // × 0.75
     hp: 76, // (balance pass 2026-11-02: was 48)
     bite: 5.6, attackInterval: 1.0, // (was 4.33)
@@ -483,7 +483,7 @@ export const SPECIES: Record<SpeciesId, SpeciesDef> = {
     id: 'nasutitermes', common: NASUTE.displayName, scientific: 'Nasutitermes corniger', queen: 'nasute_queen', king: 'nasute_king', kind: 'termite', resource: 'wood',
     castes: ['nasute_worker', 'nasute_soldier', 'nasute_major'],
     ratio: { nasute_worker: 0.8, nasute_soldier: 0.15, nasute_major: 0.05 }, startWorkers: 8, eggInterval: 4.5, color: '#c98a3e',
-    blurb: 'Termites, not ants: blind wood-eaters with a king and queen. Nasute soldiers squirt a sticky glue stream that grows stronger the longer they hold a target; majors charge, glue enemies in place and drum the alarm.',
+    blurb: 'Termites, not ants: blind wood-eaters with a king and queen. Sprayers squirt a sticky glue stream from the nasus that grows stronger the longer they hold a target (they never bite); soldiers charge, glue enemies in place and drum the alarm.',
     traits: ['Wood economy (not insect food)', 'Ramping glue stream (pure damage)', 'Majors: charge, glue hold, alarm', 'A king guards the royal chamber'],
   },
   rhynchotermes: {
