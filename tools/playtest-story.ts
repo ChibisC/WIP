@@ -221,7 +221,8 @@ for (let t = 0; t < minutes * 1200; t++) {
   }
   // a person reacts a look late: a new target is acted on the second time it is seen
   if (HUMAN && target) {
-    const key = `${target.space}:${Math.round(target.x / 60)}:${Math.round(target.y / 60)}`;
+    // (by what it is going after, not where: a moving foe is the same target a look later)
+    const key = `${target.space}:${(S?.objectives ?? []).map((o) => o.type).join()}`;
     if (key !== seenKey && !assisting) {
       seenKey = key;
       target = null;
