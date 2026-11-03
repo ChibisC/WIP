@@ -1,4 +1,18 @@
 import type { StoryLevelDef } from '../../sim/story/types';
+import { column, earlyRaid, heat, party, surprisePool, wanderer, windfall } from '../surprises';
+
+/**
+ * Surprise events (claude/story/06-spec §6): a red wood ant column crossing the garden, the ground beetle back hunting
+ * the meadow's foragers, a fallen strawberry the garden ants come for, a hot spell; on Hard and Brutal an early raid.
+ */
+const EV = surprisePool(
+  column('woodAnts', { window: [1000, 1700], visitor: 'formica', species: 'formica', name: 'Red wood ants', ants: [['formica_worker', 7], ['formica_soldier', 2]], enter: 'evEast', path: 'woodCol', exit: 'evSouth', label: 'the wood ant column', say: 'woodAnts' }),
+  wanderer('beetleHunt', { window: [520, 900], creature: 'groundBeetle', enter: 'beetleExit', to: 'fruit', r: 60, s: 110, exit: 'evSouth', hp: 0.7, label: 'the ground beetle', say: 'beetleHunt' }),
+  windfall('strawberry', { window: [700, 1300], at: 'berryDrop', kind: 'berry', model: '', scale: 2.2, say: 'strawberry' }),
+  party('berryParty', { window: [25, 55], after: 'ev:strawberry', rival: 'lasius', ants: [['lasius_worker', 4]], enter: 'stoneSteps', to: 'berryDrop', s: 50, label: 'the strawberry foragers' }),
+  heat('hotSpell', { window: [1500, 2400], chance: 0.7, s: 100, say: 'heat' }),
+  earlyRaid('earlyRaid', { window: [90, 240], after: 'stage:2', from: 'hard', rival: 'lasius', note: 'earlyRaid' }),
+);
 
 /**
  * Chapter 1, level 1 — "The Garden Below" (claude/story/02-spec §5; map src/maps/story/gardenBelow.ts). The queen is
@@ -30,7 +44,10 @@ export const GARDEN: StoryLevelDef = {
     scouts: { ants: [['lasius_worker', 2]], colony: 'lasius', at: 'scoutTop', spawn: 'action', label: 'the scouts' },
     // the first raid, ten minutes in (the bonus: steal the soldier before it)
     raiders: { ants: [['lasius_soldier', 2], ['lasius_worker', 5]], colony: 'lasius', at: 'stoneSteps', spawn: 'action', wave: true, label: 'the Lasius raid' },
+    ...EV.actors,
   },
+  surprises: EV.surprises,
+  visitors: EV.visitors,
   scenes: [
     {
       actor: 'raiders',
@@ -38,6 +55,7 @@ export const GARDEN: StoryLevelDef = {
       // (`mode: 'aggressive'` then the guard: as this played while a charge cue was skipped at once — kept unchanged)
       cues: [{ holdAt: 'stoneSteps', anim: 'threat', s: 4 }, { flag: 'raidComing' }, { mode: 'aggressive' }, { guard: 'playerNest', r: 70, s: 45 }, { release: true }],
     },
+    ...EV.scenes,
   ],
   say: [{ key: 'raid1', on: 'raidComing' }],
   events: [

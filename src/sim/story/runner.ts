@@ -15,6 +15,7 @@ import { storyLevel } from '../../story/levels';
 import { mapDef } from '../../maps';
 import type { StoryLevelDef } from './types';
 import { storyText } from '../../story/text';
+import { rollSurprises, surprisesSecond } from './surprises';
 
 /**
  * Story levels on the mission runner (claude/story/02-spec §5–6). `missions.ts` plays a story level like any mission
@@ -98,6 +99,8 @@ export function initStory(w: World, m: MissionState, level: StoryLevelId, diff: 
   // a scripted flood: the map's flood zones idle until a stage floods them
   const map = w.terrain.map;
   if (map?.floods.length && !w.s.flood) w.s.flood = map.floods.map((): FloodState => ({ phase: 0, t: 0, next: 1e12, level: -9999 }));
+  // the surprise events: which happen and when (a hash of the seed; the sim's RNG is not touched)
+  rollSurprises(w, st, L);
   // the cast that is on the map from the start
   st.actors.forEach((a, i) => {
     if ((L.actors[a.name].spawn ?? 'start') === 'start') spawnActor(w, st, i);
@@ -161,6 +164,18 @@ function act(w: World, st: StoryState, a: Action): void {
     case 'tip': {
       const text = storyText(`tip.${a.key}`);
       if (text) w.events.emit({ t: 'message', text, kind: 'researcher' });
+      return;
+    }
+    case 'note': {
+      const text = storyText(`${st.level}.${a.key}`);
+      const p = w.s.colonies.find((c) => c.player);
+      if (text) w.events.emit({ t: 'message', text, kind: a.kind ?? 'info', ...(p ? { colony: p.id } : {}) });
+      return;
+    }
+    case 'weather': {
+      const W = (w.s.weather ??= { rain: 0, heat: 0 });
+      if (a.rain) W.rain = Math.max(W.rain, w.s.time + a.rain);
+      if (a.heat) W.heat = Math.max(W.heat, w.s.time + a.heat);
       return;
     }
   }
@@ -262,6 +277,9 @@ export function storySecond(w: World, c: Colony, m: MissionState): void {
   worldFlags(w, st, c);
   storyFire(w, st, m, m.stage, m.t);
   levelFire(w, st);
+  surprisesSecond(w, st, L, (a) => act(w, st, a), (key) => {
+    if (!st.said.includes(key)) say(w, st, key);
+  });
   // the bonus objective
   const B = L.medals.bonus;
   if (st.bonus === 0) {

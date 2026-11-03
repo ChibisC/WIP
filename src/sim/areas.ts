@@ -99,6 +99,8 @@ export function hasRouteHome(w: World, a: { colony: number; space: number; x: nu
   if (!c || !c.alive) return false;
   const home = nestSpace(c.id);
   if (a.space === home) return true;
+  // a story level's visiting party has no nest: on the surface it is never lost (it walks off the map)
+  if (c.visitor) return a.space === SURFACE;
   if (!c.entrances.length) return false;
   if (a.space === SURFACE) return true;
   const flow = w.flowOf(a.space);

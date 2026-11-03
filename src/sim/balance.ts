@@ -1299,11 +1299,18 @@ export const LAYERS = {
  */
 export const STORY = {
   difficulty: {
-    easy: { enemyStat: 0.75, wave: 0.6, aggression: 0.6, food: 1.6, rival: 0.7, boss: 0.75 },
-    normal: { enemyStat: 1, wave: 1, aggression: 1, food: 1, rival: 1, boss: 1 },
-    hard: { enemyStat: 1.2, wave: 1.35, aggression: 1.3, food: 0.85, rival: 1.25, boss: 1.1 },
-    brutal: { enemyStat: 1.4, wave: 1.7, aggression: 1.6, food: 0.7, rival: 1.5, boss: 1.2 },
+    // events: the surprise events' chance × this (claude/story/06-spec §6: fewer on Easy, more on Hard and Brutal)
+    easy: { enemyStat: 0.75, wave: 0.6, aggression: 0.6, food: 1.6, rival: 0.7, boss: 0.75, events: 0.6 },
+    normal: { enemyStat: 1, wave: 1, aggression: 1, food: 1, rival: 1, boss: 1, events: 1 },
+    hard: { enemyStat: 1.2, wave: 1.35, aggression: 1.3, food: 0.85, rival: 1.25, boss: 1.1, events: 1.3 },
+    brutal: { enemyStat: 1.4, wave: 1.7, aggression: 1.6, food: 0.7, rival: 1.5, boss: 1.2, events: 1.6 },
   },
+  /** a member leaving the map by an edge point is gone once this near it (mm) */
+  edgeLeave: 26,
+  /** surprise events: a big one due while another runs waits this long after it (s) */
+  eventGap: 20,
+  /** a hot spell: the speed of ants on the surface × this */
+  heatSpeed: 0.8,
   /** stolen-caste slots: one to start, one more per boss beaten (later chapters) */
   slots: { start: 1, perBoss: 1 },
   /** seconds before a cue that waits on the world gives up and the scene moves on */

@@ -1532,7 +1532,9 @@ export class GameSession {
       const list = n === views.length ? views : views.slice(0, n);
       const t = w.terrain;
       this.mounds.update(w, this.terrainHeight);
-      this.view.storm = stormLevel(w.s.flood);
+      // (a story rain shower: the storm light while it lasts, easing in and out over 8 s)
+      const rain = w.s.weather ? Math.max(0, Math.min(1, (w.s.weather.rain - w.s.time) / 8)) : 0;
+      this.view.storm = Math.max(stormLevel(w.s.flood), rain);
       // a story level's night (its own day/night clock, sim/story/dayNight.ts): moonlight; wolf spiders' eyeshine
       this.view.nightLevel = w.s.night ?? 0;
       this.surfCreatures.night = w.s.night ?? 0;

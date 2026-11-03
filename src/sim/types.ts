@@ -565,6 +565,11 @@ export interface Colony {
   /** human-controlled (stat multiplier `statMul`, player messages). Which human is local is client-side. */
   player: boolean;
   ai: boolean;
+  /**
+   * a story level's visiting party (a marching column of a species not in the level, sim/story/surprises.ts): a colony
+   * with no nest and no queen that only owns its directed ants; never builds, forages, raids or dies of a lost queen
+   */
+  visitor?: boolean;
   /** colonies on one team are allies: they never fight, and allied ants open area tabs */
   team: number;
   alive: boolean;
@@ -892,6 +897,8 @@ export interface SimState {
   host?: number;
   /** authored maps with floods on: each flood zone's storm cycle (sim/floods.ts) */
   flood?: FloodState[];
+  /** story weather (sim/story/surprises.ts): a rain shower and a hot spell, each until a game time (s) */
+  weather?: { rain: number; heat: number };
 }
 
 /** One flood zone's storm cycle: phase 0 idle, 1 warning, 2 rising, 3 holding, 4 draining. */

@@ -93,6 +93,8 @@ export interface ColonyOptions {
   team?: number;
   /** the authored map's site index the colony stands on */
   site?: number;
+  /** a story level's visiting party: no nest dug, no queen, no ants of its own (sim/story/surprises.ts) */
+  visitor?: boolean;
 }
 
 export function createColony(w: World, o: ColonyOptions): Colony {
@@ -154,6 +156,14 @@ export function createColony(w: World, o: ColonyOptions): Colony {
   w.s.colonies.push(c);
   w.colonyById.set(id, c);
   w.phero.ensureColonies(w.s.colonies.length);
+  if (o.visitor) {
+    // a visiting party's colony: an empty nest plane (every colony has one), no queen, no tiles, never an AI
+    c.visitor = true;
+    c.queen = -1;
+    c.food = 0;
+    w.addNest(id, new NestGrid({ cols: NEST_COLS, rows: NEST_ROWS, R: hexRadiusFor(casteOf(basicCaste(o.species)).length), seed: w.s.seed * 13 + id * 101 + 7 }));
+    return c;
+  }
 
   // ---- Nest plane: queen cluster in the middle, a tunnel to the entrance ramp.
   const R = hexRadiusFor(casteOf(basicCaste(o.species)).length);
@@ -642,6 +652,11 @@ export function colonySystem(w: World, dt: number): void {
   if (!arena && w.s.tick % 20 === 0) entranceTick(w, 1);
   for (const c of w.s.colonies) {
     if (!c.alive) continue;
+    // a story level's visiting party: only its directed ants (no queen, no nest, never lost)
+    if (c.visitor) {
+      if (w.s.tick % 20 === 0) countColony(w, c);
+      continue;
+    }
     if (c.infiniteFood) c.food = c.foodCap;
     abilityTick(c, dt);
     if (c.alarmT > 0) c.alarmT -= dt;

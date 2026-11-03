@@ -5,7 +5,7 @@ import { arrivalHash, canEnter, canLeave, entranceTop, exitHole, holeIn, passEnt
 import { casteOf } from './species';
 import { hexCoreCells } from './colony';
 import { hexSpeedOf } from './tiles';
-import { BALANCE, ECITON, LAYERS, NASUTE, TERMANT, TRAIL } from './balance';
+import { BALANCE, ECITON, LAYERS, NASUTE, STORY, TERMANT, TRAIL } from './balance';
 import { cartonBlocks, termantSpeedMul } from './termants';
 import { potholeMul, teamLoad } from './eciton';
 import { datan2, dcos, dhypot, dsin, hash01, sq } from './dmath';
@@ -51,6 +51,8 @@ export function antSpeed(w: World, a: Ant): number {
   }
   // Carabid-style night bonus not for ants; ants slow slightly at night.
   v *= 1 - w.s.night * 0.15;
+  // a story level's hot spell: ants out on the surface walk slower (sim/story/surprises.ts)
+  if (w.s.weather && a.space === SURFACE && w.s.weather.heat > w.s.time) v *= STORY.heatSpeed;
   // layered ground: a little slower walking up a ramp (LAYERS.upSpeed)
   if (a.space === SURFACE && w.terrain.layers) v *= w.terrain.slopeSpeed(a.x, a.y, dcos(a.h), dsin(a.h));
   return v;

@@ -172,7 +172,14 @@ export type Action =
   /** a titan raiding a nest (digInto) walks back out and leaves (dawn) */
   | { do: 'endRaid'; actor: string }
   /** a gameplay tip (a note, not narration): key into the text file (`tip.<key>`) */
-  | { do: 'tip'; key: string };
+  | { do: 'tip'; key: string }
+  /**
+   * the weather for `s` seconds: a rain shower (the storm light, the ground wet; give a `flood` action too on a map with
+   * flood zones) or a hot spell (ants on the surface walk slower: STORY.heatSpeed)
+   */
+  | { do: 'weather'; rain?: number; heat?: number }
+  /** a toast (a short note in the message log, not narration): key into the level's text (`<level>.<key>`) */
+  | { do: 'note'; key: string; kind?: 'warn' | 'good' | 'info' };
 
 export interface TimedAction {
   at?: number;
@@ -250,6 +257,41 @@ export interface LairDef {
   look?: 'den' | 'burrow';
 }
 
+/**
+ * A surprise event (claude/story/06-spec §6): a marching column of another species, a wandering hunter, a windfall,
+ * the weather or a rival's move, out of the blue. The level lists a pool; when the level starts each is rolled (its
+ * `chance` × the difficulty's `events`, from a seeded hash, so the same seed gives the same events) and given a time in
+ * its `window`. When it fires it sets the flag `ev:<id>` (level scenes with `on: 'ev:<id>'` play the party or the
+ * creature; sim/story/surprises.ts), does its `actions` and says its caption. Big ones never overlap: a big one due while
+ * another runs waits until that one's `dur` is over.
+ */
+export interface SurpriseDef {
+  id: string;
+  /** seconds after the level began (or after `after` was set) it may start: [earliest, latest] */
+  window: [number, number];
+  /** the window counts from this flag (default: the level's start); never before it */
+  after?: string;
+  /** never once this flag is set (e.g. the boss fight) */
+  until?: string;
+  /** chance on Normal (× the difficulty's `events`, at most 1); default 1 */
+  chance?: number;
+  /** only on this difficulty and harder */
+  from?: Difficulty;
+  /** a big one (a column, a swarm raid, a hunter): never two at once */
+  big?: boolean;
+  /** how long it keeps the map busy (s) */
+  dur: number;
+  actions?: Action[];
+  /** narration said as it starts (`<level>.<key>`) */
+  say?: string;
+}
+
+/** Ants of a species that is not in the level (a marching column): a nestless colony that only owns them. */
+export interface VisitorDef {
+  species: SpeciesId;
+  name: string;
+}
+
 export interface StoryLevelDef {
   id: StoryLevelId;
   chapter: number;
@@ -294,4 +336,8 @@ export interface StoryLevelDef {
    * round the queen holds `player.startWorkers` worker tiles (at most 12). A caste not brought in is left out.
    */
   nest?: Array<{ type: TileType; caste?: string; n: number }>;
+  /** surprise events (claude/story/06-spec §6) */
+  surprises?: SurpriseDef[];
+  /** visiting species' parties (actors name them as their `colony`) */
+  visitors?: Record<string, VisitorDef>;
 }

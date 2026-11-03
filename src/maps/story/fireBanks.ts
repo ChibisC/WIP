@@ -118,10 +118,14 @@ export const FIRE_BANKS: MapDef = {
   ],
   floods: [
     // the low margin, flooded only by the story (first and every far beyond any game's length)
-    { shape: { poly: [[-60, 690], [1260, 690], [1260, 960], [-60, 960]] }, level: 5, first: [99999, 99999], every: [99999, 99999], hold: [45, 55] },
+    { shape: { poly: [[-60, 690], [1260, 690], [1260, 960], [-60, 960]] }, level: 5, first: [99999, 99999], every: [1186, 886], hold: [45, 55] },
   ],
   story: {
     points: {
+      // surprise events (claude/story/06-spec §6): where parties and wanderers come on and go off, windfalls
+      evWestMargin: [14, 760],
+      evEastMargin: [1186, 760],
+      evEastMid: [1186, 560],
       mound: [930, 150],
       seedA: [760, 185],
       seedB: [1080, 230],
@@ -140,6 +144,7 @@ export const FIRE_BANKS: MapDef = {
       shelf: [500, 520],
     },
     paths: {
+      swarmMargin: [[1000, 760], [760, 760], [650, 765], [400, 760], [200, 760]],
       forageTrail: [
         [906, 172],
         [850, 196],
