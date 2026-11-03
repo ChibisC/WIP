@@ -11,7 +11,8 @@ import { column, heat, party, rain, surprisePool, wanderer, windfall } from '../
  *  2. The nasus: take nasute soldiers' corpses home and steal the caste (a shower fills the hollow; after it the
  *     termites' winged alates pour out for their mating flight: food for whoever catches them);
  *  3. The first nest and 4. The second: destroy both colonies, in either order.
- * Win: both termite queens dead. Lose: the queen dies. Reward: the Nasute (conehead) soldier, kept for the campaign. The
+ * Win: both termite queens dead. Lose: the queen dies. Reward: the Conehead Termite Sprayer (`nasute_soldier`, the glue
+ * squirter: the spec's "Nasute Termite soldier"; main named it the Sprayer, 2026-11-03), kept for the campaign. The
  * chapter's closing line follows its win. About 38 minutes on Normal.
  */
 const EV = surprisePool(
@@ -32,7 +33,7 @@ export const CARTON_KINGDOM_LEVEL: StoryLevelDef = {
   title: 'Carton Kingdom',
   region: 'rainforest',
   map: 'rainforestEdge',
-  brief: 'At the rainforest’s edge two conehead termite colonies hold a shelf between the roots of two giant trees, and they defend each other. Steal the glue-squirting soldiers’ genes, then destroy both nests.',
+  brief: 'At the rainforest’s edge two conehead termite colonies hold a shelf between the roots of two giant trees, and they defend each other. Steal the genes of their glue-squirting Sprayers, then destroy both nests.',
   player: { site: 0, startWorkers: 10, startFood: 240, name: 'Termants' },
   nest: [
     { type: 'brood', caste: 'termant_worker', n: 7 },
@@ -116,7 +117,7 @@ export const CARTON_KINGDOM_LEVEL: StoryLevelDef = {
   medals: {
     time: [40 * 60, 52 * 60],
     losses: [70, 160],
-    bonus: { type: 'stealBefore', caste: 'nasute_soldier', flag: 'raid:north', text: 'Steal the nasute soldier before the termites raid you' },
+    bonus: { type: 'stealBefore', caste: 'nasute_soldier', flag: 'raid:north', text: 'Steal the Conehead Termite Sprayer before the termites raid you' },
   },
   win: 'win',
   lose: 'lose',

@@ -137,8 +137,8 @@ export const EN: Record<string, string> = {
   'tip.stagBeetles': 'Tip: a beetle that size needs many ants. Send a group, not a few: ants that climb onto its back bite where it cannot reach them.',
   'tip.highWater': 'Tip: the river rises in stages; the clock on the goal counts down to the next. Store food from the plain while you can: only the summit stays dry.',
   'tip.termites': 'Tip: the two termite colonies are allies. Attack one and the other sends help unless it is busy defending itself.',
-  'tip.nasuteGenes': 'Tip: carry nasute soldiers’ corpses home into the stores. The Genome tab shows how close you are to their caste.',
-  'tip.nasuteCaste': 'Tip: the nasute soldier is in the Build panel now. It squirts glue at range and cannot bite.',
+  'tip.nasuteGenes': 'Tip: carry the Sprayers’ corpses home into the stores (the termites with the nozzle on the head). The Genome tab shows how close you are to their caste.',
+  'tip.nasuteCaste': 'Tip: the Conehead Termite Sprayer is in the Build panel now. It squirts glue at range and cannot bite.',
   'tip.allies': 'Tip: raid one nest while the other is busy, or be ready to fight both.',
   'tip.hold': 'Tip: put a marker on the sap flow and send a group of 10 or more to hold it. The clock on the goal starts over whenever too few are there.',
   // ------------------------------------------------------------------ Level 5 — The Antlered King

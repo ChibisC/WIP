@@ -252,14 +252,14 @@ their carton nests and covered galleries. No fallen-leaf dressing (user rule).
 | Stage | Objectives | Scenes and set pieces |
 |---|---|---|
 | The forest's edge | raise 35, gather 200; store 20 wood (optional) | opening flight (the trunks → the termite shelf → the colony); captions on carton and the galleries; tip: the allies |
-| The nasus | steal the nasute soldier, raise 4 | a shower fills the hollow, then the termites' winged alates come out (fallen alates: food); tips on the genes |
+| The nasus | steal the Conehead Termite Sprayer (`nasute_soldier`), raise 4 | a shower fills the hollow, then the termites' winged alates come out (fallen alates: food); tips on the genes |
 | The first nest | destroy one of the two colonies (either) | rival raids; the other comes to help |
 | The second nest | destroy the other | — |
 
 Surprise events: a termite foraging party (workers with a soldier escort) in the hollow, a mantis at the forest's edge,
 the shower and the alates, a fallen fruit, steam after the rain (a hot spell), on Hard and Brutal an army ant swarm raid
 along the forest's edge. Medals: time gold ≤ 40 min, silver ≤ 52; losses gold ≤ 70, silver ≤ 160; bonus "steal the nasute
-soldier before the termites raid you". Reward: the **Nasute soldier** (`nasute_soldier`), kept for the campaign. The
+Sprayer before the termites raid you". Reward: the **Conehead Termite Sprayer** (`nasute_soldier`, the glue squirter — the spec's "Nasute Termite soldier"; main named it the Sprayer on 2026-11-03), kept for the campaign. The
 chapter's closing line (the Mega Colony hint) follows its win, then "Chapter 1 complete".
 
 ### Surprise events (claude/story/06-spec §6)
