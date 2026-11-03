@@ -3,7 +3,7 @@ import { AphidCluster, AS, Colony, SURFACE, TileType } from './types';
 import { CASTES, basicCaste, casteOf, isTermiteSpecies, tierOf } from './species';
 import { designateDig } from './colony';
 import type { NestGrid } from '../world/nestGrid';
-import { MAX_TILE_LEVEL, buildableTiles, canPlaceTile, hatchCost, markUpgrade, placeTile, popUsed, raisesAnts, tileCost, upgradeCost, upgradeNeed, upgradePoints } from './tiles';
+import { MAX_TILE_LEVEL, buildableTiles, canPlaceTile, hatchCost, markUpgrade, placeTile, popUsed, raisesAnts, tileAnts, tileAt, tileCapacity, tileCost, upgradeCost, upgradeNeed, upgradePoints } from './tiles';
 import { JOB, listJobs } from './jobs';
 import { assignGroup, markerRadius, placeMarker, removeMarker } from './markers';
 import { creatureHooks } from './combat';
@@ -560,7 +560,15 @@ function buildOne(w: World, c: Colony, b: BuildBrain, g: NestGrid, home: number,
 /** Food kept back for the larvae already waiting on their tiles. */
 function larvaeReserve(w: World, c: Colony): number {
   let reserve = 0;
-  for (const br of w.s.brood) if (br.colony === c.id) reserve += hatchCost(br.caste) * Math.max(0, 1 - br.t);
+  for (const br of w.s.brood) {
+    if (br.colony !== c.id) continue;
+    // a pre-staged larva (its tile's ant alive) grows only to BALANCE.prestage and waits there, eating nothing more until
+    // that ant dies: only the growing it still has to do counts (else a big colony's reserve outgrows its whole store,
+    // nothing is ever upgraded, and a full store stops the gathering for good)
+    const t = tileAt(c, br.tile);
+    const cap = t && tileAnts(w, t).length >= tileCapacity(t) ? BALANCE.prestage : 1;
+    reserve += hatchCost(br.caste) * Math.max(0, cap - br.t);
+  }
   return reserve;
 }
 
