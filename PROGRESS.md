@@ -1583,19 +1583,21 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   threatened at home; stops when clear, after heavy losses, when outmatched, after 4 min; one go per threat (no
   flip-flopping) and a cooldown; raids give way to bad trouble. Messages for a human ally; the ✋ call-for-help button (command `callHelp`, wire 25,
   `BUILD_ID` `ud-mp-9`). Joint raids (gather short of the target, go together), shared targets.
-- **Growth** (`tools/econ.ts`, one AI colony, 900 mm meadow, seed 7; ants at 10 / 20 / 30 / 45 min; `main` = `f79ebd1`):
+- **Growth** (`tools/econ.ts`, one AI colony, 900 mm meadow, seed 7; ants at 10 / 20 / 30 / 45 min; measured on the
+  final merge against `main` `ccaba9d`, both with main's caste balance and tiles paid when placed):
 
   | Species | this branch | `main` | tiles by level at 45 min |
   |---|---|---|---|
-  | Black garden | 20 / 52 / 102 / 187 | 22 / 55 / 109 / 138 | 200 / 27 / 33 |
-  | Leafcutter | 36 / 74 / 106 / 163 | 35 / 67 / 88 / 102 | 29 / 69 / 148 |
-  | Red wood | 20 / 49 / 89 / 121 | 21 / 51 / 78 / 135 | 180 / 12 / 0 |
-  | Fire ant | 15 / 22 / 32 / 62 | 18 / 29 / 45 / 67 | 102 / 0 / 0 |
-  | Army ant | 23 / 41 / 48 / 48 | 22 / 22 / 22 / 22 | 73 / 0 / 0 |
+  | Black garden | 22 / 64 / 122 / 206 | 24 / 65 / 123 / 148 | 179 / 44 / 62 |
+  | Leafcutter | 39 / 80 / 123 / 179 | 37 / 67 / 89 / 96 | 21 / 71 / 176 |
+  | Red wood | 26 / 68 / 125 / 194 | 28 / 67 / 120 / 166 | 254 / 18 / 10 |
+  | Fire ant | 19 / 33 / 56 / 89 | 20 / 35 / 51 / 68 | 138 / 0 / 0 |
+  | Army ant | 23 / 48 / 81 / 81 | 22 / 51 / 68 / 68 | 122 / 0 / 0 |
 
-  Fire ants start slower (their first brood mound waits for a chamber of its own; digging rooms only as they fill was
-  tried and changed nothing); Red wood ants end a little lower and upgrade little (their food goes to brood first).
-  The army-ant stall is older than this work (on `main` they stop at 22 ants; their foragers stop going out).
+  The same in the first 20 minutes, ahead from 30 (the stores and upgrades keep growing past where the old builder
+  stopped). Fire ants and army ants upgrade nothing by 45 min (their food goes to brood first; they reach mid game
+  late). The army-ant stall at 81 is older than this work (main stops at 68; their foragers stop going out). Before
+  main's caste balance (`f79ebd1`) the fire ants started slower here; that gap is gone.
 - **Nests** (`tests/browser/ai_nests.py` → `docs/ai/chambers/`, five AI colonies on Meadow Pond in peace, at 10, 30 and
   45 min, with `sheet.jpg`): 7-hex chambers at 10 min; 19-hex chambers, highways and level II–III tiles from 30 min.
 - **Help clip** (`tests/browser/ai_help.py` → `docs/ai/allies_help.mp4` and stills): your nest invaded by a band of Red
@@ -1617,6 +1619,13 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   16 min (its ally went to help and fell back, outmatched). Allies with the brain are more decisive both ways.
   The first version (before lost causes were left alone) did worse: helpers died in
   hopeless fights and the helper fell sooner than with the brain off.
+- **Checks** (final merge): `npm test` 29 suites, all passing; `check-determinism` 68 files clean; `npm run build`.
+- **Merges** (claude/handoff/00-MERGE-RULE.md): `origin/main` six times on the way (entrance rework, Gene Thief
+  termite soldiers, story chapter 1, layered ground, caste balance, Termants' one food store, underground realism,
+  hell ant and nasute realism, earth-tone caste looks, tiles paid when placed, layered-ground pathfinding, ground
+  realism). This plan became CHANGE_PLAN §23 (main's §22 is the hell ant and nasute rework); the protocol is
+  `ud-mp-9` (main's 7 and 8 plus `callHelp`). Main's tiles-paid-when-placed refused a developed head start's tiles,
+  so AI rivals started empty until the head start was placed instant.
 
 ### 2026-11-02 — Kings do no nest duties: they walk round the queen in her chamber
 - **User note** (15:21): "the kings of termants and termites should just wander around the nanitic chamber the queen
