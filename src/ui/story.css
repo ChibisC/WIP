@@ -29,6 +29,8 @@
 /* a trait or a night level in place of a caste's silhouette */
 .sh-trait { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; font-size: 22px; color: #d6b072; border: 1px solid rgba(168,132,79,0.45); border-radius: 50%; background: rgba(0,0,0,0.25); }
 .sh-gene:not(.on) .sh-trait { color: #5b4c3a; }
+/* on the Genome's paper sheet the trait badge is ink, not the dark card's gold */
+.sh-sheet .sh-trait { color: #8a5a22; background: rgba(201,164,106,0.22); border-color: rgba(122,84,40,0.5); }
 
 .sh-steal span { display: block; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #a99878; }
 .sh-steal b { font-family: 'Marcellus SC', Georgia, serif; font-weight: 500; font-size: 16px; }

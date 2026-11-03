@@ -2,7 +2,7 @@ import { World } from './world';
 import { Ant, AS, Colony, Creature, POSE, snapping } from './types';
 import { BALANCE } from './balance';
 import { casteOf } from './species';
-import { damageAnt, damageCreature, applyVenom, creatureHooks } from './combat';
+import { damageAnt, damageCreature, applyVenom, creatureHooks, executeAnt } from './combat';
 import { faceToward, steerTo } from './movement';
 import { dcos, dhypot, dsin } from './dmath';
 
@@ -126,6 +126,27 @@ export function hellUpdate(w: World, a: Ant, c: Colony, dt: number, biteMul: num
   a.v = 0;
   const p = prey(w, a.holdKind ?? 0, a.holdId ?? 0);
   if (!p || p.space !== a.space) return release(w, a, false);
+  if (a.exec && p.ant) {
+    // the finisher (combat.startExecution): the foe held up by the neck in front of the jaws, facing the hell ant,
+    // struggling; when the hold runs out the head comes off
+    const o = p.ant;
+    const d = L * S.finisherReach + casteOf(o.caste).length * S.finisherNeck;
+    // pulled in to the hold point over the first 0.3 s (a third of the way each tick), then held there
+    const pull = a.st < 0.3 ? 0.35 : 1;
+    o.x += (a.x + dcos(a.h) * d - o.x) * pull;
+    o.y += (a.y + dsin(a.h) * d - o.y) * pull;
+    o.h = a.h + Math.PI;
+    o.v = 0;
+    a.pose = POSE.GRAPPLE;
+    if (p.dead) return release(w, a, true);
+    o.stun = Math.max(o.stun, 0.25);
+    a.holdT = (a.holdT ?? 0) - dt;
+    if ((a.holdT ?? 0) <= 1e-9) {
+      executeAnt(w, o, a);
+      return release(w, a, true);
+    }
+    return true;
+  }
   // pin the prey at the mandible–horn socket, off the ground, across the jaws
   const fx = a.x + dcos(a.h) * L * S.holdForward;
   const fy = a.y + dsin(a.h) * L * S.holdForward;
@@ -203,6 +224,7 @@ export function release(w: World, a: Ant, done: boolean): boolean {
   a.holdId = 0;
   a.holdKind = 0;
   a.holdT = 0;
+  if (a.exec) a.exec = 0;
   const col = w.colony(a.colony);
   const cool = sn ? (done ? sn.cooldown : sn.cooldown * 0.5) : 0;
   // Ambush (the colony ability): the snap is ready again at once

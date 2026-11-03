@@ -26,7 +26,7 @@ export const LONG_NIGHTS_LEVEL: StoryLevelDef = {
   plants: 6,
   reward: {},
   loadout: true,
-  dayNight: { first: 330, day: 240, night: 180, lastNight: 240, dusk: 30, fade: 20, nights: 3 },
+  dayNight: { first: 330, day: 240, night: 180, lastNight: 240, dusk: 30, fade: 30, nights: 3 },
   lairs: [
     { name: 'Beetle den', at: 'lairNW', food: 30 },
     { name: 'Centipede crevice', at: 'lairN', food: 30 },
@@ -52,7 +52,7 @@ export const LONG_NIGHTS_LEVEL: StoryLevelDef = {
       objectives: [
         { type: 'surviveNight', n: 1 },
         { type: 'collectFood', amount: 150, optional: true },
-        { type: 'build', tile: 'brood', n: 3, optional: true, text: 'Build 3 brood tiles' },
+        { type: 'build', tile: 'food', n: 3, optional: true, text: 'Build 3 food store tiles' },
       ],
       say: [
         { key: 'intro1', at: 0.5 },

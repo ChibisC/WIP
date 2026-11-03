@@ -178,7 +178,7 @@ export function applyAttackBody(p: AttackPose, w: number, L: number, vF: THREE.V
 // ---------------------------------------------------------------------------------------------------------------
 
 /** Attack variants of the planted-feet pass (attackVariant in antMotion.ts picks them per species and cycle). */
-export const ATK = { LUNGE: 0, REAR: 1, CLAMP: 2, PIVOT_STING: 3, QUICK_STING: 4, CRUSH: 5, HEAD_SWING: 6, ACID: 7, TAUNT: 8, RAGE: 9, SNAP: 10, IMPALE: 11 } as const;
+export const ATK = { LUNGE: 0, REAR: 1, CLAMP: 2, PIVOT_STING: 3, QUICK_STING: 4, CRUSH: 5, HEAD_SWING: 6, ACID: 7, TAUNT: 8, RAGE: 9, SNAP: 10, IMPALE: 11, CHOMP: 12, SLAM: 13, EXECUTE: 14, EXECUTE_P: 15, LIFT: 16 } as const;
 
 type Key = Partial<Omit<AttackPose, never>>;
 const FIELDS = ['fwd', 'pitch', 'yaw', 'roll', 'headPitch', 'headYaw', 'mand', 'gaster', 'sting', 'up', 'side', 'px', 'spread', 'front', 'gYaw'] as const;
@@ -269,6 +269,26 @@ const IMPALE_S: Key = { fwd: 0.11, up: 0.0, pitch: -0.02, px: 0.25, headPitch: 0
 const IMPALE_L: Key = { fwd: -0.03, up: 0.04, pitch: 0.1, headPitch: 0.3, mand: 0.1, spread: 0.3 };
 /** fraction of the attack cycle the hell ants' snap freezes on the contact */
 export const HIT_STOP = 0.07;
+/**
+ * Hell ants, user rating 2026-11-02 (H8–H10: "open up more", "open and close when attacking", "3 attack animations, the
+ * impale its own finisher"): the chomp — a lunge, the scythes opening and closing on the foe as it goes in — and the
+ * slam — rearing on the hind legs with the jaws wide, crashing down and snapping. The finisher (a foe at a quarter of
+ * its health): the jaws gape and reach round the neck, a tremble, the snap, and the head torn up and back; the soldier
+ * first drives its paddle down onto the foe and holds it.
+ */
+const CHOMP_W: Key = { fwd: -0.05, up: 0.03, pitch: 0.08, px: -0.25, headPitch: 0.3, mand: 1, gaster: 0.15, spread: 0.3 };
+const CHOMP_S: Key = { fwd: 0.11, up: 0.02, pitch: 0.02, px: 0.25, headPitch: 0.18, mand: 0, spread: 0.3 };
+const SLAM_W: Key = { fwd: -0.07, up: 0.07, pitch: 0.24, px: -0.3, headPitch: 0.45, mand: 1, gaster: 0.3, spread: 0.45, front: 0.5 };
+const SLAM_S: Key = { fwd: 0.1, up: 0.0, pitch: -0.02, px: 0.25, headPitch: 0.22, mand: 0, spread: 0.45 };
+const EXEC_W: Key = { fwd: 0.09, up: 0.02, pitch: -0.03, px: 0.25, headPitch: 0.12, mand: 1, gaster: 0.1, spread: 0.35 };
+const EXEC_S: Key = { fwd: 0.09, up: 0.02, pitch: -0.03, px: 0.25, headPitch: 0.12, mand: 0, spread: 0.35 };
+const EXEC_T: Key = { fwd: -0.04, up: 0.05, pitch: 0.13, px: -0.2, headPitch: 0.58, mand: 0, spread: 0.35 };
+// the finisher's lift (user note 2026-11-02 12:39): the foe held up by the neck — head and front raised, braced on the
+// hind legs; the jaws part a little, then shear shut with a toss of the head (the cut)
+const LIFT_U: Key = { fwd: 0.0, up: 0.06, pitch: 0.16, px: -0.1, headPitch: 0.6, mand: 0, gaster: -0.1, spread: 0.4 };
+const LIFT_O: Key = { fwd: 0.01, up: 0.06, pitch: 0.15, px: -0.1, headPitch: 0.5, mand: 0.4, gaster: -0.1, spread: 0.4 };
+const LIFT_C: Key = { fwd: -0.03, up: 0.07, pitch: 0.18, px: -0.15, headPitch: 0.78, mand: 0, gaster: -0.15, spread: 0.4 };
+const EXECP_D: Key = { fwd: 0.11, up: 0.0, pitch: -0.02, px: 0.25, headPitch: 0.04, mand: 0.85, gaster: 0.1, spread: 0.4 };
 
 /**
  * Pose of a planted-feet attack at phase q. `holdIn` / `holdOut`: this sting continues a grip held from the
@@ -280,6 +300,69 @@ export function attackPoseV2(variant: number, q: number, side: number, out: Atta
   const s = strikeEase((q - STRIKE) / (C - STRIKE));
   const tremble = q > WIND && q < STRIKE ? Math.sin(q * 160) * 0.5 : 0;
   switch (variant) {
+    case ATK.CHOMP: {
+      // jaws wide, then a lunge on which they open and close two and a half times, shut on the contact; settle
+      if (q < WIND) blend({}, CHOMP_W, sm(q / WIND), side, out);
+      else if (q < C) {
+        const k = (q - WIND) / (C - WIND);
+        blend(CHOMP_W, CHOMP_S, sm(k), side, out);
+        out.mand = 0.5 + 0.5 * Math.cos(k * Math.PI * 5);
+        out.headPitch += 0.1 * Math.sin(k * Math.PI * 5);
+      } else blend(CHOMP_S, {}, sm((q - C) / (1 - C)), side, out);
+      return out;
+    }
+    case ATK.SLAM: {
+      // rear up on the hind legs, the jaws gaping, a moment's hold — crash down and snap, a hit-stop; settle
+      if (q < WIND) blend({}, SLAM_W, sm(q / WIND), side, out);
+      else if (q < STRIKE) blend(SLAM_W, SLAM_W, 1, side, out);
+      else if (q < C) blend(SLAM_W, SLAM_S, strikeEase((q - STRIKE) / (C - STRIKE)), side, out);
+      else if (q < C + HIT_STOP) blend(SLAM_S, SLAM_S, 1, side, out);
+      else blend(SLAM_S, {}, sm((q - C - HIT_STOP) / (1 - C - HIT_STOP)), side, out);
+      if (q > WIND && q < STRIKE) out.headPitch += 0.015 * Math.sin(q * 180);
+      return out;
+    }
+    case ATK.EXECUTE:
+    case ATK.EXECUTE_P: {
+      const pad = variant === ATK.EXECUTE_P;
+      if (pad) {
+        // the soldier: rear (0 → 0.3), drive the paddle down and hold the foe (→ 0.5), the jaws reaching round its neck
+        if (q < 0.3) blend({}, IMPALE_W, sm(q / 0.3), side, out);
+        else if (q < 0.5) blend(IMPALE_W, EXECP_D, strikeEase((q - 0.3) / 0.2), side, out);
+        else if (q < C - 0.02) blend(EXECP_D, EXECP_D, 1, side, out);
+        else if (q < C) blend(EXECP_D, EXEC_S, (q - (C - 0.02)) / 0.02, side, out);
+      } else {
+        // reach in, jaws gaping round the neck (→ 0.45), a tremble (→ the contact), the snap
+        if (q < 0.45) blend({}, EXEC_W, sm(q / 0.45), side, out);
+        else if (q < C - 0.02) blend(EXEC_W, EXEC_W, 1, side, out);
+        else if (q < C) blend(EXEC_W, EXEC_S, (q - (C - 0.02)) / 0.02, side, out);
+      }
+      if (q >= C) {
+        // the head torn up and back (→ 0.84), held a beat, then settle
+        const k = (q - C) / (1 - C);
+        if (k < 0.4) blend(EXEC_S, EXEC_T, strikeEase(k / 0.4), side, out);
+        else if (k < 0.6) blend(EXEC_T, EXEC_T, 1, side, out);
+        else blend(EXEC_T, {}, sm((k - 0.6) / 0.4), side, out);
+      } else if (q > (pad ? 0.5 : 0.45)) {
+        out.headPitch += 0.012 * Math.sin(q * 200);
+        out.mand = Math.min(1, out.mand + 0.03 * Math.sin(q * 240));
+      }
+      return out;
+    }
+    case ATK.LIFT: {
+      // q 0..0.95 over the sim's hold (game/antViews.ts): lift (→ 0.3), hold and shake the foe (→ 0.82), the jaws
+      // part (→ 0.9), the shear (→ 0.93: the head comes off when the hold ends, at 0.95)
+      if (q < 0.3) blend(EXEC_S, LIFT_U, sm(q / 0.3), side, out);
+      else if (q < 0.82) {
+        blend(LIFT_U, LIFT_U, 1, side, out);
+        const e = sm((q - 0.3) / 0.15) * (1 - sm((q - 0.72) / 0.1));
+        out.headYaw += 0.16 * e * Math.sin(q * 70);
+        out.yaw += 0.04 * e * Math.sin(q * 70 + 0.6);
+        out.roll += 0.03 * e * Math.sin(q * 70 + 1.2);
+      } else if (q < 0.9) blend(LIFT_U, LIFT_O, sm((q - 0.82) / 0.08), side, out);
+      else if (q < 0.93) blend(LIFT_O, LIFT_C, (q - 0.9) / 0.03, side, out);
+      else blend(LIFT_C, LIFT_C, 1, side, out);
+      return out;
+    }
     case ATK.SNAP:
     case ATK.IMPALE: {
       const imp = variant === ATK.IMPALE;
@@ -421,4 +504,22 @@ export function attackPoseV2(variant: number, q: number, side: number, out: Atta
       out.px = -0.3;
       return out;
   }
+}
+
+/**
+ * The finisher's foe (user note 2026-11-02 12:39), held up by the neck in the hell ant's jaws, facing it: `k` 0..1
+ * through the hold. Its head is lifted to the raised jaws (about a third of the hell ant's length up), the body hanging
+ * nose-up behind, the gaster just clear of the ground (a foe much longer than the hell ant is held lower at the head);
+ * kicking and twisting, weaker as the hold goes on. Lift in mm (body lengths × mm), angles in rad.
+ */
+export function execHeld(k: number, Lh: number, Lv: number, t: number, seed: number, out: { lift: number; pitch: number; roll: number; headYaw: number }): void {
+  const up = sm(k / 0.3);
+  const Hj = 0.36 * Lh;
+  // (a foe much bigger than the hell ant still comes up nose-high: at least 0.45 rad, its gaster just clear)
+  const sinT = Math.min(Math.sin(0.9), Math.max(Math.sin(0.45), (Hj - 0.05 * Lv) / (0.9 * Lv)));
+  out.pitch = Math.asin(sinT) * up;
+  out.lift = Math.max(0, Hj - 0.22 * Lv - 0.4 * Lv * sinT, 0.5 * Lv * sinT - 0.19 * Lv) * up;
+  const e = (1 - 0.5 * k) * (0.4 + 0.6 * up);
+  out.roll = (0.3 * Math.sin(t * 17 + seed * 9) + 0.12 * Math.sin(t * 29 + seed * 3)) * e;
+  out.headYaw = 0.25 * Math.sin(t * 13 + seed * 5) * e;
 }

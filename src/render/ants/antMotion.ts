@@ -69,10 +69,26 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
     out.variant = ATK.RAGE;
     return out;
   }
-  // hell ants (realism rework): the vertical snap; the soldier mostly impales with its paddle; now and then a lunge
+  // hell ants (user rating 2026-11-02): three attacks — the vertical snap, the chomp, the slam — never the same twice
+  // running; a foe at a quarter of its health gets the finisher (the soldier's with its paddle)
   if (morph.startsWith('hell_')) {
-    out.variant = morph === 'hell_soldier' ? [ATK.IMPALE, ATK.SNAP, ATK.IMPALE][av] : [ATK.SNAP, ATK.SNAP, ATK.LUNGE][av];
-    if (v.atkSeq && morph !== 'hell_soldier') out.variant = hash01(seed * 1000 + n, 6) < 0.8 ? ATK.SNAP : ATK.LUNGE;
+    if (v.special === 3) {
+      out.variant = morph === 'hell_soldier' ? ATK.EXECUTE_P : ATK.EXECUTE;
+      return out;
+    }
+    // …then the foe lifted into the air by its neck and the head cut off (user note 2026-11-02 12:39)
+    if (v.special === 4) {
+      out.variant = ATK.LIFT;
+      return out;
+    }
+    // (the soldier's first attack is its paddle impale)
+    const set = morph === 'hell_soldier' ? [ATK.IMPALE, ATK.CHOMP, ATK.SLAM] : [ATK.SNAP, ATK.CHOMP, ATK.SLAM];
+    if (!v.atkSeq) out.variant = set[av];
+    else {
+      const pick = (k: number) => Math.floor(hs(k, 6) * 3) % 3;
+      const i = pick(n);
+      out.variant = set[n > 0 && i === pick(n - 1) ? (i + 1) % 3 : i];
+    }
     return out;
   }
   if (morph.startsWith('fire_major')) {
@@ -204,6 +220,9 @@ export interface Motion2 {
   flash: number;
   flashCd: number;
   deadT: number;
+  /** the lift (mm) and nose-up pitch it had on its last living frame (the finisher's foe falls from the jaws) */
+  hl: number;
+  hpi: number;
   deadV: number;
   deadS: number;
   spin: number;
@@ -316,6 +335,8 @@ export function newMotion(id: number): Motion2 {
     flash: 0,
     flashCd: 0,
     deadT: -1,
+    hl: 0,
+    hpi: 0,
     deadV: r(7) < 0.5 ? 0 : 1,
     deadS: r(8) < 0.5 ? -1 : 1,
     spin: 0,
@@ -556,14 +577,18 @@ export function stepMotion(
     if (m.deadT < 0) {
       m.deadT = s.death > 0.9 ? 5 : 0;
       // a big kill: a beat of hit-stop and a flash
-      if (m.deadT === 0 && (v.cause === 4 || v.cause === 8)) {
+      if (m.deadT === 0 && (v.cause === 4 || v.cause === 8 || v.cause === 9)) {
         m.freeze = 0.08;
         m.flash = 1;
       }
       if (m.deadT === 0) out.sfx = ANIM_SFX.DEATH;
     }
     m.deadT += dt;
-  } else m.deadT = -1;
+  } else {
+    m.deadT = -1;
+    m.hl = v.lift;
+    m.hpi = v.pitch;
+  }
   if (m.deadT >= 0) deathPose(m, v.cause ?? 0, m.deadT, out);
   if (m.deadT >= 0) s.death = out.deathLeg;
   else {
@@ -726,6 +751,20 @@ export function deathPose(m: Motion2, cause: number, t: number, out: MotionOut):
       out.antPitch -= 0.8 * sm(t / 1.6);
       out.headPitch -= 0.3 * sm(t / 1.6);
       return;
+    case 9: {
+      // the hell ants' finisher (user note 2026-11-02 12:39): the head cut off in the jaws, high in the air — the body
+      // drops from where it was held (a fall of ~0.2 s, a small bounce), the nose-up hang levelling out; legs kicking,
+      // then curling
+      out.decap = sm(t / 0.08);
+      const tf = 0.2;
+      const f = t < tf ? (t / tf) * (t / tf) : 1;
+      const b = t > tf && t < tf + 0.16 ? 0.12 * Math.sin(Math.PI * ((t - tf) / 0.16)) : 0;
+      out.up += m.hl * (1 - f + b);
+      out.pitch += m.hpi * (1 - sm(t / 0.28));
+      out.deathLeg = clamp(0.25 + 0.35 * sm((t - 0.2) / 0.5) + 0.35 * Math.sin(t * 27 + sd) * Math.exp(-t * 1.4), 0, 1.12);
+      out.deathRoll = 0.35 * m.deadS * sm((t - 0.18) / 0.4);
+      return;
+    }
     case 8: {
       out.decap = sm(t / 0.35);
       out.deathLeg = clamp(0.55 * sm(t / 0.4) + 0.3 * Math.sin(t * 29 + sd) * Math.exp(-t * 0.6), 0, 1.12);

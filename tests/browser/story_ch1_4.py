@@ -7,6 +7,7 @@ and digging in. Fails on page errors or shader warnings.
 Run: tests/browser/with_server.sh python3 tests/browser/story_ch1_4.py   (ONLY=hub,nights,spider)
 Screenshots: docs/story/shots/ch1_4/*.jpg
 """
+import math
 import os
 import time
 from playwright.sync_api import sync_playwright
@@ -53,6 +54,11 @@ JUMP = """([stage, time]) => { const w = window.__session.world, m = w.s.mode.mi
 SIM = """(secs) => { const w = window.__session.world; for (let i = 0; i < secs * 20; i++) { w.step(0.05); w.events.drain(); } }"""
 FLAG = """(f) => window.__session.world.s.mode.mission.story.flags.includes(f)"""
 ACTOR = """(name) => { const w = window.__session.world, st = w.s.mode.mission.story; const a = st.actors.find((x) => x.name === name); if (!a) return null; for (const id of a.ids) { const c = w.creatureById.get(id); if (c && !c.dead) return { x: c.x, y: c.y, h: c.h, space: c.space, hp: c.hp / c.maxHp }; } return null; }"""
+
+
+def front(a, dist, pitch=0.0, space="surface"):
+    """the camera in front of a creature (its head toward the camera: the rig's offset is (sin yaw, cos yaw))"""
+    return (a["x"], a["y"], dist, math.pi / 2 - a["h"], pitch, space)
 
 
 def sim_until(pg, flag, limit):
@@ -115,10 +121,11 @@ with sync_playwright() as p:
         # dusk of night 2: wolf spiders' eyes at the lair mouths (the camera looks at them from the terrace side)
         pg.evaluate(JUMP, [1, 330 + 180 + 240 - 30 - 1])
         sim_until(pg, "eyesSeen", 20)
-        pg.evaluate("() => { window.__session.world.s.night = 0.85; }")
+        # (the light fades through the dusk: 20 s on it is mostly night)
+        pg.evaluate(SIM, 20)
         a = pg.evaluate(ACTOR, "eyes")
         if a:
-            cam(pg, a["x"] - 60, a["y"] + 70, 150, 2.4, -0.1)
+            cam(pg, *front(a, 110, -0.12))
         pg.evaluate("window.__step(60, 0.05)")
         shot(pg, "nights_eyes")
         # night 3: the tarantula digs into the nest, then walks through it
@@ -126,7 +133,7 @@ with sync_playwright() as p:
         sim_until(pg, "tarantulaOut", 20)
         a = pg.evaluate(ACTOR, "tarantula")
         if a:
-            cam(pg, a["x"], a["y"], 260, 2.8, 0.05)
+            cam(pg, *front(a, 280, 0.05))
         pg.evaluate("window.__step(40, 0.05)")
         shot(pg, "nights_tarantula_out")
         sim_until(pg, "tarantulaDigs", 150)
@@ -154,7 +161,7 @@ with sync_playwright() as p:
         pg.evaluate(SIM, 45)
         a = pg.evaluate(ACTOR, "mother")
         if a:
-            cam(pg, a["x"], a["y"], 170, 2.5, 0.0)
+            cam(pg, *front(a, 170, 0.0))
         pg.evaluate("window.__step(60, 0.05)")
         shot(pg, "spider_hunt")
         # the brood phase: her spiderlings spill

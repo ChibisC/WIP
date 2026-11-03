@@ -126,13 +126,13 @@ at the foot of the banks (underground areas, `sim/areas.ts` caves of kind `lair`
 tarantula's drawn as a silk-lined burrow). No water, no fallen leaves.
 
 **Day and night** (`StoryLevelDef.dayNight`, `sim/story/dayNight.ts`): a first day of 5½ min, days of 4 min, nights of
-3 min and a last night of 4; dusk warnings 30 s before each night (a caption and a tip), the light fading over 20 s
-(`w.s.night` 0 → 1: moonlight on the client, `render/view.ts`), the flags `dusk:N`, `night:N`, `dawn:N`, a clock under
+3 min and a last night of 4; dusk warnings 30 s before each night (a caption and a tip), the light fading through the dusk
+(`w.s.night` 0 → 1 over the 30 s of dusk and back at dawn: moonlight on the client, `render/view.ts`), the flags `dusk:N`, `night:N`, `dawn:N`, a clock under
 the stage name ("Day 2 · dusk in 1:40", "Night 2 of 3 · dawn in 0:55"). About 23½ minutes in all.
 
 | Stage | Objectives | Scenes and set pieces |
 |---|---|---|
-| The first day | survive night 1; gather 150 food, 3 brood tiles (optional) | opening flight (the knoll → the hollow → the terrace); food in the hollow; at dusk a ground beetle comes out of a lair and crosses the hollow (the first sign; the camera follows it); at night two packs (2 ground beetles; a ground beetle and a rove beetle) come out of the two nearest lairs and climb the two ramps to hold the ramp tops till dawn |
+| The first day | survive night 1; gather 150 food, 3 food store tiles (optional) | opening flight (the knoll → the hollow → the terrace); food in the hollow; at dusk a ground beetle comes out of a lair and crosses the hollow (the first sign; the camera follows it); at night two packs (2 ground beetles; a ground beetle and a rove beetle) come out of the two nearest lairs and climb the two ramps to hold the ramp tops till dawn |
 | The second day | survive night 2; 10 fighters, store 200 food (optional) | at dawn the hunters go home (passive, `leave` to their lairs) and the night's leftovers lie in the hollow; at dusk two wolf spiders wait at the mouths of two lairs facing the terrace (their eyes shine: eyeshine, render), then charge with the night's two packs (stone centipedes and ground beetles), from two sides |
 | The third day | survive night 3; upgrade a chamber (optional) | at night packs from every lair (beetles, a rove beetle, wolf spiders, centipedes); the red-knee tarantula leaves its burrow on the knoll, walks down the rim and across the hollow (the camera follows), digs a hole wider and walks into the nest breaking soil (`digInto`; a story titan never gives up or flees, `titanDig.ts`); keep the queen alive until dawn |
 | level-wide | — | at dawn after the third night the level is won; the tarantula walks back out (`endRaid`) to its burrow and the hunters go home |

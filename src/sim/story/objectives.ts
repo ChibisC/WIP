@@ -183,7 +183,8 @@ export function evalObjective(w: World, c: Colony, st: StoryState, base: StageBa
       const D = levelOf(st).dayNight;
       if (!D) return { done: false, progress: '' };
       const d = dayNightAt(D, w.s.time);
-      return { done: false, progress: d.n === o.n && d.night ? `dawn in ${mmss(d.left)}` : d.n === o.n ? `night in ${mmss(d.left)}` : '' };
+      // (by day the clock above the goals counts down to dusk; here only the last minutes before the night and the night)
+      return { done: false, progress: d.n === o.n && d.night ? `dawn in ${mmss(d.left)}` : d.n === o.n && d.left <= D.dusk ? `night in ${mmss(d.left)}` : '' };
     }
     case 'upgrade':
       return count(c.tiles.filter((t) => t.built && t.level >= 2 && (!o.tile || t.type === o.tile)).length, o.n);

@@ -842,3 +842,40 @@ Plan, as built:
 5. Lobby: "Titans raid nests" (menu and multiplayer lobby, `settings.titanRaids`), protocol `ud-mp-8`.
 6. Tests `tests/titans.ts`; clips `tests/browser/titan_dig.py`.
 Not done here: the ally brain's titan danger (on `feature/ai-allies`, not in `main` yet — noted for that work).
+
+### 22.6 The user's ratings, round 1 (review page, 2026-11-02 afternoon)
+Scores: hell ants 9–10 for the looks (the amber 10, the lineup 10), the attacks 7–8; the nasutes 8–9. Asked for:
+- **H8 / H9 — the jaws:** open much wider when attacking (`hellMorphs` `openExtra` 0.55 → 1.45) and open and close
+  through the attack. The renderer keeps the wide-open jaws off the ground (`lowestJaw`: the head is raised until the
+  jaw blades clear it).
+- **H10 — three attacks:** `ATK.SNAP` (the vertical snap), `ATK.CHOMP` (a lunge with the jaws working open and shut),
+  `ATK.SLAM` (rear, hold, slam the head down, hit-stop). The game never plays the same one twice running.
+- **H7 — the finisher, a gameplay change the user asked for:** a hell ant's grapple bite on a foe at
+  `BALANCE.snap.finisherHp` (25 %) of its health or less (never a queen or king) — the jaws reach round the neck
+  (`ATK.EXECUTE`, the soldier's `ATK.EXECUTE_P` with the paddle) and close. **User note 12:39:** the foe is then lifted
+  into the air: `combat.startExecution` → `AS.Hold` with `exec` (hellAnts.ts) holds it up by the neck in front of the
+  jaws for `finisherLift` s (stunned, pulled in over 0.3 s, facing the hell ant), then `executeAnt` kills it with
+  `HIT.EXEC` (9). Render: the hell ant's `ATK.LIFT` (head and front raised, shaking the foe, the jaws part, the shear);
+  the foe's `execHeld` (head up at the jaws, body hanging nose-up, kicking); death 9: the head comes off in the air,
+  the body drops. Ant field `exec` is set on hell ants only (older saves: undefined).
+- **N6 — the alarm:** the major drums with its feet planted (no body bob or pitch; only the head).
+- **G4 — more attack motion for every creature:** the nasute melee in the kit shader, gated by `real` (sickle-jaws
+  unchanged): workers' BITE 0 snap, 1 grab and tug, 2 nibbling flurry; majors' RAM 0 lunge, 1 head swing, 2 rear and
+  crush; `TermiteInstances.setMelee` picks it. The body moves with the legs compensating so the feet stay put
+  (termiteLayer no longer slides the whole nasute body). The soldier sways its aim and each squirt jolts it back,
+  squeezes the abdomen and dips the head.
+
+## 24. Chapter 1 becomes four levels (user spec 2026-11-02, claude/story/04-spec-chapter1-four-levels.md)
+Built on §23 (`digInto`). Plan, as built:
+1. Order and save: `story/campaign.ts` nodes Garden → The Long Nights → Fire on the Banks → The Spider Mother; the save
+   keeps progress by level id (open = the one before won, or won already); `traits` in the save.
+2. Data: `STORY_LEVEL_IDS`; `StoryLevelDef.dayNight`, `lairs`, `developed`, `reward.trait`; objectives `surviveNight`,
+   `upgrade`, `storeFood`, `surviveTime` per difficulty; cues `rest`, `goto`; actions `night`, `endRaid`; actors with
+   creature groups (`creatures`, `from`), `phases`, `bossCuts`, `goal`; bonus `killBefore`; food medal; `STORY.traits`,
+   `STORY.difficulty.*.boss`.
+3. Sim: `sim/story/dayNight.ts` (light and flags from game time), `sim/story/traits.ts` (Spiderling Venom on bites,
+   `Colony.traits`), lairs as caves, story titans that stay until dawn or death, the hogna's story cuts.
+4. Levels and maps: `longNights` on `stonyHollow`, `spiderMother` on `spiderTerrace`; narration and journal pages with
+   sources (DESIGN-STORY §10).
+5. Client: moonlight blend, wolf spider eyeshine, the spider burrow, map moods, the night clock, hub/Genome/end screen.
+6. Tests `tests/storyCh1.ts`; the playtest bot plays bosses and nights; browser shots `tests/browser/story_ch1_4.py`.

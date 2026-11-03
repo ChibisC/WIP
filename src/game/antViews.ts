@@ -7,8 +7,9 @@ import { AnimState, Carry as TCarry, LUNGE_SEC, LUNGE_SNAP } from '../render/ter
 import { victimStruggle } from '../render/termite/material';
 import { bodyHook } from '../sim/slots';
 import { LUNGE_TICKS, isSickle, sickleRampFraction } from '../sim/sickleJaws';
-import { ATTACK_CONTACT } from '../render/ants/attackPoses';
+import { ATTACK_CONTACT, execHeld } from '../render/ants/attackPoses';
 import { CASTE_FX } from '../sim/casteAbilities';
+import { finisherOn } from '../sim/combat';
 import { queenBody, rampFraction } from '../sim/termites';
 import { World } from '../sim/world';
 import { antClear, antCrouch, antHeights, antNeed, creatureClear, creatureHeights, zoneAt } from '../sim/underpass';
@@ -92,6 +93,8 @@ function pressingIn(a: Ant): boolean {
  * rage pulse play as an attack cycle of their own (the sim's timers give the phase); ants fighting in a rage aura flush
  * red, deeper as it grows, pulsing at the cap (EotU's glow at +45 %).
  */
+const EXH = { lift: 0, pitch: 0, roll: 0, headYaw: 0 };
+
 function casteFx(w: World, a: Ant, out: AntView): void {
   out.special = 0;
   out.rageGlow = 0;
@@ -102,6 +105,21 @@ function casteFx(w: World, a: Ant, out: AntView): void {
     out.atkGap = CASTE_FX.tauntPose;
     out.atkSide = 1;
     out.atkSeq = true;
+  } else if (casteOf(a.caste).snap && a.state === AS.Grapple && a.gKind === 3) {
+    // hell ants (user rating 2026-11-02): a foe at a quarter of its health — this attack is the finisher, the jaws
+    // reaching round its neck (the sim takes the head off on the bite: combat.ts executeAnt)
+    const o = w.antById.get(a.gId);
+    if (o && finisherOn(w, o)) out.special = 3;
+  } else if (a.state === AS.Hold && a.exec) {
+    // …and then (user note 2026-11-02 12:39) the foe lifted into the air by its neck, shaken, the head cut off when
+    // the hold runs out (hellAnts.ts): the hold's progress as an attack phase 0..0.95
+    const L = BALANCE.snap.finisherLift;
+    out.special = 4;
+    out.atk = 0.95 * Math.min(1, Math.max(0, 1 - (a.holdT ?? 0) / L));
+    out.atkGap = L / 0.95;
+    out.atkVar = 0;
+    out.atkSide = a.id & 1 ? 1 : -1;
+    out.atkN = 0;
   } else if ((a.rageFx ?? 0) > 0) {
     out.special = 2;
     out.atk = Math.min(0.999, 1 - a.rageFx! / CASTE_FX.ragePulse);
@@ -487,6 +505,17 @@ function speciesExtras(w: World, a: Ant, out: AntView): void {
       out.antennaActivity = 1;
       out.pose = POSE.GRAPPLE;
     }
+  } else if (holder?.exec && a.state !== AS.Dead) {
+    // the finisher (user note 2026-11-02 12:39): held up by the neck in the hell ant's jaws, kicking and twisting
+    const k = 1 - Math.max(0, holder.holdT ?? 0) / BALANCE.snap.finisherLift;
+    execHeld(k, casteOf(holder.caste).length, cd.length, w.time, (a.id * 0.37) % 1, EXH);
+    out.lift = Math.max(out.lift, EXH.lift);
+    out.pitch = EXH.pitch;
+    out.roll = EXH.roll;
+    out.headYaw = EXH.headYaw;
+    out.mandible = Math.max(out.mandible, 0.7);
+    out.antennaActivity = 1;
+    out.pose = POSE.GRAPPLE;
   } else if (a.heldBy) {
     // pinned in a hell ant's jaws: lifted off the ground at the socket, hanging nose-down, legs flailing
     const h = w.antById.get(a.heldBy);
@@ -696,12 +725,11 @@ function hellPosture(a: Ant, out: AntView, L: number): void {
       out.mandible = 0.5; // relaxed open
       return;
     case AS.Hunt:
-      // stalking: jaws fully cocked, head down, antennae busy, body lowered
+      // stalking: jaws fully cocked, antennae busy (user 2026-11-02: with the wide gape the head no longer dips and the
+      // body no longer sinks — the renderer raises the head so the open scythes stay off the ground)
       out.mandible = 1;
-      out.headPitch = -0.45;
+      out.headPitch = 0.1;
       out.antennaActivity = 1;
-      out.pitch = -0.06;
-      out.lift -= 0.08 * L;
       return;
     case AS.Snap:
       out.mandible = 0;
@@ -711,7 +739,7 @@ function hellPosture(a: Ant, out: AntView, L: number): void {
     case AS.Hold:
       out.mandible = 0;
       out.snap = a.st < 0.15;
-      out.headPitch = -0.2;
+      out.headPitch = a.exec ? 0 : -0.2; // (the finisher's lift raises the head: the LIFT attack pose)
       return;
   }
   if (out.carrying) {

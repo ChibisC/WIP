@@ -29,7 +29,8 @@ const HELL_BASE = {
     fringe: { count: 26, from: 0.2, to: 0.97, len: 0.42 } },
   // four trigger hairs, two per side, in Ceratomyrmex (hell-ant.md §3)
   trigger: { count: 4, len: 1.0, ang: 0.35 },
-  mandible: { pts: [[0, 0], [0.3, -0.35], [0.75, -0.22], [1.05, 0.4], [1.08, 1.1], [0.85, 1.75]], hingeZ: 0.16, tipZ: 0.05, r: 0.046, depth: 1.5, teeth: 0, teethFrom: 0.7, teethTo: 0.9, tooth: 0.08, openExtra: 0.55 },
+  // (user rating 2026-11-02, H8: "open up more while attacking" — a gape near the fossils' estimated 140–180°)
+  mandible: { pts: [[0, 0], [0.3, -0.35], [0.75, -0.22], [1.05, 0.4], [1.08, 1.1], [0.85, 1.75]], hingeZ: 0.16, tipZ: 0.05, r: 0.046, depth: 1.5, teeth: 0, teethFrom: 0.7, teethTo: 0.9, tooth: 0.08, openExtra: 1.45 },
   antenna: { scapeAng: 1.5, splay: 0.22, scape: 1.05, r: 0.045, funiStart: 0.2, funiBend: 1.5, funi: 3.0 },
   petiole: 0.5, node: { h: 0.32 },
   gaster: { len: 1.85, h: 1.0, w: 0.95, tilt: 0.08, constrict: 0.2, at: 0.3 },

@@ -304,6 +304,8 @@ export interface Ant {
   holdKind?: number;
   holdT?: number;
   heldBy?: number;
+  /** hell ants: 1 while the hold is the finisher (the foe lifted by the neck, its head cut off when the hold ends) */
+  exec?: number;
   /** clamped in a creature's jaws (the stag beetle's antlers): its id; the ant is lifted (Flung, held still) */
   gripCr?: number;
   /** Saiy-Ants: seconds of gold surge left, and cooldown left */
@@ -349,7 +351,7 @@ export interface Brood {
 export type FoodKind = 'insect' | 'seed' | 'berry' | 'honeydew' | 'crumb' | 'corpse' | 'leaf' | 'fungus' | 'wood';
 
 /** What last hurt an ant (`Ant.lastHit`, the death event's and the corpse's `cause`): the render picks the death. */
-export const HIT = { BITE: 1, VENOM: 2, ACID: 3, CRUSH: 4, FALL: 5, DROWN: 6, STARVE: 7, DECAP: 8 } as const;
+export const HIT = { BITE: 1, VENOM: 2, ACID: 3, CRUSH: 4, FALL: 5, DROWN: 6, STARVE: 7, DECAP: 8, EXEC: 9 } as const;
 
 export interface Food {
   id: number;

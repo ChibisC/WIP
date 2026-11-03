@@ -695,8 +695,10 @@ export class GameView {
     const s = this.stormShown;
     const n = this.nightShown;
     const L = this.surfaceLights;
-    L.sun.intensity = this.daySun * (1 - 0.6 * s) * (1 - 0.78 * n);
-    L.hemi.intensity = this.dayHemi * (1 - 0.25 * s) * (1 - 0.5 * n);
+    L.sun.intensity = this.daySun * (1 - 0.6 * s) * (1 - 0.85 * n);
+    L.hemi.intensity = this.dayHemi * (1 - 0.25 * s) * (1 - 0.6 * n);
+    // the image-based light (the sky's reflection on everything, the ground included) goes down with the sky
+    this.surfaceScene.environmentIntensity = 1 - 0.72 * n;
     if (n > 0.001 || this.nightTint) {
       L.sun.color.copy(this.daySunColor).lerp(MOON, n);
       L.hemi.color.copy(this.dayHemiSky).lerp(NIGHT_SKY, n);
@@ -716,10 +718,10 @@ export class GameView {
     if (this.space === 'surface') {
       const s = this.stormShown;
       const n = this.nightShown;
-      g.exposure = this.night ? 1.25 : (1.0 - 0.12 * s) * (1 + 0.28 * n);
-      g.saturation = this.night ? 0.7 : (1.08 - 0.35 * s) * (1 - 0.32 * n);
+      g.exposure = this.night ? 1.25 : (1.0 - 0.12 * s) * (1 + 0.18 * n);
+      g.saturation = this.night ? 0.7 : (1.08 - 0.35 * s) * (1 - 0.42 * n);
       g.contrast = 1.06;
-      g.warmth = this.night ? -0.6 : 0.25 - 0.55 * s - 0.75 * n;
+      g.warmth = this.night ? -0.6 : 0.25 - 0.55 * s - 0.95 * n;
       g.vignette = 0.32;
       g.lift.setRGB(0.008, 0.007, 0.004);
     } else {

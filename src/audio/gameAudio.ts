@@ -123,7 +123,7 @@ export class GameAudio {
     if (k === ANIM_SFX.FLIP || k === ANIM_SFX.RIGHT) return this.want('ant.pellet_drop', x, y, space, { pool: 'work', gain: k === ANIM_SFX.FLIP ? 0.6 : 0.4, rate: 1.3 });
     if (k === ANIM_SFX.DEATH) {
       if (cause === 3) return this.want('combat.acid_splat', x, y, space, { pool: 'combat', gain: 0.4, rate: 1.2 });
-      if (cause === 4 || cause === 8) return this.want('combat.chitin_crack', x, y, space, { pool: 'combat', gain: 0.8, rate: 0.75 });
+      if (cause === 4 || cause === 8 || cause === 9) return this.want('combat.chitin_crack', x, y, space, { pool: 'combat', gain: 0.8, rate: 0.75 });
     }
   }
 

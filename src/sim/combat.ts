@@ -67,6 +67,53 @@ export function sameTeam(a: Ant, b: Ant): boolean {
 // Damage
 // ---------------------------------------------------------------------------
 
+/**
+ * Can a hell ant's bite finish this foe (BALANCE.snap.finisherHp)? An enemy ant or termite, alive, at a quarter of its
+ * health or less; never a queen, a king or an invincible queen. (The render reads this too: the finisher animation.)
+ */
+export function finisherOn(w: World, t: Ant): boolean {
+  if (t.state === AS.Dead || riding(t)) return false;
+  const c = w.colony(t.colony);
+  if (c && t.id === c.queen) return false;
+  const role = casteOf(t.caste).role;
+  if (role === 'king' || role === 'queen') return false;
+  return t.hp <= t.maxHp * BALANCE.snap.finisherHp;
+}
+
+/**
+ * The hell ants' finisher, step 1 (user note 2026-11-02 12:39): the jaws close round the foe's neck and lift it into
+ * the air — the hell ant lets go of the leg grip and holds the foe (AS.Hold with `exec`, hellAnts.ts) for
+ * `finisherLift` seconds; then executeAnt takes the head off.
+ */
+export function startExecution(w: World, a: Ant, t: Ant): void {
+  releaseGrapple(w, a);
+  a.tgt = t.id;
+  a.tk = 3;
+  a.holdId = t.id;
+  a.holdKind = 3;
+  a.holdT = BALANCE.snap.finisherLift;
+  a.exec = 1;
+  a.state = AS.Hold;
+  a.st = 0;
+  a.v = 0;
+  t.heldBy = a.id;
+  t.stun = Math.max(t.stun, 0.25);
+  t.v = 0;
+  w.events.emit({ t: 'bite', x: t.x, y: t.y, space: t.space, strength: casteOf(a.caste).bite / 10, by: a.caste, on: 'ant' });
+}
+
+/** The hell ants' finisher, step 2: the head cut off — the foe dies, decapitated. */
+export function executeAnt(w: World, t: Ant, src: Ant): void {
+  if (t.state === AS.Dead) return;
+  t.lastHit = HIT.EXEC;
+  t.hp = 0;
+  const kc = w.colony(src.colony);
+  if (kc) kc.stats.kills++;
+  killAnt(w, t);
+  casteOnKill(w, src);
+  w.events.emit({ t: 'snap', x: t.x, y: t.y, space: t.space, by: src.caste, impale: true });
+}
+
 export function damageAnt(w: World, t: Ant, amount: number, type: DamageType, src: Ant | Creature | null): void {
   if (t.state === AS.Dead || riding(t)) return;
   const c = w.colony(t.colony);
@@ -1361,6 +1408,11 @@ function grappleUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
     if (cd.snap && snapEligible(w, a, 3, o.id)) return regrip(w, a);
     if (a.cd <= 0) {
       a.cd = biteGap(w, a, c, cd.attackInterval);
+      // hell ants: a foe down to a quarter of its health is finished — the head taken off (the render plays the finisher)
+      if (cd.snap && finisherOn(w, o)) {
+        startExecution(w, a, o);
+        return true;
+      }
       damageAnt(w, o, cd.bite * biteMul(w, a, c) * hookMul(a, casteOf(o.caste).armor), 'bite', a);
       if (cd.termite === 'major') glueBurst(w, a, 3, o.id);
       // army ants: the Soldier's hook holds the victim; a crowd of them spread-eagles it (eciton.ts)

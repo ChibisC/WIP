@@ -7,9 +7,9 @@
 import { EventBus } from '../src/core/events';
 import { createWorld } from '../src/sim/mapGen';
 import { World } from '../src/sim/world';
-import { Ant, AS, SURFACE, nestSpace } from '../src/sim/types';
+import { Ant, AS, HIT, SURFACE, nestSpace } from '../src/sim/types';
 import { makeAnt, makeFood } from '../src/sim/factory';
-import { damageAnt } from '../src/sim/combat';
+import { damageAnt, finisherOn } from '../src/sim/combat';
 import { killAnt } from '../src/sim/antAI';
 import { BALANCE, NASUTE } from '../src/sim/balance';
 import { BORROWABLE, CASTES, SPECIES, casteOf } from '../src/sim/species';
@@ -471,6 +471,77 @@ function rampRun(phases: number[], targetCaste = 'formica_soldier'): { dmg: numb
     if (sp.data.heldBy === h5.id && sp.stun > 0) crHeld++;
   }
   check('hell worker: snaps a spiderling and holds it stunned', crHeld > 40, `${crHeld} ticks`);
+}
+
+// ---------------------------------------------------------------- hell ants: the finisher
+// (user rating 2026-11-02 H7/H10, note 12:39) a grappled foe at a quarter of its health is lifted into the air by its
+// neck for BALANCE.snap.finisherLift s, then its head is cut off; above a quarter the bite is a normal bite; never a queen
+{
+  const w = world(['hell', 'lasius']);
+  const p = arena(w);
+  for (const o of w.s.ants) if (o.colony === 1 && o.id !== w.colony(1)!.queen && o.state !== AS.Dead && o.space === SURFACE) killAnt(w, o);
+  const fight = (hpK: number, dy: number) => {
+    const foe = makeAnt(w, 1, 'atta_major', SURFACE, p.x + 6, p.y + dy, Math.PI);
+    foe.hp = foe.maxHp * hpK;
+    const h = makeAnt(w, 0, 'hell_soldier', SURFACE, p.x, p.y + dy, 0);
+    h.task = 'guard';
+    w.reindex();
+    h.state = AS.Attack;
+    h.tgt = foe.id;
+    h.tk = 3;
+    return { foe, h };
+  };
+  // above a quarter: plain bites, no lift
+  {
+    const { foe, h } = fight(0.6, 0);
+    const hp0 = foe.hp;
+    let lifted = false;
+    for (let i = 0; i < 80; i++) {
+      // a passive foe (dazed), so the hell soldier grips it rather than the other way round
+      foe.stun = Math.max(foe.stun, 0.2);
+      w.step(0.05);
+      w.events.drain();
+      if (h.exec || foe.heldBy === h.id) lifted = true;
+      if (foe.hp <= foe.maxHp * BALANCE.snap.finisherHp) break;
+    }
+    check('finisher: above a quarter of its health the foe is only bitten (no lift)', !lifted && foe.hp < hp0 && foe.state !== AS.Dead, `${foe.hp.toFixed(1)} / ${hp0.toFixed(1)} hp, ${AS[h.state]}`);
+    killAnt(w, foe);
+    killAnt(w, h);
+  }
+  // at a quarter: grabbed and lifted (held, stunned, in front of the jaws), then decapitated when the lift runs out
+  {
+    const { foe, h } = fight(0.24, 30);
+    let t0 = -1;
+    let t1 = -1;
+    let heldOk = true;
+    let viewOk = false;
+    for (let i = 0; i < 200 && t1 < 0; i++) {
+      foe.cd = Math.max(foe.cd, 1);
+      foe.cd2 = Math.max(foe.cd2, 1);
+      w.step(0.05);
+      w.events.drain();
+      if (t0 < 0 && h.exec) t0 = i;
+      if (t0 >= 0 && foe.state !== AS.Dead) {
+        heldOk = heldOk && foe.heldBy === h.id && foe.stun > 0 && h.state === AS.Hold;
+        if (i - t0 === 10) {
+          const hv = antToView(w, h, blankView(), SURFACE, 0);
+          const fv = antToView(w, foe, blankView(), SURFACE, 0);
+          viewOk = hv.special === 4 && (hv.atk ?? -1) > 0.3 && (hv.atk ?? 2) < 0.95 && fv.lift > 0 && fv.pitch >= 0.4;
+        }
+      }
+      if (t0 >= 0 && foe.state === AS.Dead) t1 = i;
+    }
+    const lift = Math.round(BALANCE.snap.finisherLift * BALANCE.tickHz);
+    check('finisher: at a quarter of its health the foe is lifted by the neck and held up (stunned) for the lift', t0 >= 0 && heldOk && t1 - t0 >= lift - 1 && t1 - t0 <= lift + 1, `lift from tick ${t0}, dead at ${t1}`);
+    check('…then decapitated (HIT.EXEC); the hell ant lets go and its snap cools down', foe.lastHit === HIT.EXEC && !h.exec && h.holdId === 0 && (h.snapCd ?? 0) > 0 && foe.heldBy === 0, `${foe.lastHit}, ${AS[h.state]}`);
+    check('…the render plays it: the hell ant\'s LIFT pose (special 4) and the foe lifted nose-up', viewOk);
+  }
+  // never a queen or king
+  const q = w.antById.get(w.colony(1)!.queen)!;
+  const qhp = q.hp;
+  q.hp = q.maxHp * 0.1;
+  check('finisher: never on a queen', !finisherOn(w, q));
+  q.hp = qhp;
 }
 
 // ---------------------------------------------------------------- Saiy-Ants
