@@ -65,7 +65,7 @@ for (const sp of Object.keys(SPECIES)) {
   check(`${sp}: ${cs.length} castes, each its own colour and texture`, cols.size === cs.length && pats.size === cs.length, cs.map((c) => `${c} ${casteLook(c).colour}/${casteLook(c).pattern}`).join(', '));
 }
 
-// anywhere: no two castes share both (stolen castes in a Gene Thief or Termant nest still differ)
+// anywhere: no two castes share both (stolen castes in a Mimic Ant or Termant nest still differ)
 const pairs = new Map<string, string>();
 const dup: string[] = [];
 for (const c of brood) {

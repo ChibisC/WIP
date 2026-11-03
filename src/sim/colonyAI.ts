@@ -74,7 +74,7 @@ export function defaultMix(c: Colony): Record<string, number> {
       return m;
     }
     case 'plagiaria': {
-      // Gene Thief: its own workers plus an even share of every borrowed caste.
+      // Mimic Ant: its own workers plus an even share of every borrowed caste.
       const borrowed = c.castes.filter((cs) => cs !== 'plagiaria_worker' && CASTES[cs].role !== 'queen');
       const m: Record<string, number> = { plagiaria_worker: borrowed.length ? 0.5 : 1 };
       for (const cs of borrowed) m[cs] = 0.5 / borrowed.length;

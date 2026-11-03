@@ -1,8 +1,8 @@
-"""Multiplayer lobby: teams, the Gene Thief's stolen castes and map cards (docs/multiplayer.md §6), in two tabs
+"""Multiplayer lobby: teams, the Mimic Ant's stolen castes and map cards (docs/multiplayer.md §6), in two tabs
 through BroadcastChannel (?local=1, the same lobby code as online). Everything is clicked for real.
 
   1. the lobby has eight slots and five map cards with sketches; the host picks Forest Floor and the guest sees it
-  2. the guest plays a Gene Thief and picks its castes; the host sees them
+  2. the guest plays a Mimic Ant and picks its castes; the host sees them
   3. teams: the guest and the host pick teams, the host adds an AI and puts it on a team; everyone on one team
      cannot start
   4. the match starts on Forest Floor with those teams and castes on both tabs; teammates are allies; the Gene
@@ -83,16 +83,16 @@ with sync_playwright() as p:
     ok = wait(lambda: guest.locator('.lb-maps .map-card.on[data-map="forestFloor"]').count() == 1, 15)
     check('the host picks Forest Floor on a map card; the guest sees it chosen', ok and guest.locator('.lb-maps .map-card[data-map="meadowPond"]').is_disabled())
 
-    # 2. Gene Thief: the guest switches to it and picks castes
+    # 2. Mimic Ant: the guest switches to it and picks castes
     guest.select_option('select[data-slot="1"][data-f="species"]', 'plagiaria')
     ok = wait(lambda: guest.locator('button[data-a="borrow"]').count() >= 20, 15)
-    check('a Gene Thief player gets the caste picker (every borrowable caste)', ok, guest.locator('button[data-a="borrow"]').count())
+    check('a Mimic Ant player gets the caste picker (every borrowable caste)', ok, guest.locator('button[data-a="borrow"]').count())
     guest.click('button[data-a="borrow"][data-caste="atta_major"]')
     wait(lambda: 'Leafcutter Major' in host.locator('.lb-sub').inner_text(), 15)
     guest.click('button[data-a="borrow"][data-caste="formica_mortar"]')  # the default pick: off again
     ok = wait(lambda: 'Leafcutter Major' in host.locator('.lb-sub').inner_text() and 'Mortar' not in host.locator('.lb-sub').inner_text(), 15)
-    check("the host sees the Gene Thief's picks", ok, host.locator('.lb-sub').inner_text()[:160])
-    guest.screenshot(path=os.path.join(SHOTS, 'teams-guest-gene-thief.png'))
+    check("the host sees the Mimic Ant's picks", ok, host.locator('.lb-sub').inner_text()[:160])
+    guest.screenshot(path=os.path.join(SHOTS, 'teams-guest-mimic.png'))
 
     # 3. teams
     guest.select_option('select[data-slot="1"][data-f="team"]', '2')
@@ -115,18 +115,18 @@ with sync_playwright() as p:
     check('the match starts on both tabs', wait(lambda: all(pg.evaluate('window.__ready===true') for pg in pages), 300))
     ev = lambda pg, js: pg.evaluate(js)
     st = [ev(pg, "JSON.stringify({map: __session.setup && __session.setup.map, teams: __session.world.s.colonies.map(c => c.team), castes: __session.world.colony(1).castes})") for pg in pages]
-    check('both tabs play Forest Floor with the same teams and Gene Thief castes', st[0] == st[1] and '"forestFloor"' in st[0] and '[102,102,103]' in st[0] and 'atta_major' in st[0] and 'formica_mortar' not in st[0], st[0])
+    check('both tabs play Forest Floor with the same teams and Mimic Ant castes', st[0] == st[1] and '"forestFloor"' in st[0] and '[102,102,103]' in st[0] and 'atta_major' in st[0] and 'formica_mortar' not in st[0], st[0])
     check('the host and the guest are allies; the AI is an enemy', ev(host, '__session.world.teamOf(0) === __session.world.teamOf(1) && __session.world.teamOf(2) !== __session.world.teamOf(0)'))
     check('real clicks reach every in-game button on both tabs', all(ev(pg, REACH) == 0 for pg in pages), [ev(pg, REACH) for pg in pages])
-    # the Gene Thief's Castes tab lists its stolen caste
+    # the Mimic Ant's Castes tab lists its stolen caste
     tab = guest.locator('.bp-tab').nth(1)
     bb = tab.bounding_box() if tab.count() else None
     if bb:
         guest.mouse.click(bb['x'] + bb['width'] / 2, bb['y'] + bb['height'] / 2)
     ok = wait(lambda: 'Leafcutter Major' in ' '.join(guest.locator('.caste-card .cc-t').all_inner_texts()), 30)
-    check("the Gene Thief's Castes tab (opened with a real click) lists the stolen Leafcutter Major", ok, guest.locator('.caste-card .cc-t').all_inner_texts())
+    check("the Mimic Ant's Castes tab (opened with a real click) lists the stolen Leafcutter Major", ok, guest.locator('.caste-card .cc-t').all_inner_texts())
     try:
-        guest.screenshot(path=os.path.join(SHOTS, 'teams-match-gene-thief.png'), timeout=90000)
+        guest.screenshot(path=os.path.join(SHOTS, 'teams-match-mimic.png'), timeout=90000)
     except Exception as e:
         print('  (no screenshot', str(e)[:60], ')')
     check('no errors in either tab', not errors, errors[:5])

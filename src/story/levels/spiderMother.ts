@@ -20,7 +20,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
   region: 'riverbank',
   map: 'spiderTerrace',
   brief: 'Above the river, the sandy terrace belongs to a huge wolf spider mother carrying her young. The colony is ready, but only just: prepare, then kill her before she digs her way in.',
-  player: { site: 0, startWorkers: 22, startFood: 280, name: 'Gene-Thief Termants' },
+  player: { site: 0, startWorkers: 22, startFood: 280, name: 'Termants' },
   developed: 10,
   rivals: {},
   creatures: 0,

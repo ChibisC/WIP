@@ -18,7 +18,7 @@ npx vite build      # production build in dist/
 
 The title screen has **Story**, **Single-player** and **Multiplayer**.
 
-- **Story — *The Gene-Thief*** (chapter 1): a storm washes a Gene-Thief Termant queen ashore on Wayfarer Island. On the
+- **Story — *The Termants*** (chapter 1): a storm washes a Termant queen ashore on Wayfarer Island. On the
   island map pick a level, a difficulty (Easy, Normal, Hard, Brutal) and the stolen castes to bring (one slot); steal
   each species' caste from its dead and keep it by winning. Four levels in order: *The Garden Below* (black garden ants:
   steal the Black Garden Ant Soldier), *The Long Nights* (survive three nights of the island's night hunters; on the last
@@ -34,11 +34,11 @@ The title screen has **Story**, **Single-player** and **Multiplayer**.
 
 ### Multiplayer and invite links
 1. **Create game** gives you a six-letter room code and an invite link (`…/?room=ABCDEF`). Press **Copy link** and send it.
-2. Friends open the link and land in the lobby. Each player picks a name, species, colour and team, then clicks **Ready**. A **Gene Thief** player also picks the castes it steals (any of the 24 borrowable castes, the termite soldiers included; each needs its own room tile).
-3. The host can set each of the eight slots to Open, Closed or AI (and pick an AI's species, team and, for a Gene Thief AI, its castes), move anyone to another team, pick the map from the map cards (everyone sees the choice), and set the seed, food, floods, whether titans raid nests (on by default: now and then a titan digs one of a colony's holes wider and walks into its nest breaking the ground it touches) and population cap.
+2. Friends open the link and land in the lobby. Each player picks a name, species, colour and team, then clicks **Ready**. A **Mimic Ant** player also picks the castes it steals (any of the 24 borrowable castes, the termite soldiers included; each needs its own room tile).
+3. The host can set each of the eight slots to Open, Closed or AI (and pick an AI's species, team and, for a Mimic Ant AI, its castes), move anyone to another team, pick the map from the map cards (everyone sees the choice), and set the seed, food, floods, whether titans raid nests (on by default: now and then a titan digs one of a colony's holes wider and walks into its nest breaking the ground it touches) and population cap.
    - **Teams:** Red, Blue, Green, Gold or no team. Teammates never fight each other, start on neighbouring colony sites (the map cards show each team's sites), help each other when an AI is on the team, and win together when theirs is the last team with a living queen. Everyone on one team cannot start.
 
-   ![A lobby with teams, a Gene Thief and the map cards](docs/multiplayer/teams-lobby-host.png)
+   ![A lobby with teams, a Mimic Ant and the map cards](docs/multiplayer/teams-lobby-host.png)
 4. The host starts the match once everyone is ready.
 
 How it works:
@@ -164,7 +164,7 @@ The pause menu has graphics quality, interface size, edge scrolling and the sand
 | Tropical fire ant (*Solenopsis geminata*) | worker, soldier, major |
 | Leafcutter ant (*Atta cephalotes*) | minim, media, soldier, major |
 | Army ant (*Eciton burchellii*) | worker, porter (carries prey under its body, leads team carries), media (escorts the porters), soldier (hooked jaws; guards the raid trail once there are 3 or more), wingless queen. Raids sweep the marker area as a pulsing swarm front; three-lane trails, living bridges over water, pothole plugs. They eat only **insects and corpses**. |
-| Gene Thief (*Formica plagiaria*, fictional) | its own worker plus castes borrowed from any species, termite soldiers included |
+| Mimic Ant (*Formica plagiaria*, fictional) | its own worker plus castes borrowed from any species, termite soldiers included |
 | Nasute Termites (*Nasutitermes corniger*) — termites, not ants | worker (two sizes), nasute soldier (ramping glue stream), major soldier (charge, glue hold, drumming alarm); a king guards the royal chamber. They eat only **wood**. |
 | Hell ants (Haidomyrmecinae, extinct) | worker (snaps small prey up against its horn and pins it), soldier (impales it on its paddle) |
 | Saiy-Ants (*Aurimyrmex fulgurans*, fictional) | worker, soldier: bites only (no acid); flash gold in a fight (or by the group's **Gold Surge** button) for more speed and damage, then tire |

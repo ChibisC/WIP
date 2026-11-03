@@ -14,7 +14,7 @@ import { kingTick } from './termites';
  *
  *  - Gene stealing. A piece of an enemy corpse (or a whole small corpse) delivered to the store credits gene samples
  *    for its species (by the dead ant's size class; creatures by kind). At a species' threshold its stolen caste is
- *    pushed into `colony.castes` — the same path the Gene Thief's lobby-borrowed castes take — so its brood tiles,
+ *    pushed into `colony.castes` — the same path the Mimic Ant's lobby-borrowed castes take — so its brood tiles,
  *    eggs, hatching, model, behaviour and sounds are that species' own. At most `maxStolen` at once; a fourth waits
  *    until the player forgets one (command `forgetCaste`: its brood tiles are refunded; living ants stay). Creature
  *    genes give a small passive bonus once (beetles armour, spiders speed).

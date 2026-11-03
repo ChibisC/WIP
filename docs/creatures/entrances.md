@@ -18,7 +18,7 @@ and rearranged so the three holes read as one nest:
 | Leafcutter | A wide low mound of bare orange soil with three big craters on its flanks, leaf fragments along each hole's trail, the pale refuse dump beside it (where the dead are dropped: `refuseSpot`). |
 | Fire ant | The worked-soil dome centred over the holes, the three small holes with granular collars at its edge; no opening in the middle (the single tunnel opening ~70 mm away is gone). |
 | Army ant | The bivouac over the middle, three dark gaps in its skirt; the real ants stream in and out of them. |
-| Gene Thief Ant (*F. plagiaria*) | As the black garden ant's crater, with plant slivers. |
+| Mimic Ant (*F. plagiaria*) | As the black garden ant's crater, with plant slivers. |
 | Hell ant (reconstruction) | Three small neat holes on a minimal ring of soil, leaf litter round about. |
 | Gilded Ant | The rotting stump in the middle, a root running out to each hole (the holes open among the roots), pale frass below. |
 | Termant | The black garden ant's crater, carton-reinforced: dark carton flakes on it, a carton collar in each throat. |
@@ -34,10 +34,10 @@ What the real nests look like (the study behind the looks above; 2026-10-26):
 | Leafcutter ant, *Atta cephalotes* | Wide crater mounds of bare, loose excavated soil (often reddish or yellowish subsoil) with big entrance holes; cleared trails lead in with leaf fragments being carried; a separate pale refuse dump of spent fungus and dead ants outside. |
 | Tropical fire ant, *Solenopsis geminata* | Low irregular mounds or craters of worked granular soil in open sunny ground, up to ~60 cm across and 30 cm high in the wild, with no obvious central opening: workers come and go through many small holes and foraging tunnels at the edges (up to ~20 per nest). |
 | Army ant, *Eciton burchellii* | No dug nest: the bivouac, a living mass of hundreds of thousands of workers linked by their legs and bodies round the queen and brood (about a metre across), hung under a log or between buttress roots; it dissolves into raid columns each morning. The mass itself is the entrance. |
-| Gene Thief Ant (*Formica plagiaria*, fictional; modelled on *F. sanguinea*) | *F. sanguinea* nests in soil under stones, stumps and at the base of plants, with small earth mounds mixed with plant debris. |
+| Mimic Ant (*Formica plagiaria*, fictional; modelled on *F. sanguinea*) | *F. sanguinea* nests in soil under stones, stumps and at the base of plants, with small earth mounds mixed with plant debris. |
 | Hell ant (Haidomyrmecinae, extinct; **reconstruction**) | Nothing survives of their nests (all known from Cretaceous amber). The model assumes a small ground-nesting hunter in leaf litter. |
 | Gilded / Saiy-Ants (*Aurimyrmex*, fictional, carpenter-ant-like) | Carpenter ants (*Camponotus*) excavate galleries in decaying wood (stumps, roots, logs) and push out coarse pale frass: wood shavings mixed with insect parts, piling below the openings. |
-| Gene-Thief Termants (*Chimaeromyrmex*, fictional hybrid) | Hybrid of an ant's soil crater and a termite's carton. |
+| Termants (*Chimaeromyrmex*, fictional hybrid) | Hybrid of an ant's soil crater and a termite's carton. |
 | Nasute termites, *Nasutitermes corniger* | Dark brown carton nests (chewed wood and faeces bound with saliva) with a lumpy surface and lobes, small ones near spherical; covered foraging galleries (shelter tubes about one soldier length wide) run from the nest along the ground and up trunks. |
 | Sickle-jaw termites, *Rhynchotermes perarmatus* | Nest underground or shallow and epigeic in forest leaf litter; most species forage on the surface in the open, mainly on litter. Openings are inconspicuous. |
 

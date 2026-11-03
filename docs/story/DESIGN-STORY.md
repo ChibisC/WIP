@@ -1,4 +1,4 @@
-# Story mode — "The Gene-Thief", Chapter 1
+# Story mode — "The Termants", Chapter 1
 
 Specs: `claude/story/02-spec-gene-thief-chapter1-two-levels.md` (campaign, chapter 1), `claude/story/03-spec-story-level-maps.md`
 (the two maps), `claude/story/04-spec-chapter1-four-levels.md` (chapter 1 as four levels: the nights and the Spider
@@ -10,7 +10,7 @@ asset here is original.
 
 ## 1. Premise and the narrator
 
-A storm carries a winged **Gene-Thief Termant** queen to **Wayfarer Island**, a remote island where ants, termites and
+A storm carries a winged **Termant** queen to **Wayfarer Island**, a remote island where ants, termites and
 giant arthropods from across the world live side by side ("everything here arrived from somewhere else": currents,
 storms, ships). Level by level her colony spreads inland, defeating each species it meets and absorbing its genes.
 

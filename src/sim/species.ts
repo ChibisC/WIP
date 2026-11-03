@@ -16,10 +16,10 @@ export type DamageType = 'bite' | 'acid' | 'sting' | 'pure';
 export const SPECIES_DISPLAY_NAME: Partial<Record<SpeciesId, string>> = {
   aurimyrmex: 'Saiy-Ants',
   /**
-   * the user's name for the ant–termite hybrid (the brief said "Termyrms"; "Termants" until 2026-11-01, renamed for the
-   * story campaign, claude/story/02-spec); the internal id stays `termant`; fallback "Chimera Ants"
+   * the user's name for the ant–termite hybrid (the brief said "Termyrms"; renamed for the story campaign on 2026-11-01,
+   * back to "Termants" by the user's note of 2026-11-02); the internal id stays `termant`; fallback "Chimera Ants"
    */
-  termant: 'Gene-Thief Termants',
+  termant: 'Termants',
 };
 export const SAIY_FALLBACK_NAME = 'Gilded Ants';
 export const TERMANT_FALLBACK_NAME = 'Chimera Ants';
@@ -474,7 +474,7 @@ export const SPECIES: Record<SpeciesId, SpeciesDef> = {
     traits: ['Swarm raids', 'Fast, high-stepping', 'Living bridges', 'Soldiers guard the trail'],
   },
   plagiaria: {
-    id: 'plagiaria', common: 'Gene Thief Ant', scientific: 'Formica plagiaria', queen: 'plagiaria_queen', castes: ['plagiaria_worker'],
+    id: 'plagiaria', common: 'Mimic Ant', scientific: 'Formica plagiaria', queen: 'plagiaria_queen', castes: ['plagiaria_worker'],
     ratio: { plagiaria_worker: 1 }, startWorkers: 8, eggInterval: 5, color: '#7a2a20', fictional: true,
     blurb: 'Custom colony (fictional). Raises the brood of any species — pick the castes you want.',
     traits: ['Borrows any caste', 'Each borrowed caste needs its own chamber', 'Modelled on slave-making Formica sanguinea'],
@@ -570,8 +570,8 @@ export function isSoldierCaste(caste: string): boolean {
 }
 
 /**
- * Castes that a custom (plagiaria, Gene Thief Ant) colony may borrow: every ant caste but queens, kings and nanitics,
- * plus the termite soldier castes (nasutes, nasute majors, sickle-jaws) — user note 2026-11-02: "gene thief ants also
+ * Castes that a custom (plagiaria, Mimic Ant) colony may borrow: every ant caste but queens, kings and nanitics,
+ * plus the termite soldier castes (nasutes, nasute majors, sickle-jaws) — user note 2026-11-02: "mimic ant ants also
  * have the termite caste soldiers". Termite workers and royals stay out (wood diet, fed by their own workers).
  */
 export const BORROWABLE = Object.values(CASTES)

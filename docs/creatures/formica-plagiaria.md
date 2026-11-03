@@ -1,4 +1,4 @@
-# Gene Thief ant — *Formica plagiaria* (fictional, game species)
+# Mimic ant — *Formica plagiaria* (fictional, game species)
 
 **Invented for the game.** Genus *Formica* is real; the epithet is Latin *plagiaria* (feminine of
 *plagiarius*, "kidnapper", the root of "plagiarism" — copying). It stands in for the custom colony that

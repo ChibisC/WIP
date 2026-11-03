@@ -1,6 +1,6 @@
-"""Gene Thief lobby chips include the termite soldiers (user note 2026-11-02): main menu Colony → Gene Thief Ant → the
-borrowed-caste chips list Nasute, Nasute Major and Sickle-jaw; clicking one toggles it. Shot: docs/multiplayer/gene-thief-termites.png
-Run: tests/browser/with_server.sh python3 tests/browser/gene_thief_termites.py"""
+"""Mimic Ant lobby chips include the termite soldiers (user note 2026-11-02): main menu Colony → Mimic Ant → the
+borrowed-caste chips list Nasute, Nasute Major and Sickle-jaw; clicking one toggles it. Shot: docs/multiplayer/mimic-termites.png
+Run: tests/browser/with_server.sh python3 tests/browser/mimic_termites.py"""
 import os, sys
 from playwright.sync_api import sync_playwright
 
@@ -28,12 +28,16 @@ with sync_playwright() as p:
     pg.wait_for_selector('.sp-card', state='attached')
     if pg.locator('[data-mode="skirmish"]').count():
         pg.click('[data-mode="skirmish"]')
+    # (user note 2026-11-02 23:47: no "Gene Thief" anywhere; the custom colony is the Mimic Ant, the hybrid the Termants)
+    card = pg.locator('.sp-card[data-sp="plagiaria"]').inner_text()
+    check('the custom colony is called the Mimic Ant', 'Mimic Ant' in card, card[:80])
+    check('no "Gene Thief" on the species screen', not pg.evaluate("() => /gene[ -]?thie/i.test(document.body.innerText)"))
     pg.click('.sp-card[data-sp="plagiaria"]')
     pg.wait_for_selector('[data-borrow]', state='attached')
     chips = pg.evaluate("() => [...document.querySelectorAll('[data-borrow]')].map((b) => [b.dataset.borrow, b.textContent.trim()])")
     ids = [c[0] for c in chips]
     names = dict(chips)
-    check('the Gene Thief borrow chips include the three termite soldiers', all(i in ids for i in ['nasute_soldier', 'nasute_major', 'rhy_soldier']), ','.join(ids))
+    check('the Mimic Ant borrow chips include the three termite soldiers', all(i in ids for i in ['nasute_soldier', 'nasute_major', 'rhy_soldier']), ','.join(ids))
     check('no termite worker or royal chips', not any(i in ids for i in ['nasute_worker', 'rhy_worker', 'nasute_queen', 'nasute_king', 'rhy_queen', 'rhy_king']))
     check('chips are named species + caste', names.get('nasute_soldier') == 'Conehead Termite Soldier' and names.get('nasute_major') == 'Conehead Termite Major' and names.get('rhy_soldier') == 'Sickle-Jaw Termite Soldier' and names.get('formica_mortar') == 'Red Wood Mortar', f"{names.get('nasute_soldier')} / {names.get('rhy_soldier')}")
     pg.click('[data-borrow="nasute_soldier"]')
@@ -42,7 +46,17 @@ with sync_playwright() as p:
     check('clicking a termite chip toggles it on', 'nasute_soldier' in on and 'rhy_soldier' in on, ','.join(on))
     os.makedirs(OUT, exist_ok=True)
     pg.locator('[data-borrow="nasute_soldier"]').scroll_into_view_if_needed()
-    pg.screenshot(path=os.path.join(OUT, 'gene-thief-termites.png'))
+    pg.screenshot(path=os.path.join(OUT, 'mimic-termites.png'))
+    # the story card and hub
+    pg.goto(BASE + "?q=low")
+    pg.wait_for_selector('[data-m="single"]', state='attached')
+    pg.click('[data-m="single"]')
+    pg.wait_for_selector('.sp-card', state='attached')
+    if pg.locator('[data-mode="story"]').count():
+        pg.click('[data-mode="story"]')
+        pg.wait_for_timeout(500)
+        txt = pg.evaluate("() => document.body.innerText")
+        check('the story is "The Termants", with no "Gene Thief" in it', 'The Termants' in txt and not __import__('re').search(r'gene[ -]?thie', txt, __import__('re').I), txt[:120].replace('\n', ' '))
     check('no page errors', not errors, '; '.join(errors)[:300])
     b.close()
 

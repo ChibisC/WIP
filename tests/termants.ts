@@ -69,7 +69,7 @@ const cmd = (w: World, body: Parameters<typeof applyCommand>[1]) => applyCommand
   const c = w.colony(0)!;
   const king = w.antById.get(c.king ?? -1);
   const queen = w.antById.get(c.queen)!;
-  check('Termants: worker, soldier, queen and king; display name from the config value', SPECIES.termant.common === 'Gene-Thief Termants' && c.castes.join() === 'termant_worker,termant_soldier' && casteOf('termant_king').role === 'king');
+  check('Termants: worker, soldier, queen and king; display name from the config value', SPECIES.termant.common === 'Termants' && c.castes.join() === 'termant_worker,termant_soldier' && casteOf('termant_king').role === 'king');
   check('the king is spawned beside the queen in the royal chamber', !!king && king.caste === 'termant_king' && king.space === nestSpace(0) && Math.hypot(king.x - queen.x, king.y - queen.y) < 12, `${king ? Math.hypot(king.x - queen.x, king.y - queen.y).toFixed(1) : '-'} mm from her`);
   check('the stolen-caste table covers the species in the game', STOLEN_CASTES.length >= 8 && STOLEN_CASTES.every((e) => CASTES[e.caste]), STOLEN_CASTES.map((e) => stolenName(e)).join(', '));
   check('stolen castes go by their ant names, no nicknames (user 2026-11-01)', stolenName('lasius_soldier') === 'Black Garden Ant Soldier' && stolenName('fire_major') === 'Tropical Fire Ant Major' && stolenName('nasute_soldier') === 'Conehead Termite Soldier' && STOLEN_CASTES.every((e) => !('name' in e)), STOLEN_CASTES.map((e) => stolenName(e)).join(', '));

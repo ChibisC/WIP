@@ -42,7 +42,7 @@ ant's, worker for worker (a design rule in `tests/casteAbilities.ts`).
 | Sickle-jaw termite worker | 21 | 2.4 | 1.0 | 0 | 12.8 | — (slow, tough) | −0.04 |
 | Hell ant worker | 18 | 2.1 | 1.0 | 0 | 19 | pinning snap (3 dps) | −0.14 |
 | Saiy-Ant worker | 16 | 1.9 | 1.0 | 0.2 | 22 | gold surge | +0.13 |
-| Gene-Thief Termant worker | 19 | 2.2 | 1.0 | 0.5 | 24 | acid opener | +0.14 |
+| Termant worker | 19 | 2.2 | 1.0 | 0.5 | 24 | acid opener | +0.14 |
 
 Before (the first round robin at 150 food) the scores ran from −0.89 (both termite workers, which lost to everything)
 to +0.80 (Plagiaria); leafcutter medias and Saiy-Ant workers won almost everything.
@@ -62,7 +62,7 @@ the sickle-jaws alone get the "no gathering" order, or they guard a trail to the
 | Sickle-jaw | 22 | 3 | 0 | grab and squirt | 22.8 | −0.40 (stalls; see below) |
 | Hell ant | 49 | 3.9 | 2 | sting 1.25, impale (burst 12.5) | 34 | +0.01 |
 | Saiy-Ant | 68 | 5.2 | 2 | gold surge | 36 | +0.17 |
-| Gene-Thief Termant | 55.5 | 4.35 | 1.5 | glue burst | 26.5 | −0.15 |
+| Termant | 55.5 | 4.35 | 1.5 | glue burst | 26.5 | −0.15 |
 
 Before, at 150 food: the Red Wood Ant soldier −0.67, leafcutter media +0.53, army ant media +0.52, nasute +0.57, hell
 ant −0.39. In small fights (150 food, 4–8 a side) the bigger soldiers still beat the black garden ant soldier.

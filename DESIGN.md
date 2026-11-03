@@ -266,7 +266,7 @@ Units: hp, damage, attack interval, armor, speed, range, mass, grip.
 
 **Damage types**
 * **Bite**: melee. Armour subtracts from each bite, floored at 30%.
-* **Formic acid** (Formica, Lasius, Gene Thief): a ranged jet that mostly ignores armour (75% floor, a quarter of the armour applies).
+* **Formic acid** (Formica, Lasius, Mimic Ant): a ranged jet that mostly ignores armour (75% floor, a quarter of the armour applies).
 * **Sting** (Solenopsis, Eciton): each sting adds a venom stack, up to 12. The stacks deal damage over time and expire a few seconds after the last sting.
 
 **Grappling and attack slots** (combat v2, 2026-10-31, CHANGE_PLAN §16; first version 2026-10-25; `sim/slots.ts`, `BALANCE.combat2`)
@@ -372,7 +372,7 @@ Units: hp, damage, attack interval, armor, speed, range, mass, grip.
 * fire ant workers fight in bouts: a series of 3–5 stings on one grip, pivoting round it, then jaws-only attacks; majors crush and swing the head; alarm is the gaster-flagging threat display;
 * a heavy hit (over a fifth of an ant's life) knocks it back a step;
 * deaths by cause: the sim records what last hurt an ant (`Ant.lastHit`: bite, venom, acid, crush, fall, drown, starve, decapitation; deterministic) and the render plays that death; corpses dry and sink.
-* realism rollout (overnight 2026-10-31, `docs/realism/OVERNIGHT-REPORT.md`): Lasius, Formica (and the Gene Thief's
+* realism rollout (overnight 2026-10-31, `docs/realism/OVERNIGHT-REPORT.md`): Lasius, Formica (and the Mimic Ant's
   Formica), Atta and Eciton are realism morphs on the same animation — formicine jaws as flat triangular blades under a
   down-tilted face, Formica's sprayers rearing and recoiling by spray kind, Lasius trophallaxis and aphid drumming;
   Atta castes fight differently (minims cling, medias bite and hold, soldiers bite and head-slam, majors a braced
@@ -472,7 +472,7 @@ Rival colonies run the full simulation with the same tiles, groups and markers.
 | Red wood ant | 35 | 95 | 182 |
 | Atta | 40 | 91 | 183 |
 | Fire ant | 38 | 78 | 136 |
-| Gene Thief | 25 | 55 | 102 |
+| Mimic Ant | 25 | 55 | 102 |
 
 The default population limit is 300.
 
@@ -511,7 +511,7 @@ The default population limit is 300.
 - **Tropical fire ant (Solenopsis):** venom. A mound with no central opening: the dome of worked soil (drawn on the surface, growing with the colony; ants walk over it) has the anthill's three small holes at its edge (since 2026-11-01; before, a single tunnel surfaced about 70 mm away).
   - The **sun-warmed brood mound** tile speeds brood by 8 / 12 / 16 % per tile by day, a quarter of that at night. In the nest, brood is shown piled on it by day.
   - Thatch and mound bonuses together are capped at +50 %.
-- **Gene Thief:** brood tiles for the castes it borrowed.
+- **Mimic Ant:** brood tiles for the castes it borrowed.
 - **Caste abilities** (2026-10-31, the user after Empires of the Undergrowth; `sim/casteAbilities.ts`, numbers in
   `BALANCE.casteAbility`). Automatic, like EotU's:
   - **Taunt: leafcutter majors only.** When the major bites while above 30 % health, there is a 30 % chance it taunts.
@@ -929,7 +929,7 @@ for sandbox and skirmish). Final mode set:
 * **Skirmish** — player vs 1–3 AI colonies on a generated map; win by killing all rival queens.
 * **Sandbox** — god-mode spawning (including all bosses), terrain sculpting, water, sliders, toggles,
   save/load setups.
-* **Custom colony: *Formica plagiaria*** ("Gene Thief ant", fictional; Latin *plagiarius* = kidnapper,
+* **Custom colony: *Formica plagiaria*** ("Mimic ant", fictional; Latin *plagiarius* = kidnapper,
   copier). Its own queen and workers are always present; the player picks **any number** of castes from
   every other species (all unlocked from the start). Each borrowed caste hatches looking and behaving like
   its source species and is raised on its own brood tile type. In-world this is real biology: slave-making
@@ -955,7 +955,7 @@ both modes.
 - A multiplayer match runs at 1× and **cannot be paused** (user note).
 
 **Story mode (2026-11-02; `docs/story/DESIGN-STORY.md`).** The **Story** tab (and the title screen's Story card) opens
-the island map of *The Gene-Thief* campaign: chapter 1 is four levels for the Gene-Thief Termants on their own layered
+the island map of *The Termants* campaign: chapter 1 is four levels for the Termants on their own layered
 maps (*The Garden Below* against black garden ants, *The Long Nights* — survive three nights of the island's night
 hunters and a red-knee tarantula that digs into the nest —, *Fire on the Banks* against tropical fire ants, and the boss
 *The Spider Mother*, a wolf spider titan in three phases whose win gives the trait Spiderling Venom). A story level is a
@@ -993,7 +993,7 @@ Every caste is a `CasteDef`: stats, morph, abilities and a **tier** (worker / so
 | Army ant | worker 10/2, porter 16/3, media 28/5, soldier (the major) 90/12 (package `claude/army-ants/`, 2026-10-25) |
 Equal-food battles (`tools/equal.ts`, `tools/battle.ts`) were used to tune these: soldiers beat their own species' workers for the same food, majors beat soldiers, and the wood ants' tanks + shooters beat most equal-food armies while shooters alone lose to swarms.
 
-Every caste a colony can raise has its own **brood tile type**, and a colony's build panel lists exactly those tiles. Each species also has a **nanitic** caste (a small first-brood worker) raised only on queen tiles. The Gene Thief colony gets a brood tile type for each borrowed caste. Caste mix is decided by which brood tiles the player places; there is no ratio slider.
+Every caste a colony can raise has its own **brood tile type**, and a colony's build panel lists exactly those tiles. Each species also has a **nanitic** caste (a small first-brood worker) raised only on queen tiles. The Mimic Ant colony gets a brood tile type for each borrowed caste. Caste mix is decided by which brood tiles the player places; there is no ratio slider.
 
 **Caste looks** (user note 2026-11-02: "make every unit tile (both ants and termites and future ones) have different
 colors and textures so they can be identifiable and different (also their UI color and look for pheromone markers and
@@ -1007,7 +1007,7 @@ pockets, cuticle striations, packed soil pellets, wrinkled (rugose) ridges, over
 fibres, wax comb, a wing-vein network, layered termite carton, rows of cocoons. They are drawn as relief (ridges catch
 the light, hollows shade, the raised parts have a waxy sheen; silk the most), with only a trace of the soil's grain
 under the colour. The castes of one species never share a colour or a texture, and no two castes
-anywhere share both, so a Gene Thief or Termant nest full of stolen castes still tells them apart. The table is
+anywhere share both, so a Mimic Ant or Termant nest full of stolen castes still tells them apart. The table is
 `render/casteLook.ts`; a caste with no entry (a new species or caste) gets the first free pair from a spot set by its
 name, unlike its own species in colour and texture. Nanitics look like their species' worker; queens and kings have no
 brood tiles. The same look is used everywhere the caste appears: the tile (floor shader `castePat`, the texture number
