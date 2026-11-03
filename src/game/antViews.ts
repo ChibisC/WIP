@@ -596,6 +596,12 @@ function speciesExtras(w: World, a: Ant, out: AntView): void {
   if (NASUTE_ANT_PATH.has(cd.morph)) nasuteAntPath(w, a, out, st);
 }
 
+/** A conehead soldier walking or charging at a foe drums in bursts: 0.6 s of drumming every 1.5 s. */
+function drumWalking(w: World, a: Ant, st: number): boolean {
+  if ((st !== AnimState.WALK && st !== AnimState.CHARGE) || a.state !== AS.Attack || !a.tgt) return false;
+  return (w.time + (a.id % 11) * 0.137) % 1.5 < 0.6;
+}
+
 /**
  * Nasute workers, soldiers and majors drawn by the ant renderer (realism round 3, CHANGE_PLAN §22.7): the walk, idles,
  * grooming, carrying, melee, hit reactions and deaths come from the shared ant views; here the termite-only parts —
@@ -621,7 +627,9 @@ function nasuteAntPath(w: World, a: Ant, out: AntView, st: number): void {
       out.headYaw = Math.max(-0.7, Math.min(0.7, d));
     }
     out.antennaActivity = 1;
-  } else if (st === AnimState.ALARM) {
+  } else if (st === AnimState.ALARM || (cd.termite === 'major' && drumWalking(w, a, st))) {
+    // the alarm drum; (user rating K4 2026-11-03: "make it do that while walking when approaching enemies") the soldier
+    // also drums in bursts as it walks or charges at a foe — the head only, so the walk's planted feet carry on
     out.special = 5;
     out.atk = (w.time * 6 + (a.id % 5) * 0.2) % 1;
     out.atkGap = 1 / 6;

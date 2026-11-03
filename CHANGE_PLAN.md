@@ -952,3 +952,8 @@ sprays"; "fix the antennae and mandibles, they are misplaced" (soldiers); "fix t
 - The soldiers' antennal sockets and vestigial mandibles are placed on the teardrop head's own surface
   (`headSurf`): the sockets on the bulb's sides, low, in front of its middle; the mandibles under the nasus base.
 - The worker's mandibles: broad toothed blades (wide to two thirds of their length), satin rather than glossy.
+
+### 22.9 The user's ratings, round 4 (2026-11-03, 00:47): approved with one change
+Every item 8 (models, worker attacks, the sprayer's glue, the soldier's crush, bulldoze, toss and drum); decision
+"approve with changes". The change (K4): the soldier drums "while walking when approaching enemies" — in bursts
+(0.6 s every 1.5 s) while it walks or charges at a foe (`antViews.drumWalking`), the head only, the walk going on.
