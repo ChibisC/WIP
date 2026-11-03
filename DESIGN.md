@@ -1022,7 +1022,7 @@ Measured numbers and history are in docs/performance.md.
 
 - **Simulation in a Web Worker.** Rendering never waits for a tick. Each tick the worker sends a frame:
   - entity lists as structure-of-arrays columns (`sim/columns.ts`), transferred zero-copy, or written into shared ring buffers when the page is cross-origin isolated;
-  - colonies by structured clone;
+  - colonies, caves, aphids and plants as deltas: only the fields whose fingerprint changed since the last frame (`worker/slowDelta.ts`), merged over the replica's copy;
   - nest grids only when they changed.
 - **Simulation hot paths.**
   - Flow fields are shared per destination and extended incrementally (§3.4).
@@ -1033,8 +1033,12 @@ Measured numbers and history are in docs/performance.md.
 - **Rendering.**
   - GPU-animated instancing, so draw calls do not grow with ant count.
   - LOD and impostors, with per-instance frustum culling.
-  - Graphics presets (low / medium / high) toggle shadows, post effects, grass density and LOD distances. **Auto** quality steps them down after 3 s of frames over 18 ms and back up after 12 s under 11 ms.
-- **Tools.** The F3 overlay shows frame rate, worker tick time and network state. `?stress=1` runs the stress scenario in the browser, and `npm run stress` runs it headless.
+  - An ant's change of LOD cross-fades over 0.25 s (both models drawn, each in the other's dithered pixels) with a 6 % hysteresis; camera cuts snap.
+  - Empty instanced meshes are hidden (three would still bind their programs); instance uploads cover only the used range.
+  - Graphics presets (low / medium / high) toggle shadows, post effects, grass density and LOD distances. **Auto** quality first lowers the render resolution in 10 % steps to its floor (75 %, a light sharpen keeps edges) after 1.5 s of slow frames, then steps the preset down after 3 s; fast again, resolution comes back first (6 s), then the preset (12 s). Slow and fast are judged against the frame cap when one is set. On phones and tablets an estimated GPU memory over 600 MB also steps the preset down.
+  - Frame cap: match the screen, 60 or 30 (phones and tablets default to 60).
+- **Switching between spaces** (performance pass, CHANGE_PLAN §25). Loading pre-warms every space: each model built once and shared by all renderers, each scene compiled and drawn once offscreen with shadows. New models met mid-match are warmed in the background (under 4 ms a frame); areas not on screen are kept current every sixth frame while the frame has room; nothing is drawn while the dive's fade is fully opaque.
+- **Tools.** The F3 overlay is a profiler (`core/profiler.ts`): frame and main-thread times by part, GPU time where measurable, GL work (shader links, texture and buffer uploads) counted by wrapping the context, an estimate of live GPU memory, and the hitch log (frames over 33 ms and their causes). `?bench=1` (Menu → Graphics) runs six fixed scenes and reports. The golden set (`tests/browser/golden.py`, `tools/golden-compare.py`) checks that an optimization changes no pixels. `?stress=1` runs the stress scenario in the browser, and `npm run stress` runs it headless.
 
 ## 8. Determinism and multiplayer
 
