@@ -107,6 +107,28 @@ function standing(x: number, y: number, h: number): AntScript {
 /** A biting attacker (as game/antViews.ts meleeAttack): the cycle's phase from the cooldown, the variant per cycle. */
 /** bites landed this tick (where the jaws are), for the combat effects — as the sim's 'bite' events in the game */
 const biteFx: Array<{ x: number; y: number }> = []; // det-ok: dev lab only
+/** A nasute soldier on the ant pipeline gluing (as game/antViews.ts nasuteAntPath): the glue as an attack cycle, the
+ *  head aimed at the target. */
+function nasFire(t: number, v: AntView, firing: boolean): void {
+  v.special = 6;
+  v.atk = firing ? (t * 2.4) % 1 : 0.6;
+  v.atkGap = 1 / 2.4;
+  v.atkVar = 0;
+  v.atkSide = 1;
+  v.atkSeq = true;
+  v.antennaActivity = 1;
+  if (v.aimX !== undefined && v.aimY !== undefined) v.headYaw = Math.max(-0.7, Math.min(0.7, Math.atan2(v.aimY - v.y, v.aimX - v.x) - v.heading));
+}
+/** A nasute major drumming the alarm (special 5: the head hammering down, the feet planted). */
+function nasDrum(t: number, v: AntView): void {
+  v.special = 5;
+  v.atk = (t * 6) % 1;
+  v.atkGap = 1 / 6;
+  v.atkVar = 0;
+  v.atkSide = 1;
+  v.atkSeq = true;
+  v.antennaActivity = 1;
+}
 function attacker(x: number, y: number, h: number, variant: number, gap: number, t0: number, onBite?: (t: number) => void): AntScript {
   let lastCycle = -1;
   return (t, v) => {
@@ -281,28 +303,42 @@ function clips(): Record<string, Clip> {
       ants: [
         ...[0, 1, 2].flatMap((k) => [
           { morph: 'termite_worker', script: ((s: AntScript): AntScript => (t, v) => { s(t, v); Object.assign(v, { tState: TS.BITE, tan: 1 }); })(attacker(-9 + k * 7, 0, 0, k, 1.2, 0.2 + k * 0.3)) },
-          { morph: FIRE, script: (t: number, v: AntView) => Object.assign(v, { x: -9 + k * 7 + 2.6, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: POSE.GRAPPLE, roll: Math.sin(t * 13 + k) * 0.12 }) },
+          { morph: FIRE, script: (t: number, v: AntView) => Object.assign(v, { x: -9 + k * 7 + 3.3, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: POSE.GRAPPLE, roll: Math.sin(t * 13 + k) * 0.12 }) },
         ]),
         {
           morph: 'termite_nasute',
-          script: (t, v) => Object.assign(v, { x: 12, y: 0, heading: 0, tState: TS.FIRE, tan: 1, aimX: 20, aimY: 0, firing: (t % 1.6) > 0.5, ramp: Math.min(1, Math.max(0, (t - 0.5) / 3)) }),
+          script: (t, v) => {
+            const firing = t % 1.6 > 0.5;
+            Object.assign(v, { x: 12, y: 0, heading: 0, tState: TS.FIRE, tan: 1, aimX: 20, aimY: 0.4 * Math.sin(t * 0.9), firing, ramp: Math.min(1, Math.max(0, (t - 0.5) / 3)) });
+            nasFire(t, v, firing);
+          },
         },
       ],
       cam: { tx: 3, ty: 0.6, tz: 0, dir: [0.04, 0.12, 1], dist: 30, fov: 30 },
     },
-    // …the majors (RAM): lunge, head swing, rear and crush; and one drumming the alarm with its feet planted (N6)
+    // …the majors: crush, bulldoze, toss; and one drumming the alarm with its feet planted (N6)
     tram: {
       dur: 6,
       noScale: true,
       ants: [
         ...[0, 1, 2].flatMap((k) => [
           { morph: 'termite_major', script: ((s: AntScript): AntScript => (t, v) => { s(t, v); Object.assign(v, { tState: TS.RAM, tan: 1 }); })(attacker(-11 + k * 8.5, 0, 0, k, 1.4, 0.3 + k * 0.3)) },
-          { morph: FIRE, script: (t: number, v: AntView) => Object.assign(v, { x: -11 + k * 8.5 + 3.4, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: POSE.GRAPPLE, roll: Math.sin(t * 11 + k) * 0.12 }) },
+          { morph: FIRE, script: (t: number, v: AntView) => Object.assign(v, { x: -11 + k * 8.5 + 4.6, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: POSE.GRAPPLE, roll: Math.sin(t * 11 + k) * 0.12 }) },
         ]),
-        { morph: 'termite_major', script: (_t, v) => Object.assign(v, { x: 15, y: 0, heading: 0, tan: 1, tState: TS.ALARM, tRate: 6 }) },
+        { morph: 'termite_major', script: (t, v) => { Object.assign(v, { x: 15, y: 0, heading: 0, tan: 1, tState: TS.ALARM, tRate: 6 }); nasDrum(t, v); } },
       ],
       events: [0.5, 0.67, 0.84, 1.01, 2.4, 2.57, 2.74, 2.91, 4.3, 4.47, 4.64].map((t) => ({ t, e: { t: 'headbang', x: 18, y: 0, space: -1 } as unknown as SimEvent })),
       cam: { tx: 3, ty: 0.8, tz: 0, dir: [0.04, 0.12, 1], dist: 36, fov: 30 },
+    },
+    // …the nasute soldiers in melee: the nasus jab, the lunge, the rip
+    tjab: {
+      dur: 6,
+      noScale: true,
+      ants: [0, 1, 2].flatMap((k) => [
+        { morph: 'termite_nasute', script: ((s: AntScript): AntScript => (t, v) => { s(t, v); Object.assign(v, { tState: TS.BITE, tan: 1 }); })(attacker(-9 + k * 7, 0, 0, k, 1.2, 0.2 + k * 0.3)) },
+        { morph: FIRE, script: (t: number, v: AntView) => Object.assign(v, { x: -9 + k * 7 + 3.9, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: POSE.GRAPPLE, roll: Math.sin(t * 12 + k) * 0.12 }) },
+      ]),
+      cam: { tx: -2, ty: 0.6, tz: 0, dir: [0.04, 0.12, 1], dist: 28, fov: 30 },
     },
     // the royal pair: the queen's slow peristaltic waves and an egg sliding out, the king attending beside her
     royals: {
@@ -334,7 +370,7 @@ function clips(): Record<string, Clip> {
           morph: FIRE,
           script: (t, v) => {
             const k = (t - FIN_C) / BALANCE.snap.finisherLift;
-            Object.assign(v, { x: 0, y: 0, heading: 0, hp: 20, antennaActivity: 1, mandible: 0.6, lift: 0, pitch: 0, roll: 0, headYaw: 0 });
+            Object.assign(v, { x: 0, y: 0, heading: 0, hp: 20, antennaActivity: 1, mandible: 0.6, lift: 0, pitch: 0, roll: 0, headYaw: 0, neckBy: 0 });
             v.dead = k >= 1;
             v.cause = 9;
             if (k < 0) {
@@ -349,7 +385,7 @@ function clips(): Record<string, Clip> {
             v.x = hx * Math.min(1, Math.max(0, k / 0.3));
             if (v.dead) return;
             execHeld(k, Lh, Lv, t, 0.3, EXH);
-            Object.assign(v, { lift: EXH.lift, pitch: EXH.pitch, roll: EXH.roll, headYaw: EXH.headYaw, mandible: 0.7, pose: POSE.GRAPPLE });
+            Object.assign(v, { lift: EXH.lift, pitch: EXH.pitch, roll: EXH.roll, headYaw: EXH.headYaw, mandible: 0.7, pose: POSE.GRAPPLE, neckBy: 2 });
           },
         },
         {

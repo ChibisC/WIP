@@ -1721,3 +1721,15 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   won in 14.5 min before) — its rival plays with the new colony AI; not retuned here (flagged in the handoff). The night
   look got darker (the sky's image light dims too; the light fades through the 30 s dusk) and the eyeshine sits on the
   big front eyes (`tests/browser/eyeshine.py`).
+
+## 2026-11-02 (evening) — The user's ratings, round 2: the finisher on the neck; the nasute termites redone (CHANGE_PLAN §22.7)
+- The finisher's foe is held by the neck: its neck is put on the hell ant's mandible–horn socket every frame (A2).
+- The nasute worker, soldier and major are rebuilt from the photos on the ant pipeline (`nasuteBuilder.ts`), so they
+  walk and fight with the ants' animation: three termite attacks per caste (workers tug, rip, lunge; soldiers jab,
+  lunge, rip; majors crush, bulldoze, toss), the glue spray with the head aimed and a recoil per squirt, the alarm
+  drum with the feet planted, hit reactions and deaths. King, queen, larvae and sickle-jaws stay on the kit.
+- Anim lab: `tfight` (workers, the soldier gluing), `tjab` (soldiers), `tram` (majors, the drum); the ant lab renders
+  the three castes on the ant path. Clips in `docs/realism/nasutitermes/clips/`.
+- Checks: `tsc`; `npm test` all suites; the determinism check; height data regenerated.
+- User notes 17:47–17:59: renamed Conehead Termites; legs at their real length; the worker's head and mandibles and
+  the soldier's teardrop head redone from the photos.

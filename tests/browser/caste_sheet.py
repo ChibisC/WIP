@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 DIR = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "realism", "caste-tiles")
 SPECIES = {
     "lasius": "Black Garden Ant", "formica": "Red Wood Ant", "atta": "Leafcutter Ant", "solenopsis": "Tropical Fire Ant",
-    "eciton": "Army Ant", "plagiaria": "Gene Thief Ant", "nasutitermes": "Nasute Termites", "rhynchotermes": "Sickle-Jaw Termites",
+    "eciton": "Army Ant", "plagiaria": "Gene Thief Ant", "nasutitermes": "Conehead Termites", "rhynchotermes": "Sickle-Jaw Termites",
     "hell": "Hell Ant", "aurimyrmex": "Saiy-Ants", "termant": "Termants",
 }
 rows = [l.rstrip("\n").split("\t") for l in open(os.path.join(DIR, "castes.txt")) if l.strip()]

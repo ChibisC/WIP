@@ -23,6 +23,14 @@ attacks 7–8; the nasutes 8–9. Asked for and done in round 2 (CHANGE_PLAN §2
   its feet planted; the soldier moves as it glues. Sickle-jaws unchanged.
 - Clips: `../hell-ants/clips/finisher_*`, `attack_*`, `snap_*`; `../nasutitermes/clips/tfight_*`, `tram_*`.
 
+## The user's ratings, round 2 (evening)
+The hell ant attacks 8–9, the finisher 8 and 7 ("make it on the neck": the foe's neck is now pinned to the jaws);
+the termite attacks 4–6 ("redo the termite models based on the reference images and give them dynamic and dramatic
+but realistic attacks and movement like the ants"). Round 3 (CHANGE_PLAN §22.7): the nasute worker, soldier and major
+rebuilt from the photos on the ant pipeline, with termite attacks, the glue spray and the alarm drum on the ants'
+animation. Clips: `../nasutitermes/clips/lineup_termites_*`, `tfight_w_*`, `tfight_soldier_glue_*`,
+`tjab_soldier_jab_*`, `tram_m_*`.
+
 ## Blind review: render scores per round (0–10; real photos mixed in scored 8.5–9.5)
 
 | Unit | R1 side / close | R2 | R3 | R4 |

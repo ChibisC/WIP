@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Rng } from '../../core/rng';
 import { AntMorph, PartLook } from './morphs';
 import { buildHellAnt } from './hellBuilder';
+import { buildNasute } from './nasuteBuilder';
 import { buildHair6 } from './saiyHair';
 import { REGION } from '../bake/detailBake';
 import { bakeOcclusion } from '../bake/occlusion';
@@ -562,6 +563,7 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const curvy = m.real && (atta || eciton);
   setaScale = curvy ? Math.min(1, 4.5 / m.L) * 0.8 : 1;
   if ((m as { builder?: string }).builder === 'hell') return buildHellAnt(m, detail, seed);
+  if ((m as { builder?: string }).builder === 'nasute') return buildNasute(m, detail, seed);
   const acc = new Acc();
   const rng = new Rng(seed * 101 + m.key.length * 7);
   const Lm = m.L;

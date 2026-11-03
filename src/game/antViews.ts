@@ -4,6 +4,8 @@ import { AntView } from '../render/ants/antRenderer';
 import { Ant, AS, Brood, Carry, Food, POSE, SURFACE } from '../sim/types';
 import { casteOf } from '../sim/species';
 import { AnimState, Carry as TCarry, LUNGE_SEC, LUNGE_SNAP } from '../render/termite/rig';
+import { WORKER_VARIANT_SCALE } from '../render/termite/castes';
+import { NASUTE_ANT_PATH } from '../render/ants/nasuteMorphs';
 import { victimStruggle } from '../render/termite/material';
 import { bodyHook } from '../sim/slots';
 import { LUNGE_TICKS, isSickle, sickleRampFraction } from '../sim/sickleJaws';
@@ -486,6 +488,7 @@ function speciesExtras(w: World, a: Ant, out: AntView): void {
   }
   out.snap = false;
   out.held = 0;
+  out.neckBy = 0;
   out.acid = 0;
   out.aimZ = undefined;
   out.holding = false;
@@ -495,7 +498,7 @@ function speciesExtras(w: World, a: Ant, out: AntView): void {
     const k = sickleRampFraction(holder);
     out.acid = a.state === AS.Dead ? 0 : 0.1 + 0.9 * k;
     out.held = a.state === AS.Dead ? 0 : 0.35 + 0.65 * Math.max(0, Math.min(1, a.hp / Math.max(1, a.maxHp)));
-    if (!cd.termite && a.state !== AS.Dead) {
+    if ((!cd.termite || NASUTE_ANT_PATH.has(cd.morph)) && a.state !== AS.Dead) {
       const sv = victimStruggle(w.time, (holder.id * 0.37) % 1, out.held);
       out.roll = sv.roll;
       out.pitch = sv.pitch;
@@ -516,6 +519,7 @@ function speciesExtras(w: World, a: Ant, out: AntView): void {
     out.mandible = Math.max(out.mandible, 0.7);
     out.antennaActivity = 1;
     out.pose = POSE.GRAPPLE;
+    out.neckBy = holder.id;
   } else if (a.heldBy) {
     // pinned in a hell ant's jaws: lifted off the ground at the socket, hanging nose-down, legs flailing
     const h = w.antById.get(a.heldBy);
@@ -589,6 +593,48 @@ function speciesExtras(w: World, a: Ant, out: AntView): void {
                 ? 1
                 : 0;
   if (st !== AnimState.DEATH && st !== AnimState.QUEEN && st !== AnimState.SETTLE && st !== AnimState.LUNGE) out.tStateT = 0;
+  if (NASUTE_ANT_PATH.has(cd.morph)) nasuteAntPath(w, a, out, st);
+}
+
+/**
+ * Nasute workers, soldiers and majors drawn by the ant renderer (realism round 3, CHANGE_PLAN §22.7): the walk, idles,
+ * grooming, carrying, melee, hit reactions and deaths come from the shared ant views; here the termite-only parts —
+ * the worker's two sizes, the soldier's glue as an attack cycle with the head aimed at the target (special 6), and the
+ * major drumming the alarm (special 5).
+ */
+function nasuteAntPath(w: World, a: Ant, out: AntView, st: number): void {
+  const cd = casteOf(a.caste);
+  if (cd.termite === 'worker') out.scale = (out.scale ?? 1) * (a.variant === 1 ? WORKER_VARIANT_SCALE.female : WORKER_VARIANT_SCALE.male);
+  if (a.state === AS.Dead) return;
+  if (st === AnimState.FIRE) {
+    const rate = 2.4;
+    out.special = 6;
+    out.atk = out.firing ? (w.time * rate + (a.id % 7) * 0.13) % 1 : 0.6;
+    out.atkGap = 1 / rate;
+    out.atkVar = 0;
+    out.atkSide = a.id & 1 ? 1 : -1;
+    out.atkN = 0;
+    out.atkSeq = true;
+    if (out.aimX !== undefined && out.aimY !== undefined) {
+      let d = Math.atan2(out.aimY - a.y, out.aimX - a.x) - a.h;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      out.headYaw = Math.max(-0.7, Math.min(0.7, d));
+    }
+    out.antennaActivity = 1;
+  } else if (st === AnimState.ALARM) {
+    out.special = 5;
+    out.atk = (w.time * 6 + (a.id % 5) * 0.2) % 1;
+    out.atkGap = 1 / 6;
+    out.atkVar = 0;
+    out.atkSide = 1;
+    out.atkN = 0;
+    out.atkSeq = true;
+    out.antennaActivity = 1;
+  } else if (st === AnimState.CHEW) {
+    // chewing wood: the head low, short jerks, the jaws working
+    out.headPitch = -0.3 + 0.08 * Math.sin(w.time * 9 + a.id);
+    out.mandible = 0.45 + 0.4 * Math.sin(w.time * 11 + a.id);
+  }
 }
 
 /**

@@ -1,3 +1,4 @@
+import { NASUTE_ANT_PATH } from '../render/ants/nasuteMorphs';
 import * as THREE from 'three';
 import { buildAnt } from '../render/ants/antGeometry';
 import { setBakeRenderer } from '../render/bake/detailBake';
@@ -82,7 +83,7 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
   };
   const contacts: Parameters<typeof addContactShadows>[2] = [];
   // termites (model kit): ?ants=termite_nasute,termite_worker&tstate=5&ramp=1&fire=1&tan=1
-  const termiteKeys = keys.filter((k) => k.startsWith('termite_'));
+  const termiteKeys = keys.filter((k) => k.startsWith('termite_') && !NASUTE_ANT_PATH.has(k));
   if (termiteKeys.length) {
     patchDapple(getTermiteMaterial());
     termiteTime.value = Number(q.get('time') || 1.3);
@@ -126,7 +127,7 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     glue.commit();
     scene.add(glue.mesh);
     maxL = Math.max(...widths) / 1.25;
-    keys.splice(0, keys.length, ...keys.filter((k) => !k.startsWith('termite_')));
+    keys.splice(0, keys.length, ...keys.filter((k) => !k.startsWith('termite_') || NASUTE_ANT_PATH.has(k)));
     if (!keys.length) {
       const cam = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 5000);
       const camKind = q.get('cam') || '34';

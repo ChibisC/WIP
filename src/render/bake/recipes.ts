@@ -233,6 +233,30 @@ export const HELL: DetailRecipe = {
   },
 };
 
+/**
+ * Nasute termites on the ant pipeline (realism round 3, CHANGE_PLAN §22.7; nasutitermes.md §11): soft, waxy cuticle —
+ * the abdomen and thorax finely wrinkled with an orange-peel undulation, sparse hair sockets, strongly translucent
+ * (light through the abdomen and legs, brightest at the edges), a wet glint on top; the worker's head smooth and
+ * glossy with faint sutures; the soldier's pear head glassy, almost no relief.
+ */
+const NAS_SOFT: Sculpt = { tile: [1.1, 1.1], noise: 0.0006, pits: { n: 10, r: 0.005, depth: 0.0008, pale: 0.25, stub: { len: 0.03, dir: 1, share: 0.5 } }, wave: { cell: 0.07, amp: 0.0045 }, rough: [-0.04, 0.22], roughVar: 0.1, dirt: 0.08, mottle: 0.32, cavityDark: 0.18 };
+const NAS_THORAX: Sculpt = { ...NAS_SOFT, tile: [0.8, 0.6], wave: { cell: 0.06, amp: 0.0035 } };
+const NAS_HEAD_W: Sculpt = { tile: [0.7, 0.7], noise: 0.0002, pits: { n: 14, r: 0.004, depth: 0.0006, pale: 0.2, stub: { len: 0.03, dir: -1, share: 0.7 } }, wave: { cell: 0.12, amp: 0.0018 }, rough: [-0.06, 0.18], roughVar: 0.05, dirt: 0.08, mottle: 0.12, cavityDark: 0.15 };
+const NAS_HEAD_S: Sculpt = { tile: [0.7, 0.7], noise: 0.0001, pits: { n: 6, r: 0.0035, depth: 0.0004, pale: 0.1 }, wave: { cell: 0.16, amp: 0.0012 }, rough: [-0.08, 0.1], roughVar: 0.03, dirt: 0.04, mottle: 0.08, cavityDark: 0.1 };
+const NAS_LEG: Sculpt = { ...FIRE_LEG, tile: [0.12, 0.3], pits: { n: 120, r: 0.003, depth: 0.0008, pale: 0.3 }, rough: [0.0, 0.2] };
+const NAS_MAND: Sculpt = { ...FIRE_MAND, rough: [-0.06, 0.18] };
+const nasRegions = (head: Sculpt) => ({
+  [REGION.HEAD]: { sculpt: head, shade: shade(0.6, 0.15, 0.3, 0.35, 0.5, { coatRough: 0.08, wear: 0.15, dust: 0.04, mid: 0.08 }), px: [512, 512] as [number, number] },
+  [REGION.MESO]: { sculpt: NAS_THORAX, shade: shade(0.8, 0.3, 0.3, 0.7, 0.45, { coatRough: 0.14, wear: 0.1, dust: 0.06, mid: 0.15 }), px: [512, 512] as [number, number] },
+  [REGION.GASTER]: { sculpt: NAS_SOFT, shade: shade(0.8, 0.12, 0.25, 0.85, 0.5, { coatRough: 0.12, wear: 0.08, dust: 0.05, mid: 0.12 }), px: [1024, 512] as [number, number] },
+  [REGION.LEG]: { sculpt: NAS_LEG, shade: shade(0.6, 0.45, 0, 0.8, 0.35, { coatRough: 0.18, dust: 0.25, mid: 0.3, tipThin: 0.6 }), px: [128, 320] as [number, number] },
+  [REGION.TARSUS]: { sculpt: FIRE_TARSUS, shade: shade(0.6, 0.4, 0, 0.8, 0.35, { coatRough: 0.3, dust: 0.45, mid: 0.2, tipThin: 0.5 }), px: [64, 128] as [number, number] },
+  [REGION.ANTENNA]: { sculpt: FIRE_ANTENNA, shade: shade(0.5, 0.35, 0, 0.75, 0.35, { coatRough: 0.25, dust: 0.12, mid: 0.35, tipThin: 0.4 }), px: [64, 160] as [number, number] },
+  [REGION.MANDIBLE]: { sculpt: NAS_MAND, shade: shade(0.6, 0.1, 0, 0.55, 0.35, { coatRough: 0.1, wear: 0.4, dust: 0.04, tipThin: 0.7 }), px: [96, 256] as [number, number] },
+});
+export const NASUTE_W: DetailRecipe = { key: 'nasute_w', regions: nasRegions(NAS_HEAD_W) };
+export const NASUTE_S: DetailRecipe = { key: 'nasute_s', regions: nasRegions(NAS_HEAD_S) };
+
 /** Recipe for an ant morph (null: no baked detail yet, the material stays as before). */
 export function antRecipe(morphKey: string): DetailRecipe | null {
   if (morphKey.startsWith('fire_')) return FIRE_ANT;
@@ -245,6 +269,8 @@ export function antRecipe(morphKey: string): DetailRecipe | null {
   if (morphKey === 'eciton_queen') return ECITON_QUEEN;
   if (morphKey.startsWith('eciton_')) return ECITON;
   if (morphKey.startsWith('hell_')) return HELL;
+  if (morphKey === 'termite_worker') return NASUTE_W;
+  if (morphKey === 'termite_nasute' || morphKey === 'termite_major') return NASUTE_S;
   return null;
 }
 
