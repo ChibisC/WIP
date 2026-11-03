@@ -1742,9 +1742,10 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   player-facing string, comment, test, tool and doc in the repo (README, DESIGN, docs/, this log and CHANGE_PLAN) says so;
   `GENE_THIEF_DEFAULT` is `MIMIC_DEFAULT`; `tests/browser/gene_thief_termites.py` is `mimic_termites.py` and the
   lobby screenshots `mimic-termites.png`, `teams-guest-mimic.png`, `teams-match-mimic.png`. Ids, saves and the
-  protocol are unchanged (`plagiaria`, `termant`). Left as they are: the user's own quoted words, and the file names of
+  protocol are unchanged (`plagiaria`, `termant`); colony names in older saves are renamed as they load (World
+  constructor; `tests/termants.ts`). Left as they are: the user's own quoted words, and the file names of
   the project specs (`claude/story/01-spec-gene-thief-campaign.md`, `02-spec-gene-thief-chapter1-two-levels.md`).
-- Checks: `tests/story.ts`, `termants.ts`, `casteLooks.ts`, `net.ts`, `species.ts`, `check-determinism`; the browser
+- Checks: `npm test` (31 suites) and `check-determinism`, the build; the browser
   check `mimic_termites.py` (the species card says Mimic Ant, the story tab "The Termants", no "Gene Thief" on either
   screen). Its older chip-name check expects "Conehead Termite Soldier" for `nasute_soldier`, which main's conehead
   rework now names "Nasute" — not part of this change.

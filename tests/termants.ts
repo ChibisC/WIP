@@ -245,6 +245,14 @@ const cmd = (w: World, body: Parameters<typeof applyCommand>[1]) => applyCommand
   check('carton walls are paid from the food store', tileCost(c, 'carton') === TERMANT.cartonWall.cost);
 }
 
+// ---- names from older saves (user note 2026-11-02 23:47): no "Gene Thief" left after loading
+{
+  const w = world();
+  w.s.colonies[0].name = 'Gene-Thief Termants';
+  w.s.colonies[1].name = 'Rival gene thief ant colony';
+  const r = restoreWorld(encodeState(w), new EventBus());
+  check('an old save\'s "Gene-Thief Termants" and "gene thief ant" names load as Termants and Mimic Ant', r.s.colonies[0].name === 'Termants' && r.s.colonies[1].name === 'Rival mimic ant colony', r.s.colonies.map((c) => c.name).join(' / '));
+}
 // ---- the king does no nest duties (user note 2026-11-02): he walks round the queen in her chamber, bites intruders there
 {
   const w = world('lasius', true, 3);
