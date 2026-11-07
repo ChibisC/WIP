@@ -36,10 +36,12 @@ with sync_playwright() as p:
             pg.evaluate("window.__step(1, 1/30)")
             out.append(round((time.time() - t) * 1000))
         h = pg.evaluate(f"() => {{ const p = window.__prof; return p ? p.hitches.slice({mark}).slice(0, 2).map((h) => Math.round(h.cpu) + ' ms: ' + h.causes.join('; ')) : []; }}")
-        print(f"{label:28s} frames {out}  {h}", flush=True)
+        shown = out if n <= 6 else f"max {max(out)}, median {sorted(out)[n // 2]}"
+        print(f"{label:28s} frames {shown}  {h}", flush=True)
         return out
 
-    frames("surface (warm)", 3)
+    # two seconds on the surface first (as a player would spend: the background keeps the other areas current)
+    w = frames("surface (warm, 60 frames)", 60)
     res = {}
     for rnd in range(2):
         for a in areas:

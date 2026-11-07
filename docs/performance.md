@@ -127,6 +127,8 @@ surface and the underground, and no loss of looks.
   depth programs on its first shadowed frame.
 - **The worker re-sent every colony whole each frame** (structured clone: 175 KB of objects in a 10-colony match at
   10 minutes, about 1.5 ms to clone in the worker and as much to rebuild on the main thread, all of it garbage).
+- **Entering an area rebuilt its terrain in one frame**: ants dig in every nest all the time, and an area not on screen
+  piled up dirty chunks; showing it ran the distance field (12 ms), the light maps (5 ms) and 2 ms a chunk at once.
 - **The ant shader is at the 16 vertex attributes WebGL guarantees** (phones have exactly 16): anything new per instance
   has to be packed into an existing channel.
 
@@ -136,6 +138,8 @@ surface and the underground, and no loss of looks.
 | Switching | `GameSession.prewarm()` behind the loading screen: every model that can appear is built once and shared by all renderers (`builtCache`, `impostorCache`, termite and creature part pools), then every space's scene is compiled and drawn once offscreen with shadows (`render/prewarm.ts`). |
 | Switching | `warmNew()` warms a model the simulation shows mid-match in the background (under 4 ms a frame); `keepAreasCurrent()` keeps the areas not on screen up to date every sixth frame while there is room. |
 | Switching | Nothing is drawn while the dive or area fade is fully opaque (the swap frame does the swap; the new space draws on the next). |
+| Switching | The area a dive or cut is about to show is brought up to date under the fade, a 6 ms slice a frame; the areas not on screen are kept current in 3 ms slices (`NestTerrain.update(force, budgetMs)`: the distance field, then the light maps, then chunks). |
+| CPU | The nest terrain's distance field blur skips bounds checks inside the grid, the same sums in the same order: the old result to the bit, 12 → 4 ms. |
 | Rendering | Empty instanced meshes are hidden; creature pools upload only the instances drawn. |
 | Rendering | The AO composite pass is skipped when AO is off (it copied the image unchanged). |
 | Rendering | Auto quality lowers the render resolution (10 % steps, never below 75 %, a light sharpen) before it drops a preset, and brings it back first. |
@@ -153,3 +157,23 @@ surface and the underground, and no loss of looks.
 - **Cached static shadows:** the shadow camera follows the view and the units cast most of the shadow; a static cache
   would need a second shadow map and pass.
 - **Termite LOD cross-fade:** the termite kit writes its instances through many setters; it keeps its own LOD switch.
+
+### Switching, measured (build machine: SwiftShader, no GPU; Medium; `tests/browser/switch_probe.py`)
+Meadow Pond at tick 400 with six developed areas, two seconds on the surface, then each area and back to the surface,
+twice; every switch's first four frames (ms). "Before" is `main` at d1161a0 with only the measuring tools added (the
+same profiler and probe); "after" is this branch. SwiftShader compiles shaders on the CPU, so the absolute numbers are
+far above a real GPU's; the counts and causes are what transfer.
+
+| switch | before: first frames | after: first frames | before: what the hitch log named |
+|---|---|---|---|
+| surface (warm-up) | max 1,355 | max 110 | ant model built (fire_minor), 5 shader compiles |
+| area 1 (home), first | **119,609**, 6,104 | **11**, 7 | 31 shader compiles, the nest built, 10.7 MB of buffers, lasius_queen built |
+| area 2, first | **819** | **89** | ant models built (fire_queen, fire_minor), the nest's terrain |
+| area 3, first | **13,541** | **41** | 10.7 MB of buffers, lasius_queen built |
+| cave 64, first | **12,885** | **6** | 4.3 MB of buffers |
+| cave 65, first | 21 | 5 | — |
+| round 2, the worst | 18,300 / 14,262 | 576 / 159 | (both builds: SwiftShader's GPU process stalling a buffer upload for seconds; once per run, in either build — not the game's work) |
+
+Loading takes longer in exchange: 14.4 s → 26.8 s here (every model and every program now built behind the loading
+screen, with its progress shown). On a real GPU the programs compile in parallel and the difference is a fraction of
+that; the benchmark's report gives the load time per device.
