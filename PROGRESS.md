@@ -1905,7 +1905,7 @@ User spec `claude/performance/01-spec-performance-no-visual-loss.md` (branch `fe
   `docs/performance.md`). The protocol is unchanged (`ud-mp-11`): the new pong/delay fields are optional and the
   simulation is untouched.
 
-## 2026-11-06 — Chapter 1 is seven levels; surprise events; every level 30 minutes or more (`feature/story-ch1-7`)
+## 2026-11-06 — Chapter 1 is seven levels; surprise events; longer levels (`feature/story-ch1-7`)
 - **Spec**: claude/story/06-spec-levels-5-7-and-lengths.md (user decisions 2026-11-03). Design: docs/story/DESIGN-STORY.md
   (levels 5–7, "Surprise events", the framework, §8 the playtest table, §10 sources). Helpers' branches merged in:
   `feature/stag-sizes` (four stag beetle males, wrestling) and `feature/nest-flood` (nests flood, all-out), each with its
