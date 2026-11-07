@@ -42,7 +42,7 @@ The title screen has **Story**, **Single-player** and **Multiplayer**.
 4. The host starts the match once everyone is ready.
 
 How it works:
-- Every player's computer runs the same deterministic simulation (lockstep at 20 ticks a second). Only commands travel over the network, a few bytes each. The input delay adapts to the connection, from 2 to 8 ticks (100–400 ms). Your markers, tiles and group moves appear at once with a shimmer until the command runs.
+- Every player's computer runs the same deterministic simulation (lockstep at 20 ticks a second). Only commands travel over the network, a few bytes each. The input delay adapts to the connection, from 1 tick on a LAN to 8 ticks (50–400 ms). Your markers, tiles and group moves appear at once with a shimmer until the command runs.
 - If a player stops responding, everyone sees "Waiting for …". After 30 s the AI takes over that colony; the host can also do this at once with **Drop now**.
 - A player who reloads the page or loses the connection rejoins through the same link. The host sends the current state, the client catches up, and the colony is theirs again.
 - Every 100 ticks the players compare a hash of the whole game state. If they ever differ, the match stops with "Desync detected" and offers a report to download. It never carries on out of step.

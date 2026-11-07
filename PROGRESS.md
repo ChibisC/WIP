@@ -1981,3 +1981,21 @@ Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).
 - **Saves:** version 4 — old grids embedded in the margin (everything in the space shifted), routes generated closed;
   `BUILD_ID` `ud-mp-13` (12 was taken by the story merge). `tests/tunnels.ts` (35 checks) in `npm test`.
 - Stills: `docs/underground/tunnels/` (`tests/browser/tunnels.py`; dev `?tunnel=<stage>`).
+## 2026-11-07 — Performance v2: feel — instant feedback, smooth motion, math on the client (CHANGE_PLAN §29)
+User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch `feature/responsiveness`.
+- **Measured first:** the feel meter (`core/feel.ts`, F3, the bench's *feel* scene; in `main` early, handoff 19):
+  input → feedback and → acting by kind, command latency, frame pacing, missed vsyncs, long tasks.
+- **Smooth motion:** `game/playout.ts` (playout clock, units re-anchored where they are drawn as each frame lands).
+  `tests/smoothMotion.ts`: steps within 2 % of the true speed at p99 with uneven arrivals (the old α: 165–347 % off,
+  frozen in 12 % and jumping in 6–11 % of frames); batches of 2–3 ticks and hitches: no jumps.
+- **Instant feedback:** intent poses (`game/intents.ts`), refused hex ghosts unwind, refusal reasons said once
+  (`tests/feel.ts`).
+- **Multiplayer:** one tick of delay on a LAN (`MIN_DELAY` 1, the host's margin a quarter of the path plus a frame,
+  at most the old tick); `tests/net.ts` LAN case. `BUILD_ID` `ud-mp-14`.
+- **Client visuals:** ants well out of view skipped and caught up in one step (`render/viewCull.ts`; zoomed in on a
+  crowd the ant renderer takes a tenth of the time); id-hashed seeds and seeded sparks (no run-to-run noise); combat
+  particles in closed form in the shader (`tests/clientVisuals.ts`).
+- **Messages:** delta entity columns and a generated reader: big fight 716 → 467 KB a frame, columns read 3.1 → 1.8 ms
+  on the build machine (`tests/performance.ts` keeps the replica exact; `tools/perf/frameBench.ts`).
+- **UI:** marker counts once a tick, label styles written only when changed.
+- **Fixed on the way:** a story save with a visiting party restored differently (merged early with the meter).
