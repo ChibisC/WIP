@@ -61,9 +61,9 @@ OVERRIDE = {
     ("sickle_queen", "macro"): "cam=34&dist=13&tx=2&ty=1.5",
     ("sickle_queen", "front"): "cam=front&dist=16&tx=3&ty=2.5",
     ("sickle_queen", "jaw"): "cam=side&dist=9&tx=3&ty=1",
-    ("sickle_queen", "side"): "cam=fside&dist=46&tx=-9&ty=1.5",
-    ("sickle_queen", "34"): "cam=34&dist=50&tx=-9",
-    ("sickle_queen", "top"): "cam=top&dist=62&tx=-9",
+    ("sickle_queen", "side"): "cam=fside&dist=62&tx=-2&ty=1.5",
+    ("sickle_queen", "34"): "cam=34&dist=68&tx=-2",
+    ("sickle_queen", "top"): "cam=top&dist=80&tx=-2",
 }
 DOF = {"side": 0.8, "top": 0.4, "front": 0.7, "34": 1.0, "macro": 1.3, "jaw": 0.8}
 units = [u for u in os.environ.get("UNITS", ",".join(k for k in UNITS if not k.startswith(("nasute", "anchor")))).split(",") if u]

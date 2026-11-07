@@ -200,6 +200,7 @@ Rebuilt to the user's FIX spec (`claude/termite-royals/01-spec-royals-fix.md`). 
 
 ---
 
+
 ## 9. Sources
 
 - *Rhynchotermes*. Wikipedia. https://en.wikipedia.org/wiki/Rhynchotermes
@@ -209,3 +210,24 @@ Rebuilt to the user's FIX spec (`claude/termite-royals/01-spec-royals-fix.md`). 
 - Scheffrahn, R. H. (2010). *Rhynchotermes bulbinasus*, a new species with dimorphic soldiers. *Zootaxa* 2387: 63–68 (fore-coxa process; minor and major soldiers).
 - Wizen, G. *Rhynchotermes* (field notes and photographs, Costa Rica). https://gilwizen.com/rhynchotermes/
 - Literature cited by the sources above: Snyder 1925 (original description and measurements); Eisner 2003 (*For Love of Insects*, defensive row); Nickle & Collins 1992 (night foraging); Rocha et al. 2017 (Syntermitinae phylogeny).
+
+## 10. Model redo on the ant pipeline (2026-11-07, `claude/realism/10-spec-saiy-ant-sickle-jaw-models.md`)
+
+Every caste is now built by the ant pipeline's termite builder (`src/render/ants/nasuteBuilder.ts`, morphs in `rhyMorphs.ts`, routed through `NASUTE_ANT_PATH`), as the conehead termites were; the old kit's sickle-jaw castes are no longer drawn. Numbers are fractions of the caste's length L (mm in brackets), from §5 and from tracing the user's four photos (side, side on bark, front with the sickles agape, top) — study only, never in the game.
+
+| Part | Soldier (L 4.5 mm) | Worker (L 5.8 mm) | Note |
+|---|---|---|---|
+| Head capsule length × width × height | 0.233 × 0.222 × 0.20 (1.05 × 1.0 × 0.9 mm), a glassy dome | 0.19 × 0.27 × 0.12 (1.1 × 1.57 × 0.7 mm), flattened (0.62) and hardly narrowing (0.18) | worker wider than long |
+| Snout (labral tube) | 0.30 (1.35 mm), base radius 0.04 → tip 0.017, concave flanks (exponent 2.6), curving down (−0.32 slope, 0.22 bend); darker toward the tip; a dark pore at the open tip | — | §2: about 1.5 × the capsule, projecting slightly down |
+| Sickles | 0.26 along the curve (1.17 mm), blade half-width 0.03 → 0.008 at the tip, flattened 0.62; seen from above they leave the head sideways (77°) and sweep forward and in (sweep fitted so the closed tips cross 0.012 L past the midline); seen from the side they hang ever more steeply (dip 0.3 → 1.2 rad) with the last fifth hooked down and back; a conical marginal tooth at 0.42 (length 0.1 of the blade); dark red `#6E1C12` → near-black tips | small triangular jaws | gape: the blades swing sideways round their hinges (0.55 rad at full gape) |
+| Antennae | 14 beads, 0.55 (2.5 mm), straight | 14 beads, 0.46 (2.7 mm) | barrel-shaped beads with hairs |
+| Legs (hind femur / tibia / tarsus) | 0.28 / 0.32 / 0.12 (tibia 1.44 mm), a thorn on the fore coxa | 0.20 / 0.22 / 0.10 | long, the body clear of the ground |
+| Abdomen | 0.33 × 0.18 × 0.16, amber `#CC9450` with bold brown tergite bands `#6E3E1E` | 0.60 × 0.25 × 0.17, glassy cream-amber with the dark leaf-litter gut (three lobes) | sunken pale membranes between the plates |
+| Colour of the head | `#A23A16`, glassy (roughness 0.1, clearcoat 1) | chestnut-orange `#A0522A` with a whitish fontanelle spot | |
+
+- **Presoldier:** the soldier's shape, pale cream and soft (`termite_rhy_presoldier`, the last part of a soldier's growth on the brood tile).
+- **King (L 8.5 mm):** dark reddish-brown, compound eyes and ocelli, wing scales, a broad shield pronotum, a modest abdomen.
+- **Queen (26.2 mm):** the king's head, thorax and legs (in mm) with the physogastric abdomen, 22.5 × 5.05 × 5.1 mm, soft and pleated, small dark plates on top `#5A3A20` and sternites below.
+- **Larva:** pale and translucent, a large head and short legs; grows 0.3 → 0.85 of its mesh on the brood tile.
+
+**Animation on the ant pipeline** (`game/antViews.ts` `sickleAntPath`, `attackPoses.ts` `S_GRAB` / `S_HOLD` / `S_SQUIRT`): planted feet throughout; the threat (head raised so the snout points forward and up, the sickles agape); the lunge timed to the sim (the sickles snap shut at 0.58 of it) settling into the hold; the hold with the snout pressing in on each squirt and the abdomen pumping, the acid jet from the snout's tip and the fizz on the victim, faster as the secretion ramps; the free squirt at a foe too big to hook; the alarm drum. Workers bite as termite workers do (tug, rip, lunge), chew leaf litter and carry it, and share food mouth to mouth.
