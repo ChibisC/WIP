@@ -1362,3 +1362,40 @@ export const STORY = {
     fungalLarder: { name: 'Fungal Larder', from: 'the leafcutter mega colony', desc: 'Food stores hold more.', built: false },
   } as Record<string, { name: string; from: string; desc: string; dps?: number; duration?: number; maxStacks?: number; built: boolean }>,
 };
+
+/**
+ * A shared underground: set tunnels between nests (claude/underground/01-spec-shared-underground-tunnels.md, user
+ * 2026-11-06; CHANGE_PLAN §27 — the game's own feature: in EotU every nest is sealed). Every colony nest has a ring of
+ * `margin` hexes of unbreakable rock round its diggable interior; a route to a neighbour is a `width`-hex-wide path of
+ * diggable soil through that rock from a gate on the nest's edge to the rim (its half; the other nest's half meets it
+ * there). Up to `allPairsMax` colonies every pair of nests gets a route; more: each nest's `neighbours` nearest, and no
+ * route crosses another. Gates keep `gateGap` edge hexes apart and `gateAway` hexes from the entrance flower; the path
+ * wobbles `wobble` hexes to each side. A route hex costs `hexWorkMul` × `jobPoints` to dig (a normal crew of six
+ * level-1 workers: about 3–4 minutes a route; `tools/tunnel-dig-probe.ts`). Hints show past a digger's frontier within
+ * `hintRange` steps of the far gate; a defender is warned when an enemy's frontier is within `warnRange` steps of its gate
+ * (a dig sound every `warnEvery` s). Units in a foreign nest see `sight` hexes round them. `ai`: when AI colonies tunnel
+ * (`from` seconds by level, Easy never; a `chance` each war-brain decision), when they dig out to meet attackers
+ * (`meetFrom` level), when allies link nests (`allyLinkFrom` s).
+ */
+export const TUNNELS = {
+  margin: 8,
+  width: 3,
+  allPairsMax: 4,
+  neighbours: 3,
+  gateGap: 5,
+  gateAway: 4,
+  wobble: 1,
+  hexWorkMul: 10,
+  hintRange: 3,
+  warnRange: 3,
+  warnEvery: 4,
+  sight: 5,
+  /** an ant standing this far (× hex R) past its rim step's centre toward the rim has crossed to the other half */
+  crossFrac: 0.45,
+  ai: {
+    from: [0, 900, 600, 420],
+    chance: [0, 0.35, 0.6, 0.8],
+    meetFrom: 2,
+    allyLinkFrom: 300,
+  },
+};

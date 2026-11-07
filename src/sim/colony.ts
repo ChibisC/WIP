@@ -6,7 +6,7 @@ import { Ant, AS, Carry, Colony, MARKER_COUNT, SURFACE, Task, TileType, nestSpac
 import { CASTES, SPECIES, SpeciesId, basicCaste, casteOf, isSoldierCaste, naniticCaste } from './species';
 import { makeAnt, makeBrood } from './factory';
 import { applyLevel, hexSpeedOf, placeTile, popUsed, raisesAnts, recomputeGroups, recomputeTileCaps, tileAnts, tileAt, tileCapacity } from './tiles';
-import { BALANCE, NASUTE } from './balance';
+import { BALANCE, NASUTE, TUNNELS } from './balance';
 import { assignJobs, isJobWorker } from './jobs';
 import { applyGroupOrders } from './markers';
 import { abilityActive, abilityTick } from './abilities';
@@ -16,7 +16,10 @@ import { dcos, dhypot, dsin, sq } from './dmath';
 import { digFlower, entranceTick, flowerOver, placeHoles } from './entrances';
 import { foodFull, storeNotice, storesFull } from './stores';
 
-/** Nest plane size in hexes (the same for every species; hex radius scales instead). */
+/**
+ * Nest plane size in hexes: the diggable interior (the same for every species; hex radius scales instead). Round it lies
+ * a ring of TUNNELS.margin hexes of rock that the tunnel routes run through (sim/tunnels.ts, CHANGE_PLAN §27).
+ */
 export const NEST_COLS = 34;
 export const NEST_ROWS = 30;
 
@@ -157,8 +160,9 @@ export function createColony(w: World, o: ColonyOptions): Colony {
 
   // ---- Nest plane: queen cluster in the middle, a tunnel to the entrance ramp.
   const R = hexRadiusFor(casteOf(basicCaste(o.species)).length);
-  const g = new NestGrid({ cols: NEST_COLS, rows: NEST_ROWS, R, seed: w.s.seed * 13 + id * 101 + 7 });
-  const q0 = g.hexIndex(Math.floor(NEST_COLS / 2) + w.rng.int(-2, 2), Math.floor(NEST_ROWS / 2) + w.rng.int(-1, 1));
+  const m = TUNNELS.margin;
+  const g = new NestGrid({ cols: NEST_COLS + 2 * m, rows: NEST_ROWS + 2 * m, R, seed: w.s.seed * 13 + id * 101 + 7, margin: m });
+  const q0 = g.hexIndex(m + Math.floor(NEST_COLS / 2) + w.rng.int(-2, 2), m + Math.floor(NEST_ROWS / 2) + w.rng.int(-1, 1));
   // Starting area: hexes within 2 steps of the queen's hex.
   const start: number[] = [];
   for (let q = 0; q < g.cols * g.rows; q++) if (g.hexDistance(q, q0) <= 2) start.push(q);

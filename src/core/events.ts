@@ -71,6 +71,10 @@ export type SimEvent =
    */
   | { t: 'story'; what: 'shot' | 'music'; shot?: StoryShotData; mood?: string }
   | { t: 'invasion'; colony: number }
+  /** tunnel routes (sim/tunnels.ts): a defender warned of digging toward its gate (once), the dig sound from behind the wall, a route opened */
+  | { t: 'tunnelWarn'; colony: number; by: number; route: number; space: number; x: number; y: number; q: number }
+  | { t: 'tunnelDig'; colony: number; route: number; space: number; x: number; y: number }
+  | { t: 'tunnelOpen'; route: number; a: number; b: number; spaces: number[]; x: number[]; y: number[] }
   /** a player command was applied (ok) or ignored (why) — clears the issuer's pending feedback */
   | { t: 'command'; player: number; seq: number; type: string; ok: boolean; why?: string }
   | { t: 'wave'; index: number; total: number; label: string };

@@ -12,10 +12,21 @@ export const SOIL_TOP = 1;
 export const SOIL_LOAM = 2;
 export const SOIL_CLAY = 3;
 export const SOIL_GRAVEL = 4;
+/** a tunnel route's gate: brownish, loosened soil at the nest's edge (sim/tunnels.ts) */
+export const SOIL_GATE = 5;
+/** a tunnel route's soil through the rock margin: diggable, drawn as rock until dug (not visible beyond the gate) */
+export const SOIL_ROUTE = 6;
+/** the rock margin round a colony nest: nothing digs or breaks it (titans included); the walls of every route */
+export const SOIL_ROCK = 254;
 export const SOIL_STONE = 255;
 
 /** Excavation work units per hex by soil type (one bite = 1 unit). */
-export const HEX_WORK: Record<number, number> = { 1: 10, 2: 14, 3: 20, 4: 26 };
+export const HEX_WORK: Record<number, number> = { 1: 10, 2: 14, 3: 20, 4: 26, 5: 14, 6: 14 };
+
+/** Soil that ants can never dig (stone in the nest, the rock margin). */
+export function undiggable(t: number): boolean {
+  return t === SOIL_STONE || t === SOIL_ROCK;
+}
 
 /** Fine raster cells per hex circumradius (keeps the walk raster resolution constant per tile). */
 const CELLS_PER_R = 3.5;
@@ -26,6 +37,8 @@ export interface NestGridParams {
   /** hex circumradius in mm */
   R: number;
   seed: number;
+  /** a colony nest: the ring of rock hexes round the diggable interior (TUNNELS.margin; 0 for caves and older grids) */
+  margin?: number;
 }
 
 /** Raw typed-array state of a nest grid, for binary snapshots (sim/snapshot.ts). */
@@ -38,12 +51,16 @@ export interface NestGridSnap extends NestGridParams {
   hexTotal: Float32Array;
   hexDesig: Uint8Array;
   hexEntry: Int8Array;
+  /** tunnel route id + 1 per hex (0 none; sim/tunnels.ts); older snapshots have none */
+  hexRoute?: Int16Array;
   entrances: number[];
   tunnels: number[][];
   flowers: number[][];
 }
 
 export interface NestGridData extends NestGridParams {
+  /** tunnel route id + 1 per hex (older saves have none) */
+  hexRoute?: string;
   /** dig work per hex when full (older saves rebuild it from the soil) */
   hexTotal?: string;
   soil: string;
@@ -85,6 +102,8 @@ export const NEST_HEX_SCALE = 1.1;
 export class NestGrid extends HexLayout {
   // the hex geometry (cols, rows, R, H, C, widthMm, depthMm, hexCenter, hexAt, neighbors…) is HexLayout's
   readonly seed: number;
+  /** rock hexes round the diggable interior (colony nests; 0 for caves) */
+  readonly margin: number;
   /** fine raster cell size (mm) */
   readonly cell: number;
   /** fine raster size */
@@ -101,6 +120,8 @@ export class NestGrid extends HexLayout {
   hexDesig: Uint8Array;
   /** neighbour direction (0..5) digging advances from, −1 none */
   hexEntry: Int8Array;
+  /** tunnel route id + 1 per hex (0 none): the route's gate and its hexes through the margin (sim/tunnels.ts) */
+  hexRoute: Int16Array;
   /** fine cell indices covered by each hex */
   hexCells: Int32Array[] = [];
   /** fine cell → hex index (−1 outside) */
@@ -136,6 +157,7 @@ export class NestGrid extends HexLayout {
   constructor(p: NestGridParams) {
     super(p);
     this.seed = p.seed;
+    this.margin = p.margin ?? 0;
     this.cell = p.R / CELLS_PER_R;
     this.w = Math.ceil(this.widthMm / this.cell);
     this.h = Math.ceil(this.depthMm / this.cell);
@@ -149,12 +171,60 @@ export class NestGrid extends HexLayout {
     this.hexTotal = new Float32Array(nh);
     this.hexDesig = new Uint8Array(nh);
     this.hexEntry = new Int8Array(nh).fill(-1);
+    this.hexRoute = new Int16Array(nh);
     this.buildRaster();
     this.generate();
   }
 
   params(): NestGridParams {
-    return { cols: this.cols, rows: this.rows, R: this.R, seed: this.seed };
+    return { cols: this.cols, rows: this.rows, R: this.R, seed: this.seed, margin: this.margin };
+  }
+
+  /** Is hex q inside the diggable interior (not in the rock margin)? */
+  isInterior(q: number): boolean {
+    if (q < 0) return false;
+    const m = this.margin;
+    const c = this.hexCol(q);
+    const r = this.hexRow(q);
+    return c >= m && r >= m && c < this.cols - m && r < this.rows - m;
+  }
+
+  /** Is hex q on the interior's edge (an interior hex with a margin or off-grid neighbour)? */
+  isInteriorEdge(q: number): boolean {
+    if (!this.isInterior(q)) return false;
+    for (const n of this.neighbors(q)) if (n < 0 || !this.isInterior(n)) return true;
+    return false;
+  }
+
+  /** Is hex q on the grid's rim (an off-grid neighbour)? */
+  isRim(q: number): boolean {
+    return q >= 0 && this.neighbors(q).some((n) => n < 0);
+  }
+
+  /** The route (id, −1 none) hex q belongs to (its gate or its tunnel). */
+  routeOf(q: number): number {
+    return q >= 0 ? this.hexRoute[q] - 1 : -1;
+  }
+
+  /**
+   * Lay a tunnel route's hexes (sim/tunnels.ts): the gate (an interior edge hex) becomes loosened gate soil, the hexes
+   * through the margin diggable route soil (drawn as rock until dug); all tagged with the route.
+   */
+  layRoute(id: number, gate: number, hexes: readonly number[]): void {
+    const set = (q: number, t: number) => {
+      if (q < 0) return;
+      this.hexRoute[q] = id + 1;
+      if (this.hexSoil[q] === SOIL_AIR) return;
+      this.hexSoil[q] = t;
+      this.hexTotal[q] = this.hexWork[q] = HEX_WORK[t];
+      for (const c of this.hexCells[q]) if (this.soil[c] !== SOIL_AIR) this.soil[c] = t;
+    };
+    set(gate, SOIL_GATE);
+    for (const q of hexes) set(q, SOIL_ROUTE);
+    this.version++;
+    this.stateVersion++;
+    this.desigVersion++;
+    this.dirtyAll();
   }
 
   private buildRaster(): void {
@@ -196,6 +266,13 @@ export class NestGrid extends HexLayout {
       // Buried stones: undiggable hexes in loose clusters.
       const stoneN = valueNoise2(this.hexCol(q) * 0.5, this.hexRow(q) * 0.5, s + 77);
       if (stoneN > 0.8 && rng.chance(0.8)) t = SOIL_STONE;
+      // the rock margin round a colony nest (TUNNELS.margin): every cell rock, nothing to dig
+      if (this.margin && !this.isInterior(q)) {
+        this.hexSoil[q] = SOIL_ROCK;
+        this.hexTotal[q] = this.hexWork[q] = 0;
+        for (const c of this.hexCells[q]) this.soil[c] = SOIL_ROCK;
+        continue;
+      }
       this.hexSoil[q] = t;
       this.hexTotal[q] = t === SOIL_STONE ? 0 : HEX_WORK[t];
       this.hexWork[q] = this.hexTotal[q];
@@ -250,7 +327,7 @@ export class NestGrid extends HexLayout {
   carve(x: number, y: number): void {
     if (!this.inside(x, y)) return;
     const k = y * this.w + x;
-    if (this.soil[k] === SOIL_STONE || this.soil[k] === SOIL_AIR) return;
+    if (undiggable(this.soil[k]) || this.soil[k] === SOIL_AIR) return;
     this.soil[k] = SOIL_AIR;
     if (this.airCount === this.airLog.length) {
       const nl = new Int32Array(this.airLog.length * 2);
@@ -292,7 +369,7 @@ export class NestGrid extends HexLayout {
   }
 
   isHexDiggable(q: number): boolean {
-    return q >= 0 && this.hexSoil[q] !== SOIL_AIR && this.hexSoil[q] !== SOIL_STONE;
+    return q >= 0 && this.hexSoil[q] !== SOIL_AIR && !undiggable(this.hexSoil[q]);
   }
 
   /** Is q part of an entrance (its flower or tunnel hexes stay clear of tiles)? */
@@ -407,7 +484,7 @@ export class NestGrid extends HexLayout {
     const e = this.edgeMid(q, this.hexEntry[q]);
     const reach = prog * this.H * 1.25 + this.cell * 0.5;
     for (const c of this.hexCells[q]) {
-      if (this.soil[c] === SOIL_AIR || this.soil[c] === SOIL_STONE) continue;
+      if (this.soil[c] === SOIL_AIR || undiggable(this.soil[c])) continue;
       const cx = ((c % this.w) + 0.5) * this.cell;
       const cy = (Math.floor(c / this.w) + 0.5) * this.cell;
       if (dhypot(cx - e.x, cy - e.y) < reach) this.carve(c % this.w, Math.floor(c / this.w));
@@ -424,9 +501,10 @@ export class NestGrid extends HexLayout {
    * cell of it to air (logged like any dig, so flow fields extend). Returns whether anything broke.
    */
   breakHex(q: number): boolean {
-    if (q < 0 || this.hexSoil[q] === SOIL_AIR) return false;
+    // (the rock margin round the nest, and the walls of every tunnel route, break for nobody: CHANGE_PLAN §27)
+    if (q < 0 || this.hexSoil[q] === SOIL_AIR || this.hexSoil[q] === SOIL_ROCK) return false;
     for (const c of this.hexCells[q]) {
-      if (this.soil[c] === SOIL_AIR) continue;
+      if (this.soil[c] === SOIL_AIR || this.soil[c] === SOIL_ROCK) continue;
       // (stone cells: let carve take them by marking them soil first — the raster still only goes solid → air)
       if (this.soil[c] === SOIL_STONE) this.soil[c] = 1;
       this.carve(c % this.w, Math.floor(c / this.w));
@@ -446,9 +524,9 @@ export class NestGrid extends HexLayout {
 
   /** Instantly excavate a hex (level setup / sandbox). */
   completeHex(q: number): void {
-    if (q < 0 || this.hexSoil[q] === SOIL_STONE) return;
+    if (q < 0 || undiggable(this.hexSoil[q])) return;
     for (const c of this.hexCells[q]) {
-      if (this.soil[c] !== SOIL_STONE) this.carve(c % this.w, Math.floor(c / this.w));
+      if (!undiggable(this.soil[c])) this.carve(c % this.w, Math.floor(c / this.w));
     }
     if (this.hexDesig[q]) {
       this.hexDesig[q] = 0;
@@ -492,6 +570,7 @@ export class NestGrid extends HexLayout {
       hexDesig: toB64(this.hexDesig),
       hexEntry: toB64(new Uint8Array(this.hexEntry.buffer.slice(0))),
       hexTotal: toB64(new Uint8Array(this.hexTotal.buffer.slice(0))),
+      hexRoute: toB64(new Uint8Array(this.hexRoute.buffer.slice(0))),
       entrances: [...this.entrances],
       tunnels: this.tunnels.map((t) => [...t]),
       flowers: this.flowers.map((t) => [...t]),
@@ -510,6 +589,7 @@ export class NestGrid extends HexLayout {
       hexTotal: this.hexTotal.slice(),
       hexDesig: this.hexDesig.slice(),
       hexEntry: this.hexEntry.slice(),
+      hexRoute: this.hexRoute.slice(),
       entrances: [...this.entrances],
       tunnels: this.tunnels.map((t) => [...t]),
       flowers: this.flowers.map((t) => [...t]),
@@ -526,10 +606,51 @@ export class NestGrid extends HexLayout {
     g.hexTotal.set(d.hexTotal);
     g.hexDesig.set(d.hexDesig);
     g.hexEntry.set(d.hexEntry);
+    if (d.hexRoute && d.hexRoute.length === g.hexRoute.length) g.hexRoute.set(d.hexRoute);
     g.setEntranceLists(d);
     g.version++;
     g.dirtyAll();
     return g;
+  }
+
+  /**
+   * This grid embedded in a larger one with a rock margin of `margin` hexes (saves from before the shared underground,
+   * CHANGE_PLAN §27): every hex index moves by (margin, margin) columns and rows, every position by `embedOffset`.
+   * `margin` is even, so the odd-column shift is unchanged.
+   */
+  embed(margin: number): NestGrid {
+    const g = new NestGrid({ cols: this.cols + 2 * margin, rows: this.rows + 2 * margin, R: this.R, seed: this.seed, margin });
+    const off = g.embedOffset(margin);
+    const cx = Math.round(off.x / g.cell);
+    const cy = Math.round(off.y / g.cell);
+    for (let y = 0; y < this.h; y++)
+      for (let x = 0; x < this.w; x++) {
+        const k = y * this.w + x;
+        const nk = (y + cy) * g.w + (x + cx);
+        if (!g.inside(x + cx, y + cy) || g.cellHex[nk] < 0 || !g.isInterior(g.cellHex[nk])) continue;
+        g.soil[nk] = this.soil[k];
+        g.designated[nk] = this.designated[k];
+      }
+    for (let q = 0; q < this.cols * this.rows; q++) {
+      const nq = g.hexIndex(this.hexCol(q) + margin, this.hexRow(q) + margin);
+      g.hexSoil[nq] = this.hexSoil[q];
+      g.hexWork[nq] = this.hexWork[q];
+      g.hexTotal[nq] = this.hexTotal[q];
+      g.hexDesig[nq] = this.hexDesig[q];
+      g.hexEntry[nq] = this.hexEntry[q];
+    }
+    g.designatedCount = this.designatedCount;
+    const sh = (q: number) => (q < 0 ? q : g.hexIndex(this.hexCol(q) + margin, this.hexRow(q) + margin));
+    g.setEntranceLists({ entrances: this.entrances.map(sh), tunnels: this.tunnels.map((t) => t.map(sh)), flowers: this.flowers.map((t) => t.map(sh)) });
+    // (the air log restarts: flow fields are built fresh on the new grid)
+    g.version++;
+    g.dirtyAll();
+    return g;
+  }
+
+  /** How far (mm) positions move when a grid is embedded with `margin` hexes of rock (see `embed`). */
+  embedOffset(margin: number): { x: number; y: number } {
+    return { x: margin * this.C, y: margin * this.H };
   }
 
   /**
@@ -555,6 +676,10 @@ export class NestGrid extends HexLayout {
     g.hexDesig = fromB64(d.hexDesig);
     g.hexEntry = new Int8Array(fromB64(d.hexEntry).buffer);
     if (d.hexTotal) g.hexTotal = new Float32Array(fromB64(d.hexTotal).buffer);
+    if (d.hexRoute) {
+      const r = new Int16Array(fromB64(d.hexRoute).buffer);
+      if (r.length === g.hexRoute.length) g.hexRoute = r;
+    }
     g.setEntranceLists(d);
     g.designatedCount = 0;
     g.designated.fill(0);

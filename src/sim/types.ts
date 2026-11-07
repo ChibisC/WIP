@@ -269,6 +269,8 @@ export interface Ant {
   /** nest job: kind (JOB.*, 0 = none) and hex */
   jobK: number;
   jobQ: number;
+  /** the space the job's hex is in when it is not the colony's own nest (a route dig in the partner's half; sim/tunnels.ts) */
+  jobS?: number;
   /** seconds without a route back to its own queen (dies when too long) */
   lostT: number;
   /** team (colonies on the same team are allies); older saves fall back to the colony id */
@@ -720,6 +722,8 @@ export interface Colony {
   spoil: number[];
   /** pending dig requests by AI */
   aiPlan: number;
+  /** the one tunnel route this colony is digging (sim/tunnels.ts; −1 none; marking another pauses the first) */
+  routeDig?: number;
 }
 
 export interface AphidCluster {
@@ -901,6 +905,34 @@ export interface SimState {
   host?: number;
   /** authored maps with floods on: each flood zone's storm cycle (sim/floods.ts) */
   flood?: FloodState[];
+  /** the set tunnel routes between nests (sim/tunnels.ts; version ≥ 4; older saves get them on load, all closed) */
+  routes?: TunnelRoute[];
+}
+
+/**
+ * One half of a route between two nests (sim/tunnels.ts, CHANGE_PLAN §27): in `colony`'s nest `space`, from its gate
+ * hex (an interior edge hex, `steps[0]`) outward through the rock margin to the rim; each step the hexes across the
+ * tunnel's width (left, centre, right in the walking direction; the gate step is one hex), `dir` the outward edge at the
+ * rim (0..5). `warned`: the owner has been told something is digging toward this gate.
+ */
+export interface RouteHalf {
+  colony: number;
+  space: number;
+  gate: number;
+  steps: number[][];
+  dir: number;
+  warned: boolean;
+}
+
+/** A set tunnel route between the nests of colonies `a` and `b`: open for good once both halves are dug through. */
+export interface TunnelRoute {
+  id: number;
+  a: number;
+  b: number;
+  open: boolean;
+  /** game time it opened (s; −1 closed) */
+  openT: number;
+  halves: [RouteHalf, RouteHalf];
 }
 
 /** One flood zone's storm cycle: phase 0 idle, 1 warning, 2 rising, 3 holding, 4 draining. */
