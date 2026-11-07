@@ -308,7 +308,8 @@ for (const id of ['gardenBelow', 'fireBanks'] as const) {
   genomeOf(c).samples.lasius = 20; // stolen before the raid at 10 min
   run(w, 40);
   check('bonus: stealing the soldier before the first raid wins it', st.bonus === 1);
-  toStage(w, 3);
+  // (the raid is the last stage: 4 since The garden answers came before it, 2026-11-06)
+  toStage(w, STORY_LEVELS.garden.stages.length - 1);
   run(w, 40);
   killAnt(w, w.antById.get(w.colony(1)!.queen)!);
   for (let i = 0; i < 9; i++) makeAnt(w, 0, 'termant_worker', SURFACE, 760 + (i % 3) * 2, 236 + Math.floor(i / 3) * 2, 0);
