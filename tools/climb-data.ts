@@ -27,7 +27,8 @@ import { CREATURES } from '../src/sim/creatures/kinds';
 import { BALANCE } from '../src/sim/balance';
 import * as THREE from 'three';
 import { partGeometry } from '../src/render/creatures/primitives';
-import { SB, STAG_REF, registerStagParts } from '../src/render/creatures/stagBeetle';
+import { SB, STAG_REF, registerStagParts, stagHeadHalf } from '../src/render/creatures/stagBeetle';
+import { stagMaleGeom } from '../src/sim/creatures/kinds';
 
 /** A body part as an ellipsoid in a body frame (fractions of L): centre and semi-axes. */
 interface Part {
@@ -97,15 +98,19 @@ interface Mounts {
  * elytra's side margins and at the apex where the abdomen shows. Head riders sit on the head's own frame (`head`,
  * recorded by the model) and ride its pitch and toss.
  */
-function stagMounts(): Mounts {
+function stagMounts(kind = 'stagBeetle'): Mounts {
   registerStagParts();
+  // a male (stagMaleGeom): its own head (narrower in smaller males: the head slots and antenna bases move in with it)
+  const g = stagMaleGeom(kind);
+  const q = g ? Math.round(g.msize * 4) : 4;
+  const hk = stagHeadHalf(q / 4) / SB.head.half;
   const mesh = (n: string) => {
     const m = new THREE.Mesh(partGeometry(n), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
     m.updateMatrixWorld();
     return m;
   };
   const body = ['stag_elytra', 'stag_pronotum', 'stag_under'].map(mesh);
-  const head = [mesh('stag_head4')];
+  const head = [mesh(`stag_head${q}`)];
   const rc = new THREE.Raycaster();
   const surface = (frame: string, x: number, z: number): number => {
     rc.set(new THREE.Vector3(x * STAG_REF, 100, z * STAG_REF), new THREE.Vector3(0, -1, 0));
@@ -118,8 +123,8 @@ function stagMounts(): Mounts {
   const weak: Mounts['weak'] = [
     { name: 'neck', frame: 'body', x: SB.neck.x, y: SB.neck.y + 0.012, z: 0 },
     { name: 'pronotum–elytra', frame: 'body', x: SB.elytra.x1 - 0.012, y: 0.165, z: 0 },
-    { name: 'L antenna base', frame: 'head', x: SB.ant.x, y: SB.ant.y, z: SB.ant.z },
-    { name: 'R antenna base', frame: 'head', x: SB.ant.x, y: SB.ant.y, z: -SB.ant.z },
+    { name: 'L antenna base', frame: 'head', x: SB.ant.x, y: SB.ant.y, z: SB.ant.z * hk },
+    { name: 'R antenna base', frame: 'head', x: SB.ant.x, y: SB.ant.y, z: -SB.ant.z * hk },
     { name: 'L pronotum margin', frame: 'body', x: -0.03, ...m(1) },
     { name: 'R pronotum margin', frame: 'body', x: -0.03, ...m(-1) },
     { name: 'L elytral margin', frame: 'body', x: -0.25, ...e(1) },
@@ -130,12 +135,41 @@ function stagMounts(): Mounts {
   const pair = (frame: string, x: number, z: number, wl: number, wr: number) => {
     slots.push({ frame, x, z, w: wl }, { frame, x, z: -z, w: wr });
   };
-  pair('body', 0.022, 0.05, 0, 0);
-  pair('body', -0.115, 0.042, 1, 1);
-  pair('head', 0.095, 0.075, 2, 3);
-  pair('body', -0.035, 0.088, 4, 5);
-  pair('body', -0.235, 0.092, 6, 7);
-  pair('body', -0.395, 0.048, 8, 8);
+  if (!g) {
+    // the titan (a major male, huge: 12 riders)
+    pair('body', 0.022, 0.05, 0, 0);
+    pair('body', -0.115, 0.042, 1, 1);
+    pair('head', 0.095, 0.075, 2, 3);
+    pair('body', -0.035, 0.088, 4, 5);
+    pair('body', -0.235, 0.092, 6, 7);
+    pair('body', -0.395, 0.048, 8, 8);
+    return { weak, slots, surface };
+  }
+  // a male (large: at most `mount.capLarge` riders): the titan's places, each pair at least a rider's room apart
+  // (`slotGap` × `refRiderMm` at its size), taken in this order while they keep that room from the ones already taken
+  const L = CREATURES[kind].length;
+  const gap = (BALANCE.mount.slotGap * BALANCE.mount.refRiderMm) / L;
+  const half = (z: number) => Math.max(z, gap * 0.51);
+  const want: Array<[string, number, number, number, number]> = [
+    ['body', -0.115, half(0.042), 1, 1],
+    ['body', -0.035, half(0.088), 4, 5],
+    ['body', -0.235, half(0.092), 6, 7],
+    ['body', 0.022, half(0.05), 0, 0],
+    ['head', 0.095, half(0.075 * hk), 2, 3],
+    ['body', -0.395, half(0.048), 8, 8],
+  ];
+  // (the head frame rests where the body frame does, so places on either compare as they are)
+  const at = (frame: string, x: number, z: number): P3 => [x, surface(frame, x, z), z];
+  const taken: P3[] = [];
+  for (const [frame, x, z, wl, wr] of want) {
+    for (const [zz, w] of [[z, wl], [-z, wr]] as const) {
+      if (slots.length >= BALANCE.mount.capLarge) break;
+      const p = at(frame, x, zz);
+      if (taken.some((o) => len(sub(o, p)) < gap)) continue;
+      taken.push(p);
+      slots.push({ frame, x, z: zz, w });
+    }
+  }
   return { weak, slots, surface };
 }
 
@@ -159,8 +193,12 @@ const KINDS: Record<string, { legs: (name: string) => boolean; parts: Part[]; we
     parts: [part('body', -0.275, 0.14, 0.19, 0.065, 0.142), part('body', -0.02, 0.14, 0.075, 0.05, 0.138), part('body', 0.125, 0.118, 0.08, 0.036, 0.15)],
     weak: [{ name: 'thorax–abdomen', frame: 'body', x: -0.09 }, { name: 'abdomen', frame: 'body', x: -0.3 }, { name: 'neck', frame: 'body', x: 0.06 }, { name: 'pronotum', frame: 'body', x: -0.02 }],
     legBases: true,
-    mounts: stagMounts,
+    mounts: () => stagMounts(),
   },
+  // the stag beetle males (large creatures): the titan's model at their sizes, its hand-placed places
+  ...Object.fromEntries(
+    ['stagMinor', 'stagSmall', 'stagMedium', 'stagLarge'].map((kind) => [kind, { legs: () => true, parts: [], weak: [], legBases: false, mounts: () => stagMounts(kind) }]),
+  ),
   wolfSpider: { legs: () => true, parts: spiderParts(1), weak: spiderWeak, legBases: true },
   tarantula: { legs: () => true, parts: spiderParts(1.08), weak: spiderWeak, legBases: true },
   hogna: { legs: () => true, parts: spiderParts(1.15), weak: spiderWeak, legBases: true },

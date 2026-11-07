@@ -4,7 +4,7 @@ import { tauntOf } from '../casteAbilities';
 import { HF_CREATURE } from '../../world/surfaceLayout';
 import { Ant, AS, Creature, SURFACE } from '../types';
 import { casteOf } from '../species';
-import { ARENA, BALANCE, ECITON, STAG, TERMANT, LAYERS } from '../balance';
+import { ARENA, BALANCE, ECITON, STAG, STAG_MALE, TERMANT, LAYERS } from '../balance';
 import { enforceMountRatio, riding, throwRiders } from '../climbing';
 import { climbCap } from './climb';
 import { applyVenom, cancelAttack, creatureHooks, damageAnt, damageCreature, flingAnt, gripAnt } from '../combat';
@@ -12,7 +12,8 @@ import { STANCE, arenaTeam, stanceOf } from '../arenaState';
 import { killAnt } from '../antAI';
 import { Body, anchored, bodyHook, distToCreatureBody } from '../slots';
 import { makeCreature, makeFood } from '../factory';
-import { CREATURES, CreatureKind, creatureKind, wildKinds } from './kinds';
+import { CREATURES, CreatureKind, creatureKind, stagMaleGeom, wildKinds } from './kinds';
+import { stagRivalScan, stagWrestleTick } from './stagWrestle';
 import { datan2, dcos, dhypot, dsin, sq } from '../dmath';
 import { directCreature } from '../story/director';
 
@@ -56,6 +57,12 @@ export const CS = {
   Lift: 19,
   /** a titan digging a nest's hole wider (titanDig.ts; render: its digging style) */
   Dig: 20,
+  /** stag beetle males wrestling (stagWrestle.ts): the face-off, antlers spread; locked, shoving */
+  Spar: 21,
+  Lock: 22,
+  /** the winner lifting its rival and throwing it; the loser held up, flying, on its back and righting itself */
+  Heave: 23,
+  Thrown: 24,
 } as const;
 
 const TAU = Math.PI * 2;
@@ -124,6 +131,8 @@ export function creatureRadius(cr: Creature): number {
       return k.length * 0.5;
     case 'stag':
       return k.length * 0.24;
+    case 'stagMale':
+      return k.length * (stagMaleGeom(k.id)?.r ?? 0.24);
     case 'tarantula':
     case 'hogna':
     case 'stalker':
@@ -144,6 +153,8 @@ export function creatureBody(cr: Creature): Body {
   const k = creatureKind(cr.kind);
   const r = creatureRadius(cr);
   if (!k) return { hl: 0, r };
+  // (the stag beetle males: from their model, centred on them — STAG_MALE)
+  if (k.ai === 'stagMale') return { hl: k.length * (stagMaleGeom(k.id)?.hl ?? 0.12), r };
   return { hl: Math.max(0, k.length * (BODY_HALF[k.ai] ?? 0.12)), r };
 }
 
@@ -473,7 +484,8 @@ function riderShake(w: World, cr: Creature, dt: number, state: number): boolean 
 
 /** States in which a creature is in an attack — still, or on a planned lunge — and no other creature moves it. */
 // (CS.Lift: the stag beetle holding ants up between its antlers — merge of feature/realism)
-const ATTACKING = new Set<number>([CS.WindUp, CS.Attack, CS.Strike, CS.Pounce, CS.Coil, CS.Whip, CS.Rear, CS.Flick, CS.Display, CS.Leap, CS.Eat, CS.Lift]); // det-ok: constant
+// (the stag beetle males' wrestling states too: the pair stand their ground against other creatures)
+const ATTACKING = new Set<number>([CS.WindUp, CS.Attack, CS.Strike, CS.Pounce, CS.Coil, CS.Whip, CS.Rear, CS.Flick, CS.Display, CS.Leap, CS.Eat, CS.Lift, CS.Spar, CS.Lock, CS.Heave, CS.Thrown]); // det-ok: constant
 
 /** In an attack, from the wind-up to the end of its recovery (or holding its catch, or shaking riders off)? */
 export function creatureAttacking(cr: Creature): boolean {
@@ -521,8 +533,13 @@ function strikeR(k: CreatureKind): number {
   return reachOf(k).r * k.length * (0.5 + RX.strikePad);
 }
 
-/** A long body (its middle line over half its radius) turning on the spot sweeps the ants planted along it. */
+/**
+ * A long body (its middle line over half its radius) turning on the spot sweeps the ants planted along it. (Not the
+ * stag beetle males: a beetle pivots on its legs to face what bites its sides — balance pass, 2026-11-03: a few ants on
+ * a male's flanks were out of its reach for good.)
+ */
 function longBody(cr: Creature): boolean {
+  if (creatureKind(cr.kind)?.ai === 'stagMale') return false;
   const b = creatureBody(cr);
   return b.hl > b.r * 0.5;
 }
@@ -1329,6 +1346,222 @@ function stag(w: World, cr: Creature, k: CreatureKind, dt: number): void {
   }
 }
 
+// ---------------------------------------------------------------- stag beetle males (not bosses)
+
+const SM = STAG_MALE;
+
+/**
+ * A male walking into ants shoves them aside (the titan's plough, stagPlough, at its own size: `shove` mm/s, in a cone
+ * from the middle of its body out past its antler tips).
+ */
+function malePlough(w: World, cr: Creature, k: CreatureKind, shove: number, dt: number): void {
+  if (cr.v <= 0) return;
+  const G = stagMaleGeom(k.id);
+  if (!G) return;
+  const front = (G.hl + G.r) * k.length;
+  const hx = dcos(cr.h);
+  const hy = dsin(cr.h);
+  for (const a of antsIn(w, cr, cr.x + hx * front * 0.45, cr.y + hy * front * 0.45, front * 0.9, { dir: cr.h, half: SM.ploughHalf })) {
+    if (a.state === AS.Flung || a.state === AS.Climb || (a.state === AS.Grapple && a.gKind === 4 && a.gId === cr.id)) continue;
+    const c = w.colony(a.colony);
+    if (c && a.id === c.queen) continue;
+    const side = (a.x - cr.x) * -hy + (a.y - cr.y) * hx >= 0 ? 1 : -1;
+    if (anchored(a)) cancelAttack(w, a);
+    const nx = a.x + -hy * side * shove * dt + hx * shove * 0.3 * dt;
+    const ny = a.y + hx * side * shove * dt + hy * shove * 0.3 * dt;
+    if (w.walkable(a.space, nx, ny)) {
+      a.x = nx;
+      a.y = ny;
+    }
+    a.stun = Math.max(a.stun, 0.1);
+  }
+}
+
+/**
+ * Stag beetle males (claude/story/06-spec-levels-5-7-and-lengths.md §2, BALANCE STAG_MALE): the titan's moves, scaled
+ * down to the size. A slow, heavy walk that shoves ants aside; it fights what fights it (an ant in reach of its antlers
+ * that is fighting it, then the ant with the most threat close by, then the nearest in a crowd) with a pinch of the
+ * antlers. The medium and large males also grab ants in their antlers, lift and toss them (aimed at the thickest crowd,
+ * every `grabEvery` s); the large male rears and slams when hard pressed and shakes its riders off. No phases, no
+ * nest raids. With no ant about it ambles round its home, and a rival male nearby may draw it into a wrestle
+ * (stagWrestle.ts).
+ */
+function stagMale(w: World, cr: Creature, k: CreatureKind, dt: number): void {
+  const Z = SM.size[k.id];
+  const G = stagMaleGeom(k.id);
+  if (!Z || !G) return;
+  const L = k.length;
+  if (cr.state !== CS.Lift && (cr.data.held1 || cr.data.held2)) stagRelease(cr);
+  const jx = cr.x + dcos(cr.h) * L * G.jaw;
+  const jy = cr.y + dsin(cr.h) * L * G.jaw;
+  // the large male rears and shakes its riders off (as the titan does) — not while it holds ants up
+  if (Z.rear && cr.state !== CS.Lift && riderShake(w, cr, dt, CS.Rear)) return;
+  if (backOff(w, cr, k, dt)) return;
+  // a pinch of the antlers under way: wind-up, pinch, recovery (combat v2.1)
+  if (biteSeq(w, cr, k, dt)) return;
+  const coneX = cr.x + dcos(cr.h) * L * (G.jaw - 0.1);
+  const coneY = cr.y + dsin(cr.h) * L * (G.jaw - 0.1);
+  if (cr.state === CS.WindUp) {
+    // the grab: the antlers clamp on the nearest ants between the tips (lifted); the rest of the cone is bitten and
+    // knocked aside
+    cr.v = 0;
+    if (cr.st >= SM.windUp) {
+      const ants = antsIn(w, cr, coneX, coneY, L * SM.coneR, { dir: cr.h, half: SM.coneHalf });
+      ants.sort((a, b) => sq(a.x - jx) + sq(a.y - jy) - (sq(b.x - jx) + sq(b.y - jy)) || a.id - b.id);
+      let held = 0;
+      for (const a of ants.slice(0, Z.hold + 2)) {
+        if (held < Z.hold && a.state !== AS.Climb) {
+          bite(w, cr, k, a, 0.6);
+          if (a.state !== AS.Dead && gripAnt(w, a, cr.id, L * SM.liftH * 0.4)) {
+            if (held === 0) cr.data.held1 = a.id;
+            else cr.data.held2 = a.id;
+            held++;
+            continue;
+          }
+        }
+        bite(w, cr, k, a, SM.sideBite);
+        if (a.state !== AS.Dead) flingAnt(w, a, cr.x, cr.y, SM.sideFling);
+      }
+      if (held) {
+        setState(cr, CS.Lift);
+        w.events.emit({ t: 'bite', x: jx, y: jy, space: cr.space, strength: 0.8, by: cr.kind, on: 'ant' });
+      } else {
+        cr.cd2 = Z.grabEvery;
+        setState(cr, CS.Strike);
+      }
+    }
+    return;
+  }
+  if (cr.state === CS.Lift) {
+    // held up between the antler tips, squeezed, then tossed to one side (the side the renderer flicks the head to)
+    cr.v = 0;
+    const rise = Math.min(1, cr.st / (SM.liftS * 0.6));
+    for (const [n, key] of [[0, 'held1'], [1, 'held2']] as const) {
+      const id = cr.data[key];
+      if (!id) continue;
+      const a = w.antById.get(id);
+      if (!a || a.state === AS.Dead || a.gripCr !== cr.id) {
+        cr.data[key] = 0;
+        continue;
+      }
+      const off = (n === 0 ? 1 : -1) * L * 0.025;
+      a.x = jx - dsin(cr.h) * off;
+      a.y = jy + dcos(cr.h) * off;
+      a.fz = L * SM.liftH * (0.4 + 0.6 * rise);
+      a.h = cr.h + Math.PI / 2;
+      damageAnt(w, a, SM.squeeze * dt, 'bite', cr);
+      if ((a.state as AS) === AS.Dead) cr.data[key] = 0;
+    }
+    if (cr.st >= SM.liftS) {
+      const sideK = cr.v2 > 0.5 ? 1 : -1;
+      const fx = jx + dsin(cr.h) * sideK * L * 0.3 - dcos(cr.h) * L * 0.1;
+      const fy = jy - dcos(cr.h) * sideK * L * 0.3 - dsin(cr.h) * L * 0.1;
+      for (const key of ['held1', 'held2'] as const) {
+        const a = cr.data[key] ? w.antById.get(cr.data[key]) : undefined;
+        cr.data[key] = 0;
+        if (a && a.state !== AS.Dead && a.gripCr === cr.id) flingAnt(w, a, fx, fy, SM.toss);
+      }
+      cr.cd2 = Z.grabEvery;
+      setState(cr, CS.Strike);
+    }
+    return;
+  }
+  if (cr.state === CS.Rear && !cr.data.shake) {
+    // the large male's rear and slam
+    cr.v = 0;
+    if (cr.st >= 1.2 && !cr.data.slammed) {
+      cr.data.slammed = 1;
+      const r = L * SM.slamR;
+      for (const a of antsIn(w, cr, cr.x, cr.y, r)) {
+        damageAnt(w, a, SM.slamDmg, 'bite', cr);
+        if (a.state !== AS.Dead) flingAnt(w, a, cr.x, cr.y, SM.slamFling);
+      }
+      shakeOff(w, cr, 99, SM.slamFling);
+      w.events.emit({ t: 'slam', x: cr.x, y: cr.y, space: cr.space, radius: r, power: 0.7 });
+    }
+    if (cr.st > 1.8) {
+      cr.data.slammed = 0;
+      cr.data.rearT = SM.rearEvery;
+      setState(cr, CS.Chase);
+    }
+    return;
+  }
+  if (cr.state === CS.Strike && cr.st < 0.5) return;
+  if (Z.rear) {
+    cr.data.rearT = (cr.data.rearT ?? 4) - dt;
+    if (hurtFrac(cr) < SM.rearHp && cr.data.rearT <= 0 && antsIn(w, cr, cr.x, cr.y, L * SM.slamR).length >= SM.rearMinAnts) {
+      setState(cr, CS.Rear);
+      telegraph(w, cr, cr.x, cr.y, L * SM.slamR, 1.2);
+      return;
+    }
+  }
+  // one target (the pinch), as the titan picks
+  const near = reachPick(w, cr, k, true);
+  const a = near ?? threatPick(w, cr, L * 0.6) ?? pickAnt(w, cr, cr.x, cr.y, k.sense, (o, d2) => d2 / (1 + crowd(w, cr, o)));
+  if (!a) {
+    setState(cr, CS.Wander);
+    bossRoam(w, cr, k, dt, 0.6);
+    // no ant about: a rival male nearby may draw it into a wrestle
+    stagRivalScan(w, cr, k);
+    return;
+  }
+  const d = dhypot(a.x - cr.x, a.y - cr.y);
+  setState(cr, CS.Chase);
+  // the grab (a splash in front) is aimed at the thickest crowd: it turns there first
+  const reachG = L * (G.jaw - 0.1 + SM.coneR);
+  const aim = Z.hold > 0 && cr.cd2 <= 0 && d < reachG ? aimDir(w, cr, reachG, SM.coneHalf) : null;
+  // (at most `aimSec` of turning: ants planted round it can leave the best of the aim's cones flipping either side)
+  if (aim && aim.n >= 1 && Math.abs(angleTo(cr.h, aim.dir)) > 0.3 && (cr.data.aimT ?? 0) < SM.aimSec) {
+    cr.v = 0;
+    cr.data.aimT = (cr.data.aimT ?? 0) + dt;
+    turnCreature(cr, aim.dir, dt, 2.5);
+    return;
+  }
+  let ready = false;
+  if (!near && !(engagedWith(cr, a) && inReach(cr, k, a))) {
+    walkTo(w, cr, k, a.x, a.y, 1, dt, 2.5);
+    malePlough(w, cr, k, Z.shove, dt);
+  } else ready = standAndFace(cr, k, a, dt, 2.25);
+  if (aim && aim.n >= 1) {
+    cr.data.aimT = 0;
+    setState(cr, CS.WindUp);
+    telegraph(w, cr, coneX, coneY, L * SM.coneR, SM.windUp, { dir: cr.h, half: SM.coneHalf });
+    return;
+  }
+  if (cr.cd <= BALANCE.combat21.crWindupSec && ready) {
+    cr.data.nb = 0;
+    startBite(cr, a);
+    return;
+  }
+  // ants under its body or on its middle, where its antlers cannot come round to them: when it has had ants on it for
+  // `stuckSec` without one in front to pinch, it shrugs and kicks the nearest of them off (balance pass, 2026-11-03)
+  if (cr.latched > 0 && !ready) {
+    cr.data.nb = (cr.data.nb ?? 0) + dt;
+    if (cr.data.nb >= SM.stuckSec) {
+      shrugOff(w, cr, Z.shakeN);
+      cr.data.nb = 0;
+    }
+  } else cr.data.nb = 0;
+  if (cr.latched >= Z.shakeAt && cr.st > 2) {
+    shakeOff(w, cr, Z.shakeN, 1.2);
+    cr.st = 0;
+  }
+}
+
+/** Fling off up to n of the ants holding on to it, those nearest its middle first (stagMale). */
+function shrugOff(w: World, cr: Creature, n: number): void {
+  const ants = latchedAnts(w, cr);
+  ants.sort((a, b) => sqd(a.x - cr.x, a.y - cr.y) - sqd(b.x - cr.x, b.y - cr.y) || a.id - b.id);
+  let k = 0;
+  for (const a of ants) {
+    if (k >= n) break;
+    const hook = casteOf(a.caste).hook;
+    if (hook && w.rng.next() >= hook.dislodge) continue;
+    flingAnt(w, a, cr.x, cr.y, 1);
+    k++;
+  }
+}
+
 /** How many ants stand near an ant (bosses go for clusters). */
 function crowd(w: World, cr: Creature, a: Ant): number {
   let n = 0;
@@ -1779,6 +2012,7 @@ const PROGRAMS: Record<string, (w: World, cr: Creature, k: CreatureKind, dt: num
   antlion,
   spiderling,
   stag,
+  stagMale,
   tarantula,
   scolopendra,
   giantMantis: (w, cr, k, dt) => mantis(w, cr, k, dt, { boss: true }),
@@ -1895,8 +2129,11 @@ export function creatureSystem(w: World, dt: number): void {
         continue;
       }
     }
-    // a titan digging into a nest (titanDig.ts) — before the director: a story's digInto cue hands it over
-    if ((cr.data.raid ?? 0) > 0 && titanRaidTick(w, cr, k, dt)) {
+    // two stag beetle males wrestling (stagWrestle.ts) — before the director: a story may stage a bout
+    if ((cr.data.wr ?? 0) > 0 && stagWrestleTick(w, cr, k, dt)) {
+      // (the bout moved it)
+    } else if ((cr.data.raid ?? 0) > 0 && titanRaidTick(w, cr, k, dt)) {
+      // a titan digging into a nest (titanDig.ts) — before the director: a story's digInto cue hands it over
       // (the raid moved it)
     } else if (cr.data.dirA !== undefined && directCreature(w, cr, dt)) {
       // story levels: a creature the director plays walks its cue (sim/story/director.ts); else its own program
@@ -1984,7 +2221,8 @@ export function ecologySystem(w: World, dt: number): void {
   let wild = 0;
   for (const cr of w.s.creatures) if (!cr.dead && cr.space === SURFACE && !creatureKind(cr.kind)?.boss && cr.kind !== 'spiderling') wild++;
   if (wild >= want || !w.rng.chance(dt * 0.05 * mul)) return;
-  const kinds = wildKinds();
+  // (kinds limited to some biomes — the stag beetle males: forests — only where they live)
+  const kinds = wildKinds(mapBiome(w));
   let tot = 0;
   for (const k of kinds) tot += k.w * (CREATURES[k.id].nocturnal ? 0.5 + w.s.night : 1);
   let r = w.rng.next() * tot;
@@ -1998,6 +2236,12 @@ export function ecologySystem(w: World, dt: number): void {
   }
   const p = wildSpot(w, CREATURES[pick].ai === 'antlion' ? 140 : 110);
   if (p) spawnCreature(w, pick, SURFACE, p.x, p.y);
+}
+
+/** The map's biome: an authored map's own, a procedural map's from its style ('forest' is forest). */
+function mapBiome(w: World): string {
+  const t = w.terrain;
+  return t.map?.biome ?? (t.params.style === 'forest' ? 'forest' : t.params.style === 'sandy' ? 'savanna' : t.params.style);
 }
 
 function wildSpot(w: World, clear: number): { x: number; y: number } | null {

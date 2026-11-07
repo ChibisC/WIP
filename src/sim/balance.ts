@@ -162,6 +162,12 @@ export const BALANCE = {
     mantis: { r: 0.3, arc: 0.45 },
     giantMantis: { r: 0.3, arc: 0.65 },
     stagBeetle: { r: 0.15, arc: 0.6 },
+    // the stag beetle males (STAG_MALE): their outline already ends at the antler tips (the model is centred on them);
+    // the head swings the antlers a little further, more the longer they are
+    stagMinor: { r: 0.06, arc: 0.6 },
+    stagSmall: { r: 0.07, arc: 0.6 },
+    stagMedium: { r: 0.09, arc: 0.6 },
+    stagLarge: { r: 0.11, arc: 0.6 },
     scolopendra: { r: 0.1, arc: 2.0 },
   } as Record<string, { r: number; arc: number }>,
   /**
@@ -268,6 +274,10 @@ export const BALANCE = {
       cutworm: 0,
       mantis: 0.1,
       stagBeetle: 0.08,
+      stagMinor: 0.08,
+      stagSmall: 0.08,
+      stagMedium: 0.08,
+      stagLarge: 0.08,
       tarantula: 0.12,
       hogna: 0.12,
       giantMantis: 0.1,
@@ -1130,6 +1140,119 @@ export const STAG = {
   liftH: 0.22,
   /** how far in front of its centre the antler tips close (fraction of its length) */
   jaw: 0.42,
+};
+
+/** One stag beetle male size (STAG_MALE.size). */
+export interface StagMaleSize {
+  /** the model's allometric male size (render/creatures/stagBeetle.ts: 0 a minor … 1 the titan's major): head and antlers */
+  msize: number;
+  /** the antler grab: ants clamped at once (0: it never grabs) and the seconds between grabs */
+  hold: number;
+  grabEvery: number;
+  /** rears up and slams down (and shakes its riders off) */
+  rear: boolean;
+  /** walking into ants it shoves them aside at this speed (mm/s) */
+  shove: number;
+  /** with this many ants holding on it shakes `shakeN` of them off (every 2 s) */
+  shakeAt: number;
+  shakeN: number;
+}
+
+/**
+ * Stag beetle males (claude/story/06-spec-levels-5-7-and-lengths.md §2; docs/creatures/lucanus-cervus.md "Males of
+ * four sizes"): four normal creatures (kinds `stagMinor` … `stagLarge`, ai `stagMale`) drawn with the titan's model at
+ * male sizes 0–3 and scaled down from its 100 mm. The titan's moves, scaled down: all of them walk slowly and plough
+ * through ants (`shove`), pinching what fights them (threat first, like the titan); the medium and large males also grab
+ * ants in their antlers and toss them (`hold`, `grabEvery`, then the titan's sequence with the numbers below); the large
+ * male rears and slams when hard pressed (below `rearHp` of its health with `rearMinAnts` ants round it, every
+ * `rearEvery` s: `slamDmg` to the ants within `slamR` × its length) and shakes its riders off like a titan.
+ *
+ * `model`: the model's layout as fractions of its length (render/creatures/stagBeetle.ts SB, the antler length from
+ * render/anatomy/mandibleSpecs.ts stagMandibleShare — tests/stagSizes.ts checks they agree). A male's model is drawn
+ * shifted forward so its body, elytra apex to antler tips, is centred on the sim position (its short antlers left the
+ * titan's layout tail-heavy); its outline is a capsule of radius `r` × L round that (kinds.ts stagMaleGeom).
+ *
+ * `wrestle` (stagWrestle.ts): two males meeting with no ants about face off, lock antlers and shove, then the winner —
+ * the bigger one, mostly — lifts the other and throws it on its back; it rights itself and walks off.
+ */
+export const STAG_MALE = {
+  size: {
+    stagMinor: { msize: 0, hold: 0, grabEvery: 0, rear: false, shove: 14, shakeAt: 4, shakeN: 1 },
+    stagSmall: { msize: 0.25, hold: 0, grabEvery: 0, rear: false, shove: 17, shakeAt: 5, shakeN: 1 },
+    stagMedium: { msize: 0.5, hold: 1, grabEvery: 9, rear: false, shove: 21, shakeAt: 6, shakeN: 2 },
+    stagLarge: { msize: 0.75, hold: 2, grabEvery: 7, rear: true, shove: 24, shakeAt: 7, shakeN: 2 },
+  } as Record<string, StagMaleSize>,
+  model: { back: -0.47, hinge: 0.176, share0: 0.075, shareK: 0.265, tipK: 0.9, closeK: 0.7, lockK: 0.55, r: 0.24 },
+  /** the grab (as the titan's STAG): wind-up, the cone it clamps in (radius × L, half-angle), lift, squeeze, toss */
+  windUp: 0.8,
+  coneR: 0.3,
+  coneHalf: 0.9,
+  liftS: 0.8,
+  squeeze: 8,
+  toss: 2.2,
+  sideBite: 0.45,
+  sideFling: 1,
+  liftH: 0.2,
+  ploughHalf: 0.9,
+  /** the large male's rear and slam */
+  rearHp: 0.6,
+  rearEvery: 12,
+  rearMinAnts: 3,
+  slamR: 0.45,
+  slamDmg: 10,
+  slamFling: 1.6,
+  /** ants on it and none in front to pinch for this long (under its body, on its middle): it shrugs `shakeN` off */
+  stuckSec: 2.5,
+  /** turning to aim the grab at most this long (then it grabs where it faces) */
+  aimSec: 1,
+  wrestle: {
+    /** an idle male looks for a rival every `scanSec`; a rival within `meet` × their mean length (centre to centre: it sees it and walks over) */
+    scanSec: 1,
+    meet: 4,
+    /** a look that finds one starts a bout this often */
+    chance: 0.5,
+    /** no ant within `clear` × its length of either; both at least `minHp` of their health */
+    clear: 0.9,
+    minHp: 0.5,
+    /** walking to the face-off (× its speed); given up if they have not faced off `approachSec` after their walks should end */
+    speed: 0.8,
+    approachSec: 5,
+    /** the face-off: `gap` × their mean length further apart than locked, for `faceSec` */
+    gap: 0.12,
+    faceSec: 1.4,
+    /** locked: stepping in over `lockIn` s, then `lockMin`..`lockMax` s of shoving (± `pushAmp` × the mean length at
+     *  `pushHz`, the winner gaining `pushDrift` × it), the locked heads twisting ± `twist` rad */
+    lockIn: 0.35,
+    lockMin: 2.2,
+    lockMax: 4.2,
+    pushAmp: 0.035,
+    pushHz: 0.9,
+    pushDrift: 0.08,
+    twist: 0.1,
+    /** who wins: P = 0.5 + `winK` × (sa − sb) / (sa + sb), within `winMin`..`winMax`; s = length × (0.6 + 0.4 × health) */
+    winK: 2.2,
+    winMin: 0.1,
+    winMax: 0.9,
+    /** the lift: the loser held up at the winner's antlers (`liftZ` × the winner's length high) for `liftSec` */
+    liftSec: 1,
+    liftZ: 0.24,
+    /** (the winner's antlers raised: the loser hangs `heldK` × as far ahead as the closed tips reach on the ground) */
+    heldK: 0.8,
+    /** the throw: `throwSec` in the air, landing `throwDist` × its length to one side, turned `throwSpin` rad */
+    throwSec: 0.55,
+    throwDist: 0.75,
+    throwSpin: 1.2,
+    /** on its back for `downSec`, the last `rightSec` of it righting itself */
+    downSec: 1.8,
+    rightSec: 0.7,
+    /** then the loser walks `partDist` × its length away over `partSec` */
+    partSec: 4,
+    partDist: 1.2,
+    /** no new bout for `cdMin`..`cdMax` s after one (`cdAbort` after one broken off) */
+    cdMin: 40,
+    cdMax: 80,
+    cdAbort: 15,
+  },
 };
 
 /**
