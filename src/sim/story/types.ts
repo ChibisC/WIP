@@ -189,6 +189,8 @@ export type Action =
   | { do: 'weather'; rain?: number; heat?: number }
   /** two male stag beetles (creature actors) lock jaws and wrestle now; the bigger tends to throw the other */
   | { do: 'wrestle'; a: string; b: string }
+  /** a creature actor's health back to `to` × its maximum (a boss rested and fed before its last fight) */
+  | { do: 'heal'; actor: string; to: number }
   /** a rival colony goes all-in on the player's queen (no retreat): its nest is about to flood (High Water) */
   | { do: 'allOut'; rival: string }
   /** the nests whose entrances are under water now start to flood underground (sim/nestFlood.ts) */

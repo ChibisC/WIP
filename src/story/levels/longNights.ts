@@ -65,7 +65,8 @@ export const LONG_NIGHTS_LEVEL: StoryLevelDef = {
     // member the bot lost Hard and Brutal at human pace, 2026-11-03)
     night4n: { creatures: [['groundBeetle', 1], ['wolfSpider', 1], ['lithobius', 1]], from: ['lairNW', 'lairN'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.35, label: 'the fourth night’s hunters' },
     night4e: { creatures: [['wolfSpider', 1], ['lithobius', 1], ['groundBeetle', 1]], from: ['lairE', 'lairSE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.35, label: 'the fourth night’s hunters' },
-    tarantula: { creature: 'tarantula', at: 'tarantulaBurrow', face: 'knollFoot', spawn: 'action', hp: 0.7, phases: [0.5], label: 'the red-knee tarantula' },
+    // (0.7 → 0.6 with the fourth night, 2026-11-03: at a person's pace the bot lost Hard and Brutal to it on the last night)
+    tarantula: { creature: 'tarantula', at: 'tarantulaBurrow', face: 'knollFoot', spawn: 'action', hp: 0.6, phases: [0.5], label: 'the red-knee tarantula' },
     ...EV.actors,
   },
   surprises: EV.surprises,

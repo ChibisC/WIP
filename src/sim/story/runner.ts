@@ -172,6 +172,16 @@ function act(w: World, st: StoryState, a: Action): void {
       if (text) w.events.emit({ t: 'message', text, kind: a.kind ?? 'info', ...(p ? { colony: p.id } : {}) });
       return;
     }
+    case 'heal': {
+      const ai = actorIndex(st, a.actor);
+      const act = ai >= 0 ? st.actors[ai] : null;
+      if (!act?.spawned || act.kind !== 0) return;
+      for (const id of act.ids) {
+        const cr = w.creatureById.get(id);
+        if (cr && !cr.dead) cr.hp = Math.max(cr.hp, cr.maxHp * a.to);
+      }
+      return;
+    }
     case 'weather': {
       const W = (w.s.weather ??= { rain: 0, heat: 0 });
       if (a.rain) W.rain = Math.max(W.rain, w.s.time + a.rain);

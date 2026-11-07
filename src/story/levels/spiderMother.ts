@@ -71,7 +71,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
     {
       name: 'Before the hunt',
       objectives: [
-        { type: 'surviveTime', s: { easy: 600, normal: 570, hard: 540, brutal: 510 }, text: 'Prepare: she hunts at dusk' },
+        { type: 'surviveTime', s: { easy: 630, normal: 600, hard: 570, brutal: 540 }, text: 'Prepare: she hunts at dusk' },
         { type: 'fighters', n: 14, optional: true },
         { type: 'raise', n: 50, optional: true, text: 'Raise 50 ants' },
       ],
@@ -93,7 +93,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
     {
       name: 'Her rounds',
       objectives: [
-        { type: 'surviveTime', s: { easy: 840, normal: 900, hard: 930, brutal: 960 }, text: 'Hold out while she hunts the colony' },
+        { type: 'surviveTime', s: { easy: 900, normal: 960, hard: 990, brutal: 1020 }, text: 'Hold out while she hunts the colony' },
         { type: 'fighters', n: 20, optional: true },
         { type: 'raise', n: 60, optional: true, text: 'Raise 60 ants' },
       ],
@@ -140,7 +140,8 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
         { key: 'motherIn', on: 'motherIn' },
       ],
       events: [
-        { actions: [{ do: 'music', mood: 'assault' }, { do: 'night', level: 0.45 }] },
+        // (she comes out of her burrow for the last time rested and fed: the fight to the death starts from full health)
+        { actions: [{ do: 'music', mood: 'assault' }, { do: 'night', level: 0.45 }, { do: 'heal', actor: 'mother', to: 1 }] },
         { on: 'hp:mother:30', actions: [{ do: 'tip', key: 'motherDig' }] },
       ],
       scenes: [

@@ -239,7 +239,7 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
     run(x, 30);
     return missionOf(x)!.goals[0]?.progress ?? '';
   };
-  check('spider mother: the preparation is longer on Easy than on Brutal (8½–10 min)', prep('easy').endsWith('10:00') && prep('brutal').endsWith('8:30'), `${prep('easy')} / ${prep('brutal')}`);
+  check('spider mother: the preparation is longer on Easy than on Brutal (9–10½ min)', prep('easy').endsWith('10:30') && prep('brutal').endsWith('9:00'), `${prep('easy')} / ${prep('brutal')}`);
   const mom = members(w, actor(w, 'mother'))[0] as Creature;
   const burrow = wherePt(w, 'burrowEdge');
   run(w, 20 * 20);
@@ -257,7 +257,7 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
   }
   check('spider mother: on her rounds she comes down toward the nest and goes back to her burrow', farR > 100 && backR < 40 && w.s.night > 0.2, `${farR.toFixed(0)} then ${backR.toFixed(0)} mm from the burrow`);
   check('spider mother: a brood of her older spiderlings disperses over the terrace during her rounds', hasFlag(st, 'hatchA') && members(w, actor(w, 'broodA')).length >= 3);
-  check('spider mother: her rounds last 14–16 minutes by difficulty', JSON.stringify(STORY_LEVELS.spiderMother.stages[1].objectives[0]) === JSON.stringify({ type: 'surviveTime', s: { easy: 840, normal: 900, hard: 930, brutal: 960 }, text: 'Hold out while she hunts the colony' }));
+  check('spider mother: her rounds last 15–17 minutes by difficulty', JSON.stringify(STORY_LEVELS.spiderMother.stages[1].objectives[0]) === JSON.stringify({ type: 'surviveTime', s: { easy: 900, normal: 960, hard: 990, brutal: 1020 }, text: 'Hold out while she hunts the colony' }));
   // on her rounds she can be driven off but not killed (a health floor until the last stage)
   {
     const wf = level('spiderMother', 'normal', 8);

@@ -32,7 +32,7 @@ export const EN: Record<string, string> = {
   'garden.beetleHunt': 'The ground beetle is back, working along the meadow where her foragers go. Ground beetles take ants when they can catch them.',
   'garden.strawberry': 'A strawberry has dropped off the bed. Sugar like that will not lie there long; the garden ants will have smelled it too.',
   'garden.heat': 'The ground is baking. Her foragers hurry from shade to shade and lose time doing it.',
-  'garden.earlyRaid': 'The garden ants are not waiting for you: a raid is coming now.',
+  'garden.seeds': 'A seed head has burst over the meadow. Seeds keep; her foragers can carry them home and store them.',
   // ------------------------------------------------------------------ Level 2 — The Long Nights
   'longNights.intro1': 'Summer. The colony has spread west from the garden, to the stony hollow where the meadow meets the river woods.',
   'longNights.intro2': 'By day this hollow is empty and quiet. I have learned not to be in it after dark.',

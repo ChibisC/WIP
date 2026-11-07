@@ -115,16 +115,23 @@ for (let t = 0; t < minutes * 1200; t++) {
   for (const o of S?.objectives ?? []) {
     if (target) break;
     if ((o.type === 'stealCaste' || o.type === 'killAnts') && c.living >= 12) {
-      // the nearest rival ant on the surface
+      // the nearest rival ant on the surface (of the caste wanted, when stealing it), within reach of home; a bigger army
+      // goes further out for it, as a player would once the rival stopped coming
       const e = c.entrances[0];
+      const want = o.type === 'stealCaste' ? o.caste : '';
+      const reach = c.living >= ARMY * 0.8 ? 2000 : 500;
       let best = Infinity;
-      for (const a of w.s.ants) {
-        if (a.colony !== rivalId || a.state === AS.Dead || a.space !== SURFACE) continue;
-        const d = Math.hypot(a.x - e.sx, a.y - e.sy);
-        if (d < best && d < 500) {
-          best = d;
-          target = { space: SURFACE, x: a.x, y: a.y };
+      for (const pass of [true, false]) {
+        for (const a of w.s.ants) {
+          if (a.colony !== rivalId || a.state === AS.Dead || a.space !== SURFACE) continue;
+          if (pass && want && a.caste !== want) continue;
+          const d = Math.hypot(a.x - e.sx, a.y - e.sy);
+          if (d < best && d < (pass ? reach : 500)) {
+            best = d;
+            target = { space: SURFACE, x: a.x, y: a.y };
+          }
         }
+        if (target) break;
       }
     } else if ((o.type === 'reach' || o.type === 'hold') && c.living >= 20) {
       const p = wherePt(w, o.at);

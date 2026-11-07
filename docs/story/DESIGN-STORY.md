@@ -119,8 +119,8 @@ Medals: time gold ≤ 20 min, silver ≤ 32; losses gold ≤ 25, silver ≤ 60; 
 the first Lasius raid".
 
 Surprise events (§6): a red wood ant column crossing the garden (a visiting party); the ground beetle back, hunting the
-meadow's foragers; a strawberry fallen off the bed, and a Lasius foraging party coming for it; a hot spell; on Hard and
-Brutal an early Lasius raid once the stolen genes stage begins.
+meadow's foragers; a strawberry fallen off the bed, and a Lasius foraging party coming for it; a seed drop; a hot spell.
+(An early Lasius raid on Hard and Brutal was tried and cut: at a person's pace it ended the level at 15–19 minutes.)
 
 ### Level 2 — "The Long Nights" (map `stonyHollow`, 1100 × 900 mm) — new 2026-11-02
 Kept the working title: it says what the level is (three nights to live through) and is our own. The colony has spread
@@ -148,7 +148,7 @@ Surprise events by day (§6): a moth fallen in the hollow (day 1); a red wood an
 and a hot spell (day 2); a praying mantis hunting the hollow and a dead grasshopper (day 3); a rove beetle hunting the
 foragers and a seed drop (day 4).
 
-Hunters' health is scaled down for the level (`hp` 0.3–0.4; their counts × the difficulty's `wave`); the tarantula 0.7 ×
+Hunters' health is scaled down for the level (`hp` 0.3–0.4; their counts × the difficulty's `wave`); the tarantula 0.6 (0.7 before the fourth night) ×
 the difficulty's `boss`. Medals: **food stored** at the end (the level's length is fixed: gold ≥ 360, silver ≥ 200),
 losses (gold ≤ 60, silver ≤ 130), bonus "kill the tarantula before dawn".
 
@@ -182,9 +182,9 @@ silk turret rim); level 0 = the lower terrace by the river with the player's nes
 slope, a root ramp). A developed colony laid out like an AI nest (user 2026-11-02; `nest` in the level, `developPlan` in the map spec, built by
 the colony AI's own `developChambers`): the founding ring of workers round the queen, a 7-hex worker rosette, a 7-hex food
 store by the entrance, 7-hex soldier and 3-hex Lasius soldier and fire major chambers (castes the player owns), highways
-on the tunnels between them (about 29 ants, 140 food), a preparation (Easy 10 min, Normal 9½, Hard 9, Brutal 8½), then her
-rounds (Easy 14 min, Normal 15, Hard 15½, Brutal 16: claude/story/06-spec §7, the level ran 14–17 minutes), then the fight
-to the end; the light goes toward dusk when she comes out. On her rounds she can be hurt but not killed: at 55 % of her
+on the tunnels between them (about 29 ants, 140 food), a preparation (Easy 10½ min, Normal 10, Hard 9½, Brutal 9), then her
+rounds (Easy 15 min, Normal 16, Hard 16½, Brutal 17: claude/story/06-spec §7, the level ran 14–17 minutes), then the fight
+to the end, which she starts rested and fed (back to full health: `heal`); the light goes toward dusk when she comes out. On her rounds she can be hurt but not killed: at 55 % of her
 health she is hurt no further until the last stage (`ActorDef.floor`), and below 60 % she stays down her burrow.
 
 | Stage | Objectives | Scenes and set pieces |

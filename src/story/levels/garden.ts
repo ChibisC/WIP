@@ -1,9 +1,9 @@
 import type { StoryLevelDef } from '../../sim/story/types';
-import { column, earlyRaid, heat, party, surprisePool, wanderer, windfall } from '../surprises';
+import { column, heat, party, surprisePool, wanderer, windfall } from '../surprises';
 
 /**
  * Surprise events (claude/story/06-spec §6): a red wood ant column crossing the garden, the ground beetle back hunting
- * the meadow's foragers, a fallen strawberry the garden ants come for, a hot spell; on Hard and Brutal an early raid.
+ * the meadow's foragers, a fallen strawberry the garden ants come for, a seed drop, a hot spell.
  */
 const EV = surprisePool(
   column('woodAnts', { window: [1000, 1700], visitor: 'formica', species: 'formica', name: 'Red wood ants', ants: [['formica_worker', 7], ['formica_soldier', 2]], enter: 'evEast', path: 'woodCol', exit: 'evSouth', label: 'the wood ant column', say: 'woodAnts' }),
@@ -11,7 +11,9 @@ const EV = surprisePool(
   windfall('strawberry', { window: [700, 1300], at: 'berryDrop', kind: 'berry', model: '', scale: 2.2, say: 'strawberry' }),
   party('berryParty', { window: [25, 55], after: 'ev:strawberry', rival: 'lasius', ants: [['lasius_worker', 4]], enter: 'stoneSteps', to: 'berryDrop', s: 50, label: 'the strawberry foragers' }),
   heat('hotSpell', { window: [1500, 2400], chance: 0.7, s: 100, say: 'heat' }),
-  earlyRaid('earlyRaid', { window: [90, 240], after: 'stage:2', from: 'hard', rival: 'lasius', note: 'earlyRaid' }),
+  // (an early Lasius raid on Hard and Brutal was cut, 2026-11-03: at a person's pace it ended the first level at 15–19
+  // minutes; a seed drop instead, something to gain)
+  windfall('seeds', { window: [400, 900], after: 'stage:1', at: 'fruit', kind: 'seed', model: '', scale: 1.1, n: 10, spread: 30, say: 'seeds' }),
 );
 
 /**
