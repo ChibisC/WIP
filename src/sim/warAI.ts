@@ -9,6 +9,10 @@ import { BALANCE, NASUTE, TERMANT } from './balance';
 import { genesNear } from './termants';
 import { rivalsMayRaid } from './missions';
 import { siteRoutes } from '../world/teamSites';
+import { TUNNELS } from './balance';
+import { aiLevel } from './colonyAI';
+import { gatePos, otherHalf, ownHalf, routeBetween, routeDone, routeUsable, routes, setRouteDig, sealedAt } from './tunnels';
+import { hash01 } from './dmath';
 
 /**
  * The rival AI's war (Phase 12; allies CHANGE_PLAN §23): its fighter groups defend the nest, raid rivals and help
@@ -95,6 +99,8 @@ function threat(w: World, c: Colony): { space: number; x: number; y: number } | 
   let bd = Infinity;
   const consider = (space: number, x: number, y: number) => {
     if (space === home) {
+      // enemy diggers still sealed behind a tunnel route's soil are not in the nest (sim/tunnels.ts)
+      if (sealedAt(w, home, x, y)) return;
       // anything inside the nest beats anything outside (nearest the queen first)
       const d = -1e9 + sq(x - qx) + sq(y - qy);
       if (d < bd) {
@@ -117,6 +123,21 @@ function threat(w: World, c: Colony): { space: number; x: number; y: number } | 
     const o = w.colony(a.colony);
     if (!o || o.team === c.team) continue;
     consider(a.space, a.x, a.y);
+  }
+  // a tunnel route an enemy digs toward this nest (the warning): guards at the gate, after anything already inside
+  for (const r of routes(w)) {
+    if (r.open) continue;
+    const h = ownHalf(r, c.id);
+    if (!h || !h.warned) continue;
+    const o = otherHalf(r, h);
+    const oc = w.colony(o.colony);
+    if (!oc || !oc.alive || oc.team === c.team || oc.routeDig !== r.id) continue;
+    const p = gatePos(w, h);
+    const d = -1e8 + sq(p.x - qx) + sq(p.y - qy);
+    if (d < bd) {
+      bd = d;
+      best = { space: home, x: p.x, y: p.y };
+    }
   }
   for (const cr of w.s.creatures) {
     if (cr.dead || creatureKind(cr.kind)?.relation !== 'hostile') continue;
@@ -195,6 +216,7 @@ export function warTick(w: World, c: Colony, dt: number): void {
     if (!m.placed || m.space !== th.space || sq(m.x - th.x) + sq(m.y - th.y) > 100) placeMarker(w, c, DEFEND, th.space, th.x, th.y);
     if (!b.defending) b.defending = true;
     sendFighters(w, c, DEFEND);
+    meetDiggers(w, c);
     return;
   }
   if (b.defending) {
@@ -235,6 +257,9 @@ export function warTick(w: World, c: Colony, dt: number): void {
     return;
   }
 
+  // ---- A tunnel being dug toward a target (CHANGE_PLAN §27): fighters wait at the gate; the raid goes through when it opens
+  if (tunnelTick(w, c, b)) return;
+
   // ---- Peace: raid when strong enough (in a mission, only once the story has set the war going); not while helping.
   if (aggression <= 0 || w.s.time < W.firstRaid || w.s.time < b.cooldown || (!c.player && !rivalsMayRaid(w))) return;
   if ((c.aiAlly?.ally ?? -1) >= 0) return;
@@ -247,6 +272,8 @@ export function warTick(w: World, c: Colony, dt: number): void {
   if (!tgt || !t || own.power < tgt.power * (W.margin / aggression) * (genesNear(c, t.species) ? TERMANT.ai.raidMarginMul : 1)) return;
   const q = w.antById.get(t.queen);
   if (!q || q.state === AS.Dead) return;
+  // a tunnel instead of a surface raid (CHANGE_PLAN §27): a closed route to the target, by level and chance
+  if (startTunnel(w, c, b, t)) return;
   b.target = tgt.id;
   b.start = own.n;
   b.age = 0;
@@ -258,8 +285,97 @@ export function warTick(w: World, c: Colony, dt: number): void {
   if (colonyOfSpace(q.space) === t.id && t.player) w.events.emit({ t: 'message', text: `${c.name} is marching on your nest!`, kind: 'warn', colony: t.id });
 }
 
+/**
+ * Start digging a tunnel route toward the raid's target instead of marching over the surface (TUNNELS.ai): from
+ * `from[level]` seconds, with `chance[level]` at each decision, when a closed route leads there that this colony is
+ * not already digging. The fighters go to the gate; the dig is the workers' (jobs.ts). Returns true if started.
+ */
+function startTunnel(w: World, c: Colony, b: NonNullable<Colony['aiWar']>, t: Colony): boolean {
+  const T = TUNNELS.ai;
+  const lv = aiLevel(w);
+  if (w.s.time < T.from[lv] || T.from[lv] <= 0) return false;
+  const r = routeBetween(w, nestSpace(c.id), nestSpace(t.id));
+  if (!r || routeDone(w, r, c.id) || (c.routeDig ?? -1) >= 0) return false;
+  if (hash01(w.s.tick + c.id * 977, 11) > T.chance[lv]) return false;
+  if (!setRouteDig(w, c, r.id)) return false;
+  b.tunnel = r.id;
+  b.target = t.id;
+  b.start = fighters(w, c).n;
+  b.age = 0;
+  b.joined = c.id;
+  b.gather = undefined;
+  b.tunnelled = false;
+  const h = ownHalf(r, c.id)!;
+  const p = gatePos(w, h);
+  placeMarker(w, c, ATTACK, nestSpace(c.id), p.x, p.y);
+  sendFighters(w, c, ATTACK);
+  return true;
+}
+
+/**
+ * A tunnel raid in progress (before the route is usable): the fighters mass at the gate; the raid's age does not run
+ * until the route is usable; once it is (open, or dug through with the partner's rim step), ATTACK moves onto the target
+ * queen and the raid runs as a normal one. Returns true while this holds the war brain.
+ */
+function tunnelTick(w: World, c: Colony, b: NonNullable<Colony['aiWar']>): boolean {
+  if (b.tunnel === undefined || b.tunnel < 0) return false;
+  const r = routes(w)[b.tunnel];
+  const t = w.colony(b.target);
+  if (!r || !t || !t.alive || c.routeDig !== r.id) {
+    // the dig stopped (the route opened and the gate joined, or the target fell): a normal raid from here, or peace
+    if (r && t && t.alive && routeUsable(w, r, c.id)) {
+      b.tunnel = -1;
+      b.tunnelled = true;
+      return false;
+    }
+    b.tunnel = -1;
+    b.tunnelled = false;
+    if (b.target >= 0 && !(t && t.alive)) endRaid(w, c, !t || !t.alive);
+    else if (b.target >= 0) {
+      callHome(w, c, ATTACK);
+      b.target = -1;
+    }
+    return false;
+  }
+  if (routeUsable(w, r, c.id)) {
+    b.tunnel = -1;
+    b.tunnelled = true;
+    b.age = 0;
+    b.start = fighters(w, c).n;
+    return false;
+  }
+  b.age = 0;
+  const h = ownHalf(r, c.id)!;
+  const p = gatePos(w, h);
+  const m = c.markers[ATTACK];
+  if (!m.placed || m.space !== nestSpace(c.id) || sq(m.x - p.x) + sq(m.y - p.y) > 64) placeMarker(w, c, ATTACK, nestSpace(c.id), p.x, p.y);
+  sendFighters(w, c, ATTACK);
+  return true;
+}
+
+/**
+ * Defence by digging (TUNNELS.ai.meetFrom): a warned colony on Hard or Brutal digs the same route from its own gate to
+ * meet the attackers early (its workers; the war brain's guards stand at the gate meanwhile). Called from warTick's
+ * defence branch.
+ */
+function meetDiggers(w: World, c: Colony): void {
+  if (aiLevel(w) < TUNNELS.ai.meetFrom || (c.routeDig ?? -1) >= 0) return;
+  for (const r of routes(w)) {
+    if (r.open) continue;
+    const h = ownHalf(r, c.id);
+    if (!h || !h.warned) continue;
+    const o = otherHalf(r, h);
+    const oc = w.colony(o.colony);
+    if (!oc || !oc.alive || oc.team === c.team || oc.routeDig !== r.id) continue;
+    setRouteDig(w, c, r.id);
+    return;
+  }
+}
+
 function endRaid(w: World, c: Colony, won: boolean): void {
   const b = warBrain(c);
+  b.tunnel = -1;
+  b.tunnelled = false;
   callHome(w, c, ATTACK);
   b.target = -1;
   b.joined = -1;
@@ -436,7 +552,30 @@ export function allyDanger(w: World, o: Colony, lossRate = 0): AllyDanger {
 }
 
 /** Seconds for this colony's fighters to reach ally o: the land route between their sites (else 1.3 × the straight line). */
+/** Dig the route to the nearest ally not yet linked, when idle (no raid, no other dig) and TUNNELS.ai.allyLinkFrom has passed. */
+function linkAlly(w: World, c: Colony, allies: Colony[]): void {
+  if ((c.routeDig ?? -1) >= 0 || warBrain(c).target >= 0 || w.s.time < TUNNELS.ai.allyLinkFrom) return;
+  let pick: { r: number; d: number } | null = null;
+  for (const o of allies) {
+    const r = routeBetween(w, nestSpace(c.id), nestSpace(o.id));
+    if (!r || routeDone(w, r, c.id)) continue;
+    const d = dhypot(o.nx - c.nx, o.ny - c.ny);
+    if (!pick || d < pick.d) pick = { r: r.id, d };
+  }
+  if (pick) setRouteDig(w, c, pick.r);
+}
+
 function travelTime(w: World, c: Colony, o: Colony): number {
+  // linked nests (an open tunnel route): the walk through it, with no surface leg
+  const r = routeBetween(w, nestSpace(c.id), nestSpace(o.id));
+  if (r && routeUsable(w, r, c.id)) {
+    const g = w.nest(c.id)!;
+    const len = (r.halves[0].steps.length + r.halves[1].steps.length) * g.H * 2 + g.widthMm;
+    let sp = 0;
+    let k = 0;
+    for (const cs of c.castes) if (isFighter(cs)) ((sp += casteOf(cs).speed), k++);
+    return len / Math.max(1, k ? sp / k : 10);
+  }
   let speed = 0;
   let n = 0;
   for (const cs of c.castes)
@@ -565,6 +704,8 @@ function steerHelp(w: World, c: Colony, o: Colony, d: AllyDanger): void {
   let space = d.space;
   let x = d.x;
   let y = d.y;
+  const link = routeBetween(w, nestSpace(c.id), nestSpace(o.id));
+  if (d.inside && s.stage === 0 && link && routeUsable(w, link, c.id)) s.stage = 1; // linked nests: straight through the tunnel
   if (d.inside && s.stage === 0) {
     // the ally's hole nearest us: a marker dropped on it goes down into the ally's nest, at its entrance
     const ox = c.entrances[0]?.sx ?? c.nx;
@@ -629,6 +770,8 @@ export function allyTick(w: World, c: Colony, dt: number): void {
   if (!allies.length || home || w.s.time < s.cooldown) return;
   const war = warBrain(c);
   if (war.defending) return;
+  // ---- link nests: an idle AI ally digs the tunnel route to its nearest ally (CHANGE_PLAN §27)
+  linkAlly(w, c, allies);
   // ---- pick the ally in the most trouble for the time it takes to get there
   let pick: { o: Colony; d: AllyDanger; v: number } | null = null;
   for (const o of allies) {

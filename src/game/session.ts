@@ -1525,7 +1525,7 @@ export class GameSession {
   /** Tab alerts: the home nest invaded or the queen hurt; your ants fighting or dying in an area. */
   private noteAlert(e: SimEvent): void {
     const w = this.world;
-    if ((e.t === 'tunnelWarn' || e.t === 'tunnelBreach') && e.colony === this.player.id) this.alert(e.space);
+    if ((e.t === 'tunnelWarn' || (e.t === 'tunnelBreach' && e.by >= 0)) && e.colony === this.player.id) this.alert(e.space);
     else if (e.t === 'tunnelOpen' && (e.a === this.player.id || e.b === this.player.id)) for (const sp of e.spaces) this.alert(sp);
     else if (e.t === 'invasion' && e.colony === this.player.id) this.alert(nestSpace(this.player.id));
     else if (e.t === 'death' && e.kind === 'ant' && e.colony === this.player.id && e.space !== SURFACE) this.alert(e.space);

@@ -110,7 +110,8 @@ export class Fog {
       const h = halfIn(r, space)!;
       if (!h.breach || h.joined) continue;
       const o = otherHalf(r, h);
-      if (w.teamOf(o.colony) === viewer.team) continue;
+      // (a passage the nest's owner digs to its own gate is its own work; an enemy's breach is hidden from the owner)
+      if (w.teamOf(o.colony) === viewer.team || (owner >= 0 && w.teamOf(owner) === viewer.team && (w.colony(o.colony)?.routeDig !== r.id || !r.open))) continue;
       for (const q of h.breach) if (g.isHexDug(q)) out.add(q);
     }
     return out;

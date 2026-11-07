@@ -123,7 +123,7 @@ function jitter(q: number): number {
 // ---------------------------------------------------------------------------
 
 /** The AI level (settings.aiLevel): 0 Easy … 3 Brutal, 1 by default. */
-function aiLevel(w: World): number {
+export function aiLevel(w: World): number {
   return Math.max(0, Math.min(3, Math.round(w.s.settings.aiLevel ?? 1)));
 }
 

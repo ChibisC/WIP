@@ -274,7 +274,8 @@ export function sealedAt(w: World, space: number, x: number, y: number): boolean
   }
   for (const r of routesOf(w, space)) {
     const h = halfIn(r, space)!;
-    if (h.breach && !h.joined && h.breach.includes(q)) return true;
+    // (an enemy's breach from the open route, not the owner's own passage to its gate)
+    if (h.breach && !h.joined && r.open && h.breach.includes(q)) return true;
   }
   return false;
 }
@@ -316,6 +317,19 @@ export function routeFrontier(w: World, c: Colony): RouteDig[] {
   const g = w.nestOf(own.space);
   if (!g) return out;
   const n = r.open ? own.steps.length : dugFromGate(w, own);
+  // the way to its own gate first: a passage from the nest's dug floor to the gate (the AI's nest rarely reaches it;
+  // a player digs it by hand or lets this do it), dug from the floor outward
+  if (n === 0 && !g.neighbors(own.gate).some((m) => m >= 0 && g.isHexDug(m))) {
+    if (!own.breach || own.breach.some((q) => !g.isHexDiggable(q) && !g.isHexDug(q))) own.breach = planBreach(w, own);
+    if (!own.breach) return out;
+    for (let i = own.breach.length - 1; i >= 0; i--) {
+      const q = own.breach[i];
+      if (g.isHexDug(q)) continue;
+      if (g.neighbors(q).some((k) => k >= 0 && g.isHexDug(k))) out.push({ space: own.space, q, cross: false, route: r.id });
+      break;
+    }
+    return out;
+  }
   if (n < own.steps.length) {
     for (const q of own.steps[n]) {
       if (q < 0 || g.isHexDug(q)) continue;

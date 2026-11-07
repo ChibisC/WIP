@@ -655,6 +655,9 @@ export interface Colony {
     joined?: number;
     /** a joint raid's gathering point near the target and when to go anyway (s); `go` once everyone is there */
     gather?: { x: number; y: number; until: number; go: boolean };
+    /** a tunnel raid (sim/tunnels.ts, CHANGE_PLAN §27): the route being dug toward the target (−1 none); `tunnelled` once the raid goes through it */
+    tunnel?: number;
+    tunnelled?: boolean;
   };
   /**
    * The ally brain (sim/warAI.ts, CHANGE_PLAN §23): the ally being helped (−1 none), since when, how many ants were sent,

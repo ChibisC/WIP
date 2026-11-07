@@ -113,9 +113,9 @@ function jobValid(w: World, c: Colony, kind: number, q: number, space?: number):
   switch (kind) {
     case JOB.Dig:
     case JOB.Entrance:
-      // a route hex: still on the colony's frontier (its route, undug, reachable)
-      if (g.routeOf(q) >= 0 || (space !== undefined && space !== nestSpace(c.id))) return routeJobs(w, c).some((j) => j.q === q && jobSpace(c, j) === (space ?? nestSpace(c.id)));
-      return !!g.hexDesig[q] && g.isHexDiggable(q);
+      // a route dig (a route hex, the passage to the gate, the breach): still on the colony's frontier
+      if (!g.hexDesig[q] || g.routeOf(q) >= 0 || (space !== undefined && space !== nestSpace(c.id))) return routeJobs(w, c).some((j) => j.q === q && jobSpace(c, j) === (space ?? nestSpace(c.id)));
+      return g.isHexDiggable(q);
     case JOB.Build:
       return !!tileAt(c, q) && !tileAt(c, q)!.built;
     case JOB.Upgrade:

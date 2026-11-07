@@ -1090,7 +1090,7 @@ if (desig > 0.5) {
 float fogR = mod(floor(floor(hexT.a*255.0 + 0.5) / 16.0), 2.0) * inGrid;
 float fogD = mod(floor(floor(hexT.a*255.0 + 0.5) / 32.0), 2.0) * inGrid;
 float fogK = 1.0 - fogD;
-col = mix(col, col * 0.4, fogR);
+col = mix(col, col * 0.6, fogR);
 col = mix(col, vec3(0.012,0.011,0.009), fogD);
 diffuseColor.rgb = col;
 `;
