@@ -684,11 +684,49 @@ function layHalf(w: World, c: Colony, o: Colony, id: number, taken: readonly num
   return { colony: c.id, space, gate, steps, dir: outDir, warned: false };
 }
 
-/** Routes for a loaded save that has none (version < 4): generated afresh, all closed. */
-export function ensureRoutes(w: World): void {
-  if (w.s.routes) return;
-  const m = w.s.mode.mission as { story?: unknown } | undefined;
-  generateRoutes(w, m?.story ? 'none' : 'auto');
+/**
+ * Saves from before the shared underground (SimState.version < 4; CHANGE_PLAN §27): every colony nest grid gets its rock
+ * margin — the old grid embedded in a larger one, every hex index and position in that space shifted by the margin —
+ * and the routes are generated afresh, all closed. Idempotent: grids that have a margin are left alone.
+ */
+export function upgradeWorldTunnels(w: World): void {
+  const m = TUNNELS.margin;
+  let changed = false;
+  for (const c of w.s.colonies) {
+    const space = nestSpace(c.id);
+    const g = w.nest(c.id);
+    if (!g || g.margin) continue;
+    const ng = g.embed(m);
+    const off = g.embedOffset(m);
+    const sh = (q: number) => (q < 0 ? q : ng.hexIndex(g.hexCol(q) + m, g.hexRow(q) + m));
+    for (const t of c.tiles) t.q = sh(t.q);
+    for (const e of c.entrances) e.q = sh(e.q);
+    c.hexSpeed = null;
+    if (c.aiBuild) {
+      for (const ch of c.aiBuild.chambers ?? []) ch.q = sh(ch.q);
+      if (c.aiBuild.tunnels) c.aiBuild.tunnels = c.aiBuild.tunnels.map(sh);
+    }
+    for (const mk of c.markers) if (mk.placed && mk.space === space) ((mk.x += off.x), (mk.y += off.y));
+    for (const p of c.intruders ?? []) ((p.x += off.x), (p.y += off.y));
+    for (const a of w.s.ants) {
+      if (a.colony === c.id) {
+        a.tile = sh(a.tile);
+        if (a.jobS === undefined) a.jobQ = sh(a.jobQ);
+      }
+      if (a.space === space) ((a.x += off.x), (a.y += off.y), (a.px += off.x), (a.py += off.y));
+    }
+    for (const b of w.s.brood) if (b.colony === c.id) ((b.tile = sh(b.tile)), (b.x += off.x), (b.y += off.y));
+    for (const f of w.s.food) if (f.space === space) ((f.x += off.x), (f.y += off.y), (f.px += off.x), (f.py += off.y));
+    for (const cr of w.s.creatures) if (cr.space === space) ((cr.x += off.x), (cr.y += off.y), (cr.px += off.x), (cr.py += off.y));
+    w.replaceGrid(space, ng);
+    changed = true;
+  }
+  if (!w.s.routes) {
+    const mode = w.s.mode as { mission?: { story?: unknown } };
+    generateRoutes(w, mode.mission?.story ? 'none' : 'auto');
+    changed = true;
+  }
+  if (changed) w.events.emit({ t: 'message', text: 'Old save: the nests gained their rock margins and tunnel routes (all closed).', kind: 'info' });
 }
 
 export { colonyOfSpace };

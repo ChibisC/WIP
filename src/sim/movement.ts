@@ -645,7 +645,14 @@ export function goOut(w: World, a: Ant, dt: number): boolean {
   if (a.space === SURFACE) return true;
   const g = w.nestOf(a.space);
   const ents = w.entrancesOf(a.space);
-  if (!g || !ents.length) return false;
+  if (!g) return false;
+  // in another nest with a tunnel route home (sim/tunnels.ts): "out" is back through the tunnel, the shorter way
+  // home (callers leave an area to get home); its own nest is left by the entrance as ever
+  if (a.space !== nestSpace(a.colony)) {
+    const r = usableRoute(w, a.space, nestSpace(a.colony), a.colony);
+    if (r && walkRoute(w, a, r, dt)) return false;
+  }
+  if (!ents.length) return false;
   if (tryExit(w, a)) return true;
   const f = exitFieldIn(w, a.space);
   if (!f) return false;

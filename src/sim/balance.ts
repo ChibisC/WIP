@@ -1385,7 +1385,7 @@ export const TUNNELS = {
   gateGap: 5,
   gateAway: 4,
   wobble: 1,
-  hexWorkMul: 4,
+  hexWorkMul: 3,
   hintRange: 3,
   warnRange: 3,
   warnEvery: 4,
