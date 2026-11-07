@@ -19,9 +19,15 @@ const SURF = {
 // the soldier's head: hard, smooth and glassy red
 const GLASSY = { rough: 0.1, coat: 1, sheen: 0.04 };
 
-// ---------- the worker: large and lanky, a broad flat chestnut head with a whitish fontanelle; eyeless ----------
+// ---------- the worker (review round 1: "is that truly how the worker looks?" — redone from the descriptions) ----------
+// Constantini et al. 2019 (R. armatus, ZooKeys) and Scheffrahn 2010 (R. bulbinasus, Zootaxa): the worker's head
+// capsule is concolorous with the soldier's — reddish in R. perarmatus, ferruginous orange to chestnut in its
+// relatives — rounded, wider than long (1.17 mm wide, 0.79 long to the condyles), with a strongly inflated
+// postclypeus; R. perarmatus' fontanelle and cranial suture are "proportionately larger and more contrasting"; 14
+// antennal articles; a pointed rise on the fore coxa; slightly larger than the soldier; the abdomen a termite
+// worker's, pale and soft with the dark gut showing. Eyeless.
 const WORKER_COLORS = {
-  head: 0xa0522a, headTop: 0xac5c2e, headUnder: 0x8e4822, headBand: 0x7a3e1c, clypeus: 0xbc7a48, labrum: 0xcc9a6a, palp: 0xe6d6b8, suture: 0x7a3e1c, fontanelle: 0xeee2c8,
+  head: 0xa4461c, headTop: 0xb04e20, headUnder: 0x8c3c18, headBand: 0x7a3216, clypeus: 0xc0784a, labrum: 0xcc9a6a, palp: 0xe6d6b8, suture: 0x7a3216, fontanelle: 0xf2e6cc,
   mand: 0x7a3a1a, mandTip: 0x261006,
   thorax: 0xe0caa0, thoraxTop: 0xd6bc8e, pronotum: 0xdcc498,
   abd: 0xdcc292, abdTop: 0xd2b682, abdUnder: 0xe8d6b0, tergRear: 0xb8955e, membrane: 0xf0e2c2, gut: 0x2e2414,
@@ -31,11 +37,13 @@ const WORKER_COLORS = {
 const worker = {
   key: 'termite_rhy_worker', builder: 'nasute', real: true, L: 5.8, stance: 0.06, soft: 1.1,
   look: { colors: WORKER_COLORS, ...SURF, head: { rough: 0.36, coat: 0.42, sheen: 0.12 } },
-  // a long, low, glassy abdomen (0.63 L), the dark leaf-litter gut showing through most of it
-  abdomen: { x0: 0.5, len: 0.6, w: 0.25, h: 0.17, cy: 0.095, full: 0.38, sag: 0.012, groove: 0.04, membrane: 0.55, gut: 1.0, gutLobes: [[0.32, 0.05, 1], [0.55, 0.06, 1], [0.76, 0.03, 0.8]] },
-  thorax: { meta: 0.045, meso: 0.045, pro: 0.05, w: 0.14, h: 0.09, cy: 0.09, proW: 0.18, proLift: 0.008, saddle: 0.016 },
-  // head 1.57 mm wide, 1.1 long (wider than long), flattened top to bottom, hardly narrowing to the face
-  head: { len: 0.19, w: 0.27, h: 0.12, tilt: -0.2, neck: 0.018, neckY: 0.01, flat: 0.62, narrow: 0.18, band: 0, fontanelle: 0.1 },
+  // a termite worker's soft abdomen (0.52 L), plump, the dark leaf-litter gut showing through
+  abdomen: { x0: 0.5, len: 0.52, w: 0.27, h: 0.21, cy: 0.11, full: 0.45, sag: 0.015, groove: 0.05, membrane: 0.55, gut: 1.0, gutLobes: [[0.33, 0.03, 1], [0.52, 0.035, 1], [0.7, 0.02, 0.85]] },
+  // the pronotum a saddle with its front lobe turned up (R. armatus: the lobes at about 130°)
+  thorax: { meta: 0.05, meso: 0.05, pro: 0.055, w: 0.15, h: 0.1, cy: 0.095, proW: 0.19, proLift: 0.014, saddle: 0.02 },
+  // the head rounded, wider than long (1.5 : 1), a rounded dome — not flattened — narrowing a little to the swollen
+  // postclypeus; the fontanelle and the Y suture pale and contrasting
+  head: { len: 0.2, w: 0.255, h: 0.16, tilt: -0.24, neck: 0.018, neckY: 0.012, flat: 0.92, narrow: 0.3, band: 0.25, fontanelle: 0.085, suture: 0.035 },
   mandible: { len: 0.11, curve: 1.1, r: 0.02, open: 0.65 },
   antenna: { beads: 14, len: 0.46, r: 0.0105, sx: 0.42, sy: -0.02, sz: 0.46, ang: 0.38, splay: 0.55, droop: 0.4 },
   // long, slender legs (hind tibia 1.26 mm = 0.22 L)
@@ -63,7 +71,7 @@ const SOLDIER_COLORS = {
 };
 const soldier = {
   ...worker,
-  key: 'termite_rhy_soldier', L: 4.5, stance: 0.075, soft: 1,
+  key: 'termite_rhy_soldier', L: 4.5, stance: 0.09, soft: 1,
   look: { colors: SOLDIER_COLORS, ...SURF, head: GLASSY, mandible: GLASSY },
   abdomen: { x0: 0.37, len: 0.33, w: 0.18, h: 0.16, cy: 0.1, full: 0.5, sag: 0.01, groove: 0.05, membrane: 0.5, gut: 0.45, gutLobes: [[0.4, 0.016, 0.9], [0.6, 0.012, 0.7]] },
   thorax: { meta: 0.05, meso: 0.05, pro: 0.06, w: 0.12, h: 0.1, cy: 0.1, proW: 0.14, proLift: 0.01, saddle: 0.018 },
@@ -103,53 +111,6 @@ const presoldier = {
   },
 };
 
-// ---------- the royals: dark reddish-brown, eyes and ocelli, wing scales, a shield pronotum ----------
-const ROYAL_COLORS = {
-  ...WORKER_COLORS,
-  head: 0x5a2e18, headTop: 0x66361c, headUnder: 0x4e2814, clypeus: 0x6e3c20, labrum: 0x8a5a36, palp: 0xa88058, eye: 0x140c08, ocellus: 0xc8a070,
-  mand: 0x4a2814, mandTip: 0x160a04,
-  thorax: 0x5a3018, thoraxTop: 0x4e2814, pronotum: 0x5e321a, wingScale: 0x3a2010,
-  abd: 0x6a4224, abdTop: 0x5a3820, abdUnder: 0x9a7650, tergRear: 0x4a2c16, membrane: 0xb8946a, gut: 0x2a1a0c,
-  leg: 0x8e6038, legLight: 0x9e7044, legBase: 0x7a5030, antenna: 0x7e5430, antennaTip: 0x8e6038, hair: 0xd0b48c,
-};
-const king = {
-  ...worker,
-  key: 'termite_rhy_king', L: 8.5, stance: 0.055, soft: 0.8,
-  look: { colors: ROYAL_COLORS, ...SURF, abdomen: { rough: 0.4, coat: 0.45, sheen: 0.35 } },
-  abdomen: { x0: 0.48, len: 0.5, w: 0.21, h: 0.15, cy: 0.09, full: 0.4, sag: 0.01, groove: 0.05, membrane: 0.6, gut: 0, gutLobes: [[0.5, 0.02, 0]] },
-  thorax: { meta: 0.07, meso: 0.07, pro: 0.08, w: 0.15, h: 0.1, cy: 0.09, proW: 0.2, proLift: 0.004, saddle: 0.006, wingScales: true },
-  head: { len: 0.19, w: 0.17, h: 0.1, tilt: -0.15, neck: 0.015, neckY: 0.015, flat: 0.7, narrow: 0.25, band: 0, royal: true },
-  mandible: { len: 0.075, curve: 1.1, r: 0.014, open: 0.6 },
-  antenna: { beads: 16, len: 0.33, r: 0.009, sx: 0.36, sy: 0.0, sz: 0.4, ang: 0.32, splay: 0.6, droop: 0.6 },
-  legs: {
-    thick: 0.0115, sprawl: 0.9,
-    pairs: [
-      { coxaDir: [0.02, -0.02, 0.025], femur: 0.13, tibia: 0.14, tarsus: 0.07, foot: [0.2, 0.25] },
-      { coxaDir: [0.0, -0.02, 0.03], femur: 0.15, tibia: 0.16, tarsus: 0.075, foot: [0.0, 0.29] },
-      { coxaDir: [-0.02, -0.02, 0.025], femur: 0.17, tibia: 0.185, tarsus: 0.085, foot: [-0.22, 0.28] },
-    ],
-  },
-};
-// the queen: the king's head, thorax and legs (in mm), and the physogastric abdomen, 22.5 by 5.05 by 5.1 mm
-const QL = 26.2;
-const qf = (mm) => mm / QL;
-const queen = {
-  ...king,
-  key: 'termite_rhy_queen', L: QL, stance: qf(0.47), soft: 1.6,
-  // (round-1 photo comparison: amber-orange and plumper, the dark plates bold)
-  look: { colors: { ...ROYAL_COLORS, abd: 0xc47c34, abdTop: 0xb46e2c, abdUnder: 0xd29452, membrane: 0xe0a45e, plate: 0x4a2a12, stern: 0x8a5a2c, gut: 0x7a4e24 }, ...SURF },
-  abdomen: { x0: qf(4.2), len: qf(22.5), w: qf(6.6), h: qf(6.4), cy: qf(3.0), full: 0.3, sag: qf(0.4), groove: 0.02, membrane: 0.2, gut: 0.5, gutLobes: [[0.5, 0.1, 0]], physo: { pleat: 1 } },
-  thorax: { ...king.thorax, meta: qf(0.6), meso: qf(0.6), pro: qf(0.68), w: qf(1.27), h: qf(0.85), cy: qf(0.77), proW: qf(1.7) },
-  head: { ...king.head, len: qf(1.6), w: qf(1.45), h: qf(0.85), neck: qf(0.13), neckY: qf(0.13) },
-  mandible: { ...king.mandible, len: qf(0.64), r: qf(0.12) },
-  antenna: { ...king.antenna, len: qf(2.8), r: qf(0.075) },
-  legs: {
-    thick: qf(0.098), sprawl: 0.9,
-    pairs: king.legs.pairs.map((p) => ({ coxaDir: p.coxaDir.map((v) => qf(v * 8.5)), femur: qf(p.femur * 8.5), tibia: qf(p.tibia * 8.5), tarsus: qf(p.tarsus * 8.5), foot: [qf(p.foot[0] * 8.5), qf(p.foot[1] * 8.5)] })),
-  },
-  gait: { lift: 0.15, duty: 0.7 },
-};
-
 // ---------- the larva: a small, pale, soft nymph with a big head and short legs (scaled 0.3 → 0.85 on the brood tile) ----------
 const LARVA_COLORS = {
   ...WORKER_COLORS,
@@ -182,7 +143,5 @@ export const RHY_MORPHS = {
   termite_rhy_worker: worker,
   termite_rhy_soldier: soldier,
   termite_rhy_presoldier: presoldier,
-  termite_rhy_king: king,
-  termite_rhy_queen: queen,
   termite_rhy_larva: larva,
 };

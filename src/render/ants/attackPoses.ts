@@ -44,15 +44,14 @@ export interface AttackPose {
   up: number;
   side: number;
   px: number;
-  /** stance spread 0..1 (feet set wider: bracing), fore legs raised 0..1, gaster yaw (rad) */
-  spread: number;
+  /** fore legs raised 0..1, gaster yaw (rad) */
   front: number;
   gYaw: number;
 }
 
 export function neutralPose(out: AttackPose): AttackPose {
   out.fwd = out.pitch = out.yaw = out.roll = out.headPitch = out.headYaw = out.gaster = out.sting = 0;
-  out.up = out.side = out.px = out.spread = out.front = out.gYaw = 0;
+  out.up = out.side = out.px = out.front = out.gYaw = 0;
   out.mand = 0.25;
   return out;
 }
@@ -181,7 +180,7 @@ export function applyAttackBody(p: AttackPose, w: number, L: number, vF: THREE.V
 export const ATK = { LUNGE: 0, REAR: 1, CLAMP: 2, PIVOT_STING: 3, QUICK_STING: 4, CRUSH: 5, HEAD_SWING: 6, ACID: 7, TAUNT: 8, RAGE: 9, SNAP: 10, IMPALE: 11, CHOMP: 12, SLAM: 13, EXECUTE: 14, EXECUTE_P: 15, LIFT: 16, T_TUG: 17, T_RIP: 18, T_LUNGE: 19, T_JAB: 20, T_CRUSH: 21, T_DOZE: 22, T_TOSS: 23, DRUM: 24, GLUE: 25, S_GRAB: 26, S_HOLD: 27, S_SQUIRT: 28 } as const;
 
 type Key = Partial<Omit<AttackPose, never>>;
-const FIELDS = ['fwd', 'pitch', 'yaw', 'roll', 'headPitch', 'headYaw', 'mand', 'gaster', 'sting', 'up', 'side', 'px', 'spread', 'front', 'gYaw'] as const;
+const FIELDS = ['fwd', 'pitch', 'yaw', 'roll', 'headPitch', 'headYaw', 'mand', 'gaster', 'sting', 'up', 'side', 'px', 'front', 'gYaw'] as const;
 const NEUTRAL: AttackPose = neutralPose({} as AttackPose);
 const tmpA = {} as AttackPose;
 const tmpB = {} as AttackPose;
@@ -212,47 +211,47 @@ const WIND = 0.5;
 const STRIKE = 0.62;
 
 // ---- key poses (side +1; body lengths and radians)
-const LUNGE_W: Key = { fwd: -0.09, up: -0.03, pitch: 0.13, headPitch: 0.3, mand: 1, gaster: 0.35, spread: 0.25 };
-const LUNGE_S: Key = { fwd: 0.13, up: -0.02, pitch: -0.11, px: 0.25, headPitch: -0.34, mand: 0, gaster: 0.1, spread: 0.25 };
-const CLAMP_W: Key = { yaw: 0.34, side: 0.035, roll: 0.07, headYaw: 0.5, headPitch: 0.12, mand: 1, fwd: -0.03, spread: 0.25 };
-const CLAMP_S: Key = { yaw: -0.14, headYaw: -0.22, fwd: 0.08, headPitch: -0.16, mand: 0, spread: 0.25 };
-const CLAMP_T: Key = { yaw: -0.08, fwd: -0.13, pitch: 0.07, headPitch: -0.06, mand: 0.04, spread: 0.4 };
+const LUNGE_W: Key = { fwd: -0.09, up: -0.03, pitch: 0.13, headPitch: 0.3, mand: 1, gaster: 0.35 };
+const LUNGE_S: Key = { fwd: 0.13, up: -0.02, pitch: -0.11, px: 0.25, headPitch: -0.34, mand: 0, gaster: 0.1 };
+const CLAMP_W: Key = { yaw: 0.34, side: 0.035, roll: 0.07, headYaw: 0.5, headPitch: 0.12, mand: 1, fwd: -0.03 };
+const CLAMP_S: Key = { yaw: -0.14, headYaw: -0.22, fwd: 0.08, headPitch: -0.16, mand: 0 };
+const CLAMP_T: Key = { yaw: -0.08, fwd: -0.13, pitch: 0.07, headPitch: -0.06, mand: 0.04 };
 /**
  * Fire ant stinging, after the reference footage (user rating B2): from the flagging stance — legs wide, body
  * raised, gaster up with the sting out — the gaster cocks back, then whips down and forward under the body while
  * the ant rears on its hind legs, head up and jaws agape; it holds the jab a moment, the gaster pumping, and swings
  * back up to the flag.
  */
-const FLAG: Key = { up: 0.06, spread: 0.6, gaster: 1.15, sting: 0.75, headPitch: -0.12, mand: 0.6 };
-const COCK: Key = { up: 0.045, spread: 0.6, pitch: 0.05, px: -0.2, gaster: 1.45, sting: 0.9, headPitch: -0.05, mand: 0.9 };
-const WHIP: Key = { up: 0.12, spread: 0.6, pitch: 0.17, px: -0.3, fwd: 0.03, gaster: -2.7, sting: 1, headPitch: 0.15, mand: 1, front: 0.55 };
+const FLAG: Key = { up: 0.06, gaster: 1.15, sting: 0.75, headPitch: -0.12, mand: 0.6 };
+const COCK: Key = { up: 0.045, pitch: 0.05, px: -0.2, gaster: 1.45, sting: 0.9, headPitch: -0.05, mand: 0.9 };
+const WHIP: Key = { up: 0.12, pitch: 0.17, px: -0.3, fwd: 0.03, gaster: -2.7, sting: 1, headPitch: 0.15, mand: 1, front: 0.55 };
 /**
  * Formicines (Lasius, Formica; rollout batch 1): biting first, then bending the gaster forward between the legs to
  * spray formic acid from the acidopore at the enemy in front — the body raised on its legs and tipped nose-up so the
  * gaster tip points forward under the head; a quick pump of the gaster is the spray.
  */
-const ACID_W: Key = { up: 0.06, pitch: 0.07, px: -0.3, fwd: -0.03, gaster: -2.15, headPitch: 0.12, mand: 0.9, spread: 0.35 };
-const ACID_S: Key = { up: 0.07, pitch: 0.09, px: -0.3, fwd: 0.02, gaster: -2.5, headPitch: 0.18, mand: 1, spread: 0.35 };
-const COCK_Q: Key = { up: 0.03, spread: 0.4, pitch: 0.03, px: -0.2, gaster: 1.3, sting: 0.8, mand: 0.8 };
-const WHIP_Q: Key = { up: 0.09, spread: 0.4, pitch: 0.12, px: -0.3, fwd: 0.03, gaster: -2.4, sting: 1, headPitch: 0.1, mand: 1, front: 0.4 };
-const CRUSH_W: Key = { fwd: -0.05, up: -0.06, headPitch: -0.22, mand: 1, gaster: 0.15, spread: 0.4 };
-const CRUSH_S: Key = { fwd: 0.1, up: -0.07, pitch: -0.08, px: 0.3, headPitch: -0.42, mand: 0, spread: 0.4 };
+const ACID_W: Key = { up: 0.06, pitch: 0.07, px: -0.3, fwd: -0.03, gaster: -2.15, headPitch: 0.12, mand: 0.9 };
+const ACID_S: Key = { up: 0.07, pitch: 0.09, px: -0.3, fwd: 0.02, gaster: -2.5, headPitch: 0.18, mand: 1 };
+const COCK_Q: Key = { up: 0.03, pitch: 0.03, px: -0.2, gaster: 1.3, sting: 0.8, mand: 0.8 };
+const WHIP_Q: Key = { up: 0.09, pitch: 0.12, px: -0.3, fwd: 0.03, gaster: -2.4, sting: 1, headPitch: 0.1, mand: 1, front: 0.4 };
+const CRUSH_W: Key = { fwd: -0.05, up: -0.06, headPitch: -0.22, mand: 1, gaster: 0.15 };
+const CRUSH_S: Key = { fwd: 0.1, up: -0.07, pitch: -0.08, px: 0.3, headPitch: -0.42, mand: 0 };
 // (user rating B6, "glitchy": a smaller, slower sweep of the great head, with a follow-through)
-const SWING_W: Key = { yaw: 0.2, headYaw: 0.42, headPitch: -0.12, roll: 0.04, mand: 0.85, up: -0.03, spread: 0.32 };
-const SWING_S: Key = { yaw: -0.16, headYaw: -0.32, roll: -0.06, fwd: 0.05, headPitch: -0.2, mand: 0.15, up: -0.03, spread: 0.32 };
-const SWING_F: Key = { yaw: -0.2, headYaw: -0.4, roll: -0.05, fwd: 0.03, headPitch: -0.16, mand: 0.25, up: -0.03, spread: 0.32 };
+const SWING_W: Key = { yaw: 0.2, headYaw: 0.42, headPitch: -0.12, roll: 0.04, mand: 0.85, up: -0.03 };
+const SWING_S: Key = { yaw: -0.16, headYaw: -0.32, roll: -0.06, fwd: 0.05, headPitch: -0.2, mand: 0.15, up: -0.03 };
+const SWING_F: Key = { yaw: -0.2, headYaw: -0.4, roll: -0.05, fwd: 0.03, headPitch: -0.16, mand: 0.25, up: -0.03 };
 /**
  * The leafcutter major's taunt (user 2026-10-31, after EotU; the real Atta threat display): it rears on its hind and
  * middle legs, the fore legs lifted, head thrown up and the great jaws gaping, and stridulates — the gaster pumping
  * up and down fast (the rasp between the postpetiole and the gaster) — the jaws snapping, then settles.
  */
 // (user rating A7: the fore legs twitched — held fully up and still, the body no longer bobbing under them)
-const TAUNT_K: Key = { up: 0.08, pitch: 0.24, px: -0.32, front: 1, headPitch: 0.42, mand: 1, gaster: 0.55, spread: 0.5 };
+const TAUNT_K: Key = { up: 0.08, pitch: 0.24, px: -0.32, front: 1, headPitch: 0.42, mand: 1, gaster: 0.55 };
 /**
  * An army-ant soldier's rage (user 2026-10-31, after EotU): a frenzy at each kill — the sickles snapping open and
  * shut three times, the head tossing side to side, the body jolting forward over braced legs.
  */
-const RAGE_K: Key = { up: 0.03, fwd: 0.02, pitch: 0.06, headPitch: 0.2, mand: 1, gaster: 0.3, spread: 0.45 };
+const RAGE_K: Key = { up: 0.03, fwd: 0.02, pitch: 0.06, headPitch: 0.2, mand: 1, gaster: 0.3 };
 /**
  * Hell ants (realism rework, CHANGE_PLAN §22.2): the vertical trap. The jaws cock wide and down, the head low over the
  * prey and trembling with tension; the snap is near-instant (the last 2.5 % of the wind-up), the head jerking up with
@@ -261,12 +260,12 @@ const RAGE_K: Key = { up: 0.03, fwd: 0.02, pitch: 0.06, headPitch: 0.2, mand: 1,
  */
 // (the clips: with the head lowered the cocked scythes swung into the ground — the head and front rise as the jaws
 // cock, so the open jaws sweep just above the ground in front of the prey, and the snap lifts it)
-const SNAP_W: Key = { fwd: 0.02, up: 0.03, pitch: 0.1, px: -0.25, headPitch: 0.32, mand: 0.85, gaster: 0.15, spread: 0.3 };
-const SNAP_S: Key = { fwd: -0.02, up: 0.035, pitch: 0.13, px: -0.25, headPitch: 0.52, mand: 0, gaster: 0.05, spread: 0.3 };
-const SNAP_L: Key = { fwd: -0.04, up: 0.04, pitch: 0.12, px: -0.25, headPitch: 0.44, mand: 0, spread: 0.25 };
-const IMPALE_W: Key = { fwd: -0.06, up: 0.06, pitch: 0.22, px: -0.3, headPitch: 0.45, mand: 0.85, gaster: 0.3, spread: 0.4, front: 0.35 };
-const IMPALE_S: Key = { fwd: 0.11, up: 0.0, pitch: -0.02, px: 0.25, headPitch: 0.02, mand: 0, gaster: 0.1, spread: 0.4 };
-const IMPALE_L: Key = { fwd: -0.03, up: 0.04, pitch: 0.1, headPitch: 0.3, mand: 0.1, spread: 0.3 };
+const SNAP_W: Key = { fwd: 0.02, up: 0.03, pitch: 0.1, px: -0.25, headPitch: 0.32, mand: 0.85, gaster: 0.15 };
+const SNAP_S: Key = { fwd: -0.02, up: 0.035, pitch: 0.13, px: -0.25, headPitch: 0.52, mand: 0, gaster: 0.05 };
+const SNAP_L: Key = { fwd: -0.04, up: 0.04, pitch: 0.12, px: -0.25, headPitch: 0.44, mand: 0 };
+const IMPALE_W: Key = { fwd: -0.06, up: 0.06, pitch: 0.22, px: -0.3, headPitch: 0.45, mand: 0.85, gaster: 0.3, front: 0.35 };
+const IMPALE_S: Key = { fwd: 0.11, up: 0.0, pitch: -0.02, px: 0.25, headPitch: 0.02, mand: 0, gaster: 0.1 };
+const IMPALE_L: Key = { fwd: -0.03, up: 0.04, pitch: 0.1, headPitch: 0.3, mand: 0.1 };
 /** fraction of the attack cycle the hell ants' snap freezes on the contact */
 export const HIT_STOP = 0.07;
 /**
@@ -276,13 +275,13 @@ export const HIT_STOP = 0.07;
  * its health): the jaws gape and reach round the neck, a tremble, the snap, and the head torn up and back; the soldier
  * first drives its paddle down onto the foe and holds it.
  */
-const CHOMP_W: Key = { fwd: -0.05, up: 0.03, pitch: 0.08, px: -0.25, headPitch: 0.3, mand: 1, gaster: 0.15, spread: 0.3 };
-const CHOMP_S: Key = { fwd: 0.11, up: 0.02, pitch: 0.02, px: 0.25, headPitch: 0.18, mand: 0, spread: 0.3 };
-const SLAM_W: Key = { fwd: -0.07, up: 0.07, pitch: 0.24, px: -0.3, headPitch: 0.45, mand: 1, gaster: 0.3, spread: 0.45, front: 0.5 };
-const SLAM_S: Key = { fwd: 0.1, up: 0.0, pitch: -0.02, px: 0.25, headPitch: 0.22, mand: 0, spread: 0.45 };
-const EXEC_W: Key = { fwd: 0.09, up: 0.02, pitch: -0.03, px: 0.25, headPitch: 0.12, mand: 1, gaster: 0.1, spread: 0.35 };
-const EXEC_S: Key = { fwd: 0.09, up: 0.02, pitch: -0.03, px: 0.25, headPitch: 0.12, mand: 0, spread: 0.35 };
-const EXEC_T: Key = { fwd: -0.04, up: 0.05, pitch: 0.13, px: -0.2, headPitch: 0.58, mand: 0, spread: 0.35 };
+const CHOMP_W: Key = { fwd: -0.05, up: 0.03, pitch: 0.08, px: -0.25, headPitch: 0.3, mand: 1, gaster: 0.15 };
+const CHOMP_S: Key = { fwd: 0.11, up: 0.02, pitch: 0.02, px: 0.25, headPitch: 0.18, mand: 0 };
+const SLAM_W: Key = { fwd: -0.07, up: 0.07, pitch: 0.24, px: -0.3, headPitch: 0.45, mand: 1, gaster: 0.3, front: 0.5 };
+const SLAM_S: Key = { fwd: 0.1, up: 0.0, pitch: -0.02, px: 0.25, headPitch: 0.22, mand: 0 };
+const EXEC_W: Key = { fwd: 0.09, up: 0.02, pitch: -0.03, px: 0.25, headPitch: 0.12, mand: 1, gaster: 0.1 };
+const EXEC_S: Key = { fwd: 0.09, up: 0.02, pitch: -0.03, px: 0.25, headPitch: 0.12, mand: 0 };
+const EXEC_T: Key = { fwd: -0.04, up: 0.05, pitch: 0.13, px: -0.2, headPitch: 0.58, mand: 0 };
 /**
  * Nasute termites on the ant pipeline (realism round 3, CHANGE_PLAN §22.7; the user's ratings G7, T1, T4: "dynamic and
  * dramatic but realistic attacks and movement like the ants but realistic to termites"). Termites have no sting and no
@@ -299,25 +298,25 @@ const EXEC_T: Key = { fwd: -0.04, up: 0.05, pitch: 0.13, px: -0.2, headPitch: 0.
  *  - GLUE (soldier firing): braced and low, the head aimed (game/antViews.ts), each squirt jolting the body back,
  *    the abdomen pumping and the head jerking; between squirts a small sway of the aim.
  */
-const TTUG_W: Key = { fwd: -0.06, up: 0.02, pitch: 0.08, px: -0.2, headPitch: 0.25, mand: 1, gaster: 0.1, spread: 0.35 };
-const TTUG_S: Key = { fwd: 0.1, up: -0.02, pitch: -0.07, px: 0.25, headPitch: -0.2, mand: 0, spread: 0.35 };
-const TTUG_P: Key = { fwd: -0.1, up: -0.035, pitch: 0.05, px: -0.25, headPitch: -0.32, mand: 0, gaster: -0.1, spread: 0.5 };
-const TRIP_S: Key = { fwd: 0.08, up: -0.01, pitch: -0.05, px: 0.25, headPitch: -0.18, mand: 0, spread: 0.4 };
-const TRIP_T: Key = { fwd: 0.04, up: -0.015, yaw: 0.22, roll: 0.16, side: 0.02, headYaw: 0.6, headPitch: -0.24, mand: 0, spread: 0.45 };
-const TLUN_W: Key = { fwd: -0.08, up: 0.05, pitch: 0.2, px: -0.3, headPitch: 0.4, mand: 1, gaster: 0.15, spread: 0.35, front: 0.25 };
-const TLUN_S: Key = { fwd: 0.15, up: -0.02, pitch: -0.12, px: 0.3, headPitch: -0.3, mand: 0, spread: 0.35 };
-const TJAB_W: Key = { fwd: -0.05, up: 0.02, pitch: 0.06, headPitch: 0.15, mand: 0.4, spread: 0.35 };
-const TJAB_S: Key = { fwd: 0.09, up: -0.02, pitch: -0.08, px: 0.25, headPitch: -0.38, mand: 0.1, spread: 0.35 };
-const TCR_W: Key = { fwd: -0.08, up: 0.09, pitch: 0.3, px: -0.32, headPitch: 0.5, mand: 0.8, gaster: 0.2, spread: 0.5, front: 0.6 };
-const TCR_S: Key = { fwd: 0.12, up: -0.04, pitch: -0.1, px: 0.3, headPitch: -0.45, mand: 0, spread: 0.55 };
-const TDZ_W: Key = { fwd: -0.07, up: -0.03, pitch: -0.04, headPitch: -0.42, mand: 0.5, gaster: 0.1, spread: 0.5 };
-const TDZ_S: Key = { fwd: 0.16, up: -0.035, pitch: -0.1, px: 0.3, headPitch: -0.5, mand: 0.2, spread: 0.55 };
-const TTS_W: Key = { fwd: 0.04, up: -0.03, pitch: -0.08, px: 0.25, headPitch: -0.55, headYaw: -0.15, mand: 0.6, spread: 0.45 };
-const TTS_S: Key = { fwd: 0.02, up: 0.05, pitch: 0.15, px: -0.25, headPitch: 0.55, headYaw: 0.45, yaw: 0.12, roll: -0.08, mand: 0.2, spread: 0.45 };
-const DRUM_U: Key = { headPitch: 0.15, spread: 0.4, mand: 0.2 };
-const DRUM_D: Key = { headPitch: -0.55, up: -0.004, spread: 0.4, mand: 0.2 };
-const GLUE_B: Key = { up: -0.015, pitch: -0.03, headPitch: -0.12, gaster: 0.05, spread: 0.5, mand: 0.1 };
-const GLUE_K: Key = { fwd: -0.035, up: -0.01, pitch: 0.03, headPitch: 0.05, gaster: 0.3, spread: 0.5, mand: 0.1 };
+const TTUG_W: Key = { fwd: -0.06, up: 0.02, pitch: 0.08, px: -0.2, headPitch: 0.25, mand: 1, gaster: 0.1 };
+const TTUG_S: Key = { fwd: 0.1, up: -0.02, pitch: -0.07, px: 0.25, headPitch: -0.2, mand: 0 };
+const TTUG_P: Key = { fwd: -0.1, up: -0.035, pitch: 0.05, px: -0.25, headPitch: -0.32, mand: 0, gaster: -0.1 };
+const TRIP_S: Key = { fwd: 0.08, up: -0.01, pitch: -0.05, px: 0.25, headPitch: -0.18, mand: 0 };
+const TRIP_T: Key = { fwd: 0.04, up: -0.015, yaw: 0.22, roll: 0.16, side: 0.02, headYaw: 0.6, headPitch: -0.24, mand: 0 };
+const TLUN_W: Key = { fwd: -0.08, up: 0.05, pitch: 0.2, px: -0.3, headPitch: 0.4, mand: 1, gaster: 0.15, front: 0.25 };
+const TLUN_S: Key = { fwd: 0.15, up: -0.02, pitch: -0.12, px: 0.3, headPitch: -0.3, mand: 0 };
+const TJAB_W: Key = { fwd: -0.05, up: 0.02, pitch: 0.06, headPitch: 0.15, mand: 0.4 };
+const TJAB_S: Key = { fwd: 0.09, up: -0.02, pitch: -0.08, px: 0.25, headPitch: -0.38, mand: 0.1 };
+const TCR_W: Key = { fwd: -0.08, up: 0.09, pitch: 0.3, px: -0.32, headPitch: 0.5, mand: 0.8, gaster: 0.2, front: 0.6 };
+const TCR_S: Key = { fwd: 0.12, up: -0.04, pitch: -0.1, px: 0.3, headPitch: -0.45, mand: 0 };
+const TDZ_W: Key = { fwd: -0.07, up: -0.03, pitch: -0.04, headPitch: -0.42, mand: 0.5, gaster: 0.1 };
+const TDZ_S: Key = { fwd: 0.16, up: -0.035, pitch: -0.1, px: 0.3, headPitch: -0.5, mand: 0.2 };
+const TTS_W: Key = { fwd: 0.04, up: -0.03, pitch: -0.08, px: 0.25, headPitch: -0.55, headYaw: -0.15, mand: 0.6 };
+const TTS_S: Key = { fwd: 0.02, up: 0.05, pitch: 0.15, px: -0.25, headPitch: 0.55, headYaw: 0.45, yaw: 0.12, roll: -0.08, mand: 0.2 };
+const DRUM_U: Key = { headPitch: 0.15, mand: 0.2 };
+const DRUM_D: Key = { headPitch: -0.55, up: -0.004, mand: 0.2 };
+const GLUE_B: Key = { up: -0.015, pitch: -0.03, headPitch: -0.12, gaster: 0.05, mand: 0.1 };
+const GLUE_K: Key = { fwd: -0.035, up: -0.01, pitch: 0.03, headPitch: 0.05, gaster: 0.3, mand: 0.1 };
 /**
  * Sickle-jaw soldiers on the ant pipeline (model redo, claude/realism/10-spec §3; spec 09 §2.2): the grab-and-squirt.
  *  - S_GRAB (q = the sim's lunge, 0..LUNGE_SNAP + 0.16; game/antViews.ts): rear back on planted feet with the head
@@ -330,20 +329,20 @@ const GLUE_K: Key = { fwd: -0.035, up: -0.01, pitch: 0.03, headPitch: 0.05, gast
  */
 // (the snout hangs forward and down at rest, its tip near the ground: holding, the head is raised so the tip lies on the
 // victim's back — the victim's front pinned 1.27 soldier-mm ahead, sim/sickleJaws.ts — and each squirt presses it down)
-const SGRAB_W: Key = { fwd: -0.09, up: 0.05, pitch: 0.16, px: -0.3, headPitch: 0.45, mand: 1, gaster: 0.12, spread: 0.45 };
-const SGRAB_S: Key = { fwd: 0.15, up: -0.01, pitch: -0.08, px: 0.3, headPitch: 0.06, mand: 0, spread: 0.45 };
-const SHOLD_B: Key = { fwd: 0.03, up: 0.01, pitch: -0.02, px: 0.2, headPitch: 0.26, mand: 0, gaster: 0.04, spread: 0.5 };
-const SHOLD_P: Key = { fwd: 0.055, up: -0.004, pitch: -0.05, px: 0.25, headPitch: 0.1, mand: 0, gaster: 0.22, spread: 0.5 };
-const SSQ_B: Key = { fwd: 0.0, up: 0.0, pitch: -0.02, headPitch: 0.3, mand: 0.55, gaster: 0.04, spread: 0.5 };
-const SSQ_J: Key = { fwd: 0.07, up: -0.01, pitch: -0.06, px: 0.25, headPitch: 0.12, mand: 0.45, gaster: 0.2, spread: 0.5 };
+const SGRAB_W: Key = { fwd: -0.09, up: 0.05, pitch: 0.16, px: -0.3, headPitch: 0.45, mand: 1, gaster: 0.12 };
+const SGRAB_S: Key = { fwd: 0.15, up: -0.01, pitch: -0.08, px: 0.3, headPitch: 0.06, mand: 0 };
+const SHOLD_B: Key = { fwd: 0.03, up: 0.01, pitch: -0.02, px: 0.2, headPitch: 0.26, mand: 0, gaster: 0.04 };
+const SHOLD_P: Key = { fwd: 0.055, up: -0.004, pitch: -0.05, px: 0.25, headPitch: 0.1, mand: 0, gaster: 0.22 };
+const SSQ_B: Key = { fwd: 0.0, up: 0.0, pitch: -0.02, headPitch: 0.3, mand: 0.55, gaster: 0.04 };
+const SSQ_J: Key = { fwd: 0.07, up: -0.01, pitch: -0.06, px: 0.25, headPitch: 0.12, mand: 0.45, gaster: 0.2 };
 /** the sim's lunge: the snap at this fraction, the hold pose reached 0.16 later (render/termite/rig.ts LUNGE_SNAP) */
 const S_SNAP = 0.58;
 // the finisher's lift (user note 2026-11-02 12:39): the foe held up by the neck — head and front raised, braced on the
 // hind legs; the jaws part a little, then shear shut with a toss of the head (the cut)
-const LIFT_U: Key = { fwd: 0.0, up: 0.06, pitch: 0.16, px: -0.1, headPitch: 0.6, mand: 0, gaster: -0.1, spread: 0.4 };
-const LIFT_O: Key = { fwd: 0.01, up: 0.06, pitch: 0.15, px: -0.1, headPitch: 0.5, mand: 0.4, gaster: -0.1, spread: 0.4 };
-const LIFT_C: Key = { fwd: -0.03, up: 0.07, pitch: 0.18, px: -0.15, headPitch: 0.78, mand: 0, gaster: -0.15, spread: 0.4 };
-const EXECP_D: Key = { fwd: 0.11, up: 0.0, pitch: -0.02, px: 0.25, headPitch: 0.04, mand: 0.85, gaster: 0.1, spread: 0.4 };
+const LIFT_U: Key = { fwd: 0.0, up: 0.06, pitch: 0.16, px: -0.1, headPitch: 0.6, mand: 0, gaster: -0.1 };
+const LIFT_O: Key = { fwd: 0.01, up: 0.06, pitch: 0.15, px: -0.1, headPitch: 0.5, mand: 0.4, gaster: -0.1 };
+const LIFT_C: Key = { fwd: -0.03, up: 0.07, pitch: 0.18, px: -0.15, headPitch: 0.78, mand: 0, gaster: -0.15 };
+const EXECP_D: Key = { fwd: 0.11, up: 0.0, pitch: -0.02, px: 0.25, headPitch: 0.04, mand: 0.85, gaster: 0.1 };
 
 /**
  * Pose of a planted-feet attack at phase q. `holdIn` / `holdOut`: this sting continues a grip held from the

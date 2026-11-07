@@ -23,7 +23,9 @@ const SAIY_LOOK = {
   gaster: L(0x0a090c, 0.4, 0.32, 0.3, 0x262220),
   legs: L(0x161110, 0.48, 0.15, 0.04, 0x2a1e16),
   antenna: L(0x181210, 0.5, 0.12, 0.04, 0x2a1e16),
-  mandible: L(0x1a120e, 0.34, 0.4, 0, 0x0c0806),
+  // (review round 1: "make the mandibles look better") a dark reddish-brown, as the jaws of black carpenter ants read
+  // against the black head, their toothed edge near-black
+  mandible: L(0x2e1a10, 0.32, 0.42, 0, 0x120a06),
 };
 // sparse pale erect setae (none on the cheeks and scapes), more on the mesosoma and gaster
 const SAIY_SETAE = { color: 0xb8a47a, head: 14, meso: 28, gaster: 70, len: [0.012, 0.042] };
@@ -32,10 +34,13 @@ const SAIY_WORKER = {
   // a minor (C. pennsylvanicus HL 1.58-2.56, HW 1.24-2.34 mm, CI 78-91): longer than wide, narrowing a little
   // forward, the back nearly straight; eyes (EL ~ 0.25 HL) set behind the middle of the sides
   head: { len: 0.245, width: 0.205, height: 0.155, shape: "round", notch: 0.02 },
-  eyes: { size: 0.25, pos: 0.42, height: 0.24, ocelli: false, smooth: true },
+  // (review round 1: "fix eyes" — the smooth black eyes vanished into the black head) the formicine compound eye:
+  // a low convex dome, satin grey-black with a faceted grain
+  eyes: { size: 0.25, pos: 0.42, height: 0.24, ocelli: false },
   // long scapes (SI 100-118: they pass the back of the head by half their length), no club
   antenna: { segments: 12, scape: 1.12, funiculus: 1.35, club: 0, thick: 0.0112, smooth: true },
-  mandible: { type: "triangular", len: 0.38, teeth: 5, width: 0.58, spec: SAIY_WORKER_JAW, open: 0.7 },
+  // (review round 1) larger, as a Camponotus' closed jaws show below the clypeus
+  mandible: { type: "triangular", len: 0.52, teeth: 5, width: 0.72, spec: SAIY_WORKER_JAW, open: 0.7 },
   // one smooth, even arch (WL ~ 1.45 HL), the pronotum sloping into the neck
   meso: { len: 0.355, width: 0.125, height: 0.14, smooth: true, neck: 0.2 },
   waist: { nodes: 1, len: 0.05, scale: true, nodeH: 0.13 },
@@ -56,9 +61,9 @@ const SAIY_SOLDIER = {
   // a Camponotus major (HL 2.62-3.16, HW 2.68-3.34 mm, CI 102-106): a broad head, wider than long, the sides convex
   // and narrowing forward, the back concave; heavier five-toothed jaws; sturdier, relatively shorter legs
   head: { len: 0.26, width: 0.27, height: 0.19, shape: "heart", notch: 0.07 },
-  eyes: { size: 0.22, pos: 0.4, height: 0.22, ocelli: false, smooth: true },
+  eyes: { size: 0.22, pos: 0.4, height: 0.22, ocelli: false },
   antenna: { ...SAIY_WORKER.antenna, scape: 0.93, funiculus: 1.3 },
-  mandible: { type: "triangular", len: 0.4, teeth: 5, width: 0.7, spec: SAIY_SOLDIER_JAW, open: 0.6 },
+  mandible: { type: "triangular", len: 0.48, teeth: 5, width: 0.78, spec: SAIY_SOLDIER_JAW, open: 0.6 },
   meso: { len: 0.34, width: 0.135, height: 0.15, smooth: true, neck: 0.2 },
   gaster: { len: 0.35, width: 0.24, height: 0.2, sting: false },
   legs: { hind: 1.08, thick: 0.0165 },
@@ -70,9 +75,9 @@ const SAIY_QUEEN = {
   // a dealate Camponotus queen (HL 3.10-3.52, HW 3.38-3.80, WL ~ 5.7 mm): a broad head with large eyes and three
   // ocelli, the big mesosoma with its scutum, scutellum and wing scars, a large gaster
   head: { len: 0.2, width: 0.215, height: 0.15, shape: "round", notch: 0.03 },
-  eyes: { size: 0.26, pos: 0.45, height: 0.24, ocelli: true, smooth: true },
+  eyes: { size: 0.26, pos: 0.45, height: 0.24, ocelli: true },
   antenna: { ...SAIY_WORKER.antenna, scape: 0.87, funiculus: 1.3 },
-  mandible: { type: "triangular", len: 0.36, teeth: 5, width: 0.6, spec: SAIY_QUEEN_JAW, open: 0.6 },
+  mandible: { type: "triangular", len: 0.42, teeth: 5, width: 0.66, spec: SAIY_QUEEN_JAW, open: 0.6 },
   meso: { len: 0.35, width: 0.185, height: 0.2, queen: true },
   waist: { nodes: 1, len: 0.04, scale: true, nodeH: 0.11 },
   gaster: { len: 0.43, width: 0.3, height: 0.25, sting: false },

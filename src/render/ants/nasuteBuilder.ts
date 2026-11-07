@@ -4,7 +4,7 @@
  * "redo the termite models based on the reference images and give them dynamic and dramatic but realistic attacks
  * and movement like the ants"). The worker, the nasute soldier and the major are built here on the shared ant
  * builder's helpers, so they run on the ants' animation (planted feet, attack poses, hit reactions, deaths by cause);
- * the king, the queen and the sickle-jaw termites stay on the termite kit.
+ * the kings and queens (both termite species) stay on the termite kit.
  *
  * Shapes from the user's study photos (docs/creatures/nasutitermes.md §11): no waist — a broad thorax–abdomen joint;
  * a saddle-shaped pronotum; a soft ten-segment abdomen with pale intersegmental membranes and the dark gut showing
@@ -15,9 +15,9 @@
  * Sickle-jaw termites (Rhynchotermes perarmatus; model redo, claude/realism/10-spec-saiy-ant-sickle-jaw-models.md,
  * shapes in docs/creatures/rhynchotermes-perarmatus.md §10) use the same builder: the soldier's globe head drawn into a
  * long, down-curved snout (`head.nasus` + `head.sickle`) with long, thin crossing sickle mandibles traced from the
- * user's photos; the worker's broad, flat head with its pale fontanelle (`head.flat`, `head.fontanelle`); the royals'
- * heads with compound eyes and ocelli, wing scales and a shield pronotum (`head.royal`, `thorax.wingScales`,
- * `thorax.shield`), the queen's pleated physogastric abdomen with dark plates (`abdomen.physo`); the larva.
+ * user's photos; the worker's rounded head with its pale fontanelle and Y-shaped suture (`head.fontanelle`,
+ * `head.suture`); the presoldier and the larva. (Their king and queen stay on the termite kit, as the conehead royals do:
+ * the user preferred the kit's queen, review round 1, 2026-11-07.)
  *
  * Returns the standard { geometry, rig } plus `nasusTip` (soldiers: the glue or the secretion comes from it) and `soft`.
  * Units: mm; the spec's numbers are fractions of the body length L. +x forward, +y up, +z right, feet on y = 0.
@@ -130,29 +130,9 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       // the abdomen sags a little toward its rear
       secs.push({ x, y: aCy - ab.sag * L * s * s, ry: ab.h * 0.5 * L * r, rz: ab.w * 0.5 * L * r, n: 2.15 });
     }
-    // (physogastric queen: soft lengthwise pleats in the stretched membrane)
-    const pleat = ab.physo ? (x, y, z, t) => {
-      const k = Math.round(t * (secs.length - 1)), sc = secs[Math.max(0, Math.min(secs.length - 1, k))];
-      const a = Math.atan2((y - sc.y) / Math.max(1e-6, sc.ry), z / Math.max(1e-6, sc.rz));
-      const f = 1 + ab.physo.pleat * 0.06 * Math.sin(a * 16) * ss(0.04, 0.2, t) * ss(0.0, 0.15, 1 - t);
-      return [x, sc.y + (y - sc.y) * f, z * f];
-    } : undefined;
     gTip = new NV(aFront - aLen, aCy - ab.sag * L, 0);
-    const ph = ab.physo;
-    tloft(n, secs, S(ph ? 36 : 18, 10, 6), PART.GASTER, (s, d, lat, ang) => {
+    tloft(n, secs, S(18, 10, 6), PART.GASTER, (s, d, lat) => {
       const [q, fr] = terg(s);
-      if (ph) {
-        // a physogastric queen (the royals fix, claude/termite-royals/): the stretched pale membrane, with each
-        // segment's small dark tergite an island on top and its sternite a paler island below, far apart
-        let c = d > 0 ? mix(C.abd, C.abdTop, d * 0.5) : mix(C.abd, C.abdUnder, -d * 0.6);
-        const mid = Math.exp(-((fr - 0.45) ** 2) / 0.03);
-        const plate = mid * ss(0.55, 0.75, d) * ss(0.0, 0.3, Math.min(s, 1 - s) * 4);
-        const stern = mid * ss(0.6, 0.85, -d) * 0.6;
-        c = mix(c, C.plate, Math.min(1, plate * 1.4));
-        c = mix(c, C.stern ?? C.plate, Math.min(1, stern));
-        // the eggs seen through the membrane: a faint warm mottle
-        return mix(c, C.gut, ab.gut * 0.25 * (0.5 + 0.5 * Math.sin(s * 63 + ang * 7)) * (1 - plate));
-      }
       // each tergite a little darker toward its rear margin; the membrane between them pale
       let c = d > 0 ? mix(C.abd, C.abdTop, d * 0.7) : mix(C.abd, C.abdUnder, -d * 0.8);
       c = mix(c, C.tergRear, 0.35 * ss(0.4, 0.95, fr) * Math.max(0, d * 0.8 + 0.3));
@@ -161,7 +141,7 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       c = mix(c, C.gut, ab.gut * gutAt(s, d, lat));
       // the tip a little paler and more translucent
       return mix(c, C.abdUnder, 0.25 * ss(0.85, 1, s));
-    }, lk.abdomen, pleat, REGION.GASTER);
+    }, lk.abdomen, undefined, REGION.GASTER);
     if (o) {
       // sparse long pale hairs at the tergites' rear margins (6-10 per tergite), lying back
       for (let q = 1; q < NT; q++) {
@@ -203,20 +183,10 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       ps.push({ x, y: tCy + 0.006 * L + th.proLift * L * ss(0.6, 1, u), ry: th.h * 0.45 * L * (0.9 + 0.1 * Math.sin(Math.PI * u)), rz: w * 0.5, n: 2.6 });
     }
     tloft(n, ps, S(16, 8, 5), PART.BODY, (s, d) => mix(d > 0 ? mix(C.thorax, C.pronotum, 0.7 + 0.3 * d) : C.thorax, C.thoraxTop, 0.15 * ss(0.8, 1, s)), lk.body, (x, y, z, t) => {
-      // saddle: the sides drop away from the midline (the royals' shield: flat, the margins only turned down a little)
+      // saddle: the sides drop away from the midline
       const zf = Math.abs(z) / (th.proW * 0.5 * L);
       return [x, y - th.saddle * L * zf * zf * (y > tCy ? 1 : 0), z];
     }, REGION.MESO);
-    if (th.wingScales && lod < 2) {
-      // the royals' wing scales: the stubs left when the wings broke off at the flight, flat dark flaps lying back
-      // over the next segment on each side of the meso- and metathorax
-      for (const seg of [meso, meta]) for (const sd of [-1, 1]) {
-        const root = new NV(seg.x + seg.len * 0.7, tCy + th.h * 0.42 * L, sd * th.w * 0.34 * L);
-        const tip = root.clone().add(new NV(-seg.len * 1.25, -th.h * 0.08 * L, sd * th.w * 0.12 * L));
-        const sq = new NQ().setFromUnitVectors(new NV(1, 0, 0), tip.clone().sub(root).normalize());
-        blob(n, root.clone().lerp(tip, 0.5), new NV(root.distanceTo(tip) * 0.55, 0.012 * L, th.w * 0.12 * L), S(10, 6, 4), PART.BODY, C.wingScale ?? C.thoraxTop, lk.head, sq);
-      }
-    }
     if (o) for (let k = 0; k < 14; k++) {
       // a few fine setae at the pronotum's margin and on the thorax
       const u = rnd.range(0.1, 0.95), zf = rnd.range(-0.9, 0.9), x = pro.x + u * pro.len;
@@ -236,6 +206,9 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
   const toB = (x, y, z) => new NV(x, y, z).applyMatrix4(HM);
   const hL = hd.len * L, hW = hd.w * L, hH = hd.h * L;
   let mouth, headTipX, nasusTip = null, chin, jawTip;
+  // (sickle-jaws: points along the left sickle, so the renderer's lowestPosed keeps the hooks off the ground — review
+  // round 1, "fix jaws clipping on the ground")
+  const sickPts = [];
   /** a point on the head's surface (soldiers: from the teardrop loft), for the antennal sockets */
   let headSurf = null;
   const hingeAt = [], tips = [], sockets = [], elbows = [];
@@ -278,16 +251,17 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       c = mix(c, C.headBand, (hd.band ?? 1) * 0.75 * Math.min(1, band) * top);
       // the fontanelle: a whitish spot in the middle of the frons (the frontal gland's pore)
       if (hd.fontanelle) c = mix(c, C.fontanelle, top * Math.exp(-(((s - 0.55) / hd.fontanelle) ** 2 + (lat / (hd.fontanelle * 1.3)) ** 2) * 3));
+      // (`head.suture`, its half-width: the sickle-jaw worker's pale Y-shaped epicranial suture, "proportionately
+      // larger and more contrasting" than its relatives' — the stem along the midline from the back to the
+      // fontanelle, the arms forking forward and out toward the antennal sockets)
+      if (hd.suture) {
+        const w2 = hd.suture * hd.suture;
+        const stem = ss(0.08, 0.2, s) * (1 - ss(0.5, 0.56, s)) * Math.exp(-(lat * lat) / w2);
+        const arms = ss(0.55, 0.6, s) * (1 - ss(0.82, 0.9, s)) * Math.exp(-((Math.abs(lat) - Math.max(0, s - 0.55) * 1.6) ** 2) / w2);
+        c = mix(c, C.fontanelle, top * 0.8 * Math.min(1, stem + arms));
+      }
       return c;
     }, lk.head, (x, y, z) => [x, y > 0.22 * hH ? 0.22 * hH + (y - 0.22 * hH) * flat : y, z], REGION.HEAD);
-    if (hd.royal && lod < 2) {
-      // the royals' compound eyes (dark, convex, on the sides behind the antennae) and two ocelli in front of them
-      for (const sd of [-1, 1]) {
-        const eq = new NQ().setFromAxisAngle(new NV(0, 1, 0), sd * 0.25);
-        blob(n, toB(x0 + 0.5 * hL, 0.12 * hH, sd * hW * 0.43), new NV(0.13 * hL, 0.17 * hH, 0.07 * hW), S(14, 8, 5), PART.HEAD, C.eye, { rough: 0.15, coat: 1, sheen: 0 }, hq.clone().multiply(eq));
-        blob(n, toB(x0 + 0.62 * hL, 0.34 * hH, sd * hW * 0.24), new NV(0.035 * hL, 0.02 * hH, 0.03 * hW), S(8, 5, 4), PART.HEAD, C.ocellus, { rough: 0.1, coat: 1, sheen: 0 }, hq);
-      }
-    }
     // (user notes 17:48 / 17:59: "redo the head geometry and mandibles", "fix the mandibles especially and the head")
     // The face, front to back as in the worker-head photo: the postclypeus — a broad, swollen cushion across the front
     // of the head, a dark line down its middle; the thin pale anteclypeus; the labrum — a large rounded tongue lying
@@ -469,6 +443,7 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
           ttube(n, [pts[k].clone().addScaledVector(inner, rad[k] * 0.5), pts[k].clone().addScaledVector(inner, rad[k] * 0.5 + (sk.toothLen ?? 0.1) * mL).addScaledVector(tn, 0.03 * mL)], [rad[k] * 0.55, 0.0012 * L], 5, part, () => C.mandTip, lk.mandible, false, true, 0.7);
         }
         hingeAt.push(h); tips.push(pts[pts.length - 1]);
+        if (sd < 0) for (let k = 0; k <= 8; k++) sickPts.push(pts[Math.round((k / 8) * (pts.length - 1))].clone());
       }
     };
     // (user rating S1/S2 "the mandibles are misplaced") vestigial mandibles: two small dark points tucked under the
@@ -638,6 +613,7 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
     bodyTop: Math.max(aCy + ab.h * 0.5 * L, neck.y + hH * 0.5), bodyHalfW: Math.max(ab.w * 0.5 * L, hW * 0.5),
   };
   if (nasusTip) out.nasusTip = nasusTip.clone();
+  if (sickPts.length) Object.assign(out, { mandPts: sickPts, mandSwing: 0 });
   out.length = out.headTip.x - out.gasterTip.x;
   out.stride = (2 * out.q0 * (reach / 6)) / 0.55;
   const mid = (out.gasterTip.x + out.headTip.x) / 2;
@@ -646,6 +622,7 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
   out.coxa.forEach(sh), out.knee.forEach(sh), out.ankle.forEach(sh), out.foot.forEach(sh);
   [out.neck, out.mandL, out.mandR, out.antL, out.antR, out.elbL, out.elbR, out.gasterPivot, out.waistPivot, out.headTip, out.gasterTip, out.mouth, out.jawTip, out.chin].forEach(sh);
   if (out.nasusTip) sh(out.nasusTip);
+  if (out.mandPts) out.mandPts.forEach(sh);
   geo.computeBoundingSphere();
   plantHomes(out);
   return { geometry: geo, rig: out };

@@ -1054,7 +1054,10 @@ export class AntRenderer {
         bodyBuf[5] = qB.y * k;
         bodyBuf[6] = qB.z * k;
         // (crushed: the feet pushed out a little as it is pressed down)
-        bodyBuf[7] = atkP.spread * w + M.squash * 0.35;
+        // (user, review 2026-11-07, the attack clips: "plant legs on ground better" — an attack's brace moved the planted
+        // feet outward along the ground and back with every strike; now the feet stay where they stand and the body
+        // moves over them)
+        bodyBuf[7] = M.squash * 0.35;
         bodyBuf[8] = atkP.gYaw * w;
         bodyBuf[9] = stingW;
         bodyBuf[10] = Math.max(atkP.front * w, v.front ?? 0);

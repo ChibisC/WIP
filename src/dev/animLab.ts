@@ -390,7 +390,7 @@ function clips(): Record<string, Clip> {
         {
           morph: 'termite_rhy_soldier',
           script: (t, v) => {
-            Object.assign(v, { x: 0, y: 0, heading: 0, tan: 1, special: 0, atk: undefined, firing: false, aimX: 3.2, aimY: 0, aimZ: 0.6, ramp: 0, headPitch: 0, mandible: 0.2, antennaActivity: 1 });
+            Object.assign(v, { x: 0, y: 0, heading: 0, tan: 1, special: 0, atk: undefined, firing: false, aimX: 1.15, aimY: 0, aimZ: 0.5, ramp: 0, headPitch: 0, mandible: 0.2, antennaActivity: 1, holding: false });
             const t1 = 0.9, lun = 0.55 * 0.74, t2 = t1 + lun, t3 = 5.2;
             if (t < t1) Object.assign(v, { headPitch: 0.22, mandible: 0.85 + 0.15 * Math.sin(t * 3) });
             else if (t < t2) sickleCycle(v, 7, (t - t1) / 0.55, 0.55);
@@ -407,7 +407,9 @@ function clips(): Record<string, Clip> {
           script: (t, v) => {
             const t2 = 0.9 + 0.55 * 0.74, t3 = 5.2;
             const held = t > 0.9 + 0.55 * 0.58 && t < t3;
-            Object.assign(v, { x: 3.2, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: 0, roll: 0, pitch: 0, headYaw: 0, acid: 0, dead: false });
+            // (review round 1: the grip on the body) side-on across the sickles once caught, as the sim pins it
+            // (SICKLE.grab.gripMm 0.82 + the victim's half-width); before, a step further out, turning to flee
+            Object.assign(v, { x: held || t >= t3 ? 0.82 + 0.33 : 1.75, y: 0, heading: held || t >= t3 ? Math.PI / 2 : Math.PI * 0.62, hp: 100, antennaActivity: 1, mandible: 0.5, pose: 0, roll: 0, pitch: 0, headYaw: 0, acid: 0, dead: false });
             if (held) {
               const k = Math.min(1, Math.max(0, (t - t2) / 3.2));
               v.acid = 0.1 + 0.9 * k;
@@ -423,7 +425,7 @@ function clips(): Record<string, Clip> {
           },
         },
       ],
-      cam: { tx: 1.6, ty: 0.6, tz: 0, dir: [0.25, 0.32, 1], dist: 13, fov: 30 },
+      cam: { tx: 0.8, ty: 0.6, tz: 0, dir: [0.25, 0.32, 1], dist: 10, fov: 30 },
     },
     // the sickle-jaw castes side by side: a worker chewing leaf litter, two in trophallaxis, a soldier drumming the alarm
     // (feet planted), a soldier squirting a foe too big to hook (no grab), a worker dying
@@ -448,16 +450,6 @@ function clips(): Record<string, Clip> {
       ],
       events: [0.17, 0.34, 0.51, 0.68, 2.2, 2.37, 2.54, 2.71, 4.3, 4.47, 4.64].map((t) => ({ t, e: { t: 'headbang', x: 0.4, y: 4.4, space: -1 } as unknown as SimEvent })),
       cam: { tx: 0, ty: 0.5, tz: 0.5, dir: [0.15, 0.8, 1], dist: 34, fov: 30 },
-    },
-    // the sickle-jaw royals: the physogastric queen and the king beside her, antennae busy
-    sroyals: {
-      dur: 6,
-      noScale: true,
-      ants: [
-        { morph: 'termite_rhy_queen', script: (t, v) => Object.assign(v, { x: 0, y: 0, heading: 0, antennaActivity: 0.5, headPitch: 0.05 * Math.sin(t * 1.3), mandible: 0.3 + 0.2 * Math.sin(t * 2) }) },
-        { morph: 'termite_rhy_king', script: (t, v) => Object.assign(v, { x: 6, y: 5.5, heading: -0.9, antennaActivity: 1, headPitch: -0.1, headYaw: 0.15 * Math.sin(t * 1.7) }) },
-      ],
-      cam: { tx: -2, ty: 1.5, tz: 0, dir: [0.25, 0.7, 1], dist: 60, fov: 30 },
     },
     // the Saiy-Ant gold surge (claude/realism/10-spec §2): the ripple in from the head with the stretch and overshoot
     // (as game/antViews.ts speciesExtras), faster bites with spark impacts, the ripple out from the gaster, the

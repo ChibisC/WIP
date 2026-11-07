@@ -7,7 +7,6 @@ import { distToCreatureBody } from './slots';
 import { creatureHeld, isHeld } from './hellAnts';
 import { faceToward, steerTo } from './movement';
 import { dcos, dhypot, dsin } from './dmath';
-import { SICKLE_SOCKET } from './termiteRoyalData';
 
 /**
  * Sickle-Jaw Termites (docs/creatures/rhynchotermes-perarmatus.md; DESIGN "Sickle-Jaw Termites"):
@@ -278,19 +277,21 @@ export function sickleUpdate(w: World, a: Ant, c: Colony, dt: number, mul: numbe
 }
 
 /**
- * Pin the victim where the renderer draws it: its front in the crossed mandible tips (the kit's
- * socket, SICKLE_SOCKET), facing the soldier, unable to move or fight (stunned while held).
+ * Pin the victim in the closed sickles' hooks (SICKLE.grab.gripMm ahead of the soldier): an ant side-on across them,
+ * a creature head-on; unable to move or fight (stunned while held).
  */
 function pin(a: Ant, v: Victim, L: number): void {
   const k = L / SICKLE.sizeMm.soldier;
-  const front = v.ant ? casteOf(v.ant.caste).length * 0.5 : v.r;
-  const dist = SICKLE_SOCKET.x * k + front;
+  // an ant across the sickles, side-on (its body in the hooks); a creature head-on by its radius
+  const near = v.ant ? casteOf(v.ant.caste).length * SICKLE.grab.victimHalfWidth : v.r;
+  const dist = SICKLE.grab.gripMm * k + near;
   const x = a.x + dcos(a.h) * dist;
   const y = a.y + dsin(a.h) * dist;
   if (v.ant) {
     v.ant.x = x;
     v.ant.y = y;
-    v.ant.h = a.h + Math.PI;
+    // (turned the way it already faced, so a victim caught from its left lies with its left side to the soldier)
+    v.ant.h = a.h + (dsin(v.ant.h - a.h) >= 0 ? Math.PI / 2 : -Math.PI / 2);
     v.ant.v = 0;
     v.ant.stun = Math.max(v.ant.stun, 0.25);
   } else if (v.cr) {
