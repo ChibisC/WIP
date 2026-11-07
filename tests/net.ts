@@ -109,17 +109,17 @@ function randomOrder(c: Client): void {
   }
 }
 
-/** Run the clients for `ms` of simulated time in 16 ms frames. */
-async function run(hub: LocalHub, clients: Client[], ms: number, orders = true, onFrame?: (t: number) => void): Promise<void> {
+/** Run the clients for `ms` of simulated time in 16 ms frames (or `frameMs`). */
+async function run(hub: LocalHub, clients: Client[], ms: number, orders = true, onFrame?: (t: number) => void, frameMs = 16): Promise<void> {
   const end = hub.now + ms;
   while (hub.now < end) {
-    const now = hub.now + 16;
+    const now = hub.now + frameMs;
     hub.deliver(now);
     for (const c of clients) {
       if (!c.alive) continue;
       c.game.update();
       // the clock keeps running while waiting (up to 250 ms of debt), so a short stall is caught up after
-      c.acc += 16 * c.game.status().speed;
+      c.acc += frameMs * c.game.status().speed;
       if (c.acc > 250) c.acc = 250;
       while (c.acc >= 50) {
         if (!c.game.tryTick()) break;
@@ -165,7 +165,7 @@ const t0 = Date.now();
   const counts = clients.map((c) => c.appliedAt.filter((t) => t <= upTo).length);
   check("lockstep: every player's commands are applied on every client, at the same ticks", counts.every((n) => n === counts[0]) && counts[0] > 100 && clients.every((c) => c.appliedAt.filter((t) => t <= upTo).join() === clients[0].appliedAt.filter((t) => t <= upTo).join()), `${counts[0]} commands from 3 players`);
   const d = clients.map((c) => c.game.status().delay);
-  check('adaptive delay: settles between 2 and 8 ticks from the measured ping', d.every((x) => x >= 2 && x <= 8) && d.every((x) => x === d[0]), `delay ${d.join(', ')} ticks, pings ${JSON.stringify(clients[0].game.status().pings)}`);
+  check('adaptive delay: settles between 1 and 8 ticks from the measured ping', d.every((x) => x >= 4 && x <= 8) && d.every((x) => x === d[0]), `delay ${d.join(', ')} ticks, pings ${JSON.stringify(clients[0].game.status().pings)}`);
   // a forced desync: one client's state changes outside the simulation
   clients[2].sim.w.colony(1)!.food += 3;
   await run(hub, clients, 12_000, false);
@@ -227,6 +227,56 @@ const t0 = Date.now();
     check('rejoin: the returning player is in sync with the others', ac.diff < 0 && ac.common >= 4, `${ac.common} checkpoints ${detail}; host vs client 1: ${compareHashes(clients[0], clients[1]).diff}`);
   }
   void players;
+}
+
+// ---------------------------------------------------------------- a LAN: one tick of delay (performance v2)
+{
+  const hub = new LocalHub();
+  const lag = new Rng(11);
+  hub.latency = () => 1 + lag.next() * 3; // 1–4 ms one way
+  const { clients } = makeMatch(hub, 3);
+  // own commands: the tick each was issued at → the tick it was applied at
+  const issuedAt = clients.map(() => new Map<number, number>());
+  const waits: number[] = [];
+  clients.forEach((c, i) => {
+    const issue = c.cmds.issue.bind(c.cmds);
+    c.cmds.issue = (body, opts) => {
+      const cmd = issue(body, opts);
+      issuedAt[i].set(cmd.seq, c.sim.w.s.tick);
+      return cmd;
+    };
+    c.sim.w.events.onAny((e) => {
+      if (e.t !== 'command' || e.player !== i) return;
+      // (e.tick: the tick the command acts in)
+      const t = issuedAt[i].get(e.seq);
+      if (t !== undefined && e.tick !== undefined) waits.push(e.tick - t);
+    });
+  });
+  // (4 ms steps: the 16 ms frames of the other tests would add a frame to every hop of a ping)
+  await run(hub, clients, 10_000, true, undefined, 4);
+  const t1 = clients[0].sim.w.s.tick;
+  let stalledFrames = 0;
+  let frames = 0;
+  waits.length = 0;
+  await run(
+    hub,
+    clients,
+    20_000,
+    true,
+    () => {
+      frames++;
+      if (clients[0].game.status().waitingFor.length) stalledFrames++;
+    },
+    4,
+  );
+  const steady = clients[0].sim.w.s.tick - t1;
+  const d = clients.map((c) => c.game.status().delay);
+  check('LAN (1–4 ms one way): the delay settles at 1 tick', d.every((x) => x === 1), `delay ${d.join(', ')}`);
+  check('LAN: 20 ticks/s and almost no waiting at one tick of delay', steady >= 390 && stalledFrames / frames < 0.03, `${steady} ticks in 20 s, waited in ${((stalledFrames / frames) * 100).toFixed(1)} % of frames`);
+  const avg = waits.reduce((a, b) => a + b, 0) / Math.max(1, waits.length);
+  // (given between ticks T and T + 1, it goes in the next packet — T + 2 at one tick of delay)
+  check("LAN: a player's own command acts 2 ticks after it is given (single-player: 1)", waits.length > 50 && avg <= 2 && Math.max(...waits) <= 2, `${waits.length} commands, ${avg.toFixed(2)} ticks on average, at most ${Math.max(...waits)}`);
+  check('LAN: all in sync', clients.slice(1).every((c) => compareHashes(clients[0], c).diff < 0 && compareHashes(clients[0], c).common >= 3));
 }
 
 // ---------------------------------------------------------------- 150 ms + jitter + loss: still smooth
