@@ -419,18 +419,40 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
         }
         return pts;
       };
+      /**
+       * (round-1 photo comparison: the photos' sickles are C-shaped hooks under the head — forward and down from the
+       * hinge, round the bottom and the tip curling back up — not tusks hanging to the ground) `sk.plane`: each
+       * sickle lies in one plane, turned out by `yaw0` and leaned in toward the midline by a fitted angle so the
+       * closed tips just cross; `dip` runs past a right angle so the curve turns back on itself
+       */
+      // a turn about the blade's own forward axis that brings its lower part toward the midline
+      const lean = (pts, sd, a) => pts.map((q) => new NV(q.x, q.y * Math.cos(a) - sd * q.z * Math.sin(a), q.z * Math.cos(a) + sd * q.y * Math.sin(a)));
       for (const sd of [-1, 1]) {
         const h = headSurf(sc0 + (sk.at ?? 0.02), -(sk.ang ?? 0.95), 0.9);
         h.z *= sd;
-        // the sweep fitted so the closed tips just cross the midline (the left over the right)
-        let lo = 1.2, hi2 = 3.6, sw = 2.6;
-        for (let it = 0; it < 22; it++) {
-          sw = (lo + hi2) / 2;
-          const tp = path(sd, sw)[S(22, 12, 6)].clone().applyQuaternion(hq).add(h);
-          if (sd * tp.z > -(sk.cross ?? 0.01) * L) lo = sw;
-          else hi2 = sw;
+        let local;
+        if (sk.plane) {
+          const base = path(sd, 0);
+          // the lean fitted so the closed tips just cross the midline (the left over the right)
+          let lo = 0, hi2 = 1.4, a = 0.5;
+          for (let it = 0; it < 22; it++) {
+            a = (lo + hi2) / 2;
+            const tp = lean(base, sd, a)[base.length - 1].clone().applyQuaternion(hq).add(h);
+            if (sd * tp.z > -(sk.cross ?? 0.01) * L) lo = a;
+            else hi2 = a;
+          }
+          local = lean(base, sd, a);
+        } else {
+          // the sweep fitted so the closed tips just cross the midline (the left over the right)
+          let lo = 1.2, hi2 = 3.6, sw = 2.6;
+          for (let it = 0; it < 22; it++) {
+            sw = (lo + hi2) / 2;
+            const tp = path(sd, sw)[S(22, 12, 6)].clone().applyQuaternion(hq).add(h);
+            if (sd * tp.z > -(sk.cross ?? 0.01) * L) lo = sw;
+            else hi2 = sw;
+          }
+          local = path(sd, sw);
         }
-        const local = path(sd, sw);
         const lift = sd < 0 ? 0.008 * L : 0;
         const pts = local.map((q, k) => q.clone().add(new NV(0, lift * ss(0.6, 1, k / (local.length - 1)), 0)).applyQuaternion(hq).add(h));
         const rad = pts.map((_, k) => {

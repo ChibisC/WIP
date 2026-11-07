@@ -54,11 +54,12 @@ const worker = {
 const SOLDIER_COLORS = {
   ...WORKER_COLORS,
   head: 0xa23a16, headTop: 0xb0421a, headUnder: 0x8a3012, nasusTip: 0x5a1610, pore: 0x2a0806,
-  mand: 0x6e1c12, mandTip: 0x200806,
+  mand: 0x5a140c, mandTip: 0x160604,
   // the photos' amber-cream body with bold brown tergite bands (species doc §6: #D49E5C, bands #6E3E1E)
-  thorax: 0xd4a464, thoraxTop: 0xc89656, pronotum: 0xcc9c5c,
-  abd: 0xcc9450, abdTop: 0xbe8644, abdUnder: 0xdcb27a, tergRear: 0x6e3e1e, membrane: 0xf0dcb0, gut: 0x5a4024,
-  leg: 0xe0c07c, legLight: 0xe8cc90, legBase: 0xd0aa66, antenna: 0xd4b070, antennaTip: 0xe0c088,
+  // (round-1 photo comparison: still too pale) a warmer amber, the bands darker
+  thorax: 0xc08440, thoraxTop: 0xb47838, pronotum: 0xb87c3a,
+  abd: 0xb87434, abdTop: 0xa8682c, abdUnder: 0xcc945a, tergRear: 0x5a2c12, membrane: 0xe8c08a, gut: 0x4a3018,
+  leg: 0xd4a258, legLight: 0xdeb26a, legBase: 0xc49048, antenna: 0xc89a54, antennaTip: 0xd8ae68,
 };
 const soldier = {
   ...worker,
@@ -68,9 +69,11 @@ const soldier = {
   thorax: { meta: 0.05, meso: 0.05, pro: 0.06, w: 0.12, h: 0.1, cy: 0.1, proW: 0.14, proLift: 0.01, saddle: 0.018 },
   // the capsule 1.05 mm (0.233 L) by 1.0 wide; the snout 1.45 mm (0.322 L), down-curved toward its blunt tip
   head: {
-    len: 0.233, w: 0.222, h: 0.2, tilt: -0.1, neck: 0.012, neckY: 0.03,
+    len: 0.233, w: 0.222, h: 0.2, tilt: 0.08, neck: 0.012, neckY: 0.03,
     nasus: { len: 0.3, r0: 0.04, r1: 0.017, up: -0.32, rise: 0.0, curve: 0.22, dark: 0.55, flank: 2.6 },
-    sickle: { len: 0.26, w: 0.03, flat: 0.62, yaw0: 1.35, yawPow: 1.15, dip0: 0.3, dip1: 0.9, hook: 0.8, at: 0.02, ang: 0.9, cross: 0.012, tooth: 0.42, toothLen: 0.1 },
+    // (round-1 photo comparison) a C-hook in one plane: forward and down from the hinge, round the bottom, the tip
+    // curling back and up; thicker at the base, dark red to near-black
+    sickle: { len: 0.34, w: 0.04, flat: 0.6, plane: true, yaw0: 0.32, yawPow: 1, dip0: 0.4, dip1: 2.0, hook: 0.5, at: 0.02, ang: 0.9, cross: 0.012, tooth: 0.42, toothLen: 0.1 },
   },
   mandible: { len: 0.25, curve: 1, r: 0.02, open: 0.55 },
   antenna: { beads: 14, len: 0.55, r: 0.0105, ss: 0.3, sa: 0.3, ang: 0.42, splay: 0.6, droop: 0.6 },
@@ -89,7 +92,12 @@ const presoldier = {
   ...soldier,
   key: 'termite_rhy_presoldier',
   look: {
-    colors: { ...SOLDIER_COLORS, head: 0xe2c8a2, headTop: 0xe8d0aa, headUnder: 0xd8bc94, nasusTip: 0xcaa67c, pore: 0x8a6a48, mand: 0xd4b48a, mandTip: 0xa88458 },
+    colors: {
+      ...SOLDIER_COLORS, head: 0xe2c8a2, headTop: 0xe8d0aa, headUnder: 0xd8bc94, nasusTip: 0xcaa67c, pore: 0x8a6a48, mand: 0xd4b48a, mandTip: 0xa88458,
+      // soft and untanned all over
+      thorax: 0xe6d4b0, thoraxTop: 0xdecaa4, pronotum: 0xe2d0aa, abd: 0xe4d0a8, abdTop: 0xdac49a, abdUnder: 0xeadcbc, tergRear: 0xc8aa7c, membrane: 0xf0e4ca,
+      leg: 0xe8d8b4, legLight: 0xeee2c4, legBase: 0xdecca6, antenna: 0xe2d2ae, antennaTip: 0xeadcbc,
+    },
     ...SURF,
     head: { rough: 0.3, coat: 0.5, sheen: 0.3 },
   },
@@ -128,8 +136,9 @@ const qf = (mm) => mm / QL;
 const queen = {
   ...king,
   key: 'termite_rhy_queen', L: QL, stance: qf(0.47), soft: 1.6,
-  look: { colors: { ...ROYAL_COLORS, abd: 0xd2b488, abdTop: 0xc8a87a, abdUnder: 0xdcc29a, membrane: 0xd8bc90, plate: 0x5a3a20, stern: 0x8a6a44, gut: 0x8a6a40 }, ...SURF },
-  abdomen: { x0: qf(4.2), len: qf(22.5), w: qf(5.05), h: qf(5.1), cy: qf(2.3), full: 0.3, sag: qf(0.4), groove: 0.02, membrane: 0.2, gut: 0.5, gutLobes: [[0.5, 0.1, 0]], physo: { pleat: 1 } },
+  // (round-1 photo comparison: amber-orange and plumper, the dark plates bold)
+  look: { colors: { ...ROYAL_COLORS, abd: 0xc47c34, abdTop: 0xb46e2c, abdUnder: 0xd29452, membrane: 0xe0a45e, plate: 0x4a2a12, stern: 0x8a5a2c, gut: 0x7a4e24 }, ...SURF },
+  abdomen: { x0: qf(4.2), len: qf(22.5), w: qf(6.6), h: qf(6.4), cy: qf(3.0), full: 0.3, sag: qf(0.4), groove: 0.02, membrane: 0.2, gut: 0.5, gutLobes: [[0.5, 0.1, 0]], physo: { pleat: 1 } },
   thorax: { ...king.thorax, meta: qf(0.6), meso: qf(0.6), pro: qf(0.68), w: qf(1.27), h: qf(0.85), cy: qf(0.77), proW: qf(1.7) },
   head: { ...king.head, len: qf(1.6), w: qf(1.45), h: qf(0.85), neck: qf(0.13), neckY: qf(0.13) },
   mandible: { ...king.mandible, len: qf(0.64), r: qf(0.12) },
