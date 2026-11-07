@@ -35,7 +35,9 @@ UNITS = {
     "saiy_gold": ("saiy_worker", 6.0, "mopen=0.3&gold=1"),
     "sickle_worker": ("termite_rhy_worker", 6.14, ""),
     "sickle_soldier": ("termite_rhy_soldier", 5.4, ""),
-    "sickle_presoldier": ("termite_rhy_soldier", 5.4, "tan=0"),
+    "sickle_presoldier": ("termite_rhy_presoldier", 5.4, ""),
+    "sickle_gape": ("termite_rhy_soldier", 5.4, "mopen=1"),
+    "sickle_larva": ("termite_rhy_larva", 5.8, ""),
     "sickle_king": ("termite_rhy_king", 8.88, ""),
     "sickle_queen": ("termite_rhy_queen", 26.1, ""),
     # the calibration anchor: the fire ant pilot (rated 9-10 by the user)

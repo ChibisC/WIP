@@ -24,7 +24,7 @@ import { ATK } from './attackPoses';
  */
 
 /** Which morphs use the pass (the pilot: the tropical fire ant; the rollout widens this). */
-export const ANIM_V2_PREFIXES = ['fire_', 'saiy_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_', 'hell_', 'termite_worker', 'termite_nasute', 'termite_major'];
+export const ANIM_V2_PREFIXES = ['fire_', 'saiy_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_', 'hell_', 'termite_worker', 'termite_nasute', 'termite_major', 'termite_rhy_'];
 /** Lab switch: false shows the old motion (before/after clips). */
 export const animSettings = { v2: true };
 export const animV2 = (morph: string): boolean => animSettings.v2 && ANIM_V2_PREFIXES.some((p) => morph.startsWith(p));
@@ -92,6 +92,26 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
       const pick = (k: number) => Math.floor(hs(k, 7) * 3) % 3;
       const i = pick(n);
       out.variant = set[n > 0 && i === pick(n - 1) ? (i + 1) % 3 : i];
+    }
+    return out;
+  }
+  // sickle-jaw termites on the ant pipeline (model redo, claude/realism/10-spec §3): the soldier's grab, hold-and-squirt
+  // and free squirt (game/antViews.ts sets them as specials 7–9 from the sim's lunge and hold) and the alarm drum; the
+  // other castes bite as termite workers do (tug, rip, lunge), never the same twice running
+  if (morph.startsWith('termite_rhy_')) {
+    if (v.special === 5) out.variant = ATK.DRUM;
+    else if (v.special === 7) out.variant = ATK.S_GRAB;
+    else if (v.special === 8) out.variant = ATK.S_HOLD;
+    else if (v.special === 9) out.variant = ATK.S_SQUIRT;
+    else if (morph === 'termite_rhy_soldier' || morph === 'termite_rhy_presoldier') out.variant = [ATK.S_GRAB, ATK.S_SQUIRT, ATK.S_HOLD][av];
+    else {
+      const set = [ATK.T_TUG, ATK.T_RIP, ATK.T_LUNGE];
+      if (!v.atkSeq) out.variant = set[av];
+      else {
+        const pick = (k: number) => Math.floor(hs(k, 8) * 3) % 3;
+        const i = pick(n);
+        out.variant = set[n > 0 && i === pick(n - 1) ? (i + 1) % 3 : i];
+      }
     }
     return out;
   }

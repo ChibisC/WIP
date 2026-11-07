@@ -23,14 +23,14 @@ const GLASSY = { rough: 0.1, coat: 1, sheen: 0.04 };
 const WORKER_COLORS = {
   head: 0xa0522a, headTop: 0xac5c2e, headUnder: 0x8e4822, headBand: 0x7a3e1c, clypeus: 0xbc7a48, labrum: 0xcc9a6a, palp: 0xe6d6b8, suture: 0x7a3e1c, fontanelle: 0xeee2c8,
   mand: 0x7a3a1a, mandTip: 0x261006,
-  thorax: 0xe2d6bc, thoraxTop: 0xd6c8aa, pronotum: 0xdccdb0,
-  abd: 0xe6dac2, abdTop: 0xdacdb0, abdUnder: 0xefe6d4, tergRear: 0xc8b490, membrane: 0xf2ebdc, gut: 0x221a10,
-  leg: 0xe2d4b4, legLight: 0xebe0c6, legBase: 0xd6c4a0, claw: 0x8a6a40, antenna: 0xd8c6a0, antennaTip: 0xe6d8b8,
+  thorax: 0xe0caa0, thoraxTop: 0xd6bc8e, pronotum: 0xdcc498,
+  abd: 0xdcc292, abdTop: 0xd2b682, abdUnder: 0xe8d6b0, tergRear: 0xb8955e, membrane: 0xf0e2c2, gut: 0x2e2414,
+  leg: 0xe2cca2, legLight: 0xeadab6, legBase: 0xd6be90, claw: 0x8a6a40, antenna: 0xd8c6a0, antennaTip: 0xe6d8b8,
   hair: 0xf2ead6, seta: 0xf2ead6,
 };
 const worker = {
   key: 'termite_rhy_worker', builder: 'nasute', real: true, L: 5.8, stance: 0.06, soft: 1.1,
-  look: { colors: WORKER_COLORS, ...SURF },
+  look: { colors: WORKER_COLORS, ...SURF, head: { rough: 0.36, coat: 0.42, sheen: 0.12 } },
   // a long, low, glassy abdomen (0.63 L), the dark leaf-litter gut showing through most of it
   abdomen: { x0: 0.5, len: 0.6, w: 0.25, h: 0.17, cy: 0.095, full: 0.38, sag: 0.012, groove: 0.04, membrane: 0.55, gut: 1.0, gutLobes: [[0.32, 0.05, 1], [0.55, 0.06, 1], [0.76, 0.03, 0.8]] },
   thorax: { meta: 0.045, meso: 0.045, pro: 0.05, w: 0.14, h: 0.09, cy: 0.09, proW: 0.18, proLift: 0.008, saddle: 0.016 },
@@ -55,9 +55,10 @@ const SOLDIER_COLORS = {
   ...WORKER_COLORS,
   head: 0xa23a16, headTop: 0xb0421a, headUnder: 0x8a3012, nasusTip: 0x5a1610, pore: 0x2a0806,
   mand: 0x6e1c12, mandTip: 0x200806,
-  thorax: 0xd8b67a, thoraxTop: 0xc8a466, pronotum: 0xd0ac70,
-  abd: 0xdcbe86, abdTop: 0xc8a46a, abdUnder: 0xe8d4a8, tergRear: 0x8a5a2e, membrane: 0xf0e2bc, gut: 0x5a4024,
-  leg: 0xdcc282, legLight: 0xe6d098, legBase: 0xcaa868, antenna: 0xd0b072, antennaTip: 0xdcc088,
+  // the photos' amber-cream body with bold brown tergite bands (species doc §6: #D49E5C, bands #6E3E1E)
+  thorax: 0xd4a464, thoraxTop: 0xc89656, pronotum: 0xcc9c5c,
+  abd: 0xcc9450, abdTop: 0xbe8644, abdUnder: 0xdcb27a, tergRear: 0x6e3e1e, membrane: 0xf0dcb0, gut: 0x5a4024,
+  leg: 0xe0c07c, legLight: 0xe8cc90, legBase: 0xd0aa66, antenna: 0xd4b070, antennaTip: 0xe0c088,
 };
 const soldier = {
   ...worker,

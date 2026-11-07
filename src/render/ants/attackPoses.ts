@@ -178,7 +178,7 @@ export function applyAttackBody(p: AttackPose, w: number, L: number, vF: THREE.V
 // ---------------------------------------------------------------------------------------------------------------
 
 /** Attack variants of the planted-feet pass (attackVariant in antMotion.ts picks them per species and cycle). */
-export const ATK = { LUNGE: 0, REAR: 1, CLAMP: 2, PIVOT_STING: 3, QUICK_STING: 4, CRUSH: 5, HEAD_SWING: 6, ACID: 7, TAUNT: 8, RAGE: 9, SNAP: 10, IMPALE: 11, CHOMP: 12, SLAM: 13, EXECUTE: 14, EXECUTE_P: 15, LIFT: 16, T_TUG: 17, T_RIP: 18, T_LUNGE: 19, T_JAB: 20, T_CRUSH: 21, T_DOZE: 22, T_TOSS: 23, DRUM: 24, GLUE: 25 } as const;
+export const ATK = { LUNGE: 0, REAR: 1, CLAMP: 2, PIVOT_STING: 3, QUICK_STING: 4, CRUSH: 5, HEAD_SWING: 6, ACID: 7, TAUNT: 8, RAGE: 9, SNAP: 10, IMPALE: 11, CHOMP: 12, SLAM: 13, EXECUTE: 14, EXECUTE_P: 15, LIFT: 16, T_TUG: 17, T_RIP: 18, T_LUNGE: 19, T_JAB: 20, T_CRUSH: 21, T_DOZE: 22, T_TOSS: 23, DRUM: 24, GLUE: 25, S_GRAB: 26, S_HOLD: 27, S_SQUIRT: 28 } as const;
 
 type Key = Partial<Omit<AttackPose, never>>;
 const FIELDS = ['fwd', 'pitch', 'yaw', 'roll', 'headPitch', 'headYaw', 'mand', 'gaster', 'sting', 'up', 'side', 'px', 'spread', 'front', 'gYaw'] as const;
@@ -318,6 +318,24 @@ const DRUM_U: Key = { headPitch: 0.15, spread: 0.4, mand: 0.2 };
 const DRUM_D: Key = { headPitch: -0.55, up: -0.004, spread: 0.4, mand: 0.2 };
 const GLUE_B: Key = { up: -0.015, pitch: -0.03, headPitch: -0.12, gaster: 0.05, spread: 0.5, mand: 0.1 };
 const GLUE_K: Key = { fwd: -0.035, up: -0.01, pitch: 0.03, headPitch: 0.05, gaster: 0.3, spread: 0.5, mand: 0.1 };
+/**
+ * Sickle-jaw soldiers on the ant pipeline (model redo, claude/realism/10-spec §3; spec 09 §2.2): the grab-and-squirt.
+ *  - S_GRAB (q = the sim's lunge, 0..LUNGE_SNAP + 0.16; game/antViews.ts): rear back on planted feet with the head
+ *    raised and the sickles flung wide, a short tremble, then the lunge — the body thrown forward over the front legs,
+ *    the head dropping — the sickles crossing shut on the victim at the snap (0.58), and settling into the hold pose.
+ *  - S_HOLD (q runs with the squirts): braced, the victim at the sickle tips; each squirt the snout presses in (the
+ *    head dipping forward and down) and the soft abdomen pumps; the sickles stay crossed.
+ *  - S_SQUIRT (a foe too big to hook): planted squarely in front of it, the sickles half open, the head jabbing the
+ *    snout's tip against its side on each squirt.
+ */
+const SGRAB_W: Key = { fwd: -0.09, up: 0.05, pitch: 0.16, px: -0.3, headPitch: 0.42, mand: 1, gaster: 0.12, spread: 0.45 };
+const SGRAB_S: Key = { fwd: 0.15, up: -0.01, pitch: -0.1, px: 0.3, headPitch: -0.22, mand: 0, spread: 0.45 };
+const SHOLD_B: Key = { fwd: 0.05, up: 0.01, pitch: -0.04, px: 0.2, headPitch: -0.1, mand: 0, gaster: 0.04, spread: 0.5 };
+const SHOLD_P: Key = { fwd: 0.075, up: -0.004, pitch: -0.08, px: 0.25, headPitch: -0.3, mand: 0, gaster: 0.22, spread: 0.5 };
+const SSQ_B: Key = { fwd: 0.0, up: 0.0, pitch: -0.02, headPitch: -0.04, mand: 0.55, gaster: 0.04, spread: 0.5 };
+const SSQ_J: Key = { fwd: 0.07, up: -0.01, pitch: -0.07, px: 0.25, headPitch: -0.26, mand: 0.45, gaster: 0.2, spread: 0.5 };
+/** the sim's lunge: the snap at this fraction, the hold pose reached 0.16 later (render/termite/rig.ts LUNGE_SNAP) */
+const S_SNAP = 0.58;
 // the finisher's lift (user note 2026-11-02 12:39): the foe held up by the neck — head and front raised, braced on the
 // hind legs; the jaws part a little, then shear shut with a toss of the head (the cut)
 const LIFT_U: Key = { fwd: 0.0, up: 0.06, pitch: 0.16, px: -0.1, headPitch: 0.6, mand: 0, gaster: -0.1, spread: 0.4 };
@@ -459,6 +477,31 @@ export function attackPoseV2(variant: number, q: number, side: number, out: Atta
       blend(GLUE_B, GLUE_K, kick, side, out);
       out.headYaw += 0.06 * Math.sin(q * Math.PI * 2) * (1 - kick);
       out.headPitch += -0.06 * kick;
+      return out;
+    }
+    case ATK.S_GRAB: {
+      // rear and gape (→ 0.42), the tremble (→ 0.5), the lunge with the sickles snapping shut on the snap, settle into the hold
+      if (q < 0.42) blend({}, SGRAB_W, sm(q / 0.42), side, out);
+      else if (q < 0.5) {
+        blend(SGRAB_W, SGRAB_W, 1, side, out);
+        out.headPitch += 0.02 * Math.sin(q * 190);
+      } else if (q < S_SNAP) {
+        blend(SGRAB_W, SGRAB_S, strikeEase((q - 0.5) / (S_SNAP - 0.5)), side, out);
+        out.mand = 1 - sm((q - (S_SNAP - 0.03)) / 0.03);
+      } else blend(SGRAB_S, SHOLD_B, sm(Math.min(1, (q - S_SNAP) / 0.16)), side, out);
+      return out;
+    }
+    case ATK.S_HOLD: {
+      // each squirt: a quick press of the snout (→ 0.18), easing back; a small shake of the victim between
+      const p = q < 0.18 ? strikeEase(q / 0.18) : Math.exp(-(q - 0.18) * 6);
+      blend(SHOLD_B, SHOLD_P, p, side, out);
+      out.headYaw += 0.05 * Math.sin(q * Math.PI * 4) * (1 - p);
+      return out;
+    }
+    case ATK.S_SQUIRT: {
+      const p = q < 0.15 ? strikeEase(q / 0.15) : Math.exp(-(q - 0.15) * 7);
+      blend(SSQ_B, SSQ_J, p, side, out);
+      out.headYaw += 0.06 * Math.sin(q * Math.PI * 2) * (1 - p);
       return out;
     }
     case ATK.LIFT: {
