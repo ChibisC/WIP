@@ -1979,5 +1979,5 @@ Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).
   Hard+, allies link nests and send help through. `tools/tunnel-ai-probe.ts` (Brutal, seed 5): the fire ants warned
   the player at 13.3 min, opened at 13.8, broke in at 14.7; the leafcutter ally linked at 14 min.
 - **Saves:** version 4 — old grids embedded in the margin (everything in the space shifted), routes generated closed;
-  `BUILD_ID` `ud-mp-12`. `tests/tunnels.ts` (35 checks) in `npm test`.
+  `BUILD_ID` `ud-mp-13` (12 was taken by the story merge). `tests/tunnels.ts` (35 checks) in `npm test`.
 - Stills: `docs/underground/tunnels/` (`tests/browser/tunnels.py`; dev `?tunnel=<stage>`).

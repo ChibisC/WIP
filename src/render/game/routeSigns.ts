@@ -25,13 +25,9 @@ function texture(kind: SignKind): THREE.CanvasTexture {
   const c = cv.getContext('2d')!;
   c.clearRect(0, 0, 64, 64);
   if (kind === 'alert') {
-    // a red disc with a bold white "!"
-    c.fillStyle = '#e8342a';
-    c.beginPath();
-    c.arc(32, 32, 28, 0, Math.PI * 2);
-    c.fill();
-    c.fillStyle = '#fff';
-    c.font = 'bold 44px sans-serif';
+    // just a red "!", no disc (user 2026-11-07); drawn translucent
+    c.fillStyle = '#ff2a1e';
+    c.font = 'bold 58px sans-serif';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.fillText('!', 32, 34);
@@ -102,7 +98,14 @@ export class RouteSigns {
         continue;
       }
       sp.visible = true;
-      sp.material = this.mat(sg.kind);
+      // (its own material: the opacity is per sign — hints are fainter than the warning)
+      const base = this.mat(sg.kind);
+      let m = sp.material as THREE.MeshBasicMaterial;
+      if (m.map !== base.map) {
+        if (m !== base) m.dispose();
+        m = base.clone();
+        sp.material = m;
+      }
       const big = sg.kind === 'alert';
       const pulse = big ? 1 + 0.12 * Math.sin(time * 5) : 1;
       const s = scale * (big ? 1 : 0.6) * pulse;
@@ -110,7 +113,7 @@ export class RouteSigns {
       // just above the floor (a gate sits in the wall: its sign hangs at head height, not over the wall top)
       sp.position.set(sg.x, height(sg.x, sg.y) + s * (big ? 0.6 : 0.5), sg.y);
       if (camera) sp.quaternion.copy(camera.quaternion);
-      (sp.material as THREE.MeshBasicMaterial).opacity = sg.a ?? 1;
+      m.opacity = (sg.a ?? 1) * (sg.kind === 'alert' ? 0.7 : 1);
     }
   }
 
