@@ -30,7 +30,7 @@ export interface When {
 
 function event(id: string, when: When, big: boolean, dur: number, actions: Action[] = []): SurpriseDef {
   const acts = [...actions, ...(when.note ? [{ do: 'note' as const, key: when.note, kind: 'warn' as const }] : [])];
-  return { id, window: when.window, ...(when.after ? { after: when.after } : {}), ...(when.until ? { until: when.until } : {}), ...(when.chance !== undefined ? { chance: when.chance } : {}), ...(when.from ? { from: when.from } : {}), big, dur, ...(acts.length ? { actions: acts } : {}), ...(when.say ? { say: when.say } : {}) };
+  return { id, span: when.window, ...(when.after ? { after: when.after } : {}), ...(when.until ? { until: when.until } : {}), ...(when.chance !== undefined ? { chance: when.chance } : {}), ...(when.from ? { from: when.from } : {}), big, dur, ...(acts.length ? { actions: acts } : {}), ...(when.say ? { say: when.say } : {}) };
 }
 
 /**

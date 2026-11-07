@@ -301,14 +301,14 @@ export interface LairDef {
  * A surprise event (claude/story/06-spec §6): a marching column of another species, a wandering hunter, a windfall,
  * the weather or a rival's move, out of the blue. The level lists a pool; when the level starts each is rolled (its
  * `chance` × the difficulty's `events`, from a seeded hash, so the same seed gives the same events) and given a time in
- * its `window`. When it fires it sets the flag `ev:<id>` (level scenes with `on: 'ev:<id>'` play the party or the
+ * its `span`. When it fires it sets the flag `ev:<id>` (level scenes with `on: 'ev:<id>'` play the party or the
  * creature; sim/story/surprises.ts), does its `actions` and says its caption. Big ones never overlap: a big one due while
  * another runs waits until that one's `dur` is over.
  */
 export interface SurpriseDef {
   id: string;
   /** seconds after the level began (or after `after` was set) it may start: [earliest, latest] */
-  window: [number, number];
+  span: [number, number];
   /** the window counts from this flag (default: the level's start); never before it */
   after?: string;
   /** never once this flag is set (e.g. the boss fight) */
