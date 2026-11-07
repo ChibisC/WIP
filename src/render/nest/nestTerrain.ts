@@ -261,8 +261,19 @@ export class NestTerrain {
       src = dst;
       dst = t;
     }
+    // every cell whose distance changed dirties its chunk (and a neighbour it is near the edge of): a change's reach
+    // through the chamfer and the blur is not bounded by `markDirty`'s radius, and a background area kept current in
+    // slices must end with every chunk rebuilt that the final distance touches (tests/performance.ts)
+    const prev = this.sdPrev;
+    if (prev) {
+      for (let k = 0; k < W * H; k++) if (prev[k] !== src[k]) g.markDirty(k % W, (k - (k % W)) / W);
+    } else this.sdPrev = new Float32Array(W * H);
     if (src !== this.sd) this.sd.set(src);
+    this.sdPrev!.set(this.sd);
   }
+
+  /** the signed distance of the last computation (which cells changed → which chunks rebuild) */
+  private sdPrev: Float32Array | null = null;
 
   /** Light pools (local + wide openness), wall distance and a smooth stone mask. */
   private updateMaps(): void {

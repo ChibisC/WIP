@@ -350,7 +350,10 @@ export class NestGrid extends HexLayout {
     const cw = Math.ceil(this.w / NEST_CHUNK);
     const cx = Math.floor(x / NEST_CHUNK);
     const cy = Math.floor(y / NEST_CHUNK);
-    const r = 6;
+    // (the renderer's signed distance is blurred over 7 cells and its normals sample a cell beyond: a change this near a
+    // chunk's edge moves the neighbour's mesh too — seen with the bigger grids of the shared underground, where a
+    // background area kept current in slices ended with stale normals at one chunk's edge)
+    const r = 9;
     for (let dy = -1; dy <= 1; dy++)
       for (let dx = -1; dx <= 1; dx++) {
         const lx = x - (cx + dx) * NEST_CHUNK;
