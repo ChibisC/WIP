@@ -73,10 +73,14 @@ export const FLOOD_HILL: MapDef = {
     { kind: 'food', shape: { circle: [600, 900], r: 80 } },
     { kind: 'food', shape: { circle: [1000, 880], r: 70 } },
     { kind: 'food', shape: { circle: [140, 650], r: 50 } },
-    { kind: 'food', shape: { circle: [1060, 650], r: 50 } },
+    // (south of the east colony, not under its doorway: a summit colony's foragers on the way to it walked past the east
+    // nest and were cut down on Hard, 2026-11-06)
+    { kind: 'food', shape: { circle: [1090, 770], r: 50 } },
     { kind: 'food', shape: { circle: [800, 600], r: 45 } },
     { kind: 'aphid', shape: { circle: [400, 880], r: 40 } },
     { kind: 'aphid', shape: { circle: [820, 880], r: 40 } },
+    // a few aphids on the summit's south slope: a small income the water never takes
+    { kind: 'aphid', shape: { circle: [690, 432], r: 26 } },
     { kind: 'plant', shape: { ellipse: [600, 880], rx: 500, ry: 80 } },
     { kind: 'plant', shape: { circle: [600, 520], r: 140 } },
     { kind: 'noSpawn', shape: { circle: [620, 330], r: 80 } },

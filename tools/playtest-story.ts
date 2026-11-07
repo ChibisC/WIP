@@ -87,6 +87,11 @@ ev.on('death', (e) => {
     deaths++;
     const k = CAUSE[e.cause ?? 0] ?? '?';
     byCause[k] = (byCause[k] ?? 0) + 1;
+    // DEATHS=1: where (to the nearest 100 mm, and in or out of the nest)
+    if (process.env.DEATHS) {
+      const at = e.space === SURFACE ? `${Math.round(e.x / 100) * 100},${Math.round(e.y / 100) * 100}` : 'nest';
+      byCause['@' + at] = (byCause['@' + at] ?? 0) + 1;
+    }
   }
 });
 const t0 = performance.now();
@@ -109,6 +114,14 @@ for (let t = 0; t < minutes * 1200; t++) {
     const rv = w.colony(Object.values(st.rivals)[0]);
     const died = Object.entries(byCause).map(([k, v]) => `${k} ${v}`).join(', ');
     byCause = {};
+    // NEAR=x0,y0,x1,y1: the colony's ants on the surface in that box, by state and job (what draws them there)
+    if (process.env.NEAR) {
+      const [x0, y0, x1, y1] = process.env.NEAR.split(',').map(Number);
+      const there = w.s.ants.filter((a) => a.colony === c.id && a.space === SURFACE && a.x > x0 && a.x < x1 && a.y > y0 && a.y < y1);
+      const by: Record<string, number> = {};
+      for (const a of there) by[`${a.caste.split('_')[1]}:s${a.state}:g${a.group ?? -1}`] = (by[`${a.caste.split('_')[1]}:s${a.state}:g${a.group ?? -1}`] ?? 0) + 1;
+      log.push(`      near: ${JSON.stringify(by)}`);
+    }
     // a story titan on the map: its health and where it is
     const ti = w.s.creatures.find((cr) => !cr.dead && ((cr.data.rstory ?? 0) || cr.data.hpFloor !== undefined));
     const tis = ti ? `; titan ${Math.round((ti.hp / ti.maxHp) * 100)} % ${ti.space === SURFACE ? 'outside' : 'inside'}${ti.space !== SURFACE ? ` ${Math.round(Math.hypot(ti.x - (c.queen >= 0 ? w.antById.get(c.queen)?.x ?? 0 : 0), ti.y - (c.queen >= 0 ? w.antById.get(c.queen)?.y ?? 0 : 0)))} mm from the queen` : ''}` : '';
@@ -301,6 +314,7 @@ for (let t = 0; t < minutes * 1200; t++) {
     } else seenKey = key;
   }
   if (target) {
+    if (process.env.TARGETS) log.push(`      ${(w.s.time / 60).toFixed(1)} min: target ${target.space} ${Math.round(target.x)},${Math.round(target.y)}`);
     placeMarker(w, c, ASSIST, target.space, target.x, target.y);
     // (every look: a group raised since, or one the colony took back, joins too)
     // (the queen's own nurses too when a boss is in the nest: a person throws everything at it)
