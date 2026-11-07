@@ -6,7 +6,11 @@ Shots: every map's surface at close, gameplay and far zoom; the home nest and an
 ant lab line-up); a big fight; water and a flood; a titan in a nest; day and night (The Long Nights); the low and
 medium presets (high is every other shot).
 
-Run: tests/browser/with_server.sh python3 tests/browser/golden.py   (TAG=before|after  ONLY=name,parts)
+The "before" set must come from the same game without the change (a build of main from before the optimization), so
+that only the optimization differs. On the build machine (SwiftShader) a screenshot waits for the GPU process to catch
+up with the shader compiles, minutes after loading: the timeouts are long on purpose.
+
+Run: tests/browser/with_server.sh python3 tests/browser/golden.py   (TAG=before|after  ONLY=name,parts  RESUME=1)
 """
 import os
 import time
@@ -40,7 +44,13 @@ def note(r):
     print(r, flush=True)
 
 
+# RESUME=1: skip the shots already rendered (a long run picked up after an interruption)
+RESUME = os.environ.get("RESUME") == "1"
+
+
 def want(name):
+    if RESUME and os.path.exists(os.path.join(OUT, f"{name}.png")):
+        return False
     return not ONLY or any(o in name for o in ONLY.split(","))
 
 
@@ -146,13 +156,15 @@ with sync_playwright() as p:
         pg.evaluate(NEST_CAM, [sp[0], sp[1], sp[2], 14, 0.45])
         shoot(pg, "titan_nest", errs)
 
-    # ---- day and night (The Long Nights: the morning, and the third night)
-    for when, extra in (("day", "&stage=1"), ("night", "&night=3")):
+    # ---- day and night (The Long Nights: the morning, and the first night; plain URL parameters, so that a build
+    #      from before the performance pass renders the same shots)
+    for when, extra in (("day", "&stage=1"), ("night", "")):
         n = f"story_{when}"
         if not want(n):
             continue
         load(pg, f"?story=longNights&diff=normal&shot=1&noui=1&nocine=1&q=high&seed=7&ticks=40{extra}", errs)
-        pg.evaluate(f"window.__session.loop.advance({20 * 25 if when == 'night' else 200})")
+        # (the first night falls at 330 s + 30 s of dusk)
+        pg.evaluate(f"window.__session.loop.advance({20 * 400 if when == 'night' else 200})")
         x, z = pg.evaluate("() => { const e = window.__session.player.entrances[0]; return [e.sx, e.sy]; }")
         pg.evaluate(SURF_CAM, [x + 10, z + 6, 200, 0.9, 0.0])
         shoot(pg, n, errs, steps=40)
