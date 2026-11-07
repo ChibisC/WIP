@@ -257,6 +257,23 @@ const nasRegions = (head: Sculpt) => ({
 export const NASUTE_W: DetailRecipe = { key: 'nasute_w', regions: nasRegions(NAS_HEAD_W) };
 export const NASUTE_S: DetailRecipe = { key: 'nasute_s', regions: nasRegions(NAS_HEAD_S) };
 
+/**
+ * Termants (spec 09 §3: a fictional hybrid judged part by part against real ones): the front a Formica's — the head and
+ * mesosoma finely microreticulate, satin; the back a termite worker's — the soft, translucent abdomen with sunken
+ * membranes and a wet glint (the nasute recipe's soft abdomen); the soldier's head a Macrotermes soldier's, hard,
+ * smooth and shining (the nasute soldier's head sculpt).
+ */
+const termRegions = (head: Sculpt, headShade: ReturnType<typeof shade>) => ({
+  ...nasRegions(head),
+  [REGION.HEAD]: { sculpt: head, shade: headShade, px: [512, 512] as [number, number] },
+  [REGION.MESO]: { sculpt: FOR_MESO, shade: shade(0.8, 0.45, 0.5, 0.3, 0.4, { coatRough: 0.2, wear: 0.2, dust: 0.1, mid: 0.1 }), px: [1024, 512] as [number, number] },
+  [REGION.WAIST]: { sculpt: FOR_WAIST, shade: shade(0.8, 0.06, 0.3, 0.4, 0.3, { coatRough: 0.24, wear: 0.2, dust: 0.12 }), px: [256, 256] as [number, number] },
+  [REGION.LEG]: { sculpt: FOR_LEG, shade: shade(0.9, 0.5, 0, 0.6, 0.35, { coatRough: 0.28, wear: 0.3, dust: 0.3, mid: 0.25, tipThin: 0.55 }), px: [128, 320] as [number, number] },
+  [REGION.MANDIBLE]: { sculpt: FOR_MAND, shade: shade(0.8, 0.1, 0, 0.45, 0.35, { coatRough: 0.2, wear: 0.5, dust: 0.05, tipThin: 0.7 }), px: [96, 192] as [number, number] },
+});
+const TERMANT_W: DetailRecipe = { key: 'termant_w', regions: termRegions(FOR_HEAD, shade(0.8, 0.35, 0.45, 0.3, 0.4, { coatRough: 0.2, wear: 0.2, dust: 0.08, mid: 0.1 })) };
+const TERMANT_S: DetailRecipe = { key: 'termant_s', regions: termRegions(NAS_HEAD_S, shade(0.6, 0.15, 0.3, 0.3, 0.5, { coatRough: 0.08, wear: 0.15, dust: 0.04, mid: 0.08 })) };
+
 /** Recipe for an ant morph (null: no baked detail yet, the material stays as before). */
 /**
  * Saiy-Ants (model redo, claude/realism/10-spec): a black carpenter ant's cuticle (Camponotus pennsylvanicus, Mackay
@@ -296,6 +313,8 @@ export function antRecipe(morphKey: string): DetailRecipe | null {
   if (morphKey.startsWith('eciton_')) return ECITON;
   if (morphKey.startsWith('hell_')) return HELL;
   if (morphKey.startsWith('saiy_')) return SAIY;
+  if (morphKey === 'termant_soldier') return TERMANT_S;
+  if (morphKey.startsWith('termant_')) return TERMANT_W;
   if (morphKey === 'termite_worker') return NASUTE_W;
   if (morphKey === 'termite_nasute' || morphKey === 'termite_major') return NASUTE_S;
   return null;

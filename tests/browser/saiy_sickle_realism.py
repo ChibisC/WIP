@@ -40,6 +40,11 @@ UNITS = {
     "sickle_larva": ("termite_rhy_larva", 5.8, ""),
     "sickle_king": ("termite_rhy_king", 8.88, ""),
     "sickle_queen": ("termite_rhy_queen", 26.1, ""),
+    # Termants (spec 09 §3: the realistic hybrid redesign)
+    "termant_worker": ("termant_worker", 5.0, "mopen=0.3"),
+    "termant_soldier": ("termant_soldier", 7.0, "mopen=0.2"),
+    "termant_queen": ("termant_queen", 12.0, "mopen=0.2"),
+    "termant_king": ("termant_king", 7.5, "mopen=0.2"),
     # the calibration anchor: the fire ant pilot (rated 9-10 by the user)
     "anchor_fire": ("fire_minor", 2.96, ""),
     # the conehead termites share the termite kit: rendered before and after to prove they did not change

@@ -24,7 +24,7 @@ import { ATK } from './attackPoses';
  */
 
 /** Which morphs use the pass (the pilot: the tropical fire ant; the rollout widens this). */
-export const ANIM_V2_PREFIXES = ['fire_', 'saiy_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_', 'hell_', 'termite_worker', 'termite_nasute', 'termite_major', 'termite_rhy_'];
+export const ANIM_V2_PREFIXES = ['fire_', 'saiy_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_', 'hell_', 'termite_worker', 'termite_nasute', 'termite_major', 'termite_rhy_', 'termant_'];
 /** Lab switch: false shows the old motion (before/after clips). */
 export const animSettings = { v2: true };
 export const animV2 = (morph: string): boolean => animSettings.v2 && ANIM_V2_PREFIXES.some((p) => morph.startsWith(p));
@@ -145,6 +145,19 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
     if (!v.atkSeq) out.variant = set[av];
     else {
       const pick = (k: number) => Math.floor(hs(k, 9) * 3) % 3;
+      const i = pick(n);
+      out.variant = set[n > 0 && i === pick(n - 1) ? (i + 1) % 3 : i];
+    }
+    return out;
+  }
+  // Termants (spec 09 §3.3): workers bite like formicines and spray formic acid with the abdomen curled forward;
+  // the soldier's heavy Macrotermes bites — a crushing bite, a chomp — and the glue dab, the forehead's pore pressed
+  // at the foe (T_JAB); the royals bite; never the same twice running
+  if (morph.startsWith('termant_')) {
+    const set = morph === 'termant_soldier' ? [ATK.CRUSH, ATK.CHOMP, ATK.T_JAB] : morph === 'termant_worker' ? [ATK.LUNGE, ATK.CLAMP, ATK.ACID] : [ATK.LUNGE, ATK.CLAMP, ATK.CRUSH];
+    if (!v.atkSeq) out.variant = set[av];
+    else {
+      const pick = (k: number) => Math.floor(hs(k, 10) * 3) % 3;
       const i = pick(n);
       out.variant = set[n > 0 && i === pick(n - 1) ? (i + 1) % 3 : i];
     }
