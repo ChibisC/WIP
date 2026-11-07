@@ -131,7 +131,8 @@ function world(seed = 5, style = 'formicarium'): World {
   const k = CREATURES.stagBeetle;
   const same =
     k.length === 100 && k.hp === 2600 && k.armor === 6 && k.speed === 9 && k.bite === 26 && k.attackInterval === 2.2 && k.sense === 90 && k.strength === 140 && k.food === 400 && k.mass === 300 && k.fleeAt === 0 && k.boss === true && k.wild === 0 && k.ai === 'stag' && k.biomes === undefined &&
-    k.dig?.can === true && k.dig.speed === 0.6 && k.dig.style === 'bulldoze';
+    // (dig 0.8 since main's easier titan holes, 2026-11-03: claude/creatures/02-spec)
+    k.dig?.can === true && k.dig.speed === 0.8 && k.dig.style === 'bulldoze';
   check('the titan stag beetle: its stats unchanged', same);
   const S = STAG;
   check('the titan: its moves unchanged (STAG, reach, clearance, 12 mount slots, model at the centre)', S.windUp === 0.9 && S.hold === 2 && S.liftS === 0.85 && S.squeeze === 12 && S.toss === 2.6 && S.sideBite === 0.45 && S.sideFling === 1.2 && S.plough === 0.42 && S.ploughHalf === 0.9 && S.shove === 26 && S.liftH === 0.22 && S.jaw === 0.42 && BALANCE.creatureReach.stagBeetle.r === 0.15 && BALANCE.creatureReach.stagBeetle.arc === 0.6 && BALANCE.combat2.clearance.stagBeetle === 0.08 && CLIMB_DATA.stagBeetle.slots.length === 12 && mountClass('stagBeetle') === 'huge');

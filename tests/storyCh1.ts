@@ -183,7 +183,8 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
   const st3 = storyOf(ww)!;
   for (let i = 0; i < 4; i++) makeAnt(ww, 0, 'termant_soldier', SURFACE, 190 + i * 4, 760, 0);
   jump(ww, 3, nightStart(D, 4) - 2);
-  const out = until(ww, 'tarantulaOut', 30);
+  // (it waits 40 s into the night before it comes out, since 2026-11-06)
+  const out = until(ww, 'tarantulaOut', 70);
   const tar = members(ww, actor(ww, 'tarantula'))[0] as Creature;
   check('long nights: on the fourth (last) night the red-knee tarantula leaves its burrow on the knoll', out > 0 && !!tar && ww.terrain.levelAt(tar.x, tar.y) === 2);
   const bossHp = (d: Difficulty) => {
@@ -275,7 +276,9 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
     mf.entered = false;
     run(wf, 20 * 3);
     damageCreature(wf, mo, mo.maxHp * 2, 'pure', null);
-    check('spider mother: …and in the last stage she can (the floor ends with the stage)', mo.dead);
+    // (her own floor ends with the stage; until she has been inside, the dig-in's 10 % holds — main's story titans
+    // always get in, claude/story/05-spec)
+    check('spider mother: …and in the last stage her own floor ends (only the dig-in’s 10 % holds until she is in)', !mo.dead && Math.abs(mo.hp / mo.maxHp - STORY.titanRaid.hpFloor) < 0.01, `${(mo.hp / mo.maxHp).toFixed(2)}`);
   }
   // the hunt to the end
   m.stage = 2;
@@ -446,4 +449,4 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
 }
 
 void AS;
-console.log(failed ? `\n${failed} FAILED in ${((Date.now() - t0) / 1000).toFixed(1)}s` : `\nall chapter 1 (four levels) tests passed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+console.log(failed ? `\n${failed} FAILED in ${((Date.now() - t0) / 1000).toFixed(1)}s` : `\nall chapter 1 (seven levels) tests passed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
