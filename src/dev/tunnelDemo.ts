@@ -3,6 +3,7 @@ import { makeAnt } from '../sim/factory';
 import { chainToward } from '../world/nestGrid';
 import { ownHalf, otherHalf, routes } from '../sim/tunnels';
 import { nestSpace } from '../sim/types';
+import { assignGroup, placeMarker } from '../sim/markers';
 
 /**
  * Dev: a tunnel-route scene (`?tunnel=<stage>`, CHANGE_PLAN §27). The player's nest is dug out to its gate on route 0
@@ -44,5 +45,13 @@ export function tunnelDemo(s: GameSession, stage: string): void {
   if (stage === 'warn' || stage === 'enemy') until(() => other.warned, 900);
   if (stage === 'open') until(() => r.open, 1200);
   if (stage === 'in' || stage === 'ally') until(() => !!other.joined, 1500);
+  // in the other nest: the digger's groups go to the far gate (what the attacker sees of the rival's nest)
+  if (stage === 'in' || stage === 'ally') {
+    const og = w.nest(other.colony)!;
+    const gp = og.hexCenter(other.gate);
+    placeMarker(w, digger, 2, nestSpace(other.colony), gp.x, gp.y);
+    for (const gr of digger.groups) assignGroup(w, digger, gr.id, 2);
+    until(() => w.s.ants.filter((a) => a.colony === digger.id && a.space === nestSpace(other.colony)).length >= 3, 200);
+  }
   s.events.drain();
 }
