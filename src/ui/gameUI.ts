@@ -249,6 +249,19 @@ export class GameUI {
     // a story titan breaking into your nest (claude/story/05-spec §2): a short banner
     if (e.t === 'titanDig' && e.colony === pid && e.phase === 'enter' && e.story) this.banner('It’s in the nest!');
     else if (e.t === 'invasion' && e.colony === pid) this.toasts.push('Intruders in the nest!', 'warn', 'invasion');
+    // the shared underground (sim/tunnels.ts): digging toward your gate, a route opening, a breach into the nest
+    else if (e.t === 'tunnelWarn' && e.colony === pid) this.toasts.push('Something is digging toward your nest! Click to look.', 'warn', 'tunnel:warn', () => this.s.jumpTo('nest', e.x, e.y, e.space));
+    else if (e.t === 'tunnelOpen' && (e.a === pid || e.b === pid)) {
+      const w = this.s.world;
+      const other = w.colony(e.a === pid ? e.b : e.a);
+      const ally = other && other.team === this.s.player.team;
+      const i = e.a === pid ? 0 : 1;
+      this.toasts.push(ally ? `A tunnel now links your nest with ${other!.name}’s. Click to look.` : `The tunnel to ${other?.name ?? 'the rival nest'} is open! Click to look.`, ally ? 'good' : 'warn', 'tunnel:open', () => this.s.jumpTo('nest', e.x[i], e.y[i], e.spaces[i]));
+    } else if (e.t === 'tunnelBreach' && e.colony === pid && e.by >= 0) {
+      const w = this.s.world;
+      const by = w.colony(e.by);
+      if (by && by.team !== this.s.player.team) this.toasts.push(`${by.name} has dug into your nest! Click to look.`, 'warn', 'tunnel:breach', () => this.s.jumpTo('nest', e.x, e.y, e.space));
+    }
     else if (e.t === 'colonyLost' && e.colony === pid) this.toasts.push('Your queen has died. The colony is lost.', 'warn');
     else if (e.t === 'colonyLost') {
       const w = this.s.world;

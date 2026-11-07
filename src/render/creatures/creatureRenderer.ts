@@ -146,6 +146,9 @@ export class CreatureRenderer {
    * ticks; `dt` is real frame time (idle motion keeps going while paused,
    * walking only when they move).
    */
+  /** Underground fog (game/fog.ts): a creature out of the viewer's sight is not drawn. */
+  visible: ((x: number, y: number) => boolean) | null = null;
+
   update(creatures: ReadonlyArray<Creature>, space: number, alpha: number, dt: number, ground: GroundFn, camera: THREE.Camera | null, viewportH: number): void {
     this.frame++;
     this.time += dt;
@@ -170,6 +173,7 @@ export class CreatureRenderer {
       if (cr.space !== space) continue;
       const build = BUILDERS[cr.kind];
       if (!build) continue;
+      if (this.visible && !this.visible(cr.x, cr.y)) continue;
       const L = cr.scale || CREATURES[cr.kind]?.length || 10;
       const x = cr.px + (cr.x - cr.px) * alpha;
       const z = cr.py + (cr.y - cr.py) * alpha;
