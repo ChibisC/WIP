@@ -80,7 +80,7 @@ export type SimEvent =
   /** a route's gate joined its nest's dug floor: `by` the colony that dug in (−1: the owner's own digging reached the gate) */
   | { t: 'tunnelBreach'; colony: number; by: number; route: number; space: number; x: number; y: number; open: boolean }
   /** a player command was applied (ok) or ignored (why) — clears the issuer's pending feedback */
-  | { t: 'command'; player: number; seq: number; type: string; ok: boolean; why?: string }
+  | { t: 'command'; player: number; seq: number; type: string; ok: boolean; why?: string; /** the tick it acts in */ tick?: number }
   | { t: 'wave'; index: number; total: number; label: string };
 
 /** A story shot as data (sim/story/types.ts `Shot`), kept structural here so core does not import the sim. */

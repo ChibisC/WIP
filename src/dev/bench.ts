@@ -9,6 +9,9 @@
  *  4. a story night — The Long Nights at dusk before its last, longest night (lairs, hunters, the tarantula);
  *  5. the battle arena with 600 units;
  *  6. a multiplayer-sized world — four colonies on an authored map, the camera touring the surface.
+ *  0. first, *feel* (claude/performance/02-spec §1): real pointer and key events dispatched on the page every 0.4 s —
+ *     camera drags and wheel turns, clicks on ants, orders (a marker placed, a group sent), then in the home nest digs
+ *     and tiles — timed from each event to the frame that shows it and to the units acting (core/feel.ts).
  *
  * Each scene: a warm-up, then a camera tour of a fixed path for `bsecs` seconds (default 20) while the profiler
  * (core/profiler.ts) records every frame. Results live in sessionStorage between the page loads; `?bench=1&bdone=1`
@@ -17,7 +20,9 @@
 import * as THREE from 'three';
 import type { GameSession } from '../game/session';
 import { prof } from '../core/profiler';
+import { feel, FeelSummary } from '../core/feel';
 import { BUILD_ID } from '../net/messages';
+import { AS, SURFACE } from '../sim/types';
 
 interface SceneDef {
   id: string;
@@ -27,6 +32,7 @@ interface SceneDef {
 }
 
 export const BENCH_SCENES: SceneDef[] = [
+  { id: 'feel', title: 'Feel: clicks, orders, digging, building and the camera (scripted inputs)', query: 'play=1&seed=11&species=lasius&rival=solenopsis&developed=6&nocine=1&reveal=1' },
   { id: 'switch', title: 'Switching surface ↔ underground', query: 'play=1&seed=11&areas=1&species=lasius&rival=solenopsis&reveal=1&developed=6&nocine=1' },
   { id: 'fight', title: 'Big fight (4 × 200 ants, 100 creatures, 2 titans)', query: 'stress=1&ants=200&creatures=100&bosses=2' },
   { id: 'nest', title: 'Full nest', query: 'stress=1&ants=200&creatures=40&view=nest' },
@@ -72,6 +78,8 @@ interface SceneResult {
   creatures: number;
   hitches: string[];
   switch?: SwitchResult;
+  /** latency and pacing (core/feel.ts) */
+  feel?: FeelSummary;
 }
 
 interface SwitchStep {
@@ -96,6 +104,8 @@ interface BenchState {
   /** switching test rounds */
   rounds: number;
   results: SceneResult[];
+  /** run only these scenes (`?bonly=feel,fight`), else all */
+  only?: string[];
 }
 
 function load(): BenchState | null {
@@ -126,11 +136,18 @@ function sceneUrl(i: number, st: BenchState): string {
 /** `?bench=1` without a scene: the start screen, or (bdone) the report. */
 export function startBench(ui: HTMLElement, q: URLSearchParams): void {
   if (q.get('bdone')) return showReport(ui);
-  const st: BenchState = { started: Date.now(), quality: q.get('q') || 'high', secs: Number(q.get('bsecs') || 20), rounds: Number(q.get('brounds') || 10), results: [] };
+  const only = q.get('bonly')?.split(',').filter((id) => BENCH_SCENES.some((d) => d.id === id));
+  const st: BenchState = { started: Date.now(), quality: q.get('q') || 'high', secs: Number(q.get('bsecs') || 20), rounds: Number(q.get('brounds') || 10), results: [], only: only?.length ? only : undefined };
   const box = panel(ui);
-  box.innerHTML = `<h2>Benchmark</h2><p>Six scenes, about ${Math.round((BENCH_SCENES.length * (st.secs + 12) + 60) / 60)} minutes at <b>${st.quality}</b> quality. Each one loads, warms up, then flies the camera along a fixed path while every frame is timed. Leave the mouse and keyboard alone until the report appears; keep this tab in front.</p><p>Starting in 3 s…</p>`;
+  box.innerHTML = `<h2>Benchmark</h2><p>Seven scenes, about ${Math.round((BENCH_SCENES.length * (st.secs + 12) + 60) / 60)} minutes at <b>${st.quality}</b> quality. Each one loads, warms up, then flies the camera along a fixed path while every frame is timed. Leave the mouse and keyboard alone until the report appears; keep this tab in front.</p><p>Starting in 3 s…</p>`;
   save(st);
-  setTimeout(() => go(sceneUrl(0, st)), 3000);
+  setTimeout(() => go(sceneUrl(nextScene(st, -1), st)), 3000);
+}
+
+/** The scene after scene i (−1: the first) that this run includes; −1 when none is left. */
+function nextScene(st: BenchState, i: number): number {
+  for (let k = i + 1; k < BENCH_SCENES.length; k++) if (!st.only || st.only.includes(BENCH_SCENES[k].id)) return k;
+  return -1;
 }
 
 function panel(ui: HTMLElement): HTMLElement {
@@ -171,7 +188,8 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
     st.results.push(r);
     save(st);
     console.log('[bench]', JSON.stringify(r));
-    if (i + 1 < BENCH_SCENES.length) go(sceneUrl(i + 1, st));
+    const nx = nextScene(st, i);
+    if (nx >= 0) go(sceneUrl(nx, st));
     else go(`bench=1&bdone=1`);
   };
   // the camera tour: a slow orbit round a point, zooming in close, then out far, over `secs`
@@ -217,6 +235,7 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
   const warm = 3000;
   let reset = false;
   if (def.id === 'switch') return void runSwitching(s, () => finish(undefined), (sw) => finish(sw));
+  if (def.id === 'feel') return void runFeel(s, secs, () => finish());
   const loop = (t: number) => {
     const el = t - t0;
     if (el < warm) {
@@ -227,6 +246,7 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
     if (!reset) {
       reset = true;
       prof.reset();
+      feel.reset();
     }
     const k = (el - warm) / (secs * 1000);
     tour(Math.min(1, k));
@@ -278,7 +298,121 @@ function collect(s: GameSession, def: SceneDef, loadMs: number, secs: number, sw
     creatures: s.world.s.creatures.length,
     hitches: prof.hitches.slice(0, 12).map((h) => `${h.t.toFixed(1)} s ${h.ms.toFixed(0)} ms: ${h.causes.join('; ')}`),
     switch: sw,
+    feel: feel.summary(),
   };
+}
+
+/**
+ * The feel scene: real pointer, wheel and key events on the page, one every 0.4 s, between animation frames (a timer,
+ * as a person's input arrives): half the time on the surface (camera drags, wheel, clicks on ants, a marker placed with
+ * the marker tool, a group sent to it), then in the home nest (digs painted, a tile placed, the camera). Every one is
+ * timed by the feel meter from the event's own timestamp.
+ */
+function runFeel(s: GameSession, secs: number, done: () => void): void {
+  const v = s.view;
+  const el = v.renderer.domElement;
+  const w = s.world;
+  const vec = new THREE.Vector3();
+  const toScreen = (x: number, y: number, z: number): { x: number; y: number } | null => {
+    vec.set(x, y, z).project(v.activeCamera());
+    if (Math.abs(vec.x) > 0.95 || Math.abs(vec.y) > 0.95 || vec.z > 1) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.left + ((vec.x + 1) / 2) * r.width, y: r.top + ((1 - vec.y) / 2) * r.height };
+  };
+  const ptr = (type: string, x: number, y: number, button = 0, target: EventTarget = el) =>
+    target.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, button, buttons: type === 'pointerup' ? 0 : 1 << button, pointerId: 1, pointerType: 'mouse', bubbles: true, cancelable: true }));
+  const click = (x: number, y: number) => {
+    ptr('pointermove', x, y, 0, window);
+    ptr('pointerdown', x, y);
+    ptr('pointerup', x, y, 0, window);
+  };
+  const r = el.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  const drag = (dx: number) => {
+    ptr('pointerdown', cx, cy, 1);
+    ptr('pointermove', cx + dx, cy, 1, window);
+    ptr('pointerup', cx + dx, cy, 1, window);
+  };
+  const wheel = (dy: number) => el.dispatchEvent(new WheelEvent('wheel', { deltaY: dy, clientX: cx, clientY: cy, bubbles: true, cancelable: true }));
+  const key = (code: string) => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true }));
+  };
+  const home = s.viewedArea;
+  const groups = s.player.groups.filter((g) => g.type !== 'queen');
+  let step = 0;
+  let inNest = false;
+  // an own ant on screen, its screen point
+  const antOnScreen = (space: number): { x: number; y: number } | null => {
+    for (const a of w.s.ants) {
+      if (a.space !== space || a.colony !== s.player.id || a.state === AS.Dead) continue;
+      const p = space === SURFACE ? toScreen(a.x, w.terrain.walkHeight(a.x, a.y), a.y) : null;
+      if (p) return p;
+    }
+    return null;
+  };
+  const act = () => {
+    const k = step++ % 6;
+    if (!inNest) {
+      if (k === 0) drag(60);
+      else if (k === 1) wheel(step % 4 < 2 ? -120 : 120);
+      else if (k === 2) {
+        const p = antOnScreen(SURFACE);
+        if (p) click(p.x, p.y);
+      } else if (k === 3) {
+        // the marker tool, then a click on the ground
+        s.selectMarker(step % 5);
+        click(cx + ((step * 37) % 200) - 100, cy + ((step * 23) % 120) - 60);
+      } else if (k === 4 && groups.length) s.assignGroup(groups[step % groups.length].id, step % 5);
+      else key('KeyO');
+    } else {
+      const g = w.nest(s.player.id)!;
+      if (k === 0) drag(-50);
+      else if (k === 1) wheel(step % 4 < 2 ? -120 : 120);
+      else if (k === 2 || k === 3) {
+        // a hex next to the dug floor: the dig tool painted on it, or a tile on a dug one
+        s.setTool(k === 2 ? 'dig' : 'tile', 'brood', s.player.castes[0] ?? '');
+        for (let q = (step * 131) % (g.cols * g.rows), n = 0; n < g.cols * g.rows; n++, q = (q + 1) % (g.cols * g.rows)) {
+          const ok = k === 2 ? !g.isHexDug(q) && g.isHexDiggable(q) : g.isHexDug(q) && !g.isEntrance(q);
+          if (!ok) continue;
+          const c = g.hexCenter(q);
+          const p = toScreen(c.x, 0, c.y);
+          if (!p) continue;
+          ptr('pointerdown', p.x, p.y);
+          ptr('pointerup', p.x, p.y, 0, window);
+          break;
+        }
+        s.setTool('none');
+      } else if (k === 4) {
+        const p = antOnScreen(home);
+        if (p) click(p.x, p.y);
+      } else key('KeyO');
+    }
+  };
+  const t0 = performance.now();
+  const warm = 3000;
+  let started = false;
+  let timer = 0;
+  const loop = (t: number) => {
+    const el2 = t - t0;
+    if (el2 >= warm && !started) {
+      started = true;
+      prof.reset();
+      feel.reset();
+      timer = window.setInterval(act, 400);
+    }
+    if (started && !inNest && el2 - warm > (secs * 1000) / 2) {
+      inNest = true;
+      s.showArea(home);
+    }
+    if (el2 - warm < secs * 1000) requestAnimationFrame(loop);
+    else {
+      window.clearInterval(timer);
+      done();
+    }
+  };
+  requestAnimationFrame(loop);
 }
 
 /**
@@ -320,6 +454,7 @@ function runSwitching(s: GameSession, _fail: () => void, done: (sw: SwitchResult
     }
     if (k === -1) {
       prof.reset();
+      feel.reset();
       k = 0;
       startStep(t);
       requestAnimationFrame(loop);
@@ -381,6 +516,16 @@ function fmtScene(r: SceneResult): string[] {
     }
     const causes = sw.steps.filter((x) => x.causes.length).slice(0, 10);
     for (const x of causes) out.push(`  round ${x.round + 1} ${x.kind}: ${x.causes.slice(0, 3).join(' | ')}`);
+  }
+  if (r.feel) {
+    const F = r.feel;
+    const fm = (x: { avg: number; p95: number } | null) => (x ? `${x.avg}/${x.p95}` : '—');
+    const kinds = Object.keys(F.feedback) as Array<keyof FeelSummary['feedback']>;
+    out.push(
+      `input → feedback ms (avg/p95): ${kinds.filter((k) => F.feedback[k]).map((k) => `${k} ${fm(F.feedback[k])}`).join(', ') || '—'}`,
+      `input → acting ms: ${kinds.filter((k) => F.acting[k]).map((k) => `${k} ${fm(F.acting[k])}`).join(', ') || '—'} · command ${F.cmdTicks ? `${F.cmdTicks.avg} ticks, ${F.cmdMs?.avg} ms` : '—'}`,
+      `pacing: interval ${fm(F.interval)} ms, jitter ${F.jitter ? F.jitter.avg : '—'} ms, display ${F.vsync} ms · over 16.7 ms ${F.over16}/${F.frames}, over 33 ms ${F.over33}, missed vsync ${F.missed} · long tasks ${F.longTasks ? `${F.longTasks.n} (${F.longTasks.ms} ms)` : 'n/a'}`,
+    );
   }
   if (r.hitches.length) {
     out.push('hitches:');

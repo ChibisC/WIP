@@ -8,6 +8,9 @@
  * right-click (cancel the tool, remove a marker); two fingers pan, pinch to zoom
  * and twist to rotate; three fingers dragged up or down tilt the camera.
  */
+import { feel } from './feel';
+import { prof } from './profiler';
+
 export type Action =
   | 'panUp'
   | 'panDown'
@@ -98,6 +101,9 @@ export const DEFAULT_BINDINGS: Record<Action, string> = {
   chat: 'Enter',
 };
 
+/** Keys that move the camera (their input latency is the camera's). */
+const CAMERA_KEYS = new Set<string>(['panUp', 'panDown', 'panLeft', 'panRight', 'zoomIn', 'zoomOut', 'rotateLeft', 'rotateRight', 'resetCam']);
+
 /** Second keys for continuous actions (arrow keys pan too). */
 export const ALT_BINDINGS: Partial<Record<Action, string>> = {
   panUp: 'ArrowUp',
@@ -157,6 +163,8 @@ export interface PointerInfo {
   button: number;
   shift: boolean;
   ctrl: boolean;
+  /** the event's time (performance.now()'s clock): input latency is measured from it (core/feel.ts) */
+  t?: number;
 }
 
 export class Input {
@@ -231,6 +239,7 @@ export class Input {
       (e) => {
         e.preventDefault();
         this.wheel += Math.sign(e.deltaY) * Math.min(3, Math.abs(e.deltaY) / 60 + 0.5);
+        feel.input('camera', e.timeStamp);
       },
       { passive: false },
     );
@@ -256,9 +265,15 @@ export class Input {
       // Modified keys never trigger game actions (browser shortcuts stay usable), except Shift + number (area tabs).
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const code = e.shiftKey && e.code.startsWith('Digit') ? `Shift+${e.code}` : e.code;
+      const t0 = performance.now();
       for (const [action, bound] of Object.entries(this.bindings) as Array<[Action, string]>) {
-        if (bound === code) this.handlers.get(action)?.forEach((f) => f());
+        if (bound !== code) continue;
+        // (input latency: camera keys are drawn by the next frame's camera; other keys by whatever they change)
+        feel.input(CAMERA_KEYS.has(action) ? 'camera' : 'key', e.timeStamp);
+        this.handlers.get(action)?.forEach((f) => f());
       }
+      feel.inputDone();
+      prof.addInput(performance.now() - t0);
     }
   }
 
@@ -289,7 +304,7 @@ export class Input {
   }
 
   private info(e: PointerEvent | MouseEvent): PointerInfo {
-    return { x: e.clientX, y: e.clientY, button: e.button, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey };
+    return { x: e.clientX, y: e.clientY, button: e.button, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, t: e.timeStamp };
   }
 
   private pointerDown(e: PointerEvent): void {
@@ -318,15 +333,18 @@ export class Input {
       else if (this.dragging && this.leftDragPans) {
         this.panDX += dx;
         this.panDY += dy;
+        feel.input('camera', e.timeStamp);
       }
     }
     if (this.buttons & 4) {
       this.panDX += dx;
       this.panDY += dy;
+      feel.input('camera', e.timeStamp);
     }
     if (this.buttons & 2) {
       this.rotDX += dx;
       this.rotDY += dy;
+      feel.input('camera', e.timeStamp);
     }
   }
 
@@ -432,12 +450,14 @@ export class Input {
       else if (this.leftDragMode !== 'paint') {
         this.panDX += dx;
         this.panDY += dy;
+        feel.input('camera', e.timeStamp);
       }
       return;
     }
     if (this.touches.size < 2) return; // one finger left after a gesture: it does nothing until lifted
     const g = this.pair();
     const g0 = this.g0;
+    feel.input('camera', e.timeStamp);
     if (this.touches.size >= 3) {
       // three fingers: up and down tilts
       this.rotDY += g.my - g0.my;
