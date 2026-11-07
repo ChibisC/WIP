@@ -242,15 +242,15 @@ const rolled = (id: StoryLevelId, diff: Difficulty, seed: number) => {
   m.entered = false;
   run(w, 20 * 2);
   const p = wherePt(w, 'sapOak');
-  const ants = Array.from({ length: 12 }, (_, i) => makeAnt(w, 0, 'termant_soldier', SURFACE, p[0] + (i % 4) * 6 - 9, p[1] + 14 + Math.floor(i / 4) * 6, 0));
+  const ants = Array.from({ length: 14 }, (_, i) => makeAnt(w, 0, 'termant_soldier', SURFACE, p[0] + (i % 4) * 6 - 9, p[1] + 14 + Math.floor(i / 4) * 6, 0));
   let held = '';
-  for (let s = 0; s < 100; s++) {
+  for (let s = 0; s < 170; s++) {
     for (const a of ants) if (a.state !== AS.Dead) Object.assign(a, { x: p[0] + (ants.indexOf(a) % 4) * 6 - 9, y: p[1] + 14 + Math.floor(ants.indexOf(a) / 4) * 6, hp: a.maxHp });
     run(w, 20);
     held = m.goals[0]?.progress ?? '';
     if (m.stage !== 1) break;
   }
-  check('antlered king: holding the sap with 10 ants for 90 s finishes the sap run', m.stage === 2, held);
+  check('antlered king: holding the sap with 12 ants for 150 s finishes the sap run', m.stage === 2, held);
 }
 
 console.log(`\n${failed ? `${failed} FAILED` : 'all passed'} in ${((Date.now() - t0) / 1000).toFixed(1)}s`);

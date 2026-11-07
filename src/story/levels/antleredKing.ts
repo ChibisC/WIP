@@ -57,7 +57,7 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
     pairA: { creature: 'stagSmall', at: 'evSouth', face: 'clearing', spawn: 'action', label: 'a small male' },
     pairB: { creature: 'stagMedium', at: 'evEast', face: 'clearing', spawn: 'action', label: 'a medium male' },
     // the titan and the lesser males that come to the fight
-    king: { creature: 'stagBeetle', at: 'kingStump', face: 'knollFoot', goal: 'nestApproach', spawn: 'action', hp: 0.85, phases: [0.7, 0.45, 0.25], label: 'the Antlered King' },
+    king: { creature: 'stagBeetle', at: 'kingStump', face: 'knollFoot', goal: 'nestApproach', spawn: 'action', hp: 1, phases: [0.7, 0.45, 0.25], label: 'the Antlered King' },
     callA: { creature: 'stagSmall', at: 'evWest', face: 'nestApproach', spawn: 'action', wave: true, label: 'the lesser males' },
     callB: { creature: 'stagMedium', at: 'evSouth', face: 'nestApproach', spawn: 'action', wave: true, label: 'the lesser males' },
     ...EV.actors,
@@ -69,9 +69,10 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
     {
       name: 'Settle the woods',
       objectives: [
-        { type: 'raise', n: 30, text: 'Raise 30 ants' },
-        { type: 'collectFood', amount: 150 },
-        { type: 'fighters', n: 8 },
+        { type: 'raise', n: 35, text: 'Raise 35 ants' },
+        { type: 'collectFood', amount: 200 },
+        // (the first fight: the small male stays in the clearing until he is brought down)
+        { type: 'killCreature', actor: 'small' },
       ],
       say: [
         { key: 'intro1', at: 0.5 },
@@ -89,13 +90,13 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
       ],
       scenes: [
         { actor: 'minor', at: 60, cues: [{ wait: 2 }, { flag: 'minorSeen' }, { path: 'minorWalk', speed: 0.6, timeout: 300 }, { leave: 'evEast', speed: 0.6 }] },
-        { actor: 'small', at: 260, cues: [{ walkTo: 'clearing', speed: 0.6, timeout: 200, flag: 'smallSeen' }, { wander: 'clearingZone', s: 110, speed: 0.5 }, { leave: 'evSouth', speed: 0.6 }] },
+        { actor: 'small', at: 260, cues: [{ walkTo: 'clearing', speed: 0.6, timeout: 200, flag: 'smallSeen' }, { wander: 'clearingZone', s: 1e9, speed: 0.5 }] },
       ],
     },
     {
       name: 'The sap run',
       objectives: [
-        { type: 'hold', at: 'sapOak', r: 50, n: 10, s: 90, name: 'the sap flow' },
+        { type: 'hold', at: 'sapOak', r: 50, n: 12, s: 150, name: 'the sap flow' },
         { type: 'collectFood', amount: 150, optional: true },
       ],
       say: [
@@ -120,8 +121,8 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
     {
       name: 'Rivals in the woods',
       objectives: [
-        { type: 'surviveTime', s: { easy: 480, normal: 540, hard: 570, brutal: 600 }, text: 'Hold the woods while the rival males come and go' },
-        { type: 'killCreature', actor: 'large', optional: true },
+        { type: 'surviveTime', s: { easy: 600, normal: 660, hard: 690, brutal: 720 }, text: 'Hold the woods while the rival males come and go' },
+        { type: 'killCreature', actor: 'large' },
         { type: 'fighters', n: 20, optional: true },
       ],
       say: [
@@ -140,7 +141,8 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
       ],
       scenes: [
         { actor: 'medium', at: 60, cues: [{ walkTo: 'northFoot', speed: 0.7, timeout: 200, flag: 'mediumSeen' }, { guard: 'northFoot', r: 70, s: 110 }, { leave: 'evWest', speed: 0.7 }] },
-        { actor: 'large', at: 210, cues: [{ walkTo: 'sapOak', speed: 0.7, timeout: 240, flag: 'largeSeen' }, { guard: 'sapOak', r: 80, s: 150 }, { charge: 'shelfFoot', timeout: 120 }, { guard: 'shelfFoot', r: 80, s: 60 }, { leave: 'evSouth', speed: 0.7 }] },
+        // (the large male stays: he holds the sap and comes to the shelf's foot again and again until he is killed)
+        { actor: 'large', at: 210, cues: [{ walkTo: 'sapOak', speed: 0.7, timeout: 240, flag: 'largeSeen' }, { guard: 'sapOak', r: 80, s: 150 }, { charge: 'shelfFoot', timeout: 120 }, { guard: 'shelfFoot', r: 80, s: 60 }, { goto: 1 }] },
         { actor: 'pairA', at: 380, cues: [{ walkTo: 'clearing', speed: 0.7, timeout: 200 }, { holdAt: 'clearing', face: { actor: 'pairB' }, s: 3 }, { flag: 'pairMeet' }, { wait: 30 }, { leave: 'evSouth', speed: 0.7 }] },
         { actor: 'pairB', at: 380, cues: [{ walkTo: 'sapWest', speed: 0.7, timeout: 200 }, { holdAt: 'sapWest', face: { actor: 'pairA' }, s: 3 }, { wait: 30 }, { leave: 'evEast', speed: 0.7 }] },
       ],
@@ -154,18 +156,21 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
         { key: 'grab', on: 'kingAtNest' },
         { key: 'enraged', on: 'hp:king:70' },
         { key: 'call', on: 'hp:king:45' },
-        { key: 'kingDigs', on: 'hp:king:25' },
+        { key: 'kingDigs', on: 'kingDigs' },
         { key: 'kingIn', on: 'kingIn' },
         { key: 'kingDead', on: 'killed:king' },
       ],
       events: [
         { actions: [{ do: 'spawn', actor: 'king' }, { do: 'music', mood: 'assault' }, { do: 'shot', shot: { keys: [{ at: { actor: 'king' }, dist: 260, yaw: 0.9, t: 0, pitch: 0.05 }, { at: { actor: 'king' }, dist: 220, yaw: 1.3, t: 6 }] } }] },
         { on: 'hp:king:45', actions: [{ do: 'spawn', actor: 'callA' }, { do: 'spawn', actor: 'callB' }] },
-        { on: 'hp:king:25', actions: [{ do: 'tip', key: 'titanDig' }] },
+        { on: 'hp:king:25', actions: [{ do: 'flag', flag: 'kingDigs' }] },
+        { on: 'kingDigs', actions: [{ do: 'tip', key: 'titanDig' }] },
       ],
       scenes: [
         // down from his stump, across the clearing and up to the colony's doorstep, fighting what he meets (his own program)
-        { actor: 'king', cues: [{ holdAt: 'kingStump', face: 'clearing', s: 5 }, { flag: 'kingOut' }, { path: 'kingWay', speed: 1, timeout: 240 }, { flag: 'kingAtNest' }, { guard: 'nestApproach', r: 160 }] },
+        // (after three minutes at the doorstep he goes for the nest itself, hurt or not: a colony that only waits him out
+        // does not stall the level, 2026-11-03)
+        { actor: 'king', cues: [{ holdAt: 'kingStump', face: 'clearing', s: 5 }, { flag: 'kingOut' }, { path: 'kingWay', speed: 1, timeout: 240 }, { flag: 'kingAtNest' }, { guard: 'nestApproach', r: 160, s: 180 }, { flag: 'kingDigs' }, { mode: 'aggressive' }, { digInto: 'player', flag: 'kingIn', timeout: 300 }, { release: true }] },
         { actor: 'callA', on: 'hp:king:45', cues: [{ charge: 'nestApproach', timeout: 200 }, { guard: 'nestApproach', r: 90 }] },
         { actor: 'callB', on: 'hp:king:45', cues: [{ charge: 'shelfFoot', timeout: 200 }, { guard: 'shelfFoot', r: 90 }] },
         // a quarter left: he goes for the nest itself, shoving a hole wider with his head and antlers
