@@ -59,12 +59,12 @@ export const LONG_NIGHTS_LEVEL: StoryLevelDef = {
     eyes: { creatures: [['wolfSpider', 2]], from: ['lairN', 'lairE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, passive: true, label: 'the wolf spiders' },
     night2n: { creatures: [['lithobius', 1], ['groundBeetle', 1]], from: ['lairN', 'lairNW'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, label: 'the second night’s hunters' },
     night2e: { creatures: [['lithobius', 1], ['groundBeetle', 1]], from: ['lairE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, label: 'the second night’s hunters' },
-    night3n: { creatures: [['groundBeetle', 1], ['wolfSpider', 1], ['lithobius', 1]], from: ['lairNW', 'lairN'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.35, label: 'the third night’s hunters' },
-    night3e: { creatures: [['rove', 1], ['wolfSpider', 1], ['groundBeetle', 1]], from: ['lairE', 'lairSE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.35, label: 'the third night’s hunters' },
+    night3n: { creatures: [['groundBeetle', 1], ['wolfSpider', 1], ['lithobius', 1]], from: ['lairNW', 'lairN'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, label: 'the third night’s hunters' },
+    night3e: { creatures: [['rove', 1], ['wolfSpider', 1], ['groundBeetle', 1]], from: ['lairE', 'lairSE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, label: 'the third night’s hunters' },
     // (the last night's packs are the third night's again: the tarantula is the last night's weight; with a fourth pack
     // member the bot lost Hard and Brutal at human pace, 2026-11-03)
-    night4n: { creatures: [['groundBeetle', 1], ['wolfSpider', 1], ['lithobius', 1]], from: ['lairNW', 'lairN'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.35, label: 'the fourth night’s hunters' },
-    night4e: { creatures: [['wolfSpider', 1], ['lithobius', 1], ['groundBeetle', 1]], from: ['lairE', 'lairSE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.35, label: 'the fourth night’s hunters' },
+    night4n: { creatures: [['groundBeetle', 1], ['wolfSpider', 1], ['lithobius', 1]], from: ['lairNW', 'lairN'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, label: 'the fourth night’s hunters' },
+    night4e: { creatures: [['wolfSpider', 1], ['lithobius', 1], ['groundBeetle', 1]], from: ['lairE', 'lairSE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, label: 'the fourth night’s hunters' },
     // (0.7 → 0.6 with the fourth night, 2026-11-03: at a person's pace the bot lost Hard and Brutal to it on the last night)
     tarantula: { creature: 'tarantula', at: 'tarantulaBurrow', face: 'knollFoot', spawn: 'action', hp: 0.6, phases: [0.5], label: 'the red-knee tarantula' },
     ...EV.actors,

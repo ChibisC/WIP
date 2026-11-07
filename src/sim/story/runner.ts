@@ -17,6 +17,7 @@ import type { StoryLevelDef } from './types';
 import { storyText } from '../../story/text';
 import { rollSurprises, surprisesSecond } from './surprises';
 import { forceAllOut, startNestFlood } from '../nestFlood';
+import { startStagWrestle } from '../creatures/stagWrestle';
 
 /**
  * Story levels on the mission runner (claude/story/02-spec §5–6). `missions.ts` plays a story level like any mission
@@ -159,6 +160,23 @@ function act(w: World, st: StoryState, a: Action): void {
     case 'raid':
       forceRaid(w, st, a.rival);
       return;
+    case 'wrestle': {
+      // two male stag beetles lock antlers now (sim/creatures/stagWrestle.ts: the bigger tends to throw the other)
+      const one = (name: string) => {
+        const i = actorIndex(st, name);
+        const act = i >= 0 ? st.actors[i] : null;
+        if (!act?.spawned || act.kind !== 0) return null;
+        for (const id of act.ids) {
+          const cr = w.creatureById.get(id);
+          if (cr && !cr.dead) return cr;
+        }
+        return null;
+      };
+      const ca = one(a.a);
+      const cb = one(a.b);
+      if (ca && cb && !startStagWrestle(w, ca, cb)) st.log.push(`${Math.round(w.s.time)} s: ${a.a} and ${a.b} could not wrestle`);
+      return;
+    }
     case 'allOut': {
       // (High Water: the colony whose nest floods next goes all-in on the queen who holds the high ground)
       const r = w.colony(st.rivals[a.rival] ?? -1);
