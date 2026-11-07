@@ -1,0 +1,671 @@
+[
+ {
+  "id": "switch",
+  "title": "Switching surface \u2194 underground",
+  "loadMs": 138793,
+  "prewarmMs": 114659,
+  "secs": 15,
+  "frames": 136,
+  "fps": 0.2,
+  "frameAvg": 4705.82,
+  "p95": 11549.5,
+  "worst": 13283,
+  "over33": 132,
+  "over50": 125,
+  "cpuAvg": 13.78,
+  "parts": {
+   "sim": 0,
+   "msg": 1.91,
+   "events": 0.13,
+   "units": 0.56,
+   "creatures": 0.04,
+   "nest": 3.26,
+   "fx": 0.18,
+   "ui": 1.52,
+   "render": 7.8,
+   "prewarm": 0
+  },
+  "gpuAvg": null,
+  "calls": 1,
+  "tris": 1,
+  "programs": 152,
+  "textures": 185,
+  "geometries": 600,
+  "heapMB": 180,
+  "gpuMB": 340,
+  "tickMs": 0.76,
+  "msgKB": 55,
+  "glLinks": 0,
+  "glUploads": 135,
+  "quality": "medium",
+  "ants": 62,
+  "creatures": 2,
+  "hitches": [
+   "151.4 s 250 ms: render 13 ms",
+   "151.9 s 567 ms: outside this thread (browser, GPU or a background tab)",
+   "158.9 s 6916 ms: render 12 ms, nest 9 ms",
+   "172.0 s 13133 ms: buffer upload 0.0 MB (7 ms); render 9 ms",
+   "172.1 s 117 ms: buffer upload 0.0 MB (8 ms); render 12 ms",
+   "176.3 s 4166 ms: render 6 ms, nest 6 ms",
+   "184.8 s 8500 ms: ui 22 ms, nest 19 ms, render 15 ms; nest mesh: 2 chunks rebuilt (15 ms)",
+   "192.1 s 7366 ms: texture upload \u00d76 (0.3 MB, 0 ms); render 15 ms",
+   "205.4 s 13233 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 5 ms",
+   "218.4 s 13033 ms: texture upload \u00d72 (0.0 MB, 0 ms); nest 8 ms, render 6 ms, msg 6 ms",
+   "224.9 s 6516 ms: render 30 ms, nest 8 ms, msg 5 ms; nest mesh: 4 chunks rebuilt (30 ms)",
+   "231.5 s 6600 ms: texture upload \u00d76 (0.3 MB, 0 ms); buffer upload 0.0 MB (5 ms); render 8 ms"
+  ],
+  "switch": {
+   "rounds": 4,
+   "steps": [
+    {
+     "kind": "dive in",
+     "round": 0,
+     "frames": 7,
+     "worst": 13132.805000000022,
+     "over33": 7,
+     "over50": 7,
+     "causes": [
+      "250 ms: render 13 ms",
+      "567 ms: outside this thread (browser, GPU or a background tab)",
+      "6916 ms: render 12 ms, nest 9 ms",
+      "13133 ms: buffer upload 0.0 MB (7 ms); render 9 ms",
+      "117 ms: buffer upload 0.0 MB (8 ms); render 12 ms",
+      "4166 ms: render 6 ms, nest 6 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 0,
+     "frames": 4,
+     "worst": 13232.805000000022,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "8500 ms: ui 22 ms, nest 19 ms, render 15 ms; nest mesh: 2 chunks rebuilt (15 ms)",
+      "7366 ms: texture upload \u00d76 (0.3 MB, 0 ms); render 15 ms",
+      "13233 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 5 ms",
+      "13033 ms: texture upload \u00d72 (0.0 MB, 0 ms); nest 8 ms, render 6 ms, msg 6 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 0,
+     "frames": 4,
+     "worst": 6599.739999999991,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "6516 ms: render 30 ms, nest 8 ms, msg 5 ms; nest mesh: 4 chunks rebuilt (30 ms)",
+      "6600 ms: texture upload \u00d76 (0.3 MB, 0 ms); buffer upload 0.0 MB (5 ms); render 8 ms",
+      "6350 ms: texture upload \u00d72 (0.0 MB, 0 ms); ui 17 ms, render 6 ms",
+      "6333 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 16 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 0,
+     "frames": 5,
+     "worst": 6699.729999999981,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "6333 ms: outside this thread (browser, GPU or a background tab)",
+      "6700 ms: render 8 ms",
+      "6283 ms: outside this thread (browser, GPU or a background tab)",
+      "500 ms: ui 20 ms, render 7 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 0,
+     "frames": 6,
+     "worst": 10499.580000000016,
+     "over33": 6,
+     "over50": 5,
+     "causes": [
+      "6200 ms: msg 5 ms",
+      "10500 ms: render 7 ms",
+      "5566 ms: outside this thread (browser, GPU or a background tab)",
+      "50 ms: ui 11 ms, render 9 ms",
+      "100 ms: render 7 ms",
+      "6083 ms: render 6 ms"
+     ]
+    },
+    {
+     "kind": "dive out",
+     "round": 0,
+     "frames": 7,
+     "worst": 11549.540000000037,
+     "over33": 7,
+     "over50": 7,
+     "causes": [
+      "11550 ms: render 6 ms",
+      "100 ms: outside this thread (browser, GPU or a background tab)",
+      "10933 ms: msg 8 ms, ui 6 ms, nest 5 ms",
+      "5800 ms: outside this thread (browser, GPU or a background tab)",
+      "833 ms: buffer upload 0.0 MB (4 ms); render 7 ms, msg 6 ms",
+      "5883 ms: nest 7 ms",
+      "5183 ms: buffer upload 0.0 MB (6 ms); render 16 ms, msg 10 ms"
+     ]
+    },
+    {
+     "kind": "dive in",
+     "round": 1,
+     "frames": 6,
+     "worst": 5116.459999999963,
+     "over33": 6,
+     "over50": 6,
+     "causes": [
+      "4766 ms: render 10 ms",
+      "5016 ms: units 9 ms",
+      "233 ms: outside this thread (browser, GPU or a background tab)",
+      "5116 ms: texture upload \u00d71 (0.0 MB, 0 ms); nest 8 ms, msg 5 ms, render 4 ms",
+      "4850 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 8 ms",
+      "5066 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 5 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 1,
+     "frames": 5,
+     "worst": 5049.800000000047,
+     "over33": 5,
+     "over50": 5,
+     "causes": [
+      "4966 ms: nest 21 ms, render 12 ms; nest mesh: 2 chunks rebuilt (12 ms)",
+      "5050 ms: texture upload \u00d76 (0.3 MB, 0 ms); nest 16 ms, render 5 ms",
+      "4766 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 20 ms; nest mesh: 2 chunks rebuilt (18 ms)",
+      "83 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 15 ms; nest mesh: 2 chunks rebuilt (12 ms)",
+      "4583 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 18 ms, nest 7 ms, ui 7 ms; nest mesh: 2 chunks rebuilt (12 ms)"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 1,
+     "frames": 4,
+     "worst": 5699.770000000019,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "5700 ms: render 33 ms, nest 18 ms, fx 7 ms; nest mesh: 4 chunks rebuilt (33 ms)",
+      "5400 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 35 ms; nest mesh: 4 chunks rebuilt (30 ms)",
+      "5683 ms: texture upload \u00d72 (0.0 MB, 0 ms); nest 4 ms",
+      "5316 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 19 ms; nest mesh: 4 chunks rebuilt (17 ms)"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 1,
+     "frames": 6,
+     "worst": 6383.080000000016,
+     "over33": 6,
+     "over50": 6,
+     "causes": [
+      "83 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 8 ms",
+      "6300 ms: nest 10 ms",
+      "6383 ms: render 8 ms",
+      "5683 ms: outside this thread (browser, GPU or a background tab)",
+      "83 ms: outside this thread (browser, GPU or a background tab)",
+      "5616 ms: outside this thread (browser, GPU or a background tab)"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 1,
+     "frames": 6,
+     "worst": 10982.89499999996,
+     "over33": 6,
+     "over50": 5,
+     "causes": [
+      "67 ms: outside this thread (browser, GPU or a background tab)",
+      "5600 ms: outside this thread (browser, GPU or a background tab)",
+      "5466 ms: outside this thread (browser, GPU or a background tab)",
+      "10983 ms: render 4 ms",
+      "50 ms: nest 6 ms",
+      "5783 ms: render 6 ms"
+     ]
+    },
+    {
+     "kind": "dive out",
+     "round": 1,
+     "frames": 7,
+     "worst": 10499.580000000016,
+     "over33": 7,
+     "over50": 7,
+     "causes": [
+      "100 ms: outside this thread (browser, GPU or a background tab)",
+      "10500 ms: nest 13 ms, render 5 ms",
+      "5733 ms: outside this thread (browser, GPU or a background tab)",
+      "267 ms: render 6 ms",
+      "6450 ms: nest 7 ms, render 6 ms",
+      "83 ms: render 10 ms",
+      "9383 ms: units 10 ms"
+     ]
+    },
+    {
+     "kind": "dive in",
+     "round": 2,
+     "frames": 10,
+     "worst": 8799.650000000023,
+     "over33": 9,
+     "over50": 8,
+     "causes": [
+      "67 ms: nest 9 ms, render 7 ms",
+      "4750 ms: render 7 ms",
+      "5016 ms: outside this thread (browser, GPU or a background tab)",
+      "4966 ms: units 21 ms, nest 4 ms",
+      "50 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 10 ms",
+      "100 ms: texture upload \u00d71 (0.0 MB, 0 ms); nest 6 ms",
+      "8800 ms: texture upload \u00d71 (0.0 MB, 0 ms); buffer upload 0.0 MB (6 ms); render 13 ms",
+      "67 ms: texture upload \u00d71 (0.0 MB, 0 ms); buffer upload 0.0 MB (6 ms); render 11 ms",
+      "8383 ms: texture upload \u00d71 (0.0 MB, 0 ms); nest 25 ms, render 10 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 2,
+     "frames": 4,
+     "worst": 5349.785000000033,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "4516 ms: render 24 ms; nest mesh: 4 chunks rebuilt (24 ms)",
+      "4366 ms: texture upload \u00d76 (0.3 MB, 0 ms); nest 8 ms, render 6 ms",
+      "83 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 12 ms; nest mesh: 2 chunks rebuilt (10 ms)",
+      "5350 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 11 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 2,
+     "frames": 4,
+     "worst": 10849.560000000056,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "5350 ms: render 16 ms, nest 6 ms; nest mesh: 4 chunks rebuilt (16 ms)",
+      "10850 ms: texture upload \u00d76 (0.3 MB, 0 ms); GC (heap \u221210 MB); nest 19 ms, render 17 ms; nest mesh: 4 chunks rebuilt (13 ms)",
+      "100 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 39 ms, nest 5 ms; nest mesh: 4 chunks rebuilt (33 ms)",
+      "5283 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 39 ms, msg 5 ms; nest mesh: 4 chunks rebuilt (33 ms)"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 2,
+     "frames": 5,
+     "worst": 10782.904999999912,
+     "over33": 5,
+     "over50": 4,
+     "causes": [
+      "7200 ms: msg 5 ms",
+      "233 ms: outside this thread (browser, GPU or a background tab)",
+      "10783 ms: buffer upload 0.0 MB (5 ms); render 15 ms",
+      "50 ms: outside this thread (browser, GPU or a background tab)",
+      "5833 ms: outside this thread (browser, GPU or a background tab)"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 2,
+     "frames": 5,
+     "worst": 5933.089999999967,
+     "over33": 5,
+     "over50": 5,
+     "causes": [
+      "5633 ms: outside this thread (browser, GPU or a background tab)",
+      "5933 ms: ui 7 ms",
+      "5516 ms: render 6 ms",
+      "117 ms: render 9 ms",
+      "5716 ms: nest 6 ms"
+     ]
+    },
+    {
+     "kind": "dive out",
+     "round": 2,
+     "frames": 8,
+     "worst": 11116.224999999977,
+     "over33": 8,
+     "over50": 6,
+     "causes": [
+      "50 ms: render 5 ms",
+      "11116 ms: render 11 ms",
+      "183 ms: nest 11 ms, render 6 ms",
+      "6000 ms: msg 4 ms",
+      "5733 ms: msg 5 ms",
+      "5783 ms: nest 6 ms",
+      "33 ms: render 7 ms",
+      "4833 ms: outside this thread (browser, GPU or a background tab)"
+     ]
+    },
+    {
+     "kind": "dive in",
+     "round": 3,
+     "frames": 6,
+     "worst": 7949.680000000051,
+     "over33": 6,
+     "over50": 6,
+     "causes": [
+      "4766 ms: nest 6 ms",
+      "4950 ms: render 4 ms",
+      "4900 ms: creatures 4 ms",
+      "7950 ms: texture upload \u00d71 (0.0 MB, 0 ms); nest 7 ms, render 7 ms",
+      "3517 ms: texture upload \u00d71 (0.0 MB, 0 ms); msg 7 ms, nest 6 ms",
+      "650 ms: texture upload \u00d71 (0.0 MB, 0 ms); buffer upload 0.0 MB (4 ms); render 8 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 3,
+     "frames": 4,
+     "worst": 4716.479999999981,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "3900 ms: render 15 ms, msg 5 ms; nest mesh: 4 chunks rebuilt (15 ms)",
+      "4716 ms: texture upload \u00d77 (0.3 MB, 0 ms); render 27 ms; nest mesh: 1 chunks rebuilt (17 ms)",
+      "4450 ms: texture upload \u00d76 (0.3 MB, 0 ms); render 21 ms; nest mesh: 1 chunks rebuilt (18 ms)",
+      "4400 ms: texture upload \u00d76 (0.3 MB, 0 ms); render 23 ms, nest 17 ms; nest mesh: 2 chunks rebuilt (18 ms)"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 3,
+     "frames": 6,
+     "worst": 11782.859999999986,
+     "over33": 6,
+     "over50": 6,
+     "causes": [
+      "133 ms: texture upload \u00d76 (0.3 MB, 0 ms); render 15 ms, msg 6 ms, nest 6 ms; nest mesh: 2 chunks rebuilt (11 ms)",
+      "6216 ms: nest 10 ms, render 7 ms; nest mesh: 2 chunks rebuilt (7 ms)",
+      "11783 ms: texture upload \u00d76 (0.3 MB, 0 ms); nest 8 ms, render 7 ms",
+      "67 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 6 ms, msg 4 ms",
+      "5900 ms: texture upload \u00d72 (0.0 MB, 0 ms); buffer upload 0.0 MB (5 ms); render 10 ms",
+      "5883 ms: texture upload \u00d72 (0.0 MB, 0 ms); nest 6 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 3,
+     "frames": 5,
+     "worst": 6899.724999999977,
+     "over33": 5,
+     "over50": 4,
+     "causes": [
+      "800 ms: nest 6 ms",
+      "6900 ms: render 4 ms",
+      "6216 ms: nest 10 ms, render 5 ms",
+      "33 ms: outside this thread (browser, GPU or a background tab)",
+      "6133 ms: ui 9 ms, render 7 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 3,
+     "frames": 5,
+     "worst": 6316.409999999916,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "6266 ms: nest 8 ms",
+      "183 ms: buffer upload 0.0 MB (9 ms); render 12 ms",
+      "6316 ms: render 5 ms, msg 4 ms",
+      "6083 ms: outside this thread (browser, GPU or a background tab)"
+     ]
+    },
+    {
+     "kind": "dive out",
+     "round": 3,
+     "frames": 7,
+     "worst": 13282.800000000047,
+     "over33": 7,
+     "over50": 7,
+     "causes": [
+      "5900 ms: render 7 ms",
+      "12200 ms: nest 9 ms, render 4 ms",
+      "767 ms: outside this thread (browser, GPU or a background tab)",
+      "13283 ms: render 11 ms, units 5 ms, msg 4 ms",
+      "6900 ms: nest 8 ms",
+      "200 ms: render 5 ms",
+      "5833 ms: msg 5 ms"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "fight",
+  "title": "Big fight (4 \u00d7 200 ants, 100 creatures, 2 titans)",
+  "loadMs": 251317,
+  "prewarmMs": 152043,
+  "secs": 15,
+  "frames": 0,
+  "fps": 1000,
+  "frameAvg": 0,
+  "p95": 0,
+  "worst": 0,
+  "over33": 0,
+  "over50": 0,
+  "cpuAvg": 0,
+  "parts": {
+   "sim": 0,
+   "msg": 0,
+   "events": 0,
+   "units": 0,
+   "creatures": 0,
+   "nest": 0,
+   "fx": 0,
+   "ui": 0,
+   "render": 0,
+   "prewarm": 0
+  },
+  "gpuAvg": null,
+  "calls": 1,
+  "tris": 1,
+  "programs": 153,
+  "textures": 367,
+  "geometries": 936,
+  "heapMB": 361,
+  "gpuMB": 704,
+  "tickMs": 11.81,
+  "msgKB": 720,
+  "glLinks": 0,
+  "glUploads": 0,
+  "quality": "medium",
+  "ants": 889,
+  "creatures": 102,
+  "hitches": []
+ },
+ {
+  "id": "nest",
+  "title": "Full nest",
+  "loadMs": 283460,
+  "prewarmMs": 142284,
+  "secs": 15,
+  "frames": 4,
+  "fps": 0.2,
+  "frameAvg": 4154.01,
+  "p95": 8283,
+  "worst": 8283,
+  "over33": 3,
+  "over50": 3,
+  "cpuAvg": 17.22,
+  "parts": {
+   "sim": 0,
+   "msg": 17.77,
+   "events": 0.29,
+   "units": 0,
+   "creatures": 0,
+   "nest": 10.63,
+   "fx": 0.27,
+   "ui": 0.98,
+   "render": 4.94,
+   "prewarm": 0
+  },
+  "gpuAvg": null,
+  "calls": 1,
+  "tris": 1,
+  "programs": 152,
+  "textures": 364,
+  "geometries": 921,
+  "heapMB": 346,
+  "gpuMB": 646,
+  "tickMs": 12.97,
+  "msgKB": 664,
+  "glLinks": 0,
+  "glUploads": 14,
+  "quality": "medium",
+  "ants": 889,
+  "creatures": 40,
+  "hitches": [
+   "184.9 s 117 ms: texture upload \u00d74 (0.1 MB, 0 ms); msg 16 ms, nest 13 ms",
+   "193.2 s 8283 ms: texture upload \u00d73 (0.0 MB, 0 ms); buffer upload 0.0 MB (5 ms); msg 10 ms, render 9 ms, nest 8 ms",
+   "201.4 s 8200 ms: texture upload \u00d74 (0.0 MB, 0 ms); msg 21 ms, render 5 ms, nest 4 ms"
+  ]
+ },
+ {
+  "id": "story",
+  "title": "Story: The Long Nights, last night",
+  "loadMs": 336621,
+  "prewarmMs": 159419,
+  "secs": 15,
+  "frames": 5,
+  "fps": 0.8,
+  "frameAvg": 1226.62,
+  "p95": 5899.8,
+  "worst": 5900,
+  "over33": 3,
+  "over50": 3,
+  "cpuAvg": 8.22,
+  "parts": {
+   "sim": 0,
+   "msg": 0.36,
+   "events": 0.49,
+   "units": 1.15,
+   "creatures": 0.04,
+   "nest": 0.01,
+   "fx": 0.05,
+   "ui": 0.82,
+   "render": 5.6,
+   "prewarm": 0
+  },
+  "gpuAvg": null,
+  "calls": 1,
+  "tris": 1,
+  "programs": 177,
+  "textures": 311,
+  "geometries": 847,
+  "heapMB": 236,
+  "gpuMB": 632,
+  "tickMs": 8.92,
+  "msgKB": 34,
+  "glLinks": 0,
+  "glUploads": 0,
+  "quality": "medium",
+  "ants": 13,
+  "creatures": 0,
+  "hitches": [
+   "198.4 s 100 ms: render 5 ms",
+   "198.5 s 100 ms: render 6 ms",
+   "204.4 s 5900 ms: render 5 ms"
+  ]
+ },
+ {
+  "id": "arena",
+  "title": "Battle arena, 600 units",
+  "loadMs": 209800,
+  "prewarmMs": 89032,
+  "secs": 15,
+  "frames": 9,
+  "fps": 0.3,
+  "frameAvg": 2973.96,
+  "p95": 13816.1,
+  "worst": 13816,
+  "over33": 7,
+  "over50": 3,
+  "cpuAvg": 1562.68,
+  "parts": {
+   "sim": 0,
+   "msg": 1.62,
+   "events": 0.03,
+   "units": 15.55,
+   "creatures": 0.02,
+   "nest": 0,
+   "fx": 0.02,
+   "ui": 0.88,
+   "render": 1545.73,
+   "prewarm": 0
+  },
+  "gpuAvg": null,
+  "calls": 1,
+  "tris": 1,
+  "programs": 152,
+  "textures": 105,
+  "geometries": 295,
+  "heapMB": 106,
+  "gpuMB": 403,
+  "tickMs": 3.48,
+  "msgKB": 102,
+  "glLinks": 1,
+  "glUploads": 53,
+  "quality": "medium",
+  "ants": 302,
+  "creatures": 0,
+  "hitches": [
+   "109.4 s 17 ms: texture upload \u00d76 (0.1 MB, 0 ms); units 22 ms, render 13 ms, msg 5 ms",
+   "109.4 s 33 ms: texture upload \u00d76 (0.1 MB, 0 ms); units 27 ms, render 18 ms",
+   "109.5 s 50 ms: texture upload \u00d76 (0.1 MB, 0 ms); buffer upload 0.0 MB (6 ms); units 23 ms, render 19 ms",
+   "109.5 s 50 ms: texture upload \u00d76 (0.1 MB, 0 ms); units 11 ms, render 10 ms",
+   "109.6 s 33 ms: texture upload \u00d76 (0.1 MB, 0 ms); render 10 ms",
+   "117.2 s 7616 ms: texture upload \u00d76 (0.1 MB, 0 ms); render 18 ms, units 17 ms",
+   "122.3 s 5133 ms: shader compile \u00d71 (0 ms); texture upload \u00d76 (0.1 MB, 0 ms); GC (heap \u221241 MB); render 13800 ms, units 10 ms",
+   "136.1 s 13816 ms: texture upload \u00d75 (0.0 MB, 0 ms); buffer upload 2.9 MB (1 ms); render 14 ms, units 14 ms"
+  ]
+ },
+ {
+  "id": "mp4",
+  "title": "Multiplayer-sized world (4 colonies, authored map)",
+  "loadMs": 347700,
+  "prewarmMs": 144524,
+  "secs": 15,
+  "frames": 4,
+  "fps": 0.5,
+  "frameAvg": 2095.76,
+  "p95": 8166.3,
+  "worst": 8166,
+  "over33": 3,
+  "over50": 3,
+  "cpuAvg": 6390.41,
+  "parts": {
+   "sim": 0,
+   "msg": 1.14,
+   "events": 0.09,
+   "units": 3.84,
+   "creatures": 0.03,
+   "nest": 0.01,
+   "fx": 0.04,
+   "ui": 0.85,
+   "render": 6385.47,
+   "prewarm": 0
+  },
+  "gpuAvg": null,
+  "calls": 1,
+  "tris": 1,
+  "programs": 157,
+  "textures": 319,
+  "geometries": 804,
+  "heapMB": 343,
+  "gpuMB": 627,
+  "tickMs": 14.21,
+  "msgKB": 102,
+  "glLinks": 1,
+  "glUploads": 0,
+  "quality": "medium",
+  "ants": 77,
+  "creatures": 0,
+  "hitches": [
+   "189.2 s 100 ms: outside this thread (browser, GPU or a background tab)",
+   "189.3 s 100 ms: outside this thread (browser, GPU or a background tab)",
+   "197.5 s 8166 ms: shader compile \u00d71 (0 ms); render 25533 ms"
+  ]
+ }
+]

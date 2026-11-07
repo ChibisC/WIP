@@ -217,7 +217,32 @@ function builtAnt(m: AntMorph, detail: 0 | 1): ReturnType<typeof buildAnt> {
   if (!b) builtCache.set(k, (b = buildAnt(m, detail, 3)));
   return b;
 }
-const impostorCache = new Map<string, THREE.MeshStandardMaterial>();
+/** baked impostors per WebGL renderer (an atlas lives on one context) */
+const impostorCaches = new WeakMap<THREE.WebGLRenderer, Map<string, THREE.MeshStandardMaterial>>();
+function impostorCacheOf(r: THREE.WebGLRenderer): Map<string, THREE.MeshStandardMaterial> {
+  let m = impostorCaches.get(r);
+  if (!m) impostorCaches.set(r, (m = new Map()));
+  return m;
+}
+
+/**
+ * A geometry that shares another's vertex data (the same attribute objects: uploaded once per renderer) and takes its
+ * own instance attributes. Every area's renderer used to clone each model's vertices (performance pass, GPU memory).
+ */
+function sharedGeometry(src: THREE.BufferGeometry): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  g.setIndex(src.index);
+  for (const name of Object.keys(src.attributes)) g.setAttribute(name, src.attributes[name]);
+  const ma = src.morphAttributes as Record<string, Array<THREE.BufferAttribute | THREE.InterleavedBufferAttribute>>;
+  for (const name of Object.keys(ma)) (g.morphAttributes as typeof ma)[name] = ma[name];
+  g.morphTargetsRelative = src.morphTargetsRelative;
+  for (const gr of src.groups) g.addGroup(gr.start, gr.count, gr.materialIndex);
+  g.setDrawRange(src.drawRange.start, src.drawRange.count);
+  g.boundingBox = src.boundingBox;
+  g.boundingSphere = src.boundingSphere;
+  g.userData = src.userData;
+  return g;
+}
 
 class Bucket {
   meshes: THREE.InstancedMesh[] = [];
@@ -251,9 +276,13 @@ class Bucket {
     const old = this.meshes[l];
     if (old) {
       this.group.remove(old);
+      // (the vertices are the model's, shared: only the old instance attributes leave the GPU)
+      for (const name of Object.keys(this.geos[l].attributes)) old.geometry.deleteAttribute(name);
+      old.geometry.setIndex(null);
+      old.geometry.dispose();
       old.dispose();
     }
-    const geo = this.geos[l].clone();
+    const geo = sharedGeometry(this.geos[l]);
     const mk = () => new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4).setUsage(THREE.DynamicDrawUsage);
     const at = { a: mk(), b: mk(), c: mk(), d: mk(), e: mk() };
     geo.setAttribute('aA', at.a);
@@ -308,7 +337,7 @@ class Bucket {
       this.shellTex[l] = tex;
       const su = shellMat.userData.antUniforms as Record<string, THREE.IUniform>;
       su.uBodyTex.value = tex;
-      const geo = this.geos[l].clone();
+      const geo = sharedGeometry(this.geos[l]);
       const mk = (size = 4) => new THREE.InstancedBufferAttribute(new Float32Array(cap * size), size).setUsage(THREE.DynamicDrawUsage);
       const at = { a: mk(), b: mk(), c: mk(), d: mk(), e: mk(), g: mk(1) };
       geo.setAttribute('aA', at.a);
@@ -332,6 +361,9 @@ class Bucket {
         const old = this.shellAt[l]!;
         for (const key of ['a', 'b', 'c', 'd', 'e', 'g'] as const) (at[key].array as Float32Array).set((old[key].array as Float32Array).subarray(0, k * at[key].itemSize));
         this.group.remove(mesh);
+        // (its vertices are the model's, shared: only its own instance attributes leave the GPU)
+        for (const name of Object.keys(this.geos[l].attributes)) mesh.geometry.deleteAttribute(name);
+        mesh.geometry.setIndex(null);
         mesh.geometry.dispose();
         mesh.dispose();
       }
@@ -405,6 +437,8 @@ const atkP = neutralPose({} as AttackPose);
 const plan: AtkPlan = { variant: 0, holdIn: false, holdOut: false, piv: 0 };
 
 const tmpM = new THREE.Matrix4();
+/** the impostor bakes' shared multisampled target (each morph keeps a single-sample copy of its atlas) */
+let bakeTarget: THREE.WebGLRenderTarget | null = null;
 /** the far impostor's matrix when its on-screen size is clamped up (LOD cross-fade: the near model keeps tmpM) */
 const tmpMb = new THREE.Matrix4();
 const vSb = new THREE.Vector3();
@@ -615,7 +649,7 @@ export class AntRenderer {
 
   /** Render the ant from above into an 8-frame gait atlas used by far LOD quads. */
   private impostorFor(key: string): THREE.MeshStandardMaterial {
-    let mat = this.impostorMats.get(key) ?? impostorCache.get(key);
+    let mat = this.impostorMats.get(key) ?? impostorCacheOf(this.renderer).get(key);
     if (mat) {
       this.impostorMats.set(key, mat);
       return mat;
@@ -626,8 +660,13 @@ export class AntRenderer {
     const cols = 4;
     const rows = 2;
     const cell = 128;
-    const rt = new THREE.WebGLRenderTarget(cols * cell, rows * cell, { samples: 4 });
-    rt.texture.colorSpace = THREE.SRGBColorSpace;
+    // (the bake draws into one multisampled target shared by every bake; each morph keeps only the resolved image:
+    //  0.5 MB instead of 4.5 MB of samples, colour and depth — performance pass, GPU memory on phones)
+    if (!bakeTarget) {
+      bakeTarget = new THREE.WebGLRenderTarget(cols * cell, rows * cell, { samples: 4 });
+      bakeTarget.texture.colorSpace = THREE.SRGBColorSpace;
+    }
+    const rt = bakeTarget;
     const scene = new THREE.Scene();
     scene.add(new THREE.AmbientLight(0xffffff, 2.2));
     const dl = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -674,7 +713,14 @@ export class AntRenderer {
     rt.viewport.set(0, 0, cols * cell, rows * cell);
     r.setRenderTarget(prevTarget);
     r.setClearColor(prevClear, prevAlpha);
-    mat = new THREE.MeshStandardMaterial({ map: rt.texture, alphaTest: 0.35, transparent: false, roughness: 0.6, side: THREE.DoubleSide });
+    // the resolved atlas copied as it is (same format, a GPU copy) into the morph's own single-sample texture
+    const atlas = new THREE.WebGLRenderTarget(cols * cell, rows * cell, { depthBuffer: false, samples: 0 });
+    atlas.texture.colorSpace = THREE.SRGBColorSpace;
+    r.initRenderTarget(atlas);
+    r.copyTextureToTexture(rt.texture, atlas.texture);
+    // (the bake's copy of the model leaves the GPU with it)
+    geo.dispose();
+    mat = new THREE.MeshStandardMaterial({ map: atlas.texture, alphaTest: 0.35, transparent: false, roughness: 0.6, side: THREE.DoubleSide });
     patchDapple(mat);
     addPatch(mat, {
       key: 'impostor',
@@ -707,7 +753,7 @@ export class AntRenderer {
       ],
     });
     this.impostorMats.set(key, mat);
-    impostorCache.set(key, mat);
+    impostorCacheOf(this.renderer).set(key, mat);
     return mat;
   }
 

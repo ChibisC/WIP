@@ -998,7 +998,7 @@ devices) in `docs/performance.md`; DESIGN, README, PROGRESS; handoff; merge rule
 
 **As built (2026-11-03).**
 - Switching: `GameSession.prewarm()` runs behind the loading screen: every ant, termite and creature model that can
-  appear in a space is built once and shared by every renderer (`antRenderer.ts` `builtCache`/`impostorCache`,
+  appear in a space is built once and shared by every renderer (`antRenderer.ts` `builtCache`/`impostorCacheOf`,
   `termiteLayer.ts` `baseGeos`, `primitives.ts` `prepare`), then each space's scene is compiled and drawn once offscreen
   with shadows on (`render/prewarm.ts` `warmScene`: everything visible, empty instanced meshes given one instance).
   `warmNew()` warms morphs the simulation shows mid-match under 4 ms a frame; `keepAreasCurrent()` keeps the other

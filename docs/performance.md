@@ -135,12 +135,13 @@ surface and the underground, and no loss of looks.
 ### What changed (no change of looks)
 | Area | Change |
 |---|---|
-| Switching | `GameSession.prewarm()` behind the loading screen: every model that can appear is built once and shared by all renderers (`builtCache`, `impostorCache`, termite and creature part pools), then every space's scene is compiled and drawn once offscreen with shadows (`render/prewarm.ts`). |
+| Switching | `GameSession.prewarm()` behind the loading screen: every model that can appear is built once and shared by all renderers (`builtCache`, `impostorCacheOf`, termite and creature part pools), then every space's scene is compiled and drawn once offscreen with shadows (`render/prewarm.ts`). |
 | Switching | `warmNew()` warms a model the simulation shows mid-match in the background (under 4 ms a frame); `keepAreasCurrent()` keeps the areas not on screen up to date every sixth frame while there is room. |
 | Switching | Nothing is drawn while the dive or area fade is fully opaque (the swap frame does the swap; the new space draws on the next). |
 | Switching | The area a dive or cut is about to show is brought up to date under the fade, a 6 ms slice a frame; the areas not on screen are kept current in 3 ms slices (`NestTerrain.update(force, budgetMs)`: the distance field, then the light maps, then chunks). |
 | CPU | The nest terrain's distance field blur skips bounds checks inside the grid, the same sums in the same order: the old result to the bit, 12 → 4 ms. |
 | Rendering | Empty instanced meshes are hidden; creature pools upload only the instances drawn. |
+| Memory | Every area's ant renderer shares each model's vertices (it used to clone them); the impostor bakes share one multisampled target and each model keeps only its resolved 0.5 MB atlas (it kept 4.5 MB); old instance buffers are freed when a pool grows. On the build machine, a developed match at Medium: estimated GPU memory 340 → 279 MB (buffers 82 → 43, renderbuffers 75 → 52). |
 | Rendering | The AO composite pass is skipped when AO is off (it copied the image unchanged). |
 | Rendering | Auto quality lowers the render resolution (10 % steps, never below 75 %, a light sharpen) before it drops a preset, and brings it back first. |
 | Rendering | An ant's change of LOD cross-fades over 0.25 s (both models, each in the other's dithered pixels) with a 6 % hysteresis; camera cuts snap. The fade rides in `aE.z` with "exhausted". |
