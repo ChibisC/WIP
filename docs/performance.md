@@ -106,7 +106,8 @@ surface and the underground, and no loss of looks.
   its binds, uploads and deletes), the GL work since loading (shader links and their time, texture uploads and bytes),
   and the **hitch log**: every frame over 33 ms with what happened in it (a model built, a shader linked, textures
   uploaded, a nest's terrain rebuilt, a big simulation message…).
-- **`?bench=1`** (Menu → Graphics → Run the benchmark, `src/dev/bench.ts`): six fixed scenes, each loaded fresh, warmed
+- **`?bench=1`** (Menu → Graphics → Run the benchmark, `src/dev/bench.ts`): seven fixed scenes (the first, *feel*, added by
+  performance v2 — below), each loaded fresh, warmed
   up, then timed while the camera flies a fixed path. *switch*: surface → home → every area → surface, ten rounds, every
   switch's frames kept; *fight*: 400 against 400 with two titans; *nest*: a developed nest; *story*: The Long Nights at
   dusk before the third night; *arena*: six teams of 100; *mp4*: a four-colony world. The report has the device, the
@@ -197,5 +198,28 @@ pre-warm's 150 programs also keep the software GPU busy for minutes after loadin
 | texture uploads during the run | 272 | 135 |
 | ant models built during the run | yes (lasius_queen 15 s, …) | none |
 | load | 94.7 s | 138.8 s (114.7 s of it the pre-warm) |
+
+The real numbers come from the user's laptop and iPhone (`?bench=1`, below once they arrive).
+
+
+## Performance v2: feel (claude/performance/02-spec-responsiveness-client-visuals.md)
+
+### The feel meter (F3 and `?bench=1`)
+`src/core/feel.ts` measures what the player feels, on every page (three lines on F3) and in the benchmark's new first
+scene, *feel*, which plays scripted inputs through the real event handlers every 400 ms — a camera drag and wheel, a
+click on an ant, a marker placed, a group sent, a key, then in the nest a hex marked for digging and a tile placed:
+
+- **input → feedback**: from the input event's own timestamp to the end of the first frame that started after it (the
+  frame that draws the ring, the marker, the ghost hex, the camera's move), by kind;
+- **input → acting**: to the end of the first frame after the simulation ran the tick that applies the command;
+- **command latency**: issue → the tick that applies it, in ticks and ms (single-player: 1 tick; multiplayer: the
+  lockstep delay and one packet);
+- **frame pacing**: the frame intervals (average, p95), their jitter, frames over 16.7 and 33 ms, frames that missed a
+  vsync of the display (its rate estimated from the intervals), and long tasks (over 50 ms) where the browser reports
+  them;
+- the main thread's parts per frame (now with `input`, the time in input handlers) and the worker's tick time.
+
+`tests/browser/bench.py` takes `ONLY=feel,fight` and `VW=480 VH=300` (a small viewport keeps the software GPU of the
+build machine nearer real time; its frame times still mean nothing for a real device).
 
 The real numbers come from the user's laptop and iPhone (`?bench=1`, below once they arrive).

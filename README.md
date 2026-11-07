@@ -159,7 +159,7 @@ Play phones in landscape (in portrait the game asks you to turn the phone). On p
 The pause menu has graphics quality, frame rate (match the screen, 60 or 30), interface size, edge scrolling and the sandbox setting **Reveal all underground areas**. Auto quality first lowers the render resolution a little (never below 75 %, with a light sharpen) and only then the preset.
 
 ### Benchmark
-Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`) runs six fixed scenes for about four minutes: switching surface ↔ underground ten times, a big fight, a full nest, a story night, the arena at 600 units and a multiplayer-sized world. It ends with a report to copy and send (frame times, hitches and their causes, the switch frames, draw calls, memory). See `docs/performance.md`.
+Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`) runs seven fixed scenes for about four minutes: scripted clicks, orders, digging, building and camera moves (how quickly the game answers), switching surface ↔ underground ten times, a big fight, a full nest, a story night, the arena at 600 units and a multiplayer-sized world. It ends with a report to copy and send (frame times, hitches and their causes, the switch frames, draw calls, memory). See `docs/performance.md`.
 
 ## Species
 | Species | Castes |
