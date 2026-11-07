@@ -46,6 +46,9 @@ export const GARDEN: StoryLevelDef = {
     scouts: { ants: [['lasius_worker', 2]], colony: 'lasius', at: 'scoutTop', spawn: 'action', label: 'the scouts' },
     // the first raid, ten minutes in (the bonus: steal the soldier before it)
     raiders: { ants: [['lasius_soldier', 2], ['lasius_worker', 5]], colony: 'lasius', at: 'stoneSteps', spawn: 'action', wave: true, label: 'the Lasius raid' },
+    // the garden answers the theft (2026-11-06): two parties at the nest, the second down the flowerbed
+    answerA: { ants: [['lasius_soldier', 2], ['lasius_worker', 4]], colony: 'lasius', at: 'stoneSteps', spawn: 'action', wave: true, label: 'the Lasius answer' },
+    answerB: { ants: [['lasius_soldier', 2], ['lasius_worker', 4]], colony: 'lasius', at: 'scoutTop', spawn: 'action', wave: true, label: 'the Lasius answer' },
     ...EV.actors,
   },
   surprises: EV.surprises,
@@ -143,6 +146,28 @@ export const GARDEN: StoryLevelDef = {
       events: [
         { at: 10, actions: [{ do: 'tip', key: 'genes' }] },
         { on: 'caste:lasius_soldier', actions: [{ do: 'tip', key: 'caste' }] },
+      ],
+    },
+    {
+      // (2026-11-06: at a person's pace the level ran 22–27 minutes on Normal once the playtest bot was fixed, under the
+      // 30 the chapter aims at, claude/story/06-spec §7; the garden answers the theft before the raid)
+      name: 'The garden answers',
+      objectives: [
+        { type: 'surviveTime', s: { easy: 300, normal: 360, hard: 360, brutal: 360 }, text: 'Hold the nest while the garden ants answer' },
+        { type: 'raise', n: 30, text: 'Raise 30 ants', optional: true },
+      ],
+      say: [
+        { key: 'answer1', at: 3 },
+        { key: 'answer2', at: 150 },
+      ],
+      events: [
+        { actions: [{ do: 'music', mood: 'tense' }] },
+        { at: 20, actions: [{ do: 'spawn', actor: 'answerA' }] },
+        { at: 150, actions: [{ do: 'spawn', actor: 'answerB' }] },
+      ],
+      scenes: [
+        { actor: 'answerA', at: 20, cues: [{ holdAt: 'stoneSteps', anim: 'threat', s: 3 }, { mode: 'aggressive' }, { guard: 'playerNest', r: 70, s: 45 }, { release: true }] },
+        { actor: 'answerB', at: 150, cues: [{ mode: 'aggressive' }, { path: 'scoutsDown', speed: 1 }, { guard: 'playerNest', r: 70, s: 45 }, { release: true }] },
       ],
     },
     {
