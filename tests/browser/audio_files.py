@@ -10,7 +10,7 @@ import sys
 from playwright.sync_api import sync_playwright
 
 BASE = os.environ.get("BASE", "http://127.0.0.1:5173/")
-CHECK = """
+CHECK = r"""
 async (ext) => {
   const audio = window.__audio;
   const bank = audio.bank;
