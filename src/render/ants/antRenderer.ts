@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { prof } from '../../core/profiler';
 import { camCuts } from '../cameras';
 import { AntRig, buildAnt } from './antGeometry';
-import { BODY_TEX, createAntMaterials, createAntGlueShell, LOD_FADE_GLSL, POSE, TINT_GLSL } from './antMaterial';
+import { BODY_TEX, createAntMaterials, createAntGlueShell, LOD_FADE_GLSL, packExhaustedFade, POSE, TINT_GLSL } from './antMaterial';
 import { ATK, ATTACK_CONTACT, AttackPose, applyAttackBody, attackPose, attackPoseV2, neutralPose } from './attackPoses';
 import { AntMorph, MORPHS } from './morphs';
 import { ANIM_SFX, animV2, AtkPlan, attackPlan, Motion2, newMotion, newMotionOut, stepMotion } from './antMotion';
@@ -221,7 +221,7 @@ const impostorCache = new Map<string, THREE.MeshStandardMaterial>();
 
 class Bucket {
   meshes: THREE.InstancedMesh[] = [];
-  attrs: Array<{ a: THREE.InstancedBufferAttribute; b: THREE.InstancedBufferAttribute; c: THREE.InstancedBufferAttribute; d: THREE.InstancedBufferAttribute; e: THREE.InstancedBufferAttribute; f: THREE.InstancedBufferAttribute }> = [];
+  attrs: Array<{ a: THREE.InstancedBufferAttribute; b: THREE.InstancedBufferAttribute; c: THREE.InstancedBufferAttribute; d: THREE.InstancedBufferAttribute; e: THREE.InstancedBufferAttribute }> = [];
   counts = [0, 0, 0];
   capacity = [0, 0, 0];
   rig: AntRig;
@@ -255,8 +255,7 @@ class Bucket {
     }
     const geo = this.geos[l].clone();
     const mk = () => new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4).setUsage(THREE.DynamicDrawUsage);
-    const at = { a: mk(), b: mk(), c: mk(), d: mk(), e: mk(), f: new THREE.InstancedBufferAttribute(new Float32Array(cap), 1).setUsage(THREE.DynamicDrawUsage) };
-    geo.setAttribute('aF', at.f);
+    const at = { a: mk(), b: mk(), c: mk(), d: mk(), e: mk() };
     geo.setAttribute('aA', at.a);
     geo.setAttribute('aB', at.b);
     geo.setAttribute('aC', at.c);
@@ -680,7 +679,7 @@ export class AntRenderer {
     addPatch(mat, {
       key: 'impostor',
       uniforms: { uSpan: { value: span } },
-      vertexHeader: 'attribute vec4 aA; attribute vec4 aD; attribute vec4 aE; attribute float aF; uniform float uSpan; varying vec2 vGoldI; varying float vTintI; varying float vFadeI;',
+      vertexHeader: 'attribute vec4 aA; attribute vec4 aD; attribute vec4 aE; uniform float uSpan; varying vec2 vGoldI; varying float vTintI; varying float vFadeI;',
       fragmentHeader: 'varying vec2 vGoldI; varying float vTintI; varying float vFadeI;',
       // far away a Saiy-Ant in its gold surge still reads as a gold speck; exhausted ones look dull
       fragment: [
@@ -694,7 +693,7 @@ export class AntRenderer {
         ],
       ],
       vertex: [
-        ['#include <begin_vertex>', 'vGoldI = vec2(abs(aE.x), aE.z); vTintI = floor((aD.z + 2.0) / 4.0); vFadeI = aF;\n#include <begin_vertex>'],
+        ['#include <begin_vertex>', '{ float fe = floor(aE.z / 256.0); vGoldI = vec2(abs(aE.x), mod(aE.z, 256.0) / 255.0); vFadeI = fe < 0.5 ? 0.0 : fe < 256.5 ? fe / 256.0 : (256.0 - fe) / 256.0; }\nvTintI = floor((aD.z + 2.0) / 4.0);\n#include <begin_vertex>'],
         [
           '#include <uv_vertex>',
           `#include <uv_vertex>
@@ -1142,7 +1141,8 @@ export class AntRenderer {
       s.lodSeen = this.frame;
       const lod = s.lod;
       const glueAt = lod < 2 ? lod : s.lodFrom! >= 0 && s.lodFrom! < 2 ? s.lodFrom! : -1;
-      // the shown LOD, then the one fading out (aF: 0 whole; t > 0 the pixels below t; −t the pixels at or above t)
+      // the shown LOD, then the one fading out (fade: 0 whole; t > 0 the pixels below t; −t the pixels at or above t;
+      // packed into aE.z with "exhausted")
       for (let pass = 0; pass < 2; pass++) {
         const l = pass === 0 ? lod : s.lodFrom!;
         if (l < 0) break;
@@ -1166,7 +1166,6 @@ export class AntRenderer {
           if (M) b.writeBody(l, n, bodyBuf);
           else b.writeBody(l, n, zeroBody);
         }
-        at.f.setX(n, fade);
         at.a.setXYZW(n, s.phase, s.amp, hy, hp);
         at.b.setXYZW(n, mo, act * 0.3 + (v.antennaPitch > 0.5 ? 0.6 : 0) + (M ? M.antSpread : 0), s.ap, s.wave);
         // pose id + 0.99 × its weight; the hit flash
@@ -1175,8 +1174,8 @@ export class AntRenderer {
         at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, (M ? M.flash : 0) + 2 * Math.round(Math.min(1, Math.max(0, v.rageGlow ?? 0)) * 10));
         // colour variation −1..1, plus 4 × the Termant tint code (decoded in the shader); the planted feet's stance sweep
         at.d.setXYZW(n, M ? M.deathLeg : s.death, M ? M.Dh : 0, Math.max(-1, Math.min(1, v.colorVar)) + 4 * (v.tint ?? 0), s.pph);
-        // gold × ripple direction, the planted feet's turn per stance, exhausted, hair sway
-        at.e.setXYZW(n, (v.gold ?? 0) * ((v.goldDir ?? 1) < 0 ? -1 : 1), M ? M.Ps : 0, v.exhausted ?? 0, s.sw ?? 0);
+        // gold × ripple direction, the planted feet's turn per stance, exhausted with the LOD fade, hair sway
+        at.e.setXYZW(n, (v.gold ?? 0) * ((v.goldDir ?? 1) < 0 ? -1 : 1), M ? M.Ps : 0, packExhaustedFade(v.exhausted ?? 0, fade), s.sw ?? 0);
         // termite glue clinging to the ant (render only), on one of the two while they cross-fade
         if (pass === 0) {
           // eases in, wears off slowly; a sickle-jaw's acid uses the same wet shell (the kit's acid and glue colours
@@ -1198,11 +1197,11 @@ export class AntRenderer {
         if (b.counts[l] > 0) {
           mesh.instanceMatrix.needsUpdate = true;
           const at = b.attrs[l];
-          at.a.needsUpdate = at.b.needsUpdate = at.c.needsUpdate = at.d.needsUpdate = at.e.needsUpdate = at.f.needsUpdate = true;
+          at.a.needsUpdate = at.b.needsUpdate = at.c.needsUpdate = at.d.needsUpdate = at.e.needsUpdate = true;
           const bt = b.bodyTex[l];
           if (bt) bt.needsUpdate = true;
           // Only upload the used range.
-          for (const attr of [mesh.instanceMatrix, at.a, at.b, at.c, at.d, at.e, at.f]) {
+          for (const attr of [mesh.instanceMatrix, at.a, at.b, at.c, at.d, at.e]) {
             attr.clearUpdateRanges();
             attr.addUpdateRange(0, b.counts[l] * attr.itemSize);
           }

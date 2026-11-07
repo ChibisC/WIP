@@ -4,6 +4,8 @@
  *    up identical to the simulation's state, tick after tick, in a busy 4-colony match (tiles built, upgraded and
  *    deleted, AI plans, fields that appear and disappear); and the deltas are much smaller than the whole state.
  *  - The fingerprint tells apart values that differ (numbers, -0, NaN, strings, key order, typed arrays, nesting).
+ *  - The LOD cross-fade rides in aE.z with "exhausted" (the ant shader has no vertex attribute left): both unpack
+ *    as the shader unpacks them.
  *  - The frame cap holds 30 and 60 on a 120 Hz clock and never skips at 60 on a 60 Hz one.
  *
  *   npx vite-node tests/performance.ts
@@ -13,6 +15,7 @@ import { createWorld } from '../src/sim/mapGen';
 import { SlowDelta, fingerprint } from '../src/worker/slowDelta';
 import { GameLoop } from '../src/core/loop';
 import { frameCapOf, sanitizeSettings } from '../src/game/profile';
+import { packExhaustedFade } from '../src/render/ants/antMaterial';
 
 const t0 = Date.now();
 let failed = 0;
@@ -80,6 +83,31 @@ function check(name: string, ok: boolean, detail = ''): void {
   }
   check('slow-state deltas: the replica matches the simulation after every one of 2,400 ticks', same, firstBad);
   check('slow-state deltas: a quarter or less of the whole state on average', sent < full * 0.25, `${((sent / full) * 100).toFixed(1)} % of ${(full / 2400 / 1024).toFixed(1)} KB a frame (largest delta ${(worst / 1024).toFixed(1)} KB)`);
+}
+
+// ---- aE.z: exhausted and the LOD fade, unpacked as the shader does (antMaterial.ts lodFadeOf)
+{
+  const unpack = (z: number) => {
+    const f32 = Math.fround(z);
+    const fe = Math.floor(f32 / 256);
+    return { exh: (f32 - 256 * fe) / 255, fade: fe < 0.5 ? 0 : fe < 256.5 ? fe / 256 : (256 - fe) / 256 };
+  };
+  // what a fade draws: the pixels whose noise n (0..1) it keeps
+  const keeps = (f: number, n: number) => (f === 0 ? true : f > 0 ? n < f : n >= -f);
+  let worstE = 0;
+  let worstF = 0;
+  for (const exh of [0, 0.1, 0.37, 0.5, 0.99, 1]) {
+    for (const fade of [0, 0.001, 0.2, 0.5, 0.999, 1, -0.001, -0.2, -0.5, -0.999, -1]) {
+      const u = unpack(packExhaustedFade(exh, fade));
+      worstE = Math.max(worstE, Math.abs(u.exh - exh));
+      // the share of pixels drawn differently from the exact fade
+      let diff = 0;
+      for (let i = 0; i < 4096; i++) if (keeps(u.fade, (i + 0.5) / 4096) !== keeps(fade, (i + 0.5) / 4096)) diff++;
+      worstF = Math.max(worstF, diff / 4096);
+    }
+  }
+  check('aE.z packing: exhausted within 1/500; the fade draws the same pixels but for 1/256 of them', worstE <= 1 / 500 && worstF <= 1 / 256 + 1 / 4096, `exhausted ±${worstE.toFixed(4)}, pixels ${(worstF * 100).toFixed(2)} %`);
+  check('aE.z packing: no fade unpacks as the whole model', unpack(packExhaustedFade(0.4, 0)).fade === 0);
 }
 
 // ---- the frame cap
