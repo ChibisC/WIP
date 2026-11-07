@@ -957,9 +957,76 @@ sprays"; "fix the antennae and mandibles, they are misplaced" (soldiers); "fix t
 Every item 8 (models, worker attacks, the sprayer's glue, the soldier's crush, bulldoze, toss and drum); decision
 "approve with changes". The change (K4): the soldier drums "while walking when approaching enemies" — in bursts
 (0.6 s every 1.5 s) while it walks or charges at a foe (`antViews.drumWalking`), the head only, the walk going on.
+
+## 25. Performance pass — faster in every mode, smooth surface ↔ underground switching, no loss of looks (user spec 2026-11-02, claude/performance/01-spec-performance-no-visual-loss.md)
+Branch `feature/performance` from `main` (`18d3d79`). Render, client and worker-message work only: the simulation's
+results never change (the determinism check, replays and every suite prove it).
+
+**Step 1 — measure first.**
+- `core/profiler.ts` (`prof`): every frame's time (animation frame to animation frame), the main thread's own time, named
+  parts (sim, msg, units, creatures, nest, fx, ui, render, prewarm), GL work counted and timed by wrapping the WebGL
+  context (shader compiles and links, texture and buffer uploads), the renderer's counts, the JS heap (Chrome), GPU time
+  (`EXT_disjoint_timer_query_webgl2`), and the hitch log: every frame over 33 ms with what happened in it.
+- F3 overlay (`ui/debugOverlay.ts`) shows all of it at 4 Hz.
+- `?bench=1` (`dev/bench.ts`, Menu → Graphics → Run the benchmark): six scenes, one page load each (so loading counts):
+  the switching test (surface → home nest → each area → surface, ten rounds, every frame), a big fight (4 × 200 ants,
+  100 creatures, 2 titans), a full nest, a story night (The Long Nights' last night), the arena at 600 units, and a
+  multiplayer-sized world. A report to copy and paste back. `tests/browser/bench.py` runs it headless.
+- The golden set before anything changes (`tests/browser/golden.py` → `docs/performance/golden/`) and a comparison tool
+  (`tools/golden-compare.py`: SSIM and per-pixel difference, side-by-side sheets).
+- Baseline numbers in `docs/performance.md`; the measurement build merged to `main` first so the user's devices can run
+  the same `?bench=1` before the optimizations land.
+
+**Step 2 — switching (top priority).** Findings from the hitch log decide the order; the plan:
+- Pre-warm while loading: every area's stage rendered once behind the loading screen (shaders, shadow variants, textures,
+  instance buffers), every ant and creature model that can appear built and compiled for every space, the effects
+  compiled; `renderer.compileAsync` where it avoids a blocking compile (KHR_parallel_shader_compile).
+- Shared model assets: one copy of each ant model's geometry, materials' programs and far-LOD impostor atlas for every
+  space (each area's renderer used to build and bake its own the first time it was shown).
+- Things that appear mid-match (a caste first raised, a creature kind first spawned, a stolen caste) are warmed in the
+  background under a small time budget per frame, as soon as the simulation shows them.
+- Inactive areas kept current at a low rate (nest meshes after digging, hex tiles), so a switch has nothing to catch up.
+- During the dive's black frames the leaving scene is not rendered at full cost; the swap's work is spread over frames.
+
+**Step 3 — every mode, no visible change.** Culling and draw-call merges where the counts say they pay; dynamic
+resolution before `autoQuality` drops a preset; allocation-free hot loops (GC in the hitch log); HUD at a few Hz;
+the worker's tick in the stress scenes; per-player tick and frame times in the multiplayer HUD; a mobile memory budget
+and a 30/60 frame cap option. Each change is checked against the golden set before it is kept.
+
+**Step 4 — verify.** Golden set, `npm test`, determinism, build, replays; final numbers (the build machine and the user's
+devices) in `docs/performance.md`; DESIGN, README, PROGRESS; handoff; merge rule; merge and publish.
+
+**As built (2026-11-03).**
+- Switching: `GameSession.prewarm()` runs behind the loading screen: every ant, termite and creature model that can
+  appear in a space is built once and shared by every renderer (`antRenderer.ts` `builtCache`/`impostorCacheOf`,
+  `termiteLayer.ts` `baseGeos`, `primitives.ts` `prepare`), then each space's scene is compiled and drawn once offscreen
+  with shadows on (`render/prewarm.ts` `warmScene`: everything visible, empty instanced meshes given one instance).
+  `warmNew()` warms morphs the simulation shows mid-match under 4 ms a frame; `keepAreasCurrent()` keeps the other
+  areas' terrain current in 3 ms slices every third frame (`NestTerrain.update(force, budgetMs)`: the distance field,
+  then the light maps, then chunks) and brings the area a dive or cut is about to show up to date under the fade, a
+  6 ms slice a frame. The fade covers the swap: nothing is drawn while it is fully opaque (`GameView.fadedOut`). The
+  distance field's blur is 3× faster with the same result to the bit.
+- Every mode: empty instanced meshes hidden (three binds a program for a visible mesh with no instances); creature part
+  pools upload only the used range; the AO composite pass is skipped when AO is off (same image); dynamic resolution
+  (to 75 %, never lower, with a light sharpen) before auto quality drops a preset; the HUD's labels skip unchanged
+  writes; the slow state goes as per-field deltas (`worker/slowDelta.ts`: 16 % of the bytes, replica identical, tested);
+  ant LOD changes cross-fade over 0.25 s with a 6 % hysteresis (dithered, both models drawn in complementary pixels;
+  the fade rides in `aE.z` with "exhausted" — a new attribute put the ant shader over the 16 a phone allows);
+  frame cap 30/60 (phones 60 by default); a GPU memory estimate (profiler) and a 600 MB phone budget in auto quality;
+  multiplayer pong/delay carry each player's tick and frame time (HUD line and players panel).
+- Verified: the golden set (35 shots, `docs/performance/golden/compare-after.md`) — 35 of 35 match `main`: 30
+  identical (at most a few pixels), the fight and the flood at SSIM 0.9999, the home nest and the titan at 0.997 (walking ants
+  and dust), and the enemy nest at 0.9845, which is closer to `main` than `main` is to itself (0.9871: the ants' random
+  gait phases); every test suite; the determinism check; the switching probe (`docs/performance.md`).
+- Not done, and why: KTX2 (every texture is generated in the page; a transcoder would cost more than it saves);
+  IndexedDB bake cache (not done in this pass: worth it only if the user's device numbers show loading dominated by
+  the impostor bakes); cached static shadows (the shadow camera follows the view, and units cast
+  most of the shadow); termite LOD cross-fade (the kit's instance writes are spread over many setters; it keeps its own
+  hard switch).
+
 ## 26. Story titans get inside; titans open holes more easily (user specs 2026-11-03: claude/story/05-spec-story-titans-get-inside.md, claude/creatures/02-spec-easier-titan-holes.md)
 
-(§25 is the performance pass's, on `feature/performance`, still in progress.)
+(§25 is the performance pass's.)
 
 ### 26.1 Why the story titans never got in (evidence, before any change: `main` `762d7c3`)
 `tools/titan-raid-probe.ts` (the probe: `tools/titanProbe.ts`) starts each level at its titan's moment and logs the

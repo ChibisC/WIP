@@ -27,6 +27,9 @@ export class NetHud {
   private root = document.createElement('div');
   private banner = document.createElement('div');
   private bannerText = document.createElement('span');
+  /** a slow player (performance pass): lockstep runs at the slowest player's pace, so say who it is */
+  private perfLine = document.createElement('div');
+  private perfAt = 0;
   private dropBtn = document.createElement('button');
   private chatLog = document.createElement('div');
   private chatInput = document.createElement('input');
@@ -100,7 +103,8 @@ export class NetHud {
     // "no", or withdraw one's own request: vote the current speed
     this.voteNo.onclick = () => s.issue({ type: 'speedVote', speed: s.gameSpeed() });
     this.vote.append(this.voteText, this.voteYes, this.voteNo);
-    this.root.append(this.banner, this.vote, this.chatLog, this.chatInput, this.muteBtn);
+    this.perfLine.className = 'net-perf';
+    this.root.append(this.banner, this.vote, this.chatLog, this.chatInput, this.muteBtn, this.perfLine);
     if (s.net?.isHost && s.net.transport.lan && lan.reconnect) this.root.append(this.playersBtn);
     parent.appendChild(this.root);
     s.onChat = (from, text) => this.line(from, text);
@@ -165,6 +169,16 @@ export class NetHud {
       drop = net.isHost;
     }
     if (this.bannerText.textContent !== banner) this.bannerText.textContent = banner;
+    // a slow player (twice a second): simulation ticks over 25 ms or frames over 40 ms on someone's device
+    if (now - this.perfAt > 500) {
+      this.perfAt = now;
+      const slow = Object.entries(st.perf)
+        .filter(([, [tick, frame]]) => tick > 25 || frame > 40)
+        .map(([p, [tick, frame]]) => `${this.name(Number(p))} (tick ${tick.toFixed(0)} ms, frame ${frame.toFixed(0)} ms)`);
+      const txt = slow.length ? `Slow device: ${slow.join(', ')} — the match runs at the slowest player's pace` : '';
+      if (this.perfLine.textContent !== txt) this.perfLine.textContent = txt;
+      this.perfLine.classList.toggle('show', !!txt);
+    }
     this.speedVote();
     this.banner.classList.toggle('show', !!banner);
     this.dropBtn.style.display = drop ? '' : 'none';
@@ -255,7 +269,8 @@ export class NetHud {
         if (sl.kind !== 'human' || i === net.self) return '';
         const on = peers.has(sl.peer);
         const state = st.dropped.includes(i) ? 'Dropped: the AI runs their colony' : on ? 'Connected' : 'Disconnected';
-        return `<tr><td><b>${esc(sl.name)}</b></td><td class="dim">${state}${on ? ` · ${sl.ping || '—'} ms` : ''}</td><td><button class="chip" data-a="reconnect" data-slot="${i}">Reconnect player ${i + 1}</button></td></tr>`;
+        const pf = st.perf[i];
+        return `<tr><td><b>${esc(sl.name)}</b></td><td class="dim">${state}${on ? ` · ${sl.ping || '—'} ms` : ''}${on && pf ? ` · tick ${pf[0].toFixed(1)} ms, frame ${pf[1].toFixed(0)} ms` : ''}</td><td><button class="chip" data-a="reconnect" data-slot="${i}">Reconnect player ${i + 1}</button></td></tr>`;
       })
       .join('');
     this.panelKey = '';

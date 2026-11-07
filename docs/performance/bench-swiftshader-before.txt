@@ -1,0 +1,82 @@
+# Underground Dominion benchmark — ud-mp-11 — 2026-11-07T12:59:55.817Z
+Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36
+GPU ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver); 2 cores; screen 1280×760 at 1× (window 1280×760)
+quality medium, 15 s a scene
+
+## Switching surface ↔ underground
+load 94.7 s · 142 frames · 0.2 FPS · frame avg 5376.19 ms, p95 14549.4, worst 21749 · over 33 ms: 129, over 50 ms: 123
+main thread 517.16 ms (msg 1.58, units 4.03, nest 264.92, fx 0.1, ui 1.77, render 239.25) · GPU n/a ms · sim tick 2.2 ms, msg 68 KB
+draw calls 1 · tris 0k · programs 84 · textures 104 · geometries 478 · heap 144 MB · 62 ants, 2 creatures · quality medium
+GL during the run: 38 shader links, 272 texture uploads
+switch dive in: 4× · worst frame first round 21749 ms, later rounds 9416 ms · frames over 33 ms: first 7, later 19
+switch area: 16× · worst frame first round 20916 ms, later rounds 16583 ms · frames over 33 ms: first 21, later 53
+switch dive out: 4× · worst frame first round 10700 ms, later rounds 11816 ms · frames over 33 ms: first 8, later 22
+  round 1 dive in: 17 ms: GC (heap −16 MB); render 27 ms | 33 ms: render 11 ms, ui 5 ms | 33 ms: render 10 ms
+  round 1 area: 6383 ms: texture upload ×8 (0.3 MB, 0 ms); buffer upload 6.3 MB (5 ms); render 17 ms | 19733 ms: shader compile ×1 (0 ms); texture upload ×20 (0.1 MB, 0 ms); buffer upload 4.6 MB (3 ms); nest 20891 ms, ui 13 ms, render 11 ms; ant model fire_queen built for areaAnts2 (20564 ms); ant model fire_minor built for areaAnts2 (200 ms); ant model fire_major built for areaAnts2 (122 ms) | 20916 ms: texture upload ×2 (0.0 MB, 0 ms); render 6 ms
+  round 1 area: 13033 ms: texture upload ×8 (0.3 MB, 0 ms); buffer upload 6.3 MB (2 ms); GC (heap −10 MB); render 61 ms | 67 ms: texture upload ×18 (0.1 MB, 0 ms); buffer upload 4.4 MB (5 ms); nest 824 ms, render 14 ms; ant model lasius_queen built for areaAnts3 (371 ms); ant model lasius_worker built for areaAnts3 (255 ms); ant model lasius_soldier built for areaAnts3 (194 ms) | 5183 ms: texture upload ×2 (0.0 MB, 0 ms); ui 16 ms
+  round 1 area: 117 ms: texture upload ×2 (0.0 MB, 0 ms); render 9 ms | 6450 ms: texture upload ×8 (0.1 MB, 0 ms); buffer upload 4.3 MB (3 ms); render 12 ms | 15183 ms: texture upload ×3 (0.0 MB, 0 ms); buffer upload 0.0 MB (8 ms); render 13 ms, msg 6 ms
+  round 1 area: 5466 ms: texture upload ×8 (0.1 MB, 0 ms); buffer upload 4.3 MB (3 ms); render 17 ms | 5250 ms: texture upload ×3 (0.0 MB, 0 ms) | 5483 ms: ui 12 ms
+  round 1 dive out: 6666 ms: render 9 ms | 5516 ms: render 8 ms | 5466 ms: render 9 ms
+  round 2 dive in: 5100 ms: render 11 ms, msg 4 ms | 4966 ms: render 6 ms, msg 6 ms | 4833 ms: render 5 ms, ui 4 ms
+  round 2 area: 233 ms: texture upload ×5 (0.3 MB, 0 ms); render 42 ms | 4783 ms: texture upload ×4 (0.0 MB, 0 ms); nest 7 ms, render 7 ms | 15266 ms: texture upload ×2 (0.0 MB, 0 ms); ui 24 ms, render 11 ms
+  round 2 area: 117 ms: texture upload ×5 (0.3 MB, 0 ms); render 32 ms | 11000 ms: texture upload ×5 (0.3 MB, 0 ms); render 47 ms | 5766 ms: texture upload ×5 (0.3 MB, 0 ms); render 30 ms
+  round 2 area: 6816 ms: buffer upload 0.0 MB (5 ms); render 7 ms | 5800 ms: render 5 ms | 6283 ms: msg 5 ms
+hitches:
+  112.2 s 17 ms: GC (heap −16 MB); render 27 ms
+  112.2 s 33 ms: render 11 ms, ui 5 ms
+  112.2 s 33 ms: render 10 ms
+  113.2 s 800 ms: shader compile ×26 (12 ms); texture upload ×8 (0.3 MB, 0 ms); buffer upload 6.3 MB (3 ms); render 21127 ms
+  134.3 s 21132 ms: shader compile ×8 (3 ms); texture upload ×22 (0.1 MB, 0 ms); buffer upload 4.4 MB (5 ms); nest 15799 ms, render 5934 ms; ant model lasius_queen built for areaAnts1 (15080 ms); ant model lasius_worker built for areaAnts1 (305 ms); ant model lasius_soldier built for areaAnts1 (391 ms)
+  156.1 s 21749 ms: texture upload ×1 (0.0 MB, 0 ms); render 18 ms, ui 9 ms, nest 4 ms
+  157.1 s 967 ms: render 5 ms
+  163.5 s 6383 ms: texture upload ×8 (0.3 MB, 0 ms); buffer upload 6.3 MB (5 ms); render 17 ms
+
+## Big fight (4 × 200 ants, 100 creatures, 2 titans)
+load 166.4 s · 1 frames · 59.9 FPS · frame avg 16.7 ms, p95 16.7, worst 17 · over 33 ms: 0, over 50 ms: 0
+main thread 61.07 ms (units 27.28, creatures 15.64, fx 0.07, ui 0.54, render 16.34) · GPU 13595.83 ms · sim tick 0 ms, msg 0 KB
+draw calls 1 · tris 0k · programs 55 · textures 75 · geometries 115 · heap 284 MB · 889 ants, 102 creatures · quality medium
+GL during the run: 0 shader links, 0 texture uploads
+hitches:
+  167.9 s 17 ms: units 27 ms, render 16 ms, creatures 16 ms
+
+## Full nest
+load 119.9 s · 1 frames · 59.9 FPS · frame avg 16.7 ms, p95 16.7, worst 17 · over 33 ms: 0, over 50 ms: 0
+main thread 100.82 ms (nest 12.15, fx 0.12, ui 0.64, render 40.09) · GPU 8840.24 ms · sim tick 0 ms, msg 0 KB
+draw calls 1 · tris 0k · programs 56 · textures 51 · geometries 110 · heap 141 MB · 889 ants, 40 creatures · quality medium
+GL during the run: 0 shader links, 3 texture uploads
+hitches:
+  122.5 s 17 ms: texture upload ×3 (0.0 MB, 0 ms); render 40 ms, nest 12 ms
+
+## Story: The Long Nights, last night
+load 120.1 s · 17 frames · 2.7 FPS · frame avg 365.67 ms, p95 5849.8, worst 5850 · over 33 ms: 4, over 50 ms: 2
+main thread 22.64 ms (msg 0.06, units 1.53, creatures 0.94, fx 0.13, ui 1.65, render 7.19) · GPU n/a ms · sim tick 3.63 ms, msg 36 KB
+draw calls 1 · tris 0k · programs 50 · textures 35 · geometries 61 · heap 110 MB · 13 ants, 0 creatures · quality medium
+GL during the run: 0 shader links, 0 texture uploads
+hitches:
+  114.4 s 17 ms: render 16 ms
+  114.5 s 33 ms: render 8 ms, units 6 ms
+  114.5 s 17 ms: render 10 ms, ui 5 ms
+  114.6 s 33 ms: render 5 ms, creatures 5 ms
+  114.7 s 83 ms: render 7 ms
+  120.6 s 5850 ms: render 11 ms
+
+## Battle arena, 600 units
+load 176.8 s · 4 frames · 0.5 FPS · frame avg 2016.59 ms, p95 7966.3, worst 7966 · over 33 ms: 3, over 50 ms: 1
+main thread 45.13 ms (msg 6.44, units 16.03, ui 0.39, render 15.1) · GPU n/a ms · sim tick 6.86 ms, msg 85 KB
+draw calls 1 · tris 0k · programs 49 · textures 58 · geometries 83 · heap 91 MB · 302 ants, 0 creatures · quality medium
+GL during the run: 1 shader links, 17 texture uploads
+hitches:
+  98.7 s 17 ms: shader compile ×1 (0 ms); texture upload ×6 (0.1 MB, 0 ms); render 20 ms, units 17 ms
+  98.7 s 50 ms: texture upload ×3 (0.0 MB, 0 ms); render 16 ms, msg 5 ms
+  98.8 s 33 ms: texture upload ×3 (0.0 MB, 0 ms); GC (heap −29 MB); units 23 ms, render 18 ms
+  106.7 s 7966 ms: texture upload ×5 (0.1 MB, 0 ms); GC (heap −23 MB); units 21 ms, msg 20 ms, render 7 ms
+
+## Multiplayer-sized world (4 colonies, authored map)
+load 264.1 s · 9 frames · 49.1 FPS · frame avg 20.37 ms, p95 50, worst 50 · over 33 ms: 1, over 50 ms: 0
+main thread 18.12 ms (units 1.25, creatures 0.26, fx 0.16, ui 1.45, render 5.61) · GPU n/a ms · sim tick 0 ms, msg 0 KB
+draw calls 1 · tris 0k · programs 52 · textures 34 · geometries 74 · heap 138 MB · 77 ants, 0 creatures · quality medium
+GL during the run: 1 shader links, 0 texture uploads
+hitches:
+  116.2 s 17 ms: GC (heap −5 MB); render 7 ms
+  116.3 s 50 ms: render 7 ms
+

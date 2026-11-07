@@ -35,11 +35,32 @@ export function TINT_GLSL(code: string): string {
   return `if (${code} > 0.5 && ${code} < 1.5) diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.15, 0.95, 0.7) + vec3(0.05, 0.026, 0.004), ${k});`;
 }
 
+/**
+ * LOD cross-fade (performance pass): while an ant changes model, both are drawn, each in the pixels the other leaves
+ * (the same per-pixel noise, split at the fade's level), so the change dissolves instead of popping. 0 = drawn whole.
+ */
+export function LOD_FADE_GLSL(v: string): string {
+  // (the fade comes packed with "exhausted" in aE.z: the ant's material is at the 16 vertex attributes a phone allows)
+  return `if (${v} != 0.0) { float lodN = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))); if (${v} > 0.0 ? lodN >= ${v} : lodN < -${v}) discard; }`;
+}
+
+/**
+ * aE.z: "exhausted" 0..1 in 1/255 steps, plus 256 × the LOD cross-fade code (0 whole; 1..256 the incoming model at
+ * k/256; 257..512 the outgoing one at (k − 256)/256). Every value is an exact integer in a float.
+ */
+export function packExhaustedFade(exhausted: number, fade: number): number {
+  const ex = Math.round(Math.min(1, Math.max(0, exhausted)) * 255);
+  const fe = fade === 0 ? 0 : fade > 0 ? Math.max(1, Math.min(256, Math.round(fade * 256))) : 256 + Math.min(256, Math.round(-fade * 256));
+  return ex + 256 * fe;
+}
+
 const ANIM_HEADER = /* glsl */ `
 attribute float aPart;
 attribute vec4 aSurf;
 attribute vec4 aA; attribute vec4 aB; attribute vec4 aC; attribute vec4 aD;
-attribute vec4 aE; // Saiy-Ants: gold 0..1, ripple dir ±1, exhausted 0..1, hair sway −1..1
+attribute vec4 aE; // Saiy-Ants: gold 0..1 × ripple dir ±1; turn per stance; exhausted (packed with the LOD fade); hair sway −1..1
+float lodFadeOf(float ez) { float fe = floor(ez / 256.0); return fe < 0.5 ? 0.0 : fe < 256.5 ? fe / 256.0 : (256.0 - fe) / 256.0; }
+varying float vFade; // LOD cross-fade (performance pass), unpacked from aE.z: 0 whole; t > 0 the pixels below t; −t those at or above t
 varying vec4 vGold;
 uniform float uMandVert; uniform float uMandSwing; uniform float uMandOpen; uniform vec3 uCrest;
 uniform vec3 uLegCoxa[6]; uniform vec3 uLegKnee[6]; uniform vec3 uLegAnkle[6]; uniform vec3 uLegAxis[6]; uniform vec3 uLegFoot[6]; uniform vec3 uLegHome[6];
@@ -124,8 +145,10 @@ vec3 animP = position;
   float bAng = length(bT1.xyz);
   vec3 bAx = bAng > 1e-5 ? bT1.xyz / bAng : vec3(0.0, 1.0, 0.0);
   // aE.x packs the gold amount and the ripple direction in its sign; aE.y is the turn per stance (planted feet)
-  float goldA = abs(aE.x), exh = aE.z;
-  vGold = vec4(goldA, aE.x < 0.0 ? -1.0 : 1.0, aE.z, aE.w);
+  // aE.z packs exhausted (0..255) and the LOD cross-fade (× 256; packExhaustedFade): no attribute slot was left for it
+  float goldA = abs(aE.x), exh = mod(aE.z, 256.0) / 255.0;
+  vFade = lodFadeOf(aE.z);
+  vGold = vec4(goldA, aE.x < 0.0 ? -1.0 : 1.0, exh, aE.w);
   // the hit flash, and the army-ant soldier's rage glow riding on it (+ 2 × its level 0..10)
   { float rq = floor(aC.w * 0.5); vHit = aC.w - 2.0 * rq; vRage = rq * 0.1; }
   // body bob at twice the stride frequency (the planted feet allow for it)
@@ -416,6 +439,7 @@ vec3 animP = position;
 
 const FRAG_HEADER = /* glsl */ `
 varying vec4 vSurf; varying vec3 vLocal; varying float vColorVar; varying float vTint; varying vec4 vGold; uniform float uGoldTime;
+varying float vFade;
 varying float vHit;
 varying float vRage;
 varying float vDry;
@@ -462,6 +486,7 @@ export function antPatch(): ShaderPatch {
       [
         '#include <color_fragment>',
         `#include <color_fragment>
+         ${LOD_FADE_GLSL('vFade')}
          diffuseColor.rgb *= 1.0 + vColorVar * 0.14;
          if (uReal > 0.5) {
            // each ant a little different: hue and saturation as well as value

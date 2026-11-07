@@ -11,6 +11,9 @@ export interface CamInputDelta {
   wheel: number;
 }
 
+/** Camera cuts (a rig jumped rather than moved): the ant renderer shows LODs at once after one instead of cross-fading. */
+export const camCuts = { n: 0 };
+
 /**
  * RTS camera for a horizontal plane (the surface and the nest): orbit around a
  * ground target with pitch that flattens as you zoom in (macro feel) and
@@ -118,6 +121,7 @@ export class SurfaceCameraRig {
   }
 
   jumpTo(x: number, z: number, dist?: number): void {
+    camCuts.n++;
     this.goal.set(x, this.heightAt(x, z), z);
     this.target.copy(this.goal);
     if (dist) this.distance = this.goalDistance = dist;

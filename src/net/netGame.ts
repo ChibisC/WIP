@@ -42,6 +42,11 @@ export interface NetStatus {
   hostLeft: boolean;
   /** simulation clock factor (slightly below 1 while waiting for a slower player) */
   speed: number;
+  /**
+   * Each player's simulation tick time and frame time (ms), this client included (performance pass): lockstep runs at
+   * the slowest player's pace, so a slow device shows here. The host gathers them with its pings and shares them.
+   */
+  perf: Record<number, [number, number]>;
   /** host: rejoining players still rebuilding the match (waited for longer) */
   loading: number[];
 }
@@ -56,6 +61,8 @@ export const REJOIN_LOAD_S = 300;
 
 export class NetGame {
   readonly lockstep: Lockstep;
+  /** this client's simulation tick and frame times (ms), sent with its pongs (set by the session) */
+  perfOf: (() => [number, number]) | null = null;
   slots: Slot[];
   private stallSince = 0;
   private lastPing = 0;
@@ -94,6 +101,7 @@ export class NetGame {
       waitingMs: 0,
       desync: null,
       pings: {},
+      perf: {},
       dropped: [],
       lastHash: null,
       hostLost: false,
@@ -159,7 +167,7 @@ export class NetGame {
     const c = m.msg;
     switch (c.t) {
       case 'ping':
-        this.control({ t: 'pong', at: c.at }, from);
+        this.control({ t: 'pong', at: c.at, perf: this.perfOf?.() }, from);
         break;
       case 'pong': {
         // a reply that took seconds means a busy tab, not the network: cap it for the average
@@ -168,11 +176,13 @@ export class NetGame {
         this.rtt.set(from, prev ? { rtt: prev.rtt * 0.8 + r * 0.2, jitter: prev.jitter * 0.8 + Math.abs(r - prev.rtt) * 0.2 } : { rtt: r, jitter: r * 0.25 });
         const p = this.playerOfPeer(from);
         if (p >= 0) this.slots[p].ping = Math.round(this.rtt.get(from)!.rtt);
+        if (p >= 0 && c.perf) this.st.perf[p] = c.perf;
         break;
       }
       case 'delay':
         if (!this.isHost) this.lockstep.delay = Math.min(MAX_DELAY, Math.max(MIN_DELAY, c.d));
         if (c.pings) this.st.pings = c.pings;
+        if (c.perf) this.st.perf = { ...c.perf };
         break;
       case 'hash':
         if (this.isHost) this.noteHash(c.tick, c.player, c.hash);
@@ -305,10 +315,12 @@ export class NetGame {
       if (s.kind === 'human' && i !== this.self) pings[i] = s.ping;
     });
     this.st.pings = pings;
+    const own = this.perfOf?.();
+    if (own) this.st.perf[this.self] = own;
     if (d !== this.lockstep.delay || now - this.lastDelaySent > 2000) {
       this.lockstep.delay = d;
       this.lastDelaySent = now;
-      this.control({ t: 'delay', d, pings });
+      this.control({ t: 'delay', d, pings, perf: this.st.perf });
     }
   }
 

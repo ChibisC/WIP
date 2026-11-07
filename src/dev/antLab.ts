@@ -2,7 +2,7 @@ import { NASUTE_ANT_PATH } from '../render/ants/nasuteMorphs';
 import * as THREE from 'three';
 import { buildAnt } from '../render/ants/antGeometry';
 import { setBakeRenderer } from '../render/bake/detailBake';
-import { createAntGlueShell, createAntMaterials, labMask } from '../render/ants/antMaterial';
+import { createAntGlueShell, createAntMaterials, labMask, packExhaustedFade } from '../render/ants/antMaterial';
 import { ATTACK_CONTACT, AttackPose, applyAttackBody, attackPose, neutralPose } from '../render/ants/attackPoses';
 import { MORPHS } from '../render/ants/morphs';
 import { PostPipeline } from '../render/post';
@@ -195,7 +195,7 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     // (aC.z packs the pose id and its weight; aE.x the gold and its ripple direction)
     set('aC', [Number(q.get('gpitch') || 0), Number(q.get('swell') || 0), pz + (pz ? 0.99 : 0), Number(q.get('hit') || 0)]);
     set('aD', [Number(q.get('death') || 0), 0, 4 * per('tints', bi, 0), Number(q.get('pph') || 0.1)]);
-    set('aE', [Number(q.get('gold') || 0) * (Number(q.get('golddir') || 1) < 0 ? -1 : 1), 0, Number(q.get('exh') || 0), 0]);
+    set('aE', [Number(q.get('gold') || 0) * (Number(q.get('golddir') || 1) < 0 ? -1 : 1), 0, packExhaustedFade(Number(q.get('exh') || 0), 0), 0]);
     const mx = new THREE.Matrix4();
     const cx = x + (b.rig.length * sc) / 2;
     placements.push(cx);

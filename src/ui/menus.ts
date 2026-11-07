@@ -2,7 +2,7 @@ import { firstMedal, lossesNeed } from '../story/medalText';
 import { TOUCH } from '../core/device';
 import { GameSession } from '../game/session';
 import { Action, ACTION_LABELS, DEFAULT_BINDINGS } from '../core/input';
-import { Volumes, bindingChanges, keyLabel, profile, rebind, settings, updateSettings } from '../game/profile';
+import { Volumes, bindingChanges, frameCapOf, keyLabel, profile, rebind, settings, updateSettings } from '../game/profile';
 import { SAVE_SLOTS, SaveSlot, describeSave, download, listSaves, putSave, readSaveHeader, savesPersist, slotName, stampedName } from '../game/saves';
 import { MISSIONS, missionDef, missionOf } from '../sim/missions';
 import { SPECIES } from '../sim/species';
@@ -265,6 +265,31 @@ export class Menus {
       r2.appendChild(b);
     }
     m.appendChild(r2);
+    // frame cap (performance pass): phones default to 60 (a 120 Hz screen at 60 runs cooler and lasts longer)
+    m.appendChild(el('h3', '', 'Frame rate'));
+    const rf = el('div', 'row');
+    for (const [k, label, tip] of [
+      [0, 'Match the screen', 'Draw a frame for every frame the screen shows (60, 120 or more)'],
+      [60, '60', 'At most 60 frames a second'],
+      [30, '30', 'At most 30 frames a second: cooler and longer-lasting on a phone or laptop battery; the game itself runs at the same speed'],
+    ] as Array<[number, string, string]>) {
+      const b = button(frameCapOf(settings()) === k ? 'on' : '', label, tip, () => {
+        updateSettings({ frameCap: k });
+        this.s.loop.frameCap = k;
+        for (const x of Array.from(rf.children)) x.classList.remove('on');
+        b.classList.add('on');
+      });
+      rf.appendChild(b);
+    }
+    m.appendChild(rf);
+    // the benchmark (performance pass): six fixed scenes, then a report to copy (dev/bench.ts)
+    const rb = el('div', 'row');
+    rb.appendChild(
+      button('', 'Run the benchmark', 'Leaves this match (it is autosaved) and runs six fixed scenes for about 4 minutes, then shows a report you can copy and send', () => {
+        location.href = `${location.pathname}?bench=1&q=${this.s.view.quality}`;
+      }),
+    );
+    m.appendChild(rb);
     m.appendChild(el('h3', '', 'Interface size'));
     const r3 = el('div', 'row');
     for (const k of [0.7, 0.85, 1, 1.15, 1.3]) {

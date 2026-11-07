@@ -1,0 +1,649 @@
+[
+ {
+  "id": "switch",
+  "title": "Switching surface \u2194 underground",
+  "loadMs": 94724,
+  "secs": 15,
+  "frames": 142,
+  "fps": 0.2,
+  "frameAvg": 5376.19,
+  "p95": 14549.4,
+  "worst": 21749,
+  "over33": 129,
+  "over50": 123,
+  "cpuAvg": 517.16,
+  "parts": {
+   "sim": 0,
+   "msg": 1.58,
+   "units": 4.03,
+   "creatures": 0.02,
+   "nest": 264.92,
+   "fx": 0.1,
+   "ui": 1.77,
+   "render": 239.25,
+   "prewarm": 0
+  },
+  "gpuAvg": null,
+  "calls": 1,
+  "tris": 1,
+  "programs": 84,
+  "textures": 104,
+  "geometries": 478,
+  "heapMB": 144,
+  "tickMs": 2.2,
+  "msgKB": 68,
+  "glLinks": 38,
+  "glUploads": 272,
+  "quality": "medium",
+  "ants": 62,
+  "creatures": 2,
+  "hitches": [
+   "112.2 s 17 ms: GC (heap \u221216 MB); render 27 ms",
+   "112.2 s 33 ms: render 11 ms, ui 5 ms",
+   "112.2 s 33 ms: render 10 ms",
+   "113.2 s 800 ms: shader compile \u00d726 (12 ms); texture upload \u00d78 (0.3 MB, 0 ms); buffer upload 6.3 MB (3 ms); render 21127 ms",
+   "134.3 s 21132 ms: shader compile \u00d78 (3 ms); texture upload \u00d722 (0.1 MB, 0 ms); buffer upload 4.4 MB (5 ms); nest 15799 ms, render 5934 ms; ant model lasius_queen built for areaAnts1 (15080 ms); ant model lasius_worker built for areaAnts1 (305 ms); ant model lasius_soldier built for areaAnts1 (391 ms)",
+   "156.1 s 21749 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 18 ms, ui 9 ms, nest 4 ms",
+   "157.1 s 967 ms: render 5 ms",
+   "163.5 s 6383 ms: texture upload \u00d78 (0.3 MB, 0 ms); buffer upload 6.3 MB (5 ms); render 17 ms",
+   "183.2 s 19733 ms: shader compile \u00d71 (0 ms); texture upload \u00d720 (0.1 MB, 0 ms); buffer upload 4.6 MB (3 ms); nest 20891 ms, ui 13 ms, render 11 ms; ant model fire_queen built for areaAnts2 (20564 ms); ant model fire_minor built for areaAnts2 (200 ms); ant model fire_major built for areaAnts2 (122 ms)",
+   "204.1 s 20916 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 6 ms",
+   "204.1 s 33 ms: texture upload \u00d72 (0.0 MB, 0 ms); buffer upload 0.0 MB (9 ms); render 20 ms, ui 4 ms",
+   "210.3 s 6116 ms: texture upload \u00d75 (0.3 MB, 0 ms); GC (heap \u221215 MB); render 51 ms, nest 7 ms"
+  ],
+  "switch": {
+   "rounds": 4,
+   "steps": [
+    {
+     "kind": "dive in",
+     "round": 0,
+     "frames": 18,
+     "worst": 21749.129999999976,
+     "over33": 7,
+     "over50": 5,
+     "causes": [
+      "17 ms: GC (heap \u221216 MB); render 27 ms",
+      "33 ms: render 11 ms, ui 5 ms",
+      "33 ms: render 10 ms",
+      "800 ms: shader compile \u00d726 (12 ms); texture upload \u00d78 (0.3 MB, 0 ms); buffer upload 6.3 MB (3 ms); render 21127 ms",
+      "21132 ms: shader compile \u00d78 (3 ms); texture upload \u00d722 (0.1 MB, 0 ms); buffer upload 4.4 MB (5 ms); nest 15799 ms, render 5934 ms; ant model lasius_queen built for areaAnts1 (15080 ms); ant model lasius_worker built for areaAnts1 (305 ms); ant model lasius_soldier built for areaAnts1 (391 ms)",
+      "21749 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 18 ms, ui 9 ms, nest 4 ms",
+      "967 ms: render 5 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 0,
+     "frames": 6,
+     "worst": 20915.830000000016,
+     "over33": 5,
+     "over50": 4,
+     "causes": [
+      "6383 ms: texture upload \u00d78 (0.3 MB, 0 ms); buffer upload 6.3 MB (5 ms); render 17 ms",
+      "19733 ms: shader compile \u00d71 (0 ms); texture upload \u00d720 (0.1 MB, 0 ms); buffer upload 4.6 MB (3 ms); nest 20891 ms, ui 13 ms, render 11 ms; ant model fire_queen built for areaAnts2 (20564 ms); ant model fire_minor built for areaAnts2 (200 ms); ant model fire_major built for areaAnts2 (122 ms)",
+      "20916 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 6 ms",
+      "33 ms: texture upload \u00d72 (0.0 MB, 0 ms); buffer upload 0.0 MB (9 ms); render 20 ms, ui 4 ms",
+      "6116 ms: texture upload \u00d75 (0.3 MB, 0 ms); GC (heap \u221215 MB); render 51 ms, nest 7 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 0,
+     "frames": 6,
+     "worst": 14549.415000000008,
+     "over33": 6,
+     "over50": 6,
+     "causes": [
+      "13033 ms: texture upload \u00d78 (0.3 MB, 0 ms); buffer upload 6.3 MB (2 ms); GC (heap \u221210 MB); render 61 ms",
+      "67 ms: texture upload \u00d718 (0.1 MB, 0 ms); buffer upload 4.4 MB (5 ms); nest 824 ms, render 14 ms; ant model lasius_queen built for areaAnts3 (371 ms); ant model lasius_worker built for areaAnts3 (255 ms); ant model lasius_soldier built for areaAnts3 (194 ms)",
+      "5183 ms: texture upload \u00d72 (0.0 MB, 0 ms); ui 16 ms",
+      "850 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 6 ms",
+      "117 ms: texture upload \u00d72 (0.0 MB, 0 ms); GC (heap \u221213 MB); render 17 ms",
+      "14549 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 6 ms, msg 5 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 0,
+     "frames": 6,
+     "worst": 15182.725000000006,
+     "over33": 6,
+     "over50": 6,
+     "causes": [
+      "117 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 9 ms",
+      "6450 ms: texture upload \u00d78 (0.1 MB, 0 ms); buffer upload 4.3 MB (3 ms); render 12 ms",
+      "15183 ms: texture upload \u00d73 (0.0 MB, 0 ms); buffer upload 0.0 MB (8 ms); render 13 ms, msg 6 ms",
+      "200 ms: render 8 ms",
+      "83 ms: render 8 ms",
+      "13949 ms: render 5 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 0,
+     "frames": 4,
+     "worst": 5483.109999999986,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "5466 ms: texture upload \u00d78 (0.1 MB, 0 ms); buffer upload 4.3 MB (3 ms); render 17 ms",
+      "5250 ms: texture upload \u00d73 (0.0 MB, 0 ms)",
+      "5483 ms: ui 12 ms",
+      "5066 ms: GC (heap \u221211 MB); render 7 ms"
+     ]
+    },
+    {
+     "kind": "dive out",
+     "round": 0,
+     "frames": 8,
+     "worst": 10699.575000000012,
+     "over33": 8,
+     "over50": 7,
+     "causes": [
+      "6666 ms: render 9 ms",
+      "5516 ms: render 8 ms",
+      "5466 ms: render 9 ms",
+      "5516 ms: shader compile \u00d73 (2 ms); texture upload \u00d710 (0.0 MB, 0 ms); buffer upload 3.0 MB (1 ms); render 5273 ms, units 517 ms; ant model fire_minor built for surfaceAnts (231 ms); ant model lasius_worker built for surfaceAnts (281 ms)",
+      "5783 ms: main thread busy (unattributed)",
+      "33 ms: outside this thread (browser, GPU or a background tab)",
+      "67 ms: GC (heap \u22129 MB); render 10 ms",
+      "10700 ms: GC (heap \u22127 MB)"
+     ]
+    },
+    {
+     "kind": "dive in",
+     "round": 1,
+     "frames": 6,
+     "worst": 9416.289999999979,
+     "over33": 6,
+     "over50": 6,
+     "causes": [
+      "5100 ms: render 11 ms, msg 4 ms",
+      "4966 ms: render 6 ms, msg 6 ms",
+      "4833 ms: render 5 ms, ui 4 ms",
+      "4766 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 7 ms",
+      "4683 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 13 ms, nest 4 ms",
+      "9416 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 4 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 1,
+     "frames": 4,
+     "worst": 15266.055000000051,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "233 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 42 ms",
+      "4783 ms: texture upload \u00d74 (0.0 MB, 0 ms); nest 7 ms, render 7 ms",
+      "15266 ms: texture upload \u00d72 (0.0 MB, 0 ms); ui 24 ms, render 11 ms",
+      "6383 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 23 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 1,
+     "frames": 5,
+     "worst": 10999.559999999998,
+     "over33": 5,
+     "over50": 5,
+     "causes": [
+      "117 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 32 ms",
+      "11000 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 47 ms",
+      "5766 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 30 ms",
+      "5700 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 38 ms",
+      "6633 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 29 ms, ui 10 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 1,
+     "frames": 4,
+     "worst": 6816.395000000019,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "6816 ms: buffer upload 0.0 MB (5 ms); render 7 ms",
+      "5800 ms: render 5 ms",
+      "6283 ms: msg 5 ms",
+      "6333 ms: main thread busy (unattributed)"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 1,
+     "frames": 5,
+     "worst": 12116.184999999998,
+     "over33": 5,
+     "over50": 4,
+     "causes": [
+      "6016 ms: render 5 ms",
+      "12116 ms: render 8 ms, ui 4 ms",
+      "50 ms: outside this thread (browser, GPU or a background tab)",
+      "6100 ms: outside this thread (browser, GPU or a background tab)",
+      "6366 ms: render 5 ms"
+     ]
+    },
+    {
+     "kind": "dive out",
+     "round": 1,
+     "frames": 7,
+     "worst": 11816.195000000007,
+     "over33": 7,
+     "over50": 7,
+     "causes": [
+      "6100 ms: outside this thread (browser, GPU or a background tab)",
+      "11816 ms: outside this thread (browser, GPU or a background tab)",
+      "5433 ms: ui 6 ms",
+      "5400 ms: render 8 ms, units 6 ms",
+      "133 ms: render 6 ms",
+      "5066 ms: render 4 ms",
+      "11700 ms: render 6 ms"
+     ]
+    },
+    {
+     "kind": "dive in",
+     "round": 2,
+     "frames": 7,
+     "worst": 8183,
+     "over33": 7,
+     "over50": 7,
+     "causes": [
+      "5483 ms: main thread busy (unattributed)",
+      "133 ms: render 12 ms, ui 7 ms",
+      "4450 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 12 ms, msg 5 ms",
+      "83 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 7 ms",
+      "8183 ms: texture upload \u00d71 (0.0 MB, 0 ms); buffer upload 0.0 MB (11 ms); render 14 ms",
+      "4566 ms: texture upload \u00d71 (0.0 MB, 0 ms)",
+      "4533 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 8 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 2,
+     "frames": 4,
+     "worst": 12416.169999999925,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "4083 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 33 ms, ui 5 ms",
+      "4283 ms: texture upload \u00d76 (0.3 MB, 0 ms); render 48 ms, nest 14 ms",
+      "6483 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 31 ms, msg 5 ms",
+      "12416 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 5 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 2,
+     "frames": 4,
+     "worst": 11716.20000000007,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "11716 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 75 ms",
+      "383 ms: texture upload \u00d76 (0.3 MB, 0 ms); render 52 ms, nest 6 ms, msg 5 ms",
+      "7083 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 30 ms, ui 9 ms, msg 5 ms",
+      "6066 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 35 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 2,
+     "frames": 4,
+     "worst": 11616.199999999953,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "667 ms: ui 5 ms",
+      "11083 ms: outside this thread (browser, GPU or a background tab)",
+      "117 ms: outside this thread (browser, GPU or a background tab)",
+      "11616 ms: outside this thread (browser, GPU or a background tab)"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 2,
+     "frames": 4,
+     "worst": 11899.525000000023,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "5766 ms: render 8 ms, msg 6 ms",
+      "83 ms: render 8 ms",
+      "5850 ms: render 7 ms",
+      "11900 ms: render 5 ms"
+     ]
+    },
+    {
+     "kind": "dive out",
+     "round": 2,
+     "frames": 8,
+     "worst": 11266.209999999963,
+     "over33": 8,
+     "over50": 8,
+     "causes": [
+      "5716 ms: msg 12 ms, render 5 ms",
+      "6050 ms: render 11 ms, msg 4 ms",
+      "100 ms: buffer upload 0.0 MB (5 ms); GC (heap \u22126 MB); render 8 ms, ui 6 ms",
+      "6133 ms: GC (heap \u22123 MB); render 8 ms, msg 6 ms",
+      "6283 ms: render 10 ms",
+      "11266 ms: render 7 ms",
+      "83 ms: main thread busy (unattributed)",
+      "5000 ms: render 9 ms, units 5 ms"
+     ]
+    },
+    {
+     "kind": "dive in",
+     "round": 3,
+     "frames": 6,
+     "worst": 8049.67499999993,
+     "over33": 6,
+     "over50": 6,
+     "causes": [
+      "5116 ms: render 7 ms",
+      "5033 ms: render 6 ms",
+      "3950 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 6 ms",
+      "4117 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 10 ms",
+      "8050 ms: texture upload \u00d71 (0.0 MB, 2 ms); render 8 ms",
+      "3700 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 7 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 3,
+     "frames": 6,
+     "worst": 16582.669999999925,
+     "over33": 6,
+     "over50": 5,
+     "causes": [
+      "83 ms: texture upload \u00d71 (0.0 MB, 0 ms); render 7 ms, msg 5 ms, ui 5 ms",
+      "3867 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 45 ms",
+      "50 ms: texture upload \u00d75 (0.0 MB, 0 ms); render 12 ms",
+      "16583 ms: texture upload \u00d76 (0.3 MB, 0 ms); render 34 ms",
+      "6066 ms: texture upload \u00d76 (0.3 MB, 0 ms); render 26 ms",
+      "5700 ms: texture upload \u00d76 (0.3 MB, 0 ms); render 35 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 3,
+     "frames": 4,
+     "worst": 7049.7200000000885,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "6200 ms: texture upload \u00d75 (0.3 MB, 0 ms); render 42 ms, ui 6 ms",
+      "6583 ms: texture upload \u00d74 (0.0 MB, 0 ms); render 8 ms, ui 7 ms",
+      "150 ms: texture upload \u00d72 (0.0 MB, 0 ms); render 8 ms",
+      "7050 ms: texture upload \u00d74 (0.0 MB, 0 ms); render 6 ms"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 3,
+     "frames": 5,
+     "worst": 11632.86499999999,
+     "over33": 5,
+     "over50": 5,
+     "causes": [
+      "5433 ms: render 5 ms",
+      "5833 ms: render 5 ms",
+      "11633 ms: render 7 ms, ui 4 ms",
+      "83 ms: render 6 ms, msg 5 ms",
+      "5933 ms: outside this thread (browser, GPU or a background tab)"
+     ]
+    },
+    {
+     "kind": "area",
+     "round": 3,
+     "frames": 4,
+     "worst": 6216.415000000037,
+     "over33": 4,
+     "over50": 4,
+     "causes": [
+      "5783 ms: render 10 ms",
+      "6066 ms: render 5 ms",
+      "6216 ms: msg 6 ms",
+      "6000 ms: main thread busy (unattributed)"
+     ]
+    },
+    {
+     "kind": "dive out",
+     "round": 3,
+     "frames": 7,
+     "worst": 10499.584999999963,
+     "over33": 7,
+     "over50": 7,
+     "causes": [
+      "6366 ms: outside this thread (browser, GPU or a background tab)",
+      "5900 ms: render 9 ms",
+      "6150 ms: render 5 ms",
+      "6033 ms: units 6 ms, render 5 ms",
+      "10500 ms: units 5 ms, render 5 ms",
+      "183 ms: ui 4 ms",
+      "5266 ms: outside this thread (browser, GPU or a background tab)"
+     ]
+    }
+   ]
+  }
+ },
+ {
+  "id": "fight",
+  "title": "Big fight (4 \u00d7 200 ants, 100 creatures, 2 titans)",
+  "loadMs": 166358,
+  "secs": 15,
+  "frames": 1,
+  "fps": 59.9,
+  "frameAvg": 16.7,
+  "p95": 16.7,
+  "worst": 17,
+  "over33": 0,
+  "over50": 0,
+  "cpuAvg": 61.07,
+  "parts": {
+   "sim": 0,
+   "msg": 0,
+   "units": 27.28,
+   "creatures": 15.64,
+   "nest": 0,
+   "fx": 0.07,
+   "ui": 0.54,
+   "render": 16.34,
+   "prewarm": 0
+  },
+  "gpuAvg": 13595.83,
+  "calls": 1,
+  "tris": 1,
+  "programs": 55,
+  "textures": 75,
+  "geometries": 115,
+  "heapMB": 284,
+  "tickMs": 0,
+  "msgKB": 0,
+  "glLinks": 0,
+  "glUploads": 0,
+  "quality": "medium",
+  "ants": 889,
+  "creatures": 102,
+  "hitches": [
+   "167.9 s 17 ms: units 27 ms, render 16 ms, creatures 16 ms"
+  ]
+ },
+ {
+  "id": "nest",
+  "title": "Full nest",
+  "loadMs": 119911,
+  "secs": 15,
+  "frames": 1,
+  "fps": 59.9,
+  "frameAvg": 16.7,
+  "p95": 16.7,
+  "worst": 17,
+  "over33": 0,
+  "over50": 0,
+  "cpuAvg": 100.82,
+  "parts": {
+   "sim": 0,
+   "msg": 0,
+   "units": 0,
+   "creatures": 0,
+   "nest": 12.15,
+   "fx": 0.12,
+   "ui": 0.64,
+   "render": 40.09,
+   "prewarm": 0
+  },
+  "gpuAvg": 8840.24,
+  "calls": 1,
+  "tris": 1,
+  "programs": 56,
+  "textures": 51,
+  "geometries": 110,
+  "heapMB": 141,
+  "tickMs": 0,
+  "msgKB": 0,
+  "glLinks": 0,
+  "glUploads": 3,
+  "quality": "medium",
+  "ants": 889,
+  "creatures": 40,
+  "hitches": [
+   "122.5 s 17 ms: texture upload \u00d73 (0.0 MB, 0 ms); render 40 ms, nest 12 ms"
+  ]
+ },
+ {
+  "id": "story",
+  "title": "Story: The Long Nights, last night",
+  "loadMs": 120075,
+  "secs": 15,
+  "frames": 17,
+  "fps": 2.7,
+  "frameAvg": 365.67,
+  "p95": 5849.8,
+  "worst": 5850,
+  "over33": 4,
+  "over50": 2,
+  "cpuAvg": 22.64,
+  "parts": {
+   "sim": 0,
+   "msg": 0.06,
+   "units": 1.53,
+   "creatures": 0.94,
+   "nest": 0,
+   "fx": 0.13,
+   "ui": 1.65,
+   "render": 7.19,
+   "prewarm": 0
+  },
+  "gpuAvg": null,
+  "calls": 1,
+  "tris": 1,
+  "programs": 50,
+  "textures": 35,
+  "geometries": 61,
+  "heapMB": 110,
+  "tickMs": 3.63,
+  "msgKB": 36,
+  "glLinks": 0,
+  "glUploads": 0,
+  "quality": "medium",
+  "ants": 13,
+  "creatures": 0,
+  "hitches": [
+   "114.4 s 17 ms: render 16 ms",
+   "114.5 s 33 ms: render 8 ms, units 6 ms",
+   "114.5 s 17 ms: render 10 ms, ui 5 ms",
+   "114.6 s 33 ms: render 5 ms, creatures 5 ms",
+   "114.7 s 83 ms: render 7 ms",
+   "120.6 s 5850 ms: render 11 ms"
+  ]
+ },
+ {
+  "id": "arena",
+  "title": "Battle arena, 600 units",
+  "loadMs": 176771,
+  "secs": 15,
+  "frames": 4,
+  "fps": 0.5,
+  "frameAvg": 2016.59,
+  "p95": 7966.3,
+  "worst": 7966,
+  "over33": 3,
+  "over50": 1,
+  "cpuAvg": 45.13,
+  "parts": {
+   "sim": 0,
+   "msg": 6.44,
+   "units": 16.03,
+   "creatures": 0.04,
+   "nest": 0,
+   "fx": 0.04,
+   "ui": 0.39,
+   "render": 15.1,
+   "prewarm": 0
+  },
+  "gpuAvg": null,
+  "calls": 1,
+  "tris": 1,
+  "programs": 49,
+  "textures": 58,
+  "geometries": 83,
+  "heapMB": 91,
+  "tickMs": 6.86,
+  "msgKB": 85,
+  "glLinks": 1,
+  "glUploads": 17,
+  "quality": "medium",
+  "ants": 302,
+  "creatures": 0,
+  "hitches": [
+   "98.7 s 17 ms: shader compile \u00d71 (0 ms); texture upload \u00d76 (0.1 MB, 0 ms); render 20 ms, units 17 ms",
+   "98.7 s 50 ms: texture upload \u00d73 (0.0 MB, 0 ms); render 16 ms, msg 5 ms",
+   "98.8 s 33 ms: texture upload \u00d73 (0.0 MB, 0 ms); GC (heap \u221229 MB); units 23 ms, render 18 ms",
+   "106.7 s 7966 ms: texture upload \u00d75 (0.1 MB, 0 ms); GC (heap \u221223 MB); units 21 ms, msg 20 ms, render 7 ms"
+  ]
+ },
+ {
+  "id": "mp4",
+  "title": "Multiplayer-sized world (4 colonies, authored map)",
+  "loadMs": 264088,
+  "secs": 15,
+  "frames": 9,
+  "fps": 49.1,
+  "frameAvg": 20.37,
+  "p95": 50,
+  "worst": 50,
+  "over33": 1,
+  "over50": 0,
+  "cpuAvg": 18.12,
+  "parts": {
+   "sim": 0,
+   "msg": 0,
+   "units": 1.25,
+   "creatures": 0.26,
+   "nest": 0,
+   "fx": 0.16,
+   "ui": 1.45,
+   "render": 5.61,
+   "prewarm": 0
+  },
+  "gpuAvg": null,
+  "calls": 1,
+  "tris": 1,
+  "programs": 52,
+  "textures": 34,
+  "geometries": 74,
+  "heapMB": 138,
+  "tickMs": 0,
+  "msgKB": 0,
+  "glLinks": 1,
+  "glUploads": 0,
+  "quality": "medium",
+  "ants": 77,
+  "creatures": 0,
+  "hitches": [
+   "116.2 s 17 ms: GC (heap \u22125 MB); render 7 ms",
+   "116.3 s 50 ms: render 7 ms"
+  ]
+ }
+]
