@@ -44,9 +44,10 @@ export const CARTON_KINGDOM_LEVEL: StoryLevelDef = {
   ],
   rivals: {
     // (developed 3, 10 workers and 30 at most fell in 15 minutes at a person's pace, 2026-11-03: two mature carton
-    // colonies now, each bigger than the colony at the start)
-    north: { species: 'nasutitermes', site: 1, name: 'Conehead termites (north)', developed: 6, startWorkers: 18, popLimit: 70, team: 1, income: 0.8 },
-    east: { species: 'nasutitermes', site: 2, name: 'Conehead termites (east)', developed: 6, startWorkers: 18, popLimit: 70, team: 1, income: 0.8 },
+    // colonies now, each bigger than the colony at the start; their income 0.6 food a second, 0.8 until 2026-11-06, when
+    // a person-paced colony was overrun at their nests on Normal to Brutal on one seed of two)
+    north: { species: 'nasutitermes', site: 1, name: 'Conehead termites (north)', developed: 6, startWorkers: 18, popLimit: 70, team: 1, income: 0.6 },
+    east: { species: 'nasutitermes', site: 2, name: 'Conehead termites (east)', developed: 6, startWorkers: 18, popLimit: 70, team: 1, income: 0.6 },
   },
   creatures: 0,
   aphids: 3,
@@ -125,14 +126,15 @@ export const CARTON_KINGDOM_LEVEL: StoryLevelDef = {
       ],
       say: [
         { key: 'answer1', at: 3 },
-        { key: 'answer2', at: 140 },
+        { key: 'answer2', at: 220 },
         { key: 'answer3', at: 250 },
       ],
       events: [
         { actions: [{ do: 'music', mood: 'assault' }] },
         { at: 12, actions: [{ do: 'raid', rival: 'north' }] },
         { at: 25, actions: [{ do: 'tip', key: 'termiteRaid' }] },
-        { at: 140, actions: [{ do: 'raid', rival: 'east' }] },
+        // (the east colony once the north's raid is over: both at once wiped out a person-paced colony on Hard)
+        { at: 220, actions: [{ do: 'raid', rival: 'east' }] },
       ],
     },
     {

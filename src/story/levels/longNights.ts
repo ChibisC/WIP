@@ -67,8 +67,9 @@ export const LONG_NIGHTS_LEVEL: StoryLevelDef = {
     night4e: { creatures: [['wolfSpider', 1], ['lithobius', 1], ['groundBeetle', 1]], from: ['lairE', 'lairSE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, label: 'the fourth night’s hunters' },
     // (0.7 → 0.6 with the fourth night, 2026-11-03: at a person's pace the bot lost Hard and Brutal to it on the last night)
     // (inside the nest, until dawn: softer on the queen as the difficulty's armies are thinner by the last night —
-    // claude/story/05-spec §3)
-    tarantula: { creature: 'tarantula', at: 'tarantulaBurrow', face: 'knollFoot', spawn: 'action', hp: 0.6, phases: [0.5], label: 'the red-knee tarantula', inside: { bite: { easy: 0.85, normal: 0.85, hard: 0.8, brutal: 0.75 }, queenBite: { easy: 0.4, normal: 0.5, hard: 0.55, brutal: 0.6 } } },
+    // claude/story/05-spec §3; softer still on Hard and Brutal since the fourth night, 2026-11-06: a person-paced
+    // colony lost its queen to it a minute before the last dawn)
+    tarantula: { creature: 'tarantula', at: 'tarantulaBurrow', face: 'knollFoot', spawn: 'action', hp: 0.6, phases: [0.5], label: 'the red-knee tarantula', inside: { bite: { easy: 0.85, normal: 0.85, hard: 0.7, brutal: 0.65 }, queenBite: { easy: 0.4, normal: 0.5, hard: 0.4, brutal: 0.4 } } },
     ...EV.actors,
   },
   surprises: EV.surprises,
@@ -195,13 +196,14 @@ export const LONG_NIGHTS_LEVEL: StoryLevelDef = {
         { actor: 'night3e', cues: [{ mode: 'passive' }, { leave: 'nest' }] },
         { actor: 'night4n', on: 'night:4', cues: [{ charge: 'rampNorthTop', timeout: 90 }, { guard: 'rampNorthTop', r: 80 }] },
         { actor: 'night4e', on: 'night:4', cues: [{ charge: 'rampEastTop', timeout: 90 }, { guard: 'rampEastTop', r: 80 }] },
-        // the titan of the last night: out of its burrow on the knoll, down to the hollow without stopping to fight (an
+        // the titan of the last night: out of its burrow on the knoll 40 s into the night (4 until 2026-11-06: in the
+        // fourth night's worn colony it killed the queen seconds before dawn on Brutal), down to the hollow without stopping to fight (an
         // army on its way slows it, never stops it: claude/story/05-spec), then into the nest — every time (it can't die
         // before it is in; the dig can't be stalled); in the nest it fights what it meets until dawn
         {
           actor: 'tarantula',
           on: 'night:4',
-          cues: [{ face: 'knollFoot' }, { wait: 4 }, { flag: 'tarantulaOut' }, { mode: 'passive' }, { path: 'tarantulaWay', speed: 1.6, timeout: 100 }, { mode: 'aggressive' }, { flag: 'tarantulaDigs' }, { digInto: 'player', flag: 'tarantulaIn' }, { release: true }],
+          cues: [{ face: 'knollFoot' }, { wait: 40 }, { flag: 'tarantulaOut' }, { mode: 'passive' }, { path: 'tarantulaWay', speed: 1.6, timeout: 100 }, { mode: 'aggressive' }, { flag: 'tarantulaDigs' }, { digInto: 'player', flag: 'tarantulaIn' }, { release: true }],
         },
       ],
     },

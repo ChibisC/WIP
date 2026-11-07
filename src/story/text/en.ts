@@ -21,6 +21,8 @@ export const EN: Record<string, string> = {
   'garden.genes1': "Now I see what she does with the dead. Her workers carry Lasius corpses into the stores, and the colony keeps more than the meat.",
   'garden.aphids': 'Up on the flowerbed the garden ants keep aphids, stroking them for sugary honeydew and driving off the ladybirds that hunt them.',
   'garden.genes2': 'Her newest brood are not hers at all: black garden ant soldiers, big-headed and strong, raised in a stranger’s nest.',
+  'garden.answer1': 'The garden colony has noticed what we took. Soldiers are gathering on the stone steps.',
+  'garden.answer2': 'More of them, coming down from the flowerbed. Hold the nest: every one that falls here is one fewer at their door.',
   'garden.raid1': 'The garden colony has noticed her. Lasius defend their aphids and their nest hard.',
   'garden.flank': 'The stone steps are watched. At the far end of the flowerbed the bank has slumped into a narrower way up.',
   'garden.queenFact': 'A Lasius niger queen can live for decades; one kept by a German entomologist lived nearly twenty-nine years.',

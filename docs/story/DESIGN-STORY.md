@@ -112,7 +112,8 @@ its far east end (the flank; a caption hints at it). No dangerous creatures (the
 | 1 Landfall | raise 10 workers, 2 worker brood tiles, a food store, gather 60 food, store 8 wood | opening flight (Lasius nest → meadow → the shore); the castaway queen walks from the puddle into her nest; a ground beetle walks the shore, stops and watches her, then leaves the map; the cutworm patrols by the fruit; Lasius workers tend the aphids (drumming, trophallaxis poses); tips: dig, tiles, foraging, wood, ramps |
 | 2 First contact | kill 4 black garden ants, raise 18 ants | two Lasius scouts walk down the stone steps, stop at the edge of the player's ground, antennate, walk back up (then the normal AI) |
 | 3 Stolen genes | steal the Black Garden Ant Soldier, raise 3 | captions on what she does with the dead, aphid farming, the soldier's arrival |
-| 4 Raid the garden | take the aphid plants (8 ants), kill the black garden ant queen | rival raids allowed; the flank hint; the long-lived queen fact |
+| 4 The garden answers | hold the nest (Easy 5 min, else 6); raise 30 (optional) | added 2026-11-06 (at a person's pace the level ran 22–27 min on Normal once the playtest bot was fixed; it had looked over 50 because the bot kept chasing a goal it had met): two Lasius parties (2 soldiers, 4 workers × the difficulty's `wave`) at the nest, from the stone steps at once and down the flowerbed 2½ min later |
+| 5 Raid the garden | take the aphid plants (8 ants), kill the black garden ant queen | rival raids allowed; the flank hint; the long-lived queen fact |
 | level-wide | — | at 10 min: the first Lasius raid (2 soldiers, 5 workers; a wave) gathers on the steps, charges the nest, guards, goes home |
 
 Medals: time gold ≤ 20 min, silver ≤ 32; losses gold ≤ 25, silver ≤ 60; bonus "steal the Black Garden Ant Soldier before
