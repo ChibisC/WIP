@@ -1821,6 +1821,7 @@ User (2026-11-06): "a weird protruding thing in front of the stag beetles, at th
   smaller males (sizes 0–3) exist only in the labs (`msize`) until `feature/stag-sizes` lands — fixed there too.
 - New: `tools/creature-hash.ts` (save/check/dump creature-model fingerprints, like `morph-hash.ts` for ants) with
   the baseline `tests/data/creature-hashes.json`.
+
 ## 2026-11-07 — Performance pass: faster in every mode, smooth switching, no loss of looks
 User spec `claude/performance/01-spec-performance-no-visual-loss.md` (branch `feature/performance`). Plan and as-built:
 `CHANGE_PLAN.md` §25; numbers, findings and what was not done: `docs/performance.md`; golden set:
