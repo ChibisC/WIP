@@ -261,8 +261,10 @@ their carton nests and covered galleries. No fallen-leaf dressing (user rule).
 
 | Stage | Objectives | Scenes and set pieces |
 |---|---|---|
-| The forest's edge | raise 35, gather 200; store 20 wood (optional) | opening flight (the trunks → the termite shelf → the colony); captions on carton and the galleries; tip: the allies |
-| The nasus | steal the Conehead Termite Sprayer (`nasute_soldier`), raise 4 | a shower fills the hollow, then the termites' winged alates come out (fallen alates: food); tips on the genes |
+| The forest's edge | raise 60, gather 300, store 30 wood (35, 200 and optional wood until 2026-11-06: over in 2–3 min at a person's pace) | opening flight (the trunks → the termite shelf → the colony); captions on carton and the galleries; tip: the allies |
+| The nasus | steal the Conehead Termite Sprayer (`nasute_soldier`), raise 3 | four foraging parties, from each colony in turn (at ½, 2½, 4⅔ and 7 min: 6 workers and 3 Sprayers walking to the hollow, foraging there 2½ min, going home: the Sprayers to steal come out — when none did the stage could go on for an hour); a shower fills the hollow, then the termites' winged alates come out (fallen alates: food); tips on the genes |
+| The termites answer | hold out (Easy 5½ min, Normal 6, Hard 6½, Brutal 7); kill 25 termites (optional) | added 2026-11-06: both colonies raid the nest, the north colony at once and the east 2⅓ min later (`raid`); tip: keep the soldiers together at the doorway |
+| Before the assault | 40 fighters | added 2026-11-06: an army before the nests (a stage holding the shelf between the two nests, with both colonies raiding, wiped out a person-paced colony and was dropped); two more foraging parties |
 | The first nest | destroy one of the two colonies (either) | rival raids; the other comes to help |
 | The second nest | destroy the other | — |
 
