@@ -854,7 +854,8 @@ function tendAphids(w: World, c: Colony, ox: number, oy: number, foraging: Colon
  * only while there are no nest jobs and the stores are low.
  */
 export function forageTick(w: World, c: Colony, dt: number): void {
-  if (!c.alive) return;
+  // (all-out, sim/nestFlood.ts forceAllOut: the workers have gone to war; warAI keeps the forage marker down)
+  if (!c.alive || c.aiWar?.allOut) return;
   const b = forageBrain(c);
   b.t -= dt;
   b.age += dt;

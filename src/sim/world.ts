@@ -6,6 +6,7 @@ import { NestGrid } from '../world/nestGrid';
 import { NestFlow, SurfaceFlow } from './flow';
 import { Pheromones } from './pheromones';
 import { SpatialHash } from './spatial';
+import type { FloodCache } from './nestFlood';
 import { Ant, AphidCluster, Brood, CaveDef, Colony, Creature, Entrance, Food, LeafPlant, SimState, SURFACE, colonyOfSpace, nestSpace, isCaveSpace, Projectile } from './types';
 
 /**
@@ -43,6 +44,11 @@ export class World {
     /** sickle-jaw lunges this tick: victim key → the lunging soldier (sickleJaws.ts) */
     lunging: { tick: -1, map: new Map<number, number>() },
   };
+  /**
+   * Nest floods (nestFlood.ts), per nest space: the fill plan (each hex's depth along the tunnels, the fill order) and the
+   * mask of hexes under water — caches of the grid and `Colony.nestFlood`, rebuilt when those change, never saved.
+   */
+  readonly floodCache = new Map<number, FloodCache>();
   foodById = new Map<number, Food>();
   broodById = new Map<number, Brood>();
   creatureById = new Map<number, Creature>();

@@ -15,6 +15,7 @@ import { warTick } from './warAI';
 import { dcos, dhypot, dsin, sq } from './dmath';
 import { digFlower, entranceTick, flowerOver, placeHoles } from './entrances';
 import { foodFull, storeNotice, storesFull } from './stores';
+import { isHexFlooded, queenHexBlocked } from './nestFlood';
 
 /** Nest plane size in hexes (the same for every species; hex radius scales instead). */
 export const NEST_COLS = 34;
@@ -428,7 +429,8 @@ export function onAntDied(w: World, a: Ant): void {
 function queenLay(w: World, c: Colony, dt: number): void {
   for (const t of c.tiles) if (t.wait > 0) t.wait -= dt;
   const q = w.antById.get(c.queen);
-  c.eggs = q && q.state !== AS.Dead ? BALANCE.eggPileMax : 0;
+  // (a queen under water lays nothing: sim/nestFlood.ts)
+  c.eggs = q && q.state !== AS.Dead && !queenHexBlocked(w, c) ? BALANCE.eggPileMax : 0;
   void dt;
 }
 
@@ -476,6 +478,8 @@ function failsafe(w: World, c: Colony, dt: number): void {
   if (c.workers > 0 || c.food >= 1 || c.failsafeT > 0) return;
   const q = w.antById.get(c.queen);
   if (!q || q.state === AS.Dead) return;
+  // (not into a flooding queen's chamber: sim/nestFlood.ts)
+  if (queenHexBlocked(w, c)) return;
   const t = c.tiles.find((x) => x.type === 'queen' && tileAnts(w, x).length < tileCapacity(x)) ?? c.tiles.find((x) => x.type === 'queen');
   if (!t) return;
   c.failsafeT = BALANCE.failsafeEvery;
@@ -505,7 +509,9 @@ function fungusFarm(w: World, c: Colony, dt: number): void {
 /** Root-aphid pastures (Lasius) trickle honeydew; tended by nurses in the nest. */
 function aphidPastures(w: World, c: Colony, dt: number): void {
   let n = 0;
-  for (const t of c.tiles) if (t.type === 'aphid') n += 1 + 0.25 * (t.level - 1);
+  // (a pasture under water gives nothing: sim/nestFlood.ts)
+  const wet = !!c.nestFlood?.q.length;
+  for (const t of c.tiles) if (t.type === 'aphid' && !(wet && isHexFlooded(w, c.id, t.q))) n += 1 + 0.25 * (t.level - 1);
   if (n > 0) c.food = Math.min(c.foodCap, c.food + n * 0.08 * dt);
 }
 
@@ -670,7 +676,7 @@ export function colonySystem(w: World, dt: number): void {
       buildTick(w, c, dt);
       forageTick(w, c, dt);
       warTick(w, c, dt);
-    }
+    } else if (c.aiWar?.allOut) warTick(w, c, dt); // (forceAllOut on a colony without the AI: its groups still go)
     if (w.s.tick % 20 === 0) {
       updateFlowCosts(w, c);
       auditTiles(w, c);

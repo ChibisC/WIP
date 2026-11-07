@@ -177,6 +177,15 @@ export class Minimaps {
         ctx.stroke();
       }
     }
+    // a flooding nest (sim/nestFlood.ts): the hexes under water in a muddy blue
+    if (c?.nestFlood?.q.length) {
+      ctx.fillStyle = 'rgba(78,108,132,0.7)';
+      for (const q of c.nestFlood.q) {
+        g.hexCenter(q, p);
+        hex(p.x * k, p.y * k, g.R * k * 1.0);
+        ctx.fill();
+      }
+    }
     // the way up to the surface: one arrow on the entrance (a nest's wide flower, a cave's tunnel; grey once caved in)
     const ents = w.entrancesOf(space);
     g.entrances.forEach((q, i) => {

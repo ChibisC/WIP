@@ -21,6 +21,8 @@ import { MARKER_COLORS, markerRadius } from '../sim/markers';
 import { groupById, raisesAnts } from '../sim/tiles';
 import { antToView, blankView, corpseToView, termiteBroodToView } from './antViews';
 import { casteColour, casteLook } from '../render/casteLook';
+import { NestWater } from '../render/nest/nestWater';
+import { floodCache } from '../sim/nestFlood';
 
 /** Colour of a caste's brood tile and UI (render/casteLook: every caste its own colour and texture). */
 export function casteTint(caste: string): THREE.Color {
@@ -57,6 +59,8 @@ export class NestView {
   private floorHeight: (x: number, z: number) => number;
   private hexKey = '';
   private views: AntView[] = [];
+  /** the water of a flooding nest (sim/nestFlood.ts), made when the owner's nest first floods */
+  private water: NestWater | null = null;
 
   constructor(
     view: GameView,
@@ -171,6 +175,14 @@ export class NestView {
       this.decor.update(w, owner);
     }
     const nt = this.stage.terrain;
+    // a flooding nest: the river water standing in it and pouring in at the entrance
+    if (owner?.nestFlood) {
+      if (!this.water) {
+        this.water = new NestWater(w.nestOf(this.space)!, nt);
+        this.stage.scene.add(this.water.mesh);
+      }
+      this.water.update(owner.nestFlood, floodCache(w, owner), w.s.time - (1 - alpha) / BALANCE.tickHz);
+    } else this.water?.update(undefined, null, 0);
     this.markers.update(shown, this.space, (x, y) => nt.heightAt(x, y), camDist, (i) => markerRadius(w, player, i), markerSel, time);
     if (owner) this.updateRings(w, owner, owner === player ? pendingHexes : [], time);
     else this.rings.set([]);

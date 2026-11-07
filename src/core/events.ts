@@ -55,6 +55,8 @@ export type SimEvent =
   | { t: 'queenHurt'; colony: number }
   /** a flood zone's storm: warning, rising water or draining (sound, sky and minimap only) */
   | { t: 'flood'; zone: number; phase: 'warn' | 'rise' | 'drain'; x: number; y: number }
+  /** a colony's nest floods (sim/nestFlood.ts): the water starts pouring in, or the nest is full; x, y its anthill on the surface */
+  | { t: 'nestFlood'; colony: number; phase: 'start' | 'full'; x: number; y: number }
   | { t: 'queenDead'; colony: number }
   | { t: 'colonyLost'; colony: number }
   | { t: 'food'; colony: number; amount: number }
