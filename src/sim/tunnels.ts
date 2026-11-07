@@ -692,7 +692,8 @@ function layHalf(w: World, c: Colony, o: Colony, id: number, taken: readonly num
 export function upgradeWorldTunnels(w: World): void {
   const m = TUNNELS.margin;
   let changed = false;
-  for (const c of w.s.colonies) {
+  // (only saves from before version 4: a story's visitor colony has a margin-less grid of its own by design)
+  for (const c of w.loadedVersion < 4 ? w.s.colonies : []) {
     const space = nestSpace(c.id);
     const g = w.nest(c.id);
     // (a visiting party's nest plane has no margin on purpose — colony.ts — and is not an old save's)
