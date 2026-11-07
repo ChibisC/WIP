@@ -953,6 +953,11 @@ sprays"; "fix the antennae and mandibles, they are misplaced" (soldiers); "fix t
   (`headSurf`): the sockets on the bulb's sides, low, in front of its middle; the mandibles under the nasus base.
 - The worker's mandibles: broad toothed blades (wide to two thirds of their length), satin rather than glossy.
 
+### 22.9 The user's ratings, round 4 (2026-11-03, 00:47): approved with one change
+Every item 8 (models, worker attacks, the sprayer's glue, the soldier's crush, bulldoze, toss and drum); decision
+"approve with changes". The change (K4): the soldier drums "while walking when approaching enemies" — in bursts
+(0.6 s every 1.5 s) while it walks or charges at a foe (`antViews.drumWalking`), the head only, the walk going on.
+
 ## 25. Performance pass — faster in every mode, smooth surface ↔ underground switching, no loss of looks (user spec 2026-11-02, claude/performance/01-spec-performance-no-visual-loss.md)
 Branch `feature/performance` from `main` (`18d3d79`). Render, client and worker-message work only: the simulation's
 results never change (the determinism check, replays and every suite prove it).
