@@ -17,6 +17,8 @@ import { Ant, AphidCluster, Brood, CaveDef, Colony, Creature, Entrance, Food, Le
  */
 export class World {
   s: SimState;
+  /** the state's version as it was loaded, before the upgrades below bump it (a fresh world: the current version) */
+  loadedVersion: number;
   rng: Rng;
   events: EventBus;
   terrain: Terrain;
@@ -107,9 +109,12 @@ export class World {
           .replace(/gene[ -]?thie(f|ves)/gi, (m) => (m[0] === 'G' ? 'Mimic Ant' : 'mimic ant') + (/ves$/i.test(m) ? 's' : ''));
     // version 4 (2026-11-06): the shared underground — rock margins round every nest and tunnel routes between them
     // (sim/tunnels.ts; a binary snapshot attaches its grids after this, and restoreWorld upgrades it then)
+    // (only states saved before it: a version-4 state can hold grids without a margin on purpose — the nestless garden
+    // column's — and embedding them on load made a restored snapshot diverge, tests/storyEvents.ts)
+    this.loadedVersion = state.version ?? 1;
     state.version = Math.max(4, state.version ?? 1);
     this.reindex();
-    if (this.grids.size) upgradeWorldTunnels(this);
+    if (this.grids.size && this.loadedVersion < 4) upgradeWorldTunnels(this);
   }
 
   get time(): number {
