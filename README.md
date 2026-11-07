@@ -223,7 +223,6 @@ npx vite-node tools/duels.ts -- ant:lasius_worker 60 ant:fire_soldier 60 20   # 
 npx vite-node tools/spin-check.ts                                   # 50 v 50 spinning, 30 ants on a beetle, tunnel flow
 npx vite-node tools/climb-stress.ts -- 40 400                       # 4 titans with full riders + a 400 v 400 clash: tick time with and without mounting
 npx vite-node tools/chain-check.ts                                  # centipede / caterpillar bodies: neck and joint bends, body vs hitbox
-npx vite-node tools/sickle-guard.ts -- 24 12 5                       # the sickle-jaw guard line along the workers' route
 npx vite-node tools/eciton-raid.ts -- 40 8 5 8 120 5 1               # army-ant raid numbers: front, pulses, lanes, porters, posts, bridge, plugs [puddle=1]
 npx vite-node tools/morph-hash.ts -- check tests/data/morph-hashes.json   # ant model geometry unchanged (save <file> for a new baseline)
 npx vite-node tools/climb-data.ts                                   # re-author climbing points, rails, weak points and mount slots from the creature models

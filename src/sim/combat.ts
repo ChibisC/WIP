@@ -10,7 +10,7 @@ import { killAnt, releaseGrapple } from './antAI';
 import { dropCarried, setTask } from './colony';
 import { abilityMods } from './abilities';
 import { datan2, dcos, dhypot, dsin, hash01, sq } from './dmath';
-import { BALANCE, GUARD, SICKLE, LAYERS } from './balance';
+import { BALANCE, GUARD, LAYERS } from './balance';
 import { glueBurst, majorAlarm, majorCharge, nasuteAttack, acquireInRange } from './termites';
 import { startSurge, surging } from './surge';
 import { hellUpdate, isHellState, release, snapEligible, startHunt } from './hellAnts';
@@ -343,8 +343,6 @@ function aggroRadius(w: World, a: Ant, c: Colony): number {
   let r = a.space === SURFACE ? (fighter ? 34 : 9) : fighter ? 22 : 8;
   if (a.alarm > 0.3) r = Math.max(r, a.space === SURFACE ? 26 : 18);
   if (a.task === 'marker') r = Math.max(r, 30);
-  // sickle-jaws guarding a trail are short-ranged: they take on what comes near the column, not what passes by
-  if (cd.termite === 'sickle' && a.task === 'marker' && a.state === AS.Rally) r = Math.min(r, SICKLE.escort.aggroBodyLengths * cd.length);
   // army-ant Soldiers at their trail posts rush what comes near the column (eciton.ts)
   if (cd.hook && a.task === 'marker' && a.state === AS.Guard) r = guardRush(a);
   // shooters see (and engage) as far as they can spray

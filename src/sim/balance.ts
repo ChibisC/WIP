@@ -886,16 +886,6 @@ export const SICKLE = {
     freeTargetBiteInterval: 1.0,
   },
   alarm: { radiusBodyLengths: 12, alertSec: 8, cooldownSec: 3 },
-  /**
-   * Eisner's defensive row (user notes 2026-10-25: along the trail the workers really walk, wide enough that they
-   * stay inside it, spare soldiers spread along it): at a surface marker the guards stand on both sides of the
-   * workers' route from the marker back to the nest (the home flow field traced from the marker, refreshed every
-   * `trailRefreshSec`), `halfWidthBodyLengths` out from it, evenly spread over its whole length (at least
-   * `minSpacingBodyLengths` apart; more soldiers than fit stand in further rows `rowGapBodyLengths` out), facing
-   * outward. On a marker with food, `guardShare` of the sickle-jaws there guard (the lowest ids) and the rest
-   * gather; with no food, all guard. Guards only engage enemies within `aggroBodyLengths` (short-ranged fighters).
-   */
-  escort: { halfWidthBodyLengths: 3.5, minSpacingBodyLengths: 1.6, rowGapBodyLengths: 1.6, guardShare: 0.5, trailStepMm: 4, trailRefreshSec: 2, aggroBodyLengths: 3 },
   food: {
     /** plant matter: 1 unit = 1 food unit of the ant economy (the store shared with the Nasute Termites' wood) */
     leafLitterPatch: { amount: 25, bitesPerFragment: 3, biteIntervalSec: 0.3, perFragment: 1 },

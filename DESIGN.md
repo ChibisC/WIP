@@ -660,7 +660,7 @@ Built from the user's package `claude/sickle-jaw-termites/` (model kit v2.1, use
 
 | Marker use | Workers | Soldiers |
 |---|---|---|
-| Gather (a marker on leaf litter or wood) | chew the sources round the marker, open columns | half of them (the lowest ids; all of them when there is no food in reach) form **Eisner's defensive row** along the route the workers really walk: the colony's home flow field traced from the marker to the nest (`sickleTrail`, refreshed every 2 s), guards on both sides 3.5 soldier lengths (16 mm) out, spread evenly over the whole route (at least 1.6 lengths apart, further rows 1.6 lengths out when they don't fit), a post on rock or water moved in toward the route, facing outward (THREAT); they walk to far posts along the route. The others gather. Guards engage only enemies within 3 body lengths. (User notes 2026-10-25: the row was one thin straight line the workers walked outside, spare soldiers piled up at the entrance, and they fought from too far.) |
+| Gather (a marker on leaf litter or wood) | chew the sources round the marker, open columns | gather there like other species' soldiers; with nothing to gather in reach they hold the escort ring round the work area (the nasutes' ring, facing outward with the sickles agape: THREAT) and fight what comes. (Spec 09 §2.4, user 2026-11-03: the defensive rows along the route — Eisner's row, `sickleTrail`, the guard posts — are gone.) |
 | Attack | follow and fight like ant workers | advance; lunge at grabbable enemies one by one; bite and squirt the big ones |
 | Defend | — | the row (in the nest: a ring round the marker); rush on the alarm |
 | Recall | home | home (a holding soldier finishes its hold first: holds ignore orders) |

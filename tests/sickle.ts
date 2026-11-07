@@ -6,7 +6,7 @@
  *   npx vite-node tests/sickle.ts
  */
 import { EventBus, SimEvent } from '../src/core/events';
-import { createWorld } from '../src/sim/mapGen';
+import { createWorld, placeLitter } from '../src/sim/mapGen';
 import { World } from '../src/sim/world';
 import { Ant, AS, SURFACE, nestSpace } from '../src/sim/types';
 import { makeAnt } from '../src/sim/factory';
@@ -16,8 +16,8 @@ import { SICKLE } from '../src/sim/balance';
 import { CASTES, casteOf } from '../src/sim/species';
 import { hashState } from '../src/sim/snapshot';
 import { LUNGE_TICKS, sickleRampDamage, sickleRampTotal } from '../src/sim/sickleJaws';
-import { assignGroup, placeMarker } from '../src/sim/markers';
-import { guardScene } from '../tools/sickleGuardScene';
+import { assignGroup, placeMarker, markerRadius } from '../src/sim/markers';
+import { Rng } from '../src/core/rng';
 
 let failed = 0;
 function check(name: string, ok: boolean, info = ''): void {
@@ -306,17 +306,58 @@ check('lunge: the grab resolves 6 ticks in (round(0.58 × 0.55 s × 20))', LUNGE
   check('termite soldiers gather at a marker like ant soldiers (sickle-jaws chew leaf litter and carry it home)', carried);
 }
 {
-  // the guard line (user notes 2026-10-25): along the route the workers walk, wide, spare soldiers spread along it
-  // (seed 25 since 2026-11-01: with pebbles and twigs blocking, seed 19's route came out nearly straight — no bends to
-  // follow; seed 27 since the one-entrance rework: a crowd leaving spreads over the anthill's three holes, and on seed 25
-  // the ones from the far holes walked their first stretch outside the line)
-  const r = guardScene(24, 30, 27, 75);
-  check(
-    'guard line: half the sickle-jaws guard and half gather; the guards spread along the whole route, none piled at the entrance',
-    r.guards >= 13 && r.gatherers >= 13 && r.atEntrance === 0 && r.arcTo - r.arcFrom > r.trail * 0.6 && r.maxGap < r.trail * 0.2,
-    `${r.guards} guards / ${r.gatherers} gathering, ${r.arcFrom.toFixed(0)}–${r.arcTo.toFixed(0)} of ${r.trail.toFixed(0)} mm, gap ${r.maxGap.toFixed(0)} mm`,
-  );
-  check('guard line: it follows the bends of the route, and the workers walk inside it', r.trail > r.straight + 5 && r.insideFrac > 0.85, `route ${r.trail.toFixed(0)} vs straight ${r.straight.toFixed(0)} mm; ${(100 * r.insideFrac).toFixed(0)} % inside`);
+  // no more defensive rows (spec 09 §2.4, user 2026-11-03): sent with workers to a leaf-litter patch 140 mm out, the
+  // sickle-jaws gather there like other species' soldiers and none stands guard along the route; with the patch
+  // eaten, they hold the escort ring round the marker
+  const scene = (food: boolean) => {
+    const w = world(27);
+    const c = w.colony(0)!;
+    const e = c.entrances[0];
+    let mx = e.sx + 140;
+    let my = e.sy;
+    for (let k = 0; k < 24; k++) {
+      const x = e.sx + Math.cos((k / 24) * Math.PI * 2) * 140;
+      const y = e.sy + Math.sin((k / 24) * Math.PI * 2) * 140;
+      if (x > 40 && y > 40 && x < 660 && y < 660 && w.walkable(SURFACE, x, y)) {
+        mx = x;
+        my = y;
+        break;
+      }
+    }
+    if (food) {
+      placeLitter(w, new Rng(1), mx, my);
+      for (const f of w.s.food) if (f.from === 'litter' && Math.hypot(f.x - mx, f.y - my) < 1) f.amount = f.max = 1e4;
+    } else for (const f of w.s.food) if (Math.hypot(f.x - mx, f.y - my) < 60) f.amount = 0;
+    placeMarker(w, c, 0, SURFACE, mx, my);
+    const chamber = c.tiles.find((t) => t.type === 'queen')!;
+    for (const [caste, n] of [['rhy_worker', 16], ['rhy_soldier', 16]] as const)
+      for (let i = 0; i < n; i++) {
+        const a = makeAnt(w, 0, caste, SURFACE, e.sx + Math.cos(i * 2.4) * (6 + i * 0.5), e.sy + Math.sin(i * 2.4) * (6 + i * 0.5), 0);
+        a.tile = chamber.q;
+        a.task = 'marker';
+        a.marker = 0;
+      }
+    assignGroup(w, c, chamber.group, 0);
+    w.reindex();
+    const radius = markerRadius(w, c, 0);
+    let carried = 0;
+    const seen = new Set<number>();
+    for (let t = 0; t < 20 * 75; t++) {
+      c.food = Math.min(c.food, c.foodCap * 0.5);
+      w.step(0.05);
+      w.events.drain();
+      for (const a of w.s.ants) if (a.caste === 'rhy_soldier' && a.carry !== 0 && !seen.has(a.id)) seen.add(a.id), carried++;
+    }
+    const sol = w.s.ants.filter((a) => a.colony === 0 && a.caste === 'rhy_soldier' && a.state !== AS.Dead && a.space === SURFACE);
+    const L = CASTES.rhy_soldier.length;
+    const posted = sol.filter((a) => a.state === AS.Rally);
+    const onRoute = posted.filter((a) => Math.hypot(a.x - mx, a.y - my) > radius + 6 * L && !c.entrances.some((h) => Math.hypot(a.x - h.sx, a.y - h.sy) < 15));
+    return { carried, posted: posted.length, onRoute: onRoute.length, n: sol.length, far: Math.max(0, ...posted.map((a) => Math.hypot(a.x - mx, a.y - my) - radius)) / L };
+  };
+  const g = scene(true);
+  check('no defensive rows: at a gathering marker the sickle-jaws gather like other soldiers, none posted along the route', g.carried >= 8 && g.onRoute === 0, `${g.carried} soldiers carried litter; ${g.onRoute} posted on the route`);
+  const r = scene(false);
+  check('no defensive rows: with nothing to gather they hold the escort ring round the marker', r.posted >= r.n * 0.6 && r.onRoute === 0 && r.far < 5, `${r.posted}/${r.n} posted, the farthest ${r.far.toFixed(1)} body lengths outside the work area`);
 }
 {
   // determinism: 10 minutes of sickle-jaws against black garden ants, AI on both sides
