@@ -107,10 +107,14 @@ export class World {
           .replace(/gene[ -]?thie(f|ves)/gi, (m) => (m[0] === 'G' ? 'Mimic Ant' : 'mimic ant') + (/ves$/i.test(m) ? 's' : ''));
     // version 4 (2026-11-06): the shared underground — rock margins round every nest and tunnel routes between them
     // (sim/tunnels.ts; a binary snapshot attaches its grids after this, and restoreWorld upgrades it then)
+    this.loadedVersion = state.version ?? 1;
     state.version = Math.max(4, state.version ?? 1);
     this.reindex();
     if (this.grids.size) upgradeWorldTunnels(this);
   }
+
+  /** the SimState version this world was constructed from (save upgrades that must run once the grids are attached) */
+  loadedVersion = 4;
 
   get time(): number {
     return this.s.time;
