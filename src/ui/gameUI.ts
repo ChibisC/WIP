@@ -405,6 +405,10 @@ export class GameUI {
     showStoryEnd(this.root, info, { hub, retry, keep: () => {} });
   }
 
+  /** the marker labels' counts, recounted once a tick (performance v2) */
+  private labelTick = -1;
+  private labelText: string[] = [];
+
   private update(): void {
     this.tick++;
     this.audio.update();
@@ -433,19 +437,25 @@ export class GameUI {
       this.updateGoals();
       this.checkEnd();
     }
-    // marker count labels under each world marker
+    // marker count labels under each world marker (performance v2: the counts once a tick — they walk every tile of
+    // every group — and only the styles that changed written)
     const pos = s.markerScreenPositions();
+    const recount = s.world.s.tick !== this.labelTick;
+    this.labelTick = s.world.s.tick;
     for (let i = 0; i < 5; i++) {
       const l = this.labels[i];
       const p = pos[i];
       if (!p || s.view.transitioning) {
-        l.style.display = 'none';
+        if (l.style.display !== 'none') l.style.display = 'none';
         continue;
       }
       if (l.style.display !== 'block') l.style.display = 'block';
-      l.style.left = p.x + 'px';
-      l.style.top = p.y + 'px';
-      const txt = String(markerCounts(s.world, s.player, i).current);
+      const left = Math.round(p.x * 2) / 2 + 'px';
+      const top = Math.round(p.y * 2) / 2 + 'px';
+      if (l.style.left !== left) l.style.left = left;
+      if (l.style.top !== top) l.style.top = top;
+      if (recount || this.labelText[i] === undefined) this.labelText[i] = String(markerCounts(s.world, s.player, i).current);
+      const txt = this.labelText[i];
       if (l.textContent !== txt) l.textContent = txt;
     }
     // placement feedback at the cursor
@@ -454,8 +464,10 @@ export class GameUI {
       if (this.cursorTip.textContent !== msg) this.cursorTip.textContent = msg;
       this.cursorTip.classList.add('show');
       this.cursorTip.classList.toggle('bad', !!s.hoverMsg);
-      this.cursorTip.style.left = s.input.mouseX + 18 + 'px';
-      this.cursorTip.style.top = s.input.mouseY + 16 + 'px';
+      const cl = s.input.mouseX + 18 + 'px';
+      const ct = s.input.mouseY + 16 + 'px';
+      if (this.cursorTip.style.left !== cl) this.cursorTip.style.left = cl;
+      if (this.cursorTip.style.top !== ct) this.cursorTip.style.top = ct;
     } else this.cursorTip.classList.remove('show');
     this.paused.classList.toggle('show', s.loop.paused && !this.menus.open);
     // status line: starving brood
@@ -482,8 +494,10 @@ export class GameUI {
       }
       // (written only when they change: an unchanged class or display still costs a style pass every frame)
       if (e.style.display !== 'block') e.style.display = 'block';
-      e.style.left = l.x + 'px';
-      e.style.top = l.y + 'px';
+      const left = Math.round(l.x * 2) / 2 + 'px';
+      const top = Math.round(l.y * 2) / 2 + 'px';
+      if (e.style.left !== left) e.style.left = left;
+      if (e.style.top !== top) e.style.top = top;
       const cls = 'tlabel ' + l.kind;
       if (e.className !== cls) e.className = cls;
       if (e.innerHTML !== l.html) e.innerHTML = l.html;
