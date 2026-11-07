@@ -25,6 +25,7 @@ import { antToView, blankView, corpseToView, termiteBroodToView } from './antVie
 import { casteColour, casteLook } from '../render/casteLook';
 import { NestWater } from '../render/nest/nestWater';
 import { floodCache } from '../sim/nestFlood';
+import { ViewCull } from '../render/viewCull';
 
 /** Colour of a caste's brood tile and UI (render/casteLook: every caste its own colour and texture). */
 export function casteTint(caste: string): THREE.Color {
@@ -64,6 +65,9 @@ export class NestView {
   private floorHeight: (x: number, z: number) => number;
   private hexKey = '';
   private views: AntView[] = [];
+  /** the units' loose view test and this frame's list of views (performance v2) */
+  private cull = new ViewCull();
+  private viewList: AntView[] = [];
   /** underground fog (game/fog.ts): the viewer's fog for this space this frame, null when everything is shown */
   fog: Fog | null = null;
   private fogTick = -1;
@@ -175,16 +179,24 @@ export class NestView {
       if (n >= views.length) views.push(blankView());
       return views[n++];
     };
+    // (ants well out of view get no view and no animation this frame: render/viewCull.ts)
+    const cull = this.cull;
+    cull.begin(cam);
+    const pos = this.map.pos;
     for (const a of w.s.ants) {
       if (a.space !== this.space) continue;
       if (a.state === AS.Dead && a.deadT > 30) continue;
       if (vis && !vis(a.x, a.y)) continue;
+      if (!cull.keeps(a, pos)) continue;
       antToView(w, a, take(), 0, 0);
     }
-    for (const f of w.s.food) if (f.space === this.space && f.kind === 'corpse' && f.from.includes('_') && !(vis && !vis(f.x, f.y))) corpseToView(f, take(), 0, f.from);
+    for (const f of w.s.food) if (f.space === this.space && f.kind === 'corpse' && f.from.includes('_') && !(vis && !vis(f.x, f.y)) && cull.keepsPoint(f.x, f.y, pos)) corpseToView(f, take(), 0, f.from);
     // termite larvae and presoldiers on their tiles: the model kit (eggs stay with the brood renderer)
-    if (owner && isTermiteSpecies(owner.species)) for (const b of w.s.brood) if (b.colony === owner.id && b.stage === 1 && !(vis && !vis(b.x, b.y))) termiteBroodToView(b, take(), 0);
-    const list = n === views.length ? views : views.slice(0, n);
+    if (owner && isTermiteSpecies(owner.species)) for (const b of w.s.brood) if (b.colony === owner.id && b.stage === 1 && !(vis && !vis(b.x, b.y)) && cull.keepsPoint(b.x, b.y, pos)) termiteBroodToView(b, take(), 0);
+    // (the list is kept, not sliced: no garbage per frame)
+    const list = this.viewList;
+    list.length = n;
+    for (let i = 0; i < n; i++) list[i] = views[i];
     // creatures first: climbing ants are placed on their animated legs and backs
     this.creatures.update(w.s.creatures, this.space, alpha, dt, this.floorHeight, cam, viewportH);
     this.ants.mount = (v, a, out) => {

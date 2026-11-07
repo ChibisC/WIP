@@ -6,6 +6,7 @@ import { Input, PointerInfo } from '../core/input';
 import { GameView, Quality } from '../render/view';
 import { AntRenderer, AntSpaceAdapter, AntView, animHooks, antHeadingHook } from '../render/ants/antRenderer';
 import { intentAnts, intents } from './intents';
+import { ViewCull } from '../render/viewCull';
 import { edible } from '../sim/diet';
 import { HitboxOverlay } from './hitboxOverlay';
 import { CombatDebugOverlay } from './combatDebugOverlay';
@@ -1190,6 +1191,9 @@ export class GameSession {
     }
     return cmd;
   }
+  /** the units' loose view test, and the surface's list of views this frame (performance v2) */
+  private cull = new ViewCull();
+  private viewList: AntView[] = [];
   /** this player's hex commands not acknowledged yet (by seq), and refused ones unwinding (performance v2) */
   private hexCmds = new Map<number, { q: number; kind: string }>();
   private unwinding: Array<{ q: number; t0: number }> = [];
@@ -1856,13 +1860,21 @@ export class GameSession {
         if (n >= views.length) views.push(blankView());
         return views[n++];
       };
+      // (ants well out of view get no view and no animation this frame: render/viewCull.ts)
+      const cull = this.cull;
+      cull.begin(cam);
+      const pos = this.surfMap.pos;
       for (const a of w.s.ants) {
         if (a.space !== SURFACE) continue;
         if (a.state === AS.Dead && a.deadT > 30) continue;
+        if (!cull.keeps(a, pos)) continue;
         antToView(w, a, take(), 0, 0);
       }
-      for (const f of w.s.food) if (f.space === SURFACE && f.kind === 'corpse' && f.from.includes('_')) corpseToView(f, take(), 0, f.from);
-      const list = n === views.length ? views : views.slice(0, n);
+      for (const f of w.s.food) if (f.space === SURFACE && f.kind === 'corpse' && f.from.includes('_') && cull.keepsPoint(f.x, f.y, pos)) corpseToView(f, take(), 0, f.from);
+      // (the list is kept, not sliced: no garbage per frame)
+      const list = this.viewList;
+      list.length = n;
+      for (let i = 0; i < n; i++) list[i] = views[i];
       const t = w.terrain;
       this.mounds.update(w, this.terrainHeight);
       // (a story rain shower: the storm light while it lasts, easing in and out over 8 s)
