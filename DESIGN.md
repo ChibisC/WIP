@@ -442,7 +442,9 @@ inside, its carcass stays in the nest. The hole stays a breach until the colony 
 and multiplayer: "Titans raid nests" in the lobby (on by default, `settings.titanRaids`): after `peaceMin`, a titan off
 its `raidCooldown` raids with a `raidChance` a minute a colony within `raidRange` (weighted by ants and food, never one
 already raided), at most `maxRaiding` at once. AI colonies defend as against any hostile creature at their holes or
-inside. Dev: `?titanRaid=<kind>`; clips `tests/browser/titan_dig.py` → `docs/creatures/digging/`.
+inside, and once warned they meet the titan at the hole it will dig (`warAI.ts threat`: a hole opens in 10–20 s now,
+too fast to gather after it starts; `tools/titan-ai-defence.ts`). Dev: `?titanRaid=<kind>`; clips
+`tests/browser/titan_dig.py` → `docs/creatures/digging/`.
 
 **Story titans always get in** (2026-11-03, claude/story/05-spec-story-titans-get-inside.md; why they never did:
 CHANGE_PLAN §25.1 — killed at the hole, or crawling under the army's grip on the way, or stopped on its walk by every

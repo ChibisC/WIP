@@ -176,7 +176,8 @@ on the tunnels between them (about 29 ants, 140 food) and a short preparation (E
 | The Spider Mother | kill her | her rounds (a `goto` loop): out to the colony's doorstep, where her own program stalks, pounces on and drags away lone ants, then back to the burrow with her catch, and out again. **Phase 1 (100–60 %)**: hurt below 80 % she goes back to her burrow, passive, healing a little (26 s), then out again. **Phase 2 (60–30 %)**: her spiderlings spill off her back in two groups (at 60 % and 45 %; `bossCuts`). **Phase 3 (30–0 %)**: she comes for the nest, digs a hole wider and walks in breaking soil and stone (`digInto`). Pounces and her rider shake are telegraphed (wind-up, ground marker, sound); riders follow the mounting rules |
 
 Her health 0.7 × 2400 × the difficulty's `boss` (Easy 0.75, Normal 1, Hard 1.1, Brutal 1.2). Medals: time gold ≤ 12 min,
-silver ≤ 18; losses gold ≤ 35, silver ≤ 80; bonus "kill her before she digs into the nest". Reward: the trait
+silver ≤ 18; losses gold ≤ 35, silver ≤ 80; bonus "kill her within a minute of her breaking into the nest" (`killWithin`;
+it was "kill her before she digs in", impossible since 2026-11-03: she always gets in). Reward: the trait
 **Spiderling Venom**. The ending: the win line, then (when it completes the chapter) the Mega Colony hint and "Chapter 1
 complete".
 
@@ -191,7 +192,10 @@ complete".
   the level and given scenes: sequences of cues — `walkTo`, `path` (+`reverse`), `holdAt` (+`face`, `anim`), `patrol`,
   `guard`, `wander`, `follow`, `anim`, `face`, `leave` (an edge point or 'nest'), `mode` (passive, aggressive, normal),
   `flee`, `charge`, `wait`, `waitFlag`, `flag`, `release`, `digInto` (a titan digs into a colony's nest:
-  `claude/creatures/01-spec`), `rest` (back to a place, still, healing a little), `goto` (loop back to an earlier cue: a
+  `claude/creatures/01-spec`; guaranteed since 2026-11-03, `claude/story/05-spec`: the cue owns the titan until it is
+  inside — retried if it can't start, out of its lair first, other scenes wait, a health floor until in, a pace floor and
+  a dig cap per difficulty; `speed` its walk there; the level's actor `inside` softens its bites in the nest by
+  difficulty — DESIGN.md "Story titans always get in"), `rest` (back to a place, still, healing a little), `goto` (loop back to an earlier cue: a
   hunter's rounds). Actors may be groups of creatures out of several lairs (`creatures`, `from`), with health marks
   (`phases` → flags `hp:<actor>:<percent>`, `killed:<actor>`), a boss's own phase cuts (`bossCuts`) and a hunting goal
   (`goal`). (2026-11-02: `charge` and `flee` used to be skipped at once — the actor went straight to its next cue; they
@@ -220,7 +224,8 @@ complete".
   thresholds) and the bonus (gold when achieved: steal before a flag, lose few to a wave, kill an actor before a flag).
 - **Rewards**: a stolen caste, or a boss's trait (`STORY.traits`); extra slots from later chapters' bosses
   (`LevelNode.boss`, `STORY.slots`).
-- **Dev**: `?story=<level>&stage=N[&ants=N]` starts a level at any stage (with extra ants); `?nocine=1` skips shots;
+- **Dev**: `?story=<level>&stage=N[&ants=N]` starts a level at any stage (with extra ants), `&titan=1` at the stage's
+  titan moment (the last night's start; a boss just above the mark that sends it to dig in); `?nocine=1` skips shots;
   `storyDebug(world)` lists each actor's members, scene and cue; `tools/playtest-story.ts` plays a level headless.
 
 ## 7. Saves, determinism, co-op
