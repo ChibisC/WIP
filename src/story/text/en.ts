@@ -142,6 +142,7 @@ export const EN: Record<string, string> = {
   'tip.nasuteCaste': 'Tip: the Conehead Termite Sprayer is in the Build panel now. It squirts glue at range and cannot bite.',
   'tip.allies': 'Tip: raid one nest while the other is busy, or be ready to fight both.',
   'tip.hold': 'Tip: put a marker on the sap flow and send a group of 12 or more to hold it. The clock on the goal starts over whenever too few are there.',
+  'tip.kingPrep': 'Tip: he will come down for the colony soon. Rebuild your fighters and keep them near the nest: an army that meets him together does far more than ants arriving a few at a time.',
   'tip.kingDig': 'Tip: he is shoving his way into the nest, and nothing will keep him out now. Have fighters below to meet him in the chambers: kill him within a minute of his breaking in.',
   // ------------------------------------------------------------------ Level 5 — The Antlered King
   'antleredKing.intro1': 'West of the river the island rises into old oak woods. Dead branches, rotting stumps, and a floor of humus a hand deep.',
@@ -159,6 +160,10 @@ export const EN: Record<string, string> = {
   'antleredKing.large': 'A large male. With jaws like those he could lift three of her soldiers at once.',
   'antleredKing.pair': 'Two more males squaring off in the clearing. They fight head to head, jaws locked, each trying to get under the other.',
   'antleredKing.stump': 'Something big has been moving on the knoll by the old stump. The others give it a wide berth.',
+  'antleredKing.stumpSeen': 'He is up on the old stump: a male twice the size of any we have seen, sitting over the woods as if he owns them. He does.',
+  'antleredKing.challenger': 'A younger male is climbing the knoll toward him.',
+  'antleredKing.challengerOff': 'He did not even have to fight. The old male lifted his jaws, and the younger one turned and went back down the slope.',
+  'antleredKing.stumpPrep': 'Whatever he wants, he will come down for it soon. The colony has a few minutes.',
   'antleredKing.king1': 'There he is. The biggest stag beetle I have ever seen, off the stump and coming down the knoll.',
   'antleredKing.king2': 'He is not here for the sap. He is coming for the colony.',
   'antleredKing.grab': 'He grabs, lifts and throws, the same move he would use on a rival male. Every throw is telegraphed: watch his head go down.',

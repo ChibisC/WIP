@@ -225,7 +225,7 @@ const rolled = (id: StoryLevelId, diff: Difficulty, seed: number) => {
   check('carton kingdom: two conehead termite colonies, allies (one team), not the colony’s', tm.length === 2 && tm.every((c) => c.species === 'nasutitermes') && tm[0].team === tm[1].team && tm[0].team !== ck.colony(0)!.team);
   check('carton kingdom: the reward is the glue-squirting Sprayer, kept for the campaign', STORY_LEVELS.cartonKingdom.reward.caste === 'nasute_soldier');
   const ak = STORY_LEVELS.antleredKing;
-  check('antlered king: four stages, the titan last; the reward is Antler Plating (built, story only)', ak.stages.length === 4 && ak.actors.king.creature === 'stagBeetle' && ak.reward.trait === 'antlerPlating' && !!STORY.traits.antlerPlating.built);
+  check('antlered king: five stages (the old stump before the titan), the titan last; the reward is Antler Plating (built, story only)', ak.stages.length === 5 && ak.stages[3].name === 'The old stump' && ak.actors.king.creature === 'stagBeetle' && ak.reward.trait === 'antlerPlating' && !!STORY.traits.antlerPlating.built);
   check('antlered king: the four stag beetle sizes are in the cast', ['stagMinor', 'stagSmall', 'stagMedium', 'stagLarge'].every((k) => Object.values(ak.actors).some((a) => a.creature === k)));
 }
 

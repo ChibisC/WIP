@@ -81,6 +81,7 @@ export const OAK_WOODS: MapDef = {
       sapEast: [740, 515],
       kingStump: [1000, 290],
       knollFoot: [770, 520],
+      knollSlope: [900, 372],
       evNorth: [600, 14],
       evWest: [14, 420],
       evEast: [1186, 700],

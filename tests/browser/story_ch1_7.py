@@ -1,6 +1,7 @@
 """Chapter 1 as seven levels in the browser (claude/story/06-spec-levels-5-7-and-lengths.md): the island hub with the
 seven nodes (the Forest Floor and the Rainforest out of the mist), and the three new levels at their set pieces — The
-Antlered King (the woods, two males wrestling at the sap, the titan coming down from his stump, digging in), High Water
+Antlered King (the woods, two males wrestling at the sap, the old male seeing off a challenger on his stump, the titan
+coming down, digging in), High Water
 (the summit above three nests, the plain under water, the river over the hill's foot and the west nest flooding below
 ground), Carton Kingdom (the termites' shelf and carton nests, the shower over the hollow and the alates after it) —
 and two surprise events in the old levels (a red wood ant column in the garden, an army ant swarm on the river bank).
@@ -106,8 +107,15 @@ with sync_playwright() as p:
         pg.evaluate(SIM, 8)
         render(pg)
         shot(pg, "king_sap_wrestle2")
+        # the old stump: the king on it, a challenger climbing the knoll to him
+        pg.evaluate(JUMP, [3, 1500])
+        sim_until(pg, "challenger", 160)
+        pg.evaluate(SIM, 2)
+        cam(pg, 955, 330, 200, 1.0, 0.0)
+        render(pg)
+        shot(pg, "king_stump_challenger")
         # the Antlered King comes down from his stump
-        pg.evaluate(JUMP, [3, 1800])
+        pg.evaluate(JUMP, [4, 1800])
         sim_until(pg, "kingOut", 30)
         pg.evaluate(SIM, 10)
         a = pg.evaluate(ACTOR, "king")

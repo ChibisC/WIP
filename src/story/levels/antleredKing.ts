@@ -4,14 +4,15 @@ import { rain, surprisePool, wanderer, windfall } from '../surprises';
 /**
  * Chapter 1, level 5 — "The Antlered King" (claude/story/06-spec-levels-5-7-and-lengths.md §3; map
  * src/maps/story/oakWoods.ts). The colony moves into old oak woods where male stag beetles of every size fight over the
- * sap of a wounded oak. Four stages:
+ * sap of a wounded oak. Five stages:
  *  1. Settle the woods: build up; a minor male walks through, a small male comes to the clearing and stays until he is
  *     brought down (big beetles need many ants; ants can climb onto them);
  *  2. The sap run: the oak weeps sap (a food landmark: honeydew drops every 45 s); two males meet there and wrestle,
  *     the bigger throws the smaller; the colony must hold the sap;
  *  3. Rivals in the woods: a medium male comes and goes, the large male holds the sap and keeps coming to the shelf until
  *     he is killed, two more wrestle in the clearing, surprise events;
- *  4. The Antlered King: the major male (the stag beetle titan) comes down from his stump. Every attack is telegraphed
+ *  4. The old stump: a breathing space; the old male on his stump sees off a challenger without a fight;
+ *  5. The Antlered King: the major male (the stag beetle titan) comes down from his stump. Every attack is telegraphed
  *     (his own program: grab-and-toss, shoving through the swarm, rear-and-slam when enraged); at 45 % lesser males
  *     arrive from the woods; at 25 %, or after three minutes at the doorstep, he digs into the nest.
  * Win: kill him. Lose: the queen dies. Reward: the trait Antler Plating (story only, STORY.traits). The level aims at
@@ -58,7 +59,11 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
     pairA: { creature: 'stagSmall', at: 'evSouth', face: 'clearing', spawn: 'action', label: 'a small male' },
     pairB: { creature: 'stagMedium', at: 'evEast', face: 'clearing', spawn: 'action', label: 'a medium male' },
     // the titan and the lesser males that come to the fight
-    king: { creature: 'stagBeetle', at: 'kingStump', face: 'knollFoot', goal: 'nestApproach', spawn: 'action', hp: 1, phases: [0.7, 0.45, 0.25], label: 'the Antlered King' },
+    // (0.85 of the titan's health: at full health, with the stages before him longer, a person-paced colony lost him on
+    // Normal and Hard, 2026-11-06)
+    king: { creature: 'stagBeetle', at: 'kingStump', face: 'knollFoot', goal: 'nestApproach', spawn: 'action', hp: 0.85, phases: [0.7, 0.45, 0.25], label: 'the Antlered King' },
+    // a younger male who climbs the knoll to the old one and thinks better of it
+    challenger: { creature: 'stagMedium', at: 'evEast', face: 'knollSlope', spawn: 'action', label: 'a challenger' },
     callA: { creature: 'stagSmall', at: 'evWest', face: 'nestApproach', spawn: 'action', wave: true, label: 'the lesser males' },
     callB: { creature: 'stagMedium', at: 'evSouth', face: 'nestApproach', spawn: 'action', wave: true, label: 'the lesser males' },
     ...EV.actors,
@@ -146,6 +151,30 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
         { actor: 'large', at: 210, cues: [{ walkTo: 'sapOak', speed: 0.7, timeout: 240, flag: 'largeSeen' }, { guard: 'sapOak', r: 80, s: 150 }, { charge: 'shelfFoot', timeout: 120 }, { guard: 'shelfFoot', r: 80, s: 60 }, { goto: 1 }] },
         { actor: 'pairA', at: 380, cues: [{ walkTo: 'clearing', speed: 0.7, timeout: 200 }, { holdAt: 'clearing', face: { actor: 'pairB' }, s: 3 }, { flag: 'pairMeet' }, { wait: 30 }, { leave: 'evSouth', speed: 0.7 }] },
         { actor: 'pairB', at: 380, cues: [{ walkTo: 'sapWest', speed: 0.7, timeout: 200 }, { holdAt: 'sapWest', face: { actor: 'pairA' }, s: 3 }, { wait: 30 }, { leave: 'evEast', speed: 0.7 }] },
+      ],
+    },
+    {
+      // (a breathing space before the titan, 2026-11-06: the colony rebuilds after the large male; the old male shows
+      // himself on his stump and sees off a challenger without a fight)
+      name: 'The old stump',
+      objectives: [
+        { type: 'surviveTime', s: { easy: 270, normal: 240, hard: 225, brutal: 210 }, text: 'Get ready before he comes down' },
+        { type: 'fighters', n: 25, optional: true },
+      ],
+      say: [
+        { key: 'stumpSeen', at: 3 },
+        { key: 'challenger', on: 'challenger' },
+        { key: 'challengerOff', on: 'challengerOff' },
+        { key: 'stumpPrep', at: 160 },
+      ],
+      events: [
+        { actions: [{ do: 'spawn', actor: 'king' }, { do: 'music', mood: 'tense' }, { do: 'shot', shot: { keys: [{ at: 'kingStump', dist: 300, yaw: 0.9, t: 0, pitch: 0.08 }, { at: 'kingStump', dist: 240, yaw: 1.2, t: 6 }] } }] },
+        { at: 20, actions: [{ do: 'tip', key: 'kingPrep' }] },
+        { at: 40, actions: [{ do: 'spawn', actor: 'challenger' }] },
+      ],
+      scenes: [
+        { actor: 'king', cues: [{ holdAt: 'kingStump', face: 'clearing', s: 1 }, { waitFlag: 'challenger', timeout: 200 }, { holdAt: 'kingStump', face: { actor: 'challenger' }, s: 6 }, { flag: 'challengerOff' }, { guard: 'kingStump', r: 60 }] },
+        { actor: 'challenger', at: 40, cues: [{ walkTo: 'knollSlope', speed: 0.8, timeout: 200 }, { holdAt: 'knollSlope', face: { actor: 'king' }, s: 3 }, { flag: 'challenger' }, { waitFlag: 'challengerOff', timeout: 30 }, { leave: 'evEast', speed: 1.1 }] },
       ],
     },
     {
