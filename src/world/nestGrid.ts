@@ -470,12 +470,12 @@ export class NestGrid extends HexLayout {
    * cells are carved progressively from the shared edge inward so the
    * excavation visibly grows. Returns true when the hex is fully dug.
    */
-  digHex(q: number, work: number, from: number): boolean {
+  digHex(q: number, work: number, from: number, fromDir = -1): boolean {
     if (!this.isHexDiggable(q)) return false;
     if (this.hexEntry[q] < 0) {
       const nb = this.neighbors(q);
       let d = nb.indexOf(from);
-      if (d < 0) d = 5;
+      if (d < 0) d = fromDir >= 0 ? fromDir : 5;
       this.hexEntry[q] = d;
     }
     this.hexWork[q] = Math.max(0, this.hexWork[q] - work);

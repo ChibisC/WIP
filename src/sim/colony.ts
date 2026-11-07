@@ -338,7 +338,9 @@ function developNest(w: World, c: Colony, extra: number): void {
 export function designateDig(w: World, c: Colony, q: number, on: boolean): boolean {
   const g = w.nest(c.id);
   if (!g || q < 0 || !g.isHexDiggable(q)) return false;
-  // (digging never makes an entrance: each nest has its one, sim/entrances.ts)
+  // (a tunnel route's hexes are dug as a route from its gate, sim/tunnels.ts; digging never makes an entrance: each
+  // nest has its one, sim/entrances.ts)
+  if (g.routeOf(q) >= 0) return false;
   g.designateHex(q, on);
   return true;
 }

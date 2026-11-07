@@ -7,8 +7,11 @@ import { canUpgrade, completeBuild, completeDelete, completeUpgrade, raisesAnts,
 import { makeBrood } from './factory';
 import { markerRadius } from './markers';
 import { datan2, dcos, dhypot, dsin, sq } from './dmath';
-import { faceToward } from './movement';
+import { faceToward, goToArea } from './movement';
 import { abdomenTipBack } from './termites';
+import { TUNNELS } from './balance';
+import { SPECIES } from './species';
+import { crossSpot, routeById, routeFrontier } from './tunnels';
 
 /**
  * Nest jobs (Revision 2, EotU — DESIGN.md 3.6). Workers do all nest work
@@ -32,6 +35,32 @@ export interface JobSpot {
   prio: number;
   /** workers allowed */
   max: number;
+  /** a tunnel route dig (sim/tunnels.ts): the space the hex is in (the partner's nest, past the rim), and whether it is dug from across the rim */
+  space?: number;
+  cross?: boolean;
+}
+
+/** The space a job's hex is in. */
+function jobSpace(c: Colony, j: { space?: number }): number {
+  return j.space ?? nestSpace(c.id);
+}
+
+/** A job's key for the counts (kind, hex and space). */
+function jobKey(c: Colony, kind: number, q: number, space?: number): number {
+  return kind * 100000 + q + (space !== undefined && space !== nestSpace(c.id) ? (space + 1) * 10000000 : 0);
+}
+
+/**
+ * The colony's tunnel-route digs this tick (sim/tunnels.ts routeFrontier), cached per tick: each hex of the next step on
+ * its side, dug by `digWorkersPerHex` workers like any hex.
+ */
+function routeJobs(w: World, c: Colony): JobSpot[] {
+  const cache = (w.tickCache as unknown as { routeJobs?: Map<number, { tick: number; list: JobSpot[] }> }).routeJobs ?? ((w.tickCache as unknown as { routeJobs: Map<number, { tick: number; list: JobSpot[] }> }).routeJobs = new Map());
+  const hit = cache.get(c.id);
+  if (hit && hit.tick === w.s.tick) return hit.list;
+  const list = routeFrontier(w, c).map((d) => ({ kind: JOB.Dig, q: d.q, prio: 0, max: BALANCE.digWorkersPerHex, space: d.space, cross: d.cross }));
+  cache.set(c.id, { tick: w.s.tick, list });
+  return list;
 }
 
 const tmp = { x: 0, y: 0 };
@@ -66,6 +95,8 @@ export function listJobs(w: World, c: Colony): JobSpot[] {
     if (!g.neighbors(q).some((n) => n >= 0 && g.isHexDug(n))) continue; // unreachable: waits
     out.push({ kind: JOB.Dig, q, prio: 0, max: BALANCE.digWorkersPerHex });
   }
+  // the tunnel route the colony digs (prio 1: after the nest's own digging, before building)
+  for (const j of routeJobs(w, c)) out.push({ ...j, prio: 1 });
   for (const t of c.tiles) {
     if (!t.built) out.push({ kind: JOB.Build, q: t.q, prio: 2, max: 1 });
     else if (t.pend === 1) out.push({ kind: JOB.Upgrade, q: t.q, prio: 2, max: 1 });
@@ -76,12 +107,14 @@ export function listJobs(w: World, c: Colony): JobSpot[] {
   return out;
 }
 
-function jobValid(w: World, c: Colony, kind: number, q: number): boolean {
+function jobValid(w: World, c: Colony, kind: number, q: number, space?: number): boolean {
   const g = w.nest(c.id);
   if (!g) return false;
   switch (kind) {
     case JOB.Dig:
     case JOB.Entrance:
+      // a route hex: still on the colony's frontier (its route, undug, reachable)
+      if (g.routeOf(q) >= 0 || (space !== undefined && space !== nestSpace(c.id))) return routeJobs(w, c).some((j) => j.q === q && jobSpace(c, j) === (space ?? nestSpace(c.id)));
       return !!g.hexDesig[q] && g.isHexDiggable(q);
     case JOB.Build:
       return !!tileAt(c, q) && !tileAt(c, q)!.built;
@@ -114,6 +147,7 @@ export function endJob(w: World, a: Ant, c: Colony): void {
   }
   a.jobK = 0;
   a.jobQ = -1;
+  delete a.jobS;
   a.task = a.marker >= 0 ? 'marker' : 'idle';
   a.taskT = 0;
   a.tgt = 0;
@@ -125,9 +159,12 @@ export function endJob(w: World, a: Ant, c: Colony): void {
 }
 
 /** Distance-like cost of sending this ant to hex q (in-nest ants first). */
-function jobCost(w: World, c: Colony, a: Ant, q: number): number {
-  const g = w.nest(c.id)!;
+function jobCost(w: World, c: Colony, a: Ant, q: number, space = nestSpace(c.id)): number {
+  const g = w.nestOf(space)!;
   const p = g.hexCenter(q, tmp);
+  if (a.space === space) return dhypot(p.x - a.x, p.y - a.y);
+  // (a route dig past the rim: from the nest by the route; ants out in the world are far from it)
+  if (space !== nestSpace(c.id)) return a.space === nestSpace(c.id) ? 3000 : 20000;
   if (a.space === nestSpace(c.id)) return dhypot(p.x - a.x, p.y - a.y);
   if (a.space === SURFACE) {
     const e = c.entrances[0];
@@ -142,19 +179,20 @@ function jobCost(w: World, c: Colony, a: Ant, q: number): number {
  */
 export function assignJobs(w: World, c: Colony): void {
   const jobs = listJobs(w, c);
-  const key = (k: number, q: number) => k * 100000 + q;
-  const valid = new Set(jobs.map((j) => key(j.kind, j.q)));
+  const key = (k: number, q: number, space?: number) => jobKey(c, k, q, space);
+  const valid = new Set(jobs.map((j) => key(j.kind, j.q, j.space)));
   const count = new Map<number, number>();
   const free: Ant[] = [];
   for (const a of w.s.ants) {
     if (a.colony !== c.id || !isJobWorker(c, a)) continue;
     if (a.task === 'job') {
-      const k = key(a.jobK, a.jobQ);
+      const k = key(a.jobK, a.jobQ, a.jobS);
       // a marker group follows its marker: moved out of the nest or out of reach, its workers drop the job
       let leave = false;
       if (a.marker >= 0) {
         const m = c.markers[a.marker];
         if (!m.placed || m.space !== nestSpace(c.id)) leave = true;
+        else if (a.jobS !== undefined && a.jobS !== nestSpace(c.id)) leave = true;
         else {
           const ctr = w.nest(c.id)!.hexCenter(a.jobQ, { x: 0, y: 0 });
           leave = dhypot(m.x - ctr.x, m.y - ctr.y) > markerRadius(w, c, a.marker) * BALANCE.markerJobReach;
@@ -179,19 +217,21 @@ export function assignJobs(w: World, c: Colony): void {
   if (!free.length) return;
   for (const j of jobs) {
     if (!free.length) break;
-    const k = key(j.kind, j.q);
+    const k = key(j.kind, j.q, j.space);
     let need = j.max - (count.get(k) ?? 0);
     if (need <= 0) continue;
-    const g = w.nest(c.id)!;
+    const js = jobSpace(c, j);
+    const g = w.nestOf(js)!;
     const ctr = g.hexCenter(j.q, { x: 0, y: 0 });
-    // nearest eligible workers
+    // nearest eligible workers (a marker group never digs past the rim: that is the home column's work)
     const cand = free
       .filter((a) => {
         if (a.task !== 'marker') return true;
+        if (js !== nestSpace(c.id)) return false;
         const m = c.markers[a.marker];
         return dhypot(m.x - ctr.x, m.y - ctr.y) <= markerRadius(w, c, a.marker) * BALANCE.markerJobReach;
       })
-      .map((a) => ({ a, d: jobCost(w, c, a, j.q) }))
+      .map((a) => ({ a, d: jobCost(w, c, a, j.q, js) }))
       .sort((x, y) => x.d - y.d);
     for (const { a } of cand) {
       if (need <= 0) break;
@@ -199,6 +239,8 @@ export function assignJobs(w: World, c: Colony): void {
       a.taskT = 0;
       a.jobK = j.kind;
       a.jobQ = j.q;
+      if (js !== nestSpace(c.id)) a.jobS = js;
+      else delete a.jobS;
       a.tgt = 0;
       a.tk = 0;
       a.state = AS.Idle;
@@ -211,9 +253,21 @@ export function assignJobs(w: World, c: Colony): void {
 }
 
 /** Where a worker stands to work on hex q (digging: just inside a dug neighbour at the shared edge). */
-function workSpot(w: World, c: Colony, a: Ant, kind: number, q: number, out: { x: number; y: number; from: number }): boolean {
-  const g = w.nest(c.id)!;
+function workSpot(w: World, c: Colony, a: Ant, kind: number, q: number, out: { x: number; y: number; from: number; dir: number }): boolean {
+  const g = w.nestOf(a.jobS ?? nestSpace(c.id))!;
+  out.dir = -1;
   if (kind === JOB.Dig || kind === JOB.Entrance) {
+    // a route hex dug from across the rim: the digger stands in its own rim step at the rim edge
+    const rj = a.jobS !== undefined ? routeJobs(w, c).find((j) => j.q === q && j.space === a.jobS) : undefined;
+    if (rj?.cross) {
+      const r = routeById(w, c.routeDig ?? -1);
+      if (!r || !crossSpot(w, c, r, q, a, crossTmp)) return false;
+      out.x = crossTmp.x;
+      out.y = crossTmp.y;
+      out.from = -1;
+      out.dir = crossTmp.dir;
+      return true;
+    }
     const nb = g.neighbors(q);
     let best = -1;
     let bd = Infinity;
@@ -257,25 +311,40 @@ export interface JobNav {
   goOut: (w: World, a: Ant, dt: number) => void;
 }
 
-const spot = { x: 0, y: 0, from: -1 };
+const spot = { x: 0, y: 0, from: -1, dir: -1 };
+const crossTmp = { x: 0, y: 0, dir: -1 };
+
+/** A worker's dig speed factor from data: its caste's and its species' `digRate` (digging specialists later). */
+export function digRateOf(c: Colony, a: Ant): number {
+  return (casteOf(a.caste).digRate ?? 1) * (SPECIES[c.species].digRate ?? 1);
+}
 
 /** The 'job' task: walk to the job and work it until done. */
 export function jobWork(w: World, a: Ant, c: Colony, dt: number, nav: JobNav): void {
   const k = a.jobK;
   const q = a.jobQ;
-  if (!k || !jobValid(w, c, k, q)) {
+  if (!k || !jobValid(w, c, k, q, a.jobS)) {
     endJob(w, a, c);
     return;
   }
-  // get home first
-  if (a.space !== nestSpace(c.id)) {
+  // get to the job's space first: home, or (a route dig past the rim) the partner's nest through the route; a dig from
+  // across the rim is worked from home
+  const cross = a.jobS !== undefined ? routeJobs(w, c).find((j) => j.q === q && j.space === a.jobS)?.cross : false;
+  const want = cross ? nestSpace(c.id) : (a.jobS ?? nestSpace(c.id));
+  if (a.space !== want) {
     if (a.carry !== Carry.None && a.carry !== Carry.Brood) a.carry = Carry.None;
+    if (want !== nestSpace(c.id) || a.space !== SURFACE) {
+      if (a.space !== SURFACE && !goToArea(w, a, want, dt)) return;
+      if (a.space === SURFACE) nav.goHome(w, a, dt);
+      return;
+    }
     if (a.space === SURFACE) nav.goHome(w, a, dt);
     else nav.goOut(w, a, dt);
     return;
   }
-  const g = w.nest(c.id)!;
-  const rate = BALANCE.workRate[Math.max(0, Math.min(2, (a.level || 1) - 1))];
+  const g = w.nestOf(cross ? (a.jobS ?? nestSpace(c.id)) : want)!;
+  let rate = BALANCE.workRate[Math.max(0, Math.min(2, (a.level || 1) - 1))];
+  if (k === JOB.Dig || k === JOB.Entrance) rate *= digRateOf(c, a);
   if (k === JOB.Spawn) {
     spawnWork(w, a, c, q, dt, nav);
     return;
@@ -302,8 +371,10 @@ export function jobWork(w: World, a: Ant, c: Colony, dt: number, nav: JobNav): v
   const pts = rate * dt;
   if (k === JOB.Dig || k === JOB.Entrance) {
     const total = g.hexTotal[q] || 1;
-    const done = g.digHex(q, (pts / BALANCE.jobPoints) * total, spot.from);
-    if (w.s.tick % 6 === a.id % 6) w.events.emit({ t: 'dig', colony: c.id, x: a.x + dcos(a.h) * 2, y: a.y + dsin(a.h) * 2 });
+    // a tunnel route's hex takes TUNNELS.hexWorkMul × the points
+    const mul = g.routeOf(q) >= 0 ? TUNNELS.hexWorkMul : 1;
+    const done = g.digHex(q, (pts / (BALANCE.jobPoints * mul)) * total, spot.from, spot.dir);
+    if (w.s.tick % 6 === a.id % 6) w.events.emit({ t: 'dig', colony: c.id, x: a.x + dcos(a.h) * 2, y: a.y + dsin(a.h) * 2, space: a.space });
     if (done) endJob(w, a, c);
     return;
   }

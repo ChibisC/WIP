@@ -922,6 +922,14 @@ export interface RouteHalf {
   steps: number[][];
   dir: number;
   warned: boolean;
+  /**
+   * the breach: the hexes from this gate inward through the owner's undug interior to its dug floor, planned when a
+   * digger from the other nest reaches the gate and the owner's digging has not (sim/tunnels.ts planBreach; undefined
+   * until then, empty when the gate already touches dug floor)
+   */
+  breach?: number[];
+  /** the gate joins the owner's dug floor (set by tunnelTick when first seen; a breach by the other colony, or the owner's digging reaching its gate) */
+  joined?: boolean;
 }
 
 /** A set tunnel route between the nests of colonies `a` and `b`: open for good once both halves are dug through. */

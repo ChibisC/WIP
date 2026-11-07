@@ -90,6 +90,57 @@ export function halfThrough(w: World, h: RouteHalf): boolean {
   return dugFromGate(w, h) >= h.steps.length;
 }
 
+/**
+ * Does the half's gate join the owner's dug floor: the gate dug and touching dug interior floor that is not the route's
+ * own, or its breach dug through to it (an attacker's digging inside the nest).
+ */
+export function gateConnected(w: World, h: RouteHalf): boolean {
+  const g = w.nestOf(h.space);
+  if (!g || !g.isHexDug(h.gate)) return false;
+  const floor = (q: number, except: readonly number[]) => g.neighbors(q).some((m) => m >= 0 && g.isInterior(m) && g.isHexDug(m) && g.routeOf(m) < 0 && !except.includes(m));
+  if (floor(h.gate, h.breach ?? [])) return true;
+  if (!h.breach) return false;
+  for (let i = 0; i < h.breach.length; i++) {
+    const q = h.breach[i];
+    if (!g.isHexDug(q)) return false;
+    if (floor(q, h.breach)) return true;
+  }
+  return false;
+}
+
+/**
+ * Plan the breach from a half's gate inward to the owner's nearest dug interior floor (a breadth-first search through
+ * diggable interior hexes, deterministic by neighbour order): the hexes to dig, gate excluded. Empty when the gate
+ * already touches dug floor; undefined when no way exists.
+ */
+export function planBreach(w: World, h: RouteHalf): number[] | undefined {
+  const g = w.nestOf(h.space);
+  if (!g) return undefined;
+  const isFloor = (m: number) => m >= 0 && g.isInterior(m) && g.isHexDug(m) && g.routeOf(m) < 0;
+  if (g.neighbors(h.gate).some(isFloor)) return [];
+  const prev = new Map<number, number>([[h.gate, -1]]);
+  const queue = [h.gate];
+  while (queue.length) {
+    const q = queue.shift()!;
+    for (const m of g.neighbors(q)) {
+      if (m < 0 || prev.has(m) || !g.isInterior(m) || g.routeOf(m) >= 0) continue;
+      if (isFloor(m)) {
+        const path: number[] = [];
+        let cur = q;
+        while (cur !== h.gate && cur >= 0) {
+          path.push(cur);
+          cur = prev.get(cur)!;
+        }
+        return path.reverse();
+      }
+      if (!g.isHexDiggable(m)) continue;
+      prev.set(m, q);
+      queue.push(m);
+    }
+  }
+  return undefined;
+}
+
 /** Can units cross between the halves (both rim steps dug)? */
 export function canCross(w: World, r: TunnelRoute): boolean {
   if (r.open) return true;
@@ -233,13 +284,13 @@ export function ownHalf(r: TunnelRoute, colony: number): RouteHalf | undefined {
  */
 export function routeFrontier(w: World, c: Colony): RouteDig[] {
   const r = routeById(w, c.routeDig ?? -1);
-  if (!r || r.open) return [];
+  if (!r) return [];
   const own = ownHalf(r, c.id);
   if (!own) return [];
   const out: RouteDig[] = [];
   const g = w.nestOf(own.space);
   if (!g) return out;
-  const n = dugFromGate(w, own);
+  const n = r.open ? own.steps.length : dugFromGate(w, own);
   if (n < own.steps.length) {
     for (const q of own.steps[n]) {
       if (q < 0 || g.isHexDug(q)) continue;
@@ -251,7 +302,18 @@ export function routeFrontier(w: World, c: Colony): RouteDig[] {
   const og = w.nestOf(o.space);
   if (!og) return out;
   const m = dugFromRim(w, o);
-  if (m >= o.steps.length) return out;
+  if (m >= o.steps.length) {
+    // through to the partner's gate: on into its nest, to its dug floor (the breach)
+    if (gateConnected(w, o)) return out;
+    if (!o.breach) o.breach = planBreach(w, o);
+    if (!o.breach) return out;
+    for (const q of o.breach) {
+      if (og.isHexDug(q)) continue;
+      if (og.isHexDiggable(q) && og.neighbors(q).some((k) => k >= 0 && og.isHexDug(k))) out.push({ space: o.space, q, cross: false, route: r.id });
+      break;
+    }
+    return out;
+  }
   const step = o.steps[o.steps.length - 1 - m];
   for (const q of step) {
     if (q < 0 || og.isHexDug(q)) continue;
@@ -290,9 +352,15 @@ export function crossSpot(w: World, c: Colony, r: TunnelRoute, q: number, a: Ant
 /** Set which route a colony digs (−1: none). Marking another pauses the first (its dug hexes stay). */
 export function setRouteDig(w: World, c: Colony, id: number): boolean {
   const r = routeById(w, id);
-  if (id >= 0 && (!r || r.open || !ownHalf(r, c.id))) return false;
+  if (id >= 0 && (!r || !ownHalf(r, c.id) || routeDone(w, r, c.id))) return false;
   c.routeDig = id;
   return true;
+}
+
+/** Nothing left for this colony to dig on the route: open, and the partner's gate joined to its floor. */
+export function routeDone(w: World, r: TunnelRoute, colony: number): boolean {
+  const own = ownHalf(r, colony);
+  return r.open && (!own || gateConnected(w, otherHalf(r, own)));
 }
 
 /** Route progress 0..1 (both halves' steps dug). */
@@ -319,11 +387,25 @@ export function routeProgress(w: World, r: TunnelRoute): number {
 export function tunnelTick(w: World, dt: number): void {
   void dt;
   for (const r of routes(w)) {
-    if (r.open) continue;
+    // a gate joining its nest's floor: the breach (the other colony dug in) or the owner's digging reaching its gate
+    for (const h of r.halves) {
+      if (h.joined || !gateConnected(w, h)) continue;
+      h.joined = true;
+      const o = otherHalf(r, h);
+      const oc = w.colony(o.colony);
+      const by = oc && oc.routeDig === r.id && r.open ? o.colony : -1;
+      const p = gatePos(w, h);
+      w.events.emit({ t: 'tunnelBreach', colony: h.colony, by, route: r.id, space: h.space, x: p.x, y: p.y, open: r.open });
+    }
+    if (r.open) {
+      for (const c of [w.colony(r.a), w.colony(r.b)]) if (c && c.routeDig === r.id && routeDone(w, r, c.id)) c.routeDig = -1;
+      continue;
+    }
     if (halfThrough(w, r.halves[0]) && halfThrough(w, r.halves[1])) {
       r.open = true;
       r.openT = w.time;
-      for (const c of [w.colony(r.a), w.colony(r.b)]) if (c && c.routeDig === r.id) c.routeDig = -1;
+      // (a colony still digging the breach into the other nest digs on)
+      for (const c of [w.colony(r.a), w.colony(r.b)]) if (c && c.routeDig === r.id && routeDone(w, r, c.id)) c.routeDig = -1;
       const p0 = gatePos(w, r.halves[0]);
       const p1 = gatePos(w, r.halves[1]);
       w.events.emit({ t: 'tunnelOpen', route: r.id, a: r.a, b: r.b, spaces: [r.halves[0].space, r.halves[1].space], x: [p0.x, p1.x], y: [p0.y, p1.y] });

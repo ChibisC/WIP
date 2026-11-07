@@ -9,6 +9,8 @@ import { BALANCE, ECITON, LAYERS, NASUTE, TERMANT, TRAIL } from './balance';
 import { cartonBlocks, termantSpeedMul } from './termants';
 import { potholeMul, teamLoad } from './eciton';
 import { datan2, dcos, dhypot, dsin, hash01, sq } from './dmath';
+import { halfIn, routeField, stepIndex, usableRoute } from './tunnels';
+import type { TunnelRoute } from './types';
 
 const TAU = Math.PI * 2;
 const tmp = { x: 0, y: 0 };
@@ -458,10 +460,42 @@ export function approachSurface(w: World, a: Ant, x: number, y: number, dt: numb
   return steerTo(w, a, x, y, dt, speedMul, rate, weave);
 }
 
+/**
+ * Walk a tunnel route (sim/tunnels.ts) out of the ant's nest toward the other: down the space's field to the route's
+ * rim step, then out over the rim (the crossing itself is the tunnel system's, before the ants move). Returns true while
+ * it is on its way (false: no way to the rim here).
+ */
+export function walkRoute(w: World, a: Ant, r: TunnelRoute, dt: number, speedMul = 1): boolean {
+  const g = w.nestOf(a.space);
+  const h = halfIn(r, a.space);
+  if (!g || !h) return false;
+  const q = g.hexAt(a.x, a.y);
+  if (q >= 0 && stepIndex(h, q) === h.steps.length - 1) {
+    // in the rim step: on out over the rim
+    const ctr = g.hexCenter(q, tmp);
+    const ang = ROUTE_EDGE_ANG[h.dir];
+    steerTo(w, a, ctr.x + dcos(ang) * g.R * 0.75, ctr.y + dsin(ang) * g.R * 0.75, dt, speedMul);
+    return true;
+  }
+  const f = routeField(w, a.space, r);
+  if (!f) return false;
+  const res = followNest(w, a, f, dt, speedMul);
+  return res !== 'stuck';
+}
+const ROUTE_EDGE_ANG = [-Math.PI / 6, Math.PI / 6, Math.PI / 2, (5 * Math.PI) / 6, (7 * Math.PI) / 6, -Math.PI / 2];
+
 /** Walk home on the surface; enters the nest when reaching an entrance. Returns true once inside. */
 export function goHome(w: World, a: Ant, dt: number, speedMul = 1): boolean {
   const c = w.colony(a.colony);
   if (!c) return false;
+  // in another nest with a tunnel route home: through it (no climbing out)
+  if (a.space !== SURFACE) {
+    if (a.space === nestSpace(a.colony)) return true;
+    const r = usableRoute(w, a.space, nestSpace(a.colony), a.colony);
+    if (r && walkRoute(w, a, r, dt, speedMul)) return false;
+    goOut(w, a, dt);
+    return false;
+  }
   // the nearest hole; while it is busy, another of the anthill's with room that is not much farther
   let ei = holeIn(w, c.entrances, a.x, a.y);
   if (ei < 0) ei = nearestEntrance(c, a.x, a.y);
@@ -645,6 +679,9 @@ export function goToArea(w: World, a: Ant, space: number, dt: number, speedMul =
   if (a.space === space) return true;
   if (space === nestSpace(a.colony)) return goHome(w, a, dt, speedMul);
   if (a.space !== SURFACE) {
+    // a tunnel route from this nest to that one (sim/tunnels.ts): walk it instead of climbing out
+    const r = space !== SURFACE ? usableRoute(w, a.space, space, a.colony) : undefined;
+    if (r && walkRoute(w, a, r, dt, speedMul)) return false;
     goOut(w, a, dt);
     return false;
   }
