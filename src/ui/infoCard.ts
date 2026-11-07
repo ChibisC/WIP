@@ -50,6 +50,9 @@ function activity(task: string, state: AS, carrying: boolean, jobK = 0, held = f
       return 'Carrying a dead nestmate out';
     case AS.Flung:
       return 'Thrown!';
+    // (a flooding nest: sim/nestFlood.ts — climbing ahead of the water, fetching brood up)
+    case AS.Flee:
+      return 'Escaping the rising water';
   }
   if (carrying) return 'Carrying food home';
   const t: Record<string, string> = { forage: 'Foraging', dig: 'Digging', nurse: 'Nursing brood', haul: 'Hauling', garden: 'Tending the fungus garden', guard: 'Guarding the nest', marker: 'At a marker', idle: 'Resting' };

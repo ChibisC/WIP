@@ -1769,3 +1769,32 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   ring); the sun march fades with the face blend; face styles meet along a ragged line.
 - Merged with `main` (the Mimic Ant / Termants rename: the level's colony is "Termants").
 
+
+## 2026-11-03 — Nests flood; a colony with nowhere to go goes all-out (`feature/nest-flood`)
+- **Spec**: claude/story/06-spec-levels-5-7-and-lengths.md §4 (level 6 "High Water"): the pieces the level is built on
+  (the level itself, its rising river and terraces, is built separately and calls this API). DESIGN.md 3.12c.
+- **`sim/nestFlood.ts`** (`NEST_FLOOD` in balance.ts): `startNestFlood(w, colony, { fillSec?, delaySec? })`,
+  `nestFloodFraction`, `isHexFlooded`, `floodedAt`, `forceAllOut`; the system `nestFlood`; the event
+  `{ t: 'nestFlood', colony, phase: 'start' | 'full', x, y }`; state `Colony.nestFlood` (+ `uw` / `fl` / `flB` on units).
+  The water pours in at the entrance and fills the nest deepest first — depth = steps along the tunnels from the
+  entrance's top, so it pools in the far chambers and backs up to the entrance — one hex at a time at a steady inflow,
+  in `fillSec` (45 s). Under water: 6 s of breath, then 10 % of the maximum health a second (16 s from full health; brood
+  10 s; creatures 5 %/s); swimming at 0.45 × speed. The colony's ants at home climb ahead of the water (2 hexes clear)
+  and wait above it, carrying the brood that lies just above the waterline; jobs near the water stop. Tiles under water
+  stop working: no eggs, larvae stop, nothing built, stores hold nothing (the food above the dry stores' capacity is
+  lost), pastures and warming tiles give nothing, no tile placed, no digging from the water; a queen under water lays no
+  eggs. A full nest drowns everything inside; the queen's death ends the colony (and, the usual rule, its ants outside
+  die within 30 s).
+- **All-out** (`warAI.startAllOut` / `allOutTick`): every group but the queen's own (her nurses) on the target's queen,
+  marker III with "no gathering", re-placed every think; no defence, retreat, gathering, ally help or foraging, until she
+  or the colony is dead. Skirmish AI unchanged: a 10-min four-AI skirmish has the same state hash before and after the
+  change (`b6d28049b969bc58`), and the flood system leaves a skirmish's hash as it was (`tests/nestFlood.ts`).
+- **Look** (`render/nest/nestWater.ts`): murky, silty water standing in the flooded hexes, rising up the wall slopes
+  over 2.5 s per hex to 0.6 of the wall height (a crisp, frothy waterline; never more than 84 % opaque, so the ants show
+  through); while it fills, a stream pours over the top of the ramp as a wide sheet and runs down the tunnels to every
+  place the pool begins. The nest minimap tints flooded hexes. Dev URL `?floodNest=<colony>&floodAt=<s>[&floodFill=<s>]`.
+  Sheet: `docs/story/shots/nest_flood_sheet.jpg` (before / during / late / after; `tests/browser/nest_flood.py`).
+- Measured (seed 11, a 74-hex developed Lasius nest): the queen's hex (depth 7 of 13) went under 28 s into a 45 s fill,
+  she drowned 16 s later, the nest was full at 44.4 s; the home ants ended on the ramp with the brood and drowned there.
+  An all-out by a 39-ant Lasius colony on a small colony 580 mm away: in its nest at 60 s, its queen dead at about 110 s.
+- Checks: `tests/nestFlood.ts` (new, in `npm test`), `npm test`, `check-determinism`, `tsc`, the build.

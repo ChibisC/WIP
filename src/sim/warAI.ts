@@ -170,6 +170,8 @@ export function warTick(w: World, c: Colony, dt: number): void {
     b.target = -1;
     return;
   }
+  // all-out (sim/nestFlood.ts forceAllOut): nothing else counts
+  if (b.allOut) return allOutTick(w, c, b, dt);
   allyTick(w, c, dt);
   const W = BALANCE.aiWar;
   if (b.target >= 0) b.age += dt;
@@ -672,4 +674,69 @@ export function allyTick(w: World, c: Colony, dt: number): void {
   s.flips++;
   steerHelp(w, c, pick.o, pick.d);
   if (pick.o.player) w.events.emit({ t: 'message', text: `Your ally's soldiers are coming to help.`, kind: 'info', colony: pick.o.id });
+}
+
+// ---------------------------------------------------------------------------
+// All-out (sim/nestFlood.ts `forceAllOut`; claude/story/06-spec-levels-5-7-and-lengths.md §4): a colony with nowhere
+// else to go throws everything at one enemy's queen
+// ---------------------------------------------------------------------------
+
+/** Every group but the queen's own (her chamber's workers stay with her as nurses), to marker III. */
+function sendAllOut(w: World, c: Colony): void {
+  for (const g of c.groups) if (raisesAnts(g) && g.type !== 'queen' && g.marker !== ATTACK) assignGroup(w, c, g.id, ATTACK);
+}
+
+/**
+ * Go all in on t's queen: marker III on her (it follows her; nothing is carried home from it), every group but the
+ * queen's own sent, the defence, the forage marker and any help for an ally lifted. No retreat, no gathering, no
+ * cooldown: `allOutTick` keeps at it until she or the colony is dead. A skirmish never calls this.
+ */
+export function startAllOut(w: World, c: Colony, t: Colony): void {
+  const b = warBrain(c);
+  const q = w.antById.get(t.queen);
+  b.allOut = true;
+  b.target = t.id;
+  b.start = Math.max(1, fighters(w, c).n);
+  b.age = 0;
+  b.defending = false;
+  b.clearT = 0;
+  b.joined = c.id;
+  b.gather = undefined;
+  b.t = 0;
+  // whatever else the groups were doing is over: defence (II), forage (I), help for an ally (V)
+  const s = c.aiAlly;
+  if (s && s.ally >= 0) {
+    s.ally = -1;
+    s.sent = 0;
+  }
+  for (const i of [0, DEFEND, HELP]) {
+    if (c.markers[i].placed) removeMarker(w, c, i);
+    for (const g of c.groups) if (g.marker === i) g.marker = -1;
+  }
+  const m = c.markers[ATTACK];
+  m.noGather = true;
+  if (q && q.state !== AS.Dead) placeMarker(w, c, ATTACK, q.space, q.x, q.y);
+  sendAllOut(w, c);
+}
+
+/** Every think: stay on the target's queen with everything (new hatchlings join), until she or the colony is dead. */
+function allOutTick(w: World, c: Colony, b: WarBrain, dt: number): void {
+  b.age += dt;
+  b.t -= dt;
+  if (b.t > 0) return;
+  b.t = BALANCE.aiWar.every;
+  const t = w.colony(b.target);
+  const q = t ? w.antById.get(t.queen) : undefined;
+  if (!t || !t.alive || !q || q.state === AS.Dead) {
+    // the queen is dead: the war is won (the groups come home, as after any raid)
+    b.allOut = false;
+    delete c.markers[ATTACK].noGather;
+    endRaid(w, c, true);
+    return;
+  }
+  const m = c.markers[ATTACK];
+  m.noGather = true;
+  if (!m.placed || m.space !== q.space || sq(m.x - q.x) + sq(m.y - q.y) > 16) placeMarker(w, c, ATTACK, q.space, q.x, q.y);
+  if (c.markers[0].placed) removeMarker(w, c, 0);
+  sendAllOut(w, c);
 }

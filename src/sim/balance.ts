@@ -1176,6 +1176,46 @@ export const FLOOD = {
 };
 
 /**
+ * A nest flooding (sim/nestFlood.ts; claude/story/06-spec-levels-5-7-and-lengths.md §4, level 6 "High Water"; DESIGN.md
+ * 3.12c). Only a story (or a dev URL) starts one: `startNestFlood`. The water pours in at the entrance, runs down the
+ * tunnels and fills the nest from its deepest hexes (farthest from the entrance along the tunnels) back up to the
+ * entrance, hex by hex at a steady inflow (a big chamber takes longer to fill than a tunnel).
+ */
+export const NEST_FLOOD = {
+  /** seconds the whole nest takes to fill (startNestFlood's default): a dramatic moment, short enough to watch through */
+  fillSec: 45,
+  /**
+   * seconds an ant, the queen or a creature holds its breath under water before it starts to drown (real ants survive
+   * hours under water; a game keeps it to a short window)
+   */
+  breathS: 6,
+  /** then it loses this share of its maximum health a second (10 s more from full health: about 16 s in all) */
+  drownFrac: 0.1,
+  /** creatures (bigger, more air in them): this share a second */
+  creatureDrownFrac: 0.05,
+  /** brood (no health): an egg or larva under water this long past `breathS` is dead */
+  broodS: 4,
+  /** breath comes back this many times as fast out of the water */
+  breathBack: 2,
+  /** speed in water (swimming, × the walking speed) */
+  swimMul: 0.45,
+  /**
+   * The colony's ants at home keep working until the water comes within this many hexes (along the tunnels) of where
+   * they are; then they climb to higher ground at least `keepAbove` + 1 hexes above the water and stay there; workers
+   * fetch brood lying within `rescueAhead` hexes above the water (and not under it yet) up with them. Jobs within
+   * `keepAbove` of the water stop.
+   */
+  keepAbove: 2,
+  rescueAhead: 3,
+  /** how far (mm) a worker goes for brood to carry up */
+  rescueR: 90,
+  /** render: seconds a hex's water takes to rise from the floor to its full depth after it goes under */
+  riseS: 2.5,
+  /** render: the full water depth as a share of the nest's wall height (the walls' upper slopes still show above it) */
+  depthOfWall: 0.6,
+};
+
+/**
  * Nest entrances (sim/entrances.ts; claude/maps/02-spec-nest-entrances, user spec 2026-11-01 "one wide underground
  * entrance, three surface holes per anthill"; DESIGN.md "Entrances"). Each nest has one entrance: a 7-hex flower at the
  * nest's edge underground, and three holes in its anthill on the surface, all leading into it, always open.
