@@ -292,7 +292,10 @@ export function storySystem(w: World, dt: number): void {
   if (!st || !m || m.result === 'lost') return;
   const D = levelOf(st).dayNight;
   if (D) w.s.night = dayNightAt(D, w.s.time).light;
-  directorTick(w, st, m.stage, m.t, dt);
+  // (until the mission enters a new stage, up to a second later, `m.t` is still the last stage's clock: the new stage's
+  // scenes timed `at` would all start at once — the Spider Mother's broods at 6½ and 10 minutes came out together at
+  // the start of her rounds, 2026-11-06)
+  directorTick(w, st, m.stage, m.entered ? m.t : 0, dt);
 }
 
 /** Flags the world sets (each second, before the captions and actions that wait on them). */

@@ -263,6 +263,21 @@ const rolled = (id: StoryLevelId, diff: Difficulty, seed: number) => {
   check('antlered king: holding the sap with 12 ants for 150 s finishes the sap run', m.stage === 2, held);
 }
 
+// ---------------------------------------------------------------- a new stage's timed scenes wait for its own clock
+{
+  // (the mission enters a stage once a second: until it does, the director must not read the last stage's clock — the
+  // Spider Mother's broods at 6½ and 10 min came out together at the start of her rounds)
+  const w = level('spiderMother', 'normal', 5);
+  const st = storyOf(w)!;
+  const m = missionOf(w)!;
+  while (w.s.tick % 20 !== 1) run(w, 1);
+  m.stage = 1;
+  m.entered = false;
+  m.t = 900;
+  run(w, 25);
+  check('director: a new stage’s timed scenes wait for its own clock (no brood at the start of her rounds)', m.entered && !hasFlag(st, 'wave:broodB') && !hasFlag(st, 'wave:broodC'), st.flags.join(', '));
+}
+
 // ---------------------------------------------------------------- the old stump (the king sees off a challenger)
 {
   const w = level('antleredKing', 'normal', 5);
