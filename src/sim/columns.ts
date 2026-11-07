@@ -19,6 +19,55 @@ const K_OTHER = 3;
 /** NaN payload that marks an absent optional number (`team?`) */
 const ABSENT = -1.2345e-300;
 
+/**
+ * A generated reader (performance v2): a loop that stores `o[k]` for a hundred different keys k is one megamorphic
+ * keyed store per value; a loop generated for the schema stores each field by name, one object at a time — under half
+ * the time (800 ants: 3.1 → 1.8 ms on the build machine). Pages that forbid compiling code (a strict CSP) keep the
+ * plain loop, which gives the same result. `columnCodegen.on = false` forces the plain loop (tests).
+ */
+export const columnCodegen = {
+  on: (() => {
+    try {
+      return new Function('return 1')() === 1;
+    } catch {
+      return false;
+    }
+  })(),
+};
+type ReadFn = (out: unknown[], n: number, num: Float64Array, str: Uint16Array, table: string[], nb: number[], sb: number[], absent: number) => void;
+const readFns = new Map<string, ReadFn>();
+const sigOf = (keys: readonly string[], kinds: readonly number[]) => keys.map((k, j) => kinds[j] + k).join('\u0001');
+
+function readFn(keys: readonly string[], kinds: readonly number[]): ReadFn | null {
+  if (!columnCodegen.on) return null;
+  const sig = sigOf(keys, kinds);
+  let f = readFns.get(sig);
+  if (f) return f;
+  const decl: string[] = [];
+  const body: string[] = [];
+  keys.forEach((k, j) => {
+    const q = JSON.stringify(k);
+    if (kinds[j] === K_NUM) {
+      decl.push(`const b${j} = nb[${j}];`);
+      body.push(`if (b${j} >= 0) { const v = num[b${j} + i]; o[${q}] = v === absent ? undefined : v; }`);
+    } else if (kinds[j] === K_BOOL) {
+      decl.push(`const b${j} = nb[${j}];`);
+      body.push(`if (b${j} >= 0) { const v = num[b${j} + i]; o[${q}] = v === absent ? undefined : v === 1; }`);
+    } else if (kinds[j] === K_STR) {
+      decl.push(`const b${j} = sb[${j}];`);
+      body.push(`if (b${j} >= 0) { const v = str[b${j} + i]; o[${q}] = v === 0xffff ? undefined : table[v]; }`);
+    }
+  });
+  try {
+    f = new Function('out', 'n', 'num', 'str', 'table', 'nb', 'sb', 'absent', `${decl.join('\n')}\nfor (let i = 0; i < n; i++) { const o = out[i];\n${body.join('\n')}\n}`) as ReadFn;
+  } catch {
+    columnCodegen.on = false;
+    return null;
+  }
+  readFns.set(sig, f);
+  return f;
+}
+
 export interface ColumnPacket {
   n: number;
   keys: string[];
@@ -31,6 +80,11 @@ export interface ColumnPacket {
   newStrings: string[];
   /** other-typed fields: [entity index, key index, value] */
   other: Array<[number, number, unknown]>;
+  /**
+   * Delta frames (performance v2): per key, 1 = the column is the same as in the last packet (the same entities in the
+   * same order) and is not sent — the reader's objects keep their values. Absent: every column is sent.
+   */
+  omit?: Uint8Array;
 }
 
 /** Where a writer gets its column arrays (default: fresh ones). */
@@ -74,11 +128,22 @@ export class ColumnWriter {
     return i;
   }
 
+  /** this writer's own copy of the last two frames' full columns (the newest is compared with the next) */
+  private bufs: Array<{ num: Float64Array; str: Uint16Array }> = [
+    { num: new Float64Array(0), str: new Uint16Array(0) },
+    { num: new Float64Array(0), str: new Uint16Array(0) },
+  ];
+  private cur = 0;
+  private last: { n: number; nNum: number; nStr: number; nKeys: number } | null = null;
+
   /**
    * Encode a list. `alloc` supplies the column arrays (the worker passes
-   * shared ring buffers when the page is cross-origin isolated).
+   * shared ring buffers when the page is cross-origin isolated). `delta`:
+   * when the entities are the same as last time and in the same order, the
+   * columns that did not change are left out (`omit`) — about half of them
+   * in a big fight (performance v2).
    */
-  write(items: readonly object[], skip?: ReadonlySet<string> | null, alloc?: ColumnAlloc): ColumnPacket {
+  write(items: readonly object[], skip?: ReadonlySet<string> | null, alloc?: ColumnAlloc, delta = false): ColumnPacket {
     this.schema(items);
     const n = items.length;
     const keys = this.keys;
@@ -89,17 +154,28 @@ export class ColumnWriter {
       if (kinds[j] === K_NUM || kinds[j] === K_BOOL) nNum++;
       else if (kinds[j] === K_STR) nStr++;
     }
-    const num = alloc ? alloc.num(n * nNum) : new Float64Array(n * nNum);
-    const str = alloc ? alloc.str(n * nStr) : new Uint16Array(n * nStr);
+    // the full columns, in this writer's own arrays
+    this.cur ^= 1;
+    const B = this.bufs[this.cur];
+    if (B.num.length < n * nNum) B.num = new Float64Array(Math.ceil(n * nNum * 1.25) + 64);
+    if (B.str.length < n * nStr) B.str = new Uint16Array(Math.ceil(n * nStr * 1.25) + 64);
+    const num = B.num;
+    const str = B.str;
     const other: Array<[number, number, unknown]> = [];
+    const numBase = this.numBase;
+    const strBase = this.strBase;
+    numBase.length = strBase.length = keys.length;
     let cn = 0;
     let cs = 0;
+    // (column by column: a generated row-by-row loop is slower here — its stores are scattered over a hundred columns)
     for (let j = 0; j < keys.length; j++) {
       const k = keys[j];
       const kind = kinds[j];
+      numBase[j] = kind === K_NUM || kind === K_BOOL ? cn * n : -1;
+      strBase[j] = kind === K_STR ? cs * n : -1;
       if (skip?.has(k)) {
-        if (kind === K_NUM || kind === K_BOOL) cn++;
-        else if (kind === K_STR) cs++;
+        if (kind === K_NUM || kind === K_BOOL) num.fill(0, cn++ * n, cn * n);
+        else if (kind === K_STR) str.fill(0, cs++ * n, cs * n);
         continue;
       }
       if (kind === K_NUM) {
@@ -127,10 +203,71 @@ export class ColumnWriter {
         }
       }
     }
+    // delta: the same entities in the same order as the last packet → leave out the columns that did not change
+    let omit: Uint8Array | undefined;
+    const L = this.last;
+    const idCol = this.keyIndex.get('id') ?? -1;
+    if (delta && L && idCol >= 0 && L.n === n && L.nNum === nNum && L.nStr === nStr && L.nKeys === keys.length && n > 0) {
+      const P = this.bufs[this.cur ^ 1];
+      const ib = numBase[idCol];
+      let same = true;
+      for (let i = 0; i < n; i++)
+        if (num[ib + i] !== P.num[ib + i]) {
+          same = false;
+          break;
+        }
+      if (same) {
+        omit = new Uint8Array(keys.length);
+        for (let j = 0; j < keys.length; j++) {
+          if (j === idCol) continue;
+          const nb = numBase[j];
+          const sb = strBase[j];
+          let eq = nb >= 0 || sb >= 0;
+          if (nb >= 0) {
+            for (let i = 0; i < n; i++) {
+              const a = num[nb + i];
+              const b = P.num[nb + i];
+              // (NaN equals NaN here: an unchanged NaN need not be sent again)
+              if (a !== b && !(a !== a && b !== b)) {
+                eq = false;
+                break;
+              }
+            }
+          } else if (sb >= 0) {
+            for (let i = 0; i < n; i++)
+              if (str[sb + i] !== P.str[sb + i]) {
+                eq = false;
+                break;
+              }
+          }
+          if (eq) omit[j] = 1;
+        }
+      }
+    }
+    this.last = { n, nNum, nStr, nKeys: keys.length };
+    // the columns sent
+    let sNum = 0;
+    let sStr = 0;
+    for (let j = 0; j < keys.length; j++) {
+      if (omit?.[j]) continue;
+      if (numBase[j] >= 0) sNum++;
+      else if (strBase[j] >= 0) sStr++;
+    }
+    const outNum = alloc ? alloc.num(n * sNum) : new Float64Array(n * sNum);
+    const outStr = alloc ? alloc.str(n * sStr) : new Uint16Array(n * sStr);
+    let on = 0;
+    let os = 0;
+    for (let j = 0; j < keys.length; j++) {
+      if (omit?.[j]) continue;
+      if (numBase[j] >= 0) outNum.set(num.subarray(numBase[j], numBase[j] + n), on++ * n);
+      else if (strBase[j] >= 0) outStr.set(str.subarray(strBase[j], strBase[j] + n), os++ * n);
+    }
     const newStrings = this.table.slice(this.sentStrings);
     this.sentStrings = this.table.length;
-    return { n, keys: keys.slice(), kinds: kinds.slice(), num, str, newStrings, other };
+    return { n, keys: keys.slice(), kinds: kinds.slice(), num: outNum, str: outStr, newStrings, other, ...(omit ? { omit } : {}) };
   }
+  private numBase: number[] = [];
+  private strBase: number[] = [];
 }
 
 /**
@@ -155,16 +292,19 @@ export class ColumnReader<T extends { id: number }> {
     const n = p.n;
     const keys = p.keys;
     const kinds = p.kinds;
+    const omit = p.omit;
     const idCol = keys.indexOf('id');
     if (idCol < 0 && n > 0) throw new Error('columns: entities need an id');
-    // column offsets
-    const numBase: number[] = [];
-    const strBase: number[] = [];
+    // column offsets (a left-out column takes no space: its values stay on the objects)
+    const numBase = this.numBase;
+    const strBase = this.strBase;
+    numBase.length = strBase.length = keys.length;
     let cn = 0;
     let cs = 0;
     for (let j = 0; j < keys.length; j++) {
-      numBase.push(kinds[j] === K_NUM || kinds[j] === K_BOOL ? cn++ * n : -1);
-      strBase.push(kinds[j] === K_STR ? cs++ * n : -1);
+      const sent = !omit || !omit[j];
+      numBase[j] = sent && (kinds[j] === K_NUM || kinds[j] === K_BOOL) ? cn++ * n : -1;
+      strBase[j] = sent && kinds[j] === K_STR ? cs++ * n : -1;
     }
     const num = p.num;
     const str = p.str;
@@ -172,37 +312,59 @@ export class ColumnReader<T extends { id: number }> {
     out.length = n;
     const seen = this.seen;
     seen.clear();
+    if (this.kept.length < n) this.kept = new Uint8Array(Math.ceil(n * 1.5) + 16);
+    const kept = this.kept;
     const idBase = numBase[idCol];
+    // the objects (pooled by id), and what the carry keeps of them before they change
     for (let i = 0; i < n; i++) {
       const id = num[idBase + i];
       let o = this.pool.get(id);
-      const kept = !!o && !!carry;
+      kept[i] = o && carry ? 1 : 0;
       if (!o) {
         o = {} as T;
         this.pool.set(id, o);
-      } else if (kept) carry!.save(o);
+      } else if (carry) carry.save(o);
       seen.add(id);
-      const r = o as unknown as Record<string, unknown>;
-      for (let j = 0; j < keys.length; j++) {
-        const kind = kinds[j];
-        if (kind === K_NUM) {
-          const v = num[numBase[j] + i];
-          r[keys[j]] = v === ABSENT ? undefined : v;
-        } else if (kind === K_BOOL) {
-          const v = num[numBase[j] + i];
-          r[keys[j]] = v === ABSENT ? undefined : v === 1;
-        } else if (kind === K_STR) {
-          const v = str[strBase[j] + i];
-          r[keys[j]] = v === 0xffff ? undefined : this.table[v];
-        }
-      }
-      if (kept) carry!.restore(o);
       out[i] = o;
     }
+    // then the values: a loop generated for the schema (named stores), or column by column
+    const gen = readFn(keys, kinds);
+    if (gen) gen(out, n, num, str, this.table, numBase, strBase, ABSENT);
+    for (let j = 0; j < keys.length && !gen; j++) {
+      const kind = kinds[j];
+      const k = keys[j];
+      if (kind === K_NUM) {
+        const b = numBase[j];
+        if (b < 0) continue;
+        for (let i = 0; i < n; i++) {
+          const v = num[b + i];
+          (out[i] as unknown as Record<string, unknown>)[k] = v === ABSENT ? undefined : v;
+        }
+      } else if (kind === K_BOOL) {
+        const b = numBase[j];
+        if (b < 0) continue;
+        for (let i = 0; i < n; i++) {
+          const v = num[b + i];
+          (out[i] as unknown as Record<string, unknown>)[k] = v === ABSENT ? undefined : v === 1;
+        }
+      } else if (kind === K_STR) {
+        const b = strBase[j];
+        if (b < 0) continue;
+        const table = this.table;
+        for (let i = 0; i < n; i++) {
+          const v = str[b + i];
+          (out[i] as unknown as Record<string, unknown>)[k] = v === 0xffff ? undefined : table[v];
+        }
+      }
+    }
+    if (carry) for (let i = 0; i < n; i++) if (kept[i]) carry.restore(out[i]);
     for (const [i, j, v] of p.other) (out[i] as unknown as Record<string, unknown>)[keys[j]] = v;
     if (this.pool.size > n) for (const id of this.pool.keys()) if (!seen.has(id)) this.pool.delete(id);
     return out;
   }
+  private numBase: number[] = [];
+  private strBase: number[] = [];
+  private kept = new Uint8Array(0);
 }
 
 /** Buffers to transfer (zero-copy) when posting a packet; shared ones are not transferred. */
