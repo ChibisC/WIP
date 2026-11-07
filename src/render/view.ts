@@ -426,6 +426,13 @@ export class GameView {
     return !!this.transition || !!this.areaFade;
   }
 
+  /** Where a dive or an area cut in progress lands (null: none, or already swapped). */
+  get incoming(): ViewSpace | null {
+    if (this.transition && !this.transition.swapped) return this.transition.to;
+    if (this.areaFade && !this.areaFade.swapped) return 'nest';
+    return null;
+  }
+
   /**
    * Smooth cut between two underground areas (they are separate maps):
    * a quick fade to black, `swap` changes the shown area, then fade back in.

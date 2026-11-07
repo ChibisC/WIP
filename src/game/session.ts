@@ -421,15 +421,28 @@ export class GameSession {
    * mesh after digging and its tiles, while the frame has room, so showing it later has nothing to catch up on.
    */
   private keepAreasCurrent(): void {
-    if (this.frameNo % 6 !== 0 || prof.cpuMs.ema > 12) return;
-    const list = [...this.nests.values()];
     const v = this.view;
+    // the area a dive or a cut is about to show: brought up to date under the fade, a slice every frame
+    if (v.incoming === 'nest') {
+      const nv = this.nests.get(this.viewedArea);
+      if (nv && nv.stage.terrain.dirty) {
+        const t0 = performance.now();
+        nv.stage.terrain.update(false, 6);
+        prof.add('nest', performance.now() - t0);
+        return;
+      }
+    }
+    // the others in turn, a slice every third frame while the frame has room
+    if (this.frameNo % 3 !== 0 || prof.cpuMs.ema > 25) return;
+    const list = [...this.nests.values()];
     for (let k = 0; k < list.length; k++) {
       const nv = list[this.areaRR++ % list.length];
       if (v.space === 'nest' && nv.space === v.activeNest) continue;
       const t0 = performance.now();
-      nv.stage.terrain.update();
-      nv.updateHexes(this.world, this.world.colony(colonyOfSpace(nv.space)) ?? null);
+      if (nv.stage.terrain.dirty) nv.stage.terrain.update(false, 3);
+      // (the hexes: tiles and their looks, cheap; at most every 18 frames per area)
+      else if (this.frameNo % 18 === 0) nv.updateHexes(this.world, this.world.colony(colonyOfSpace(nv.space)) ?? null);
+      else continue;
       prof.add('nest', performance.now() - t0);
       return;
     }

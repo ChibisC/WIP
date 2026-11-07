@@ -6,6 +6,8 @@
  *  - The fingerprint tells apart values that differ (numbers, -0, NaN, strings, key order, typed arrays, nesting).
  *  - The LOD cross-fade rides in aE.z with "exhausted" (the ant shader has no vertex attribute left): both unpack
  *    as the shader unpacks them.
+ *  - The nest terrain's signed distance (its faster blur) is the same to the bit as the plain loop's, and faster; an
+ *    area kept current in slices ends with the mesh a full rebuild gives.
  *  - The frame cap holds 30 and 60 on a 120 Hz clock and never skips at 60 on a 60 Hz one.
  *
  *   npx vite-node tests/performance.ts
@@ -16,6 +18,8 @@ import { SlowDelta, fingerprint } from '../src/worker/slowDelta';
 import { GameLoop } from '../src/core/loop';
 import { frameCapOf, sanitizeSettings } from '../src/game/profile';
 import { packExhaustedFade } from '../src/render/ants/antMaterial';
+import { NestTerrain } from '../src/render/nest/nestTerrain';
+import { SOIL_AIR } from '../src/world/nestGrid';
 
 const t0 = Date.now();
 let failed = 0;
@@ -108,6 +112,134 @@ function check(name: string, ok: boolean, detail = ''): void {
   }
   check('aE.z packing: exhausted within 1/500; the fade draws the same pixels but for 1/256 of them', worstE <= 1 / 500 && worstF <= 1 / 256 + 1 / 4096, `exhausted ±${worstE.toFixed(4)}, pixels ${(worstF * 100).toFixed(2)} %`);
   check('aE.z packing: no fade unpacks as the whole model', unpack(packExhaustedFade(0.4, 0)).fade === 0);
+}
+
+// ---- the nest terrain's signed distance: the faster blur gives the old result to the bit
+{
+  // the plain implementation from before the performance pass
+  const chamferRef = (d: Float32Array, W: number, H: number) => {
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const k = y * W + x;
+        let v = d[k];
+        if (v === 0) continue;
+        if (x > 0) v = Math.min(v, d[k - 1] + 1);
+        if (y > 0) {
+          v = Math.min(v, d[k - W] + 1);
+          if (x > 0) v = Math.min(v, d[k - W - 1] + Math.SQRT2);
+          if (x < W - 1) v = Math.min(v, d[k - W + 1] + Math.SQRT2);
+        }
+        d[k] = v;
+      }
+    for (let y = H - 1; y >= 0; y--)
+      for (let x = W - 1; x >= 0; x--) {
+        const k = y * W + x;
+        let v = d[k];
+        if (v === 0) continue;
+        if (x < W - 1) v = Math.min(v, d[k + 1] + 1);
+        if (y < H - 1) {
+          v = Math.min(v, d[k + W] + 1);
+          if (x < W - 1) v = Math.min(v, d[k + W + 1] + Math.SQRT2);
+          if (x > 0) v = Math.min(v, d[k + W - 1] + Math.SQRT2);
+        }
+        d[k] = v;
+      }
+  };
+  const sdRef = (soil: Uint8Array | number[], W: number, H: number) => {
+    const sd = new Float32Array(W * H);
+    const dA = new Float32Array(W * H);
+    const dS = new Float32Array(W * H);
+    for (let k = 0; k < W * H; k++) {
+      const air = soil[k] === SOIL_AIR;
+      dA[k] = air ? 1e6 : 0;
+      dS[k] = air ? 0 : 1e6;
+      const x = k % W;
+      const y = (k - x) / W;
+      if (air && (x === 0 || y === 0 || x === W - 1 || y === H - 1)) dA[k] = 0.5;
+    }
+    chamferRef(dA, W, H);
+    chamferRef(dS, W, H);
+    for (let k = 0; k < W * H; k++) sd[k] = soil[k] === SOIL_AIR ? dA[k] - 0.5 : -(dS[k] - 0.5);
+    const tmp = new Float32Array(W * H);
+    for (let pass = 0; pass < 7; pass++) {
+      for (let y = 0; y < H; y++)
+        for (let x = 0; x < W; x++) {
+          let sum = 0;
+          let n = 0;
+          for (let dy = -1; dy <= 1; dy++)
+            for (let dx = -1; dx <= 1; dx++) {
+              const xx = x + dx;
+              const yy = y + dy;
+              if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+              const wgt = dx === 0 && dy === 0 ? 2 : 1;
+              sum += sd[yy * W + xx] * wgt;
+              n += wgt;
+            }
+          tmp[y * W + x] = sum / n;
+        }
+      sd.set(tmp);
+    }
+    return sd;
+  };
+  const w = createWorld({ seed: 4, style: 'meadow', width: 100, depth: 100, map: 'meadowPond', colonies: [{ species: 'lasius', player: true, ai: true }, { species: 'formica', player: false, ai: true }], food: 1.2, settings: {} } as never, new EventBus());
+  for (let i = 0; i < 20 * 120; i++) w.step(0.05);
+  let same = true;
+  let tNew = 0;
+  let tOld = 0;
+  for (const sp of [1, 2]) {
+    const g = w.nestOf(sp)!;
+    const nt = new NestTerrain(g) as unknown as { computeSignedDistance(): void; sd: Float32Array };
+    for (let r = 0; r < 3; r++) {
+      let a = performance.now();
+      nt.computeSignedDistance();
+      tNew += performance.now() - a;
+      a = performance.now();
+      const ref = sdRef(g.soil as unknown as Uint8Array, g.w, g.h);
+      tOld += performance.now() - a;
+      for (let k = 0; k < ref.length; k++) if (!Object.is(ref[k], nt.sd[k])) same = false;
+    }
+  }
+  check('nest terrain: the signed distance is the old one to the bit, in less time', same && tNew < tOld, `${(tNew / 6).toFixed(1)} ms against ${(tOld / 6).toFixed(1)} ms`);
+
+  // an area kept current in slices (budget 3 ms a call) ends up with the very mesh a full rebuild gives
+  {
+    const g = w.nestOf(1)!;
+    const bg = new NestTerrain(g) as unknown as { update(f?: boolean, b?: number): void; chunks: Map<number, { geometry: { attributes: Record<string, { array: ArrayLike<number> }> } }>; dirty: number };
+    bg.update(true);
+    // dig a tunnel across the nest, a cell at a time (as ants do), then let the slices catch up
+    let calls = 0;
+    for (let i = 0; i < 400; i++) {
+      g.carve(Math.floor(g.w * 0.2) + (i % 120), Math.floor(g.h * 0.5) + Math.floor(i / 120));
+      if (i % 25 === 0) {
+        bg.update(false, 3);
+        calls++;
+      }
+    }
+    let slicesMax = 0;
+    while (bg.dirty) {
+      const a = performance.now();
+      bg.update(false, 3);
+      slicesMax = Math.max(slicesMax, performance.now() - a);
+      calls++;
+    }
+    const full = new NestTerrain(g) as unknown as typeof bg;
+    full.update(true);
+    let equal = bg.chunks.size === full.chunks.size;
+    for (const [ci, m] of full.chunks) {
+      const o = bg.chunks.get(ci);
+      if (!o) {
+        equal = false;
+        continue;
+      }
+      for (const name of ['position', 'normal']) {
+        const A = m.geometry.attributes[name]?.array;
+        const B = o.geometry.attributes[name]?.array;
+        if (!A || !B || A.length !== B.length) equal = false;
+        else for (let k = 0; k < A.length; k++) if (!Object.is(A[k], B[k])) equal = false;
+      }
+    }
+    check('nest terrain: kept current in 3 ms slices, an area ends with the same mesh as a full rebuild', equal, `${calls} slices, the longest ${slicesMax.toFixed(1)} ms`);
+  }
 }
 
 // ---- the frame cap
