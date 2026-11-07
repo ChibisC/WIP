@@ -26,6 +26,12 @@ const EV = surprisePool(
   wanderer('smallLate', { window: [200, 400], after: 'stage:2', until: 'stage:3', from: 'hard', creature: 'stagSmall', enter: 'evSouth', to: 'shelfFoot', r: 70, s: 100, exit: 'evSouth', label: 'a small male stag beetle' }),
 );
 
+/**
+ * The oak's sap: drops at its foot every 45 s from the sap run to the end (the woods' best food: whoever holds the oak eats
+ * well — it ran only during the sap run until 2026-11-06, and a person-paced colony starved in the stages after it).
+ */
+const SAP = Array.from({ length: 24 }, (_, k) => ({ at: k * 45 + 2, actions: [{ do: 'food' as const, at: 'sapOak', kind: 'honeydew' as const, from: '', scale: 1.6, n: 2, spread: 12 }] }));
+
 export const ANTLERED_KING_LEVEL: StoryLevelDef = {
   id: 'antleredKing',
   chapter: 1,
@@ -61,7 +67,9 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
     // the titan and the lesser males that come to the fight
     // (0.85 of the titan's health: at full health, with the stages before him longer, a person-paced colony lost him on
     // Normal and Hard, 2026-11-06)
-    king: { creature: 'stagBeetle', at: 'kingStump', face: 'knollFoot', goal: 'nestApproach', spawn: 'action', hp: 0.85, phases: [0.7, 0.45, 0.25], label: 'the Antlered King' },
+    // (inside the nest his bites are softer, like the Spider Mother's — claude/story/05-spec §3: he always gets in, and a
+    // person-paced colony that had worn him to his floor outside lost its queen to him inside on Normal, 2026-11-06)
+    king: { creature: 'stagBeetle', at: 'kingStump', face: 'knollFoot', goal: 'nestApproach', spawn: 'action', hp: 0.85, phases: [0.7, 0.45, 0.25], label: 'the Antlered King', inside: { bite: { easy: 0.8, normal: 0.75, hard: 0.6, brutal: 0.65 }, queenBite: { easy: 0.4, normal: 0.5, hard: 0.4, brutal: 0.5 } } },
     // a younger male who climbs the knoll to the old one and thinks better of it
     challenger: { creature: 'stagMedium', at: 'evEast', face: 'knollSlope', spawn: 'action', label: 'a challenger' },
     callA: { creature: 'stagSmall', at: 'evWest', face: 'nestApproach', spawn: 'action', wave: true, label: 'the lesser males' },
@@ -114,7 +122,7 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
       events: [
         { actions: [{ do: 'music', mood: 'tense' }, { do: 'shot', shot: { keys: [{ at: 'sapOak', dist: 220, yaw: 0.6, t: 0, pitch: 0.05 }, { at: 'sapOak', dist: 180, yaw: 1.0, t: 5 }] } }] },
         // the oak weeps sap: drops at its foot, again and again
-        ...[0, 45, 90, 135, 180, 225, 270, 315, 360, 405, 450, 495, 540, 585, 630, 675, 720].map((at) => ({ at: at + 2, actions: [{ do: 'food' as const, at: 'sapOak', kind: 'honeydew' as const, from: '', scale: 1.6, n: 2, spread: 12 }] })),
+        ...SAP,
         { at: 20, actions: [{ do: 'spawn', actor: 'sapA' }, { do: 'spawn', actor: 'sapB' }] },
         { on: 'sapMeet', actions: [{ do: 'wrestle', a: 'sapA', b: 'sapB' }] },
         { at: 40, actions: [{ do: 'tip', key: 'hold' }] },
@@ -140,6 +148,7 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
       ],
       events: [
         { actions: [{ do: 'music', mood: 'calm' }] },
+        ...SAP,
         { at: 60, actions: [{ do: 'spawn', actor: 'medium' }] },
         { at: 210, actions: [{ do: 'spawn', actor: 'large' }, { do: 'music', mood: 'tense' }] },
         { at: 380, actions: [{ do: 'spawn', actor: 'pairA' }, { do: 'spawn', actor: 'pairB' }] },
@@ -169,6 +178,7 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
       ],
       events: [
         { actions: [{ do: 'spawn', actor: 'king' }, { do: 'music', mood: 'tense' }, { do: 'shot', shot: { keys: [{ at: 'kingStump', dist: 300, yaw: 0.9, t: 0, pitch: 0.08 }, { at: 'kingStump', dist: 240, yaw: 1.2, t: 6 }] } }] },
+        ...SAP,
         { at: 20, actions: [{ do: 'tip', key: 'kingPrep' }] },
         { at: 40, actions: [{ do: 'spawn', actor: 'challenger' }] },
       ],
@@ -192,6 +202,7 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
       ],
       events: [
         { actions: [{ do: 'spawn', actor: 'king' }, { do: 'music', mood: 'assault' }, { do: 'shot', shot: { keys: [{ at: { actor: 'king' }, dist: 260, yaw: 0.9, t: 0, pitch: 0.05 }, { at: { actor: 'king' }, dist: 220, yaw: 1.3, t: 6 }] } }] },
+        ...SAP,
         { on: 'hp:king:45', actions: [{ do: 'spawn', actor: 'callA' }, { do: 'spawn', actor: 'callB' }] },
         { on: 'hp:king:25', actions: [{ do: 'flag', flag: 'kingDigs' }] },
         { on: 'kingDigs', actions: [{ do: 'tip', key: 'kingDig' }] },

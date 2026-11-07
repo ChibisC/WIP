@@ -217,11 +217,12 @@ ring, a 7-hex worker chamber, 4 store tiles, 3 soldier tiles). The four stag bee
 | Settle the woods | raise 35, gather 200 food, kill the small male | opening flight (the stump → the sap oak → the shelf); a minor male walks across the woods (1 min); a small male comes to the clearing (4½ min) and stays there until he is brought down (the first fight); tip: big beetles need many ants, riders bite where it can't reach |
 | The sap run | hold the sap flow with 12 ants for 2½ min; gather 150 (optional) | the oak weeps sap (honeydew drops every 45 s); a small and a medium male come to the oak, face off and wrestle (`wrestle` action: jaws locked, the bigger throws the other); the loser leaves, the winner guards the sap 2½ min |
 | Rivals in the woods | hold out 10–12 min (by difficulty) and kill the large male; 20 fighters (optional) | a medium male guards the root ramp's foot; the large male takes the sap, then comes to the shelf's foot, and again and again until he is killed (a `goto` loop); two more males wrestle in the clearing; the stump hint |
+| The old stump | get ready (Easy 4½ min, Normal 4, Hard 3¾, Brutal 3½); 25 fighters (optional) | a breathing space after the large male (added 2026-11-06: the colony rebuilds before the titan): he sits on his stump over the woods; a younger medium male climbs the knoll to him, they face each other, and the younger one turns back down the slope without a fight; tip: meet him together |
 | The Antlered King | kill him | the titan comes down from his stump along the clearing to the colony's doorstep, fighting what he meets (his own program: grab-and-toss, shoving through, rear-and-slam when enraged — telegraphed); at 45 % two lesser males come out of the woods (a wave); at 25 %, or after three minutes at the doorstep whatever his health, he digs into the nest (`digInto`): a colony that only waits him out does not stall the level |
 
 Surprise events: a ground beetle at the root ramp's foot, a fallen moth, a summer shower and a beetle brought down by it,
-on Hard and Brutal a small male at the shelf's foot. His health the titan's × the difficulty's `boss` (0.85 until a
-person-pace playtest finished Normal in 22 minutes, 2026-11-06; the stages above were lengthened then too). Medals:
+on Hard and Brutal a small male at the shelf's foot. His health 0.85 × the titan's × the difficulty's `boss` (briefly the full titan's on
+2026-11-06: with the longer stages before him a person-paced colony then lost him on Normal and Hard). Medals:
 time gold ≤ 40 min, silver ≤ 52; losses gold ≤ 60, silver ≤ 140; bonus "kill him within a minute of his breaking into the
 nest" (`killWithin`: story titans always get in, 05-spec, merged 2026-11-06). Reward:
 the trait **Antler Plating** (`STORY.traits.antlerPlating`: +1 armour on every ant of the colony; story only).
@@ -245,10 +246,12 @@ fight each other (three separate colonies). The summit never floods.
 | The summit stands | all three colonies gone (drowned or destroyed) | the terrace and its nest flood; the scientist on the high ground |
 
 Surprise events: a ground beetle and a drowned grasshopper on the plain, a seed drop on the hill's foot, a wolf spider
-come up out of the water's way, on Hard and Brutal a red wood ant column crossing the plain. Medals: food stored (gold ≥
-420, silver ≥ 240), losses (gold ≤ 70, silver ≤ 160), bonus "destroy a colony yourself before the water takes it"
-(`deadBefore`). The water's timetable is the same on every difficulty (about 36 minutes); the difficulty scales the
-rivals.
+come up out of the water's way, on Hard and Brutal a red wood ant column crossing the plain (4 workers and a soldier: with
+6 and 2 it cut a person-paced colony's foragers from 48 to 16 on Hard). Medals: food stored (gold ≥ 420, silver ≥ 240),
+losses (gold ≤ 70, silver ≤ 160), bonus "destroy a colony yourself before the water takes it" (`deadBefore`). The water's
+timetable is the same on every difficulty (about 35 minutes); the difficulty scales the rivals' strength and aggression
+but not their sizes (`RivalDef.fixedSize`, 2026-11-06: three colonies at once, each 1.25× and 1.5× as big on Hard and
+Brutal as well, overran a person-paced colony by 20 minutes).
 
 ### Level 7 — "Carton Kingdom" (map `rainforestEdge`, 1200 × 1000 mm) — new 2026-11-03, the chapter's last level
 Kept the working title. The Rainforest's edge: two giant trunks on buttress roots, wet ground, a sunken hollow of puddles
@@ -304,7 +307,9 @@ the surface at `STORY.heatSpeed` 0.8 of their speed).
   (`goal`). (2026-11-02: `charge` and `flee` used to be skipped at once — the actor went straight to its next cue; they
   now take their time. The two older levels' waves, balanced on the old behaviour, say `mode: 'aggressive'` then their
   guard instead, so they play exactly as before; their fleeing critters now really flee, which is only visual.)
-  Scenes start with a stage, at a time, or on a flag; cues set
+  Scenes start with a stage, at a time (the stage's own clock: until the mission has entered a new stage, up to a second
+  after the last one ended, the director reads 0 — it used to read the old stage's clock, so a new stage's timed scenes
+  could all start at once; fixed 2026-11-06), or on a flag; cues set
   flags; captions, actions, camera shots and other scenes wait on flags. Walking uses the flow fields (round banks and
   walls, up ramps) and the ant and creature movement code (foot planting is the renderer's, as for any walking ant).
   Directed ants fight what they meet unless passive; a hurt creature reacts with its own program; a cue that cannot
@@ -314,7 +319,17 @@ the surface at `STORY.heatSpeed` 0.8 of their speed).
   `dead:<rival>`, `wave:<actor>` (a wave appeared), `beaten:<actor>`, `gone:<actor>`, `flood:<zone>`, `dusk:N`,
   `night:N`, `dawn:N` (a level's clock), `hp:<actor>:<percent>`, `killed:<actor>`.
 - **Actions**: spawn an actor, flood a zone, set a flag, place food, play a shot, set the music mood, force a raid, show
-  a tip, end a titan's raid (`endRaid`), set the light (`night`).
+  a tip, end a titan's raid (`endRaid`), set the light (`night`); added for levels 5–7 (claude/story/06-spec): `weather`
+  (a shower: falling rain `render/rainFX.ts` and wet ground; a hot spell: ants on the surface at `STORY.heatSpeed`),
+  `note` (a researcher's note), `wrestle` (two stag beetle males lock antlers: `startStagWrestle`), `allOut` (a rival
+  goes all-in on the player: `forceAllOut`), `floodNests` (every rival whose doorway is under water starts to flood:
+  `startNestFlood`), `heal` (an actor to a share of its health).
+- **Objectives and bonuses added for levels 5–7**: `hold` (`n` ants within `r` of a point for `s` seconds in a row; the
+  clock starts over when too few are there), `killQueens` (`n` of these rivals' queens dead); bonuses `deadBefore` (a
+  rival destroyed before the water floods its nest) and, from main's titan work, `killWithin`. Actors: `floor` (a boss's
+  health floor until a flag: the Spider Mother on her rounds; with a dig-in's floor the higher one holds). Rivals: `team`
+  (allies), `income` (food a second: a mature colony's economy), `fixedSize` (its size does not grow with the
+  difficulty).
 - **Level fields** besides the stages: `dayNight` (its own clock), `lairs` (dens as underground areas), `developed` (a
   preset nest), `reward` (a caste, a trait, or neither). The director keeps running after a win (actors walk off, a titan
   leaves at dawn) for "keep playing here".

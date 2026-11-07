@@ -109,7 +109,10 @@ for (let t = 0; t < minutes * 1200; t++) {
     const rv = w.colony(Object.values(st.rivals)[0]);
     const died = Object.entries(byCause).map(([k, v]) => `${k} ${v}`).join(', ');
     byCause = {};
-    log.push(`    ${(w.s.time / 60).toFixed(0)} min: ${c.living} ants (${Object.entries(c.counts).map(([k, v]) => k.split('_')[1] + ' ' + v).join(', ')}) v rival ${rv?.living ?? 0}, food ${Math.floor(c.food)}; goals ${m.goals.map((g) => g.progress).join(' ')}${died ? `; died: ${died}` : ''}`);
+    // a story titan on the map: its health and where it is
+    const ti = w.s.creatures.find((cr) => !cr.dead && ((cr.data.rstory ?? 0) || cr.data.hpFloor !== undefined));
+    const tis = ti ? `; titan ${Math.round((ti.hp / ti.maxHp) * 100)} % ${ti.space === SURFACE ? 'outside' : 'inside'}${ti.space !== SURFACE ? ` ${Math.round(Math.hypot(ti.x - (c.queen >= 0 ? w.antById.get(c.queen)?.x ?? 0 : 0), ti.y - (c.queen >= 0 ? w.antById.get(c.queen)?.y ?? 0 : 0)))} mm from the queen` : ''}` : '';
+    log.push(`    ${(w.s.time / 60).toFixed(0)} min: ${c.living} ants (${Object.entries(c.counts).map(([k, v]) => k.split('_')[1] + ' ' + v).join(', ')}) v rival ${rv?.living ?? 0}, food ${Math.floor(c.food)}; goals ${m.goals.map((g) => g.progress).join(' ')}${died ? `; died: ${died}` : ''}${tis}`);
   }
   // the "player": builds what a stage asks for (a tutorial goal the colony AI would get to late)
   const S = def.story!.stages[m.stage];
@@ -125,6 +128,7 @@ for (let t = 0; t < minutes * 1200; t++) {
       }
     }
   let target: { space: number; x: number; y: number } | null = null;
+  let allIn = false;
   // defend at the hole: a titan digging in (any objective) — the army on its hole, then after it into the nest
   if (STRATEGY === 'hole')
     for (const cr of w.s.creatures) {
@@ -224,6 +228,7 @@ for (let t = 0; t < minutes * 1200; t++) {
       if (!boss) continue;
       if (boss.space !== SURFACE) {
         target = { space: boss.space, x: boss.x, y: boss.y };
+        allIn = true;
         continue;
       }
       if (assaulting) {
@@ -297,7 +302,9 @@ for (let t = 0; t < minutes * 1200; t++) {
   }
   if (target) {
     placeMarker(w, c, ASSIST, target.space, target.x, target.y);
-    if (!assisting) for (const g of c.groups) if (raisesAnts(g) && g.type !== 'queen') assignGroup(w, c, g.id, ASSIST);
+    // (every look: a group raised since, or one the colony took back, joins too)
+    // (the queen's own nurses too when a boss is in the nest: a person throws everything at it)
+    for (const g of c.groups) if (raisesAnts(g) && (g.type !== 'queen' || allIn) && g.marker !== ASSIST) assignGroup(w, c, g.id, ASSIST);
     assisting = true;
   } else if (assisting) {
     removeMarker(w, c, ASSIST);
