@@ -244,6 +244,13 @@ function clips(): Record<string, Clip> {
       cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.1, 0.45, 1], dist: 7, fov: 30 },
     },
     // a hundred workers idling side by side
+    // (review round 1, "fix the idle animation ... with the back legs") six standing ants, close enough to see the
+    // idles: the leg grooming lifts one hind leg at a time
+    idle6: {
+      dur: 12,
+      ants: Array.from({ length: 6 }, (_, i) => ({ script: standing(((i % 3) - 1) * 4.2, (Math.floor(i / 3) - 0.5) * 4.6, 0.4 + i * 1.7) })),
+      cam: { tx: 0, ty: 0.3, tz: 0, dir: [0.2, 0.55, 1], dist: 16, fov: 30 },
+    },
     idle100: {
       dur: 9,
       ants: Array.from({ length: 100 }, (_, i) => ({ script: standing(((i % 10) - 4.5) * 3.9, (Math.floor(i / 10) - 4.5) * 3.9, (i * 2.399) % 6.283) })),
