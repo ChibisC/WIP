@@ -12,3 +12,5 @@ docs/creatures/digging/*_frames/
 # the golden set: only the reference (before/) is committed; comparison renders are regenerated (docs/performance/golden/README.md)
 docs/performance/golden/after/
 docs/performance/golden/before2/
+# (while the reference set is being rendered: added with -f when it is complete)
+docs/performance/golden/before/*.png
