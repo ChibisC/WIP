@@ -9,3 +9,6 @@ audio-src/standins/
 __pycache__/
 docs/realism/**/*_frames/
 docs/creatures/digging/*_frames/
+# the golden set: only the reference (before/) is committed; comparison renders are regenerated (docs/performance/golden/README.md)
+docs/performance/golden/after/
+docs/performance/golden/before2/
