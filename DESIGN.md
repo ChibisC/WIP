@@ -412,23 +412,61 @@ into a ball when attacked), colony (termites). Predators hold territory and
 flee below a health threshold. Bosses run scripted phases with telegraphed
 attacks (wind-up pose + ground marker before each big attack).
 
-**Titans dig into nests** (2026-11-02, `sim/creatures/titanDig.ts`, claude/creatures/01-spec-digging-titans.md; the
-game's own twist — in Empires of the Undergrowth titans never enter nests). Diggers carry `dig: { can, speed, style }`
-(tarantula and wolf spider mother rake, fast; giant centipede squeezes, medium; stag beetle bulldozes, slow; the giant
-mantis never digs). A raid: walk to one of the colony's three holes (the colony is warned `TITAN_DIG.warnSec` before:
-a toast that jumps the camera there, a rumble and a sound), dig it wider (`holeWork` ÷ speed s; any hit staggers it to
-`hitSlow` of its pace for `staggerSec`, a hit of `heavyFrac` of its health knocks back `heavyBack` of the work; below
-`giveUpHealth` it gives up — not in story raids), then walk into the nest through the flower and straight through the
-ground: every soil or stone hex its body touches opens at once (`NestGrid.breakHex`: stone too; logged like any dig, so
-flow fields extend). Built tiles stand on dug floor and never break. It bites what is in reach (standing still), heads
-for the queen (then brood, stores), and walks back out below `fleeHealth`, after `maxStay`, once the queen is dead, or
-when a story ends the raid; killed inside, its carcass stays in the nest. The hole stays a breach (drawn as a wide raw
-crater; any titan walks in without digging) until the colony repairs it over `repairSec`. Skirmish and multiplayer:
-"Titans raid nests" in the lobby (on by default, `settings.titanRaids`; protocol `ud-mp-8`): after `peaceMin`, a titan
-off its `raidCooldown` raids with a `raidChance` a minute a colony within `raidRange` (weighted by ants and food, never
-one already raided), at most `maxRaiding` at once. Story levels start raids with the director cue `digInto` and end them
-with the action `endRaid`. AI colonies defend as against any hostile creature at their holes or inside. Dev:
-`?titanRaid=<kind>`; clips `tests/browser/titan_dig.py` → `docs/creatures/digging/`.
+**Titans dig into nests** (2026-11-02, `sim/creatures/titanDig.ts`, claude/creatures/01-spec-digging-titans.md; holes
+made easier 2026-11-03, claude/creatures/02-spec-easier-titan-holes.md; the game's own twist — in Empires of the
+Undergrowth titans never enter nests). Diggers carry `dig: { can, speed, style }` (tarantula 1.6 and wolf spider mother
+1.5 rake, fast; giant centipede 1.15 squeezes; stag beetle 0.8 bulldozes, slowest; the giant mantis never digs). A
+raid: walk to one of the colony's three holes (the colony is warned `TITAN_DIG.warnSec` before: a toast with the time to
+the breakthrough — "about 35 s" — that jumps the camera there, a rumble and a sound; another toast when the digging
+starts), then dig it wider:
+* **Time**: `holeWork` (16 s) ÷ its dig speed × (its size ÷ `sizeRef`)^`sizeExp` — undefended about 10 s for the
+  burrowers, 15 s for the centipede, 20 s for the stag beetle (`tools/titan-holes.ts`, `docs/creatures/titans.md`).
+* **Defence slows it by damage rate**, not by "any hit": the damage it takes a second as a share of its health,
+  smoothed over `rateSec`; pace = `slowFloor` (55 %) + (1 − `slowFloor`) ÷ (1 + (rate ÷ `slowRate`)²). A few ants
+  barely matter (0.2 %/s: 97 %), 20 soldiers about 1.2–1.5 × the time, a big army near the floor (up to 1.8 ×).
+* **Checkpoints** at 25 / 50 / 75 %: a blow of `heavyFrac` of its health in one tick knocks back `heavyBack` (8 %),
+  never below the last checkpoint reached. The hole shows them: the rim crumbling, a wider crater, soil fountaining
+  out, then the breach (drawn `breachHoleMm` × √(size ÷ `sizeRef`) wide); a progress ring over the hole for everyone
+  (`render/game/digRings.ts`, the checkpoints as ticks); the rumble rises in pitch and grows with the work.
+* **Memory**: the work stays on the hole (`Entrance.dprog`, `dT`) for `holeMemorySec` (60 s): a titan that comes back
+  carries on; after that the colony fills it in. An open breach is still walked into at once.
+* **Stopping it** (skirmish): below `giveUpHealth` (55 %) while digging it gives up (its work stays on the hole); a
+  titan only sets out above `raidMinHealth` (85 %). So a big army drives off a slow digger (the centipede, the stag
+  beetle) but not a fast one with much health; hurting it, not stalling it, is the defence.
+
+Then it walks into the nest through the flower and straight through the ground: every soil or stone hex its body
+touches opens at once (`NestGrid.breakHex`: stone too; logged like any dig, so flow fields extend). Built tiles stand on
+dug floor and never break. It bites what is in reach (standing still), heads for the queen (then brood, stores), and
+walks back out below `fleeHealth`, after `maxStay`, once the queen is dead, or when a story ends the raid; killed
+inside, its carcass stays in the nest. The hole stays a breach until the colony repairs it over `repairSec`. Skirmish
+and multiplayer: "Titans raid nests" in the lobby (on by default, `settings.titanRaids`): after `peaceMin`, a titan off
+its `raidCooldown` raids with a `raidChance` a minute a colony within `raidRange` (weighted by ants and food, never one
+already raided), at most `maxRaiding` at once. AI colonies defend as against any hostile creature at their holes or
+inside, and once warned they meet the titan at the hole it will dig (`warAI.ts threat`: a hole opens in 10–20 s now,
+too fast to gather after it starts; `tools/titan-ai-defence.ts`). Dev: `?titanRaid=<kind>`; clips
+`tests/browser/titan_dig.py` → `docs/creatures/digging/`.
+
+**Story titans always get in** (2026-11-03, claude/story/05-spec-story-titans-get-inside.md; why they never did:
+CHANGE_PLAN §26.1 — killed at the hole, or crawling under the army's grip on the way, or stopped on its walk by every
+hit). The director's cue `digInto` (`sim/story/director.ts`) starts the raid and **owns the titan until it is inside**:
+* done only when every titan of it has been inside (`data.rinside`) or is dead; a start that fails is tried again
+  every `STORY.titanRaid.retrySec` and logged (the dev view); in a lair (a cave) it walks up the tunnel and out first;
+* a scene that would start on it waits until it is in (boss phase events — the spiderlings — still happen:
+  `hognaPhases` runs in the raid too); only the level's `endRaid` (dawn) or death ends the raid;
+* the approach walks the surface route field (round banks, up the ramps) at no less than `minPace` (60 %) of its
+  speed whatever holds it, sidesteps after `stuckSec` without getting nearer, and pushes other creatures aside (a
+  guard at a ramp's top stopped the tarantula for good before: `separation.ts pushesThrough`);
+* it digs at no less than `minPace`, with no knock-backs, and breaks through by `digCap` (12 / 15 / 18 / 20 s, Easy →
+  Brutal) whatever happens;
+* a titan the level sends to dig in can't drop below `hpFloor` (10 %) of its health until it has been inside
+  (`data.hpFloor`, held by every kind of damage: `combat.ts holdHpFloor`); the boss bar shows a padlock and the floor's
+  mark meanwhile; once in it can be killed normally;
+* inside, its bites on the queen do `queenBite` (40 / 60 / 80 / 100 %) — with no army at all the queen lasts about two
+  minutes (CHANGE_PLAN §26.3); breaking in shows "It’s in the nest!".
+The Long Nights' tarantula walks its path to the hollow without stopping to fight (passive), then digs in; "kill the
+tarantula before dawn" stays. The Spider Mother rushes to the nest at 30 % (`digInto` `speed` 1.5); her bonus is now
+"kill her within a minute of her breaking in" (`killWithin`). Skirmish raids get none of this. Dev:
+`?story=<level>&stage=N&titan=1` starts at the titan's moment; `tools/titan-raid-probe.ts` logs a raid tick by tick.
 
 **Rendering** (`render/creatures/`, Phase 11):
 - Every creature is built each frame from three shared instanced primitives: ellipsoids (segments, heads, eyes), tapered tubes (legs, antennae, jaws) and cones (fangs, claws, spines). Each instance has its own colour and surface (roughness, gloss, and a pattern drawn in the shape's own coordinates: segment rings, hair, elytra striae, speckle, wing veins, Scolopendra rear bands, the antlion's funnel). So the whole bestiary is three draw calls per scene.

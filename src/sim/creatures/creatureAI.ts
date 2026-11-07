@@ -7,7 +7,7 @@ import { casteOf } from '../species';
 import { ARENA, BALANCE, ECITON, STAG, TERMANT, LAYERS } from '../balance';
 import { enforceMountRatio, riding, throwRiders } from '../climbing';
 import { climbCap } from './climb';
-import { applyVenom, cancelAttack, creatureHooks, damageAnt, damageCreature, flingAnt, gripAnt } from '../combat';
+import { applyVenom, cancelAttack, creatureHooks, damageAnt, damageCreature, flingAnt, gripAnt, holdHpFloor } from '../combat';
 import { STANCE, arenaTeam, stanceOf } from '../arenaState';
 import { killAnt } from '../antAI';
 import { Body, anchored, bodyHook, distToCreatureBody } from '../slots';
@@ -1557,7 +1557,11 @@ function scolopendra(w: World, cr: Creature, k: CreatureKind, dt: number): void 
   telegraph(w, cr, cr.data.sx, cr.data.sy, strikeR(k), 0.7 / fast);
 }
 
-function hogna(w: World, cr: Creature, k: CreatureKind, dt: number): void {
+/**
+ * The wolf spider mother's phases and her brood (also while she digs into a nest: a raid moves her, but her phase
+ * changes and the spiderlings still happen — claude/story/05-spec §2). Returns her phase.
+ */
+export function hognaPhases(w: World, cr: Creature): number {
   // (a story's boss may set its own cuts: the Spider Mother's are 60 % and 30 %, claude/story/04-spec §3)
   const story = cr.data.cut1 !== undefined;
   const p = bossPhase(w, cr, ['Stalk and pounce', 'Spiderlings scatter', 'Frenzy sprints'], story ? [cr.data.cut1!, cr.data.cut2 ?? 0.3] : [0.66, 0.33]);
@@ -1570,6 +1574,11 @@ function hogna(w: World, cr: Creature, k: CreatureKind, dt: number): void {
     cr.data.brood2 = 1;
     scatterSpiderlings(w, cr, 6);
   }
+  return p;
+}
+
+function hogna(w: World, cr: Creature, k: CreatureKind, dt: number): void {
+  const p = hognaPhases(w, cr);
   // rears up and shakes her riders off (combat v2)
   if (riderShake(w, cr, dt, CS.Rear)) return;
   if (cr.latched >= 6 && cr.cd2 <= 0) {
@@ -1856,6 +1865,7 @@ export function creatureSystem(w: World, dt: number): void {
     // venom from stings (fire ants, army ants)
     if (cr.venom > 0) {
       cr.hp -= cr.venomDps * cr.venom * dt * 0.35;
+      holdHpFloor(cr);
       cr.venomT -= dt;
       if (cr.venomT <= 0) {
         cr.venom = 0;

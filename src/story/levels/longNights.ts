@@ -44,7 +44,9 @@ export const LONG_NIGHTS_LEVEL: StoryLevelDef = {
     night2e: { creatures: [['lithobius', 1], ['groundBeetle', 1]], from: ['lairE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.3, label: 'the second night’s hunters' },
     night3n: { creatures: [['groundBeetle', 1], ['wolfSpider', 1], ['lithobius', 1]], from: ['lairNW', 'lairN'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.35, label: 'the third night’s hunters' },
     night3e: { creatures: [['rove', 1], ['wolfSpider', 1], ['groundBeetle', 1]], from: ['lairE', 'lairSE'], face: 'playerNest', spawn: 'action', wave: true, hp: 0.35, label: 'the third night’s hunters' },
-    tarantula: { creature: 'tarantula', at: 'tarantulaBurrow', face: 'knollFoot', spawn: 'action', hp: 0.7, phases: [0.5], label: 'the red-knee tarantula' },
+    // (inside the nest, until dawn: softer on the queen as the difficulty's armies are thinner by the third night —
+    // claude/story/05-spec §3)
+    tarantula: { creature: 'tarantula', at: 'tarantulaBurrow', face: 'knollFoot', spawn: 'action', hp: 0.7, phases: [0.5], label: 'the red-knee tarantula', inside: { bite: { easy: 0.85, normal: 0.85, hard: 0.8, brutal: 0.75 }, queenBite: { easy: 0.4, normal: 0.5, hard: 0.55, brutal: 0.6 } } },
   },
   stages: [
     {
@@ -143,11 +145,13 @@ export const LONG_NIGHTS_LEVEL: StoryLevelDef = {
         { actor: 'night2e', cues: [{ mode: 'passive' }, { leave: 'nest' }] },
         { actor: 'night3n', on: 'night:3', cues: [{ charge: 'rampNorthTop', timeout: 90 }, { guard: 'rampNorthTop', r: 80 }] },
         { actor: 'night3e', on: 'night:3', cues: [{ charge: 'rampEastTop', timeout: 90 }, { guard: 'rampEastTop', r: 80 }] },
-        // the titan of the last night: out of its burrow on the knoll, down to the hollow and into the nest
+        // the titan of the last night: out of its burrow on the knoll, down to the hollow without stopping to fight (an
+        // army on its way slows it, never stops it: claude/story/05-spec), then into the nest — every time (it can't die
+        // before it is in; the dig can't be stalled); in the nest it fights what it meets until dawn
         {
           actor: 'tarantula',
           on: 'night:3',
-          cues: [{ face: 'knollFoot' }, { wait: 4 }, { flag: 'tarantulaOut' }, { path: 'tarantulaWay', speed: 1.6, timeout: 150 }, { flag: 'tarantulaDigs' }, { digInto: 'player', flag: 'tarantulaIn', timeout: 300 }, { release: true }],
+          cues: [{ face: 'knollFoot' }, { wait: 4 }, { flag: 'tarantulaOut' }, { mode: 'passive' }, { path: 'tarantulaWay', speed: 1.6, timeout: 100 }, { mode: 'aggressive' }, { flag: 'tarantulaDigs' }, { digInto: 'player', flag: 'tarantulaIn' }, { release: true }],
         },
       ],
     },

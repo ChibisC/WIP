@@ -1,3 +1,4 @@
+// @ts-nocheck — a Node script (vite-node): tsconfig types the browser build only, without Node's modules
 /**
  * Audio v3 (claude/audio/03-spec-sfx-rework-insect.md): the catalog, the packed files, the manifest and the
  * attributions agree; no walking or termite idle sound is left anywhere; every sound has 3-6 takes.

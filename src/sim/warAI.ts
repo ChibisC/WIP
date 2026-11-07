@@ -121,7 +121,11 @@ function threat(w: World, c: Colony): { space: number; x: number; y: number } | 
   for (const cr of w.s.creatures) {
     if (cr.dead || creatureKind(cr.kind)?.relation !== 'hostile') continue;
     if (cr.faction >= 0 && w.colony(cr.faction)?.team === c.team) continue;
-    consider(cr.space, cr.x, cr.y);
+    // a titan coming to dig into this nest (titanDig.ts; the colony is warned `warnSec` before it gets there): meet it
+    // at the hole it will dig, a little out toward it (2026-11-03: holes open in 10–20 s now, too fast to gather after)
+    const e = (cr.data.raid ?? 0) === c.id + 1 && cr.space === SURFACE && (cr.data.rwarn ?? 0) ? c.entrances[cr.data.rhole ?? 0] : undefined;
+    if (e) consider(SURFACE, e.sx + (cr.x - e.sx) * 0.15, e.sy + (cr.y - e.sy) * 0.15);
+    else consider(cr.space, cr.x, cr.y);
   }
   return best;
 }

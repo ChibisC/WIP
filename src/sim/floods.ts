@@ -1,6 +1,7 @@
 import { FLOOD } from './balance';
 import { casteOf } from './species';
 import { killAnt } from './antAI';
+import { holdHpFloor } from './combat';
 import { AS, HIT, SURFACE, FloodState } from './types';
 import { World } from './world';
 import { inShape, shapeBox } from '../world/mapShapes';
@@ -127,6 +128,7 @@ function floodEffects(w: World, i: number, dt: number): void {
     if (cr.space !== SURFACE || cr.dead) continue;
     if (!t.isWater(cr.x, cr.y) || !inShape(z.shape, cr.x, cr.y)) continue;
     cr.hp -= cr.maxHp * FLOOD.drownFrac * 0.5 * dt;
+    holdHpFloor(cr);
     if (cr.hp <= 0) {
       cr.hp = 0;
       cr.dead = true;

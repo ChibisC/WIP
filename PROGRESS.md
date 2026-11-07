@@ -1773,8 +1773,35 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
 - Round 4 ratings (2026-11-03): every item 8, approved with one change — the soldier drums in bursts while walking or
   charging at a foe (`drumWalking`; anim lab `tdrumwalk`).
 
+## 2026-11-03 — Story titans always get inside; titans open holes more easily (all modes)
+User specs `claude/story/05-spec-story-titans-get-inside.md` and `claude/creatures/02-spec-easier-titan-holes.md`
+(branch `fix/story-titans-inside`, both on one branch). Plan, evidence and results: `CHANGE_PLAN.md` §26; design:
+`DESIGN.md` "Titans dig into nests", "Story titans always get in"; tables: `docs/creatures/titans.md`.
+- **Why they never got in** (tick logs, `tools/titan-raid-probe.ts`): killed at the hole (any hit → 45 % pace, heavy
+  ticks knocked progress back; the spider mother starts at 30 %), crawling under the army's grip on the way (14 % of
+  its speed, never biting back), or — the tarantula — stopped on its path by every hit and killed on the hollow's floor.
+  The cue also counted "not raiding" as done (a failed start would have skipped the dig-in silently).
+- **Story raids are guaranteed**: the `digInto` cue owns the titan until it is inside (done only when in or dead;
+  failed starts retry every second and are logged; in a lair it walks out first; scenes for it wait); story approaches
+  walk the route field at ≥ 60 % pace and push through creatures (a guard at a ramp's top had held it for good); story
+  digging at ≥ 60 % with no knock-backs and a cap (12 / 15 / 18 / 20 s, Easy → Brutal); a 10 % health floor until it is
+  in (a padlock and the floor's mark on the boss bar); "It’s in the nest!" on breaking in. The tarantula walks its path
+  without stopping to fight; the spider mother rushes in at 30 %; her bonus is now "kill her within a minute of her
+  breaking in" (`killWithin`). The fight inside is softened per difficulty in the level data (`inside`).
+- **Holes open more easily** (every mode): `holeWork` 16 s (stag beetle 0.8, centipede 1.15): undefended 10 / 10 /
+  15 / 20 s; the slow from the damage rate with a 55 % floor (20 soldiers 1.2–1.5 ×, a big army 1.5–1.6 ×); checkpoints
+  at 25 / 50 / 75 % (a blow never knocks the work past the last one); the work kept on the hole 60 s; giving up below
+  55 % (a big army drives off the slow diggers); skirmish titans set out above 85 % health; AI colonies meet a warned
+  titan at its hole. Readable: the hole's stages (rim crumbling, wider crater, soil fountaining, the breach sized to
+  the titan), a dig ring over the hole for everyone, the toasts say how long until it breaks through, the rumble rises
+  with the work.
+- Tests: `tests/titans.ts` (hole times, the damage-rate slow, checkpoints, memory, giving up), `tests/storyCh1.ts`
+  (both levels × four difficulties × four defences: inside every time, within the cap; the floor; the new bonus;
+  skirmish raids unchanged). Playtests (`STRATEGY=hole` new): both levels won on every difficulty (the Spider Mother on
+  Brutal on one seed of three that reach her fury). Protocol `ud-mp-11`. Dev: `?story=<level>&stage=N&titan=1`.
+
 ## 2026-11-06 — Audio v3: every sound effect remade (insect-like, made for this game); no walking or termite idle sounds
-- **User spec** `claude/audio/03-spec-sfx-rework-insect.md` (branch `feature/sfx-insect`; CHANGE_PLAN §25).
+- **User spec** `claude/audio/03-spec-sfx-rework-insect.md` (branch `feature/sfx-insect`; CHANGE_PLAN §27).
 - **Made for this game:** `tools/audio/sfx` renders every effect offline with numpy/scipy from the physics of the
   real sound — chitin clicks (inharmonic modes at 2–12 kHz dying in milliseconds), fracture cascades, file-and-scraper
   stridulation, stick-slip friction, Minnaert bubbles and fizz — 3–6 takes each (401 takes, 103 sounds), trimmed to

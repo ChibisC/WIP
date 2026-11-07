@@ -96,7 +96,7 @@ Every one of these starts within a few milliseconds of its file's start (checked
 
 ## Removed (spec §2–3)
 
-Ant and termite walking (all species, Termants included): `ant.step_soil`, `ant.step_leaf`, `ant.step_bark`, `ant.step_stone`, `ant.step_sand`, `ant.step_carton`, `ant.step_queen`, the climbing skitter on creatures' legs, the Termant skitter and papery shuffle, `species.nasute_move`, and the swarm movement bed `ant.swarm_bed`. Termite idle sounds: termites no longer get antenna taps, and their alarm drum plays only on a real alarm (a soldier attacked or grabbing, the colony's alarm ability, a conehead soldier charging a foe); the termite kit's procedural voices (`SickleJawAudio`: an unused bite snap and alarm drum, the hold's acid stream, fizz and struggle) were replaced by files. Details: CHANGE_PLAN.md §24.
+Ant and termite walking (all species, Termants included): `ant.step_soil`, `ant.step_leaf`, `ant.step_bark`, `ant.step_stone`, `ant.step_sand`, `ant.step_carton`, `ant.step_queen`, the climbing skitter on creatures' legs, the Termant skitter and papery shuffle, `species.nasute_move`, and the swarm movement bed `ant.swarm_bed`. Termite idle sounds: termites no longer get antenna taps, and their alarm drum plays only on a real alarm (a soldier attacked or grabbing, the colony's alarm ability, a conehead soldier charging a foe); the termite kit's procedural voices (`SickleJawAudio`: an unused bite snap and alarm drum, the hold's acid stream, fizz and struggle) were replaced by files. Details: CHANGE_PLAN.md §27.
 
 ## References
 
