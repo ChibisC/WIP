@@ -337,22 +337,30 @@ function segGeo(kind: 'coxa' | 'femur' | 'tibia1' | 'tibia' | 'tarsus' | 'scape'
       const fore = kind === 'tibia1';
       const pts: THREE.Vector3[] = [];
       const rad: number[] = [];
+      // the fore tibia of Lucanus is long and nearly parallel-sided, widening only a little to the apex and
+      // bowing slightly outward (fix 2026-11-06: it flared to twice its base width into a paddle that, drawn with
+      // its wide face vertical, stuck out ahead of the beetle as a spiked blade)
       for (let i = 0; i <= 8; i++) {
         const t = i / 8;
-        pts.push(Y(t, fore ? 0.25 * t * t : 0));
-        rad.push(fore ? 0.7 + 0.75 * t : 0.72 + 0.22 * t);
+        pts.push(Y(t, fore ? 0.18 * t * t : 0));
+        rad.push(fore ? 0.72 + 0.3 * t : 0.72 + 0.22 * t);
       }
       put(acc, tube(pts, rad, 14, false, false, fore ? 0.82 : 0.92), reg);
-      // teeth on the outer edge (the fore tibia digs; the others carry small spines), and the apical spurs
-      const teeth = fore ? [0.42, 0.6, 0.76, 0.9] : [0.5, 0.72];
+      // teeth on the outer edge (+x; the fore tibia digs: a row of small teeth along its distal half, growing
+      // toward the apex; the others carry small spines)
+      const teeth = fore ? [0.45, 0.6, 0.74, 0.86] : [0.5, 0.72];
       // (y is in leg lengths, x and z in thicknesses: keep the teeth's y offsets tiny) — small, blunt teeth
       for (const t of teeth) {
-        const r0 = fore ? 0.22 + 0.16 * t : 0.16;
-        const a = Y(t, (fore ? 0.25 * t * t : 0) + (fore ? 0.7 + 0.75 * t : 0.7) * 0.6);
-        const b = a.clone().add(new THREE.Vector3(fore ? 0.5 : 0.32, fore ? 0.012 : 0.015, 0));
+        const r0 = fore ? 0.2 + 0.12 * t : 0.16;
+        const a = Y(t, (fore ? 0.18 * t * t : 0) + (fore ? 0.72 + 0.3 * t : 0.7) * 0.6);
+        const b = a.clone().add(new THREE.Vector3(fore ? 0.45 + 0.45 * t : 0.32, fore ? 0.012 : 0.015, 0));
         put(acc, tube([a, b], [r0, 0.05], 6, false, true), reg);
       }
-      for (const z of [-0.4, 0.4]) put(acc, tube([Y(0.97, 0, z * (fore ? 0.5 : 0.7)), Y(1.06, -0.3, z)], [0.26, 0.03], 6, false, true), reg);
+      if (fore) {
+        // the apex forks outward into two prongs (the largest tooth), and two short apical spurs on the inner face
+        for (const z of [-0.3, 0.3]) put(acc, tube([Y(0.9, 0.5, 0), Y(1.07, 1.1, z)], [0.32, 0.04], 6, false, true), reg);
+        for (const z of [-0.35, 0.35]) put(acc, tube([Y(0.97, -0.2, z * 0.6), Y(1.03, -0.5, z)], [0.14, 0.03], 6, false, true), reg);
+      } else for (const z of [-0.4, 0.4]) put(acc, tube([Y(0.97, 0, z * 0.7), Y(1.06, -0.3, z)], [0.26, 0.03], 6, false, true), reg);
       // rows of fine spines along the tibia (the mid and hind tibiae of Lucanus are spinose)
       if (!fore)
         for (let k = 0; k < 7; k++) {
@@ -854,8 +862,13 @@ export function stagBeetle2(rig: Rig, p: CrPose): void {
       const r = 0.02 * L;
       rig.partFrame('stag_coxa', hip, tA.set(hip.x, hip.y - 0.004 * L, hip.z + sd * 0.022 * L), side, r * 1.2, r * 1.2, SG2.leg, SURF.leg);
       rig.partFrame('stag_femur', tA, knee, side, r * 1.1, r * 0.9, SG2.leg, SURF.leg);
+      // the fore tibia lies flat, its toothed outer edge (+x) facing away from the body (fix 2026-11-06: with
+      // the wide axis in the vertical plane its teeth and spurs pointed ahead of the head as one spike)
+      if (i === 0) side.set(0, 0, sd);
+      else side.set(0, 1, 0);
+      // (the fore tibia is slender: about an eighth as wide as it is long, thinner still top to bottom)
+      rig.partFrame(i === 0 ? 'stag_tibia1' : 'stag_tibia', knee, ankle, side, r * (i === 0 ? 0.62 : 0.8), r * (i === 0 ? 0.5 : 0.75), SG2.leg, SURF.leg);
       side.set(0, 1, 0);
-      rig.partFrame(i === 0 ? 'stag_tibia1' : 'stag_tibia', knee, ankle, side, r * (i === 0 ? 0.95 : 0.8), r * 0.75, SG2.leg, SURF.leg);
       rig.partFrame('stag_tarsus', ankle, foot, side, r * 0.5, r * 0.5, SG2.leg, SURF.leg);
       rig.recLeg((sd > 0 ? 'L' : 'R') + (i + 1), hip, knee, ankle, foot);
     }

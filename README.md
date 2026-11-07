@@ -234,6 +234,7 @@ npm run stress -- 400 60 100                                        # tick time:
 tests/browser/with_server.sh python3 tests/browser/ui_areas.py      # browser checks (Playwright); also ui_test.py, ui_test2.py, ui_dig.py, ui_camera.py
 tests/browser/with_server.sh python3 tests/browser/mp_local.py      # 3 tabs + AI over BroadcastChannel: lobby, lockstep, chat, drop
 tests/browser/with_server.sh python3 tests/browser/mp_finish.py     # 2 tabs: a match played to the end (surrender, results)
+tests/browser/with_server.sh python3 tests/browser/story_titans_in.py # clips: the chapter 1 titans dig into the nest and walk it (ONLY=nights,spider ANTS=60 PARTS=surface,nest; docs/story/shots/titans_in/)
 tests/browser/with_server.sh python3 tests/browser/worker.py        # also replay.py, stress.py, determinism.py
 tests/browser/with_server.sh python3 tests/browser/species_renders.py  # new species in the lab; also species_battle.py, species_fx.py, attack_renders.py (the three melee attacks)
 tests/browser/with_server.sh python3 tests/browser/combat_v2.py docs/combat/v2   # 60 v 60 clash shots (LABEL=before against the base), titan riders, shake-off, clip
