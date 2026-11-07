@@ -1001,16 +1001,23 @@ devices) in `docs/performance.md`; DESIGN, README, PROGRESS; handoff; merge rule
   appear in a space is built once and shared by every renderer (`antRenderer.ts` `builtCache`/`impostorCache`,
   `termiteLayer.ts` `baseGeos`, `primitives.ts` `prepare`), then each space's scene is compiled and drawn once offscreen
   with shadows on (`render/prewarm.ts` `warmScene`: everything visible, empty instanced meshes given one instance).
-  `warmNew()` warms morphs the simulation shows mid-match under 4 ms a frame; `keepAreasCurrent()` brings the other
-  areas' terrain and hexes up to date every sixth frame while the frame has room. The fade covers the swap: nothing is
-  drawn while it is fully opaque (`GameView.fadedOut`).
+  `warmNew()` warms morphs the simulation shows mid-match under 4 ms a frame; `keepAreasCurrent()` keeps the other
+  areas' terrain current in 3 ms slices every third frame (`NestTerrain.update(force, budgetMs)`: the distance field,
+  then the light maps, then chunks) and brings the area a dive or cut is about to show up to date under the fade, a
+  6 ms slice a frame. The fade covers the swap: nothing is drawn while it is fully opaque (`GameView.fadedOut`). The
+  distance field's blur is 3× faster with the same result to the bit.
 - Every mode: empty instanced meshes hidden (three binds a program for a visible mesh with no instances); creature part
   pools upload only the used range; the AO composite pass is skipped when AO is off (same image); dynamic resolution
   (to 75 %, never lower, with a light sharpen) before auto quality drops a preset; the HUD's labels skip unchanged
   writes; the slow state goes as per-field deltas (`worker/slowDelta.ts`: 16 % of the bytes, replica identical, tested);
-  ant LOD changes cross-fade over 0.25 s with a 6 % hysteresis (dithered, both models drawn in complementary pixels);
+  ant LOD changes cross-fade over 0.25 s with a 6 % hysteresis (dithered, both models drawn in complementary pixels;
+  the fade rides in `aE.z` with "exhausted" — a new attribute put the ant shader over the 16 a phone allows);
   frame cap 30/60 (phones 60 by default); a GPU memory estimate (profiler) and a 600 MB phone budget in auto quality;
   multiplayer pong/delay carry each player's tick and frame time (HUD line and players panel).
+- Verified: the golden set (35 shots, `docs/performance/golden/compare-after.md`) — 35 of 35 match `main`: 30
+  identical (at most a few pixels), the fight and the flood at SSIM 0.9999, the home nest and the titan at 0.997 (walking ants
+  and dust), and the enemy nest at 0.9845, which is closer to `main` than `main` is to itself (0.9871: the ants' random
+  gait phases); every test suite; the determinism check; the switching probe (`docs/performance.md`).
 - Not done, and why: KTX2 (every texture is generated in the page; a transcoder would cost more than it saves);
   IndexedDB bake cache (not done in this pass: worth it only if the user's device numbers show loading dominated by
   the impostor bakes); cached static shadows (the shadow camera follows the view, and units cast
