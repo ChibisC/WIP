@@ -1393,22 +1393,35 @@ export const ENTRANCE = {
  */
 /**
  * Titans dig into nests (claude/creatures/01-spec-digging-titans.md, user 2026-11-02; the game's own twist: in EotU titans
- * never enter nests). A titan digs one surface hole wider (`holeWork` ÷ its `dig.speed` seconds; slowed to `hitSlow` of
- * its pace for `staggerSec` after any hit, set back `heavyBack` of the work by a hit of `heavyFrac` of its health or more;
- * it gives up below `giveUpHealth`), then walks into the nest at `undergroundSpeed` × its speed: every soil or stone hex
- * its body touches (its body radius + `breakMargin` mm) opens at once. It leaves below `fleeHealth`, after `maxStay` s,
- * or once the queen is dead. The breach (the widened hole) is repaired by the colony over `repairSec` s once the titan
- * is gone. Skirmish ("Titans raid nests", on by default): after `peaceMin` minutes, a titan raids at most every
- * `raidCooldown` minutes (a `raidChance` a minute once off cooldown), a colony within `raidRange` mm (weighted by its
- * ants and food), at most `maxRaiding` titans at once; the colony is warned `warnSec` s before the titan reaches the hole.
+ * never enter nests; holes made easier: claude/creatures/02-spec-easier-titan-holes.md, user 2026-11-03). A titan digs one
+ * surface hole wider: `holeWork` ÷ its `dig.speed` seconds undefended, × (its size ÷ `sizeRef`)^`sizeExp` (a bigger titan
+ * digs a bigger hole, a little slower). Defence slows it by the damage it takes a second (smoothed over `rateSec`, as a
+ * share of its health): its pace = `slowFloor` + (1 − `slowFloor`) ÷ (1 + (rate ÷ `slowRate`)²) — a few ants barely
+ * matter, a big army nears the floor (about twice the time). A hit of `heavyFrac` of its health in one tick knocks
+ * `heavyBack` of the work back, never below the last of the `checkpoints` reached (the hole's visible stages). Partial
+ * work stays on the hole for `holeMemorySec` s. It gives up below `giveUpHealth` while digging (a story script may forbid
+ * that: STORY.titanRaid), and a skirmish titan only sets out above `raidMinHealth`. Then it walks into the nest at
+ * `undergroundSpeed` × its speed: every soil or stone hex its body touches (its body radius + `breakMargin` mm) opens at
+ * once. It leaves below `fleeHealth`, after `maxStay` s, or once the queen is dead. The breach (the widened hole, drawn
+ * `breachHoleMm` × (size ÷ `sizeRef`)^0.5 wide) is repaired by the colony over `repairSec` s once the titan is gone.
+ * Skirmish ("Titans raid nests", on by default): after `peaceMin` minutes, a titan raids at most every `raidCooldown`
+ * minutes (a `raidChance` a minute once off cooldown), a colony within `raidRange` mm (weighted by its ants and food), at
+ * most `maxRaiding` titans at once; the colony is warned `warnSec` s before the titan reaches the hole.
+ * (Before 2026-11-03: `holeWork` 40, any hit 45 % pace for 1.2 s, heavy hits 15 % back to zero, giving up at 35 %.)
  */
 export const TITAN_DIG = {
-  holeWork: 40,
-  hitSlow: 0.45,
-  staggerSec: 1.2,
-  heavyFrac: 0.06,
-  heavyBack: 0.15,
-  giveUpHealth: 0.35,
+  holeWork: 16,
+  sizeRef: 90,
+  sizeExp: 0.1,
+  slowFloor: 0.55,
+  slowRate: 0.008,
+  rateSec: 2,
+  heavyFrac: 0.05,
+  heavyBack: 0.08,
+  checkpoints: [0.25, 0.5, 0.75],
+  holeMemorySec: 60,
+  giveUpHealth: 0.55,
+  raidMinHealth: 0.85,
   undergroundSpeed: 0.8,
   breakMargin: 1.5,
   fleeHealth: 0.25,
@@ -1420,7 +1433,7 @@ export const TITAN_DIG = {
   raidRange: 700,
   maxRaiding: 1,
   warnSec: 25,
-  /** the widened hole's radius as drawn (mm; render only — the breach is still the colony's hole) */
+  /** the widened hole's radius as drawn for a titan of `sizeRef` (mm; render only — the breach is still the colony's hole) */
   breachHoleMm: 10,
 };
 
@@ -1488,6 +1501,21 @@ export const STORY = {
   waveBeaten: 0.8,
   /** a guarding actor chases what came within its radius at most this far beyond it (mm) */
   guardLeash: 40,
+  /**
+   * Story titan raids are guaranteed (claude/story/05-spec-story-titans-get-inside.md, user 2026-11-03): a titan on a
+   * `digInto` cue walks to the hole at no less than `minPace` of its speed whatever holds it (riders, glue, jaws), and
+   * sidesteps after `stuckSec` s without getting nearer; digs at no less than `minPace` (no knock-backs), breaking through
+   * by `digCap` s whatever happens; can't drop below `hpFloor` of its health until it has been inside; a start that fails
+   * retries every `retrySec` s. Inside, its bites on the queen do `queenBite` × (so the fight stays winnable).
+   */
+  titanRaid: {
+    minPace: 0.6,
+    stuckSec: 3,
+    digCap: { easy: 12, normal: 15, hard: 18, brutal: 20 } as Record<'easy' | 'normal' | 'hard' | 'brutal', number>,
+    hpFloor: 0.1,
+    retrySec: 1,
+    queenBite: { easy: 0.4, normal: 0.6, hard: 0.8, brutal: 1 } as Record<'easy' | 'normal' | 'hard' | 'brutal', number>,
+  },
   /**
    * Traits (claude/story/04-spec §4): permanent colony-wide bonuses in story mode, earned from titans and mega colonies,
    * kept in the campaign save and given to the player's colony in every story level (`Colony.traits`); never in skirmish

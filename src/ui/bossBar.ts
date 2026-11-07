@@ -18,14 +18,19 @@ export class BossBar {
   private fill = el('i');
   private phase = el('div', 'boss-phase');
   private riders = el('div', 'boss-riders');
+  /** a story titan that can't fall before it is in the nest (STORY.titanRaid.hpFloor): a lock and the floor's mark */
+  private lock = el('span', 'boss-lock');
+  private floor = el('b', 'boss-floor');
   private phaseNames = new Map<number, string>();
   private shown = -1;
 
   constructor(private s: GameSession) {
     const hp = el('div', 'boss-hp');
-    hp.appendChild(this.fill);
+    hp.append(this.fill, this.floor);
     const head = el('div', 'boss-head');
-    head.append(this.name, this.sci, this.riders);
+    this.lock.innerHTML = '<svg viewBox="0 0 12 14" aria-hidden="true"><path d="M3 6V4.2a3 3 0 0 1 6 0V6" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="1.2" y="6" width="9.6" height="7.2" rx="1.4" fill="currentColor"/></svg>';
+    this.lock.title = 'It can’t be killed before it gets into the nest';
+    head.append(this.name, this.sci, this.lock, this.riders);
     this.root.append(head, hp, this.phase);
   }
 
@@ -62,6 +67,12 @@ export class BossBar {
     const r = cap > 0 ? `${boss.climbers ?? 0}/${cap} riding${bonus ? ` · +${Math.round((BALANCE.mount.bonusMul - 1) * 100)} % damage` : ''}` : '';
     if (this.riders.textContent !== r) this.riders.textContent = r;
     this.riders.classList.toggle('bonus', bonus);
+    const fl = boss.data.hpFloor ?? 0;
+    this.root.classList.toggle('locked', fl > 0);
+    if (fl > 0) {
+      const fw = ((fl / Math.max(1, boss.maxHp)) * 100).toFixed(1) + '%';
+      if (this.floor.style.left !== fw) this.floor.style.left = fw;
+    }
     const ph = this.phaseNames.get(boss.id) ?? '';
     if (this.phase.textContent !== ph) this.phase.textContent = ph;
     this.root.classList.toggle('enraged', boss.phase > 0);

@@ -474,6 +474,15 @@ export interface Entrance {
   breach?: number;
   breachBy?: number;
   repair?: number;
+  /**
+   * A titan's work on this hole so far (0 → 1; claude/creatures/02-spec-easier-titan-holes.md): the hole's stages are
+   * drawn from it (rim crumbling at 25 %, a wider crater at 50 %, soil fountaining at 75 %), it is kept `holeMemorySec`
+   * after the digging stopped (`dT` the time it was last dug) so a titan that comes back carries on; `breachMm` the breach's
+   * drawn radius (from the titan that opened it).
+   */
+  dprog?: number;
+  dT?: number;
+  breachMm?: number;
 }
 
 /** One of the five pheromone markers (I–V). */

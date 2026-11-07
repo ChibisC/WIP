@@ -190,6 +190,15 @@ export function applyVenom(w: World, t: { venom: number; venomT: number; venomDp
   t.venomDps = Math.max(t.venomDps * 0.9, dps);
 }
 
+/**
+ * A story titan that must get into the nest first (claude/story/05-spec-story-titans-get-inside.md): the director sets
+ * `data.hpFloor` (STORY.titanRaid.hpFloor of its health) until it has been inside; damage beyond it is ignored.
+ */
+export function holdHpFloor(cr: Creature): void {
+  const f = cr.data.hpFloor ?? 0;
+  if (f > 0 && cr.hp < f) cr.hp = Math.min(f, cr.maxHp);
+}
+
 export function damageCreature(w: World, cr: Creature, amount: number, type: DamageType, src: Ant | null): void {
   if (cr.dead) return;
   const armor = creatureHooks.armor(cr);
@@ -202,6 +211,7 @@ export function damageCreature(w: World, cr: Creature, amount: number, type: Dam
   const floor = cr.data.hpFloor ?? 0;
   if (floor > 0 && cr.hp - dmg < floor) dmg = Math.max(0, cr.hp - floor);
   cr.hp -= dmg;
+  holdHpFloor(cr);
   creatureHooks.onDamaged?.(w, cr, src, dmg);
   if (cr.hp <= 0) {
     cr.hp = 0;

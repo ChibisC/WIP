@@ -26,6 +26,8 @@ export interface StoryActor {
   died0: number;
   /** a wave: beaten (1) */
   beaten: number;
+  /** a titan's dig-in: the game time it got into the nest (the `killWithin` bonus) */
+  inT?: number;
 }
 
 /** A scene running (or finished) on an actor. */

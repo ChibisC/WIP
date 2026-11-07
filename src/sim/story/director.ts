@@ -1,6 +1,6 @@
-import { RAID, endTitanRaid, startTitanRaid } from '../creatures/titanDig';
+import { RAID, endTitanRaid, startTitanRaid, walkThrough, whyNoRaid } from '../creatures/titanDig';
 import type { World } from '../world';
-import { AS, Ant, Colony, Creature, POSE, SURFACE } from '../types';
+import { AS, Ant, Colony, Creature, POSE, SURFACE, isCaveSpace } from '../types';
 import { creatureKind } from '../creatures/kinds';
 import { spawnCreature, CS } from '../creatures/creatureAI';
 import { makeAnt } from '../factory';
@@ -279,13 +279,74 @@ function enterCue(w: World, st: StoryState, sc: StoryScene): void {
       act.mode = 1;
       return;
     } else if ('digInto' in cue) {
-      // titans dig into the nest (they never give up: a story script); the cue waits until they are in
-      const col = cue.digInto === 'player' ? (w.s.colonies.find((c) => c.player)?.id ?? 0) : (st.rivals[cue.digInto] ?? -1);
-      for (const e of members(w, act)) if (!('caste' in e)) startTitanRaid(w, e as Creature, col, cue.hole ?? -1, true);
+      // titans dig into the nest (they never give up: a story script); the cue waits until they are in — a start that
+      // fails is tried again every second (directorTick), a titan in its lair walks out first (directCreature)
+      for (const e of members(w, act)) if (!('caste' in e)) startDig(w, st, act, e as Creature, cue);
       return;
     } else return; // a cue that takes time
     sc.cue++;
   }
+}
+
+/** The colony a `digInto` cue means. */
+function digColony(w: World, st: StoryState, cue: Extract<Cue, { digInto: string }>): number {
+  return cue.digInto === 'player' ? (w.s.colonies.find((c) => c.player)?.id ?? 0) : (st.rivals[cue.digInto] ?? -1);
+}
+
+const WHY: string[] = ['', 'in its lair (underground)', 'not on the surface', 'already raiding', 'the colony is gone', 'the colony has no holes', 'dead', 'not a digging titan'];
+
+/**
+ * Start a story titan's dig-in (claude/story/05-spec §2): a raid by another colony is dropped first; in its lair it walks
+ * out first (directCreature); any other refusal is logged once (the dev view) and tried again every `retrySec` s.
+ */
+function startDig(w: World, st: StoryState, act: StoryActor, cr: Creature, cue: Extract<Cue, { digInto: string }>): boolean {
+  const col = digColony(w, st, cue);
+  cr.data.rtry = w.s.time;
+  if ((cr.data.raid ?? 0) > 0 && ((cr.data.raid ?? 0) - 1 !== col || (cr.data.rph ?? 0) >= RAID.Leave)) {
+    cr.data.raid = 0;
+    cr.data.rph = 0;
+  }
+  if ((cr.data.raid ?? 0) > 0) return true;
+  const why = whyNoRaid(w, cr, col);
+  if (!why) {
+    // its bites inside, by the difficulty (the level's `inside`; else STORY.titanRaid.queenBite on the queen)
+    const ins = levelOf(st).actors[act.name]?.inside;
+    cr.data.rbite = ins?.bite?.[st.diff] ?? 1;
+    cr.data.rqbite = ins?.queenBite?.[st.diff] ?? STORY.titanRaid.queenBite[st.diff];
+    return startTitanRaid(w, cr, col, cue.hole ?? -1, true, cue.speed ?? 1);
+  }
+  const code = Math.max(0, WHY.indexOf(why));
+  if ((cr.data.rwhy ?? -1) !== code) {
+    cr.data.rwhy = code;
+    st.log.push(`${w.s.time.toFixed(0)} s: ${act.name} can't dig in yet — ${why}; trying again every ${STORY.titanRaid.retrySec} s`);
+  }
+  return false;
+}
+
+/** Has this titan been inside the nest of its dig-in (its health floor lifts, the cue is done)? */
+function dugIn(cr: Creature): boolean {
+  return (cr.data.rinside ?? 0) > 0;
+}
+
+/**
+ * An actor on a `digInto` cue that is not in yet (and not told to leave): it is locked — a scene that would start on
+ * it waits until it is in (claude/story/05-spec §2: the cue owns the creature).
+ */
+function digLocked(w: World, st: StoryState, ai: number): boolean {
+  const act = st.actors[ai];
+  if (!act || act.scene < 0) return false;
+  const sc = st.scenes[act.scene];
+  const cue = sc && !sc.done ? cueOf(st, sc) : undefined;
+  if (!cue || !('digInto' in cue)) return false;
+  return members(w, act).some((e) => !('caste' in e) && !dugIn(e as Creature) && !((e as Creature).data.rstop ?? 0));
+}
+
+/** Actors some scene of the level sends to dig in (they can't die before they have been inside: STORY.titanRaid.hpFloor). */
+function diggers(st: StoryState): Set<string> {
+  const L = levelOf(st);
+  const out = new Set<string>();
+  for (const S of [...L.stages.flatMap((x) => x.scenes ?? []), ...(L.scenes ?? [])]) if (S.cues.some((q) => 'digInto' in q)) out.add(S.actor);
+  return out;
 }
 
 /** A cue whose members walk somewhere and are done on arrival. */
@@ -323,10 +384,11 @@ export function directorTick(w: World, st: StoryState, stage: number, stageT: nu
   const L = levelOf(st);
   const S = L.stages[stage];
   // scenes of this stage that start now
+  // (a titan digging in is locked: a scene for it waits until it is in)
   S?.scenes?.forEach((sd, i) => {
     if (st.firedScene.includes(i)) return;
     const go = sd.on ? st.flags.includes(sd.on) : stageT >= (sd.at ?? 0);
-    if (!go) return;
+    if (!go || digLocked(w, st, actorIndex(st, sd.actor))) return;
     st.firedScene.push(i);
     startScene(w, st, stage, i);
   });
@@ -334,10 +396,26 @@ export function directorTick(w: World, st: StoryState, stage: number, stageT: nu
   L.scenes?.forEach((sd, i) => {
     if (st.firedLevel.includes(`scene${i}`)) return;
     const go = sd.on ? st.flags.includes(sd.on) : w.s.time >= (sd.at ?? 0);
-    if (!go) return;
+    if (!go || digLocked(w, st, actorIndex(st, sd.actor))) return;
     st.firedLevel.push(`scene${i}`);
     startScene(w, st, -1, i);
   });
+  // story titans that are to dig in can't die before they have been inside (the boss bar shows a lock)
+  const dig = diggers(st);
+  if (dig.size)
+    st.actors.forEach((act) => {
+      if (!act.spawned || act.kind !== 0 || !dig.has(act.name)) return;
+      // (with the level's own floor for the stage, `ActorDef.floor`, when that is higher: the Spider Mother's rounds)
+      const F = L.actors[act.name]?.floor;
+      const f0 = F && !st.flags.includes(F.until) ? F.hp : 0;
+      for (const e of members(w, act)) {
+        const cr = e as Creature;
+        if (dugIn(cr)) {
+          if (f0 > 0) cr.data.hpFloor = cr.maxHp * f0;
+          else if (cr.data.hpFloor !== undefined) delete cr.data.hpFloor;
+        } else cr.data.hpFloor = cr.maxHp * Math.max(STORY.titanRaid.hpFloor, f0);
+      }
+    });
   for (const sc of st.scenes) {
     if (sc.done) continue;
     const act = st.actors[sc.actor];
@@ -359,7 +437,18 @@ export function directorTick(w: World, st: StoryState, stage: number, stageT: nu
       if (act.spawned) setFlag(st, `gone:${act.name}`);
       continue;
     } else if (act.kind === 2) done = true;
-    else if ('digInto' in cue) done = alive.every((e) => 'caste' in e || ((e as Creature).data.rph ?? 0) >= RAID.Inside || !((e as Creature).data.raid ?? 0));
+    else if ('digInto' in cue) {
+      // done only once every titan of it has been inside (or is dead: not among the living); "not raiding" is not done —
+      // a raid that never started, or ended early, starts again (every `retrySec` s), unless the level told it to leave
+      for (const e of alive) {
+        if ('caste' in e) continue;
+        const cr = e as Creature;
+        if (dugIn(cr) || (cr.data.raid ?? 0) > 0 || (cr.data.rstop ?? 0) || w.s.time - (cr.data.rtry ?? -1e9) < STORY.titanRaid.retrySec) continue;
+        startDig(w, st, act, cr, cue);
+      }
+      done = alive.every((e) => 'caste' in e || dugIn(e as Creature));
+      if (done && act.inT === undefined) act.inT = w.s.time;
+    }
     else if ('guard' in cue) done = cue.s !== undefined && sc.t >= cue.s;
     else if ('patrol' in cue && cue.loops === undefined) done = sc.t >= (cue.s ?? 1e9);
     else if (!walking(cue) && ('holdAt' in cue || 'anim' in cue || 'wander' in cue || 'follow' in cue || 'rest' in cue)) done = sc.t >= (cue as { s: number }).s;
@@ -640,6 +729,13 @@ export function directCreature(w: World, cr: Creature, dt: number): boolean {
     cr.v = 0;
     return true;
   }
+  if ('digInto' in cue) {
+    // (raiding, the raid moves it before this; here it is not raiding yet) in its lair: out to the surface first,
+    // through the lair's tunnel to its hole; on the surface it waits for the next try
+    if (isCaveSpace(cr.space)) caveExit(w, cr, k, dt);
+    else cr.v = 0;
+    return true;
+  }
   const speed = ((cue as { speed?: number }).speed ?? 0.7) * k.speed;
   const key = `story:cr:${act.scene}:${sc?.cue ?? 0}`;
   const walk = (x: number, y: number, sp = speed) => crWalk(w, cr, x, y, sp, dt, key);
@@ -754,6 +850,30 @@ export function directCreature(w: World, cr: Creature, dt: number): boolean {
   }
   cr.v = 0;
   return true;
+}
+
+/** A creature in a lair walks up its tunnel (pushing through the soil like a raiding titan) and out of its hole. */
+function caveExit(w: World, cr: Creature, k: ReturnType<typeof creatureKind>, dt: number): void {
+  const cave = w.s.caves.find((v) => v.space === cr.space);
+  const g = w.nestOf(cr.space);
+  const e = cave?.entrances[0];
+  if (!cave || !g || !e) {
+    cr.space = SURFACE;
+    return;
+  }
+  const top = g.hexCenter(e.q);
+  if (dhypot(top.x - cr.x, top.y - cr.y) > 4) {
+    walkThrough(w, cr, k, top.x, top.y, dt);
+    return;
+  }
+  // out of the hole, a step clear of it, facing away
+  const a = datan2(e.sy - cave.ny, e.sx - cave.nx);
+  const p = nearestWalkable(w, e.sx + dcos(a) * 6, e.sy + dsin(a) * 6) ?? { x: e.sx, y: e.sy };
+  cr.space = SURFACE;
+  cr.x = cr.px = p.x;
+  cr.y = cr.py = p.y;
+  cr.h = cr.ph = a;
+  cr.data.rtry = -1e9;
 }
 
 /** Walk a creature toward (x, y) along the surface flow field (round banks and walls, up ramps). Returns the distance left. */

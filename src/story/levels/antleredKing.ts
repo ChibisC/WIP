@@ -165,24 +165,25 @@ export const ANTLERED_KING_LEVEL: StoryLevelDef = {
         { actions: [{ do: 'spawn', actor: 'king' }, { do: 'music', mood: 'assault' }, { do: 'shot', shot: { keys: [{ at: { actor: 'king' }, dist: 260, yaw: 0.9, t: 0, pitch: 0.05 }, { at: { actor: 'king' }, dist: 220, yaw: 1.3, t: 6 }] } }] },
         { on: 'hp:king:45', actions: [{ do: 'spawn', actor: 'callA' }, { do: 'spawn', actor: 'callB' }] },
         { on: 'hp:king:25', actions: [{ do: 'flag', flag: 'kingDigs' }] },
-        { on: 'kingDigs', actions: [{ do: 'tip', key: 'titanDig' }] },
+        { on: 'kingDigs', actions: [{ do: 'tip', key: 'kingDig' }] },
       ],
       scenes: [
         // down from his stump, across the clearing and up to the colony's doorstep, fighting what he meets (his own program)
         // (after three minutes at the doorstep he goes for the nest itself, hurt or not: a colony that only waits him out
         // does not stall the level, 2026-11-03)
-        { actor: 'king', cues: [{ holdAt: 'kingStump', face: 'clearing', s: 5 }, { flag: 'kingOut' }, { path: 'kingWay', speed: 1, timeout: 240 }, { flag: 'kingAtNest' }, { guard: 'nestApproach', r: 160, s: 180 }, { flag: 'kingDigs' }, { mode: 'aggressive' }, { digInto: 'player', flag: 'kingIn', timeout: 300 }, { release: true }] },
+        { actor: 'king', cues: [{ holdAt: 'kingStump', face: 'clearing', s: 5 }, { flag: 'kingOut' }, { path: 'kingWay', speed: 1, timeout: 240 }, { flag: 'kingAtNest' }, { guard: 'nestApproach', r: 160, s: 180 }, { flag: 'kingDigs' }, { mode: 'aggressive' }, { digInto: 'player', flag: 'kingIn' }, { release: true }] },
         { actor: 'callA', on: 'hp:king:45', cues: [{ charge: 'nestApproach', timeout: 200 }, { guard: 'nestApproach', r: 90 }] },
         { actor: 'callB', on: 'hp:king:45', cues: [{ charge: 'shelfFoot', timeout: 200 }, { guard: 'shelfFoot', r: 90 }] },
         // a quarter left: he goes for the nest itself, shoving a hole wider with his head and antlers
-        { actor: 'king', on: 'hp:king:25', cues: [{ mode: 'aggressive' }, { digInto: 'player', flag: 'kingIn', timeout: 300 }, { release: true }] },
+        { actor: 'king', on: 'hp:king:25', cues: [{ mode: 'aggressive' }, { digInto: 'player', flag: 'kingIn' }, { release: true }] },
       ],
     },
   ],
   medals: {
     time: [40 * 60, 52 * 60],
     losses: [60, 140],
-    bonus: { type: 'killBefore', actor: 'king', flag: 'kingIn', text: 'Kill the Antlered King before he digs into the nest' },
+    // (story titans always get in now: claude/story/05-spec §3, merged 2026-11-06)
+    bonus: { type: 'killWithin', actor: 'king', s: 60, text: 'Kill the Antlered King within a minute of his breaking into the nest' },
   },
   win: 'win',
   lose: 'lose',

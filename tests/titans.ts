@@ -14,7 +14,7 @@ import { killAnt } from '../src/sim/antAI';
 import { TITAN_DIG } from '../src/sim/balance';
 import { CREATURES } from '../src/sim/creatures/kinds';
 import { spawnCreature } from '../src/sim/creatures/creatureAI';
-import { RAID, endTitanRaid, startTitanRaid, titanRaidSystem } from '../src/sim/creatures/titanDig';
+import { RAID, digPace, endTitanRaid, holeSecs, startTitanRaid, titanRaidSystem } from '../src/sim/creatures/titanDig';
 import { SOIL_AIR, SOIL_STONE } from '../src/world/nestGrid';
 import { hashState } from '../src/sim/snapshot';
 
@@ -47,7 +47,7 @@ function titan(w: World, kind: string): ReturnType<typeof spawnCreature> {
   w.terrain.clearArea(e.sx - 60, e.sy - 60, e.sx + 60, e.sy + 60);
   return spawnCreature(w, kind, SURFACE, e.sx + Math.cos(a) * 45, e.sy + Math.sin(a) * 45);
 }
-const holeSecs = (kind: string) => TITAN_DIG.holeWork / CREATURES[kind].dig!.speed;
+const holeSecsOf = (kind: string) => TITAN_DIG.holeWork / CREATURES[kind].dig!.speed;
 
 // ---- data
 check('diggers: tarantula, wolf spider mother, giant centipede, stag beetle; the giant mantis does not dig', !!CREATURES.tarantula.dig?.can && !!CREATURES.hogna.dig?.can && !!CREATURES.scolopendra.dig?.can && !!CREATURES.stagBeetle.dig?.can && !CREATURES.giantMantis.dig?.can);
@@ -80,7 +80,7 @@ check('burrowers dig fastest, the stag beetle slowest', CREATURES.tarantula.dig!
     if (cr.space !== SURFACE) inT = t / 20;
   }
   const e = c.entrances[cr.data.rhole ?? 0];
-  check(`it digs the hole wider in about holeWork ÷ dig speed (${holeSecs('tarantula').toFixed(0)} s undefended)`, Math.abs(digT - holeSecs('tarantula')) < 2, `${digT.toFixed(1)} s`);
+  check(`it digs the hole wider in about holeWork ÷ dig speed (${holeSecsOf('tarantula').toFixed(0)} s undefended)`, Math.abs(digT - holeSecs(cr, CREATURES.tarantula)) < 1 && Math.abs(digT - holeSecsOf('tarantula')) < 2, `${digT.toFixed(1)} s`);
   check('the colony was warned before it got there', warned);
   check('the hole is now a breach the titan is in; still the colony\'s hole', (e.breach ?? 0) === 1 && e.breachBy === cr.id && c.entrances.length === 3);
   check('it walked into the nest', cr.space === nestSpace(0));
@@ -111,7 +111,24 @@ check('burrowers dig fastest, the stag beetle slowest', CREATURES.tarantula.dig!
   check('with the queen dead it walks back out of the breach', out >= 0 && !(e.breachBy ?? 0), `after ${out} s`);
 }
 
-// ---- defenders slow it; badly hurt, it gives up
+// ---- the hole's time (claude/creatures/02-spec-easier-titan-holes.md): undefended within the targets
+{
+  const w = world();
+  const secs = (kind: string) => holeSecs(spawnCreature(w, kind, SURFACE, 100, 100), CREATURES[kind]);
+  const t = { tarantula: secs('tarantula'), hogna: secs('hogna'), scolopendra: secs('scolopendra'), stag: secs('stagBeetle') };
+  check('undefended: the burrowers open a hole in 8–12 s, the centipede in about 15 s, the stag beetle in about 20 s', t.tarantula >= 8 && t.tarantula <= 12 && t.hogna >= 8 && t.hogna <= 12 && Math.abs(t.scolopendra - 15) <= 2 && Math.abs(t.stag - 20) <= 2, JSON.stringify(Object.fromEntries(Object.entries(t).map(([k, v]) => [k, +v.toFixed(1)]))));
+  check('a bigger titan of the same kind takes a little longer (its size)', (() => {
+    const a = spawnCreature(w, 'tarantula', SURFACE, 100, 100);
+    const b = spawnCreature(w, 'tarantula', SURFACE, 120, 100);
+    b.scale = a.scale * 1.5;
+    const r = holeSecs(b, CREATURES.tarantula) / holeSecs(a, CREATURES.tarantula);
+    return r > 1.02 && r < 1.1;
+  })());
+  check('defence slows it by the damage it takes a second, with diminishing returns: a few ants barely matter, a big army nears the floor', digPace(0) === 1 && digPace(0.002) > 0.95 && digPace(0.01) < 0.8 && digPace(0.03) < 0.62 && digPace(1) >= TITAN_DIG.slowFloor && digPace(0.03) - digPace(0.06) < digPace(0.005) - digPace(0.03), [0.002, 0.01, 0.03, 1].map((r) => digPace(r).toFixed(2)).join(' '));
+  check('the skirmish floor is 55–60 % of full speed', TITAN_DIG.slowFloor >= 0.55 && TITAN_DIG.slowFloor <= 0.6);
+}
+
+// ---- defenders slow it; heavy blows only back to the last checkpoint; the work is remembered; badly hurt, it gives up
 {
   const w = world();
   const c = w.colony(0)!;
@@ -119,23 +136,36 @@ check('burrowers dig fastest, the stag beetle slowest', CREATURES.tarantula.dig!
   const cr = titan(w, 'tarantula');
   startTitanRaid(w, cr, 0);
   for (let t = 0; t < 20 * 30 && cr.data.rph !== RAID.Dig; t++) run(w, 1);
-  // hits every second: each staggers it (hitSlow)
+  // a steady 2 % of its health a second
   let dig = 0;
-  for (let t = 0; t < 20 * 20; t++) {
-    if (t % 20 === 0) cr.hp -= 1;
+  for (let t = 0; t < 20 * 4; t++) {
+    cr.hp -= cr.maxHp * 0.02 * 0.05;
     const p0 = cr.data.rprog ?? 0;
     run(w, 1);
     dig += (cr.data.rprog ?? 0) - p0;
   }
-  const free = (20 * CREATURES.tarantula.dig!.speed) / TITAN_DIG.holeWork;
-  check('hits stagger it: digging under attack goes at hitSlow of its pace', Math.abs(dig - free * TITAN_DIG.hitSlow) < free * 0.1, `${dig.toFixed(3)} of the hole v ${free.toFixed(3)} undisturbed`);
-  const p0 = cr.data.rprog ?? 0;
+  const free = (4 * 1) / holeSecs(cr, CREATURES.tarantula);
+  check('under steady damage it digs at the damage-rate pace (not "any hit": 45 %)', dig < free * 0.9 && dig > free * TITAN_DIG.slowFloor, `${(dig / free).toFixed(2)} of its pace (floor ${TITAN_DIG.slowFloor})`);
+  cr.data.rprog = 0.53;
+  cr.data.rhp = cr.hp;
   cr.hp -= cr.maxHp * TITAN_DIG.heavyFrac * 1.01;
   run(w, 1);
-  check('a heavy blow knocks some of the work back', (cr.data.rprog ?? 0) < p0, `${p0.toFixed(2)} → ${(cr.data.rprog ?? 0).toFixed(2)}`);
+  check('a heavy blow knocks a little back, never below the last checkpoint (50 %)', (cr.data.rprog ?? 0) >= 0.5 - 1e-9 && (cr.data.rprog ?? 0) < 0.53, `0.53 → ${(cr.data.rprog ?? 0).toFixed(3)}`);
+  const e = c.entrances[cr.data.rhole ?? 0];
+  check('the work shows on the hole as it goes (the stages are drawn from it)', Math.abs((e.dprog ?? 0) - (cr.data.rprog ?? 0)) < 1e-9);
   cr.hp = cr.maxHp * (TITAN_DIG.giveUpHealth - 0.05);
   run(w, 2);
   check('badly hurt while digging, it gives up (skirmish)', !(cr.data.raid ?? 0) && (c.entrances[0].breach ?? 0) === 0);
+  const kept = e.dprog ?? 0;
+  check('…and its work stays on the hole', kept >= 0.5, kept.toFixed(2));
+  // another titan comes back to the hole within holeMemorySec: it carries on from there
+  const cr2 = titan(w, 'tarantula');
+  startTitanRaid(w, cr2, 0, cr.data.rhole ?? 0);
+  for (let t = 0; t < 20 * 30 && cr2.data.rph !== RAID.Dig; t++) run(w, 1);
+  check('a titan that comes back within holeMemorySec carries on from the work left', (cr2.data.rprog ?? 0) >= kept - 0.01, `${(cr2.data.rprog ?? 0).toFixed(2)} from ${kept.toFixed(2)}`);
+  for (const x of w.s.creatures) x.dead = true;
+  run(w, 20 * (TITAN_DIG.holeMemorySec + 3));
+  check('…after holeMemorySec without digging, the colony fills it in', (e.dprog ?? 0) === 0);
 }
 
 // ---- a story raid never gives up; endTitanRaid sends it out; the breach is repaired afterwards

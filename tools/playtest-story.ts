@@ -10,6 +10,9 @@
  * PACE=human (claude/story/06-spec §7): a person's pace — it looks at the map every 15 s instead of every 5, acts on a
  * target only once it has seen it twice in a row, waits for a bigger army (×1.3) before an assault or a boss, and
  * defends at home (no sorties beyond 90 mm) while a stage asks it to hold out. JSON=1 prints one line of results.
+ * STRATEGY=hole (claude/story/05-spec §4): defend at the hole — once a titan comes to dig into the nest, the whole army
+ * waits on the hole it digs and fights it there, then follows it in. The summary says whether (and when) a story titan
+ * got inside.
  */
 import { EventBus } from '../src/core/events';
 import { createWorld } from '../src/sim/mapGen';
@@ -43,6 +46,8 @@ const NIGHT_R = Number(process.env.NIGHT_R ?? (HUMAN ? 90 : 130));
 /** how often the "player" looks (ticks) */
 const LOOK = HUMAN ? 300 : 100;
 const ARMY_MUL = HUMAN ? 1.3 : 1;
+/** 'hole': defend at the hole a titan digs (and follow it in) */
+const STRATEGY = process.env.STRATEGY ?? '';
 
 const ev = new EventBus();
 // TRAITS=spiderlingVenom: play with the campaign's traits
@@ -70,6 +75,9 @@ let regroupTo = 0;
 let pushing = false;
 let gatherT = 0;
 let deaths = 0;
+/** game time a titan came to dig in / got inside (0 not yet) */
+let titanSeen = 0;
+let titanIn = 0;
 ev.on('death', (e) => {
   if (e.kind === 'ant' && e.colony === 0) deaths++;
 });
@@ -107,6 +115,24 @@ for (let t = 0; t < minutes * 1200; t++) {
       }
     }
   let target: { space: number; x: number; y: number } | null = null;
+  // defend at the hole: a titan digging in (any objective) — the army on its hole, then after it into the nest
+  if (STRATEGY === 'hole')
+    for (const cr of w.s.creatures) {
+      if (cr.dead || (cr.data.raid ?? 0) !== c.id + 1) continue;
+      const e = c.entrances[cr.data.rhole ?? 0];
+      if (cr.space !== SURFACE) target = { space: cr.space, x: cr.x, y: cr.y };
+      else if (e) target = { space: SURFACE, x: e.sx + (cr.x - e.sx) * 0.15, y: e.sy + (cr.y - e.sy) * 0.15 };
+      if (!titanSeen) {
+        titanSeen = w.s.time;
+        log.push(`${(w.s.time / 60).toFixed(1)} min: a titan comes to dig in — the army to the hole (${c.living} ants)`);
+      }
+      break;
+    }
+  for (const cr of w.s.creatures)
+    if (!cr.dead && (cr.data.rinside ?? 0) && (cr.data.rstory ?? 0) && !titanIn) {
+      titanIn = w.s.time;
+      log.push(`${(w.s.time / 60).toFixed(1)} min: the titan is inside the nest (${Math.round((cr.hp / cr.maxHp) * 100)} % health)`);
+    }
   // the rival to go after: the objective's, else the first still alive (levels with several)
   const killObj = (S?.objectives ?? []).find((o) => o.type === 'killQueen' || o.type === 'killQueens');
   const keys = killObj?.type === 'killQueen' ? [killObj.rival] : killObj?.type === 'killQueens' ? killObj.rivals : Object.keys(st.rivals);
@@ -248,8 +274,9 @@ for (let t = 0; t < minutes * 1200; t++) {
   }
 }
 const m = missionOf(w)!;
-if (process.env.JSON) console.log(JSON.stringify({ level, diff, seed, pace: HUMAN ? 'human' : 'bot', result: m.result || 'unfinished', min: Number(end.toFixed(1)), stage: m.stage, ants: c.living, died: deaths, events: (st.flags.filter((f) => f.startsWith('ev:')).map((f) => f.slice(3))), wall: Math.round((performance.now() - t0) / 1000) }));
-console.log(`\n${def.title} (${diff}, seed ${seed}${loadout.length ? ', loadout ' + loadout.join('+') : ''}): ${m.result || 'unfinished'} at ${end.toFixed(1)} min — ${c.living} ants, ${deaths} died (${((performance.now() - t0) / 1000).toFixed(0)} s)`);
+if (process.env.JSON) console.log(JSON.stringify({ level, diff, seed, pace: HUMAN ? 'human' : 'bot', result: m.result || 'unfinished', min: Number(end.toFixed(1)), stage: m.stage, ants: c.living, died: deaths, events: (st.flags.filter((f) => f.startsWith('ev:')).map((f) => f.slice(3))), titanIn: titanIn ? Number((titanIn / 60).toFixed(1)) : undefined, wall: Math.round((performance.now() - t0) / 1000) }));
+console.log(`\n${def.title} (${diff}, seed ${seed}${loadout.length ? ', loadout ' + loadout.join('+') : ''}${STRATEGY ? ', strategy ' + STRATEGY : ''}): ${m.result || 'unfinished'} at ${end.toFixed(1)} min — ${c.living} ants, ${deaths} died (${((performance.now() - t0) / 1000).toFixed(0)} s)`);
+if (titanSeen || titanIn) console.log(`  titan: ${titanSeen ? `came to dig in at ${(titanSeen / 60).toFixed(1)} min, ` : ''}${titanIn ? `inside at ${(titanIn / 60).toFixed(1)} min` : 'NEVER INSIDE'}`);
 for (const l of log) console.log('  ' + l);
 console.log('  flags: ' + st.flags.join(', '));
 if (st.log.length) console.log('  director: ' + st.log.join('; '));

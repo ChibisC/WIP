@@ -27,7 +27,9 @@ import { validateMap } from '../src/world/mapValidate';
 import { Terrain, mapTerrainParams } from '../src/world/terrain';
 import { encodeState, hashState, restoreWorld } from '../src/sim/snapshot';
 import { damageCreature } from '../src/sim/combat';
-import { RAID } from '../src/sim/creatures/titanDig';
+import { RAID, startTitanRaid } from '../src/sim/creatures/titanDig';
+import { spawnCreature } from '../src/sim/creatures/creatureAI';
+import { probe } from '../tools/titanProbe';
 import { EN } from '../src/story/text/en';
 import type { Difficulty, StoryLevelId } from '../src/sim/story/types';
 
@@ -300,10 +302,11 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
   damageCreature(w, mom, mom.hp - mom.maxHp * 0.28, 'pure', null);
   const dig = until(w, 'motherIn', 150);
   check('spider mother: below 30 % she digs a hole wider and walks into the nest', dig > 0 && mom.space === nestSpace(0), `in at ${dig.toFixed(0)}, space ${mom.space}`);
+  check('spider mother: once in, her health floor lifts (she can be killed inside)', mom.data.hpFloor === undefined);
   damageCreature(w, mom, mom.hp + 10, 'pure', null);
   run(w, 20 * 2);
-  check('spider mother: killing her wins the level; the bonus is lost once she has dug in', missionOf(w)!.result === 'won' && st.bonus === -1);
-  // the bonus: killed before she digs in
+  check('spider mother: killing her within a minute of her breaking in wins the level and the bonus', missionOf(w)!.result === 'won' && st.bonus === 1, `bonus ${st.bonus}`);
+  // before she is in she can't be killed (claude/story/05-spec §2: her health stops at the floor)
   const w2 = level('spiderMother', 'normal', 6);
   const m2 = missionOf(w2)!;
   m2.stage = 2;
@@ -312,7 +315,18 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
   const mom2 = members(w2, actor(w2, 'mother'))[0] as Creature;
   damageCreature(w2, mom2, mom2.hp + 10, 'pure', null);
   run(w2, 40);
-  check('spider mother: killed before she digs in: the bonus', missionOf(w2)!.result === 'won' && storyOf(w2)!.bonus === 1);
+  check('spider mother: before she has dug in she can’t be killed — her health stops at STORY.titanRaid.hpFloor (the boss bar shows a lock)', !mom2.dead && Math.abs(mom2.hp - mom2.maxHp * STORY.titanRaid.hpFloor) < 1 && (mom2.data.hpFloor ?? 0) > 0 && !missionOf(w2)!.result, `${(mom2.hp / mom2.maxHp * 100).toFixed(0)} %`);
+  // …so the fury starts, she rushes in, and the bonus clock runs: a minute, then it is lost
+  const inAt = until(w2, 'motherIn', 90);
+  check('spider mother: at her floor (below 30 %) she rushes to the nest and digs in', inAt > 0 && mom2.space === nestSpace(0), `in at ${inAt.toFixed(0)}`);
+  const sm = STORY_LEVELS.spiderMother.medals.bonus;
+  check('spider mother: the bonus is now killing her within a minute of her breaking in (her old one, before she digs in, can’t happen)', sm.type === 'killWithin' && sm.s === 60 && /minute/.test(sm.text));
+  for (let i = 0; i < 20 * 64 && !mom2.dead; i++) {
+    mom2.hp = Math.max(mom2.hp, mom2.maxHp * 0.5);
+    w2.step(0.05);
+    w2.events.drain();
+  }
+  check('spider mother: alive a minute after breaking in: the bonus is lost', storyOf(w2)!.bonus === -1, `bonus ${storyOf(w2)!.bonus}`);
   check('spider mother: the reward is the trait Spiderling Venom (built, story only)', STORY_LEVELS.spiderMother.reward.trait === 'spiderlingVenom' && !!STORY.traits.spiderlingVenom.built);
   // a restart skips the opening flight
   const shots = (retry: boolean) => {
@@ -326,6 +340,43 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
     return n;
   };
   check('spider mother: a restart skips the opening flight (the boss rule)', shots(false) === 1 && shots(true) === 0);
+}
+
+// ---------------------------------------------------------------- the titans always get in (claude/story/05-spec-story-titans-get-inside.md §4)
+{
+  // both levels, every difficulty: no defence; the whole army at the hole; ants on it (riders); the titan down in its
+  // burrow when its dig cue fires — it gets inside every time, digging no longer than the difficulty's cap, and the cue
+  // is not done before it is in
+  const rows: string[] = [];
+  let bad = 0;
+  let capOk = true;
+  for (const L of ['longNights', 'spiderMother'] as const)
+    for (const d of ['easy', 'normal', 'hard', 'brutal'] as const)
+      for (const setup of ['none', 'hole', 'riders', 'burrow'] as const) {
+        const r = probe(L, setup, d, 5, 40, 240, false, 0);
+        const ok = r.inside >= 0 && !r.doneEarly && !r.diedOutside;
+        if (!ok) bad++;
+        if (r.digSec > STORY.titanRaid.digCap[d] + 0.1) capOk = false;
+        rows.push(`${L}/${d}/${setup}: ${ok ? `in at ${r.inside.toFixed(0)} s (dug ${r.digSec.toFixed(1)} s, ${(r.hpIn * 100).toFixed(0)} %)` : `NOT IN (${r.notes.slice(-2).join('; ')})`}`);
+      }
+  check('titans get in: both levels × four difficulties × no defence / army at the hole / riders / in its burrow — inside every time, the cue never done before', bad === 0, bad ? rows.filter((x) => /NOT IN/.test(x)).join(' | ') : `${rows.length} runs`);
+  check('titans get in: never more than the difficulty’s dig cap (STORY.titanRaid.digCap)', capOk, rows.filter((x) => /hole/.test(x)).join(' | '));
+  check('titans get in: the caps rise with the difficulty, 12–20 s', STORY.titanRaid.digCap.easy === 12 && STORY.titanRaid.digCap.brutal === 20 && STORY.titanRaid.digCap.normal < STORY.titanRaid.digCap.hard);
+  console.log('      ' + rows.join('\n      '));
+}
+{
+  // the dig cue owns the titan: a story raid can't be stalled (no knock-backs, a pace floor) and never gives up
+  const r = probe('longNights', 'hole', 'normal', 5, 60, 240, false, 0);
+  check('titans get in: with 60 ants at the hole the tarantula still gets in (before: it died at the hole after 9 s of digging)', r.inside > 0 && !r.diedOutside, `in at ${r.inside.toFixed(0)} s with ${(r.hpIn * 100).toFixed(0)} %`);
+  // skirmish raids are unchanged by this fix: no floor, they give up
+  const sk = createWorld({ seed: 3, style: 'meadow', width: 640, depth: 640, colonies: [{ species: 'termant', player: true, ai: false }], settings: { creatures: 0, titanRaids: false } } as never, new EventBus());
+  const c0 = sk.colony(0)!;
+  const e0 = c0.entrances[0];
+  const t = spawnCreature(sk, 'tarantula', SURFACE, e0.sx + 30, e0.sy);
+  startTitanRaid(sk, t, 0);
+  run(sk, 20 * 3);
+  damageCreature(sk, t, t.hp + 10, 'pure', null);
+  check('titans get in: a skirmish raid has no health floor (only story raids are guaranteed)', t.dead && t.data.hpFloor === undefined && !t.data.rstory);
 }
 
 // ---------------------------------------------------------------- the trait: Spiderling Venom

@@ -40,6 +40,7 @@ import { storySetup } from './sim/story/runner';
 import { STORY_LEVEL_IDS, type StoryLevelId } from './sim/story/types';
 import { nightLen, nightStart } from './sim/story/dayNight';
 import { missionDef, missionOf } from './sim/missions';
+import { actorIndex, storyOf } from './sim/story/state';
 import { campaign } from './game/campaign';
 import { makeAnt } from './sim/factory';
 import { SURFACE } from './sim/types';
@@ -178,7 +179,7 @@ function startGame(): void {
       if (q.get('hitboxes')) s.setHitboxes(true);
       if (q.get('combatdebug')) s.setCombatDebug(true);
       if (q.get('layout') || q.get('battle') || q.get('chamber') || q.get('spawn')) s.replayable = false; // test scenes edit the world directly
-      // dev: a story level from any stage (?story=<level>&stage=N[&ants=N]), to test its scenes
+      // dev: a story level from any stage (?story=<level>&stage=N[&ants=N][&titan=1]), to test its scenes
       if (c.mode === 'story' && q.get('stage')) {
         const m = missionOf(s.world);
         if (m) {
@@ -191,6 +192,20 @@ function startGame(): void {
         const extra = Number(q.get('ants') || 0);
         const e0 = s.player.entrances[0];
         for (let i = 0; i < extra; i++) makeAnt(s.world, s.player.id, i % 4 ? 'termant_worker' : 'termant_soldier', SURFACE, e0.sx + ((i % 7) - 3) * 4, e0.sy + Math.floor(i / 7) * 4 + 8, 0);
+        // &titan=1: straight to the stage's titan moment (claude/story/05-spec §1) — the last night's start (its titan comes
+        // out), or a boss's health set just above the mark whose scene sends it to dig in
+        if (q.get('titan') && m) {
+          const L = missionDef(m.id).story!;
+          if (L.dayNight && m.stage === L.stages.length - 1) s.world.s.time = nightStart(L.dayNight, L.dayNight.nights) - 3;
+          s.loop.advance(2);
+          const st = storyOf(s.world);
+          for (const S of [...L.stages.flatMap((x) => x.scenes ?? []), ...(L.scenes ?? [])]) {
+            const mk = S.cues.some((c) => 'digInto' in c) ? /^hp:([^:]+):(\d+)$/.exec(S.on ?? '') : null;
+            const act = mk && st ? st.actors[actorIndex(st, mk[1])] : undefined;
+            const cr = act?.ids.length ? s.world.creatureById.get(act.ids[0]) : undefined;
+            if (cr && mk) cr.hp = cr.maxHp * (Number(mk[2]) / 100 - 0.005);
+          }
+        }
         s.replayable = false;
       }
       // The simulation runs in a Web Worker (the screenshot harness steps it synchronously in this thread; ?worker=0 too).

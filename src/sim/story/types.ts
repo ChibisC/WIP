@@ -93,9 +93,11 @@ export type Cue =
   | { release: true }
   /**
    * a titan digs into a colony's nest (sim/creatures/titanDig.ts): `into` a rival's key or 'player'; by hole `hole` (else the
-   * nearest); done once it is inside (or its raid ended). It never gives up digging; `endRaid` sends it out.
+   * nearest); walking there at `speed` × its speed. Guaranteed (claude/story/05-spec): done only once it is inside (or
+   * dead); a start that fails is tried again, in its lair it walks out first, it can't die before it is in, and other
+   * scenes for it wait. It never gives up digging; `endRaid` sends it out.
    */
-  | { digInto: string; hole?: number; flag?: string; timeout?: number }
+  | { digInto: string; hole?: number; flag?: string; timeout?: number; speed?: number }
   /** go back to cue `goto` of this scene (a loop: a hunter's rounds) */
   | { goto: number }
   /** rest on the spot (or walking there first), healing `heal` of its health a second, for `s` seconds */
@@ -152,6 +154,11 @@ export interface ActorDef {
    * Spider Mother can't be killed on her rounds, only driven down her burrow; the fight to the death is the last stage)
    */
   floor?: { hp: number; until: string };
+  /**
+   * A titan that digs in (claude/story/05-spec §3, the fight inside kept winnable): its bites inside the nest do `bite` ×
+   * (on everything) and `queenBite` × (on the queen), by difficulty (else STORY.titanRaid.queenBite, and 1).
+   */
+  inside?: { bite?: Partial<Record<Difficulty, number>>; queenBite?: Partial<Record<Difficulty, number>> };
 }
 
 /** A caption: a key into the level's narration text, said `at` seconds into the stage or once a flag is set. */
@@ -240,8 +247,10 @@ export type Bonus =
   | { type: 'stealBefore'; caste: string; flag: string; text: string }
   /** lose no more than `max` ants from the moment `actor` (a wave) appears until it is beaten */
   | { type: 'waveLosses'; actor: string; max: number; text: string }
-  /** kill `actor` (a creature) before `flag` is set (e.g. before dawn, before it digs into the nest) */
+  /** kill `actor` (a creature) before `flag` is set (e.g. before dawn) */
   | { type: 'killBefore'; actor: string; flag: string; text: string }
+  /** kill `actor` (a titan that digs in) within `s` seconds of its getting into the nest */
+  | { type: 'killWithin'; actor: string; s: number; text: string }
   /** destroy one of these rival colonies before its nest floods (`dead:<rival>` before `nestFlood:<rival>`) */
   | { type: 'deadBefore'; rivals: string[]; text: string };
 

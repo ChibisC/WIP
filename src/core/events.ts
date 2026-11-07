@@ -24,8 +24,12 @@ export type SimEvent =
   | { t: 'telegraph'; x: number; y: number; space: number; radius: number; duration: number; creature: number; dir?: number; half?: number }
   | { t: 'bossPhase'; creature: number; phase: number; name: string }
   | { t: 'bossFootstep'; x: number; y: number; power: number }
-  /** a titan digging into a nest (sim/creatures/titanDig.ts): the warning, digging at the hole, the breach, going in, a hex breaking, leaving */
-  | { t: 'titanDig'; phase: 'warn' | 'dig' | 'breach' | 'enter' | 'break' | 'leave'; colony: number; x: number; y: number; space: number; creature: number; kind: string }
+  /**
+   * a titan digging into a nest (sim/creatures/titanDig.ts): the warning, the digging starting, digging at the hole, the
+   * breach, going in, a hex breaking, leaving; `prog` the hole's progress (0–1), `eta` the seconds to the breakthrough
+   * (warn, start), `story` a story's titan (it always gets in)
+   */
+  | { t: 'titanDig'; phase: 'warn' | 'start' | 'dig' | 'breach' | 'enter' | 'break' | 'leave'; colony: number; x: number; y: number; space: number; creature: number; kind: string; prog?: number; eta?: number; story?: boolean }
   /** termite soldiers drumming the alarm (a nasute major's alarm call) */
   | { t: 'headbang'; x: number; y: number; space: number }
   /** a termite major's point-blank glue burst (the target is held) */

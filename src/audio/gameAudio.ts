@@ -206,9 +206,12 @@ export class GameAudio {
         // ground breaking round it underground as soil grains
         if (e.phase === 'warn' || e.phase === 'breach') return this.want('boss.slam', e.x, e.y, e.space, { pool: 'creature', gain: 0.8, reach: 6, important: true, heat: 0.4 });
         if (e.phase === 'dig') {
-          this.want('boss.footstep', e.x, e.y, e.space, { pool: 'creature', gain: 0.8, reach: 4, heat: 0.05 });
-          return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 1 });
+          // the rumble rises in pitch and grows louder as the hole opens (claude/creatures/02-spec §3)
+          const p = Math.max(0, Math.min(1, e.prog ?? 0));
+          this.want('boss.footstep', e.x, e.y, e.space, { pool: 'creature', gain: 0.65 + 0.45 * p, rate: 0.82 + 0.5 * p, reach: 4 + 2 * p, heat: 0.05 + 0.05 * p });
+          return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 0.85 + 0.4 * p, rate: 0.9 + 0.3 * p });
         }
+        if (e.phase === 'start') return this.want('boss.footstep', e.x, e.y, e.space, { pool: 'creature', gain: 0.9, rate: 0.8, reach: 5, heat: 0.1 });
         if (e.phase === 'break') return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 0.9, heat: 0.02 });
         return;
       case 'bite':
