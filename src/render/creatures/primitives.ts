@@ -247,6 +247,13 @@ function depthMaterial(): THREE.MeshDepthMaterial {
 const tmpC = new THREE.Color();
 
 /** A set of primitive pools in one scene group. */
+/** Mark the first n instances of an attribute for upload. */
+function upload(a: THREE.BufferAttribute, n: number): void {
+  a.clearUpdateRanges();
+  a.addUpdateRange(0, n * a.itemSize);
+  a.needsUpdate = true;
+}
+
 export class PrimitiveBatch {
   readonly group = new THREE.Group();
   private pools: Record<Prim, Pool>;
@@ -347,11 +354,8 @@ export class PrimitiveBatch {
     m.count = p.n;
     m.visible = p.n > 0;
     if (!p.n) return;
-    for (const a of [m.instanceMatrix, m.instanceColor, p.mat]) {
-      if (!a) continue;
-      a.clearUpdateRanges();
-      a.addUpdateRange(0, p.n * a.itemSize);
-      a.needsUpdate = true;
-    }
+    upload(m.instanceMatrix, p.n);
+    if (m.instanceColor) upload(m.instanceColor, p.n);
+    upload(p.mat, p.n);
   }
 }

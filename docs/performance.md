@@ -92,3 +92,64 @@ What changed:
 5. **Trail evaporation is spread over four ticks** (a quarter of the map each tick) instead of the whole map every fourth tick.
 
 CPU profile now (self time): target scans 15 %, foraging 7 %, ant dispatch 5 %, GC 3 % (was 9 %), flow fields about 3 % (was 46 %).
+
+## The performance pass, 2026-11-03 to 11-06 (CHANGE_PLAN §25)
+
+Spec: `claude/performance/01-spec-performance-no-visual-loss.md` — faster in every mode, smooth switching between the
+surface and the underground, and no loss of looks.
+
+### How it is measured
+- **F3** is a profiler (`src/core/profiler.ts`): frame time (average, p95, worst over the last 300 frames), the main
+  thread's time and its parts (simulation messages, events, units, creatures, the nest, effects, UI, render submit),
+  GPU time where the browser has `EXT_disjoint_timer_query_webgl2`, draw calls, triangles, programs, textures,
+  geometries, heap, an estimate of live GPU memory (every texture, renderbuffer and buffer's size, followed through
+  its binds, uploads and deletes), the GL work since loading (shader links and their time, texture uploads and bytes),
+  and the **hitch log**: every frame over 33 ms with what happened in it (a model built, a shader linked, textures
+  uploaded, a nest's terrain rebuilt, a big simulation message…).
+- **`?bench=1`** (Menu → Graphics → Run the benchmark, `src/dev/bench.ts`): six fixed scenes, each loaded fresh, warmed
+  up, then timed while the camera flies a fixed path. *switch*: surface → home → every area → surface, ten rounds, every
+  switch's frames kept; *fight*: 400 against 400 with two titans; *nest*: a developed nest; *story*: The Long Nights at
+  dusk before the third night; *arena*: six teams of 100; *mp4*: a four-colony world. The report has the device, the
+  numbers per scene, the switch table and the hitch causes, with a Copy button. `tests/browser/bench.py` runs it headless.
+- **The golden set** (`tests/browser/golden.py`, `tools/golden-compare.py`, `docs/performance/golden/`): 35 fixed shots
+  (every map at three zooms, both nests, eleven species close-ups, a big fight, a flood, a titan in a nest, day and
+  night, the low and medium presets), rendered from main without the change and from the branch, compared by SSIM
+  (≥ 0.985) and mean pixel difference (≤ 2 of 255).
+
+### What was found
+- **Switching hitches came from lazy creation.** Each space has its own ant renderer, and the first time an area was
+  shown its renderer built every ant model it met, baked their far impostors, created their materials, and the GPU
+  compiled every shader on first draw. The hitch log named it on the first probe: entering the home nest the first time
+  was one 7.4 s frame on the build machine (medium quality), area 3 1.6 s, area 2 0.6 s.
+- **three.js binds a program for every visible instanced mesh, even with no instances** (`setProgram` runs before the
+  empty-draw check). Hundreds of empty pools (ant LODs × morphs, creature parts) cost a program switch each per frame.
+- **`renderer.compile()` does not reach the shadow pass's depth materials**, so a scene "compiled" at load still linked
+  depth programs on its first shadowed frame.
+- **The worker re-sent every colony whole each frame** (structured clone: 175 KB of objects in a 10-colony match at
+  10 minutes, about 1.5 ms to clone in the worker and as much to rebuild on the main thread, all of it garbage).
+- **The ant shader is at the 16 vertex attributes WebGL guarantees** (phones have exactly 16): anything new per instance
+  has to be packed into an existing channel.
+
+### What changed (no change of looks)
+| Area | Change |
+|---|---|
+| Switching | `GameSession.prewarm()` behind the loading screen: every model that can appear is built once and shared by all renderers (`builtCache`, `impostorCache`, termite and creature part pools), then every space's scene is compiled and drawn once offscreen with shadows (`render/prewarm.ts`). |
+| Switching | `warmNew()` warms a model the simulation shows mid-match in the background (under 4 ms a frame); `keepAreasCurrent()` keeps the areas not on screen up to date every sixth frame while there is room. |
+| Switching | Nothing is drawn while the dive or area fade is fully opaque (the swap frame does the swap; the new space draws on the next). |
+| Rendering | Empty instanced meshes are hidden; creature pools upload only the instances drawn. |
+| Rendering | The AO composite pass is skipped when AO is off (it copied the image unchanged). |
+| Rendering | Auto quality lowers the render resolution (10 % steps, never below 75 %, a light sharpen) before it drops a preset, and brings it back first. |
+| Rendering | An ant's change of LOD cross-fades over 0.25 s (both models, each in the other's dithered pixels) with a 6 % hysteresis; camera cuts snap. The fade rides in `aE.z` with "exhausted". |
+| CPU | The slow state goes as per-field deltas (`worker/slowDelta.ts`): 16 % of the bytes on average, and the replica ends up identical (`tests/performance.ts`). |
+| CPU | HUD labels skip unchanged class and display writes; creature uploads allocate nothing. |
+| Phones | Frame cap 30 / 60 / match the screen (phones default to 60); auto quality judges frames against the cap; an estimated GPU memory over 600 MB steps the preset down. |
+| Multiplayer | Every pong carries the player's tick and frame time; the host shares them; F3 and the players panel show them, and the HUD names a slow device. |
+
+### Not done, and why
+- **KTX2 textures:** every texture is generated in the page at load; there are no image files to compress, and a
+  transcoder would add weight for nothing.
+- **Bake cache in IndexedDB / bakes in a worker:** worth it only if the device numbers show loading dominated by the
+  impostor bakes; the profiler's notes will show it.
+- **Cached static shadows:** the shadow camera follows the view and the units cast most of the shadow; a static cache
+  would need a second shadow map and pass.
+- **Termite LOD cross-fade:** the termite kit writes its instances through many setters; it keeps its own LOD switch.
