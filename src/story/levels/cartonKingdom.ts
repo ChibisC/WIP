@@ -41,8 +41,10 @@ export const CARTON_KINGDOM_LEVEL: StoryLevelDef = {
     { type: 'brood', caste: 'termant_soldier', n: 3 },
   ],
   rivals: {
-    north: { species: 'nasutitermes', site: 1, name: 'Conehead termites (north)', developed: 3, startWorkers: 10, popLimit: 30, team: 1 },
-    east: { species: 'nasutitermes', site: 2, name: 'Conehead termites (east)', developed: 3, startWorkers: 10, popLimit: 30, team: 1 },
+    // (developed 3, 10 workers and 30 at most fell in 15 minutes at a person's pace, 2026-11-03: two mature carton
+    // colonies now, each bigger than the colony at the start)
+    north: { species: 'nasutitermes', site: 1, name: 'Conehead termites (north)', developed: 7, startWorkers: 20, popLimit: 90, team: 1, income: 1.5 },
+    east: { species: 'nasutitermes', site: 2, name: 'Conehead termites (east)', developed: 7, startWorkers: 20, popLimit: 90, team: 1, income: 1.5 },
   },
   creatures: 0,
   aphids: 3,

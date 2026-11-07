@@ -227,6 +227,11 @@ export interface RivalDef {
   popLimit?: number;
   /** allies share a team (the AI allies' brain: they help each other); default a team of its own */
   team?: number;
+  /**
+   * food a second into its stores (× the difficulty's `rival`): a mature colony's economy the map alone does not give
+   * (the conehead termites' carton nests; story only)
+   */
+  income?: number;
 }
 
 /** A bonus objective: the third medal. */

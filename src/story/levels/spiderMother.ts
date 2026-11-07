@@ -140,8 +140,9 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
         { key: 'motherIn', on: 'motherIn' },
       ],
       events: [
-        // (she comes out of her burrow for the last time rested and fed: the fight to the death starts from full health)
-        { actions: [{ do: 'music', mood: 'assault' }, { do: 'night', level: 0.45 }, { do: 'heal', actor: 'mother', to: 1 }] },
+        // (she comes out of her burrow for the last time rested and fed: at least 85 % of her health for the fight to the death;
+        // full health wore a colony down to a stalemate at a person's pace, 2026-11-03)
+        { actions: [{ do: 'music', mood: 'assault' }, { do: 'night', level: 0.45 }, { do: 'heal', actor: 'mother', to: 0.85 }] },
         { on: 'hp:mother:30', actions: [{ do: 'tip', key: 'motherDig' }] },
       ],
       scenes: [

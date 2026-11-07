@@ -312,6 +312,12 @@ export function storySecond(w: World, c: Colony, m: MissionState): void {
   const L = levelOf(st);
   worldFlags(w, st, c);
   holdTick(w, st, c, m.stage);
+  // rivals with an income (mature colonies: the map alone does not feed them)
+  for (const [k, R] of Object.entries(L.rivals)) {
+    if (!R.income) continue;
+    const r = w.colony(st.rivals[k] ?? -1);
+    if (r?.alive) r.food = Math.min(r.foodCap, r.food + R.income * STORY.difficulty[st.diff].rival);
+  }
   storyFire(w, st, m, m.stage, m.t);
   levelFire(w, st);
   surprisesSecond(w, st, L, (a) => act(w, st, a), (key) => {

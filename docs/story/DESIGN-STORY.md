@@ -184,7 +184,7 @@ the colony AI's own `developChambers`): the founding ring of workers round the q
 store by the entrance, 7-hex soldier and 3-hex Lasius soldier and fire major chambers (castes the player owns), highways
 on the tunnels between them (about 29 ants, 140 food), a preparation (Easy 10½ min, Normal 10, Hard 9½, Brutal 9), then her
 rounds (Easy 15 min, Normal 16, Hard 16½, Brutal 17: claude/story/06-spec §7, the level ran 14–17 minutes), then the fight
-to the end, which she starts rested and fed (back to full health: `heal`); the light goes toward dusk when she comes out. On her rounds she can be hurt but not killed: at 55 % of her
+to the end, which she starts rested and fed (at least 85 % of her health: `heal`); the light goes toward dusk when she comes out. On her rounds she can be hurt but not killed: at 55 % of her
 health she is hurt no further until the last stage (`ActorDef.floor`), and below 60 % she stays down her burrow.
 
 | Stage | Objectives | Scenes and set pieces |
