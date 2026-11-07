@@ -133,6 +133,15 @@ export class ColumnWriter {
   }
 }
 
+/**
+ * Something carried over a pooled object's update (game/playout.ts MotionCarry: where it was drawn): `save` before the
+ * frame's values overwrite it, `restore` after. Only for objects that were already there.
+ */
+export interface ColumnCarry<T> {
+  save(o: T): void;
+  restore(o: T): void;
+}
+
 /** Decoder side (one per entity list, on the main thread): a pool of objects keyed by id. */
 export class ColumnReader<T extends { id: number }> {
   private table: string[] = [];
@@ -141,7 +150,7 @@ export class ColumnReader<T extends { id: number }> {
   /** the current list, in simulation order */
   list: T[] = [];
 
-  read(p: ColumnPacket): T[] {
+  read(p: ColumnPacket, carry?: ColumnCarry<T> | null): T[] {
     for (const s of p.newStrings) this.table.push(s);
     const n = p.n;
     const keys = p.keys;
@@ -167,10 +176,11 @@ export class ColumnReader<T extends { id: number }> {
     for (let i = 0; i < n; i++) {
       const id = num[idBase + i];
       let o = this.pool.get(id);
+      const kept = !!o && !!carry;
       if (!o) {
         o = {} as T;
         this.pool.set(id, o);
-      }
+      } else if (kept) carry!.save(o);
       seen.add(id);
       const r = o as unknown as Record<string, unknown>;
       for (let j = 0; j < keys.length; j++) {
@@ -186,6 +196,7 @@ export class ColumnReader<T extends { id: number }> {
           r[keys[j]] = v === 0xffff ? undefined : this.table[v];
         }
       }
+      if (kept) carry!.restore(o);
       out[i] = o;
     }
     for (const [i, j, v] of p.other) (out[i] as unknown as Record<string, unknown>)[keys[j]] = v;
