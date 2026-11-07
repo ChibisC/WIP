@@ -13,7 +13,7 @@ export type Difficulty = 'easy' | 'normal' | 'hard' | 'brutal';
 export const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'brutal'];
 
 /** Every story level id, in campaign order (src/story/campaign.ts has the nodes and the unlock rules). */
-export const STORY_LEVEL_IDS = ['garden', 'longNights', 'fireBanks', 'spiderMother'] as const;
+export const STORY_LEVEL_IDS = ['garden', 'longNights', 'fireBanks', 'spiderMother', 'antleredKing', 'highWater', 'cartonKingdom'] as const;
 export type StoryLevelId = (typeof STORY_LEVEL_IDS)[number];
 
 /** A named point of the map's story data, or a point in mm. */
@@ -31,6 +31,8 @@ export type Objective = (
   | { type: 'stealCaste'; caste: string }
   | { type: 'raiseCaste'; caste: string; n: number }
   | { type: 'killQueen'; rival: string }
+  /** `n` of these rival colonies gone (their queens dead: killed, or drowned), in any order */
+  | { type: 'killQueens'; rivals: string[]; n: number }
   /** hold out `s` seconds (or per difficulty: a boss level's preparation) */
   | { type: 'surviveTime'; s: number | Partial<Record<Difficulty, number>> }
   | { type: 'surviveWave'; actor: string }
@@ -45,6 +47,8 @@ export type Objective = (
   | { type: 'upgrade'; n: number; tile?: TileType }
   /** food in the stores now (not gathered since the stage began) */
   | { type: 'storeFood'; amount: number }
+  /** keep `n` ants within `r` mm of a point for `s` seconds without a break (a landmark held: the sap run) */
+  | { type: 'hold'; at: Where; r: number; n: number; s: number; name?: string }
 ) & {
   text?: string;
   /** shown, never needed to finish the stage */
@@ -146,6 +150,11 @@ export interface ActorDef {
   /** a boss roams toward this point when no ant is near (its hunting goal; default: where it appeared) */
   goal?: Where;
   /**
+   * a boss's health floor (a fraction of its health) until a flag is set: hurt to it, it is hurt no further for now (the
+   * Spider Mother can't be killed on her rounds, only driven down her burrow; the fight to the death is the last stage)
+   */
+  floor?: { hp: number; until: string };
+  /**
    * A titan that digs in (claude/story/05-spec §3, the fight inside kept winnable): its bites inside the nest do `bite` ×
    * (on everything) and `queenBite` × (on the queen), by difficulty (else STORY.titanRaid.queenBite, and 1).
    */
@@ -170,7 +179,7 @@ export type Action =
   | { do: 'spawn'; actor: string }
   | { do: 'flood'; zone: number }
   | { do: 'flag'; flag: string }
-  | { do: 'food'; at: Where; kind: 'insect' | 'berry' | 'seed'; from: string; scale: number; n?: number; spread?: number }
+  | { do: 'food'; at: Where; kind: 'insect' | 'berry' | 'seed' | 'honeydew'; from: string; scale: number; n?: number; spread?: number }
   | { do: 'shot'; shot: Shot | 'flight' }
   | { do: 'music'; mood: 'calm' | 'tense' | 'swarm' | 'assault' }
   | { do: 'raid'; rival: string }
@@ -179,7 +188,22 @@ export type Action =
   /** a titan raiding a nest (digInto) walks back out and leaves (dawn) */
   | { do: 'endRaid'; actor: string }
   /** a gameplay tip (a note, not narration): key into the text file (`tip.<key>`) */
-  | { do: 'tip'; key: string };
+  | { do: 'tip'; key: string }
+  /**
+   * the weather for `s` seconds: a rain shower (the storm light, the ground wet; give a `flood` action too on a map with
+   * flood zones) or a hot spell (ants on the surface walk slower: STORY.heatSpeed)
+   */
+  | { do: 'weather'; rain?: number; heat?: number }
+  /** two male stag beetles (creature actors) lock jaws and wrestle now; the bigger tends to throw the other */
+  | { do: 'wrestle'; a: string; b: string }
+  /** a creature actor's health back to `to` × its maximum (a boss rested and fed before its last fight) */
+  | { do: 'heal'; actor: string; to: number }
+  /** a rival colony goes all-in on the player's queen (no retreat): its nest is about to flood (High Water) */
+  | { do: 'allOut'; rival: string }
+  /** the nests whose entrances are under water now start to flood underground (sim/nestFlood.ts) */
+  | { do: 'floodNests' }
+  /** a toast (a short note in the message log, not narration): key into the level's text (`<level>.<key>`) */
+  | { do: 'note'; key: string; kind?: 'warn' | 'good' | 'info' };
 
 export interface TimedAction {
   at?: number;
@@ -208,6 +232,18 @@ export interface RivalDef {
   startWorkers: number;
   /** population limit (× the difficulty's `rival`): keeps a level's rival beatable */
   popLimit?: number;
+  /** allies share a team (the AI allies' brain: they help each other); default a team of its own */
+  team?: number;
+  /**
+   * food a second into its stores (× the difficulty's `rival`): a mature colony's economy the map alone does not give
+   * (the conehead termites' carton nests; story only)
+   */
+  income?: number;
+  /**
+   * its size (nest, starting workers, population limit) does not grow with the difficulty, only its strength and
+   * aggression: for levels with several rivals at once (High Water's three colonies), where the sizes compound
+   */
+  fixedSize?: boolean;
 }
 
 /** A bonus objective: the third medal. */
@@ -219,7 +255,9 @@ export type Bonus =
   /** kill `actor` (a creature) before `flag` is set (e.g. before dawn) */
   | { type: 'killBefore'; actor: string; flag: string; text: string }
   /** kill `actor` (a titan that digs in) within `s` seconds of its getting into the nest */
-  | { type: 'killWithin'; actor: string; s: number; text: string };
+  | { type: 'killWithin'; actor: string; s: number; text: string }
+  /** destroy one of these rival colonies before its nest floods (`dead:<rival>` before `nestFlood:<rival>`) */
+  | { type: 'deadBefore'; rivals: string[]; text: string };
 
 export interface Medals {
   /**
@@ -257,6 +295,41 @@ export interface LairDef {
   food: number;
   /** drawn as a spider's silk-lined burrow with a turret rim (render) instead of a stony den */
   look?: 'den' | 'burrow';
+}
+
+/**
+ * A surprise event (claude/story/06-spec §6): a marching column of another species, a wandering hunter, a windfall,
+ * the weather or a rival's move, out of the blue. The level lists a pool; when the level starts each is rolled (its
+ * `chance` × the difficulty's `events`, from a seeded hash, so the same seed gives the same events) and given a time in
+ * its `span`. When it fires it sets the flag `ev:<id>` (level scenes with `on: 'ev:<id>'` play the party or the
+ * creature; sim/story/surprises.ts), does its `actions` and says its caption. Big ones never overlap: a big one due while
+ * another runs waits until that one's `dur` is over.
+ */
+export interface SurpriseDef {
+  id: string;
+  /** seconds after the level began (or after `after` was set) it may start: [earliest, latest] */
+  span: [number, number];
+  /** the window counts from this flag (default: the level's start); never before it */
+  after?: string;
+  /** never once this flag is set (e.g. the boss fight) */
+  until?: string;
+  /** chance on Normal (× the difficulty's `events`, at most 1); default 1 */
+  chance?: number;
+  /** only on this difficulty and harder */
+  from?: Difficulty;
+  /** a big one (a column, a swarm raid, a hunter): never two at once */
+  big?: boolean;
+  /** how long it keeps the map busy (s) */
+  dur: number;
+  actions?: Action[];
+  /** narration said as it starts (`<level>.<key>`) */
+  say?: string;
+}
+
+/** Ants of a species that is not in the level (a marching column): a nestless colony that only owns them. */
+export interface VisitorDef {
+  species: SpeciesId;
+  name: string;
 }
 
 export interface StoryLevelDef {
@@ -303,4 +376,8 @@ export interface StoryLevelDef {
    * round the queen holds `player.startWorkers` worker tiles (at most 12). A caste not brought in is left out.
    */
   nest?: Array<{ type: TileType; caste?: string; n: number }>;
+  /** surprise events (claude/story/06-spec §6) */
+  surprises?: SurpriseDef[];
+  /** visiting species' parties (actors name them as their `colony`) */
+  visitors?: Record<string, VisitorDef>;
 }

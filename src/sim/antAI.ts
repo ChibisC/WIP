@@ -41,6 +41,7 @@ import { crossBridge, ecitonTimers, escortPorter, holdLink, isArmyAnt, isMajor, 
 import { passiveAnt } from './arena';
 import { storeFullFor, storesFull } from './stores';
 import { directAnt, directMode } from './story/director';
+import { floodAnt, floodJob } from './nestFlood';
 
 const tmp = { x: 0, y: 0 };
 
@@ -385,6 +386,8 @@ export function antSystem(w: World, dt: number): void {
       finish(w, a);
       continue;
     }
+    // A flooding nest (sim/nestFlood.ts): a job under the water, or about to be, is given up
+    if (a.task === 'job' && c.nestFlood) floodJob(w, a, c);
     // A worker on a nest job ignores food and enemies (venom still hurts).
     if (a.task === 'job') {
       if (venomTick(w, a, dt)) continue;
@@ -393,6 +396,11 @@ export function antSystem(w: World, dt: number): void {
       continue;
     }
     if (combatPreempt(w, a, c, dt)) {
+      finish(w, a);
+      continue;
+    }
+    // A flooding nest: loads are washed out of the jaws; the colony's ants at home climb ahead of the water with the brood
+    if (a.space !== SURFACE && floodAnt(w, a, c, dt)) {
       finish(w, a);
       continue;
     }

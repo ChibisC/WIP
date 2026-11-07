@@ -5,7 +5,8 @@ import { arrivalHash, canEnter, canLeave, entranceTop, exitHole, holeIn, passEnt
 import { casteOf } from './species';
 import { hexCoreCells } from './colony';
 import { hexSpeedOf } from './tiles';
-import { BALANCE, ECITON, LAYERS, NASUTE, TERMANT, TRAIL } from './balance';
+import { BALANCE, ECITON, LAYERS, NASUTE, NEST_FLOOD, STORY, TERMANT, TRAIL } from './balance';
+import { isHexFlooded } from './nestFlood';
 import { cartonBlocks, termantSpeedMul } from './termants';
 import { potholeMul, teamLoad } from './eciton';
 import { datan2, dcos, dhypot, dsin, hash01, sq } from './dmath';
@@ -49,10 +50,14 @@ export function antSpeed(w: World, a: Ant): number {
     if (owner && g) {
       const q = g.hexAt(a.x, a.y);
       if (q >= 0) v *= hexSpeedOf(w, owner)[q];
+      // swimming in a flooding nest (sim/nestFlood.ts)
+      if (q >= 0 && owner.nestFlood?.q.length && isHexFlooded(w, owner.id, q)) v *= NEST_FLOOD.swimMul;
     }
   }
   // Carabid-style night bonus not for ants; ants slow slightly at night.
   v *= 1 - w.s.night * 0.15;
+  // a story level's hot spell: ants out on the surface walk slower (sim/story/surprises.ts)
+  if (w.s.weather && a.space === SURFACE && w.s.weather.heat > w.s.time) v *= STORY.heatSpeed;
   // layered ground: a little slower walking up a ramp (LAYERS.upSpeed)
   if (a.space === SURFACE && w.terrain.layers) v *= w.terrain.slopeSpeed(a.x, a.y, dcos(a.h), dsin(a.h));
   return v;

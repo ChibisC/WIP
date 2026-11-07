@@ -194,6 +194,15 @@ export class Minimaps {
         ctx.stroke();
       }
     }
+    // a flooding nest (sim/nestFlood.ts): the hexes under water in a muddy blue
+    if (c?.nestFlood?.q.length) {
+      ctx.fillStyle = 'rgba(78,108,132,0.7)';
+      for (const q of c.nestFlood.q) {
+        g.hexCenter(q, p);
+        hex(p.x * k, p.y * k, g.R * k * 1.0);
+        ctx.fill();
+      }
+    }
     // tunnel routes (sim/tunnels.ts): a gate as a brown ring (red when warned), an open route as a line to the rim
     for (const r of routesOf(w, space)) {
       const h = halfIn(r, space)!;

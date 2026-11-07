@@ -30,6 +30,7 @@ import { ecitonSystem } from './eciton';
 import { termantSystem } from './termants';
 import { arenaSystem, setupArena } from './arena';
 import { floodSystem, initFloods } from './floods';
+import { nestFloodSystem, startNestFlood } from './nestFlood';
 import { RoutePlan, crossings, generateRoutes, tunnelTick } from './tunnels';
 
 export interface ColonySpec {
@@ -71,6 +72,8 @@ export interface GameSetup {
   mission?: MissionId;
   /** dev and browser shots: a titan of this kind starts beside the player's anthill and digs straight in (titanDig.ts) */
   devTitanRaid?: string;
+  /** dev and browser shots (`?floodNest=<colony>&floodAt=<s>`): that colony's nest starts flooding at that game time (nestFlood.ts) */
+  devNestFlood?: { colony: number; at: number; fillSec?: number };
   /** a story level (sim/story): the difficulty, the stolen castes brought in, the campaign's traits, a restart (the level is `mission`) */
   story?: { difficulty: Difficulty; loadout: string[]; traits?: string[]; retry?: boolean };
   /** sandbox game: the sandbox commands (spawn, fill stores, toggles) are allowed */
@@ -131,6 +134,8 @@ export function registerSystems(w: World): void {
     { name: 'story', fn: storySystem },
     // storms on authored maps (only when the match turns floods on)
     { name: 'floods', fn: floodSystem },
+    // nests filling with water (sim/nestFlood.ts; only when a story or the dev URL starts one)
+    { name: 'nestFlood', fn: nestFloodSystem },
     ...extraSystems,
   ];
 }
@@ -188,6 +193,7 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
       startTitanRaid(w, cr, p.id, 0);
     }
   }
+  if (setup.devNestFlood) startNestFlood(w, setup.devNestFlood.colony, { delaySec: setup.devNestFlood.at, fillSec: setup.devNestFlood.fillSec });
   if (setup.sandbox) w.s.mode.sandbox = true;
   if (setup.arena) setupArena(w);
 

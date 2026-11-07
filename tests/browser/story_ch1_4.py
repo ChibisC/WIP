@@ -103,7 +103,7 @@ with sync_playwright() as p:
         pg.evaluate("window.__step(3, 0.05)")
         shot(pg, "nights_day")
         # dusk: the beetle crossing the hollow
-        pg.evaluate(JUMP, [0, 330 - 30 - 1])
+        pg.evaluate(JUMP, [0, 420 - 30 - 1])
         sim_until(pg, "beetleSeen", 20)
         pg.evaluate(SIM, 12)
         a = pg.evaluate(ACTOR, "duskBeetle")
@@ -119,7 +119,7 @@ with sync_playwright() as p:
         pg.evaluate("window.__step(60, 0.05)")
         shot(pg, "nights_night1")
         # dusk of night 2: wolf spiders' eyes at the lair mouths (the camera looks at them from the terrace side)
-        pg.evaluate(JUMP, [1, 330 + 180 + 240 - 30 - 1])
+        pg.evaluate(JUMP, [1, 420 + 210 + 330 - 30 - 1])
         sim_until(pg, "eyesSeen", 20)
         # (the light fades through the dusk: 20 s on it is mostly night)
         pg.evaluate(SIM, 20)
@@ -128,8 +128,8 @@ with sync_playwright() as p:
             cam(pg, *front(a, 110, -0.12))
         pg.evaluate("window.__step(60, 0.05)")
         shot(pg, "nights_eyes")
-        # night 3: the tarantula digs into the nest, then walks through it
-        pg.evaluate(JUMP, [2, 330 + 2 * (180 + 240) - 2])
+        # night 4 (the last): the tarantula digs into the nest, then walks through it
+        pg.evaluate(JUMP, [3, 420 + 3 * (210 + 330) - 2])
         sim_until(pg, "tarantulaOut", 20)
         a = pg.evaluate(ACTOR, "tarantula")
         if a:
@@ -157,7 +157,7 @@ with sync_playwright() as p:
         pg.evaluate("window.__step(3, 0.05)")
         shot(pg, "spider_burrow")
         # the hunt at dusk: she comes to the nest
-        pg.evaluate(JUMP, [1, 400])
+        pg.evaluate(JUMP, [2, 1500])
         pg.evaluate(SIM, 45)
         a = pg.evaluate(ACTOR, "mother")
         if a:

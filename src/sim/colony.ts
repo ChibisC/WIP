@@ -15,6 +15,7 @@ import { warTick } from './warAI';
 import { dcos, dhypot, dsin, sq } from './dmath';
 import { digFlower, entranceTick, flowerOver, placeHoles } from './entrances';
 import { foodFull, storeNotice, storesFull } from './stores';
+import { isHexFlooded, queenHexBlocked } from './nestFlood';
 
 /**
  * Nest plane size in hexes: the diggable interior (the same for every species; hex radius scales instead). Round it lies
@@ -96,6 +97,8 @@ export interface ColonyOptions {
   team?: number;
   /** the authored map's site index the colony stands on */
   site?: number;
+  /** a story level's visiting party: no nest dug, no queen, no ants of its own (sim/story/surprises.ts) */
+  visitor?: boolean;
 }
 
 export function createColony(w: World, o: ColonyOptions): Colony {
@@ -157,6 +160,14 @@ export function createColony(w: World, o: ColonyOptions): Colony {
   w.s.colonies.push(c);
   w.colonyById.set(id, c);
   w.phero.ensureColonies(w.s.colonies.length);
+  if (o.visitor) {
+    // a visiting party's colony: an empty nest plane (every colony has one), no queen, no tiles, never an AI
+    c.visitor = true;
+    c.queen = -1;
+    c.food = 0;
+    w.addNest(id, new NestGrid({ cols: NEST_COLS, rows: NEST_ROWS, R: hexRadiusFor(casteOf(basicCaste(o.species)).length), seed: w.s.seed * 13 + id * 101 + 7 }));
+    return c;
+  }
 
   // ---- Nest plane: queen cluster in the middle, a tunnel to the entrance ramp.
   const R = hexRadiusFor(casteOf(basicCaste(o.species)).length);
@@ -424,7 +435,8 @@ export function onAntDied(w: World, a: Ant): void {
 function queenLay(w: World, c: Colony, dt: number): void {
   for (const t of c.tiles) if (t.wait > 0) t.wait -= dt;
   const q = w.antById.get(c.queen);
-  c.eggs = q && q.state !== AS.Dead ? BALANCE.eggPileMax : 0;
+  // (a queen under water lays nothing: sim/nestFlood.ts)
+  c.eggs = q && q.state !== AS.Dead && !queenHexBlocked(w, c) ? BALANCE.eggPileMax : 0;
   void dt;
 }
 
@@ -472,6 +484,8 @@ function failsafe(w: World, c: Colony, dt: number): void {
   if (c.workers > 0 || c.food >= 1 || c.failsafeT > 0) return;
   const q = w.antById.get(c.queen);
   if (!q || q.state === AS.Dead) return;
+  // (not into a flooding queen's chamber: sim/nestFlood.ts)
+  if (queenHexBlocked(w, c)) return;
   const t = c.tiles.find((x) => x.type === 'queen' && tileAnts(w, x).length < tileCapacity(x)) ?? c.tiles.find((x) => x.type === 'queen');
   if (!t) return;
   c.failsafeT = BALANCE.failsafeEvery;
@@ -501,7 +515,9 @@ function fungusFarm(w: World, c: Colony, dt: number): void {
 /** Root-aphid pastures (Lasius) trickle honeydew; tended by nurses in the nest. */
 function aphidPastures(w: World, c: Colony, dt: number): void {
   let n = 0;
-  for (const t of c.tiles) if (t.type === 'aphid') n += 1 + 0.25 * (t.level - 1);
+  // (a pasture under water gives nothing: sim/nestFlood.ts)
+  const wet = !!c.nestFlood?.q.length;
+  for (const t of c.tiles) if (t.type === 'aphid' && !(wet && isHexFlooded(w, c.id, t.q))) n += 1 + 0.25 * (t.level - 1);
   if (n > 0) c.food = Math.min(c.foodCap, c.food + n * 0.08 * dt);
 }
 
@@ -648,6 +664,11 @@ export function colonySystem(w: World, dt: number): void {
   if (!arena && w.s.tick % 20 === 0) entranceTick(w, 1);
   for (const c of w.s.colonies) {
     if (!c.alive) continue;
+    // a story level's visiting party: only its directed ants (no queen, no nest, never lost)
+    if (c.visitor) {
+      if (w.s.tick % 20 === 0) countColony(w, c);
+      continue;
+    }
     if (c.infiniteFood) c.food = c.foodCap;
     abilityTick(c, dt);
     if (c.alarmT > 0) c.alarmT -= dt;
@@ -661,7 +682,7 @@ export function colonySystem(w: World, dt: number): void {
       buildTick(w, c, dt);
       forageTick(w, c, dt);
       warTick(w, c, dt);
-    }
+    } else if (c.aiWar?.allOut) warTick(w, c, dt); // (forceAllOut on a colony without the AI: its groups still go)
     if (w.s.tick % 20 === 0) {
       updateFlowCosts(w, c);
       auditTiles(w, c);

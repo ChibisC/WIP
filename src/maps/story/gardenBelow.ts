@@ -129,6 +129,10 @@ export const GARDEN_BELOW: MapDef = {
   floods: [],
   story: {
     points: {
+      // surprise events (claude/story/06-spec §6): where parties and wanderers come on and go off, windfalls
+      evEast: [1086, 780],
+      evSouth: [440, 882],
+      berryDrop: [720, 690],
       queenShore: [300, 708],
       queenGate: [362, 620],
       beetleStart: [40, 690],
@@ -146,6 +150,7 @@ export const GARDEN_BELOW: MapDef = {
       meadow: [620, 450],
     },
     paths: {
+      woodCol: [[900, 730], [720, 680], [560, 610], [480, 760]],
       scoutsDown: [
         [700, 270],
         [652, 318],

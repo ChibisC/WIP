@@ -6,6 +6,7 @@ import { tunnelSpeed } from './entrances';
 import { BALANCE, NASUTE, TERMANT } from './balance';
 import { makeFood } from './factory';
 import { dcos, dsin } from './dmath';
+import { isHexFlooded } from './nestFlood';
 
 /**
  * Hex tile system (Revision 2, EotU rules — see DESIGN.md 3.7). Tiles sit on
@@ -176,6 +177,7 @@ export function canPlaceTile(w: World, c: Colony, type: TileType, q: number, cas
   if (g.isEntrance(q)) return 'The entrance must stay clear';
   if (!tileAllowedOnRoute(c, g, q)) return 'A tunnel route: tiles stay inside the nest';
   if (tileAt(c, q)) return 'There is already a tile here';
+  if (c.nestFlood?.q.length && isHexFlooded(w, c.id, q)) return 'This ground is under water';
   if (type === 'queen') return "The queen's chamber cannot be built: every colony starts with its own seven tiles";
   if (type === 'brood') {
     if (!caste || !c.castes.includes(caste) || CASTES[caste]?.nanitic) return 'This colony cannot raise that caste';
@@ -604,8 +606,10 @@ export function recomputeGroups(w: World, c: Colony): void {
 export function recomputeTileCaps(c: Colony): void {
   let food = 0;
   let fungus = 0;
+  // stores and gardens under water hold nothing (sim/nestFlood.ts): the food above what the dry ones hold is lost
+  const wet = c.nestFlood?.q.length ? new Set(c.nestFlood.q) : null;
   for (const t of c.tiles) {
-    if (!t.built) continue;
+    if (!t.built || wet?.has(t.q)) continue;
     if (t.type === 'queen') food += BALANCE.queenTileFood;
     else if (t.type === 'food') food += BALANCE.storage[t.level - 1];
     else if (t.type === 'fungus') fungus += BALANCE.fungus.cap[t.level - 1];

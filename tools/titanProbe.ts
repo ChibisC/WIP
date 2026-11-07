@@ -59,16 +59,18 @@ const ASSIST = 4;
 export function titanMoment(level: StoryLevelId, diff: Difficulty, seed: number): { w: World; actor: string } {
   const w = createWorld(storySetup(level, diff, [], seed), new EventBus());
   const m = missionOf(w)!;
-  if (level === 'longNights') {
-    const D = STORY_LEVELS.longNights.dayNight!;
-    m.stage = 2;
-    m.entered = false;
-    w.s.time = nightStart(D, 3) - 2;
-    return { w, actor: 'tarantula' };
-  }
-  m.stage = 1;
+  // the stage whose scenes send the titan to dig in (the level's last: the Long Nights' fourth day, the Spider Mother's
+  // fight after her rounds — claude/story/06-spec), and for the nights the night its scene waits for
+  const actor = level === 'longNights' ? 'tarantula' : 'mother';
+  const L = STORY_LEVELS[level];
+  const si = L.stages.findIndex((S) => (S.scenes ?? []).some((sc) => sc.actor === actor && sc.cues.some((q) => 'digInto' in q)));
+  m.stage = si;
   m.entered = false;
-  return { w, actor: 'mother' };
+  if (level === 'longNights') {
+    const sc = L.stages[si].scenes!.find((x) => x.actor === actor && x.cues.some((q) => 'digInto' in q))!;
+    w.s.time = nightStart(L.dayNight!, Number(sc.on?.split(':')[1] ?? 3)) - 2;
+  }
+  return { w, actor };
 }
 
 /** An army of the player's ants by the nest (in a group, so markers can send them). */

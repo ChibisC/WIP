@@ -1,4 +1,20 @@
 import type { StoryLevelDef } from '../../sim/story/types';
+import { column, heat, party, rain, surprisePool, wanderer, windfall } from '../surprises';
+
+/**
+ * Surprise events (claude/story/06-spec §6): a praying mantis waiting at the slope's foot, a fire ant scouting band on
+ * the shelf, a dead cricket by the river, a summer shower and the fire ants' mating flight after it (fallen alates:
+ * food), a hot spell; on Hard and Brutal an army ant swarm raid along the river margin.
+ */
+const EV = surprisePool(
+  wanderer('mantis', { window: [500, 1100], creature: 'mantis', enter: 'evEastMid', to: 'slopeFoot', r: 70, s: 120, exit: 'evEastMid', label: 'the mantis', say: 'mantis' }),
+  party('scouts', { window: [700, 1500], rival: 'fire', ants: [['fire_minor', 5]], enter: 'slopeTop', to: 'shelf', s: 50, label: 'the fire ant scouts', say: 'scouts' }),
+  windfall('cricket', { window: [300, 900], at: 'marginWest', kind: 'insect', model: 'cricket', scale: 1.8 }),
+  rain('shower', { window: [900, 1600], s: 70, until: 'stage:3', say: 'shower' }),
+  windfall('alates', { window: [30, 60], after: 'ev:shower', at: 'slopeFoot', kind: 'insect', model: 'fly', scale: 0.55, n: 12, spread: 60, say: 'alates' }),
+  heat('hotSand', { window: [600, 2000], chance: 0.6, s: 100, say: 'heat' }),
+  column('armySwarm', { window: [1300, 2200], from: 'hard', visitor: 'eciton', species: 'eciton', name: 'Army ants', ants: [['eciton_minor', 12], ['eciton_submajor', 3], ['eciton_major', 1]], enter: 'evEastMargin', path: 'swarmMargin', exit: 'evWestMargin', label: 'the army ant swarm', say: 'armySwarm', dur: 200 }),
+);
 
 /**
  * Chapter 1, level 3 — "Fire on the Banks" (claude/story/02-spec §5; map src/maps/story/fireBanks.ts; level 2 until
@@ -32,7 +48,15 @@ export const FIRE_BANKS_LEVEL: StoryLevelDef = {
     swarm: { ants: [['fire_minor', 22], ['fire_soldier', 5]], colony: 'fire', at: 'slopeTop', face: 'playerNest', spawn: 'action', wave: true, label: 'the swarm' },
     guardsA: { ants: [['fire_major', 2], ['fire_soldier', 2]], colony: 'fire', at: 'seedA', spawn: 'action', label: 'the seed guards' },
     guardsB: { ants: [['fire_major', 2], ['fire_soldier', 2]], colony: 'fire', at: 'seedB', spawn: 'action', label: 'the seed guards' },
+    // (more majors come down to the seeds if the colony has not taken any genes ten minutes in: guards lost to a mantis or
+    // killed with nobody to carry them home left nothing to steal, a person-pace playtest of Easy, 2026-11-06)
+    guardsC: { ants: [['fire_major', 2], ['fire_soldier', 1]], colony: 'fire', at: 'slopeTop', spawn: 'action', label: 'the seed guards' },
+    guardsD: { ants: [['fire_major', 2], ['fire_soldier', 1]], colony: 'fire', at: 'slopeTop', spawn: 'action', label: 'the seed guards' },
+    ...EV.actors,
   },
+  scenes: EV.scenes,
+  surprises: EV.surprises,
+  visitors: EV.visitors,
   stages: [
     {
       name: 'Settle the bank',
@@ -89,6 +113,7 @@ export const FIRE_BANKS_LEVEL: StoryLevelDef = {
         { key: 'majors', at: 4 },
         { key: 'genes', at: 60 },
         { key: 'stolen', on: 'caste:fire_major' },
+        { key: 'moreMajors', at: 600 },
       ],
       events: [
         { actions: [{ do: 'spawn', actor: 'guardsA' }, { do: 'spawn', actor: 'guardsB' }, { do: 'music', mood: 'tense' }] },
@@ -98,6 +123,8 @@ export const FIRE_BANKS_LEVEL: StoryLevelDef = {
       scenes: [
         { actor: 'guardsA', cues: [{ guard: 'seedA', r: 70 }] },
         { actor: 'guardsB', cues: [{ guard: 'seedB', r: 70 }] },
+        { actor: 'guardsC', at: 600, cues: [{ walkTo: 'seedA', speed: 0.8, timeout: 150 }, { guard: 'seedA', r: 70 }] },
+        { actor: 'guardsD', at: 1200, cues: [{ walkTo: 'seedB', speed: 0.8, timeout: 200 }, { guard: 'seedB', r: 70 }] },
       ],
     },
     {

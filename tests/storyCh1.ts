@@ -71,17 +71,19 @@ const actor = (w: World, name: string) => storyOf(w)!.actors[actorIndex(storyOf(
 // ---------------------------------------------------------------- the campaign: four levels in order
 {
   const ids = CHAPTERS[0].levels.join();
-  check('campaign: chapter 1 is Garden Below → The Long Nights → Fire on the Banks → The Spider Mother', ids === 'garden,longNights,fireBanks,spiderMother', ids);
+  check('campaign: chapter 1 is Garden Below → The Long Nights → Fire on the Banks → The Spider Mother → The Antlered King → High Water → Carton Kingdom', ids === 'garden,longNights,fireBanks,spiderMother,antleredKing,highWater,cartonKingdom', ids);
   check('campaign: level numbers follow the order', CHAPTERS[0].levels.every((l, i) => STORY_LEVELS[l].number === i + 1));
   const after = Object.fromEntries(NODES.map((n) => [n.level, n.after.join()]));
-  check('campaign: each level opens after the one before it', after.garden === '' && after.longNights === 'garden' && after.fireBanks === 'longNights' && after.spiderMother === 'fireBanks');
+  check('campaign: each level opens after the one before it', after.garden === '' && after.longNights === 'garden' && after.fireBanks === 'longNights' && after.spiderMother === 'fireBanks' && after.antleredKing === 'spiderMother' && after.highWater === 'antleredKing' && after.cartonKingdom === 'highWater');
+  check('campaign: the new levels sit in the Forest Floor, the Riverbank and the Rainforest, all out of the mist (chapter 1)', NODES.find((n) => n.level === 'antleredKing')!.region === 'forest' && NODES.find((n) => n.level === 'highWater')!.region === 'riverbank' && NODES.find((n) => n.level === 'cartonKingdom')!.region === 'rainforest' && ['forest', 'rainforest', 'riverbank'].every((r) => REGIONS.find((x) => x.id === r)!.chapter === 1));
   check('campaign: the new nodes sit in their regions (the nights in the meadow by the river woods, the spider on the riverbank)', NODES.every((n) => nearestRegion(REGIONS, nodePos(n)[0], nodePos(n)[1]).r.id === n.region) && NODES.find((n) => n.level === 'longNights')!.region === 'meadow' && NODES.find((n) => n.level === 'spiderMother')!.region === 'riverbank');
   const pg = nodePos(NODES[0]);
   const pn = nodePos(NODES[1]);
   const pf = nodePos(NODES[2]);
   check('campaign: The Long Nights sits between the garden and the river on the map', pn[0] > pg[0] && pn[0] < pf[0], `${pg[0].toFixed(2)} < ${pn[0].toFixed(2)} < ${pf[0].toFixed(2)}`);
   check('campaign: Fire on the Banks keeps its gameplay (same stages, reward, map); only its number moved to 3', STORY_LEVELS.fireBanks.number === 3 && STORY_LEVELS.fireBanks.stages.length === 5 && STORY_LEVELS.fireBanks.reward.caste === 'fire_major' && STORY_LEVELS.fireBanks.map === 'fireBanks');
-  check('campaign: the chapter’s closing hint moved to the end of The Spider Mother', !!EN['spiderMother.ending'] && !EN['fireBanks.ending']);
+  check('campaign: the chapter’s closing hint moved to the end of Carton Kingdom (level 7)', !!EN['cartonKingdom.ending'] && !EN['spiderMother.ending'] && !EN['fireBanks.ending']);
+  check('campaign: The Spider Mother’s win line leads on (to the oak woods)', /oak woods/.test(EN['spiderMother.win']));
   check('campaign: Fire on the Banks opens with a line linking it to the nights before', /nights/.test(EN['fireBanks.intro1']));
 
   // the save: progress by level id; a new player; an old save that beat Fire on the Banks
@@ -136,12 +138,12 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
 {
   const D = STORY_LEVELS.longNights.dayNight!;
   const n1 = nightStart(D, 1);
-  const n3 = nightStart(D, 3);
-  check('clock: three nights; the first day the longest of the days; the last night the longest', D.nights === 3 && D.first > D.day && (D.lastNight ?? D.night) > D.night);
+  const n3 = nightStart(D, 4);
+  check('clock: four nights (claude/story/06-spec §7); the first day the longest of the days; the last night the longest', D.nights === 4 && D.first > D.day && (D.lastNight ?? D.night) > D.night);
   check('clock: day light at the start, full night inside a night, smooth fades', dayNightAt(D, 10).light === 0 && dayNightAt(D, n1 + 10).light === 1 && dayNightAt(D, n1 - D.fade / 2).light > 0.3 && dayNightAt(D, n1 - D.fade / 2).light < 0.7 && dayNightAt(D, n1 + D.night + D.fade / 2).light < 0.7);
   check('clock: the dusk warning comes 30 s before each night', dayNightFlags(D, n1 - D.dusk).includes('dusk:1') && !dayNightFlags(D, n1 - D.dusk - 1).includes('dusk:1') && !dayNightFlags(D, n1 - 1).includes('night:1'));
-  check('clock: dawn after the last (longer) night, then day for good', dayNightFlags(D, n3 + (D.lastNight ?? D.night)).includes('dawn:3') && !dayNightFlags(D, n3 + (D.lastNight ?? D.night) - 1).includes('dawn:3') && dayNightAt(D, n3 + 2000).light === 0);
-  check('clock: the HUD says the day and the time to dusk, the night count and the time to dawn', dayNightLabel(D, 30) === 'Day 1 · dusk in 4:30' && dayNightLabel(D, n1 + 60).startsWith('Night 1 of 3 · dawn in 2:00') && dayNightLabel(D, n1 - 10).startsWith('Dusk'));
+  check('clock: dawn after the last (longer) night, then day for good', dayNightFlags(D, n3 + (D.lastNight ?? D.night)).includes('dawn:4') && !dayNightFlags(D, n3 + (D.lastNight ?? D.night) - 1).includes('dawn:4') && dayNightAt(D, n3 + 2000).light === 0);
+  check('clock: the HUD says the day and the time to dusk, the night count and the time to dawn', dayNightLabel(D, 30) === 'Day 1 · dusk in 6:00' && dayNightLabel(D, n1 + 60).startsWith('Night 1 of 4 · dawn in 2:30') && dayNightLabel(D, n1 - 10).startsWith('Dusk'));
 }
 
 // ---------------------------------------------------------------- The Long Nights
@@ -176,17 +178,18 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
   run(w, 20 * 4);
   const eyes = members(w, actor(w, 'eyes'));
   check('long nights: before night 2 wolf spiders wait at the lair mouths facing the terrace (their eyes)', eyes.length >= 2 && eyes.every((e) => (e as Creature).v === 0 || Math.hypot(e.x - 760, e.y - 236) < 80 || Math.hypot(e.x - 890, e.y - 420) < 80));
-  // night 3: the tarantula
+  // night 4: the tarantula
   const ww = level('longNights', 'normal', 9);
   const st3 = storyOf(ww)!;
   for (let i = 0; i < 4; i++) makeAnt(ww, 0, 'termant_soldier', SURFACE, 190 + i * 4, 760, 0);
-  jump(ww, 2, nightStart(D, 3) - 2);
-  const out = until(ww, 'tarantulaOut', 30);
+  jump(ww, 3, nightStart(D, 4) - 2);
+  // (it waits 40 s into the night before it comes out, since 2026-11-06)
+  const out = until(ww, 'tarantulaOut', 70);
   const tar = members(ww, actor(ww, 'tarantula'))[0] as Creature;
-  check('long nights: on the third night the red-knee tarantula leaves its burrow on the knoll', out > 0 && !!tar && ww.terrain.levelAt(tar.x, tar.y) === 2);
+  check('long nights: on the fourth (last) night the red-knee tarantula leaves its burrow on the knoll', out > 0 && !!tar && ww.terrain.levelAt(tar.x, tar.y) === 2);
   const bossHp = (d: Difficulty) => {
     const x = level('longNights', d, 3);
-    jump(x, 2, nightStart(D, 3) + 1);
+    jump(x, 3, nightStart(D, 4) + 1);
     run(x, 40);
     const cr = members(x, actor(x, 'tarantula'))[0] as Creature;
     return cr?.maxHp ?? 0;
@@ -210,7 +213,7 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
   t2.hp = Math.max(t2.hp, t2.maxHp * 0.6);
   // (keep the queen out of its reach for the rest of the night: the test is about dawn)
   const qx = q.x;
-  ww.s.time = nightStart(D, 3) + (D.lastNight ?? D.night) - 3;
+  ww.s.time = nightStart(D, 4) + (D.lastNight ?? D.night) - 3;
   for (let i = 0; i < 20 * 6; i++) {
     q.hp = q.maxHp;
     ww.step(0.05);
@@ -218,7 +221,7 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
   }
   void qx;
   const m = missionOf(ww)!;
-  check('long nights: dawn after the third night wins the level', m.result === 'won', m.result);
+  check('long nights: dawn after the fourth night wins the level', m.result === 'won', m.result);
   const med = storyMedals(ww)!;
   check('long nights: the first medal is food stored (a level of fixed length)', med.food !== undefined && med.time !== undefined && STORY_LEVELS.longNights.medals.food !== undefined);
   run(ww, 20 * 40);
@@ -239,14 +242,46 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
     run(x, 30);
     return missionOf(x)!.goals[0]?.progress ?? '';
   };
-  check('spider mother: the preparation is longer on Easy than on Brutal (5–8 min)', prep('easy').endsWith('8:00') && prep('brutal').endsWith('5:30'), `${prep('easy')} / ${prep('brutal')}`);
+  check('spider mother: the preparation is longer on Easy than on Brutal (10–11½ min)', prep('easy').endsWith('11:30') && prep('brutal').endsWith('10:00'), `${prep('easy')} / ${prep('brutal')}`);
   const mom = members(w, actor(w, 'mother'))[0] as Creature;
   const burrow = wherePt(w, 'burrowEdge');
   run(w, 20 * 20);
   check('spider mother: before the hunt she waits at her burrow', Math.hypot(mom.x - burrow[0], mom.y - burrow[1]) < 20);
-  // the hunt
+  // her rounds (claude/story/06-spec §7): out to the doorstep and back to the burrow, broods of spiderlings dispersing
   const m = missionOf(w)!;
   m.stage = 1;
+  m.entered = false;
+  run(w, 20 * 50);
+  const farR = Math.hypot(mom.x - burrow[0], mom.y - burrow[1]);
+  let backR = 1e9;
+  for (let k = 0; k < 160; k++) {
+    run(w, 20);
+    backR = Math.min(backR, Math.hypot(mom.x - burrow[0], mom.y - burrow[1]));
+  }
+  check('spider mother: on her rounds she comes down toward the nest and goes back to her burrow', farR > 100 && backR < 40 && w.s.night > 0.2, `${farR.toFixed(0)} then ${backR.toFixed(0)} mm from the burrow`);
+  check('spider mother: a brood of her older spiderlings disperses over the terrace during her rounds', hasFlag(st, 'hatchA') && members(w, actor(w, 'broodA')).length >= 3);
+  check('spider mother: her rounds last 18½–20 minutes by difficulty', JSON.stringify(STORY_LEVELS.spiderMother.stages[1].objectives[0]) === JSON.stringify({ type: 'surviveTime', s: { easy: 1110, normal: 1140, hard: 1170, brutal: 1200 }, text: 'Hold out while she hunts the colony' }));
+  // on her rounds she can be driven off but not killed (a health floor until the last stage)
+  {
+    const wf = level('spiderMother', 'normal', 8);
+    const mf = missionOf(wf)!;
+    mf.stage = 1;
+    mf.entered = false;
+    run(wf, 20 * 30);
+    const mo = members(wf, actor(wf, 'mother'))[0] as Creature;
+    damageCreature(wf, mo, mo.maxHp * 2, 'pure', null);
+    run(wf, 20 * 2);
+    check('spider mother: on her rounds she can’t be killed (hurt to 55 % at most), only driven down her burrow', !mo.dead && Math.abs(mo.hp / mo.maxHp - 0.55) < 0.01, `${(mo.hp / mo.maxHp).toFixed(2)}`);
+    mf.stage = 2;
+    mf.entered = false;
+    run(wf, 20 * 3);
+    damageCreature(wf, mo, mo.maxHp * 2, 'pure', null);
+    // (her own floor ends with the stage; until she has been inside, the dig-in's 10 % holds — main's story titans
+    // always get in, claude/story/05-spec)
+    check('spider mother: …and in the last stage her own floor ends (only the dig-in’s 10 % holds until she is in)', !mo.dead && Math.abs(mo.hp / mo.maxHp - STORY.titanRaid.hpFloor) < 0.01, `${(mo.hp / mo.maxHp).toFixed(2)}`);
+  }
+  // the hunt to the end
+  m.stage = 2;
   m.entered = false;
   run(w, 20 * 60);
   check('spider mother: the hunt begins with dusk light; she comes down toward the nest', w.s.night > 0.3 && Math.hypot(mom.x - burrow[0], mom.y - burrow[1]) > 100, `night ${w.s.night}, ${Math.hypot(mom.x - burrow[0], mom.y - burrow[1]).toFixed(0)} mm from the burrow`);
@@ -277,7 +312,7 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
   // before she is in she can't be killed (claude/story/05-spec §2: her health stops at the floor)
   const w2 = level('spiderMother', 'normal', 6);
   const m2 = missionOf(w2)!;
-  m2.stage = 1;
+  m2.stage = 2;
   m2.entered = false;
   run(w2, 40);
   const mom2 = members(w2, actor(w2, 'mother'))[0] as Creature;
@@ -374,13 +409,16 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
 // ---------------------------------------------------------------- narration
 {
   const keys: string[] = [];
-  for (const id of ['longNights', 'spiderMother'] as const) {
+  for (const id of ['longNights', 'spiderMother', 'antleredKing', 'highWater', 'cartonKingdom'] as const) {
     const L = STORY_LEVELS[id];
     for (const S of L.stages) for (const cap of S.say ?? []) keys.push(`${id}.${cap.key}`);
     for (const S of L.stages) for (const e of S.events ?? []) for (const a of e.actions) if (a.do === 'tip') keys.push(`tip.${a.key}`);
     keys.push(`${id}.win`, `${id}.lose`, `journal.${id}.title`, `journal.${id}.body`, `journal.${id}.note`);
   }
-  keys.push('spiderMother.ending');
+  keys.push('cartonKingdom.ending');
+  // the surprise events' captions, every level
+  for (const L of Object.values(STORY_LEVELS)) for (const e of L.surprises ?? []) if (e.say) keys.push(`${L.id}.${e.say}`);
+  for (const L of Object.values(STORY_LEVELS)) for (const e of L.surprises ?? []) for (const a of e.actions ?? []) if (a.do === 'note') keys.push(`${L.id}.${a.key}`);
   const missing = keys.filter((k) => !EN[k]);
   check('narration: every new caption, tip and journal key has text', missing.length === 0, missing.join(', '));
   check('narration: the scientist’s unease grows on the nights (“as if it remembers”)', /as if it does|remember/.test(EN['longNights.unease']));
@@ -391,7 +429,7 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
   const D = STORY_LEVELS.longNights.dayNight!;
   const a = level('longNights', 'normal', 21);
   const b = level('longNights', 'normal', 21);
-  for (const w of [a, b]) jump(w, 2, nightStart(D, 3) - 5);
+  for (const w of [a, b]) jump(w, 3, nightStart(D, 4) - 5);
   run(a, 20 * 100);
   run(b, 20 * 100);
   check('determinism: two runs of the last night (hunters, the tarantula on its way) agree exactly', hashState(a) === hashState(b) && storyOf(a)!.flags.join() === storyOf(b)!.flags.join(), hashState(a));
@@ -411,4 +449,4 @@ for (const [id, levels] of [['stonyHollow', 3], ['spiderTerrace', 2]] as const) 
 }
 
 void AS;
-console.log(failed ? `\n${failed} FAILED in ${((Date.now() - t0) / 1000).toFixed(1)}s` : `\nall chapter 1 (four levels) tests passed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+console.log(failed ? `\n${failed} FAILED in ${((Date.now() - t0) / 1000).toFixed(1)}s` : `\nall chapter 1 (seven levels) tests passed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);

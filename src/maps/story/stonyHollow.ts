@@ -105,6 +105,10 @@ export const STONY_HOLLOW: MapDef = {
   floods: [],
   story: {
     points: {
+      // surprise events (claude/story/06-spec §6): where parties and wanderers come on and go off, windfalls
+      evEast: [1086, 560],
+      evSouth: [700, 886],
+      evWest: [14, 760],
       playerNest: [190, 740],
       playerGate: [214, 720],
       hollow: [620, 520],
@@ -125,6 +129,7 @@ export const STONY_HOLLOW: MapDef = {
       dawnFood2: [480, 620],
     },
     paths: {
+      woodColHollow: [[950, 600], [760, 560], [620, 520], [640, 700], [700, 860]],
       // a ground beetle crosses the hollow at dusk, the first sign of the night
       duskCrossing: [
         [760, 250],

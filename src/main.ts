@@ -167,6 +167,8 @@ function startGame(): void {
         mission: mission?.id,
         sandbox: c.mode === 'sandbox',
         ...(q.get('titanRaid') ? { devTitanRaid: q.get('titanRaid')! } : {}),
+        // dev: ?floodNest=<colony index>&floodAt=<s>[&floodFill=<s>] floods that colony's nest (sim/nestFlood.ts)
+        ...(q.get('floodNest') ? { devNestFlood: { colony: Number(q.get('floodNest')), at: Number(q.get('floodAt') || 0), fillSec: q.get('floodFill') ? Number(q.get('floodFill')) : undefined } } : {}),
         ...(c.map && !mission ? { map: c.map, siteSet: q.get('sites') ? Number(q.get('sites')) : undefined } : {}),
       };
       if (!q.get('play')) updateSettings({ quality: c.quality });
