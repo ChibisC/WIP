@@ -111,6 +111,9 @@ export class FoodRenderer {
    * moves with the head (2026-11-01, 21:48: carried food lagged a tick behind the ant). Without it, a load is placed
    * ahead of the carrier's drawn (interpolated) position.
    */
+  /** Underground fog (game/fog.ts): food out of the viewer's sight is not drawn. */
+  visible: ((x: number, y: number) => boolean) | null = null;
+
   update(w: World, space: number, alpha: number, map: SpaceMapper, hold?: (id: number) => JawHold | null): void {
     for (const p of this.pools.values()) p.begin();
     const carcass = this.carcass;
@@ -119,6 +122,7 @@ export class FoodRenderer {
     for (const f of w.s.food) {
       if (f.space !== space) continue;
       if (carcass.size && carcass.has(f.id)) continue;
+      if (this.visible && !this.visible(f.x, f.y)) continue;
       const key = this.keyOf(f);
       if (!key) continue;
       const pool = this.pools.get(key)!;

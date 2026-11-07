@@ -92,6 +92,8 @@ export interface CasteDef {
   hook?: { hold: number; softBonus: number; dislodge: number };
   forage: boolean;
   dig: boolean;
+  /** dig speed on nest and tunnel digs (× the species' `digRate`; default 1: digging specialists later) */
+  digRate?: number;
   nurse: boolean;
   cutLeaves?: boolean;
   tendAphids?: boolean;
@@ -136,6 +138,13 @@ export interface SpeciesDef {
   king?: string;
   /** what the colony's stores hold (UI wording): default "food"; both termites share one plant-material store */
   resource?: 'wood' | 'plant matter';
+  /** dig speed of the whole species on nest and tunnel digs (× the caste's `digRate`; default 1: digging specialists later) */
+  digRate?: number;
+  /**
+   * multiple-queen species (planned): may build tiles in and beyond tunnel routes (satellite nests); off for every species
+   * now — tiles stay inside the nest (sim/tiles.ts tileAllowedOnRoute, sim/tunnels.ts)
+   */
+  satelliteNests?: boolean;
 }
 
 const C = (c: CasteDef) => c;

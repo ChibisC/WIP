@@ -19,6 +19,9 @@ import { CombatFx } from '../render/game/combatFx';
 import { WorldMarkers } from '../render/game/worldMarkers';
 import { MarkerTrail, TrailEnds } from '../render/game/markerTrail';
 import { World } from '../sim/world';
+import { Fog } from './fog';
+import { halfIn, otherHalf, ownHalf, routeById, routeDone, routeUsable, stepIndex } from '../sim/tunnels';
+const ROUTE_EDGE_ANG = [-Math.PI / 6, Math.PI / 6, Math.PI / 2, (5 * Math.PI) / 6, (7 * Math.PI) / 6, -Math.PI / 2];
 import { createWorld, GameSetup } from '../sim/mapGen';
 import { AS, Colony, FloodState, SURFACE, TileType, colonyOfSpace, nestSpace } from '../sim/types';
 import { AreaInfo, areaOpen, areasFor, teamPresence } from '../sim/areas';
@@ -100,6 +103,8 @@ export class GameSession {
   viewedArea: number;
   /** viewer setting (sandbox): every area tab open. Client-side only, never simulation state. */
   revealAreas = false;
+  /** underground fog for tunnel invasions (game/fog.ts; render-side, per viewer) */
+  readonly fog = new Fog();
   /** every player action goes through here (multiplayer brief, Part C) */
   commands!: LocalCommands;
   /** where the simulation runs: this thread or a worker (then `world` is a replica) */
@@ -818,7 +823,12 @@ export class GameSession {
     // Every change is a command; the checks here only choose what to send and what to say. (Each nest has one entrance,
     // always open: Dig and Remove do nothing special at it.)
     if (this.tool === 'dig') {
-      if (!g.isHexDug(q) && g.isHexDiggable(q)) this.issue({ type: 'dig', q, on: this.paintOn }, phase !== 'start');
+      const rid = g.routeOf(q);
+      if (rid >= 0) {
+        // a tunnel route's gate (sim/tunnels.ts): a click starts or pauses the route's dig (never painted over)
+        const r = routeById(this.world, rid);
+        if (phase === 'start' && r && ownHalf(r, c.id)?.gate === q && !routeDone(this.world, r, c.id)) this.issue({ type: 'digRoute', route: rid, on: c.routeDig !== rid }, false);
+      } else if (!g.isHexDug(q) && g.isHexDiggable(q)) this.issue({ type: 'dig', q, on: this.paintOn }, phase !== 'start');
     } else if (this.tool === 'tile') {
       const ex = tileAt(c, q) ?? (this.pendingTileAt(q) ? { built: false } : undefined);
       if (ex && !ex.built && phase === 'start') {
@@ -1560,7 +1570,24 @@ export class GameSession {
     let ok = true;
     if (this.tool === 'dig') {
       ok = g.isHexDiggable(q);
-      if (ok) this.ghostInfo = g.hexDesig[q] ? 'Marked for digging · click again to cancel' : 'Mark for digging · workers excavate it (6 points)';
+      const rid = g.routeOf(q);
+      if (rid >= 0) {
+        // a tunnel route (sim/tunnels.ts): dug from its gate
+        const r = routeById(this.world, rid);
+        const own = r && ownHalf(r, c.id);
+        const other = r ? this.world.colony(r.a === c.id ? r.b : r.a) : undefined;
+        const name = other?.name ?? 'another nest';
+        if (r && routeDone(this.world, r, c.id)) {
+          ok = false;
+          this.ghostInfo = `Tunnel to ${name} · open`;
+        } else if (own && own.gate === q) {
+          ok = true;
+          this.ghostInfo = c.routeDig === rid ? `Digging the tunnel to ${name} · click to pause` : `Tunnel gate · click to dig toward ${name}${c.routeDig !== undefined && c.routeDig >= 0 ? ' (pauses the other tunnel)' : ''}`;
+        } else {
+          ok = false;
+          this.ghostInfo = `Tunnel to ${name} · dig it from its gate`;
+        }
+      } else if (ok) this.ghostInfo = g.hexDesig[q] ? 'Marked for digging · click again to cancel' : 'Mark for digging · workers excavate it (6 points)';
     } else if (this.tool === 'upgrade') {
       const t = tileAt(c, q);
       ok = !!t && t.built && !canUpgrade(this.world, c, t);
@@ -1596,10 +1623,52 @@ export class GameSession {
     u.uGhostCol.value.set(ok ? 0x7cdc6a : 0xe0503a);
   }
 
+  /**
+   * The shared underground (sim/tunnels.ts): scrolling the nest camera out over a route's rim step into an open (or,
+   * for the digger, passable) route switches to the other nest at its rim step, with the normal fade cut, and its tab
+   * lights up; following a group does the same through updateFollow.
+   */
+  private updateTunnelView(): void {
+    const v = this.view;
+    const w = this.world;
+    if (v.space !== 'nest' || v.transitioning || v.observing || this.frameNo % 6 !== 0) return;
+    const space = v.activeNest;
+    const g = w.nestOf(space);
+    if (!g) return;
+    const rig = v.nestRig;
+    const q = g.hexAt(rig.goal.x, rig.goal.z);
+    if (q < 0 || !g.isRim(q)) return;
+    const rid = g.routeOf(q);
+    if (rid < 0) return;
+    const r = routeById(w, rid);
+    const h = r && halfIn(r, space);
+    if (!r || !h || stepIndex(h, q) !== h.steps.length - 1 || !routeUsable(w, r, this.player.id)) return;
+    // only when pushing against the rim: the goal clamped at the grid's edge on the route's outward side
+    const B = rig.bounds;
+    const atEdge = rig.goal.x <= B.min.x + 0.5 || rig.goal.z <= B.min.y + 0.5 || rig.goal.x >= B.max.x - 0.5 || rig.goal.z >= B.max.y - 0.5;
+    if (!atEdge) return;
+    const o = otherHalf(r, h);
+    if (!this.areaTab(o.space)?.open && !(this.player.routeDig === r.id)) return;
+    const og = w.nestOf(o.space);
+    if (!og) return;
+    const ostep = o.steps[o.steps.length - 1];
+    const oc = og.hexCenter(ostep[0]);
+    const inward = ROUTE_EDGE_ANG[o.dir] + Math.PI;
+    const x = oc.x + Math.cos(inward) * og.R * 2.5;
+    const y = oc.y + Math.sin(inward) * og.R * 2.5;
+    this.viewedArea = o.space;
+    this.alert(o.space);
+    v.fadeCut(() => {
+      v.setActiveNest(o.space, { x, z: y });
+    });
+  }
+
   /** Tab alerts: the home nest invaded or the queen hurt; your ants fighting or dying in an area. */
   private noteAlert(e: SimEvent): void {
     const w = this.world;
-    if (e.t === 'invasion' && e.colony === this.player.id) this.alert(nestSpace(this.player.id));
+    if ((e.t === 'tunnelWarn' || (e.t === 'tunnelBreach' && e.by >= 0)) && e.colony === this.player.id) this.alert(e.space);
+    else if (e.t === 'tunnelOpen' && (e.a === this.player.id || e.b === this.player.id)) for (const sp of e.spaces) this.alert(sp);
+    else if (e.t === 'invasion' && e.colony === this.player.id) this.alert(nestSpace(this.player.id));
     else if (e.t === 'death' && e.kind === 'ant' && e.colony === this.player.id && e.space !== SURFACE) this.alert(e.space);
     else if (e.t === 'bite' && e.space !== SURFACE && w.s.tick % 4 === 0) {
       // a fight near one of your ants in an area
@@ -1649,6 +1718,7 @@ export class GameSession {
       this.showArea(nestSpace(this.player.id));
     }
     if (v.space === 'nest' && !v.transitioning && v.activeNest !== this.viewedArea) v.setActiveNest(this.viewedArea);
+    this.updateTunnelView();
     this.updateHover();
     const cam = v.activeCamera();
     const vh = window.innerHeight * v.renderer.getPixelRatio();
@@ -1664,6 +1734,10 @@ export class GameSession {
       const nv = this.nests.get(v.activeNest);
       const owner = w.colony(colonyOfSpace(v.activeNest)) ?? null;
       if (nv) nv.overlay = this.tileOverlay;
+      if (nv) {
+        if (this.fog.advance(w.s.tick) || !nv.fog) this.fog.update(w, this.player, v.activeNest, this.revealAreas);
+        nv.fog = this.fog;
+      }
       if (nv) nv.update(w, owner, this.player, cam, alpha, realDt, vh, v.observing ? v.observeRig.distance * 3 : v.nestRig.distance, sel, v.time, shown, this.pendingHexes());
       if (nv) nv.bars.update(w, v.activeNest, alpha, cam, vh, (x, y, l, o) => nv.map.pos(x, y, l, o), this.player, this.inspect, realDt);
       if (nv) nv.trail.update(sel, this.trailEnds(sel, v.activeNest, shown), (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.distance, v.time);

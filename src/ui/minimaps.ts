@@ -1,6 +1,7 @@
 import { GameSession } from '../game/session';
 import { AS, SURFACE, colonyOfSpace } from '../sim/types';
-import { SOIL_AIR, SOIL_STONE } from '../world/nestGrid';
+import { SOIL_AIR, SOIL_GATE, SOIL_ROCK, SOIL_ROUTE, SOIL_STONE } from '../world/nestGrid';
+import { halfIn, routesOf } from '../sim/tunnels';
 import { edible } from '../sim/diet';
 import { MARKER_COLORS, MARKER_NAMES } from '../sim/markers';
 import { groupById } from '../sim/tiles';
@@ -32,6 +33,7 @@ export class Minimaps {
   private surfBase: HTMLCanvasElement | null = null;
   private nestImg: ImageData | null = null;
   private nestVer = -1;
+  private nestFogKey = -1;
   private nestFor = -1;
   private tick = 0;
   private size = 0;
@@ -118,9 +120,14 @@ export class Minimaps {
     }
     const ctx = this.nestCv.getContext('2d')!;
     const k = S / Math.max(g.widthMm, g.depthMm);
-    // floor raster (cached per dig version)
-    if (g.version !== this.nestVer) {
+    // floor raster (cached per dig version and the fog's state)
+    const fog = s.fog;
+    const sealed = fog.sealedOf(space);
+    const lv = fog.levelsOf(space);
+    const fogKey = (sealed?.size ?? 0) * 1000003 + (lv ? lv.reduce((a, b) => a + b, 0) : 0);
+    if (g.version !== this.nestVer || fogKey !== this.nestFogKey) {
       this.nestVer = g.version;
+      this.nestFogKey = fogKey;
       const img = ctx.createImageData(S, S);
       for (let y = 0; y < S; y++)
         for (let x = 0; x < S; x++) {
@@ -131,10 +138,20 @@ export class Minimaps {
           let gg = 8;
           let b = 6;
           if (cx < g.w && cy < g.h) {
-            const v = g.soil[cy * g.w + cx];
-            if (v === SOIL_AIR) [r, gg, b] = [176, 132, 74];
-            else if (v === SOIL_STONE) [r, gg, b] = [70, 68, 64];
-            else [r, gg, b] = [30, 24, 17];
+            const cell = cy * g.w + cx;
+            const q = g.cellHex[cell];
+            let v = g.soil[cell];
+            if (sealed && q >= 0 && sealed.has(q)) v = SOIL_ROUTE;
+            const f = lv && q >= 0 ? lv[q] : 0;
+            if (f === 2) [r, gg, b] = [12, 10, 8];
+            else {
+              if (v === SOIL_AIR) [r, gg, b] = [176, 132, 74];
+              else if (v === SOIL_STONE) [r, gg, b] = [70, 68, 64];
+              else if (v === SOIL_ROCK || v === SOIL_ROUTE) [r, gg, b] = [44, 46, 56];
+              else if (v === SOIL_GATE) [r, gg, b] = [150, 96, 48];
+              else [r, gg, b] = [30, 24, 17];
+              if (f === 1) [r, gg, b] = [r * 0.45, gg * 0.45, b * 0.45];
+            }
           }
           img.data[i] = r;
           img.data[i + 1] = gg;
@@ -186,6 +203,25 @@ export class Minimaps {
         ctx.fill();
       }
     }
+    // tunnel routes (sim/tunnels.ts): a gate as a brown ring (red when warned), an open route as a line to the rim
+    for (const r of routesOf(w, space)) {
+      const h = halfIn(r, space)!;
+      g.hexCenter(h.gate, p);
+      ctx.strokeStyle = h.warned && !r.open ? '#ff5a44' : r.open ? '#d8b070' : '#a06a30';
+      ctx.lineWidth = Math.max(1.2, S / 140);
+      hex(p.x * k, p.y * k, g.R * k * 1.1);
+      ctx.stroke();
+      if (r.open || s.player.routeDig === r.id) {
+        const last = h.steps[h.steps.length - 1][0];
+        const e = g.hexCenter(last);
+        ctx.beginPath();
+        ctx.moveTo(p.x * k, p.y * k);
+        ctx.lineTo(e.x * k, e.y * k);
+        ctx.setLineDash(r.open ? [] : [3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
     // the way up to the surface: one arrow on the entrance (a nest's wide flower, a cave's tunnel; grey once caved in)
     const ents = w.entrancesOf(space);
     g.entrances.forEach((q, i) => {
@@ -195,21 +231,22 @@ export class Minimaps {
     });
     // food, then ants: yours pale, allies blue, enemies red; creatures as rings
     // (only food your colony can gather is shown in food colours; the rest is a dim grey)
+    const shown = (x: number, y: number) => !fog.hasFog(space) || fog.visible(g, space, x, y);
     for (const f of w.s.food) {
-      if (f.space !== space || f.heldBy || f.kind === 'corpse') continue;
+      if (f.space !== space || f.heldBy || f.kind === 'corpse' || !shown(f.x, f.y)) continue;
       ctx.fillStyle = edible(s.player, f) ? (s.foodView ? '#ffd060' : 'rgba(240,190,80,0.9)') : 'rgba(150,140,125,0.45)';
       ctx.fillRect(f.x * k - 0.8, f.y * k - 0.8, 1.8, 1.8);
     }
     const me = s.player;
     for (const a of w.s.ants) {
-      if (a.space !== space || a.state === AS.Dead) continue;
+      if (a.space !== space || a.state === AS.Dead || !shown(a.x, a.y)) continue;
       const team = a.team ?? a.colony;
       ctx.fillStyle = a.colony === me.id ? 'rgba(255,242,212,0.95)' : team === me.team ? '#7fb8ff' : '#ff5a44';
       const r = a.id === w.colony(a.colony)?.queen ? 2.4 : 0.8;
       ctx.fillRect(a.x * k - r, a.y * k - r, r * 2, r * 2);
     }
     for (const cr of w.s.creatures) {
-      if (cr.space !== space || cr.dead) continue;
+      if (cr.space !== space || cr.dead || !shown(cr.x, cr.y)) continue;
       ctx.strokeStyle = '#ff5a3c';
       ctx.lineWidth = 1.5;
       ctx.beginPath();

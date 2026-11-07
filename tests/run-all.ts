@@ -288,7 +288,9 @@ function digDisc(w: World, cid: number, qc: number, r: number): number[] {
   const g = w.nest(0)!;
   const q0 = c.tiles.find((t) => t.type === 'queen')!.q;
   const far = (min: number, avoid: number[]) => {
-    for (let q = 0; q < g.cols * g.rows; q++) if (g.hexDistance(q, q0) >= min && g.hexCol(q) > 3 && g.hexCol(q) < g.cols - 4 && g.hexRow(q) > 3 && g.hexRow(q) < g.rows - 4 && avoid.every((a) => g.hexDistance(a, q) > 7)) return q;
+    // (inside the diggable interior, clear of the rock margin: sim/tunnels.ts)
+    const m = g.margin;
+    for (let q = 0; q < g.cols * g.rows; q++) if (g.hexDistance(q, q0) >= min && g.hexCol(q) > m + 3 && g.hexCol(q) < g.cols - m - 4 && g.hexRow(q) > m + 3 && g.hexRow(q) < g.rows - m - 4 && avoid.every((a) => g.hexDistance(a, q) > 7)) return q;
     return -1;
   };
   const upgradeAll = (tiles: ReturnType<typeof placeTile>[]) => {
