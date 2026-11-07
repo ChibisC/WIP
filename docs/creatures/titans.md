@@ -59,4 +59,4 @@ checkpoints 25 / 50 / 75 %; giving up below 55 %):
 Story raids use the same digging with their own floors (`STORY.titanRaid`): pace ≥ 60 %, no knock-backs, a cap of 12 /
 15 / 18 / 20 s (Easy → Brutal), a health floor of 10 % until inside. `tests/storyCh1.ts` runs both chapter 1 titans on
 all four difficulties with no defence, 40 ants at the hole, 40 riders and the titan down in its lair when its cue
-fires: inside every time (CHANGE_PLAN §25 has the times; why they never got in before: §25.1).
+fires: inside every time (CHANGE_PLAN §26 has the times; why they never got in before: §26.1).

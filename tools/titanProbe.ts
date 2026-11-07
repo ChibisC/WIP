@@ -1,7 +1,7 @@
 /**
  * Story titan raid probe (claude/story/05-spec-story-titans-get-inside.md §1): starts The Long Nights or The Spider
  * Mother at its titan's moment, sets up the player's defence the way a person plays, and logs the titan's raid state
- * every tick (`data.raid`, `rph`, `rprog`, `rstag`, health, space, position, its director cue, its creature state).
+ * every tick (`data.raid`, `rph`, `rprog`, the damage rate `rrate` (it replaced the stagger `rstag`), health, space, position, its director cue, its creature state).
  * Prints a summary (when each phase began, why it ended) and, with LOG=1, the per-tick lines.
  *
  * Run it with tools/titan-raid-probe.ts; tests/storyCh1.ts uses it too.

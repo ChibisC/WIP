@@ -15,6 +15,7 @@ from playwright.sync_api import sync_playwright
 
 BASE = os.environ.get("BASE", "http://127.0.0.1:5173/")
 ONLY = os.environ.get("ONLY", "nights,spider").split(",")
+Q = os.environ.get("Q", "medium")
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "story", "shots", "titans_in")
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"]
 os.makedirs(OUT, exist_ok=True)
@@ -95,7 +96,7 @@ def level(pg, name, actor, url, yaw):
     t = pg.evaluate(TITAN, actor)
     note(f"  close to the hole: {t}")
     # on the surface: the approach through the army, the dig (the ring, the hole's stages), the breakthrough (0.5 s a frame)
-    last = frames(pg, name, "surface", 56, 10, "surface", actor, 190, yaw, 0.12, still_at=(16, 30, 44))
+    last = frames(pg, name, "surface", 40, 10, "surface", actor, 190, yaw, 0.12, still_at=(8, 20, 32))
     note(f"  after the surface clip: {last}")
     for _ in range(30):
         t = pg.evaluate(TITAN, actor)
@@ -109,20 +110,20 @@ def level(pg, name, actor, url, yaw):
     # underground: walking through the nest, breaking soil, the army after it (0.5 s a frame)
     pg.evaluate("() => { const s = window.__session; s.showArea(s.player.id + 1); }")
     pg.evaluate("window.__step(20, 0.05)")
-    last = frames(pg, name, "nest", 40, 10, "nest", actor, 300, 0.0, 0.45, still_at=(8, 24))
+    last = frames(pg, name, "nest", 28, 10, "nest", actor, 300, 0.0, 0.45, still_at=(6, 18))
     note(f"  after the nest clip: {last}")
 
 
 with sync_playwright() as p:
     b = p.chromium.launch(args=ARGS)
-    pg = b.new_context(viewport={"width": 1280, "height": 760}).new_page()
+    pg = b.new_context(viewport={"width": 1120, "height": 660}).new_page()
     pg.set_default_timeout(1800000)
     pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.on("console", lambda m: errs.append(m.text) if ("THREE.WebGLProgram" in m.text or "Error" in m.text) else None)
     if "nights" in ONLY:
-        level(pg, "long_nights", "tarantula", "?story=longNights&stage=2&titan=1&ants=60&shot=1&nocine=1&q=high&seed=3&ticks=4", 2.6)
+        level(pg, "long_nights", "tarantula", "?story=longNights&stage=2&titan=1&ants=60&shot=1&nocine=1&q=" + Q + "&seed=3&ticks=4", 2.6)
     if "spider" in ONLY:
-        level(pg, "spider_mother", "mother", "?story=spiderMother&stage=1&titan=1&ants=60&shot=1&nocine=1&q=high&seed=3&ticks=4", 2.4)
+        level(pg, "spider_mother", "mother", "?story=spiderMother&stage=1&titan=1&ants=60&shot=1&nocine=1&q=" + Q + "&seed=3&ticks=4", 2.4)
     bad = [e for e in errs if "favicon" not in e]
     if bad:
         fails.append("page errors: " + " | ".join(bad[:5]))

@@ -447,7 +447,7 @@ too fast to gather after it starts; `tools/titan-ai-defence.ts`). Dev: `?titanRa
 `tests/browser/titan_dig.py` → `docs/creatures/digging/`.
 
 **Story titans always get in** (2026-11-03, claude/story/05-spec-story-titans-get-inside.md; why they never did:
-CHANGE_PLAN §25.1 — killed at the hole, or crawling under the army's grip on the way, or stopped on its walk by every
+CHANGE_PLAN §26.1 — killed at the hole, or crawling under the army's grip on the way, or stopped on its walk by every
 hit). The director's cue `digInto` (`sim/story/director.ts`) starts the raid and **owns the titan until it is inside**:
 * done only when every titan of it has been inside (`data.rinside`) or is dead; a start that fails is tried again
   every `STORY.titanRaid.retrySec` and logged (the dev view); in a lair (a cave) it walks up the tunnel and out first;
@@ -462,7 +462,7 @@ hit). The director's cue `digInto` (`sim/story/director.ts`) starts the raid and
   (`data.hpFloor`, held by every kind of damage: `combat.ts holdHpFloor`); the boss bar shows a padlock and the floor's
   mark meanwhile; once in it can be killed normally;
 * inside, its bites on the queen do `queenBite` (40 / 60 / 80 / 100 %) — with no army at all the queen lasts about two
-  minutes (CHANGE_PLAN §25.3); breaking in shows "It’s in the nest!".
+  minutes (CHANGE_PLAN §26.3); breaking in shows "It’s in the nest!".
 The Long Nights' tarantula walks its path to the hollow without stopping to fight (passive), then digs in; "kill the
 tarantula before dawn" stays. The Spider Mother rushes to the nest at 30 % (`digInto` `speed` 1.5); her bonus is now
 "kill her within a minute of her breaking in" (`killWithin`). Skirmish raids get none of this. Dev:
