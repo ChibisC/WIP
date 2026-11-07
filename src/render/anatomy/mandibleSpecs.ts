@@ -409,3 +409,13 @@ export const ATTA_MAJOR_JAW = attaMandible({ teeth: 8, color: { base: 0x4e1e0e, 
 /** Army ant worker (Eciton burchellii minor), overnight pass: short toothed clamps — a small triangle with 4–5 teeth, black. */
 export const ECITON_MINOR_JAW = formicineMandible({ teeth: 5, color: { base: 0x2a1a12, mid: 0x221610, tip: 0x120c0a, teeth: 0x080606, dark: [0.6, 1.0] }, reach: 1.12, thick: 1.6, pitch: [-0.08, -0.2, -0.4], edgeDark: 0.6, roll: 0.35, heading: 0.58, curve: 1.3, toothK: 1.2 });
 
+/**
+ * Saiy-Ants (fictional, built on Camponotus; docs/creatures/aurimyrmex-fulgurans.md §6): carpenter ant jaws —
+ * triangular formicine plates with five teeth (C. pennsylvanicus: Mackay 2019), black-brown, darkest along the
+ * toothed margin. The soldier's (a Camponotus major's) broader, thicker and set wider; the queen's like the worker's.
+ */
+const SAIY_JAW_COLOR = { base: 0x1c1410, mid: 0x221812, tip: 0x0e0a08, teeth: 0x060404, dark: [0.6, 1.0] as [number, number] };
+export const SAIY_WORKER_JAW = formicineMandible({ teeth: 5, color: SAIY_JAW_COLOR, reach: 1.1, broad: 1.2, thick: 1.9, pitch: [-0.12, -0.3, -0.56], edgeDark: 0.7, roll: 0.6, heading: 0.66, toothK: 1.25 });
+export const SAIY_SOLDIER_JAW = formicineMandible({ teeth: 5, color: SAIY_JAW_COLOR, reach: 1.0, broad: 1.4, thick: 2.5, pitch: [-0.1, -0.26, -0.5], edgeDark: 0.75, roll: 0.55, heading: 0.74, toothK: 1.5 });
+export const SAIY_QUEEN_JAW = formicineMandible({ teeth: 5, color: SAIY_JAW_COLOR, reach: 1.06, broad: 1.2, thick: 2.0, pitch: [-0.12, -0.3, -0.56], edgeDark: 0.7, roll: 0.6, heading: 0.68, toothK: 1.25 });
+

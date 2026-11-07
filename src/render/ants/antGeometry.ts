@@ -556,11 +556,14 @@ function setaeOn(acc: Acc, rng: Rng, pts: number[], radial: number, nRings: numb
  * Build an ant. detail 0 = full (observe camera), 1 = medium.
  */
 export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
-  const formicine = /^(lasius|formica|plagiaria)/.test(m.key);
+  const formicine = /^(lasius|formica|plagiaria|saiy)/.test(m.key);
+  /** the Saiy-Ants' Camponotus anatomy (model redo, claude/realism/10-spec): sockets set back, a defined clypeus */
+  const campo = m.real && m.key.startsWith('saiy_');
   const atta = m.key.startsWith('atta_');
   const eciton = m.key.startsWith('eciton_');
   // (Atta and Eciton geometry pass, 2026-10-31: curved, tapering, elbowed antennae; shaped legs)
-  const curvy = m.real && (atta || eciton);
+  // (Saiy-Ant model redo: the same — the playbook's spline antennae, club femora, slim tibiae, spurs, tarsomeres)
+  const curvy = m.real && (atta || eciton || campo);
   setaScale = curvy ? Math.min(1, 4.5 / m.L) * 0.8 : 1;
   if ((m as { builder?: string }).builder === 'hell') return buildHellAnt(m, detail, seed);
   if ((m as { builder?: string }).builder === 'nasute') return buildNasute(m, detail, seed);
@@ -828,6 +831,28 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       // (realism: the head's own colour gradient, so a major's face darkens toward the jaws under it too)
       acc.piece(transformPts(pp, headM), ii, PART.HEAD, m.real ? (x, y, z) => headCol(x - neck.x, y - neck.y, z) : solid(look.head), look.head);
     }
+    if (campo) {
+      // (model redo: "a well-defined clypeus") a Camponotus clypeus: a broad trapezoidal plate set into the lower
+      // face in front of the sockets, its rear margin a fine dark suture, a low median keel, the front margin reaching
+      // over the closed jaws' bases; on the head's own surface (found by a ray), not floating on it
+      for (const [u, dark] of [[0.9, true], [0.9, false]] as Array<[number, boolean]>) {
+        const hit = headRay(new THREE.Vector3(u * hL, headCY + hH * 2, 0), new THREE.Vector3(0.45, -1, 0).normalize());
+        if (!hit) continue;
+        const [pt, nrm] = hit;
+        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), nrm);
+        const r = dark ? new THREE.Vector3(hL * 0.15, hH * 0.035, hW * 0.27) : new THREE.Vector3(hL * 0.135, hH * 0.05, hW * 0.24);
+        const [pp, ii] = ellipsoid(pt.clone().addScaledVector(nrm, dark ? -r.y * 0.35 : -r.y * 0.3), r, hi ? 16 : 6, q);
+        acc.piece(transformPts(pp, headM), ii, PART.HEAD, dark ? () => tmpC.setHex(look.head.color).multiplyScalar(0.55) : (x, y, z) => headCol(x - neck.x, y - neck.y, z), look.head);
+        if (!dark && hi) {
+          // the median keel
+          const ax = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+          const a = pt.clone().addScaledVector(ax, -r.x * 0.75).addScaledVector(nrm, r.y * 0.55);
+          const b = pt.clone().addScaledVector(ax, r.x * 0.7).addScaledVector(nrm, r.y * 0.45);
+          const [kp, ki] = tube([a, a.clone().lerp(b, 0.5).addScaledVector(nrm, r.y * 0.1), b], [0.004 * Lm, 0.0045 * Lm, 0.003 * Lm], 5, true, true);
+          acc.piece(transformPts(kp, headM), ki, PART.HEAD, (x, y, z) => headCol(x - neck.x, y - neck.y, z), look.head);
+        }
+      }
+    }
     if (curvy && hi) {
       // (geometry pass: the loft's front pole read as a stray black dot in the face — a low clypeal plate in the
       // face's own colour covers it)
@@ -958,7 +983,8 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
     // (formicines, review round 3: at the front of the frons just behind the clypeus, not on top of the head)
     // (geometry pass, review: Atta's and Eciton's antennae read as rising from the top of the head — they insert low on
     // the face, beside the clypeus and the jaw bases)
-    const sockAt = (s: number) => (m.real && atta ? hp(hL * 0.9, headCY - hH * 0.02, s * hW * 0.15) : m.real && eciton ? hp(hL * 0.92, headCY - hH * 0.04, s * hW * 0.15) : m.real && formicine ? hp(hL * 0.86, headCY + hH * 0.1, s * hW * 0.17) : m.real ? hp(hL * 0.84, headCY + hH * 0.24, s * hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, s * hW * 0.17));
+    // (Camponotus: the antennal sockets clearly behind the clypeus' rear margin, a genus character — model redo)
+    const sockAt = (s: number) => (campo ? hp(hL * 0.73, headCY + hH * 0.2, s * hW * 0.17) : m.real && atta ? hp(hL * 0.9, headCY - hH * 0.02, s * hW * 0.15) : m.real && eciton ? hp(hL * 0.92, headCY - hH * 0.04, s * hW * 0.15) : m.real && formicine ? hp(hL * 0.86, headCY + hH * 0.1, s * hW * 0.17) : m.real ? hp(hL * 0.84, headCY + hH * 0.24, s * hW * 0.16) : hp(hL * 0.74, headCY + hH * 0.32, s * hW * 0.17));
     // (2026-10-31: the right socket had kept the old position when the left one moved — lopsided antennae)
     socketL = sockAt(-1);
     socketR = sockAt(1);

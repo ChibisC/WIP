@@ -12,7 +12,14 @@
  * amber head with short crossing mandibles and the postclypeus bulge. Soldiers: a glossy dark pear-shaped head drawn
  * into the nasus, vestigial mandibles, six stiff setae.
  *
- * Returns the standard { geometry, rig } plus `nasusTip` (soldiers: the glue comes from it) and `soft`.
+ * Sickle-jaw termites (Rhynchotermes perarmatus; model redo, claude/realism/10-spec-saiy-ant-sickle-jaw-models.md,
+ * shapes in docs/creatures/rhynchotermes-perarmatus.md §10) use the same builder: the soldier's globe head drawn into a
+ * long, down-curved snout (`head.nasus` + `head.sickle`) with long, thin crossing sickle mandibles traced from the
+ * user's photos; the worker's broad, flat head with its pale fontanelle (`head.flat`, `head.fontanelle`); the royals'
+ * heads with compound eyes and ocelli, wing scales and a shield pronotum (`head.royal`, `thorax.wingScales`,
+ * `thorax.shield`), the queen's pleated physogastric abdomen with dark plates (`abdomen.physo`); the larva.
+ *
+ * Returns the standard { geometry, rig } plus `nasusTip` (soldiers: the glue or the secretion comes from it) and `soft`.
  * Units: mm; the spec's numbers are fractions of the body length L. +x forward, +y up, +z right, feet on y = 0.
  */
 import * as THREE from 'three';
@@ -123,9 +130,29 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       // the abdomen sags a little toward its rear
       secs.push({ x, y: aCy - ab.sag * L * s * s, ry: ab.h * 0.5 * L * r, rz: ab.w * 0.5 * L * r, n: 2.15 });
     }
+    // (physogastric queen: soft lengthwise pleats in the stretched membrane)
+    const pleat = ab.physo ? (x, y, z, t) => {
+      const k = Math.round(t * (secs.length - 1)), sc = secs[Math.max(0, Math.min(secs.length - 1, k))];
+      const a = Math.atan2((y - sc.y) / Math.max(1e-6, sc.ry), z / Math.max(1e-6, sc.rz));
+      const f = 1 + ab.physo.pleat * 0.06 * Math.sin(a * 16) * ss(0.04, 0.2, t) * ss(0.0, 0.15, 1 - t);
+      return [x, sc.y + (y - sc.y) * f, z * f];
+    } : undefined;
     gTip = new NV(aFront - aLen, aCy - ab.sag * L, 0);
-    tloft(n, secs, S(18, 10, 6), PART.GASTER, (s, d, lat) => {
+    const ph = ab.physo;
+    tloft(n, secs, S(ph ? 36 : 18, 10, 6), PART.GASTER, (s, d, lat, ang) => {
       const [q, fr] = terg(s);
+      if (ph) {
+        // a physogastric queen (the royals fix, claude/termite-royals/): the stretched pale membrane, with each
+        // segment's small dark tergite an island on top and its sternite a paler island below, far apart
+        let c = d > 0 ? mix(C.abd, C.abdTop, d * 0.5) : mix(C.abd, C.abdUnder, -d * 0.6);
+        const mid = Math.exp(-((fr - 0.45) ** 2) / 0.03);
+        const plate = mid * ss(0.55, 0.75, d) * ss(0.0, 0.3, Math.min(s, 1 - s) * 4);
+        const stern = mid * ss(0.6, 0.85, -d) * 0.6;
+        c = mix(c, C.plate, Math.min(1, plate * 1.4));
+        c = mix(c, C.stern ?? C.plate, Math.min(1, stern));
+        // the eggs seen through the membrane: a faint warm mottle
+        return mix(c, C.gut, ab.gut * 0.25 * (0.5 + 0.5 * Math.sin(s * 63 + ang * 7)) * (1 - plate));
+      }
       // each tergite a little darker toward its rear margin; the membrane between them pale
       let c = d > 0 ? mix(C.abd, C.abdTop, d * 0.7) : mix(C.abd, C.abdUnder, -d * 0.8);
       c = mix(c, C.tergRear, 0.35 * ss(0.4, 0.95, fr) * Math.max(0, d * 0.8 + 0.3));
@@ -134,7 +161,7 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       c = mix(c, C.gut, ab.gut * gutAt(s, d, lat));
       // the tip a little paler and more translucent
       return mix(c, C.abdUnder, 0.25 * ss(0.85, 1, s));
-    }, lk.abdomen, undefined, REGION.GASTER);
+    }, lk.abdomen, pleat, REGION.GASTER);
     if (o) {
       // sparse long pale hairs at the tergites' rear margins (6-10 per tergite), lying back
       for (let q = 1; q < NT; q++) {
@@ -176,10 +203,20 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       ps.push({ x, y: tCy + 0.006 * L + th.proLift * L * ss(0.6, 1, u), ry: th.h * 0.45 * L * (0.9 + 0.1 * Math.sin(Math.PI * u)), rz: w * 0.5, n: 2.6 });
     }
     tloft(n, ps, S(16, 8, 5), PART.BODY, (s, d) => mix(d > 0 ? mix(C.thorax, C.pronotum, 0.7 + 0.3 * d) : C.thorax, C.thoraxTop, 0.15 * ss(0.8, 1, s)), lk.body, (x, y, z, t) => {
-      // saddle: the sides drop away from the midline
+      // saddle: the sides drop away from the midline (the royals' shield: flat, the margins only turned down a little)
       const zf = Math.abs(z) / (th.proW * 0.5 * L);
       return [x, y - th.saddle * L * zf * zf * (y > tCy ? 1 : 0), z];
     }, REGION.MESO);
+    if (th.wingScales && lod < 2) {
+      // the royals' wing scales: the stubs left when the wings broke off at the flight, flat dark flaps lying back
+      // over the next segment on each side of the meso- and metathorax
+      for (const seg of [meso, meta]) for (const sd of [-1, 1]) {
+        const root = new NV(seg.x + seg.len * 0.7, tCy + th.h * 0.42 * L, sd * th.w * 0.34 * L);
+        const tip = root.clone().add(new NV(-seg.len * 1.25, -th.h * 0.08 * L, sd * th.w * 0.12 * L));
+        const sq = new NQ().setFromUnitVectors(new NV(1, 0, 0), tip.clone().sub(root).normalize());
+        blob(n, root.clone().lerp(tip, 0.5), new NV(root.distanceTo(tip) * 0.55, 0.012 * L, th.w * 0.12 * L), S(10, 6, 4), PART.BODY, C.wingScale ?? C.thoraxTop, lk.head, sq);
+      }
+    }
     if (o) for (let k = 0; k < 14; k++) {
       // a few fine setae at the pronotum's margin and on the thorax
       const u = rnd.range(0.1, 0.95), zf = rnd.range(-0.9, 0.9), x = pro.x + u * pro.len;
@@ -226,18 +263,31 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       const s = k / (R - 1);
       const back = s < 0.38 ? Math.sqrt(Math.max(0.0025, 1 - ((0.38 - s) / 0.38) ** 2)) : 1;
       const front = s > 0.84 ? Math.sqrt(Math.max(0.0025, 1 - ((s - 0.84) / 0.16) ** 2)) : 1;
-      const narrow = 1 - 0.38 * ss(0.42, 1, s);
+      // (`head.narrow`: how much the face narrows forward — the sickle-jaw worker's broad head hardly does)
+      const narrow = 1 - (hd.narrow ?? 0.38) * ss(0.42, 1, s);
       const env = back * front;
       secs.push({ x: x0 + s * hL, y: 0.2 * hH - 0.16 * hH * s * s, ry: hH * 0.5 * env * (1 - 0.18 * ss(0.55, 1, s)), rz: hW * 0.5 * env * narrow, n: 2.4 });
     }
+    // (`head.flat`: the top flattened this much — the sickle-jaw worker's head is flattened top to bottom)
+    const flat = hd.flat ?? 0.88;
     headLoft(secs, S(20, 12, 7), (s, d, lat) => {
       let c = headCol(s, d);
       // the darker band: across the frons (s ~ 0.6) and down the midline toward the back, on top only
       const top = Math.max(0, d);
       const band = Math.exp(-((s - 0.6) ** 2) / 0.006) * (0.6 + 0.4 * Math.abs(lat)) + Math.exp(-(lat * lat) / 0.02) * ss(0.15, 0.6, s) * 0.8;
-      c = mix(c, C.headBand, 0.75 * Math.min(1, band) * top);
+      c = mix(c, C.headBand, (hd.band ?? 1) * 0.75 * Math.min(1, band) * top);
+      // the fontanelle: a whitish spot in the middle of the frons (the frontal gland's pore)
+      if (hd.fontanelle) c = mix(c, C.fontanelle, top * Math.exp(-(((s - 0.55) / hd.fontanelle) ** 2 + (lat / (hd.fontanelle * 1.3)) ** 2) * 3));
       return c;
-    }, lk.head, (x, y, z) => [x, y > 0.22 * hH ? 0.22 * hH + (y - 0.22 * hH) * 0.88 : y, z], REGION.HEAD);
+    }, lk.head, (x, y, z) => [x, y > 0.22 * hH ? 0.22 * hH + (y - 0.22 * hH) * flat : y, z], REGION.HEAD);
+    if (hd.royal && lod < 2) {
+      // the royals' compound eyes (dark, convex, on the sides behind the antennae) and two ocelli in front of them
+      for (const sd of [-1, 1]) {
+        const eq = new NQ().setFromAxisAngle(new NV(0, 1, 0), sd * 0.25);
+        blob(n, toB(x0 + 0.5 * hL, 0.12 * hH, sd * hW * 0.43), new NV(0.13 * hL, 0.17 * hH, 0.07 * hW), S(14, 8, 5), PART.HEAD, C.eye, { rough: 0.15, coat: 1, sheen: 0 }, hq.clone().multiply(eq));
+        blob(n, toB(x0 + 0.62 * hL, 0.34 * hH, sd * hW * 0.24), new NV(0.035 * hL, 0.02 * hH, 0.03 * hW), S(8, 5, 4), PART.HEAD, C.ocellus, { rough: 0.1, coat: 1, sheen: 0 }, hq);
+      }
+    }
     // (user notes 17:48 / 17:59: "redo the head geometry and mandibles", "fix the mandibles especially and the head")
     // The face, front to back as in the worker-head photo: the postclypeus — a broad, swollen cushion across the front
     // of the head, a dark line down its middle; the thin pale anteclypeus; the labrum — a large rounded tongue lying
@@ -320,29 +370,89 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       } else {
         const u = (s - sc) / (1 - sc);
         // concave flanks: a fast fall then a long slim cone
-        const w = Math.pow(1 - u, 1.75);
+        const w = Math.pow(1 - u, nz.flank ?? 1.75);
         rz = rT + (R - rT) * w;
         ry = rT + (Ry - rT) * w;
-        // the axis rises so the top line stays nearly straight and the underside sweeps up
-        cy = yC + (Ry - rT) * 0.55 * Math.pow(u, 0.9) + nz.up * u * nz.len * L;
+        // the axis rises so the top line stays nearly straight and the underside sweeps up (the sickle-jaw's snout:
+        // `rise` small, so the top of the head slopes down into it, and `curve` bends it down toward the tip)
+        cy = yC + (Ry - rT) * (nz.rise ?? 0.55) * Math.pow(u, 0.9) + nz.up * u * nz.len * L - (nz.curve ?? 0) * u * u * nz.len * L;
       }
       secs.push({ x: x0 + s * HT, y: cy, ry, rz, n: 2.05 });
       if (k === NS - 1) tip = new NV(x0 + HT + rT, cy, 0);
     }
     headLoft(secs, S(22, 12, 7), (s, d) => {
       const c = headCol(s, d);
-      return mix(c, C.nasusTip, ss(0.78, 1, s) * 0.85);
+      return mix(c, C.nasusTip, ss(nz.dark ?? 0.78, 1, s) * 0.85);
     }, lk.head, undefined, REGION.HEAD);
     nasusTip = toB(tip.x, tip.y, 0);
+    if (hd.sickle && lod < 2) {
+      // the opening at the snout's tip (the frontal gland's pore): a small dark ring on the blunt end
+      const g = secs[NS - 1], dq = hq.clone().multiply(new NQ().setFromUnitVectors(new NV(1, 0, 0), new NV(g.x - secs[NS - 3].x, g.y - secs[NS - 3].y, 0).normalize()));
+      blob(n, toB(g.x + rT * 0.6, g.y, 0), new NV(rT * 0.35, rT * 0.62, rT * 0.62), S(10, 6, 4), PART.HEAD, C.pore ?? C.mandTip, lk.mandible, dq);
+    }
     // a point on the teardrop's surface: s along the head, angle a round it (0 = the side, +pi/2 = the top), out = 1
     headSurf = (s0, a, out = 1) => {
       const f = Math.max(0, Math.min(NS - 1, s0 * (NS - 1))), k = Math.min(NS - 2, Math.floor(f)), t = f - k, g0 = secs[k], g1 = secs[k + 1];
       const x = g0.x + (g1.x - g0.x) * t, y = g0.y + (g1.y - g0.y) * t, ry = g0.ry + (g1.ry - g0.ry) * t, rz = g0.rz + (g1.rz - g0.rz) * t;
       return toB(x, y + Math.sin(a) * ry * out, Math.cos(a) * rz * out);
     };
+    /**
+     * The sickle-jaw soldier's mandibles (traced from the user's four photos, docs/creatures/rhynchotermes-perarmatus.md
+     * §10): long, thin, flattened blades hinged low on the front sides of the globe, where it narrows into the snout.
+     * Seen from above each sweeps out sideways, turns forward and then in (about 150° in all), the tips crossing in
+     * front of and below the snout when closed; seen from the side it hangs, curving ever more steeply down, the last
+     * sixth hooked down and back. A small conical tooth on the inner margin at 0.42; dark red, near black at the tip.
+     */
+    const sickles = (sk, sc0) => {
+      const mL = sk.len * L;
+      const path = (sd, sweep) => {
+        const N = S(22, 12, 6), pts = [];
+        let p = new NV(0, 0, 0);
+        pts.push(p.clone());
+        for (let k = 1; k <= N; k++) {
+          const s0 = (k - 0.5) / N;
+          const yaw = sk.yaw0 - sweep * Math.pow(s0, sk.yawPow ?? 1.15);
+          const dip = sk.dip0 + sk.dip1 * s0 * s0 + sk.hook * ss(0.8, 1, s0);
+          const d = new NV(Math.cos(dip) * Math.cos(yaw), -Math.sin(dip), sd * Math.cos(dip) * Math.sin(yaw));
+          p = p.clone().addScaledVector(d, mL / N);
+          pts.push(p);
+        }
+        return pts;
+      };
+      for (const sd of [-1, 1]) {
+        const h = headSurf(sc0 + (sk.at ?? 0.02), -(sk.ang ?? 0.95), 0.9);
+        h.z *= sd;
+        // the sweep fitted so the closed tips just cross the midline (the left over the right)
+        let lo = 1.2, hi2 = 3.6, sw = 2.6;
+        for (let it = 0; it < 22; it++) {
+          sw = (lo + hi2) / 2;
+          const tp = path(sd, sw)[S(22, 12, 6)].clone().applyQuaternion(hq).add(h);
+          if (sd * tp.z > -(sk.cross ?? 0.01) * L) lo = sw;
+          else hi2 = sw;
+        }
+        const local = path(sd, sw);
+        const lift = sd < 0 ? 0.008 * L : 0;
+        const pts = local.map((q, k) => q.clone().add(new NV(0, lift * ss(0.6, 1, k / (local.length - 1)), 0)).applyQuaternion(hq).add(h));
+        const rad = pts.map((_, k) => {
+          const t = k / (pts.length - 1);
+          return L * (sk.w * (1 - 0.72 * Math.pow(t, 0.8)) + 0.0015);
+        });
+        const part = sd < 0 ? PART.MAND_L : PART.MAND_R;
+        // flattened in the blade's plane: the tube's `flat` squashes its section across the curve
+        ttube(n, pts, rad, S(10, 6, 4), part, (t) => mix(C.mand, C.mandTip, ss(0.45, 0.95, t)), lk.mandible, true, true, sk.flat ?? 0.55, REGION.MANDIBLE);
+        if (lod < 2) {
+          // the marginal tooth on the inner edge
+          const k = Math.round((sk.tooth ?? 0.42) * (pts.length - 1)), tn = pts[k + 1].clone().sub(pts[k - 1]).normalize();
+          const inner = new NV(0, 0, -sd).applyQuaternion(hq).sub(tn.clone().multiplyScalar(new NV(0, 0, -sd).applyQuaternion(hq).dot(tn))).normalize();
+          ttube(n, [pts[k].clone().addScaledVector(inner, rad[k] * 0.5), pts[k].clone().addScaledVector(inner, rad[k] * 0.5 + (sk.toothLen ?? 0.1) * mL).addScaledVector(tn, 0.03 * mL)], [rad[k] * 0.55, 0.0012 * L], 5, part, () => C.mandTip, lk.mandible, false, true, 0.7);
+        }
+        hingeAt.push(h); tips.push(pts[pts.length - 1]);
+      }
+    };
     // (user rating S1/S2 "the mandibles are misplaced") vestigial mandibles: two small dark points tucked under the
     // front of the bulb where it narrows into the nasus, pointing forward along its underside, mostly hidden
-    for (const sd of [-1, 1]) {
+    if (hd.sickle) sickles(hd.sickle, sc);
+    else for (const sd of [-1, 1]) {
       const h = headSurf(sc + 0.06, -1.2, 0.92);
       h.z *= sd;
       const part = sd < 0 ? PART.MAND_L : PART.MAND_R;
@@ -446,6 +556,11 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
     const legCol = (s) => mix(C.legBase, mix(C.leg, C.legLight, 0.3 + 0.4 * Math.sin(Math.PI * s)), ss(0, 0.2, s));
     // seg 0: coxa (stout), trochanter, femur (a little swollen in its basal half)
     ttube(n, [c0, c0.clone().lerp(c1, 0.5), c1], [t0 * 1.9, t0 * 1.7, t0 * 1.25], S(10, 5, 3), p0, () => C.legBase, lk.leg, lod < 2, false, 1, REGION.LEG);
+    if (lg.coxaThorn && pair === 0 && lod < 2) {
+      // the sickle-jaw soldier's fore coxa: a conical, thorn-like process pointing forward and down
+      const b0 = c0.clone().lerp(c1, 0.45), tip = b0.clone().add(new NV(lg.coxaThorn * L, -lg.coxaThorn * 0.45 * L, sd * lg.coxaThorn * 0.2 * L));
+      ttube(n, [b0, b0.clone().lerp(tip, 0.5), tip], [t0 * 1.1, t0 * 0.6, t0 * 0.08], 6, p0, () => C.legBase, lk.leg, false, true);
+    }
     {
       const m = S(9, 4, 2), pts = [], rr = [];
       for (let k = 0; k <= m; k++) { const s = k / m; pts.push(c1.clone().lerp(knee, s)); rr.push(t0 * (1.15 + 0.3 * Math.exp(-((s - 0.35) ** 2) / 0.07) - 0.3 * s)); }

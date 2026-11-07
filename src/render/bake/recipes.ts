@@ -258,6 +258,32 @@ export const NASUTE_W: DetailRecipe = { key: 'nasute_w', regions: nasRegions(NAS
 export const NASUTE_S: DetailRecipe = { key: 'nasute_s', regions: nasRegions(NAS_HEAD_S) };
 
 /** Recipe for an ant morph (null: no baked detail yet, the material stays as before). */
+/**
+ * Saiy-Ants (model redo, claude/realism/10-spec): a black carpenter ant's cuticle (Camponotus pennsylvanicus, Mackay
+ * 2019): the head densely and evenly punctate, the mesosoma punctate and finely coriaceous on top, the gaster very
+ * finely punctate with scattered larger punctures, each carrying one of the long appressed golden hairs (stub hairs
+ * pointing back); satin, not lacquered — the highlights broken; the legs finely punctate, a little dusty at the tarsi.
+ */
+const SAIY_HEAD: Sculpt = { tile: [1.0, 1.0], noise: 0.0004, reticulum: { cell: 0.015, depth: 0.0004 }, pits: { n: 90, r: 0.0042, depth: 0.0009, pale: 0.08, stub: { len: 0.02, dir: -1, share: 0.3 } }, wave: { cell: 0.2, amp: 0.003 }, rough: [0.16, 0.4], roughVar: 0.06, dirt: 0.14, mottle: 0.1, cavityDark: 0.28 };
+const SAIY_MESO: Sculpt = { tile: [2.4, 1.0], noise: 0.0004, reticulum: { cell: 0.013, depth: 0.0008 }, pits: { n: 120, r: 0.0042, depth: 0.001, pale: 0.08, stub: { len: 0.03, dir: -1, share: 0.4 } }, wave: { cell: 0.18, amp: 0.0035 }, rough: [0.2, 0.44], roughVar: 0.06, dirt: 0.2, mottle: 0.12, cavityDark: 0.28 };
+const SAIY_WAIST: Sculpt = { tile: [0.6, 0.6], noise: 0.0005, reticulum: { cell: 0.014, depth: 0.0008 }, pits: { n: 30, r: 0.0045, depth: 0.0011, pale: 0.1 }, rough: [0.16, 0.4], roughVar: 0.06, dirt: 0.25, mottle: 0.1, cavityDark: 0.3 };
+const SAIY_GASTER: Sculpt = { tile: [1.4, 1.4], noise: 0.0003, reticulum: { cell: 0.012, depth: 0.0003 }, pits: { n: 900, r: 0.0026, depth: 0.0004, pale: 0.35, stub: { len: 0.07, dir: 1, share: 1 } }, wave: { cell: 0.24, amp: 0.004 }, rough: [0.1, 0.34], roughVar: 0.06, dirt: 0.1, mottle: 0.12, cavityDark: 0.2 };
+const SAIY_LEG: Sculpt = { ...FIRE_LEG, tile: [0.3, 0.75], rough: [0.12, 0.36], dirt: 0.3 };
+const SAIY_MAND: Sculpt = { ...FIRE_MAND, tile: [0.24, 0.55], striae: { per: 140, depth: 0.00008, angle: 0, wobble: 0.15 }, cavityDark: 0.15 };
+export const SAIY: DetailRecipe = {
+  key: 'saiy',
+  regions: {
+    [REGION.HEAD]: { sculpt: SAIY_HEAD, shade: shade(0.8, 0.3, 0.45, 0.2, 0.45, { coatRough: 0.22, wear: 0.25, dust: 0.06, mid: 0.08 }), px: [512, 512] },
+    [REGION.MESO]: { sculpt: SAIY_MESO, shade: shade(0.8, 0.4, 0.5, 0.2, 0.45, { coatRough: 0.24, wear: 0.2, dust: 0.08, mid: 0.08 }), px: [1024, 512] },
+    [REGION.WAIST]: { sculpt: SAIY_WAIST, shade: shade(0.8, 0.06, 0.3, 0.2, 0.35, { coatRough: 0.26, wear: 0.2, dust: 0.1 }), px: [256, 256] },
+    [REGION.GASTER]: { sculpt: SAIY_GASTER, shade: shade(0.75, 0.3, 0.35, 0.22, 0.5, { coatRough: 0.3, wear: 0.15, dust: 0.05, mid: 0.06, bands: [0.4, 0.6, 0.77, 0.9], band: [0.011, 0.25, 0.75, 0.06] }), px: [512, 512] },
+    [REGION.LEG]: { sculpt: SAIY_LEG, shade: shade(1.0, 0.5, 0, 0.4, 0.35, { coatRough: 0.3, wear: 0.3, dust: 0.3, mid: 0.2, tipThin: 0.5 }), px: [128, 320] },
+    [REGION.TARSUS]: { sculpt: FIRE_TARSUS, shade: shade(0.9, 0.45, 0, 0.45, 0.35, { coatRough: 0.38, dust: 0.5, mid: 0.2, tipThin: 0.45 }), px: [64, 128] },
+    [REGION.ANTENNA]: { sculpt: FIRE_ANTENNA, shade: shade(0.7, 0.05, 0, 0.45, 0.35, { coatRough: 0.34, dust: 0.12, mid: 0, tipThin: 0.35 }), px: [64, 160] },
+    [REGION.MANDIBLE]: { sculpt: SAIY_MAND, shade: shade(0.8, 0.1, 0, 0.4, 0.35, { coatRough: 0.2, wear: 0.5, dust: 0.05, tipThin: 0.6 }), px: [96, 192] },
+  },
+};
+
 export function antRecipe(morphKey: string): DetailRecipe | null {
   if (morphKey.startsWith('fire_')) return FIRE_ANT;
   if (morphKey.startsWith('lasius_')) return LASIUS;
@@ -269,6 +295,7 @@ export function antRecipe(morphKey: string): DetailRecipe | null {
   if (morphKey === 'eciton_queen') return ECITON_QUEEN;
   if (morphKey.startsWith('eciton_')) return ECITON;
   if (morphKey.startsWith('hell_')) return HELL;
+  if (morphKey.startsWith('saiy_')) return SAIY;
   if (morphKey === 'termite_worker') return NASUTE_W;
   if (morphKey === 'termite_nasute' || morphKey === 'termite_major') return NASUTE_S;
   return null;

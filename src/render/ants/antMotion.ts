@@ -24,7 +24,7 @@ import { ATK } from './attackPoses';
  */
 
 /** Which morphs use the pass (the pilot: the tropical fire ant; the rollout widens this). */
-export const ANIM_V2_PREFIXES = ['fire_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_', 'hell_', 'termite_worker', 'termite_nasute', 'termite_major'];
+export const ANIM_V2_PREFIXES = ['fire_', 'saiy_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_', 'hell_', 'termite_worker', 'termite_nasute', 'termite_major'];
 /** Lab switch: false shows the old motion (before/after clips). */
 export const animSettings = { v2: true };
 export const animV2 = (morph: string): boolean => animSettings.v2 && ANIM_V2_PREFIXES.some((p) => morph.startsWith(p));
@@ -112,6 +112,19 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
     if (!v.atkSeq) out.variant = set[av];
     else {
       const pick = (k: number) => Math.floor(hs(k, 6) * 3) % 3;
+      const i = pick(n);
+      out.variant = set[n > 0 && i === pick(n - 1) ? (i + 1) % 3 : i];
+    }
+    return out;
+  }
+  // Saiy-Ants (model redo, claude/realism/10-spec): carpenter ant bites — the worker's lunge, clamp-and-tug and chomp;
+  // the soldier's (a Camponotus major's) crushing bite, head swing and chomp; no acid (the user's 2026-10-25 rule);
+  // never the same twice running. Gold-form bites come faster with the sim's surge; the sparks are the renderer's.
+  if (morph.startsWith('saiy_')) {
+    const set = morph === 'saiy_soldier' ? [ATK.CRUSH, ATK.HEAD_SWING, ATK.CHOMP] : morph === 'saiy_queen' ? [ATK.LUNGE, ATK.CLAMP, ATK.CRUSH] : [ATK.LUNGE, ATK.CLAMP, ATK.CHOMP];
+    if (!v.atkSeq) out.variant = set[av];
+    else {
+      const pick = (k: number) => Math.floor(hs(k, 9) * 3) % 3;
       const i = pick(n);
       out.variant = set[n > 0 && i === pick(n - 1) ? (i + 1) % 3 : i];
     }

@@ -1,33 +1,48 @@
 // @ts-nocheck
 /**
- * Saiy-Ant morphs (Aurimyrmex fulgurans, fictional Camponotus-like formicine), from the
- * user's verified prototype (claude/saiy-ants/04-prototype-code.md). Shared builder;
- * glossy jet black with a blue-black sheen; the gold form is in the shader (aE.x).
+ * Saiy-Ant morphs (Aurimyrmex fulgurans: fictional, built on a real carpenter ant, Camponotus). Model redo
+ * (claude/realism/10-spec-saiy-ant-sickle-jaw-models.md) on the fire ant pilot's playbook: proportions from
+ * C. pennsylvanicus measurements (Mackay 2019: minor, major and female head, scape, eye, mesosoma and femur lengths;
+ * docs/creatures/aurimyrmex-fulgurans.md §6), five-toothed parametric jaws, antennal sockets set well back from the
+ * clypeus, eyes behind the head's middle, one smooth mesosomal arch, a scale-like petiole, long legs, sparse erect
+ * setae with golden-grey pubescence on the gaster, baked cuticle (bake/recipes.ts SAIY). Normal colour: deep black
+ * with a faint blue-black sheen; the gold form is in the shader (aE.x). The six hair locks are the user's design
+ * (claude/saiy-ants/07, 08): unchanged.
  */
+import { SAIY_QUEEN_JAW, SAIY_SOLDIER_JAW, SAIY_WORKER_JAW } from '../anatomy/mandibleSpecs';
+
 const L = (color, rough, coat, sheen, color2) => ({ color, color2, rough, coat, sheen });
 // ===== SAIY-ANT MORPHS (Aurimyrmex fulgurans, fictional Camponotus-like formicine) =====
-// Uses the game's shared morph builder unchanged. Normal coloration: glossy jet black with a
-// blue-black sheen; the gold form is done entirely in the shader (per-instance aE.x).
+// black cuticle with a blue-black sheen toward the light (color2), satin rather than mirror (densely punctate head,
+// finely punctate gaster); the gaster's appressed golden-grey pubescence as sheen; legs and antennae a very dark
+// brown, lighter at the joints and tarsi; jaws black-brown, darkest at the teeth
 const SAIY_LOOK = {
-  head: L(0x0b0a0e, 0.3, 0.55, 0.22, 0x1a1c2c),     // color2: blue-black sheen toward the vertex
-  meso: L(0x0c0b10, 0.32, 0.5, 0.2, 0x1c1e30),
-  waist: L(0x0e0d12, 0.34, 0.45, 0.18),
-  gaster: L(0x0a090d, 0.26, 0.6, 0.28, 0x2a2426),  // color2: faint lighter band at segment edges
-  legs: L(0x241a14, 0.45, 0.1, 0.06, 0x241a14),    // no light bands; joints are lightened by the shared builder's joint pieces only
-  antenna: L(0x241a14, 0.45, 0.1, 0.06, 0x2c2018),
-  mandible: L(0x2a1c14, 0.35, 0.4, 0, 0x120c08),
+  head: L(0x0b0a0e, 0.42, 0.3, 0.05, 0x181b2a),
+  meso: L(0x0c0b0f, 0.45, 0.28, 0.06, 0x1a1d2c),
+  waist: L(0x0d0c10, 0.46, 0.25, 0.05),
+  gaster: L(0x0a090c, 0.4, 0.32, 0.3, 0x262220),
+  legs: L(0x161110, 0.48, 0.15, 0.04, 0x2a1e16),
+  antenna: L(0x181210, 0.5, 0.12, 0.04, 0x2a1e16),
+  mandible: L(0x1a120e, 0.34, 0.4, 0, 0x0c0806),
 };
+// sparse pale erect setae (none on the cheeks and scapes), more on the mesosoma and gaster
+const SAIY_SETAE = { color: 0xb8a47a, head: 14, meso: 28, gaster: 70, len: [0.012, 0.042] };
 const SAIY_WORKER = {
-  key: "saiy_worker", L: 6,
-  head: { len: 0.22, width: 0.21, height: 0.15, shape: "heart", notch: 0.05 },
-  eyes: { size: 0.24, pos: 0.5, height: 0.22, ocelli: false, smooth: true },
-  antenna: { segments: 12, scape: 1.2, funiculus: 1.25, club: 0, thick: 0.0115, smooth: true },
-  mandible: { type: "triangular", len: 0.4, teeth: 7, width: 0.58 },
-  meso: { len: 0.34, width: 0.12, height: 0.135, smooth: true },
+  key: "saiy_worker", L: 6, real: true,
+  // a minor (C. pennsylvanicus HL 1.58-2.56, HW 1.24-2.34 mm, CI 78-91): longer than wide, narrowing a little
+  // forward, the back nearly straight; eyes (EL ~ 0.25 HL) set behind the middle of the sides
+  head: { len: 0.245, width: 0.205, height: 0.155, shape: "round", notch: 0.02 },
+  eyes: { size: 0.25, pos: 0.42, height: 0.24, ocelli: false, smooth: true },
+  // long scapes (SI 100-118: they pass the back of the head by half their length), no club
+  antenna: { segments: 12, scape: 1.12, funiculus: 1.35, club: 0, thick: 0.0112, smooth: true },
+  mandible: { type: "triangular", len: 0.38, teeth: 5, width: 0.58, spec: SAIY_WORKER_JAW, open: 0.7 },
+  // one smooth, even arch (WL ~ 1.45 HL), the pronotum sloping into the neck
+  meso: { len: 0.355, width: 0.125, height: 0.14, smooth: true, neck: 0.2 },
   waist: { nodes: 1, len: 0.05, scale: true, nodeH: 0.13 },
-  gaster: { len: 0.38, width: 0.22, height: 0.18, sting: false },
-  legs: { hind: 1.1, thick: 0.0135 },
-  look: SAIY_LOOK, hair: 0.3, stance: 0.15,
+  gaster: { len: 0.36, width: 0.235, height: 0.2, sting: false },
+  // leggy (fore femur ~ 0.95 HL)
+  legs: { hind: 1.18, thick: 0.0135 },
+  look: SAIY_LOOK, hair: 0.3, setae: SAIY_SETAE, stance: 0.16,
   // six separate swept-back spikes, exact recipe from brief 07 (head-local, units of head length)
   hair6: { flat: 0.75, sag: 0.06, curl: 0.05, twist: 0.6, strands: 5, strays: 8, rough: 0.46, cap: { at: [-0.15, 0.3], r: [0.42, 0.14, 0.36] }, spikes: [
     { at: [0.10, 0.38, 0], yaw: 0, pitch: 12, len: 0.85, w: 0.45 },
@@ -38,29 +53,32 @@ const SAIY_WORKER = {
 };
 const SAIY_SOLDIER = {
   ...SAIY_WORKER, key: "saiy_soldier", L: 9,
-  // allometric: broader, squarer head with heavier mandibles; sturdier legs; slightly shorter relative legs
-  head: { len: 0.26, width: 0.27, height: 0.18, shape: "square", notch: 0.03 },
-  eyes: { size: 0.19, pos: 0.52, height: 0.2, ocelli: false, smooth: true },
-  antenna: { ...SAIY_WORKER.antenna, scape: 1.0, funiculus: 1.15 },
-  mandible: { type: "massive", len: 0.4, teeth: 6, width: 0.7 },
-  meso: { len: 0.33, width: 0.135, height: 0.15, smooth: true },
-  gaster: { len: 0.36, width: 0.22, height: 0.18, sting: false },
-  legs: { hind: 1.0, thick: 0.0155 },
-  look: { ...SAIY_LOOK, head: L(0x0a090e, 0.28, 0.6, 0.22, 0x1c1e30) },
+  // a Camponotus major (HL 2.62-3.16, HW 2.68-3.34 mm, CI 102-106): a broad head, wider than long, the sides convex
+  // and narrowing forward, the back concave; heavier five-toothed jaws; sturdier, relatively shorter legs
+  head: { len: 0.26, width: 0.27, height: 0.19, shape: "heart", notch: 0.07 },
+  eyes: { size: 0.22, pos: 0.4, height: 0.22, ocelli: false, smooth: true },
+  antenna: { ...SAIY_WORKER.antenna, scape: 0.93, funiculus: 1.3 },
+  mandible: { type: "triangular", len: 0.4, teeth: 5, width: 0.7, spec: SAIY_SOLDIER_JAW, open: 0.6 },
+  meso: { len: 0.34, width: 0.135, height: 0.15, smooth: true, neck: 0.2 },
+  gaster: { len: 0.35, width: 0.24, height: 0.2, sting: false },
+  legs: { hind: 1.08, thick: 0.0165 },
+  look: { ...SAIY_LOOK, head: L(0x0b0a0e, 0.4, 0.34, 0.05, 0x1a1d2c) },
   hair6: { ...SAIY_WORKER.hair6, wMul: 1.15, lenMul: 1.05, strands: 7, twist: 0.45, cap: { at: [-0.15, 0.3], r: [0.44, 0.16, 0.38] } },
 };
 const SAIY_QUEEN = {
   ...SAIY_WORKER, key: "saiy_queen", L: 14,
-  head: { len: 0.16, width: 0.16, height: 0.11, shape: "heart", notch: 0.04 },
-  eyes: { size: 0.22, pos: 0.5, height: 0.22, ocelli: true, smooth: true },
-  antenna: { ...SAIY_WORKER.antenna, scape: 1.05, funiculus: 1.15 },
-  mandible: { type: "triangular", len: 0.36, teeth: 7, width: 0.58 },
-  meso: { len: 0.3, width: 0.17, height: 0.19, queen: true },
-  waist: { nodes: 1, len: 0.035, scale: true, nodeH: 0.11 },
-  gaster: { len: 0.5, width: 0.29, height: 0.24, sting: false },
-  legs: { hind: 0.72, thick: 0.0125 },
+  // a dealate Camponotus queen (HL 3.10-3.52, HW 3.38-3.80, WL ~ 5.7 mm): a broad head with large eyes and three
+  // ocelli, the big mesosoma with its scutum, scutellum and wing scars, a large gaster
+  head: { len: 0.2, width: 0.215, height: 0.15, shape: "round", notch: 0.03 },
+  eyes: { size: 0.26, pos: 0.45, height: 0.24, ocelli: true, smooth: true },
+  antenna: { ...SAIY_WORKER.antenna, scape: 0.87, funiculus: 1.3 },
+  mandible: { type: "triangular", len: 0.36, teeth: 5, width: 0.6, spec: SAIY_QUEEN_JAW, open: 0.6 },
+  meso: { len: 0.35, width: 0.185, height: 0.2, queen: true },
+  waist: { nodes: 1, len: 0.04, scale: true, nodeH: 0.11 },
+  gaster: { len: 0.43, width: 0.3, height: 0.25, sting: false },
+  legs: { hind: 0.88, thick: 0.0128 },
   look: { ...SAIY_LOOK, meso: L(0x0e0d12, 0.34, 0.45, 0.2, 0x1e2032), gaster: L(0x0a090d, 0.26, 0.6, 0.3, 0x2a2426) },
-  wingScars: true, stance: 0.12,
+  wingScars: true, stance: 0.14,
   // queen: spikes 1-3 x1.5 length, 4-6 unchanged
   hair6: { ...SAIY_WORKER.hair6, queen: true, strands: 8, rough: 0.36, curl: 0.09, spikes: SAIY_WORKER.hair6.spikes.map((s, k) => k < 3 ? { ...s, lenMul: 1.5 } : s) },
 };
