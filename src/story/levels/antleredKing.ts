@@ -5,14 +5,15 @@ import { rain, surprisePool, wanderer, windfall } from '../surprises';
  * Chapter 1, level 5 — "The Antlered King" (claude/story/06-spec-levels-5-7-and-lengths.md §3; map
  * src/maps/story/oakWoods.ts). The colony moves into old oak woods where male stag beetles of every size fight over the
  * sap of a wounded oak. Four stages:
- *  1. Settle the woods: build up; a minor and a small male wander through (big beetles need many ants; ants can climb
- *     onto them);
+ *  1. Settle the woods: build up; a minor male walks through, a small male comes to the clearing and stays until he is
+ *     brought down (big beetles need many ants; ants can climb onto them);
  *  2. The sap run: the oak weeps sap (a food landmark: honeydew drops every 45 s); two males meet there and wrestle,
  *     the bigger throws the smaller; the colony must hold the sap;
- *  3. Rivals in the woods: medium and large males come and go, two more wrestle in the clearing, surprise events;
+ *  3. Rivals in the woods: a medium male comes and goes, the large male holds the sap and keeps coming to the shelf until
+ *     he is killed, two more wrestle in the clearing, surprise events;
  *  4. The Antlered King: the major male (the stag beetle titan) comes down from his stump. Every attack is telegraphed
  *     (his own program: grab-and-toss, shoving through the swarm, rear-and-slam when enraged); at 45 % lesser males
- *     arrive from the woods; at 25 % he digs into the nest.
+ *     arrive from the woods; at 25 %, or after three minutes at the doorstep, he digs into the nest.
  * Win: kill him. Lose: the queen dies. Reward: the trait Antler Plating (story only, STORY.traits). The level aims at
  * 35–45 minutes on Normal.
  */

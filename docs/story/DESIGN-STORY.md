@@ -112,10 +112,10 @@ its far east end (the flank; a caption hints at it). No dangerous creatures (the
 | 1 Landfall | raise 10 workers, 2 worker brood tiles, a food store, gather 60 food, store 8 wood | opening flight (Lasius nest → meadow → the shore); the castaway queen walks from the puddle into her nest; a ground beetle walks the shore, stops and watches her, then leaves the map; the cutworm patrols by the fruit; Lasius workers tend the aphids (drumming, trophallaxis poses); tips: dig, tiles, foraging, wood, ramps |
 | 2 First contact | kill 4 black garden ants, raise 18 ants | two Lasius scouts walk down the stone steps, stop at the edge of the player's ground, antennate, walk back up (then the normal AI) |
 | 3 Stolen genes | steal the Black Garden Ant Soldier, raise 3 | captions on what she does with the dead, aphid farming, the soldier's arrival |
-| 4 Raid the garden | take the aphid plants (8 ants), kill the black garden ant queen | rival raids allowed; the flank hint; the long-lived queen fact |
+| 4 Raid the garden | take and hold the aphid plants (8 ants for 2 min; reaching them was enough until 2026-11-06), kill the black garden ant queen | rival raids allowed; the flank hint; the long-lived queen fact |
 | level-wide | — | at 10 min: the first Lasius raid (2 soldiers, 5 workers; a wave) gathers on the steps, charges the nest, guards, goes home |
 
-Medals: time gold ≤ 20 min, silver ≤ 32; losses gold ≤ 25, silver ≤ 60; bonus "steal the Black Garden Ant Soldier before
+Medals: time gold ≤ 28 min, silver ≤ 40; losses gold ≤ 25, silver ≤ 60; bonus "steal the Black Garden Ant Soldier before
 the first Lasius raid".
 
 Surprise events (§6): a red wood ant column crossing the garden (a visiting party); the ground beetle back, hunting the
@@ -164,7 +164,7 @@ fire ants' main route), a root ramp at the far east end (the flank), and two ram
 |---|---|---|
 | 1 Settle the bank | raise 16 ants, 2 food stores, gather 120 food | opening flight (the river → the mound → the player's start); a foraging column walks the trail from the mound to the seed patch and back, the camera following it; washed-up food and seed scatters placed |
 | 2 The swarm | survive the swarm | three majors hold at the top of the wide slope in threat pose while the swarm gathers; on `swarmGo` it charges the player's nest down the slope (hold its foot), guards, then goes home |
-| 3 Majors | steal the Tropical Fire Ant Major | majors and soldiers guard the two seed patches on the high bank (guard cue, 70 mm) |
+| 3 Majors | steal the Tropical Fire Ant Major | majors and soldiers guard the two seed patches on the high bank (guard cue, 70 mm); 10 and 20 minutes in, two more majors and a soldier come down from the mound to each patch in turn (guards lost to a mantis, or killed with no one to carry them home, left nothing to steal: a person-pace playtest, 2026-11-06) |
 | 4 The river rises | ride out the flood (100 s) | the margin floods after a 25 s warning (`floods.ts`, scripted); the pill bug and cutworm on the margin flee up the ramps first. Rafts: not built (the flood system has no floating bodies); the caption tells the fact instead |
 | 5 Take the mound | kill the fire ant queen | both ramps; the flank hint; Dr. Varga's unease line |
 
@@ -182,23 +182,24 @@ silk turret rim); level 0 = the lower terrace by the river with the player's nes
 slope, a root ramp). A developed colony laid out like an AI nest (user 2026-11-02; `nest` in the level, `developPlan` in the map spec, built by
 the colony AI's own `developChambers`): the founding ring of workers round the queen, a 7-hex worker rosette, a 7-hex food
 store by the entrance, 7-hex soldier and 3-hex Lasius soldier and fire major chambers (castes the player owns), highways
-on the tunnels between them (about 29 ants, 140 food), a preparation (Easy 10½ min, Normal 10, Hard 9½, Brutal 9), then her
-rounds (Easy 15 min, Normal 16, Hard 16½, Brutal 17: claude/story/06-spec §7, the level ran 14–17 minutes), then the fight
+on the tunnels between them (about 29 ants, 140 food), a preparation (Easy 11½ min, Normal 11, Hard 10½, Brutal 10), then her
+rounds (Easy 18½ min, Normal 19, Hard 19½, Brutal 20: claude/story/06-spec §7, the level ran 14–17 minutes, then 27½ at a
+person's pace; 30 minutes on every difficulty before the last fight now), then the fight
 to the end, which she starts rested and fed (at least 85 % of her health: `heal`); the light goes toward dusk when she comes out. On her rounds she can be hurt but not killed: at 55 % of her
 health she is hurt no further until the last stage (`ActorDef.floor`), and below 60 % she stays down her burrow.
 
 | Stage | Objectives | Scenes and set pieces |
 |---|---|---|
 | Before the hunt | prepare (the time by difficulty); 14 fighters, 50 ants (optional) | opening flight (the river → her burrow → the nest; a restart skips it, `?retry=1`); she sits at her burrow's mouth (hurt early, she answers with her own program) |
-| Her rounds | hold out (the time by difficulty); 20 fighters, 60 ants (optional) | dusk light 0.3; her rounds: out to the doorstep for 40 s (her own program stalks and pounces), back to the burrow for 75 s, out again; hurt below 80 % she rests 40 s; hurt below 60 % she stays down her burrow until the last stage; four broods of her older spiderlings disperse over the terrace (at 2½, 6½, 10 and 13 min: 5–6 each, × the difficulty's `wave`), each hunting round a ramp for 2½ minutes, then on their own |
+| Her rounds | hold out (the time by difficulty); 20 fighters, 60 ants (optional) | dusk light 0.3; her rounds: out to the doorstep for 40 s (her own program stalks and pounces), back to the burrow for 75 s, out again; hurt below 80 % she rests 40 s; hurt below 60 % she stays down her burrow until the last stage; five broods of her older spiderlings disperse over the terrace (at 2½, 6½, 10, 13 and 16 min: 5–6 each, × the difficulty's `wave`), each hunting round a ramp for 2½ minutes, then on their own |
 | The Spider Mother | kill her | light 0.45; her rounds (a `goto` loop): out to the colony's doorstep, where her own program stalks, pounces on and drags away lone ants, then back to the burrow with her catch, and out again. **Phase 1 (100–60 %)**: hurt below 80 % she goes back to her burrow, passive, healing a little (26 s), then out again. **Phase 2 (60–30 %)**: her spiderlings spill off her back in two groups (at 60 % and 45 %; `bossCuts`). **Phase 3 (30–0 %)**: she comes for the nest, digs a hole wider and walks in breaking soil and stone (`digInto`). Pounces and her rider shake are telegraphed (wind-up, ground marker, sound); riders follow the mounting rules |
 
-Her health 0.7 × 2400 × the difficulty's `boss` (Easy 0.75, Normal 1, Hard 1.1, Brutal 1.2). Medals: time gold ≤ 30 min,
-silver ≤ 40; losses gold ≤ 45, silver ≤ 100; bonus "kill her before she digs into the nest". Reward: the trait
+Her health 0.7 × 2400 × the difficulty's `boss` (Easy 0.75, Normal 1, Hard 1.1, Brutal 1.2). Medals: time gold ≤ 34 min,
+silver ≤ 44; losses gold ≤ 45, silver ≤ 100; bonus "kill her before she digs into the nest". Reward: the trait
 **Spiderling Venom**. The win line now leads on to the oak woods (level 5).
 
 Surprise events (§6): before she hunts, a smaller wolf spider stalking the foragers at the slope's foot, a dead cricket, a
-hot afternoon; during her rounds a ground beetle and a fallen moth, and on Hard and Brutal a second wolf spider.
+hot afternoon; during her rounds a ground beetle, a fallen moth and a dead grasshopper, and on Hard and Brutal a second wolf spider.
 
 ### Level 5 — "The Antlered King" (map `oakWoods`, 1200 × 1000 mm) — new 2026-11-03
 Kept the working title. Old oak woods in the Forest Floor region: a clearing on the woods floor round a big oak whose
@@ -210,13 +211,14 @@ ring, a 7-hex worker chamber, 4 store tiles, 3 soldier tiles). The four stag bee
 
 | Stage | Objectives | Scenes and set pieces |
 |---|---|---|
-| Settle the woods | raise 30, gather 150 food, 8 fighters | opening flight (the stump → the sap oak → the shelf); a minor male walks across the woods (1 min); a small male wanders the clearing (4½ min); tip: big beetles need many ants, riders bite where it can't reach |
-| The sap run | hold the sap flow with 10 ants for 90 s; gather 150 (optional) | the oak weeps sap (honeydew drops every 45 s); a small and a medium male come to the oak, face off and wrestle (`wrestle` action: jaws locked, the bigger throws the other); the loser leaves, the winner guards the sap 2½ min |
-| Rivals in the woods | hold out 8–10 min (by difficulty); kill the large male, 20 fighters (optional) | a medium male guards the root ramp's foot; the large male takes the sap, then comes to the shelf's foot; two more males wrestle in the clearing; the stump hint |
-| The Antlered King | kill him | the titan comes down from his stump along the clearing to the colony's doorstep, fighting what he meets (his own program: grab-and-toss, shoving through, rear-and-slam when enraged — telegraphed); at 45 % two lesser males come out of the woods (a wave); at 25 % he digs into the nest (`digInto`) |
+| Settle the woods | raise 35, gather 200 food, kill the small male | opening flight (the stump → the sap oak → the shelf); a minor male walks across the woods (1 min); a small male comes to the clearing (4½ min) and stays there until he is brought down (the first fight); tip: big beetles need many ants, riders bite where it can't reach |
+| The sap run | hold the sap flow with 12 ants for 2½ min; gather 150 (optional) | the oak weeps sap (honeydew drops every 45 s); a small and a medium male come to the oak, face off and wrestle (`wrestle` action: jaws locked, the bigger throws the other); the loser leaves, the winner guards the sap 2½ min |
+| Rivals in the woods | hold out 10–12 min (by difficulty) and kill the large male; 20 fighters (optional) | a medium male guards the root ramp's foot; the large male takes the sap, then comes to the shelf's foot, and again and again until he is killed (a `goto` loop); two more males wrestle in the clearing; the stump hint |
+| The Antlered King | kill him | the titan comes down from his stump along the clearing to the colony's doorstep, fighting what he meets (his own program: grab-and-toss, shoving through, rear-and-slam when enraged — telegraphed); at 45 % two lesser males come out of the woods (a wave); at 25 %, or after three minutes at the doorstep whatever his health, he digs into the nest (`digInto`): a colony that only waits him out does not stall the level |
 
 Surprise events: a ground beetle at the root ramp's foot, a fallen moth, a summer shower and a beetle brought down by it,
-on Hard and Brutal a small male at the shelf's foot. His health 0.85 × the titan's × the difficulty's `boss`. Medals:
+on Hard and Brutal a small male at the shelf's foot. His health the titan's × the difficulty's `boss` (0.85 until a
+person-pace playtest finished Normal in 22 minutes, 2026-11-06; the stages above were lengthened then too). Medals:
 time gold ≤ 40 min, silver ≤ 52; losses gold ≤ 60, silver ≤ 140; bonus "kill him before he digs into the nest". Reward:
 the trait **Antler Plating** (`STORY.traits.antlerPlating`: +1 armour on every ant of the colony; story only).
 

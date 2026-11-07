@@ -80,6 +80,7 @@ export const EN: Record<string, string> = {
   'fireBanks.swarmDone': 'The swarm is spent. The bank is littered with the dead, and her workers are already carrying them home.',
   'fireBanks.majors': 'The square-headed majors rarely hunt. Their blunt jaws crack seeds, and the colony keeps the grain in its chambers.',
   'fireBanks.genes': 'She wants the majors. Their bodies are worth more to her than any number of small workers.',
+  'fireBanks.moreMajors': 'More majors come down from the mound to the seed piles. The colony does not leave its grain unguarded for long.',
   'fireBanks.stolen': 'Fire ant majors, raised by a queen that is not a fire ant. She took this in a single season.',
   'fireBanks.river1': 'The river is rising. Everything living on the low margin is heading for higher ground.',
   'fireBanks.river2': 'Fire ants ride out floods on rafts of their own linked bodies. The trick is best known from a cousin, the red imported fire ant.',

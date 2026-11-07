@@ -112,8 +112,10 @@ for (let t = 0; t < minutes * 1200; t++) {
   const keys = killObj?.type === 'killQueen' ? [killObj.rival] : killObj?.type === 'killQueens' ? killObj.rivals : Object.keys(st.rivals);
   const rivalId = keys.map((k) => st.rivals[k]).find((id) => w.colony(id)?.alive) ?? Object.values(st.rivals)[0];
   const rival = w.colony(rivalId);
-  for (const o of S?.objectives ?? []) {
+  for (const [oi, o] of (S?.objectives ?? []).entries()) {
     if (target) break;
+    // (a goal already met is not chased again: the next one is, as a player would)
+    if (m.goals[oi]?.done) continue;
     if ((o.type === 'stealCaste' || o.type === 'killAnts') && c.living >= 12) {
       // the nearest rival ant on the surface (of the caste wanted, when stealing it), within reach of home; a bigger army
       // goes further out for it, as a player would once the rival stopped coming

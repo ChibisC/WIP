@@ -48,6 +48,10 @@ export const FIRE_BANKS_LEVEL: StoryLevelDef = {
     swarm: { ants: [['fire_minor', 22], ['fire_soldier', 5]], colony: 'fire', at: 'slopeTop', face: 'playerNest', spawn: 'action', wave: true, label: 'the swarm' },
     guardsA: { ants: [['fire_major', 2], ['fire_soldier', 2]], colony: 'fire', at: 'seedA', spawn: 'action', label: 'the seed guards' },
     guardsB: { ants: [['fire_major', 2], ['fire_soldier', 2]], colony: 'fire', at: 'seedB', spawn: 'action', label: 'the seed guards' },
+    // (more majors come down to the seeds if the colony has not taken any genes ten minutes in: guards lost to a mantis or
+    // killed with nobody to carry them home left nothing to steal, a person-pace playtest of Easy, 2026-11-06)
+    guardsC: { ants: [['fire_major', 2], ['fire_soldier', 1]], colony: 'fire', at: 'slopeTop', spawn: 'action', label: 'the seed guards' },
+    guardsD: { ants: [['fire_major', 2], ['fire_soldier', 1]], colony: 'fire', at: 'slopeTop', spawn: 'action', label: 'the seed guards' },
     ...EV.actors,
   },
   scenes: EV.scenes,
@@ -109,6 +113,7 @@ export const FIRE_BANKS_LEVEL: StoryLevelDef = {
         { key: 'majors', at: 4 },
         { key: 'genes', at: 60 },
         { key: 'stolen', on: 'caste:fire_major' },
+        { key: 'moreMajors', at: 600 },
       ],
       events: [
         { actions: [{ do: 'spawn', actor: 'guardsA' }, { do: 'spawn', actor: 'guardsB' }, { do: 'music', mood: 'tense' }] },
@@ -118,6 +123,8 @@ export const FIRE_BANKS_LEVEL: StoryLevelDef = {
       scenes: [
         { actor: 'guardsA', cues: [{ guard: 'seedA', r: 70 }] },
         { actor: 'guardsB', cues: [{ guard: 'seedB', r: 70 }] },
+        { actor: 'guardsC', at: 600, cues: [{ walkTo: 'seedA', speed: 0.8, timeout: 150 }, { guard: 'seedA', r: 70 }] },
+        { actor: 'guardsD', at: 1200, cues: [{ walkTo: 'seedB', speed: 0.8, timeout: 200 }, { guard: 'seedB', r: 70 }] },
       ],
     },
     {

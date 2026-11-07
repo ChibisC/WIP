@@ -3,7 +3,7 @@ import { heat, surprisePool, wanderer, windfall } from '../surprises';
 
 /**
  * Surprise events (claude/story/06-spec §6): before she hunts, a wolf spider stalking the foragers, a dead cricket, a hot
- * afternoon; during her rounds a ground beetle and a fallen moth, on Hard and Brutal a second wolf spider.
+ * afternoon; during her rounds a ground beetle, a fallen moth and a dead grasshopper, on Hard and Brutal a second wolf spider.
  */
 const EV = surprisePool(
   wanderer('stalker', { window: [150, 330], until: 'stage:1', creature: 'wolfSpider', enter: 'evEast', to: 'rampMidFoot', r: 70, s: 110, exit: 'evEast', label: 'a wolf spider', say: 'stalker' }),
@@ -11,6 +11,7 @@ const EV = surprisePool(
   heat('hotAfternoon', { window: [250, 400], until: 'stage:1', chance: 0.6, s: 90, say: 'heat' }),
   wanderer('beetle', { window: [240, 520], after: 'stage:1', until: 'stage:2', creature: 'groundBeetle', enter: 'evWest', to: 'nestApproach', r: 60, s: 100, exit: 'evWest', hp: 0.8, label: 'a ground beetle', say: 'beetle' }),
   windfall('moth', { window: [100, 400], after: 'stage:1', until: 'stage:2', at: 'rampMidFoot', kind: 'insect', model: 'moth', scale: 1.5 }),
+  windfall('grasshopper', { window: [500, 900], after: 'stage:1', until: 'stage:2', at: 'prey', kind: 'insect', model: 'grasshopper', scale: 1.8 }),
   wanderer('stalker2', { window: [420, 640], after: 'stage:1', until: 'stage:2', from: 'hard', creature: 'wolfSpider', enter: 'evWest', to: 'nestApproach', r: 70, s: 100, exit: 'evWest', label: 'another wolf spider' }),
 );
 
@@ -18,7 +19,7 @@ const EV = surprisePool(
  * Chapter 1, level 4 — "The Spider Mother" (claude/story/04-spec-chapter1-four-levels.md §3; map
  * src/maps/story/spiderTerrace.ts). The chapter's first boss: a Carolina wolf spider mother (`hogna`, a titan) whose
  * hunting ground is the sandy terrace above the river. The colony starts developed, with a preparation before she
- * comes out (6½–9 min by difficulty); then she hunts the colony in rounds for 11–13 minutes — out to its doorstep, back to
+ * comes out (10–11½ min by difficulty); then she hunts the colony in rounds for 18½–20 minutes — out to its doorstep, back to
  * her burrow, out again — while her dispersing spiderlings hunt round the terrace in groups and other hunters come
  * (claude/story/06-spec §7: the level ran 14–17 minutes); then the fight to the end. Her three phases:
  *  1. Stalker (100–60 %): she stalks and pounces on lone ants and drags them off (the hogna program); hurt to 80 % she
@@ -62,6 +63,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
     broodB: { creatures: [['spiderling', 5]], at: 'eggB', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
     broodC: { creatures: [['spiderling', 6]], at: 'eggC', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
     broodD: { creatures: [['spiderling', 6]], at: 'eggA', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
+    broodE: { creatures: [['spiderling', 6]], at: 'eggB', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
     ...EV.actors,
   },
   surprises: EV.surprises,
@@ -71,7 +73,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
     {
       name: 'Before the hunt',
       objectives: [
-        { type: 'surviveTime', s: { easy: 630, normal: 600, hard: 570, brutal: 540 }, text: 'Prepare: she hunts at dusk' },
+        { type: 'surviveTime', s: { easy: 690, normal: 660, hard: 630, brutal: 600 }, text: 'Prepare: she hunts at dusk' },
         { type: 'fighters', n: 14, optional: true },
         { type: 'raise', n: 50, optional: true, text: 'Raise 50 ants' },
       ],
@@ -93,7 +95,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
     {
       name: 'Her rounds',
       objectives: [
-        { type: 'surviveTime', s: { easy: 900, normal: 960, hard: 990, brutal: 1020 }, text: 'Hold out while she hunts the colony' },
+        { type: 'surviveTime', s: { easy: 1110, normal: 1140, hard: 1170, brutal: 1200 }, text: 'Hold out while she hunts the colony' },
         { type: 'fighters', n: 20, optional: true },
         { type: 'raise', n: 60, optional: true, text: 'Raise 60 ants' },
       ],
@@ -112,6 +114,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
         { at: 390, actions: [{ do: 'spawn', actor: 'broodB' }] },
         { at: 600, actions: [{ do: 'spawn', actor: 'broodC' }] },
         { at: 780, actions: [{ do: 'spawn', actor: 'broodD' }] },
+        { at: 960, actions: [{ do: 'spawn', actor: 'broodE' }] },
       ],
       scenes: [
         // her rounds: down to the colony's doorstep, where whatever comes near her she stalks and pounces on with her own
@@ -126,6 +129,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
         { actor: 'broodB', at: 390, cues: [{ walkTo: 'rampWestTop', timeout: 120 }, { guard: 'rampWestTop', r: 80, s: 150 }, { release: true }] },
         { actor: 'broodC', at: 600, cues: [{ walkTo: 'nestApproach', timeout: 120 }, { guard: 'nestApproach', r: 80, s: 150 }, { release: true }] },
         { actor: 'broodD', at: 780, cues: [{ walkTo: 'rampMidFoot', timeout: 120 }, { guard: 'rampMidFoot', r: 80, s: 150 }, { release: true }] },
+        { actor: 'broodE', at: 960, cues: [{ walkTo: 'rampWestTop', timeout: 120 }, { guard: 'nestApproach', r: 80, s: 150 }, { release: true }] },
       ],
     },
     {
@@ -158,7 +162,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
     },
   ],
   medals: {
-    time: [30 * 60, 40 * 60],
+    time: [34 * 60, 44 * 60],
     losses: [45, 100],
     bonus: { type: 'killBefore', actor: 'mother', flag: 'motherIn', text: 'Kill her before she digs into the nest' },
   },
