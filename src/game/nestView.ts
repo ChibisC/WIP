@@ -15,12 +15,16 @@ import { jobProgress } from '../sim/jobs';
 import { BALANCE } from '../sim/balance';
 import { HEX_TYPE, HexVisual } from '../render/nest/nestTerrain';
 import { World } from '../sim/world';
+import { Fog } from './fog';
+import { RouteSigns, Sign } from '../render/game/routeSigns';
 import { AS, Colony } from '../sim/types';
 import { CASTES, isTermiteSpecies } from '../sim/species';
 import { MARKER_COLORS, markerRadius } from '../sim/markers';
 import { groupById, raisesAnts } from '../sim/tiles';
 import { antToView, blankView, corpseToView, termiteBroodToView } from './antViews';
 import { casteColour, casteLook } from '../render/casteLook';
+import { NestWater } from '../render/nest/nestWater';
+import { floodCache } from '../sim/nestFlood';
 
 /** Colour of a caste's brood tile and UI (render/casteLook: every caste its own colour and texture). */
 export function casteTint(caste: string): THREE.Color {
@@ -47,6 +51,9 @@ export class NestView {
   readonly trail = new MarkerTrail();
   readonly fx = new CombatFx();
   readonly rings = new ProgressRings();
+  /** tunnel route signs: the warning "!" on a gate, the attacker's hints (render/game/routeSigns.ts, game/fog.ts) */
+  readonly signs = new RouteSigns();
+  private signList: Sign[] = [];
   /** show incubation rings on every larva (tile info overlay) */
   overlay = false;
   private ringItems: RingItem[] = [];
@@ -57,6 +64,11 @@ export class NestView {
   private floorHeight: (x: number, z: number) => number;
   private hexKey = '';
   private views: AntView[] = [];
+  /** underground fog (game/fog.ts): the viewer's fog for this space this frame, null when everything is shown */
+  fog: Fog | null = null;
+  private fogTick = -1;
+  /** the water of a flooding nest (sim/nestFlood.ts), made when the owner's nest first floods */
+  private water: NestWater | null = null;
 
   constructor(
     view: GameView,
@@ -73,7 +85,7 @@ export class NestView {
     this.creatures = new CreatureRenderer('areaCreatures' + space);
     this.hit = new HitboxOverlay('areaHitboxes' + space);
     this.bars = new HealthBars('areaHealthBars' + space);
-    stage.scene.add(this.bars.group, this.hit.group, this.ants.group, this.creatures.group, this.food.group, this.brood.group, this.decor.group, this.markers.group, this.trail.group, this.fx.group, this.rings.mesh);
+    stage.scene.add(this.signs.group, this.bars.group, this.hit.group, this.ants.group, this.creatures.group, this.food.group, this.brood.group, this.decor.group, this.markers.group, this.trail.group, this.fx.group, this.rings.mesh);
     // The nest is a plane: ants walk flat on the floor (and up the entrance ramps), never up the walls (user 2026-11-01).
     this.adapter = {
       toWorld: (x, y, out) => out.set(x, nt.floorAt(x, y), y),
@@ -143,6 +155,20 @@ export class NestView {
   /** Fill all instance buffers for this area as seen from `cam` (owner = the colony whose nest it is; null for caves). */
   update(w: World, owner: Colony | null, player: Colony, cam: THREE.PerspectiveCamera, alpha: number, dt: number, viewportH: number, camDist: number, markerSel: number, time: number, shown: ReadonlyArray<ShownMarker> = player.markers, pendingHexes: ReadonlyArray<{ q: number; kind: string }> = []): void {
     this.updateHexes(w, owner);
+    // the fog: sealed hexes drawn as rock, seen/remembered/dark levels, units hidden out of sight (game/fog.ts)
+    const g = w.nestOf(this.space)!;
+    const fog = this.fog;
+    const nt = this.stage.terrain;
+    if (this.fogTick !== w.s.tick) {
+      this.fogTick = w.s.tick;
+      nt.setSealed(fog?.sealedOf(this.space) ?? null);
+      const lv = fog?.levelsOf(this.space);
+      nt.setFog(lv ? (q) => lv[q] : null);
+    }
+    const vis = fog && fog.hasFog(this.space) ? (x: number, y: number) => fog.visible(g, this.space, x, y) : null;
+    this.creatures.visible = vis;
+    this.food.visible = vis;
+    this.brood.visible = vis;
     const views = this.views;
     let n = 0;
     const take = () => {
@@ -152,11 +178,12 @@ export class NestView {
     for (const a of w.s.ants) {
       if (a.space !== this.space) continue;
       if (a.state === AS.Dead && a.deadT > 30) continue;
+      if (vis && !vis(a.x, a.y)) continue;
       antToView(w, a, take(), 0, 0);
     }
-    for (const f of w.s.food) if (f.space === this.space && f.kind === 'corpse' && f.from.includes('_')) corpseToView(f, take(), 0, f.from);
+    for (const f of w.s.food) if (f.space === this.space && f.kind === 'corpse' && f.from.includes('_') && !(vis && !vis(f.x, f.y))) corpseToView(f, take(), 0, f.from);
     // termite larvae and presoldiers on their tiles: the model kit (eggs stay with the brood renderer)
-    if (owner && isTermiteSpecies(owner.species)) for (const b of w.s.brood) if (b.colony === owner.id && b.stage === 1) termiteBroodToView(b, take(), 0);
+    if (owner && isTermiteSpecies(owner.species)) for (const b of w.s.brood) if (b.colony === owner.id && b.stage === 1 && !(vis && !vis(b.x, b.y))) termiteBroodToView(b, take(), 0);
     const list = n === views.length ? views : views.slice(0, n);
     // creatures first: climbing ants are placed on their animated legs and backs
     this.creatures.update(w.s.creatures, this.space, alpha, dt, this.floorHeight, cam, viewportH);
@@ -170,10 +197,18 @@ export class NestView {
       this.brood.update(w, owner.id, this.map, alpha);
       this.decor.update(w, owner);
     }
-    const nt = this.stage.terrain;
+    // a flooding nest: the river water standing in it and pouring in at the entrance
+    if (owner?.nestFlood) {
+      if (!this.water) {
+        this.water = new NestWater(w.nestOf(this.space)!, nt);
+        this.stage.scene.add(this.water.mesh);
+      }
+      this.water.update(owner.nestFlood, floodCache(w, owner), w.s.time - (1 - alpha) / BALANCE.tickHz);
+    } else this.water?.update(undefined, null, 0);
     this.markers.update(shown, this.space, (x, y) => nt.heightAt(x, y), camDist, (i) => markerRadius(w, player, i), markerSel, time);
     if (owner) this.updateRings(w, owner, owner === player ? pendingHexes : [], time);
     else this.rings.set([]);
+    this.signs.update(fog ? fog.signs(w, player, this.space, this.signList) : [], (x, y) => nt.floorAt(x, y), Math.max(g.R * 0.6, Math.min(g.R * 2.5, camDist * 0.045)), time, cam);
   }
 
   private static JOB_COL = new THREE.Color(0xffd27a);

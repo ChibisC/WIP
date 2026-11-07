@@ -9,6 +9,7 @@ import { exitFieldIn } from './movement';
 import { makeFood } from './factory';
 import { Rng } from '../core/rng';
 import { dcos, dsin } from './dmath';
+import { usableRoute } from './tunnels';
 
 /**
  * Underground areas (Revision 2, DESIGN 3.12). A level has one surface and up
@@ -99,6 +100,10 @@ export function hasRouteHome(w: World, a: { colony: number; space: number; x: nu
   if (!c || !c.alive) return false;
   const home = nestSpace(c.id);
   if (a.space === home) return true;
+  // a story level's visiting party has no nest: on the surface it is never lost (it walks off the map)
+  if (c.visitor) return a.space === SURFACE;
+  // in another nest joined to home by a tunnel route (sim/tunnels.ts): a way home without climbing out
+  if (a.space !== SURFACE && usableRoute(w, a.space, home, a.colony)) return true;
   if (!c.entrances.length) return false;
   if (a.space === SURFACE) return true;
   const flow = w.flowOf(a.space);

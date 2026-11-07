@@ -3,7 +3,7 @@
  * once per frame. Events carry only plain data so the sim stays render-agnostic.
  */
 export type SimEvent =
-  | { t: 'dig'; colony: number; x: number; y: number }
+  | { t: 'dig'; colony: number; x: number; y: number; space?: number }
   | { t: 'spoil'; colony: number; x: number; y: number; space: number }
   /** `by`: the biter (a caste id, or a creature kind); `on`: what was bitten (sound only: never read by the simulation) */
   | { t: 'bite'; x: number; y: number; space: number; strength: number; by?: string; on?: 'ant' | 'creature' | 'food' | 'seed' | 'leaf' | 'brood' | 'wood'; gold?: boolean; riding?: boolean }
@@ -59,6 +59,8 @@ export type SimEvent =
   | { t: 'queenHurt'; colony: number }
   /** a flood zone's storm: warning, rising water or draining (sound, sky and minimap only) */
   | { t: 'flood'; zone: number; phase: 'warn' | 'rise' | 'drain'; x: number; y: number }
+  /** a colony's nest floods (sim/nestFlood.ts): the water starts pouring in, or the nest is full; x, y its anthill on the surface */
+  | { t: 'nestFlood'; colony: number; phase: 'start' | 'full'; x: number; y: number }
   | { t: 'queenDead'; colony: number }
   | { t: 'colonyLost'; colony: number }
   | { t: 'food'; colony: number; amount: number }
@@ -71,6 +73,12 @@ export type SimEvent =
    */
   | { t: 'story'; what: 'shot' | 'music'; shot?: StoryShotData; mood?: string }
   | { t: 'invasion'; colony: number }
+  /** tunnel routes (sim/tunnels.ts): a defender warned of digging toward its gate (once), the dig sound from behind the wall, a route opened */
+  | { t: 'tunnelWarn'; colony: number; by: number; route: number; space: number; x: number; y: number; q: number }
+  | { t: 'tunnelDig'; colony: number; route: number; space: number; x: number; y: number }
+  | { t: 'tunnelOpen'; route: number; a: number; b: number; spaces: number[]; x: number[]; y: number[] }
+  /** a route's gate joined its nest's dug floor: `by` the colony that dug in (−1: the owner's own digging reached the gate) */
+  | { t: 'tunnelBreach'; colony: number; by: number; route: number; space: number; x: number; y: number; open: boolean }
   /** a player command was applied (ok) or ignored (why) — clears the issuer's pending feedback */
   | { t: 'command'; player: number; seq: number; type: string; ok: boolean; why?: string }
   | { t: 'wave'; index: number; total: number; label: string };

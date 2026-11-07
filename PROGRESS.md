@@ -1773,6 +1773,64 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
 - Round 4 ratings (2026-11-03): every item 8, approved with one change — the soldier drums in bursts while walking or
   charging at a foe (`drumWalking`; anim lab `tdrumwalk`).
 
+
+
+## 2026-11-03 — Nests flood; a colony with nowhere to go goes all-out (`feature/nest-flood`)
+- **Spec**: claude/story/06-spec-levels-5-7-and-lengths.md §4 (level 6 "High Water"): the pieces the level is built on
+  (the level itself, its rising river and terraces, is built separately and calls this API). DESIGN.md 3.12c.
+- **`sim/nestFlood.ts`** (`NEST_FLOOD` in balance.ts): `startNestFlood(w, colony, { fillSec?, delaySec? })`,
+  `nestFloodFraction`, `isHexFlooded`, `floodedAt`, `forceAllOut`; the system `nestFlood`; the event
+  `{ t: 'nestFlood', colony, phase: 'start' | 'full', x, y }`; state `Colony.nestFlood` (+ `uw` / `fl` / `flB` on units).
+  The water pours in at the entrance and fills the nest deepest first — depth = steps along the tunnels from the
+  entrance's top, so it pools in the far chambers and backs up to the entrance — one hex at a time at a steady inflow,
+  in `fillSec` (45 s). Under water: 6 s of breath, then 10 % of the maximum health a second (16 s from full health; brood
+  10 s; creatures 5 %/s); swimming at 0.45 × speed. The colony's ants at home climb ahead of the water (2 hexes clear)
+  and wait above it, carrying the brood that lies just above the waterline; jobs near the water stop. Tiles under water
+  stop working: no eggs, larvae stop, nothing built, stores hold nothing (the food above the dry stores' capacity is
+  lost), pastures and warming tiles give nothing, no tile placed, no digging from the water; a queen under water lays no
+  eggs. A full nest drowns everything inside; the queen's death ends the colony (and, the usual rule, its ants outside
+  die within 30 s).
+- **All-out** (`warAI.startAllOut` / `allOutTick`): every group but the queen's own (her nurses) on the target's queen,
+  marker III with "no gathering", re-placed every think; no defence, retreat, gathering, ally help or foraging, until she
+  or the colony is dead. Skirmish AI unchanged: a 10-min four-AI skirmish has the same state hash before and after the
+  change (`b6d28049b969bc58`), and the flood system leaves a skirmish's hash as it was (`tests/nestFlood.ts`).
+- **Look** (`render/nest/nestWater.ts`): murky, silty water standing in the flooded hexes, rising up the wall slopes
+  over 2.5 s per hex to 0.6 of the wall height (a crisp, frothy waterline; never more than 84 % opaque, so the ants show
+  through); while it fills, a stream pours over the top of the ramp as a wide sheet and runs down the tunnels to every
+  place the pool begins. The nest minimap tints flooded hexes. Dev URL `?floodNest=<colony>&floodAt=<s>[&floodFill=<s>]`.
+  Sheet: `docs/story/shots/nest_flood_sheet.jpg` (before / during / late / after; `tests/browser/nest_flood.py`).
+- Measured (seed 11, a 74-hex developed Lasius nest): the queen's hex (depth 7 of 13) went under 28 s into a 45 s fill,
+  she drowned 16 s later, the nest was full at 44.4 s; the home ants ended on the ramp with the brood and drowned there.
+  An all-out by a 39-ant Lasius colony on a small colony 580 mm away: in its nest at 60 s, its queen dead at about 110 s.
+- Checks: `tests/nestFlood.ts` (new, in `npm test`), `npm test`, `check-determinism`, `tsc`, the build.
+
+## 2026-11-03 — Stag beetle males of four sizes (claude/story/06-spec-levels-5-7-and-lengths.md §2)
+- **Four normal creatures** (`feature/stag-sizes`): `stagMinor`, `stagSmall`, `stagMedium`, `stagLarge` (*Lucanus cervus*,
+  45 / 55 / 70 / 85 mm, ai `stagMale`), the titan's model at male sizes 0–3 (heads and antlers by the allometry; the model
+  drawn forward so the body is centred on them, the outline from elytra apex to antler tips: `stagMaleGeom`). Not
+  bosses, never raid nests; large creatures for mounting (climb and height data regenerated: only additions).
+- **Moves** (`BALANCE` `STAG_MALE`, creatureAI.ts `stagMale`): the titan's, scaled down — a slow walk that shoves ants
+  aside, a pinch on what fights it (threat first), the antler grab and toss for the medium and large males, the rear and
+  slam plus the rider shake-off for the large one. A male pivots to bite ants on its flanks (they were out of reach).
+- **Wrestling** (`stagWrestle.ts`): two males meeting with no ants about face off, lock antlers and shove, then the
+  winner (the bigger one mostly) lifts the other and throws it on its back; it rights itself and walks off; nobody is
+  hurt; ants or a hit break it off. `startStagWrestle(w, a, b)` lets the story director stage a bout. Deterministic
+  (draws at the start from `w.rng`; the rest a function of the sim time).
+- **Balance** (`tools/balance-matrix.ts -- stags`, docs/balance/castes.md "Stag beetle males"): a minor male takes about
+  10 black garden ant workers, a small one 15, a medium one 20–22 workers or 7–8 soldiers, a large one 40–45 workers
+  or 12 soldiers, each killing many of them (armour 1 / 1.5 / 1.5 / 1.5; health 230 / 400 / 760 / 1150).
+- **Skirmish**: wild on forest and rainforest maps only (`CreatureKind.biomes`; other maps' spawn lists, and so their
+  games, unchanged), rarer than the common creatures, the large male rarest. **Arena**: all four in the roster (first
+  fact in the tooltip); clicking any creature now opens an info card (kind, team, health, what it is doing, its facts;
+  the stag beetles' male size and antler length). **Audio**: beetle family, antler clash pitched by size.
+- The titan unchanged: its stats, moves, model and climbing data; a titan fight, a meadow skirmish with wild creatures
+  and the titan's posed model all match `main` bit for bit.
+- Checks: `tests/stagSizes.ts` (new, in `npm test`); `tsc`; `npm test` (every suite passes; the arena's 600-unit
+  timing check read 25.5 ms against its 25 ms limit once with the machine at load 6 on 2 CPUs, 21.7 ms run alone);
+  `check-determinism`; the build. Shots: `docs/creatures/shots/stag_sizes_*.jpg` (`tests/browser/stag_sizes.py`):
+  the four males beside the titan from above and the side, workers on a medium male, and a bout (face-off, locked, the
+  lift, the loser on its back).
+
 ## 2026-11-03 — Story titans always get inside; titans open holes more easily (all modes)
 User specs `claude/story/05-spec-story-titans-get-inside.md` and `claude/creatures/02-spec-easier-titan-holes.md`
 (branch `fix/story-titans-inside`, both on one branch). Plan, evidence and results: `CHANGE_PLAN.md` §26; design:
@@ -1800,8 +1858,131 @@ User specs `claude/story/05-spec-story-titans-get-inside.md` and `claude/creatur
   skirmish raids unchanged). Playtests (`STRATEGY=hole` new): both levels won on every difficulty (the Spider Mother on
   Brutal on one seed of three that reach her fury). Protocol `ud-mp-11`. Dev: `?story=<level>&stage=N&titan=1`.
 
+## 2026-11-06 — Stag beetle fore legs: the spiked blade ahead of the head (branch `fix/stag-front-legs`)
+User (2026-11-06): "a weird protruding thing in front of the stag beetles, at the front legs". Sheets:
+`docs/realism/stag/` (before and after, every male size in four views and the poses; `tests/browser/stag_legs.py`).
+- **What it was**: the separate fore tibia part `stag_tibia1` (`stagBeetle.ts segGeo('tibia1')`), drawn by
+  `partFrame` with `side = (0, 1, 0)` so its wide, toothed axis lay in the vertical plane: a paddle flaring to twice
+  its base width (radius 0.7 → 1.45 thicknesses), four 1 mm teeth and the apical spurs all pointing ahead and down,
+  reading from the game camera as one dark spike in front of each fore leg. Nothing else protruded: the joints,
+  feet, the rig and `builders.ts`'s old primitive stag are untouched (`tools/creature-hash.ts -- dump`: every other
+  drawn stag part identical before and after; the 13 other creatures' hashes unchanged).
+- **Fix at the source** (so every size, LOD and pose gets it): the fore tibia is slender and nearly parallel-sided
+  (0.72 → 1.02 thicknesses at 0.62 × 0.5 of the leg thickness: about 1.8–2.4 mm wide and 1.2 mm deep on the 100 mm
+  boss, an eighth of its length), bowing a little outward, with four small teeth growing toward the apex on the
+  outer edge, the apex forked into two prongs (the largest tooth, 1.3 mm) and two short spurs on the inner face —
+  as on *Lucanus cervus* (teeth along the outer margin, the apex bifurcate, two apical spurs; reference photos
+  study-only). It is placed with `side = (0, 0, ±1)`: the toothed edge faces away from the body and the flat face
+  lies level, as the legs are held beside and ahead of the head. The feet keep their places (rest fore foot at
+  0.19 L, the jaws of the boss reach 0.5 L), so `tools/climb-data.ts` and `tools/height-data.ts` regenerate unchanged.
+- The far-zoom creature "impostor" is a blob ellipsoid (`creatureRenderer.ts blob`), so nothing to re-bake; the
+  smaller males (sizes 0–3) exist only in the labs (`msize`) until `feature/stag-sizes` lands — fixed there too.
+- New: `tools/creature-hash.ts` (save/check/dump creature-model fingerprints, like `morph-hash.ts` for ants) with
+  the baseline `tests/data/creature-hashes.json`.
+
+## 2026-11-07 — Performance pass: faster in every mode, smooth switching, no loss of looks
+User spec `claude/performance/01-spec-performance-no-visual-loss.md` (branch `feature/performance`). Plan and as-built:
+`CHANGE_PLAN.md` §25; numbers, findings and what was not done: `docs/performance.md`; golden set:
+`docs/performance/golden/`.
+- **Measuring:** F3 is a profiler (frame and main-thread times by part, GPU time where measurable, draw calls, programs,
+  textures, GL work since loading, an estimate of GPU memory, a hitch log naming each frame over 33 ms's causes);
+  `?bench=1` and Menu → Graphics → **Run the benchmark** (six scenes, a report to copy); the golden set (35 shots,
+  compared by SSIM) and the switching probe (`tests/browser/switch_probe.py`).
+- **Switching:** loading pre-warms every space (each model built once and shared, every scene compiled and drawn once
+  with shadows); new models are warmed in the background; other areas are kept current in 3 ms slices, and the area
+  about to show is brought up to date under the fade; nothing is drawn behind a fully opaque fade. On the build
+  machine the first visit to the home nest went from a 119.6 s frame to 11 ms, area 3 from 13.5 s to 41 ms, the worst
+  first visit is now 89 ms (SwiftShader, Medium).
+- **Every mode:** empty instanced meshes hidden; the AO copy skipped when AO is off; dynamic resolution (to 75 %, with a
+  light sharpen) before auto quality drops a preset; the worker's slow state as per-field deltas (16 % of the bytes);
+  the nest distance field 3× faster (same result to the bit); HUD writes only when changed; ant LOD cross-fade with
+  hysteresis (packed into `aE.z`: the ant shader is at 16 attributes); frame cap 30 / 60 / screen (phones 60); a GPU
+  memory estimate with a 600 MB phone budget; each player's tick and frame time in multiplayer.
+- **Looks:** 35 of 35 golden shots match `main` (`docs/performance/golden/compare-after.md`).
+- **Tests:** `tests/performance.ts` (slow-state deltas rebuild the replica exactly; fingerprints; the `aE.z` packing;
+  the distance field to the bit; sliced terrain updates end with the full rebuild's mesh; the frame cap; settings).
+- **Not done:** KTX2, an IndexedDB bake cache, cached static shadows, the termite kit's LOD cross-fade (why:
+  `docs/performance.md`). The protocol is unchanged (`ud-mp-11`): the new pong/delay fields are optional and the
+  simulation is untouched.
+
+## 2026-11-06 — Chapter 1 is seven levels; surprise events; longer levels (`feature/story-ch1-7`)
+- **Spec**: claude/story/06-spec-levels-5-7-and-lengths.md (user decisions 2026-11-03). Design: docs/story/DESIGN-STORY.md
+  (levels 5–7, "Surprise events", the framework, §8 the playtest table, §10 sources). Helpers' branches merged in:
+  `feature/stag-sizes` (four stag beetle males, wrestling) and `feature/nest-flood` (nests flood, all-out), each with its
+  own entry above; main's "story titans always get inside" merged and combined.
+- **Campaign**: The Garden Below → The Long Nights → Fire on the Banks → The Spider Mother → **The Antlered King**
+  (Forest Floor, map `oakWoods`) → **High Water** (Riverbank, `floodHill`) → **Carton Kingdom** (Rainforest,
+  `rainforestEdge`). Both regions unmisted in chapter 1; old saves keep their progress; the chapter's closing line moved
+  to level 7.
+- **The Antlered King**: five stages — settle the woods and bring down a small male; hold the sap flow (12 ants, 2½ min)
+  while two males wrestle there (`wrestle` → `startStagWrestle`); hold the woods 10–12 min and kill the large male (he
+  keeps coming back); the old stump (he sees off a younger male without a fight; the colony rebuilds); the titan (0.85
+  of the titan's health; two lesser males at 45 %; digs in at 25 % or after three minutes at the doorstep; softer bites
+  inside, like the Spider Mother's). The oak's sap drips every 45 s to the end. Reward: the trait **Antler Plating** (+1
+  armour, story only). Bonus: kill him within a minute of his breaking in.
+- **High Water**: the colony on the summit, three Lasius colonies below; four warned rises (`floodNests` → each nest
+  under water floods underground; each colony goes all-in on the summit about two minutes before); win when all three
+  are gone. Rival sizes do not grow with the difficulty (`RivalDef.fixedSize`), only strength and aggression. Medals:
+  food stored, losses, `deadBefore`.
+- **Carton Kingdom**: two allied mature conehead termite colonies (`team`, `income` 0.6 food/s); six stages — settle
+  (60 ants, 300 food, 30 wood); steal the **Conehead Termite Sprayer** while escorted foraging parties come to the hollow;
+  the termites answer (the north raids, then the east); an army of 40; the two nests. A shower fills the hollow, the
+  alates fly after it.
+- **Surprise events** in all seven levels (`src/story/surprises.ts`, `sim/story/surprises.ts`): seeded at the start,
+  chance × the difficulty's `events`, one big at a time; visiting columns of other species (nestless `Colony.visitor`),
+  wanderers, windfalls, showers (falling rain `render/rainFX.ts`, wet ground) and hot spells (`STORY.heatSpeed`), rival
+  parties. Per-level lists in DESIGN-STORY.
+- **Lengths** (claude/story/06-spec §7): the Long Nights has four nights (38.8 min; the tarantula 40 s into the fourth,
+  softer inside on Hard and Brutal); the Spider Mother hunts in rounds for 18½–20 minutes after a 10–11½ minute
+  preparation (about 32 min); Fire on the Banks sends more seed guards 10 and 20 minutes in; the Garden gets The garden
+  answers before its raid (hold the nest 5–6 min against two Lasius parties).
+- **Fixes found on the way**: a new stage's timed scenes read the old stage's clock until the mission entered it (the
+  Spider Mother's broods came out together); the boss floor is now the higher of the level's (`ActorDef.floor`) and the
+  dig-in's; "A European stag beetle is digging…", not "An european".
+- **Playtests at a person's pace** (`PACE=human JSON=1 npx vite-node tools/playtest-story.ts -- <level> <diff> <min>
+  <seed>`): a look every 15 s, a target acted on the second look, bigger armies before an assault, defends at home
+  (hunters, then raiders), steals from any of the level's rivals, forages when starving, goes with 70 % of its army
+  after 20 min, sends the nurses at a boss inside. Fixed: it chased goals already met (the reason the Garden "ran over
+  50 minutes"). Debug logs `DEATHS`, `NEAR`, `TARGETS`. Table in DESIGN-STORY §8:
+  | level | Easy | Normal | Hard | Brutal |
+  |---|---|---|---|---|
+  | The Garden Below | won 23.0 / won 17.5 | won 27.0 / won 19.8 | won 45.8 / won 30.5 | won 74.5 / won 35.0 |
+  | The Long Nights | won 38.8 / won 38.8 | won 38.8 / won 38.8 | won 38.8 / won 38.8 | won 38.8 / won 38.8 |
+  | Fire on the Banks | not in 100 (stage 3) / won 39.8 | won 42.8 / won 42.8 | not in 100 (stage 5) / won 49.0 | not in 100 (stage 3) / not in 100 (stage 3) |
+  | The Spider Mother | won 31.8 / won 35.0 | won 31.8 / won 34.0 | won 32.0 / won 35.0 | won 32.0 / won 31.5 |
+  | The Antlered King | won 33.0 / won 29.3 | won 35.8 / won 35.3 | won 33.3 / won 29.8 | won 36.3 / lost at 39.0 (stage 5) |
+  | High Water | won 34.8 / won 34.8 | won 34.8 / won 34.8 | won 34.8 / won 34.8 | won 34.8 / won 34.8 |
+  | Carton Kingdom | won 20.0 / won 36.3 | won 36.0 / won 23.3 | won 48.0 / won 40.5 | won 45.5 / lost at 15.5 (stage 3) |
+  Under 30 on Normal: the Garden (27.0 / 19.8) and Carton Kingdom seed 11 (23.3). Not won by the bot: Fire on the
+  Banks Easy seed 7, Hard seed 7 and Brutal (left to people, as before), the Antlered King and Carton Kingdom Brutal
+  seed 11.
+- Checks: `tests/storyEvents.ts` (new), `tests/storyCh1.ts` (seven levels), `npm test`, `check-determinism`, the build;
+  browser shots `docs/story/shots/ch1_7/` (`tests/browser/story_ch1_7.py`). Protocol `ud-mp-12`.
+## 2026-11-06 — A shared underground: set tunnel routes between nests, underground fog (CHANGE_PLAN §28)
+User spec `claude/underground/01-spec-shared-underground-tunnels.md` (2026-11-06); branch `feature/shared-underground`.
+Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).
+- **Layout:** every colony nest grid grew a ring of 8 hexes of unbreakable rock (`SOIL_ROCK`; titans don't break it
+  either) round the unchanged 34 × 30 interior. Routes (`sim/tunnels.ts`) are generated at match start: every pair up
+  to 4 colonies, the nearest 3 neighbours without crossings above; each route two halves meeting at the grids' rims,
+  three hexes wide, from a brownish gate on the nest's edge (readable in the dark; away from the flower). Story levels
+  decide (`GameSetup.tunnels`, default none in story). `tools/tunnel-check.ts`: valid on every map, 2–10 colonies.
+- **Digging:** the Dig tool on a gate (`digRoute`, wire 26); one route a colony at a time, pausing keeps progress;
+  the way to the own gate, the own half, the partner's half from across the rim and inward, the breach into its floor;
+  both ends count. 6 workers: 5.7 min alone, 3.6 min with both sides digging (`tests/tunnels.ts`; spec 3–5 min —
+  `TUNNELS.hexWorkMul` 3). Per-caste and per-species `digRate` hooks for digging specialists.
+- **Moving:** units walk through (the crossing at the rim, mirrored), `goToArea`/`goHome`/`goOut`/`hasRouteHome`
+  take routes; creatures use open routes; markers across nests work; dead colonies' routes stay.
+- **Fog (client-side, `game/fog.ts`):** sealed route hexes drawn as rock; an enemy nest reached by tunnel seen only
+  within 5 hexes of your units (remembered dimmed, else dark); hints near the far gate (red !, food, brood, creature
+  marks); the defender's warning (toast, tab alert, red ! on the gate, dig sound) and breakthrough alert.
+- **AI:** tunnel raids by level (Normal from 15 min, Hard 10, Brutal 7), guards at a warned gate, digging to meet on
+  Hard+, allies link nests and send help through. `tools/tunnel-ai-probe.ts` (Brutal, seed 5): the fire ants warned
+  the player at 13.3 min, opened at 13.8, broke in at 14.7; the leafcutter ally linked at 14 min.
+- **Saves:** version 4 — old grids embedded in the margin (everything in the space shifted), routes generated closed;
+  `BUILD_ID` `ud-mp-13` (12 was taken by the story merge). `tests/tunnels.ts` (35 checks) in `npm test`.
+- Stills: `docs/underground/tunnels/` (`tests/browser/tunnels.py`; dev `?tunnel=<stage>`).
 ## 2026-11-06 — Audio v3: every sound effect remade (insect-like, made for this game); no walking or termite idle sounds
-- **User spec** `claude/audio/03-spec-sfx-rework-insect.md` (branch `feature/sfx-insect`; CHANGE_PLAN §27).
+- **User spec** `claude/audio/03-spec-sfx-rework-insect.md` (branch `feature/sfx-insect`; CHANGE_PLAN §28).
 - **Made for this game:** `tools/audio/sfx` renders every effect offline with numpy/scipy from the physics of the
   real sound — chitin clicks (inharmonic modes at 2–12 kHz dying in milliseconds), fracture cascades, file-and-scraper
   stridulation, stick-slip friction, Minnaert bubbles and fizz — 3–6 takes each (401 takes, 103 sounds), trimmed to

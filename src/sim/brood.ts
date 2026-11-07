@@ -6,6 +6,7 @@ import { BALANCE } from './balance';
 import { bindAntToTile } from './colony';
 import { outsideQueenBody } from './termites';
 import { casteOf } from './species';
+import { isHexFlooded } from './nestFlood';
 
 /**
  * Extra brood growth speed from the colony's warming tiles: thatch (red wood
@@ -15,8 +16,11 @@ import { casteOf } from './species';
 export function broodWarmth(w: World, c: Colony): number {
   let thatch = 0;
   let mound = 0;
+  const wet = !!c.nestFlood?.q.length;
   for (const t of c.tiles) {
     if (!t.built) continue;
+    // (a tile under water warms nothing: sim/nestFlood.ts)
+    if (wet && isHexFlooded(w, c.id, t.q)) continue;
     if (t.type === 'thatch') thatch += BALANCE.thatch.broodSpeed[t.level - 1];
     else if (t.type === 'mound') mound += BALANCE.mound.broodSpeed[t.level - 1];
   }
@@ -61,6 +65,8 @@ export function broodSystem(w: World, dt: number): void {
       continue;
     }
     if (b.carrier) continue;
+    // a brood tile under water raises nothing: its larva neither grows nor hatches (sim/nestFlood.ts)
+    if (c.nestFlood?.q.length && isHexFlooded(w, c.id, tile.q)) continue;
     const full = tileAnts(w, tile).length >= tileCapacity(tile);
     const cap = full ? BALANCE.prestage : 1;
     if (b.t < cap) {

@@ -47,6 +47,10 @@ const BLOB: Record<string, number> = {
   antlion: 0x8a7a62,
   spiderling: 0x5b4632,
   stagBeetle: 0x6b2a14,
+  stagMinor: 0x4a2418,
+  stagSmall: 0x52261a,
+  stagMedium: 0x5c281a,
+  stagLarge: 0x652a16,
   tarantula: 0x1c1612,
   scolopendra: 0xc88d2c,
   giantMantis: 0x5f8f2e,
@@ -106,6 +110,11 @@ export class CreatureRenderer {
   private glintPos = new Float32Array(EYESHINE_MAX * 3);
   private glintCol = new Float32Array(EYESHINE_MAX * 3);
 
+  /** Build every creature part now (performance pass, CHANGE_PLAN §25). */
+  prepare(): number {
+    return this.batch.prepare();
+  }
+
   constructor(name = 'creatures') {
     this.group = this.batch.group;
     this.group.name = name;
@@ -146,6 +155,9 @@ export class CreatureRenderer {
    * ticks; `dt` is real frame time (idle motion keeps going while paused,
    * walking only when they move).
    */
+  /** Underground fog (game/fog.ts): a creature out of the viewer's sight is not drawn. */
+  visible: ((x: number, y: number) => boolean) | null = null;
+
   update(creatures: ReadonlyArray<Creature>, space: number, alpha: number, dt: number, ground: GroundFn, camera: THREE.Camera | null, viewportH: number): void {
     this.frame++;
     this.time += dt;
@@ -170,6 +182,7 @@ export class CreatureRenderer {
       if (cr.space !== space) continue;
       const build = BUILDERS[cr.kind];
       if (!build) continue;
+      if (this.visible && !this.visible(cr.x, cr.y)) continue;
       const L = cr.scale || CREATURES[cr.kind]?.length || 10;
       const x = cr.px + (cr.x - cr.px) * alpha;
       const z = cr.py + (cr.y - cr.py) * alpha;

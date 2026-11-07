@@ -1,10 +1,27 @@
 import type { StoryLevelDef } from '../../sim/story/types';
+import { heat, surprisePool, wanderer, windfall } from '../surprises';
+
+/**
+ * Surprise events (claude/story/06-spec §6): before she hunts, a wolf spider stalking the foragers, a dead cricket, a hot
+ * afternoon; during her rounds a ground beetle, a fallen moth and a dead grasshopper, on Hard and Brutal a second wolf spider.
+ */
+const EV = surprisePool(
+  wanderer('stalker', { window: [150, 330], until: 'stage:1', creature: 'wolfSpider', enter: 'evEast', to: 'rampMidFoot', r: 70, s: 110, exit: 'evEast', label: 'a wolf spider', say: 'stalker' }),
+  windfall('cricket', { window: [110, 280], until: 'stage:1', at: 'prey', kind: 'insect', model: 'cricket', scale: 1.8 }),
+  heat('hotAfternoon', { window: [250, 400], until: 'stage:1', chance: 0.6, s: 90, say: 'heat' }),
+  wanderer('beetle', { window: [240, 520], after: 'stage:1', until: 'stage:2', creature: 'groundBeetle', enter: 'evWest', to: 'nestApproach', r: 60, s: 100, exit: 'evWest', hp: 0.8, label: 'a ground beetle', say: 'beetle' }),
+  windfall('moth', { window: [100, 400], after: 'stage:1', until: 'stage:2', at: 'rampMidFoot', kind: 'insect', model: 'moth', scale: 1.5 }),
+  windfall('grasshopper', { window: [500, 900], after: 'stage:1', until: 'stage:2', at: 'prey', kind: 'insect', model: 'grasshopper', scale: 1.8 }),
+  wanderer('stalker2', { window: [420, 640], after: 'stage:1', until: 'stage:2', from: 'hard', creature: 'wolfSpider', enter: 'evWest', to: 'nestApproach', r: 70, s: 100, exit: 'evWest', label: 'another wolf spider' }),
+);
 
 /**
  * Chapter 1, level 4 — "The Spider Mother" (claude/story/04-spec-chapter1-four-levels.md §3; map
  * src/maps/story/spiderTerrace.ts). The chapter's first boss: a Carolina wolf spider mother (`hogna`, a titan) whose
- * hunting ground is the sandy terrace above the river. The colony starts developed, with a short preparation before
- * she comes out to hunt (5–8 min by difficulty). Her three phases:
+ * hunting ground is the sandy terrace above the river. The colony starts developed, with a preparation before she
+ * comes out (10–11½ min by difficulty); then she hunts the colony in rounds for 18½–20 minutes — out to its doorstep, back to
+ * her burrow, out again — while her dispersing spiderlings hunt round the terrace in groups and other hunters come
+ * (claude/story/06-spec §7: the level ran 14–17 minutes); then the fight to the end. Her three phases:
  *  1. Stalker (100–60 %): she stalks and pounces on lone ants and drags them off (the hogna program); hurt to 80 % she
  *     goes back to her burrow to rest a little, then comes out again (a director scene on `hp:mother:80`);
  *  2. Brood (60–30 %): her spiderlings spill off her back in two groups (at 60 % and 45 %) and chase the ants;
@@ -20,7 +37,7 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
   title: 'The Spider Mother',
   region: 'riverbank',
   map: 'spiderTerrace',
-  brief: 'Above the river, the sandy terrace belongs to a huge wolf spider mother carrying her young. The colony is ready, but only just: prepare, and when she digs her way in, finish her fast.',
+  brief: 'Above the river, the sandy terrace belongs to a huge wolf spider mother carrying her young. Prepare, hold out while she hunts the colony in rounds and her spiderlings scatter over the terrace, and when she digs her way in, finish her fast.',
   // a developed colony laid out like an AI nest (user 2026-11-02): the founding ring of workers round the queen, a worker
   // chamber, a soldier chamber and a store chamber by the entrance (7-hex rosettes), the passage and tunnels paved; a
   // stolen caste brought in gets a small chamber of its own
@@ -40,15 +57,26 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
   loadout: true,
   lairs: [{ name: 'The spider’s burrow', at: 'burrow', food: 60, look: 'burrow' }],
   actors: {
+    // (on her rounds she can be hurt but not killed: at 55 % she is hurt no further until the last stage, `stage:2`)
     // (inside the nest her bites are softer on the harder difficulties' worn-down colonies: claude/story/05-spec §3 —
     // she always gets in now, where before a colony of 20 at the hole killed her)
-    mother: { creature: 'hogna', at: 'burrowEdge', face: 'playerNest', goal: 'playerNest', hp: 0.7, phases: [0.8, 0.6, 0.3], bossCuts: [0.6, 0.3], label: 'the Spider Mother', inside: { bite: { easy: 0.8, normal: 0.75, hard: 0.5, brutal: 0.65 }, queenBite: { easy: 0.4, normal: 0.5, hard: 0.35, brutal: 0.5 } } },
+    mother: { creature: 'hogna', at: 'burrowEdge', face: 'playerNest', goal: 'playerNest', hp: 0.7, phases: [0.8, 0.6, 0.3], bossCuts: [0.6, 0.3], floor: { hp: 0.55, until: 'stage:2' }, label: 'the Spider Mother', inside: { bite: { easy: 0.8, normal: 0.75, hard: 0.5, brutal: 0.65 }, queenBite: { easy: 0.4, normal: 0.5, hard: 0.35, brutal: 0.5 } } },
+    // her older young, dispersing: groups of spiderlings that hunt round the terrace on their own
+    broodA: { creatures: [['spiderling', 5]], at: 'eggA', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
+    broodB: { creatures: [['spiderling', 5]], at: 'eggB', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
+    broodC: { creatures: [['spiderling', 6]], at: 'eggC', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
+    broodD: { creatures: [['spiderling', 6]], at: 'eggA', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
+    broodE: { creatures: [['spiderling', 6]], at: 'eggB', spawn: 'action', wave: true, label: 'a brood of spiderlings' },
+    ...EV.actors,
   },
+  surprises: EV.surprises,
+  visitors: EV.visitors,
+  scenes: EV.scenes,
   stages: [
     {
       name: 'Before the hunt',
       objectives: [
-        { type: 'surviveTime', s: { easy: 480, normal: 390, hard: 345, brutal: 330 }, text: 'Prepare: she hunts at dusk' },
+        { type: 'surviveTime', s: { easy: 690, normal: 660, hard: 630, brutal: 600 }, text: 'Prepare: she hunts at dusk' },
         { type: 'fighters', n: 14, optional: true },
         { type: 'raise', n: 50, optional: true, text: 'Raise 50 ants' },
       ],
@@ -68,11 +96,50 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
       scenes: [{ actor: 'mother', cues: [{ rest: 'burrowEdge', s: 1e9 }] }],
     },
     {
-      name: 'The Spider Mother',
-      objectives: [{ type: 'killCreature', actor: 'mother' }],
+      name: 'Her rounds',
+      objectives: [
+        { type: 'surviveTime', s: { easy: 1110, normal: 1140, hard: 1170, brutal: 1200 }, text: 'Hold out while she hunts the colony' },
+        { type: 'fighters', n: 20, optional: true },
+        { type: 'raise', n: 60, optional: true, text: 'Raise 60 ants' },
+      ],
       say: [
         { key: 'hunt', at: 1 },
         { key: 'pounce', at: 50 },
+        { key: 'rounds', at: 200 },
+        { key: 'hatch', on: 'hatchA' },
+        { key: 'retreat', on: 'hp:mother:80' },
+        { key: 'outAgain', on: 'motherRested' },
+        { key: 'hide', on: 'motherHides' },
+      ],
+      events: [
+        { actions: [{ do: 'music', mood: 'tense' }, { do: 'night', level: 0.3 }, { do: 'shot', shot: { keys: [{ at: { actor: 'mother' }, dist: 180, yaw: 2.6, t: 0, pitch: -0.1 }, { at: { actor: 'mother' }, dist: 220, yaw: 2.9, t: 5 }] } }] },
+        { at: 150, actions: [{ do: 'spawn', actor: 'broodA' }, { do: 'flag', flag: 'hatchA' }] },
+        { at: 390, actions: [{ do: 'spawn', actor: 'broodB' }] },
+        { at: 600, actions: [{ do: 'spawn', actor: 'broodC' }] },
+        { at: 780, actions: [{ do: 'spawn', actor: 'broodD' }] },
+        { at: 960, actions: [{ do: 'spawn', actor: 'broodE' }] },
+      ],
+      scenes: [
+        // her rounds: down to the colony's doorstep, where whatever comes near her she stalks and pounces on with her own
+        // program (stalk, pounce, drag away), then back to the burrow with her catch for a long while, and out again
+        { actor: 'mother', cues: [{ mode: 'normal' }, { holdAt: 'burrowEdge', face: 'playerNest', s: 4 }, { charge: 'nestApproach', timeout: 90 }, { guard: 'nestApproach', r: 170, s: 40 }, { rest: 'burrowEdge', s: 75, heal: 0.0006 }, { goto: 2 }] },
+        // hurt to 80 %: back to the burrow for a while, then her rounds again
+        { actor: 'mother', on: 'hp:mother:80', cues: [{ mode: 'passive' }, { rest: 'burrowEdge', s: 40, heal: 0.001 }, { flag: 'motherRested' }, { mode: 'normal' }, { charge: 'nestApproach', timeout: 90 }, { guard: 'nestApproach', r: 170, s: 40 }, { rest: 'burrowEdge', s: 75, heal: 0.0006 }, { goto: 4 }] },
+        // hurt to 60 % before the last stage: she stays down her burrow until full dark
+        { actor: 'mother', on: 'hp:mother:60', cues: [{ mode: 'passive' }, { flag: 'motherHides' }, { rest: 'burrowEdge', s: 1e9, heal: 0.0003 }] },
+        // the dispersing spiderlings: each brood hunts round a part of the terrace, then goes its own way
+        { actor: 'broodA', on: 'hatchA', cues: [{ walkTo: 'rampMidFoot', timeout: 120 }, { guard: 'rampMidFoot', r: 80, s: 150 }, { release: true }] },
+        { actor: 'broodB', at: 390, cues: [{ walkTo: 'rampWestTop', timeout: 120 }, { guard: 'rampWestTop', r: 80, s: 150 }, { release: true }] },
+        { actor: 'broodC', at: 600, cues: [{ walkTo: 'nestApproach', timeout: 120 }, { guard: 'nestApproach', r: 80, s: 150 }, { release: true }] },
+        { actor: 'broodD', at: 780, cues: [{ walkTo: 'rampMidFoot', timeout: 120 }, { guard: 'rampMidFoot', r: 80, s: 150 }, { release: true }] },
+        { actor: 'broodE', at: 960, cues: [{ walkTo: 'rampWestTop', timeout: 120 }, { guard: 'nestApproach', r: 80, s: 150 }, { release: true }] },
+      ],
+    },
+    {
+      name: 'The Spider Mother',
+      objectives: [{ type: 'killCreature', actor: 'mother' }],
+      say: [
+        { key: 'last', at: 1 },
         { key: 'retreat', on: 'hp:mother:80' },
         { key: 'outAgain', on: 'motherRested' },
         { key: 'brood', on: 'hp:mother:60' },
@@ -80,7 +147,9 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
         { key: 'motherIn', on: 'motherIn' },
       ],
       events: [
-        { actions: [{ do: 'music', mood: 'assault' }, { do: 'night', level: 0.4 }, { do: 'shot', shot: { keys: [{ at: { actor: 'mother' }, dist: 180, yaw: 2.6, t: 0, pitch: -0.1 }, { at: { actor: 'mother' }, dist: 220, yaw: 2.9, t: 5 }] } }] },
+        // (she comes out of her burrow for the last time rested and fed: at least 85 % of her health for the fight to the death;
+        // full health wore a colony down to a stalemate at a person's pace, 2026-11-03)
+        { actions: [{ do: 'music', mood: 'assault' }, { do: 'night', level: 0.45 }, { do: 'heal', actor: 'mother', to: 0.85 }] },
         { on: 'hp:mother:30', actions: [{ do: 'tip', key: 'motherDig' }] },
       ],
       scenes: [
@@ -97,8 +166,8 @@ export const SPIDER_MOTHER_LEVEL: StoryLevelDef = {
     },
   ],
   medals: {
-    time: [12 * 60, 18 * 60],
-    losses: [35, 80],
+    time: [34 * 60, 44 * 60],
+    losses: [45, 100],
     // (she always gets in now: claude/story/05-spec §3 — the bonus was "kill her before she digs into the nest")
     bonus: { type: 'killWithin', actor: 'mother', s: 60, text: 'Kill her within a minute of her breaking into the nest' },
   },

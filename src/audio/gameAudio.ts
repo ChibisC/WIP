@@ -66,6 +66,10 @@ const FAMILY: Record<string, Family> = {
   hogna: 'spider',
   groundBeetle: 'beetle',
   stagBeetle: 'beetle',
+  stagMinor: 'beetle',
+  stagSmall: 'beetle',
+  stagMedium: 'beetle',
+  stagLarge: 'beetle',
   rove: 'beetle',
   pillbug: 'beetle',
   lithobius: 'centipede',
@@ -223,8 +227,19 @@ export class GameAudio {
     const me = this.s.player.id;
     switch (e.t) {
       case 'dig':
-        this.want('ant.dig_bite', e.x, e.y, nestSpace(e.colony), { pool: 'work', gain: 0.8 });
-        if (Math.random() < 0.3) this.want('ant.soil_grains', e.x, e.y, nestSpace(e.colony), { pool: 'work', gain: 0.6 });
+        this.want('ant.dig_bite', e.x, e.y, e.space ?? nestSpace(e.colony), { pool: 'work', gain: 0.8 });
+        if (Math.random() < 0.3) this.want('ant.soil_grains', e.x, e.y, e.space ?? nestSpace(e.colony), { pool: 'work', gain: 0.6 });
+        return;
+      case 'tunnelDig':
+        // enemy diggers behind the wall at a tunnel gate (sim/tunnels.ts): muffled bites and falling grains, low
+        if (e.colony !== me) return;
+        this.want('ant.dig_bite', e.x, e.y, e.space, { pool: 'work', gain: 0.7, rate: 0.7, reach: 3, heat: 0.05 });
+        return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 0.6, rate: 0.75, reach: 3 });
+      case 'tunnelWarn':
+        if (e.colony !== me) return;
+        return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 1, rate: 0.7, reach: 6, important: true, heat: 0.3 });
+      case 'tunnelOpen':
+        for (let i = 0; i < e.spaces.length; i++) this.want('ant.soil_grains', e.x[i], e.y[i], e.spaces[i], { pool: 'work', gain: 1, rate: 0.85, reach: 6, important: true, heat: 0.2 });
         return;
       case 'spoil':
         return this.want('ant.pellet_drop', e.x, e.y, e.space, { pool: 'work', gain: 0.7 });
@@ -407,7 +422,7 @@ export class GameAudio {
       const rate = sizeRate(kind.length);
       const reach = kind.boss ? 3 : 1.5;
       const id =
-        by === 'stagBeetle'
+        by === 'stagBeetle' || kind.ai === 'stagMale' // (the stag beetle males' antlers clash too, pitched by their size)
           ? 'cr.stag_clash'
           : fam === 'spider'
             ? Math.random() < 0.25

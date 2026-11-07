@@ -62,6 +62,8 @@ export function objectiveText(w: World, st: StoryState, o: Objective): string {
       return `Raise ${o.n} ${stolenOf(o.caste) ? stolenName(o.caste) : CASTES[o.caste]?.name ?? o.caste}${o.n > 1 ? 's' : ''}`;
     case 'killQueen':
       return `Kill the ${rival(o.rival).toLowerCase()} queen`;
+    case 'killQueens':
+      return o.n >= o.rivals.length ? `Destroy all ${o.n} colonies` : `Destroy ${o.n} of the ${o.rivals.length} colonies`;
     case 'surviveTime':
       return `Hold out for ${mmss(secs(st, o.s))}`;
     case 'surviveWave':
@@ -82,6 +84,8 @@ export function objectiveText(w: World, st: StoryState, o: Objective): string {
       return `Upgrade ${o.n} ${o.tile ? `${TILE_INFO[o.tile]?.name.toLowerCase() ?? o.tile} ` : ''}tile${o.n > 1 ? 's' : ''}`;
     case 'storeFood':
       return `Store ${o.amount} food`;
+    case 'hold':
+      return `Hold ${o.name ?? (typeof o.at === 'string' ? o.at : 'the ground')} with ${o.n} ants for ${mmss(o.s)}`;
   }
 }
 
@@ -130,6 +134,13 @@ export function evalObjective(w: World, c: Colony, st: StoryState, base: StageBa
       const dead = !r || !r.alive;
       return { done: dead, progress: dead ? 'dead' : 'alive' };
     }
+    case 'killQueens': {
+      const n = o.rivals.filter((k) => {
+        const r = w.colony(st.rivals[k] ?? -1);
+        return !r || !r.alive;
+      }).length;
+      return count(n, o.n);
+    }
     case 'surviveTime': {
       const n = secs(st, o.s);
       return { done: base.t >= n, progress: `${mmss(Math.min(base.t, n))}/${mmss(n)}` };
@@ -177,6 +188,11 @@ export function evalObjective(w: World, c: Colony, st: StoryState, base: StageBa
       let n = 0;
       for (const a of w.s.ants) if (a.colony === c.id && a.space === space && a.state !== AS.Dead) n++;
       return count(n, o.n);
+    }
+    case 'hold': {
+      const i = levelOf(st).stages[(w.s.mode.mission as { stage: number }).stage]?.objectives.indexOf(o) ?? -1;
+      const held = i >= 0 ? (st.hold?.[i] ?? 0) : 0;
+      return { done: held >= o.s, progress: `${mmss(Math.min(held, o.s))}/${mmss(o.s)}` };
     }
     case 'surviveNight': {
       if (hasFlag(st, `dawn:${o.n}`)) return { done: true, progress: 'dawn' };

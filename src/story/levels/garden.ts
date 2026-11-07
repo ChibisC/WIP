@@ -1,4 +1,20 @@
 import type { StoryLevelDef } from '../../sim/story/types';
+import { column, heat, party, surprisePool, wanderer, windfall } from '../surprises';
+
+/**
+ * Surprise events (claude/story/06-spec §6): a red wood ant column crossing the garden, the ground beetle back hunting
+ * the meadow's foragers, a fallen strawberry the garden ants come for, a seed drop, a hot spell.
+ */
+const EV = surprisePool(
+  column('woodAnts', { window: [1000, 1700], visitor: 'formica', species: 'formica', name: 'Red wood ants', ants: [['formica_worker', 7], ['formica_soldier', 2]], enter: 'evEast', path: 'woodCol', exit: 'evSouth', label: 'the wood ant column', say: 'woodAnts' }),
+  wanderer('beetleHunt', { window: [520, 900], creature: 'groundBeetle', enter: 'beetleExit', to: 'fruit', r: 60, s: 110, exit: 'evSouth', hp: 0.7, label: 'the ground beetle', say: 'beetleHunt' }),
+  windfall('strawberry', { window: [700, 1300], at: 'berryDrop', kind: 'berry', model: '', scale: 2.2, say: 'strawberry' }),
+  party('berryParty', { window: [25, 55], after: 'ev:strawberry', rival: 'lasius', ants: [['lasius_worker', 4]], enter: 'stoneSteps', to: 'berryDrop', s: 50, label: 'the strawberry foragers' }),
+  heat('hotSpell', { window: [1500, 2400], chance: 0.7, s: 100, say: 'heat' }),
+  // (an early Lasius raid on Hard and Brutal was cut, 2026-11-03: at a person's pace it ended the first level at 15–19
+  // minutes; a seed drop instead, something to gain)
+  windfall('seeds', { window: [400, 900], after: 'stage:1', at: 'fruit', kind: 'seed', model: '', scale: 1.1, n: 10, spread: 30, say: 'seeds' }),
+);
 
 /**
  * Chapter 1, level 1 — "The Garden Below" (claude/story/02-spec §5; map src/maps/story/gardenBelow.ts). The queen is
@@ -30,7 +46,13 @@ export const GARDEN: StoryLevelDef = {
     scouts: { ants: [['lasius_worker', 2]], colony: 'lasius', at: 'scoutTop', spawn: 'action', label: 'the scouts' },
     // the first raid, ten minutes in (the bonus: steal the soldier before it)
     raiders: { ants: [['lasius_soldier', 2], ['lasius_worker', 5]], colony: 'lasius', at: 'stoneSteps', spawn: 'action', wave: true, label: 'the Lasius raid' },
+    // the garden answers the theft (2026-11-06): two parties at the nest, the second down the flowerbed
+    answerA: { ants: [['lasius_soldier', 2], ['lasius_worker', 4]], colony: 'lasius', at: 'stoneSteps', spawn: 'action', wave: true, label: 'the Lasius answer' },
+    answerB: { ants: [['lasius_soldier', 2], ['lasius_worker', 4]], colony: 'lasius', at: 'scoutTop', spawn: 'action', wave: true, label: 'the Lasius answer' },
+    ...EV.actors,
   },
+  surprises: EV.surprises,
+  visitors: EV.visitors,
   scenes: [
     {
       actor: 'raiders',
@@ -38,6 +60,7 @@ export const GARDEN: StoryLevelDef = {
       // (`mode: 'aggressive'` then the guard: as this played while a charge cue was skipped at once — kept unchanged)
       cues: [{ holdAt: 'stoneSteps', anim: 'threat', s: 4 }, { flag: 'raidComing' }, { mode: 'aggressive' }, { guard: 'playerNest', r: 70, s: 45 }, { release: true }],
     },
+    ...EV.scenes,
   ],
   say: [{ key: 'raid1', on: 'raidComing' }],
   events: [
@@ -123,6 +146,28 @@ export const GARDEN: StoryLevelDef = {
       events: [
         { at: 10, actions: [{ do: 'tip', key: 'genes' }] },
         { on: 'caste:lasius_soldier', actions: [{ do: 'tip', key: 'caste' }] },
+      ],
+    },
+    {
+      // (2026-11-06: at a person's pace the level ran 22–27 minutes on Normal once the playtest bot was fixed, under the
+      // 30 the chapter aims at, claude/story/06-spec §7; the garden answers the theft before the raid)
+      name: 'The garden answers',
+      objectives: [
+        { type: 'surviveTime', s: { easy: 300, normal: 360, hard: 360, brutal: 360 }, text: 'Hold the nest while the garden ants answer' },
+        { type: 'raise', n: 30, text: 'Raise 30 ants', optional: true },
+      ],
+      say: [
+        { key: 'answer1', at: 3 },
+        { key: 'answer2', at: 150 },
+      ],
+      events: [
+        { actions: [{ do: 'music', mood: 'tense' }] },
+        { at: 20, actions: [{ do: 'spawn', actor: 'answerA' }] },
+        { at: 150, actions: [{ do: 'spawn', actor: 'answerB' }] },
+      ],
+      scenes: [
+        { actor: 'answerA', at: 20, cues: [{ holdAt: 'stoneSteps', anim: 'threat', s: 3 }, { mode: 'aggressive' }, { guard: 'playerNest', r: 70, s: 45 }, { release: true }] },
+        { actor: 'answerB', at: 150, cues: [{ mode: 'aggressive' }, { path: 'scoutsDown', speed: 1 }, { guard: 'playerNest', r: 70, s: 45 }, { release: true }] },
       ],
     },
     {

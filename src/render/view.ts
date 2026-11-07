@@ -4,6 +4,7 @@ import { Input } from '../core/input';
 import { Terrain } from '../world/terrain';
 import { NestGrid } from '../world/nestGrid';
 import { TerrainMesh } from './terrainMesh';
+import { RainFX } from './rainFX';
 import { Grass } from './grass';
 import { MapDecor } from './mapDecor';
 import { BIOME_LIGHT, applyBiomeLight } from './mapBiomes';
@@ -15,6 +16,7 @@ import { createNestEnvironment, createSurfaceEnvironment, NestLights, SurfaceLig
 import { ObserveCameraRig, SurfaceCameraRig } from './cameras';
 import { globalUniforms } from './shaderPatch';
 import { presetForBiome, setCreatureEnvTexture, setCreatureLighting } from './lightPresets';
+import { prof } from '../core/profiler';
 
 export type ViewSpace = 'surface' | 'nest';
 export type Quality = 'low' | 'medium' | 'high';
@@ -90,6 +92,8 @@ export class GameView {
   freeCam = { on: false, yaw: 0, pitch: -0.5, pos: new THREE.Vector3(), speed: 60 };
   quality: Quality = 'high';
   preset: QualityPreset = QUALITY.high;
+  /** dynamic resolution (performance pass): the share of the preset's pixel ratio rendered now (1 = all of it) */
+  renderScale = 1;
   terrain: Terrain | null = null;
   terrainMesh: TerrainMesh | null = null;
   grass: Grass | null = null;
@@ -100,6 +104,8 @@ export class GameView {
   water: Water | null = null;
   surfaceLights: SurfaceLights;
   worldGroup = new THREE.Group();
+  /** falling rain while a storm or a story shower is on (render only) */
+  readonly rain = new RainFX();
   private transition: Transition | null = null;
   /** area → area cut: fade to black, swap, fade back */
   private areaFade: { t: number; swapped: boolean; swap: () => void } | null = null;
@@ -144,6 +150,7 @@ export class GameView {
     this.post = new PostPipeline(this.renderer);
     this.surfaceLights = createSurfaceEnvironment(this.renderer, this.surfaceScene);
     this.surfaceScene.add(this.worldGroup);
+    this.surfaceScene.add(this.rain.lines);
     this.fadeEl = document.createElement('div');
     this.fadeEl.className = 'view-fade';
     document.getElementById('app')!.appendChild(this.fadeEl);
@@ -155,6 +162,9 @@ export class GameView {
   setQuality(q: Quality): void {
     this.quality = q;
     this.preset = QUALITY[q];
+    // (a new preset starts at its full resolution)
+    this.renderScale = 1;
+    this.post.sharpen = 0;
     const p = this.preset;
     this.renderer.shadowMap.enabled = p.shadows;
     this.surfaceLights.sun.castShadow = p.shadows;
@@ -184,10 +194,27 @@ export class GameView {
     if (this.terrain && this.grass) this.rebuildGrass();
   }
 
+  /**
+   * Dynamic resolution (performance pass): the lowest share of the preset's pixel ratio slow frames may take before the
+   * preset itself steps down — never below about 0.85 device pixels per screen pixel, where ants stop reading clearly.
+   */
+  get minRenderScale(): number {
+    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio);
+    return Math.min(1, Math.max(0.75, 0.85 / pr));
+  }
+
+  setRenderScale(k: number): void {
+    const s = Math.max(this.minRenderScale, Math.min(1, k));
+    if (Math.abs(s - this.renderScale) < 0.01) return;
+    this.renderScale = s;
+    this.post.sharpen = s < 0.999 ? Math.min(0.6, (1 - s) * 2.2) : 0;
+    this.resize();
+  }
+
   resize(): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio);
+    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio) * this.renderScale;
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
     this.canvas.style.width = w + 'px';
@@ -403,6 +430,13 @@ export class GameView {
     return !!this.transition || !!this.areaFade;
   }
 
+  /** Where a dive or an area cut in progress lands (null: none, or already swapped). */
+  get incoming(): ViewSpace | null {
+    if (this.transition && !this.transition.swapped) return this.transition.to;
+    if (this.areaFade && !this.areaFade.swapped) return 'nest';
+    return null;
+  }
+
   /**
    * Smooth cut between two underground areas (they are separate maps):
    * a quick fade to black, `swap` changes the shown area, then fade back in.
@@ -415,22 +449,36 @@ export class GameView {
     this.areaFade = { t: 0, swapped: false, swap };
   }
 
+  /** the fade's opacity (performance pass: while it is fully opaque the scene under it is not drawn) */
+  private fadeK = 0;
+
+  private setFade(k: number): void {
+    if (k === this.fadeK) return;
+    this.fadeK = k;
+    this.fadeEl.style.opacity = String(k);
+  }
+
+  /** The fade covers the view completely: the frame under it would not be seen. */
+  get fadedOut(): boolean {
+    return this.fadeK >= 0.999;
+  }
+
   private updateAreaFade(dt: number): void {
     const f = this.areaFade!;
     f.t += dt;
     const OUT = 0.2;
     const IN = 0.32;
     if (!f.swapped) {
-      this.fadeEl.style.opacity = String(Math.min(1, f.t / OUT));
+      this.setFade(Math.min(1, f.t / OUT));
       if (f.t >= OUT) {
         f.swapped = true;
         f.swap();
         f.t = 0;
       }
     } else {
-      this.fadeEl.style.opacity = String(Math.max(0, 1 - f.t / IN));
+      this.setFade(Math.max(0, 1 - f.t / IN));
       if (f.t >= IN) {
-        this.fadeEl.style.opacity = '0';
+        this.setFade(0);
         this.areaFade = null;
       }
     }
@@ -451,7 +499,7 @@ export class GameView {
         this.nestRig.goal.set(tr.entranceNest.x, 0, tr.entranceNest.y);
         this.nestRig.goalDistance = THREE.MathUtils.lerp(this.nestRig.goalDistance, this.nestRig.minDist * 1.2, e * 0.25);
       }
-      this.fadeEl.style.opacity = String(Math.min(1, e * 1.1));
+      this.setFade(Math.min(1, e * 1.1));
       if (t >= 0.5) {
         tr.swapped = true;
         this.space = tr.to;
@@ -467,11 +515,11 @@ export class GameView {
       }
     } else {
       const k = (t - 0.5) / 0.5;
-      this.fadeEl.style.opacity = String(Math.max(0, 1 - k * 1.4));
+      this.setFade(Math.max(0, 1 - k * 1.4));
     }
     if (t >= 1) {
       this.transition = null;
-      this.fadeEl.style.opacity = '0';
+      this.setFade(0);
     }
   }
 
@@ -657,9 +705,17 @@ export class GameView {
     this.post.tilt = this.observing ? 0.15 : this.space === 'surface' ? 0.55 : 0.45;
     this.post.settings.dofStrength = this.observing ? 1.2 : 1;
     this.applyStorm(dt);
+    const rig = this.observing ? null : this.surfaceRig;
+    this.rain.update(this.space === 'surface' ? this.stormShown : 0, rig ? rig.target : this.observeRig.smoothSubject, rig ? rig.distance : this.observeRig.distance * 3, this.time);
     this.applyGrade();
     this.applyCreatureLight();
+    // Behind a fully opaque fade (the dive's and the area cut's black frames, the swap's frame among them) nothing is
+    // drawn: the leaving scene costs nothing while the swap's own work runs, and the new scene's first draw moves to
+    // the next frame (performance pass, spec §2)
+    if (this.fadedOut) return;
+    prof.gpuBegin();
     this.post.render(this.activeScene(), cam);
+    prof.gpuEnd();
   }
 
   /**

@@ -14,7 +14,8 @@ against ants right now".
   quite alike); the margin is the share of the caste's side left minus the reference's (−1..1). `ONLY=a,b` limits the
   list; `PURSUE=1` makes each side's marker follow the other side (for sickle-jaw soldiers, below). `workers` /
   `soldiers` / `heavies` run a full round robin; `creatures` puts each creature against 5 / 10 / 20 / 40 black garden ant
-  workers (bosses 20 / 40 / 80 / 120; `KINDS=a,b` limits it).
+  workers (bosses 20 / 40 / 80 / 120; `KINDS=a,b` limits it); `stags` puts each stag beetle male against 4–50 workers
+  and 2–16 soldiers (below).
 - `tools/balance-tune.ts -- <ref> <food> <castes>` searches the stat scale at which a caste ties the reference (health
   and every damage source × s; a nasute's glue stream × s²; a sickle-jaw's health × s²). Equal-food fights snowball:
   the margin swings from −0.7 to +0.7 over a few per cent of strength, so the numbers were set from the tie point
@@ -103,6 +104,32 @@ Against black garden ant workers (5 / 10 / 20 / 40): does it die, and how many a
 
 Bosses (20 / 40 / 80 / 120 workers): the tarantula, the giant mantis and the Hogna mother need 80–120 workers; the
 stag beetle and the banded centipede beat 120. Unchanged.
+
+## Stag beetle males (2026-11-03)
+Four normal (non-boss) males of *Lucanus cervus* (claude/story/06-spec-levels-5-7-and-lengths.md §2; behaviour in
+docs/creatures/lucanus-cervus.md "Males of four sizes"). Target: "balanced but challenging" at even level — a minor male
+takes about 8–10 workers, a small one 12–15, a medium one 20–25 workers or 6–8 soldiers, a large one 35–45 workers or
+10–14 soldiers; none beaten by a few ants, none wiping out an army without losses. Measured with
+`npx vite-node tools/balance-matrix.ts -- stags` (each male alone against n black garden ant workers or soldiers ringed
+round it, three seeds, level I; `tests/stagSizes.ts` re-checks one seed of each).
+
+| male | length | hp | armour | bite / interval | speed | moves | workers it beats (kills all, its health left) | workers that kill it (died in, ants lost) | soldiers it beats | soldiers that kill it |
+|---|---|---|---|---|---|---|---|---|---|---|
+| minor | 45 mm | 230 | 1 | 9 / 1.8 s | 11 | shove, pinch | 8 (22 %) | **10** (3/3, −5) · 12 (−4) | 2 (49 %) | 3 (3/3, −2) |
+| small | 55 mm | 400 | 1.5 | 10.5 / 1.8 s | 10.5 | shove, pinch | 12 (33 %) | **15** (3/3, −10) · 18 (−5) | 4 (29 %) | 5 (2/3, −4) · 6 (−2) |
+| medium | 70 mm | 760 | 1.5 | 11 / 2 s | 10 | + grab and toss one ant (every 9 s) | 18 (15 %) | **20** (2/3, −16) · 22 (3/3, −10) · 25 (−9) | 6 (17 %) | **7** (2/3, −4) · 8 (3/3, −2) |
+| large | 85 mm | 1150 | 1.5 | 13 / 2.1 s | 9.5 | + grab two (every 7 s), rear and slam (under 60 %), shake riders off | 35 (7 %) | **40** (2/3, −33) · 45 (3/3, −20) · 50 (−16) | 10 (13 %) | **12** (3/3, −5) · 14 (−3) |
+
+- The fights are all or nothing on both sides (the ants never give up): below the line the male kills every ant, at the
+  line it dies taking most of them; with half again as many ants it still kills 2–5 (soldiers) or 3–20 (workers).
+- Workers against these armours do a quarter of their bite (the floor, from 2 armour) or a little more; soldiers 3.3–3.8.
+  Armour 2 on the large male made it all but worker-proof (50 workers could not kill it), so it shares the small and
+  medium males' 1.5. Bites sit just under the thresholds that matter: every male needs two bites for a worker (17 hp)
+  and four or five for a soldier (42 hp, armour 1), which keeps the soldier-to-worker ratio near the targets' 3–3.5.
+- Two fixes found on the way (creatureAI.ts): a male pivots to bite ants on its flanks (as a long body it would not turn
+  to them, so a few soldiers on its sides killed it untouched), and when it has ants on it and none in front for
+  `stuckSec` (under its body, on its middle) it shrugs the nearest off; its grab's aiming turn is capped (`aimSec`).
+- In a game a creature's health is × the difficulty's enemy stat (skirmish wild ones), as for the other creatures.
 
 ## Costs
 `balance.ts` tile costs (build + hatch): fire ant minor 10 + 1 (hatch was 1.5), fire ant soldier 16 + 3 (was 20 + 3.5),

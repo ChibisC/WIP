@@ -30,6 +30,8 @@ import { ecitonSystem } from './eciton';
 import { termantSystem } from './termants';
 import { arenaSystem, setupArena } from './arena';
 import { floodSystem, initFloods } from './floods';
+import { nestFloodSystem, startNestFlood } from './nestFlood';
+import { RoutePlan, crossings, generateRoutes, tunnelTick } from './tunnels';
 
 export interface ColonySpec {
   species: SpeciesId;
@@ -70,6 +72,8 @@ export interface GameSetup {
   mission?: MissionId;
   /** dev and browser shots: a titan of this kind starts beside the player's anthill and digs straight in (titanDig.ts) */
   devTitanRaid?: string;
+  /** dev and browser shots (`?floodNest=<colony>&floodAt=<s>`): that colony's nest starts flooding at that game time (nestFlood.ts) */
+  devNestFlood?: { colony: number; at: number; fillSec?: number };
   /** a story level (sim/story): the difficulty, the stolen castes brought in, the campaign's traits, a restart (the level is `mission`) */
   story?: { difficulty: Difficulty; loadout: string[]; traits?: string[]; retry?: boolean };
   /** sandbox game: the sandbox commands (spawn, fill stores, toggles) are allowed */
@@ -80,6 +84,11 @@ export interface GameSetup {
   map?: MapId;
   /** which of the map's balanced site sets for this colony count (default: chosen by the seed) */
   siteSet?: number;
+  /**
+   * the set tunnel routes between nests (sim/tunnels.ts, CHANGE_PLAN §27): 'auto' (every pair up to TUNNELS.allPairsMax
+   * colonies, else nearest neighbours), 'none', or authored pairs of colony indices; story levels default to none
+   */
+  tunnels?: RoutePlan;
 }
 
 /** Register all simulation systems in update order. */
@@ -103,6 +112,8 @@ export function registerSystems(w: World): void {
     { name: 'brood', fn: broodSystem },
     // caste abilities: taunt timers, rage fading and the rage aura (casteAbilities.ts)
     { name: 'casteAbility', fn: casteAbilitySystem },
+    // units in a tunnel route's rim step crossing to the other nest (sim/tunnels.ts)
+    { name: 'tunnelCross', fn: (ww) => crossings(ww) },
     { name: 'ants', fn: antSystem },
     { name: 'food', fn: foodSystem },
     { name: 'projectiles', fn: projectileSystem },
@@ -110,6 +121,8 @@ export function registerSystems(w: World): void {
     { name: 'respawn', fn: respawnSystem, every: 20 },
     { name: 'aphidClaims', fn: aphidClaims, every: 20 },
     { name: 'invasion', fn: (ww) => invasionCheck(ww), every: 20 },
+    // tunnel routes opening, the defender's warning (sim/tunnels.ts)
+    { name: 'tunnels', fn: tunnelTick, every: 20 },
     { name: 'lost', fn: lostRouteSystem, every: 20 },
     { name: 'creatures', fn: creatureSystem },
     // titans digging into nests: skirmish raids, breach repairs (sim/creatures/titanDig.ts)
@@ -121,6 +134,8 @@ export function registerSystems(w: World): void {
     { name: 'story', fn: storySystem },
     // storms on authored maps (only when the match turns floods on)
     { name: 'floods', fn: floodSystem },
+    // nests filling with water (sim/nestFlood.ts; only when a story or the dev URL starts one)
+    { name: 'nestFlood', fn: nestFloodSystem },
     ...extraSystems,
   ];
 }
@@ -164,6 +179,8 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
     const opts: ColonyOptions = { species: spec.species, player: spec.player, ai: spec.ai, borrowed: spec.borrowed, nx: at.x, ny: at.y, developed: spec.developed, developPlan: spec.developPlan, startWorkers: spec.startWorkers, startFood: spec.startFood, popLimit: spec.popLimit, name: spec.name, team: spec.team, site };
     createColony(w, opts);
   });
+  // the set tunnel routes between the nests (sim/tunnels.ts): a story level decides; skirmish gets them by the map's size
+  generateRoutes(w, setup.tunnels ?? (setup.story ? 'none' : 'auto'));
   if (setup.mission) startMission(w, setup.mission, w.s.colonies.find((c) => c.player)?.id ?? 0);
   if (setup.mission && setup.story) initStory(w, missionOf(w)!, setup.mission as StoryLevelId, setup.story.difficulty, setup.story.loadout, setup.story);
   if (setup.devTitanRaid) {
@@ -176,6 +193,7 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
       startTitanRaid(w, cr, p.id, 0);
     }
   }
+  if (setup.devNestFlood) startNestFlood(w, setup.devNestFlood.colony, { delaySec: setup.devNestFlood.at, fillSec: setup.devNestFlood.fillSec });
   if (setup.sandbox) w.s.mode.sandbox = true;
   if (setup.arena) setupArena(w);
 

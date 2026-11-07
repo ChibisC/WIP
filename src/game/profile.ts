@@ -35,6 +35,8 @@ export interface Settings {
   bindings: Partial<Record<Action, string>>;
   /** camera shake on big hits and boss footfalls: 0 off, 0.5 reduced, 1 full (animation pass) */
   shake?: number;
+  /** frame cap (performance pass): 0 follows the display, 30 or 60; absent = 60 on phones and tablets, the display elsewhere */
+  frameCap?: number;
 }
 
 export type Medal = 'gold' | 'silver' | 'bronze';
@@ -105,7 +107,19 @@ export function sanitizeSettings(p: Partial<Settings> | null): Settings {
       narration: clamp01(v.narration, d.volume.narration),
     },
     bindings,
+    shake: typeof p?.shake === 'number' && p.shake >= 0 && p.shake <= 1 ? p.shake : undefined,
+    frameCap: p?.frameCap === 0 || p?.frameCap === 30 || p?.frameCap === 60 ? p.frameCap : undefined,
   };
+}
+
+/** The frame cap in force: the setting, or 60 on a touch device (a 120 Hz phone at 60 runs cooler) and none elsewhere. */
+export function frameCapOf(s: Settings): number {
+  if (s.frameCap !== undefined) return s.frameCap;
+  try {
+    return matchMedia('(pointer: coarse)').matches ? 60 : 0;
+  } catch {
+    return 0;
+  }
 }
 
 let current: Settings | null = null;

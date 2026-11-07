@@ -90,6 +90,12 @@ export const SPIDER_TERRACE: MapDef = {
   floods: [],
   story: {
     points: {
+      // surprise events (claude/story/06-spec §6): where parties and wanderers come on and go off, windfalls
+      evWest: [14, 700],
+      evEast: [1086, 720],
+      eggA: [700, 760],
+      eggB: [180, 400],
+      eggC: [960, 720],
       playerNest: [300, 730],
       playerGate: [324, 712],
       burrow: [600, 300],

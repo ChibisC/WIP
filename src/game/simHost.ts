@@ -16,10 +16,25 @@ import { Command, CommandSchedule, applyCommandsNow, encodeCommandLog, stepWithC
 import { encodeState, hashState } from '../sim/snapshot';
 import type { NetSim } from '../net/netGame';
 import { Replica } from './replica';
+import { prof } from '../core/profiler';
 import { sharedAvailable } from '../worker/sharedPool';
 import type { FromWorker, FrameMsg, ToWorker } from '../worker/protocol';
 
 const TICK_DT = 0.05;
+
+/** Rough size of a worker frame: its typed arrays (the per-tick entity columns and grids). */
+function frameBytes(m: unknown, depth = 0): number {
+  if (!m || typeof m !== 'object' || depth > 4) return 0;
+  if (ArrayBuffer.isView(m)) return m.byteLength;
+  if (m instanceof ArrayBuffer) return m.byteLength;
+  let n = 0;
+  if (Array.isArray(m)) {
+    for (const x of m) n += frameBytes(x, depth + 1);
+    return n;
+  }
+  for (const k in m as Record<string, unknown>) n += frameBytes((m as Record<string, unknown>)[k], depth + 1);
+  return n;
+}
 
 export interface SimHost extends NetSim {
   readonly kind: 'local' | 'worker';
@@ -181,7 +196,9 @@ export class WorkerSim implements SimHost {
         this.pump();
         break;
       case 'frame': {
+        const t0 = performance.now();
         this.replica.apply(m);
+        prof.addMsg(performance.now() - t0, frameBytes(m));
         if (m.ran > 0) {
           const now = performance.now();
           if (this.lastFrameAt > 0) this.gap = Math.min(250, Math.max(8, this.gap * 0.8 + (now - this.lastFrameAt) * 0.2));

@@ -62,6 +62,15 @@ const atkP = neutralPose({} as AttackPose);
 const mountOut: MountOut = { p: new THREE.Vector3(), f: new THREE.Vector3(), u: new THREE.Vector3(), speed: 0 };
 const holdIn: HoldPoseInput = { time: 0, seed: 0 };
 
+/** One built geometry per termite caste and LOD for every area (each set clones it: performance pass). */
+const baseGeos = new Map<string, ReturnType<typeof buildTermiteGeometry>>();
+function baseGeometry(caste: CasteId, lod: number): ReturnType<typeof buildTermiteGeometry> {
+  const k = `${caste}|${lod}`;
+  let g = baseGeos.get(k);
+  if (!g) baseGeos.set(k, (g = buildTermiteGeometry(caste, lod)));
+  return g;
+}
+
 export class TermiteLayer {
   /** climbing termites: placed on the creature's animated leg or body (shared with the ant renderer) */
   mount: MountFn | null = null;
@@ -108,6 +117,19 @@ export class TermiteLayer {
     return this.inst(casteOf(morph) ?? 'worker', 1).rig;
   }
 
+  /** Build a termite morph's instance sets now (performance pass: before it is first drawn). */
+  prepare(morph: string): number {
+    const caste = casteOf(morph);
+    if (!caste || this.sets.has(caste)) return 0;
+    for (let l = 0; l < 3; l++) this.inst(caste, l);
+    return 1;
+  }
+
+  has(morph: string): boolean {
+    const caste = casteOf(morph);
+    return !!caste && this.sets.has(caste);
+  }
+
   /** the instance set for a caste and LOD; `fx`: the one with the glue / acid shell pass */
   private inst(caste: CasteId, lod: number, fx = false): TermiteInstances {
     const key = fx ? caste + ':fx' : caste;
@@ -121,7 +143,7 @@ export class TermiteLayer {
     const n = this.counts.get(key)![lod];
     if (!t || n >= t.capacity) {
       const cap = t ? t.capacity * 2 : fx ? 16 : lod === 0 ? 32 : 128;
-      const next = new TermiteInstances(buildTermiteGeometry(caste, lod), cap, { castShadow: lod < 2, fxShell: fx });
+      const next = new TermiteInstances(baseGeometry(caste, lod), cap, { castShadow: lod < 2, fxShell: fx });
       if (t) {
         this.group.remove(t.group);
         t.dispose();

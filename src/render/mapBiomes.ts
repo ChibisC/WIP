@@ -112,6 +112,42 @@ export const MAP_MOOD: Record<string, MapMood> = {
     haze: 0.12,
     hazeColor: 0xe8d0aa,
   },
+  // The Antlered King (chapter 1, level 5): an old oak wood on a summer evening — green-gold light through the canopy,
+  // strongly dappled, a cool mist in the clearing (stag beetles fly on summer evenings)
+  oakWoods: {
+    sunEl: 24,
+    sunAz: 280,
+    light: { sun: 2.2, sunColor: 0xffe2b4, hemi: 0.9, hemiSky: 0xa8c0a0, hemiGround: 0x3a3420, fog: 1.2, fogColor: 0xb8bea4, dapple: 0.95 },
+    exposure: 1.0,
+    saturation: 1.0,
+    warmth: 0.06,
+    haze: 0.1,
+    hazeColor: 0xbcc2a8,
+  },
+  // High Water (chapter 1, level 6): a flood plain under a heavy, grey-bright sky — flat light, damp air, the river high
+  floodHill: {
+    sunEl: 40,
+    sunAz: 210,
+    light: { sun: 2.1, sunColor: 0xf2ecdc, hemi: 1.12, hemiSky: 0xc4ccd6, hemiGround: 0x5a5440, fog: 1.25, fogColor: 0xc8cccc, dapple: 0.1 },
+    exposure: 1.0,
+    contrast: 0.95,
+    saturation: 0.92,
+    warmth: -0.06,
+    haze: 0.18,
+    hazeColor: 0xcfd3d0,
+  },
+  // Carton Kingdom (chapter 1, level 7): the rainforest's edge — green shade, shafts of light through the canopy, humid
+  // haze
+  rainforestEdge: {
+    sunEl: 58,
+    sunAz: 200,
+    light: { sun: 2.0, sunColor: 0xf6f2d0, hemi: 0.95, hemiSky: 0x9ebc98, hemiGround: 0x2e3218, fog: 1.45, fogColor: 0x9aa892, dapple: 1.0 },
+    exposure: 1.02,
+    saturation: 1.04,
+    warmth: -0.02,
+    haze: 0.16,
+    hazeColor: 0xa4b29c,
+  },
 };
 
 /** The mood in force (set when a surface is built: render/terrainMesh.ts), read by applyBiomeLight and the post. */

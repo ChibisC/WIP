@@ -19,9 +19,11 @@ import type { MapId } from '../maps/types';
  * 2026-11-02. 9: the `callHelp` command and team-aware placement, CHANGE_PLAN §23 — 2026-11-02; titans raid nests (the lobby's
  * "Titans raid nests") — 2026-11-02, built at the same time and also numbered 9. 10: both together — 2026-11-02. 11: titans
  * open holes more easily (the slow from the damage rate, checkpoints, the work remembered on the hole), CHANGE_PLAN §26 —
- * 2026-11-03)
+ * 2026-11-03. 12: stag beetle males of four sizes in forest and rainforest skirmishes, nests that flood, the weather and
+ * visiting colonies of the story's surprise events, claude/story/06-spec — 2026-11-06. 13: the shared underground — rock margins, tunnel routes between nests, the `digRoute` command (wire 26),
+ * save version 4, CHANGE_PLAN §27 — 2026-11-07)
  */
-export const BUILD_ID = 'ud-mp-11';
+export const BUILD_ID = 'ud-mp-13';
 
 /** A lobby slot (players 0–3; the slot number is the colony id). */
 export interface Slot {
@@ -69,8 +71,9 @@ export type Control =
   | { t: 'refused'; reason: string }
   // in game
   | { t: 'ping'; at: number }
-  | { t: 'pong'; at: number }
-  | { t: 'delay'; d: number; pings?: Record<number, number> }
+  /** (perf: the replying player's simulation tick and frame times, ms — performance pass: slow clients show) */
+  | { t: 'pong'; at: number; perf?: [number, number] }
+  | { t: 'delay'; d: number; pings?: Record<number, number>; perf?: Record<number, [number, number]> }
   | { t: 'hash'; tick: number; hash: string; player: number }
   | { t: 'desync'; tick: number; hashes: Record<string, string> }
   | { t: 'drop'; player: number; fromTick: number }

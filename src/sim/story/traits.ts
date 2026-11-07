@@ -7,6 +7,7 @@ import { STORY } from '../balance';
  * in the campaign save and come into a story level on the player's colony (`Colony.traits`, set by the story runner);
  * skirmish and multiplayer colonies never have any, so nothing here touches their balance. Built so far:
  *  - Spiderling Venom (the Spider Mother, chapter 1): every bite adds a small venom stack (STORY.traits.spiderlingVenom).
+ *  - Antler Plating (the Antlered King, chapter 1): every ant has a little more armour (STORY.traits.antlerPlating).
  */
 
 /** After a bite by one of `c`'s ants lands on `t` (an ant or a creature). */
@@ -19,6 +20,12 @@ export function traitOnBite(_w: World, c: Colony, t: { venom: number; venomT: nu
     t.venomT = Math.max(t.venomT, T.duration ?? 0);
     t.venomDps = Math.max(t.venomDps * 0.9, T.dps ?? 0);
   }
+}
+
+/** Extra armour of `c`'s ants from its traits (Antler Plating); 0 for colonies without traits (skirmish, rivals). */
+export function traitArmor(c: Colony | undefined): number {
+  if (!c?.traits?.length) return 0;
+  return c.traits.includes('antlerPlating') ? (STORY.traits.antlerPlating.armor ?? 0) : 0;
 }
 
 /** The traits that exist in the game (built), for the save and the Genome screen. */

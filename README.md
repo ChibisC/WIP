@@ -100,6 +100,8 @@ You start with a queen, her seven-tile chamber and three small **nanitic** worke
 
 **Entrances.** Each nest has one wide entrance: seven hexes at the edge of the nest whose floor slopes up to the surface, lit by a shaft of daylight. Above it, the colony's anthill has three holes, all leading into it, always open. The anthill is built the way that species really builds it (a low crater of crumbly soil for black garden ants, a thatched dome for wood ants, a carton nest with covered galleries for nasute termites, and so on). Ants leave by the hole facing where they are going and come home by the nearest; each hole lets about 10 ants through a second, so a crowd spreads over all three. Digging never makes another entrance. A fallen colony's holes cave in over a minute.
 
+**Tunnels between nests.** Every nest lies in one shared underground, ringed by rock nothing can dig. Set routes of diggable soil run through that rock from a brownish patch of loosened soil on your nest's edge (a gate) to the matching gate of a neighbour's nest (every neighbour on small maps, the nearest few on big ones). Use the Dig tool on a gate and your workers dig the route — one route at a time (another gate pauses the first; its progress stays) — about 3–5 minutes for a normal crew, half that if the other side digs toward you too. As your diggers near the far gate you get hints of what waits beyond it; the defender hears digging behind the wall, sees a red ! on its gate and gets an alert. Once the route opens it stays open for good: ants walk through it between the nests (markers in the other nest send groups through; scrolling past the halfway point switches the view), and in an enemy nest you see only what your ants can see. Allies can link their nests the same way, and AI colonies tunnel, guard their gates and link up too. Coming in by the surface entrance works as before.
+
 **Underground areas.** The numbered tabs on top of the minimaps are the level's underground areas: 1 is your nest, the others are enemy and allied nests and neutral caves. A tab opens only while your ants (or allies) are inside. To go in, drop a marker on any of the area's entrance holes on the surface (the surface map shows each anthill as a crown in its colour, with its number and a dot on each hole). Once your ants are inside, open the tab and place markers within the area. Ants cut off from their queen weaken and die within 30 s.
 
 ### Build panel tools
@@ -130,7 +132,7 @@ You start with a queen, her seven-tile chamber and three small **nanitic** worke
 | Right-click a marker | Lift it |
 | Tab | Surface ⇄ last underground area |
 | Shift + 1 – 6 / area tabs | Show underground area 1–6 |
-| F3 | Debug overlay (frame rate, simulation tick time, network; draws the creatures' climbing points, rails, weak points and mount slots, free and taken) |
+| F3 | Debug overlay and profiler: frame rate, frame time (average, p95, worst), the main thread's time by part, GPU time where the browser measures it, draw calls, triangles, shader programs, textures, the heap and an estimate of GPU memory, the hitch log (every frame over 33 ms and what happened in it), the simulation's tick, the network and each player's tick and frame time; draws the creatures' climbing points, rails, weak points and mount slots, free and taken |
 | Enter | Chat (multiplayer) |
 | N | Next open underground area |
 | G · U · Delete | Dig · Upgrade · Delete tools |
@@ -152,9 +154,12 @@ You start with a queen, her seven-tile chamber and three small **nanitic** worke
 | Drag three fingers up or down | Tilt |
 | ✕ button (top centre) | Cancel the tool / stop following an ant |
 
-Play phones in landscape (in portrait the game asks you to turn the phone). On phones, and on tablets held upright, the interface switches to a compact layout with bigger buttons: the maps fold behind the map button beside the area tabs, the build panel behind **Build**, and the marker panel starts folded to its markers (the arrow button unfolds the group cards). Auto graphics quality starts at Medium on touch devices. On iPhone, sound follows the ring/silent switch.
+Play phones in landscape (in portrait the game asks you to turn the phone). On phones, and on tablets held upright, the interface switches to a compact layout with bigger buttons: the maps fold behind the map button beside the area tabs, the build panel behind **Build**, and the marker panel starts folded to its markers (the arrow button unfolds the group cards). Auto graphics quality starts at Medium on touch devices, and the frame rate is held at 60 there (a 120 Hz screen at 60 runs cooler). On iPhone, sound follows the ring/silent switch.
 
-The pause menu has graphics quality, interface size, edge scrolling and the sandbox setting **Reveal all underground areas**.
+The pause menu has graphics quality, frame rate (match the screen, 60 or 30), interface size, edge scrolling and the sandbox setting **Reveal all underground areas**. Auto quality first lowers the render resolution a little (never below 75 %, with a light sharpen) and only then the preset.
+
+### Benchmark
+Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`) runs six fixed scenes for about four minutes: switching surface ↔ underground ten times, a big fight, a full nest, a story night, the arena at 600 units and a multiplayer-sized world. It ends with a report to copy and send (frame times, hitches and their causes, the switch frames, draw calls, memory). See `docs/performance.md`.
 
 ## Species
 | Species | Castes |
@@ -186,6 +191,11 @@ npx vite-node tests/story.ts                                        # story mode
 npx vite-node tests/storyCh1.ts                                     # chapter 1 as four levels: order and save rule, the new maps, the nights' clock, hunters and tarantula, the Spider Mother's phases, Spiderling Venom, determinism
 npx vite-node tools/playtest-story.ts -- garden normal 50 7          # a story level played headless by the colony AI plus a scripted player (level: garden, longNights, fireBanks, spiderMother; difficulty, minutes, seed, loadout; STRATEGY=hole: defend at the hole a titan digs)
 npx vite-node tests/titans.ts                                       # titans digging into nests (hole times, the damage-rate slow, checkpoints, memory, breach, raids)
+npx vite-node tests/tunnels.ts                                      # the shared underground: rock margins, set tunnel routes, digging from both ends, opening, crossing, warnings, fog, old saves, determinism
+npx vite-node tools/tunnel-check.ts -- 2                              # routes on every map for 2–10 colonies: three wide, rock-walled, gates on the edge, no crossings (and a sketch)
+npx vite-node tools/tunnel-dig-probe.ts -- 6 3                       # a crew digging a route toward a rival: the warning, the rim, the opening, the breach, a group walking through (workers, seed)
+npx vite-node tools/tunnel-ai-probe.ts -- 3 20 5                      # AI colonies tunnelling, guarding gates and linking allied nests (level, minutes, seed)
+# dev: ?tunnel=dig|warn|open|in|enemy|ally (with &play=1&rival=lasius…): a tunnel scene from that stage; tests/browser/tunnels.py renders the stills (docs/underground/tunnels/)
 npx vite-node tools/titan-holes.ts -- 5                              # time to open a hole per titan: undefended / 20 / 80 defenders / riders (SPECIES=lasius; docs/creatures/titans.md)
 npx vite-node tools/titan-raid-probe.ts -- longNights hole normal    # a story titan's dig-in tick by tick (setups none/hole/attack/riders/block/burrow; LINES=1)
 npx vite-node tools/caste-table.ts                                   # every caste's numbers (-- creatures: the creatures')
@@ -231,6 +241,7 @@ npm run stress -- 400 60 100                                        # tick time:
 tests/browser/with_server.sh python3 tests/browser/ui_areas.py      # browser checks (Playwright); also ui_test.py, ui_test2.py, ui_dig.py, ui_camera.py
 tests/browser/with_server.sh python3 tests/browser/mp_local.py      # 3 tabs + AI over BroadcastChannel: lobby, lockstep, chat, drop
 tests/browser/with_server.sh python3 tests/browser/mp_finish.py     # 2 tabs: a match played to the end (surrender, results)
+tests/browser/with_server.sh python3 tests/browser/story_titans_in.py # clips: the chapter 1 titans dig into the nest and walk it (ONLY=nights,spider ANTS=60 PARTS=surface,nest; docs/story/shots/titans_in/)
 tests/browser/with_server.sh python3 tests/browser/worker.py        # also replay.py, stress.py, determinism.py
 tests/browser/with_server.sh python3 tests/browser/species_renders.py  # new species in the lab; also species_battle.py, species_fx.py, attack_renders.py (the three melee attacks)
 tests/browser/with_server.sh python3 tests/browser/combat_v2.py docs/combat/v2   # 60 v 60 clash shots (LABEL=before against the base), titan riders, shake-off, clip

@@ -957,9 +957,76 @@ sprays"; "fix the antennae and mandibles, they are misplaced" (soldiers); "fix t
 Every item 8 (models, worker attacks, the sprayer's glue, the soldier's crush, bulldoze, toss and drum); decision
 "approve with changes". The change (K4): the soldier drums "while walking when approaching enemies" — in bursts
 (0.6 s every 1.5 s) while it walks or charges at a foe (`antViews.drumWalking`), the head only, the walk going on.
+
+## 25. Performance pass — faster in every mode, smooth surface ↔ underground switching, no loss of looks (user spec 2026-11-02, claude/performance/01-spec-performance-no-visual-loss.md)
+Branch `feature/performance` from `main` (`18d3d79`). Render, client and worker-message work only: the simulation's
+results never change (the determinism check, replays and every suite prove it).
+
+**Step 1 — measure first.**
+- `core/profiler.ts` (`prof`): every frame's time (animation frame to animation frame), the main thread's own time, named
+  parts (sim, msg, units, creatures, nest, fx, ui, render, prewarm), GL work counted and timed by wrapping the WebGL
+  context (shader compiles and links, texture and buffer uploads), the renderer's counts, the JS heap (Chrome), GPU time
+  (`EXT_disjoint_timer_query_webgl2`), and the hitch log: every frame over 33 ms with what happened in it.
+- F3 overlay (`ui/debugOverlay.ts`) shows all of it at 4 Hz.
+- `?bench=1` (`dev/bench.ts`, Menu → Graphics → Run the benchmark): six scenes, one page load each (so loading counts):
+  the switching test (surface → home nest → each area → surface, ten rounds, every frame), a big fight (4 × 200 ants,
+  100 creatures, 2 titans), a full nest, a story night (The Long Nights' last night), the arena at 600 units, and a
+  multiplayer-sized world. A report to copy and paste back. `tests/browser/bench.py` runs it headless.
+- The golden set before anything changes (`tests/browser/golden.py` → `docs/performance/golden/`) and a comparison tool
+  (`tools/golden-compare.py`: SSIM and per-pixel difference, side-by-side sheets).
+- Baseline numbers in `docs/performance.md`; the measurement build merged to `main` first so the user's devices can run
+  the same `?bench=1` before the optimizations land.
+
+**Step 2 — switching (top priority).** Findings from the hitch log decide the order; the plan:
+- Pre-warm while loading: every area's stage rendered once behind the loading screen (shaders, shadow variants, textures,
+  instance buffers), every ant and creature model that can appear built and compiled for every space, the effects
+  compiled; `renderer.compileAsync` where it avoids a blocking compile (KHR_parallel_shader_compile).
+- Shared model assets: one copy of each ant model's geometry, materials' programs and far-LOD impostor atlas for every
+  space (each area's renderer used to build and bake its own the first time it was shown).
+- Things that appear mid-match (a caste first raised, a creature kind first spawned, a stolen caste) are warmed in the
+  background under a small time budget per frame, as soon as the simulation shows them.
+- Inactive areas kept current at a low rate (nest meshes after digging, hex tiles), so a switch has nothing to catch up.
+- During the dive's black frames the leaving scene is not rendered at full cost; the swap's work is spread over frames.
+
+**Step 3 — every mode, no visible change.** Culling and draw-call merges where the counts say they pay; dynamic
+resolution before `autoQuality` drops a preset; allocation-free hot loops (GC in the hitch log); HUD at a few Hz;
+the worker's tick in the stress scenes; per-player tick and frame times in the multiplayer HUD; a mobile memory budget
+and a 30/60 frame cap option. Each change is checked against the golden set before it is kept.
+
+**Step 4 — verify.** Golden set, `npm test`, determinism, build, replays; final numbers (the build machine and the user's
+devices) in `docs/performance.md`; DESIGN, README, PROGRESS; handoff; merge rule; merge and publish.
+
+**As built (2026-11-03).**
+- Switching: `GameSession.prewarm()` runs behind the loading screen: every ant, termite and creature model that can
+  appear in a space is built once and shared by every renderer (`antRenderer.ts` `builtCache`/`impostorCacheOf`,
+  `termiteLayer.ts` `baseGeos`, `primitives.ts` `prepare`), then each space's scene is compiled and drawn once offscreen
+  with shadows on (`render/prewarm.ts` `warmScene`: everything visible, empty instanced meshes given one instance).
+  `warmNew()` warms morphs the simulation shows mid-match under 4 ms a frame; `keepAreasCurrent()` keeps the other
+  areas' terrain current in 3 ms slices every third frame (`NestTerrain.update(force, budgetMs)`: the distance field,
+  then the light maps, then chunks) and brings the area a dive or cut is about to show up to date under the fade, a
+  6 ms slice a frame. The fade covers the swap: nothing is drawn while it is fully opaque (`GameView.fadedOut`). The
+  distance field's blur is 3× faster with the same result to the bit.
+- Every mode: empty instanced meshes hidden (three binds a program for a visible mesh with no instances); creature part
+  pools upload only the used range; the AO composite pass is skipped when AO is off (same image); dynamic resolution
+  (to 75 %, never lower, with a light sharpen) before auto quality drops a preset; the HUD's labels skip unchanged
+  writes; the slow state goes as per-field deltas (`worker/slowDelta.ts`: 16 % of the bytes, replica identical, tested);
+  ant LOD changes cross-fade over 0.25 s with a 6 % hysteresis (dithered, both models drawn in complementary pixels;
+  the fade rides in `aE.z` with "exhausted" — a new attribute put the ant shader over the 16 a phone allows);
+  frame cap 30/60 (phones 60 by default); a GPU memory estimate (profiler) and a 600 MB phone budget in auto quality;
+  multiplayer pong/delay carry each player's tick and frame time (HUD line and players panel).
+- Verified: the golden set (35 shots, `docs/performance/golden/compare-after.md`) — 35 of 35 match `main`: 30
+  identical (at most a few pixels), the fight and the flood at SSIM 0.9999, the home nest and the titan at 0.997 (walking ants
+  and dust), and the enemy nest at 0.9845, which is closer to `main` than `main` is to itself (0.9871: the ants' random
+  gait phases); every test suite; the determinism check; the switching probe (`docs/performance.md`).
+- Not done, and why: KTX2 (every texture is generated in the page; a transcoder would cost more than it saves);
+  IndexedDB bake cache (not done in this pass: worth it only if the user's device numbers show loading dominated by
+  the impostor bakes); cached static shadows (the shadow camera follows the view, and units cast
+  most of the shadow); termite LOD cross-fade (the kit's instance writes are spread over many setters; it keeps its own
+  hard switch).
+
 ## 26. Story titans get inside; titans open holes more easily (user specs 2026-11-03: claude/story/05-spec-story-titans-get-inside.md, claude/creatures/02-spec-easier-titan-holes.md)
 
-(§25 is the performance pass's, on `feature/performance`, still in progress.)
+(§25 is the performance pass's.)
 
 ### 26.1 Why the story titans never got in (evidence, before any change: `main` `762d7c3`)
 `tools/titan-raid-probe.ts` (the probe: `tools/titanProbe.ts`) starts each level at its titan's moment and logs the
@@ -1073,7 +1140,144 @@ All modes (spec B):
   (Formica and the Termants drive off or kill every titan but one that never reached the hole; the Lasius colony lets
   all four in, 76–99 % health). AI colonies now meet a warned titan at the hole it will dig (`warAI.ts threat`).
 
-## 27. Audio v3 — sound effects reworked: made-for-this-game files, no walking or termite idle sounds, insect-like attacks (user spec 2026-11-06, claude/audio/03-spec-sfx-rework-insect.md)
+## 27. A shared underground: set tunnels between nests, underground fog (user spec 2026-11-06, claude/underground/01-spec-shared-underground-tunnels.md)
+
+Branch `feature/shared-underground` off `main` `d1161a0`. Every number in `balance.ts` `TUNNELS`. Deterministic sim; fog is
+client-side only.
+
+### 27.1 What exists (survey, `main` d1161a0)
+- Each underground area is its own `NestGrid` (34 × 30 hexes, `colony.ts NEST_COLS/ROWS`) in its own space
+  (`nestSpace(id) = id + 1`), joined to the surface only by its one flower entrance. Nothing joins two nests: `goToArea`
+  always goes out onto the surface and down the other nest's holes; `hasRouteHome`, `teamPresence`, `threat`,
+  `allyDanger`, `invasionCheck` and the job system assume "own nest + surface".
+- Digging: `dig {q, on}` designates a hex of the player's own nest (`designateDig`); `jobs.ts listJobs` turns designated
+  hexes next to dug floor into Dig jobs (2 workers a hex, `workRate` 2/4/6 points a second by level, 6 points a hex
+  whatever the soil — soil only changes how the raster is carved). No per-caste or per-species dig speed is read.
+- Soil: fine raster + hex layer; `SOIL_STONE` (255) is undiggable by ants but `breakHex` (titans) breaks it.
+- Tabs: an area's tab opens while the viewer's team has live ants in it (`areaOpen`); once open the whole grid, its
+  ants and tiles are drawn (no visibility layer anywhere: nest renderer, `NestView`, minimap).
+- The worker sends every grid to every client (`worker/frames.ts`), so fog can be purely render-side.
+- Saves: `SimState.version` 3; `NestGridSnap` / `serialize` list every grid array; `restoreWorld` attaches grids after
+  the World constructor. Net: `BUILD_ID` `ud-mp-11`.
+
+### 27.2 Design (the user's decisions, 2026-11-06, and how they map onto the code)
+**One underground, nests kept separate, joined by set routes.**
+- The shared frame: every nest grid is placed under its anthill (nest mm → surface mm through `nestToSurface`'s 0.6
+  scale, as before); routes are planned in the surface frame from the anthills' positions, so gates face the neighbour
+  they lead to. The nest grids themselves stay separate spaces (their own tab, grid and rules); a route is two halves,
+  one in each nest's grid, that meet at the grids' rims (the route's halfway point).
+- **Rock margin:** every colony nest grows a ring of `TUNNELS.margin` (8) hexes of **rock** (`SOIL_ROCK`, 254: a new
+  type nothing digs or breaks — `isHexDiggable` false, `carve` and `breakHex` refuse it, titans included) round the old
+  34 × 30 diggable interior, so the interior (where tiles go) is exactly as before and routes have room. Grid 50 × 46.
+  The margin's rock is the walls of every route. Caves keep their grids.
+- **Routes** (`SimState.routes`, `sim/tunnels.ts`): generated once at match start, after the colonies, from the
+  anthills' positions: up to `allPairsMax` (4) colonies every pair; more colonies: each nest's `neighbours` (3) nearest,
+  and a route whose surface segment crosses an accepted route (shorter routes first) or whose gate would come within
+  `gateGap` (5) edge hexes of another gate is dropped. A story level decides (`GameSetup.tunnels`: `'auto'`, `'none'` or
+  authored pairs; story levels default to none unless the level says). Each route: `{ id, a, b, open, openT,
+  halves: [{ colony, space, gate, steps, dir, warned }, …] }`. A half's `steps` are hex triples (left, centre, right in
+  the walking direction) from the gate outward through the margin to the rim (step 0 is the gate hex alone, an interior
+  edge hex), the centreline a gently curving walk (a sine wobble of ±1 hex, deterministic) toward the rim in the
+  direction of the other nest, `dir` the outward edge at the rim. Route hexes get `hexRoute[q] = id + 1`, soil
+  `SOIL_ROUTE` (6, diggable, drawn as rock until dug: "not visible beyond the gate"); the gate hex `SOIL_GATE` (5,
+  brownish loosened soil). `HEX_WORK` for both. Gates keep `gateAway` (4) hexes from the flower and never lie on the
+  flower's side.
+- **Digging a route:** the player uses the Dig tool on a gate: `dig` on a gate hex becomes a route dig toggle
+  (`digRoute {route, on}`, a new command, also sent directly by the UI). `Colony.routeDig` is the one route a colony
+  digs (`-1` none); marking another pauses the first (its dug hexes stay). `jobs.ts` lists route Dig jobs for the
+  colony's frontier on that route: its own half's first undug step from its gate (each hex of the step a job, 2
+  workers each), and once its own half is through to the rim, the partner's half from the rim inward — so an attacker
+  digs the whole way and a defender (or ally) digging from its own gate meets it; dug hexes count from either side.
+  Route hexes cost `jobPoints × hexWorkMul` (10) points: 3 hexes in parallel a step, 15 steps a route, a normal crew of
+  six level-1 workers ≈ 3.7 min (`tools/tunnel-dig-probe.ts` measures it). Dig speed is data: `CasteDef.digRate`
+  and `SpeciesDef.digRate` multiply a worker's rate on Dig jobs (all 1 now; digging specialists later).
+  Cross-rim digging: a worker in its own rim step digs the partner's rim step from across the rim (`digHex` with the
+  rim edge as the entry side); once that step is dug the worker walks through (portal below) and digs on inside the
+  partner's half. A job has a space now (`Ant.jobS`); every job helper takes the grid of that space.
+- **Opening:** a half is through when all its steps are dug; the route is `open` when both halves are (checked once a
+  second by `tunnelTick`), then `tunnelOpen` is emitted (toasts for both players, tab alerts). Open routes never close;
+  a fallen colony's halves stay dug.
+- **Moving through routes (walk, no teleport):** `goToArea`, `goHome`, `hasRouteHome`, job navigation and markers:
+  an ant in a nest linked to its goal nest by an open route (or by a route it may pass: the route's halves dug all the
+  way from its own side — its colony's diggers) follows the nest field `route:<id>` to its rim step, and when it stands
+  in the rim step and heads out over the rim it crosses: same lateral place in the partner's rim step (left ↔ right,
+  since the halves face each other), heading turned inward, in the partner's space. Flow fields never cross a rim; a
+  cross-nest walk is two legs (to the rim, then the partner's field). Creatures do the same in `creatureAI` when their
+  goal lies through an open route (a titan raid walking on into a linked nest).
+- **Fog (client-side, `game/fog.ts`):** per viewed space the session builds a per-hex mask (0 seen, 1 remembered, 2
+  dark) from the sim each frame, plus an `explored` memory per space (not saved: a reload forgets what was seen).
+  Rules for the viewer's team T looking at space S owned by O:
+  - own or allied nest: all seen, **except** route hexes of a closed route that O's own digging has not reached (the
+    steps beyond O's dug prefix): those are **sealed** — the nest renderer draws them as solid rock (the SDF and the
+    soil map treat sealed cells as rock) and units in them are hidden, so an enemy digging in is unseen until the
+    warning, and the route beyond the gate is "inside the dark soil";
+  - enemy nest the viewer's ants entered by the surface (`Ant.ent ≥ 0` for any of them in S): all seen, as now;
+  - enemy nest reached only by tunnel: while the route is closed, seen = the route's own hexes within `sight` (5) of
+    the viewer's units; once open, every dug hex within `sight` of a viewer unit; remembered hexes are drawn dimmed
+    without units; enemy units, food and brood show only in seen hexes;
+  - **hints:** when the viewer's diggers are within `hintRange` (3) steps of the far gate and the route is closed, the
+    far nest's view shows, beyond the frontier at the gate: a red ! if enemy ants stand within `hintRange` hexes of
+    the gate, a food/brood mark, a creature mark (billboards, `render/game/routeSigns.ts`).
+  - The sim knows everything (lockstep); AI colonies decide from `threat`/`allyDanger`/`pickTarget` as before (they
+    are already omniscient about strengths; tunnels add no new knowledge).
+- **Warnings:** `tunnelTick` once a second: when an enemy's dug frontier on a half comes within `warnRange` (3) steps
+  of the half's gate and the route is closed, emit `tunnelWarn {colony, route, space, x, y}` once (then `warned`) and
+  `tunnelDig {space, x, y}` every `warnEvery` (4) s while the digging goes on (a muffled dig sound from behind the
+  wall). UI: toast "Something is digging toward your nest" (click: jump to the gate), the tab alert, a red ! billboard
+  on the gate until the route opens; the breakthrough toast.
+- **Tabs and camera:** each nest view draws its half up to the rim (the halfway point). Scrolling: when the nest camera
+  goal is clamped at the rim inside an open (or passable) route's rim step, the view cuts (fade) to the partner nest at
+  its rim step; following a group (`updateFollow`) already follows an ant across spaces; `areaOpen` treats the viewer's
+  ants in a partner's half as presence (the tab lights up as they dig in). The minimap draws gates (brown) and open
+  routes (a line to the rim).
+- **Tiles:** `tiles.ts` refuses tiles on route hexes unless the species flag `satelliteNests` is set
+  (`tileAllowedOnRoute`): the hook for multiple-queen species; nothing hard-codes "never".
+- **AI (`warAI.ts`, `TUNNELS.ai`):** when `time ≥ ai.from[aiLevel]` (Easy never), a closed route leads to the war
+  brain's chosen target and no raid is on, the brain starts digging it (`routeDig`), keeps its fighters at its gate
+  (DEFEND there) and raids through it when it opens (ATTACK on the target queen; pathing takes the route). Defence:
+  a warned closed half is a `threat` at the gate (guards go there); on Hard+ the colony digs the same route to meet
+  them (`ai.meetFrom`). Allies: the ally brain digs a route to an ally from `ai.allyLinkFrom` s when idle; once linked,
+  help walks through it (`travelTime` prefers a linked nest). Difficulty: `ai.from`, `ai.meetFrom`, `ai.chance`.
+- **Saves and net:** `SimState.version` 4: a version-3 grid is embedded into the margin (every hex index and nest
+  position in that space shifted by the margin; tiles, entrances, flowers, ants, food, brood, creatures, markers,
+  jobs, the AI's chambers) and routes are generated closed; `NestGridSnap`/`serialize` carry `hexRoute`; `BUILD_ID`
+  `ud-mp-12`. Fog never touches the sim.
+- **Performance:** grids are ~2.2× the cells (50 × 46 vs 34 × 30 hexes); the nest renderer's full-grid SDF runs only on
+  version changes; the fog mask is one byte a hex, and only the viewed space is computed.
+
+### 27.3 Files
+`sim/balance.ts` (TUNNELS), `sim/types.ts` (TunnelRoute, SimState.routes, Colony.routeDig, Ant.jobS), `world/nestGrid.ts`
+(SOIL_ROCK/ROUTE/GATE, hexRoute, margin, embed), `sim/tunnels.ts` (new: generation, frontier, tick, crossing, queries),
+`sim/colony.ts`, `sim/jobs.ts`, `sim/commands.ts`, `sim/movement.ts`, `sim/areas.ts`, `sim/antAI.ts` (job nav),
+`sim/tiles.ts`, `sim/warAI.ts`, `sim/mapGen.ts`, `sim/snapshot.ts`, `sim/world.ts`, `core/events.ts`, `net/messages.ts`,
+`game/fog.ts` (new), `game/session.ts`, `game/nestView.ts`, `render/nest/nestTerrain.ts`, `render/game/routeSigns.ts`
+(new), `ui/minimaps.ts`, `ui/gameUI.ts`, `audio/gameAudio.ts`, `tests/tunnels.ts` (new), `tools/tunnel-dig-probe.ts`
+(new), docs.
+
+### 27.4 Results (2026-11-07)
+- Routes valid on every playable map for 2, 3, 4, 6 and 10 colonies × 2 seeds (`tools/tunnel-check.ts`): three hexes
+  wide (bands of every margin hex within a step of the centreline, rock pockets filled), rock-walled, gates on the
+  interior edge ≥ 4 from the flower and ≥ 5 apart; all pairs ≤ 4 colonies (6 routes for 4), nearest neighbours without
+  surface crossings above (9 routes for 6).
+- Dig times with six level-1 workers (`tests/tunnels.ts`, seed 3): the defender warned at 4.5 min, the route open at
+  5.7 min, the breach into the rival's floor at 6.7 min; both sides digging: open at 3.6 min. `hexWorkMul` went
+  10 → 5 → 4 → 3 to land near the spec's 3–5 min (the hexes dug one step of three at a time, two workers each, so the
+  crew of six is the natural crew size).
+- Changes of plan while building: a half's `breach` is also the owner's own passage from its floor to its gate (the
+  AI's nests never reach the edge; dug first, from the floor outward); `goOut` takes a usable route home from a foreign
+  nest (every "not in own nest → go out" path in antAI then walks the tunnel instead of climbing out — before that,
+  marker groups oscillated between the nests); the `tunnelBreach` event (the gate joining the floor) was added for the
+  "they have dug into your nest" alert; `Fog` lives on the session and is handed to each `NestView`.
+- AI (`tools/tunnel-ai-probe.ts`, Brutal, seed 5, 4 colonies with an AI ally): the fire ants tunnelled toward the idle
+  player — warned 13.3 min, open 13.8, in 14.7 — and the leafcutter ally linked nests at 14 min; the black garden ants
+  guarded (DEFEND) when warned. Easy never tunnels.
+- Checks: `npm test` (32 suites incl. `tests/tunnels.ts`), `tools/check-determinism.ts` (72 files clean), `npm run
+  build`. `tests/run-all.ts` and `tests/entrances.ts` were adjusted for the margin and version 4.
+- Open: the fog's "remembered" dimming is subtle on the dark tunnel floor; hints past the frontier appear only when the
+  rival has ants/food within 3 hexes of its gate (quiet gates give none); the nest renderer's full-grid SDF runs on
+  every grid version change over a grid 2.3× the cells (fine on this machine; a device check with 10 colonies is
+  pending); creatures cross only open routes; the camera switch needs the goal pushed against the rim in a rim step.
+## 28. Audio v3 — sound effects reworked: made-for-this-game files, no walking or termite idle sounds, insect-like attacks (user spec 2026-11-06, claude/audio/03-spec-sfx-rework-insect.md)
 Kept: the audio system of `claude/audio/02-spec-eotu-style-audio.md` (buses, mixer and voice limits, the scuffle and
 battle beds, adaptive music, ducking, marker chirps, alerts, ambience).
 

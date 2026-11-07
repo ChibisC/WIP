@@ -44,10 +44,12 @@ export interface SlowState {
   host?: number;
   mode: SimState['mode'];
   settings: SimState['settings'];
-  colonies: Colony[];
-  caves: CaveDef[];
-  aphids: AphidCluster[];
-  plants: LeafPlant[];
+  /** each colony's fields that changed since the last frame (all of them the first time a colony is seen) */
+  colonies: Array<Partial<Colony> & { id: number }>;
+  /** absent: unchanged since the last frame */
+  caves?: CaveDef[];
+  aphids?: AphidCluster[];
+  plants?: LeafPlant[];
   /** storms on authored maps (the replica raises its own water to match) */
   flood?: SimState['flood'];
 }

@@ -238,17 +238,31 @@ export class GameUI {
     else if (e.t === 'queenHurt' && e.colony === pid) this.toasts.push('The queen is under attack!', 'warn', 'queen');
     // a titan digging toward the nest (sim/creatures/titanDig.ts): click to look
     else if (e.t === 'titanDig' && e.colony === pid && (e.phase === 'warn' || e.phase === 'start' || e.phase === 'breach')) {
-      // (lower case for the sentence, but a proper name keeps its capital: "Mexican red-knee tarantula", "Carolina wolf spider")
-      const name = (creatureKind(e.kind)?.name ?? 'titan').replace(/^(?!(?:Mexican|Carolina)\b)([A-Z])/, (c) => c.toLowerCase());
+      // (lower case for the sentence, but a proper name keeps its capital: "Mexican red-knee tarantula", "Carolina wolf spider",
+      // "European stag beetle" — "a European", not "an european")
+      const name = (creatureKind(e.kind)?.name ?? 'titan').replace(/^(?!(?:Mexican|Carolina|European)\b)([A-Z])/, (c) => c.toLowerCase());
       // how long until it breaks through (claude/creatures/02-spec §3): "about 10 s", "about 35 s"
       const eta = e.eta !== undefined ? ` It breaks through in about ${aboutSecs(e.eta)}.` : '';
       const text =
-        e.phase === 'warn' ? `${/^[aeiou]/.test(name) ? 'An' : 'A'} ${name} is digging toward your nest!${eta} Click to look.` : e.phase === 'start' ? `The ${name} is digging at your nest’s hole.${eta}` : `The ${name} has broken into the nest!`;
+        e.phase === 'warn' ? `${/^[aeiou]/.test(name) && !/^Eu/.test(name) ? 'An' : 'A'} ${name} is digging toward your nest!${eta} Click to look.` : e.phase === 'start' ? `The ${name} is digging at your nest’s hole.${eta}` : `The ${name} has broken into the nest!`;
       this.toasts.push(text, 'warn', `titan:${e.phase}`, () => this.s.jumpTo(e.phase === 'breach' ? 'nest' : 'surface', e.x, e.y, e.phase === 'breach' ? e.space : undefined));
     }
     // a story titan breaking into your nest (claude/story/05-spec §2): a short banner
     if (e.t === 'titanDig' && e.colony === pid && e.phase === 'enter' && e.story) this.banner('It’s in the nest!');
     else if (e.t === 'invasion' && e.colony === pid) this.toasts.push('Intruders in the nest!', 'warn', 'invasion');
+    // the shared underground (sim/tunnels.ts): digging toward your gate, a route opening, a breach into the nest
+    else if (e.t === 'tunnelWarn' && e.colony === pid) this.toasts.push('Something is digging toward your nest! Click to look.', 'warn', 'tunnel:warn', () => this.s.jumpTo('nest', e.x, e.y, e.space));
+    else if (e.t === 'tunnelOpen' && (e.a === pid || e.b === pid)) {
+      const w = this.s.world;
+      const other = w.colony(e.a === pid ? e.b : e.a);
+      const ally = other && other.team === this.s.player.team;
+      const i = e.a === pid ? 0 : 1;
+      this.toasts.push(ally ? `A tunnel now links your nest with ${other!.name}’s. Click to look.` : `The tunnel to ${other?.name ?? 'the rival nest'} is open! Click to look.`, ally ? 'good' : 'warn', 'tunnel:open', () => this.s.jumpTo('nest', e.x[i], e.y[i], e.spaces[i]));
+    } else if (e.t === 'tunnelBreach' && e.colony === pid && e.by >= 0) {
+      const w = this.s.world;
+      const by = w.colony(e.by);
+      if (by && by.team !== this.s.player.team) this.toasts.push(`${by.name} has dug into your nest! Click to look.`, 'warn', 'tunnel:breach', () => this.s.jumpTo('nest', e.x, e.y, e.space));
+    }
     else if (e.t === 'colonyLost' && e.colony === pid) this.toasts.push('Your queen has died. The colony is lost.', 'warn');
     else if (e.t === 'colonyLost') {
       const w = this.s.world;
@@ -428,7 +442,7 @@ export class GameUI {
         l.style.display = 'none';
         continue;
       }
-      l.style.display = 'block';
+      if (l.style.display !== 'block') l.style.display = 'block';
       l.style.left = p.x + 'px';
       l.style.top = p.y + 'px';
       const txt = String(markerCounts(s.world, s.player, i).current);
@@ -466,10 +480,12 @@ export class GameUI {
         if (e.style.display !== 'none') e.style.display = 'none';
         return;
       }
-      e.style.display = 'block';
+      // (written only when they change: an unchanged class or display still costs a style pass every frame)
+      if (e.style.display !== 'block') e.style.display = 'block';
       e.style.left = l.x + 'px';
       e.style.top = l.y + 'px';
-      e.className = 'tlabel ' + l.kind;
+      const cls = 'tlabel ' + l.kind;
+      if (e.className !== cls) e.className = cls;
       if (e.innerHTML !== l.html) e.innerHTML = l.html;
     });
     const follow = s.followId ? s.world.antById.get(s.followId) : undefined;

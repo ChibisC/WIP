@@ -4,7 +4,9 @@
  *  - equal-food fights: every species' worker against every other (and soldiers, majors), the same food's worth on
  *    each side (build + hatch), on open ground, two seeds; prints a win table and each caste's score;
  *  - creatures against black garden ant workers: how many workers a creature beats and how many it kills.
- *   npx vite-node tools/balance-matrix.ts -- [workers|soldiers|heavies|creatures|all] [food=150]
+ *  - `stags`: each stag beetle male against 4…50 black garden ant workers and 2…16 soldiers, three seeds (`KINDS=…`,
+ *    `STAG_NS=workers;soldiers` choose).
+ *   npx vite-node tools/balance-matrix.ts -- [workers|soldiers|heavies|creatures|stags|all] [food=150]
  */
 import { EventBus } from '../src/core/events';
 import { createWorld } from '../src/sim/mapGen';
@@ -13,7 +15,7 @@ import { CASTES, SPECIES } from '../src/sim/species';
 import { makeAnt } from '../src/sim/factory';
 import { placeMarker } from '../src/sim/markers';
 import { casteCosts } from '../src/sim/tiles';
-import { spawnCreature } from '../src/sim/creatures/creatureAI';
+import { creatureFight } from './creatureFight';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const what = args[0] ?? 'all';
@@ -88,45 +90,8 @@ export function fight(a: string, na: number, b: string, nb: number, seed = 3, se
   return { a: alive(0) / na, b: alive(1) / nb, t: t / 20 };
 }
 
-/** A creature against n workers of a caste; returns whether it died, ants lost, time. */
-export function creatureFight(kind: string, caste: string, n: number, seed = 3, secs = 150): { dead: boolean; lost: number; hp: number; t: number } {
-  const ev = new EventBus();
-  const w = createWorld({ seed, style: 'formicarium', width: 600, depth: 600, colonies: [{ species: CASTES[caste].species, player: true, ai: false }], food: 0, aphids: 0, plants: 0, puddles: 0, settings: { creatures: 0 } }, ev);
-  w.s.settings.foodRespawn = 0;
-  w.terrain.clearArea(150, 150, 450, 450);
-  const cr = spawnCreature(w, kind, SURFACE, 300, 300);
-  const c = w.colony(0)!;
-  placeMarker(w, c, 0, SURFACE, 300, 300);
-  const ids: number[] = [];
-  for (let i = 0; i < n; i++) {
-    const ang = (i / n) * Math.PI * 2;
-    const a = makeAnt(w, 0, caste, SURFACE, 300 + Math.cos(ang) * 45, 300 + Math.sin(ang) * 45, ang + Math.PI);
-    a.task = 'marker';
-    a.marker = 0;
-    ids.push(a.id);
-  }
-  w.reindex();
-  let t = 0;
-  for (; t <= secs * 20; t++) {
-    w.step(0.05);
-    ev.drain();
-    for (const id of ids) {
-      const x = w.antById.get(id);
-      if (x && x.state !== AS.Dead) {
-        x.task = 'marker';
-        x.marker = 0;
-        const p = w.creatureById.get(cr.id);
-        if (p && !p.dead && t % 20 === 0) placeMarker(w, c, 0, SURFACE, p.x, p.y);
-      }
-    }
-    const p = w.creatureById.get(cr.id);
-    const left = ids.filter((id) => w.antById.get(id)?.state !== AS.Dead && w.antById.get(id)).length;
-    if (!p || p.dead || !left) break;
-  }
-  const p = w.creatureById.get(cr.id);
-  const lost = ids.filter((id) => !w.antById.get(id) || w.antById.get(id)!.state === AS.Dead).length;
-  return { dead: !p || p.dead, lost, hp: p ? Math.max(0, p.hp) / p.maxHp : 0, t: t / 20 };
-}
+// (creatureFight lives in ./creatureFight.ts, without node globals, so tests can use it)
+export { creatureFight };
 
 function roundRobin(castes: string[], title: string): void {
   console.log(`\n== ${title}: equal food (${FOOD}), two seeds; cell = the row's survivors − the column's (−1..1)`);
@@ -182,9 +147,40 @@ if (what === 'workers' || what === 'all')
   roundRobin(pick((r, id) => r === 'worker' && !CASTES[id].nanitic && !['atta_minim', 'eciton_submajor'].includes(id)), 'workers');
 if (what === 'soldiers' || what === 'all') roundRobin(pick((r, id) => r === 'soldier' && !id.includes('mortar') && !id.includes('rapid')), 'soldiers');
 if (what === 'heavies' || what === 'all') roundRobin(pick((r) => r === 'major'), 'majors');
+/**
+ * The stag beetle males (docs/balance/castes.md "Stag beetle males"): against `n` of a caste for each n, over `seeds`:
+ * how many fights the beetle lost (died), the ants lost and the beetle's health left (means), and the time.
+ */
+export function stagRow(kind: string, caste: string, ns: number[], seeds = [3, 4, 5]): Array<{ n: number; died: number; lost: number; hp: number; t: number }> {
+  return ns.map((n) => {
+    let died = 0;
+    let lost = 0;
+    let hp = 0;
+    let t = 0;
+    for (const seed of seeds) {
+      const r = creatureFight(kind, caste, n, seed);
+      if (r.dead) died++;
+      lost += r.lost / seeds.length;
+      hp += r.hp / seeds.length;
+      t += r.t / seeds.length;
+    }
+    return { n, died, lost, hp, t };
+  });
+}
+if (what === 'stags') {
+  // STAG_NS=w1,w2,…;s1,s2,… (workers; soldiers) to choose the counts
+  const [wn, sn] = (process.env.STAG_NS ?? '4,6,8,10,12,15,20,25,30,35,40,45,50;2,3,4,5,6,7,8,10,12,14,16').split(';').map((x) => x.split(',').map(Number));
+  for (const kind of process.env.KINDS?.split(',') ?? ['stagMinor', 'stagSmall', 'stagMedium', 'stagLarge']) {
+    for (const [caste, ns] of [['lasius_worker', wn], ['lasius_soldier', sn]] as const) {
+      if (!ns.length || !ns[0]) continue;
+      const row = stagRow(kind, caste, ns);
+      console.log(`${kind.padEnd(11)} v ${caste.padEnd(15)} ` + row.map((r) => `${r.n}: ${r.died}/3 died, −${r.lost.toFixed(1)}, ${(r.hp * 100).toFixed(0)}% ${r.t.toFixed(0)}s`).join(' | '));
+    }
+  }
+}
 if (what === 'creatures' || what === 'all') {
   console.log('\n== creatures v black garden ant workers: for 5/10/20/40 workers: died? (ants lost, creature hp left)');
-  for (const kind of (process.env.KINDS?.split(',') ?? ['pillbug', 'cutworm', 'groundBeetle', 'wolfSpider', 'lithobius', 'rove', 'mantis', 'antlion', 'spiderling', 'stagBeetle', 'tarantula', 'scolopendra', 'giantMantis', 'hogna'])) {
+  for (const kind of (process.env.KINDS?.split(',') ?? ['pillbug', 'cutworm', 'groundBeetle', 'wolfSpider', 'lithobius', 'rove', 'mantis', 'antlion', 'spiderling', 'stagMinor', 'stagSmall', 'stagMedium', 'stagLarge', 'stagBeetle', 'tarantula', 'scolopendra', 'giantMantis', 'hogna'])) {
     const ns = ['stagBeetle', 'tarantula', 'scolopendra', 'giantMantis', 'hogna'].includes(kind) ? [20, 40, 80, 120] : [5, 10, 20, 40];
     const cells = ns.map((n) => {
       const r = creatureFight(kind, 'lasius_worker', n);

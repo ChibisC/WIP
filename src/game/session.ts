@@ -19,6 +19,9 @@ import { CombatFx } from '../render/game/combatFx';
 import { WorldMarkers } from '../render/game/worldMarkers';
 import { MarkerTrail, TrailEnds } from '../render/game/markerTrail';
 import { World } from '../sim/world';
+import { Fog } from './fog';
+import { halfIn, otherHalf, ownHalf, routeById, routeDone, routeUsable, stepIndex } from '../sim/tunnels';
+const ROUTE_EDGE_ANG = [-Math.PI / 6, Math.PI / 6, Math.PI / 2, (5 * Math.PI) / 6, (7 * Math.PI) / 6, -Math.PI / 2];
 import { createWorld, GameSetup } from '../sim/mapGen';
 import { AS, Colony, FloodState, SURFACE, TileType, colonyOfSpace, nestSpace } from '../sim/types';
 import { AreaInfo, areaOpen, areasFor, teamPresence } from '../sim/areas';
@@ -32,13 +35,16 @@ import { Command, CommandBody } from '../sim/commands';
 import { LocalCommands } from './localCommands';
 import { LocalSim, SimHost, WorkerSim } from './simHost';
 import { AutoQuality } from './autoQuality';
+import { prof } from '../core/profiler';
+import { overviewCamera, warmScene } from '../render/prewarm';
+import { STOLEN_CASTES } from '../sim/termants';
 import type { NetGame } from '../net/netGame';
 import { matchWinner } from '../net/match';
 import { MISSIONS, missionDef, missionOf } from '../sim/missions';
 import { restoreWorld } from '../sim/snapshot';
 import { commandsByTick, encodeReplay } from './replay';
 import { SaveHeader, SaveRecord, SaveSlot, encodeSave, putSave } from './saves';
-import { bindingsOf, settings } from './profile';
+import { bindingsOf, frameCapOf, settings } from './profile';
 import { antToView, blankView, corpseToView } from './antViews';
 import { NestView, casteTint } from './nestView';
 import { TeamRings } from '../render/game/teamRings';
@@ -97,6 +103,8 @@ export class GameSession {
   viewedArea: number;
   /** viewer setting (sandbox): every area tab open. Client-side only, never simulation state. */
   revealAreas = false;
+  /** underground fog for tunnel invasions (game/fog.ts; render-side, per viewer) */
+  readonly fog = new Fog();
   /** every player action goes through here (multiplayer brief, Part C) */
   commands!: LocalCommands;
   /** where the simulation runs: this thread or a worker (then `world` is a replica) */
@@ -268,6 +276,14 @@ export class GameSession {
       tick: () => this.tickOnce(),
       frame: (alpha, realDt, simDt) => this.frame(this.sim.alpha(alpha, performance.now(), this.loop.paused), realDt, simDt),
     });
+    // the frame profiler (F3, ?bench=1): every frame's parts, GL work and hitches (game/profiler.ts)
+    prof.attach(this.view.renderer);
+    (window as unknown as { __prof: unknown }).__prof = prof;
+    this.loop.onStepStart = (now) => prof.begin(now);
+    this.loop.onTicks = (ms) => {
+      if (this.sim.kind === 'local') prof.add('sim', ms);
+    };
+    this.loop.onStepEnd = () => prof.end();
     this.events.onAny((e) => {
       if (e.t === 'command') this.commands.acknowledge(e.player, e.seq);
       this.routeFx(e);
@@ -331,7 +347,135 @@ export class GameSession {
   }
 
   start(): void {
+    this.loop.frameCap = frameCapOf(settings());
     this.loop.start();
+  }
+
+  // ---------------------------------------------------------------- pre-warming (performance pass, CHANGE_PLAN §25)
+
+  /** ant models already asked for in every space's renderer (the background warm-up's bookkeeping) */
+  private warmed = new Set<string>();
+  private warmQueue: string[] = [];
+  private warmCheckAt = 0;
+
+  /** Every ant and termite model that can appear in this match: every colony's castes and royals, and stolen castes. */
+  private matchMorphs(): Set<string> {
+    const out = new Set<string>();
+    const add = (cs: string) => {
+      const m = CASTES[cs]?.morph;
+      if (m) out.add(m);
+    };
+    for (const c of this.world.s.colonies) {
+      for (const cd of Object.values(CASTES)) if (cd.species === c.species) out.add(cd.morph);
+      for (const cs of c.castes) add(cs);
+      if (c.species === 'termant') for (const e of STOLEN_CASTES) add(e.caste);
+      if (isTermiteSpecies(c.species)) out.add(c.species === 'rhynchotermes' ? 'termite_rhy_larva' : 'termite_larva');
+    }
+    return out;
+  }
+
+  private antRenderers(): AntRenderer[] {
+    return [this.surfAnts, ...[...this.nests.values()].map((nv) => nv.ants)];
+  }
+
+  /**
+   * Pre-warm everything behind the loading screen: build every model that can appear in every area, fill each
+   * area's buffers once, and draw every scene once off screen (shaders compiled and first drawn, textures uploaded,
+   * shadow maps made), so the first switch to an area costs what the tenth does. `progress` gets the steps.
+   */
+  async prewarm(progress?: (done: number, total: number) => void): Promise<void> {
+    const t0 = performance.now();
+    const v = this.view;
+    const w = this.world;
+    const morphs = this.matchMorphs();
+    const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+    const steps: Array<() => void> = [];
+    for (const r of this.antRenderers()) steps.push(() => void r.prepare(morphs));
+    steps.push(() => {
+      this.surfCreatures.prepare();
+      for (const nv of this.nests.values()) nv.creatures.prepare();
+    });
+    const vh = window.innerHeight * v.renderer.getPixelRatio();
+    for (const [space, nv] of this.nests)
+      steps.push(() => {
+        const g = w.nestOf(space)!;
+        const cam = overviewCamera(g.widthMm, g.depthMm);
+        const owner = w.colony(colonyOfSpace(space)) ?? null;
+        nv.update(w, owner, this.player, cam, 1, 0, vh, g.R * 16, -1, v.time, this.player.markers, []);
+        warmScene(v.renderer, nv.stage.scene, cam);
+      });
+    steps.push(() => {
+      const t = w.terrain;
+      warmScene(v.renderer, v.surfaceScene, overviewCamera(t.width, t.depth));
+    });
+    for (const m of morphs) this.warmed.add(m);
+    for (let i = 0; i < steps.length; i++) {
+      steps[i]();
+      progress?.(i + 1, steps.length);
+      await tick();
+    }
+    prof.note(`pre-warm ${(performance.now() - t0).toFixed(0)} ms (${steps.length} steps, ${morphs.size} models)`);
+    this.prewarmMs = performance.now() - t0;
+  }
+
+  /** time the pre-warm took (ms; the benchmark reports it) */
+  prewarmMs = 0;
+
+  private areaRR = 0;
+
+  /**
+   * Areas not on screen are kept current at a low rate (performance pass): one a few times a second rebuilds its nest
+   * mesh after digging and its tiles, while the frame has room, so showing it later has nothing to catch up on.
+   */
+  private keepAreasCurrent(): void {
+    const v = this.view;
+    // the area a dive or a cut is about to show: brought up to date under the fade, a slice every frame
+    if (v.incoming === 'nest') {
+      const nv = this.nests.get(this.viewedArea);
+      if (nv && nv.stage.terrain.dirty) {
+        const t0 = performance.now();
+        nv.stage.terrain.update(false, 6);
+        prof.add('nest', performance.now() - t0);
+        return;
+      }
+    }
+    // the others in turn, a slice every third frame while the frame has room
+    if (this.frameNo % 3 !== 0 || prof.cpuMs.ema > 25) return;
+    const list = [...this.nests.values()];
+    for (let k = 0; k < list.length; k++) {
+      const nv = list[this.areaRR++ % list.length];
+      if (v.space === 'nest' && nv.space === v.activeNest) continue;
+      const t0 = performance.now();
+      if (nv.stage.terrain.dirty) nv.stage.terrain.update(false, 3);
+      // (the hexes: tiles and their looks, cheap; at most every 18 frames per area)
+      else if (this.frameNo % 18 === 0) nv.updateHexes(this.world, this.world.colony(colonyOfSpace(nv.space)) ?? null);
+      else continue;
+      prof.add('nest', performance.now() - t0);
+      return;
+    }
+  }
+
+  /**
+   * In play: a model the match did not have at loading (a stolen caste, a borrowed one) is built in every space in the
+   * background, one renderer a frame, as soon as the simulation has it — before the player can look at it.
+   */
+  private warmNew(): void {
+    if (this.frameNo < this.warmCheckAt && !this.warmQueue.length) return;
+    if (!this.warmQueue.length) {
+      this.warmCheckAt = this.frameNo + 30;
+      for (const m of this.matchMorphs()) if (!this.warmed.has(m)) this.warmQueue.push(m);
+      return;
+    }
+    const t0 = performance.now();
+    const m = this.warmQueue[0];
+    for (const r of this.antRenderers()) {
+      if (r.has(m)) continue;
+      r.prepare([m]);
+      if (performance.now() - t0 > 4) return; // (the rest next frame)
+    }
+    this.warmQueue.shift();
+    this.warmed.add(m);
+    prof.add('prewarm', performance.now() - t0);
   }
 
   /** One simulation tick (false: it cannot run yet — multiplayer is waiting for a player's packets). */
@@ -375,6 +519,8 @@ export class GameSession {
     this.revealAreas = false;
     this.loop.speed = 1;
     this.commands.remote = (cmd) => net.issue(cmd);
+    // (each player's tick and frame times travel with the pings: slow clients show in the HUD — performance pass)
+    net.perfOf = () => [Math.round(this.sim.tickMs * 10) / 10, Math.round(prof.frameMs.ema * 10) / 10];
     net.onLog = (text) => this.onEvent?.({ t: 'message', text, kind: 'info' });
     net.onChat = (from, text) => this.onChat?.(from, text);
   }
@@ -679,7 +825,12 @@ export class GameSession {
     // Every change is a command; the checks here only choose what to send and what to say. (Each nest has one entrance,
     // always open: Dig and Remove do nothing special at it.)
     if (this.tool === 'dig') {
-      if (!g.isHexDug(q) && g.isHexDiggable(q)) this.issue({ type: 'dig', q, on: this.paintOn }, phase !== 'start');
+      const rid = g.routeOf(q);
+      if (rid >= 0) {
+        // a tunnel route's gate (sim/tunnels.ts): a click starts or pauses the route's dig (never painted over)
+        const r = routeById(this.world, rid);
+        if (phase === 'start' && r && ownHalf(r, c.id)?.gate === q && !routeDone(this.world, r, c.id)) this.issue({ type: 'digRoute', route: rid, on: c.routeDig !== rid }, false);
+      } else if (!g.isHexDug(q) && g.isHexDiggable(q)) this.issue({ type: 'dig', q, on: this.paintOn }, phase !== 'start');
     } else if (this.tool === 'tile') {
       const ex = tileAt(c, q) ?? (this.pendingTileAt(q) ? { built: false } : undefined);
       if (ex && !ex.built && phase === 'start') {
@@ -1421,7 +1572,24 @@ export class GameSession {
     let ok = true;
     if (this.tool === 'dig') {
       ok = g.isHexDiggable(q);
-      if (ok) this.ghostInfo = g.hexDesig[q] ? 'Marked for digging · click again to cancel' : 'Mark for digging · workers excavate it (6 points)';
+      const rid = g.routeOf(q);
+      if (rid >= 0) {
+        // a tunnel route (sim/tunnels.ts): dug from its gate
+        const r = routeById(this.world, rid);
+        const own = r && ownHalf(r, c.id);
+        const other = r ? this.world.colony(r.a === c.id ? r.b : r.a) : undefined;
+        const name = other?.name ?? 'another nest';
+        if (r && routeDone(this.world, r, c.id)) {
+          ok = false;
+          this.ghostInfo = `Tunnel to ${name} · open`;
+        } else if (own && own.gate === q) {
+          ok = true;
+          this.ghostInfo = c.routeDig === rid ? `Digging the tunnel to ${name} · click to pause` : `Tunnel gate · click to dig toward ${name}${c.routeDig !== undefined && c.routeDig >= 0 ? ' (pauses the other tunnel)' : ''}`;
+        } else {
+          ok = false;
+          this.ghostInfo = `Tunnel to ${name} · dig it from its gate`;
+        }
+      } else if (ok) this.ghostInfo = g.hexDesig[q] ? 'Marked for digging · click again to cancel' : 'Mark for digging · workers excavate it (6 points)';
     } else if (this.tool === 'upgrade') {
       const t = tileAt(c, q);
       ok = !!t && t.built && !canUpgrade(this.world, c, t);
@@ -1457,10 +1625,52 @@ export class GameSession {
     u.uGhostCol.value.set(ok ? 0x7cdc6a : 0xe0503a);
   }
 
+  /**
+   * The shared underground (sim/tunnels.ts): scrolling the nest camera out over a route's rim step into an open (or,
+   * for the digger, passable) route switches to the other nest at its rim step, with the normal fade cut, and its tab
+   * lights up; following a group does the same through updateFollow.
+   */
+  private updateTunnelView(): void {
+    const v = this.view;
+    const w = this.world;
+    if (v.space !== 'nest' || v.transitioning || v.observing || this.frameNo % 6 !== 0) return;
+    const space = v.activeNest;
+    const g = w.nestOf(space);
+    if (!g) return;
+    const rig = v.nestRig;
+    const q = g.hexAt(rig.goal.x, rig.goal.z);
+    if (q < 0 || !g.isRim(q)) return;
+    const rid = g.routeOf(q);
+    if (rid < 0) return;
+    const r = routeById(w, rid);
+    const h = r && halfIn(r, space);
+    if (!r || !h || stepIndex(h, q) !== h.steps.length - 1 || !routeUsable(w, r, this.player.id)) return;
+    // only when pushing against the rim: the goal clamped at the grid's edge on the route's outward side
+    const B = rig.bounds;
+    const atEdge = rig.goal.x <= B.min.x + 0.5 || rig.goal.z <= B.min.y + 0.5 || rig.goal.x >= B.max.x - 0.5 || rig.goal.z >= B.max.y - 0.5;
+    if (!atEdge) return;
+    const o = otherHalf(r, h);
+    if (!this.areaTab(o.space)?.open && !(this.player.routeDig === r.id)) return;
+    const og = w.nestOf(o.space);
+    if (!og) return;
+    const ostep = o.steps[o.steps.length - 1];
+    const oc = og.hexCenter(ostep[0]);
+    const inward = ROUTE_EDGE_ANG[o.dir] + Math.PI;
+    const x = oc.x + Math.cos(inward) * og.R * 2.5;
+    const y = oc.y + Math.sin(inward) * og.R * 2.5;
+    this.viewedArea = o.space;
+    this.alert(o.space);
+    v.fadeCut(() => {
+      v.setActiveNest(o.space, { x, z: y });
+    });
+  }
+
   /** Tab alerts: the home nest invaded or the queen hurt; your ants fighting or dying in an area. */
   private noteAlert(e: SimEvent): void {
     const w = this.world;
-    if (e.t === 'invasion' && e.colony === this.player.id) this.alert(nestSpace(this.player.id));
+    if ((e.t === 'tunnelWarn' || (e.t === 'tunnelBreach' && e.by >= 0)) && e.colony === this.player.id) this.alert(e.space);
+    else if (e.t === 'tunnelOpen' && (e.a === this.player.id || e.b === this.player.id)) for (const sp of e.spaces) this.alert(sp);
+    else if (e.t === 'invasion' && e.colony === this.player.id) this.alert(nestSpace(this.player.id));
     else if (e.t === 'death' && e.kind === 'ant' && e.colony === this.player.id && e.space !== SURFACE) this.alert(e.space);
     else if (e.t === 'bite' && e.space !== SURFACE && w.s.tick % 4 === 0) {
       // a fight near one of your ants in an area
@@ -1499,6 +1709,7 @@ export class GameSession {
     const v = this.view;
     this.frameNo++;
     this.renderAlpha = alpha;
+    const f0 = performance.now();
     this.netFrame();
     this.events.drain();
     if (this.frameNo % 30 === 0) this.autosave();
@@ -1510,19 +1721,31 @@ export class GameSession {
       this.showArea(nestSpace(this.player.id));
     }
     if (v.space === 'nest' && !v.transitioning && v.activeNest !== this.viewedArea) v.setActiveNest(this.viewedArea);
+    this.updateTunnelView();
     this.updateHover();
     const cam = v.activeCamera();
     const vh = window.innerHeight * v.renderer.getPixelRatio();
     const sel = this.tool === 'marker' ? this.markerSel : -1;
     const shown = this.shownMarkers();
+    let pt = performance.now();
+    // (the net, the event queue, autosave, the camera follow, hover and the area tabs)
+    prof.add('events', pt - f0);
+    this.warmNew();
+    this.keepAreasCurrent();
+    pt = performance.now();
     if (v.space === 'nest') {
       const nv = this.nests.get(v.activeNest);
       const owner = w.colony(colonyOfSpace(v.activeNest)) ?? null;
       if (nv) nv.overlay = this.tileOverlay;
+      if (nv) {
+        if (this.fog.advance(w.s.tick) || !nv.fog) this.fog.update(w, this.player, v.activeNest, this.revealAreas);
+        nv.fog = this.fog;
+      }
       if (nv) nv.update(w, owner, this.player, cam, alpha, realDt, vh, v.observing ? v.observeRig.distance * 3 : v.nestRig.distance, sel, v.time, shown, this.pendingHexes());
       if (nv) nv.bars.update(w, v.activeNest, alpha, cam, vh, (x, y, l, o) => nv.map.pos(x, y, l, o), this.player, this.inspect, realDt);
       if (nv) nv.trail.update(sel, this.trailEnds(sel, v.activeNest, shown), (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.distance, v.time);
       if (nv) nv.hit.update(w, v.activeNest, this.hitboxes, (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.goal.x, v.nestRig.goal.z, v.nestRig.distance * 2);
+      prof.add('nest', performance.now() - pt);
     } else {
       const views = this.views;
       let n = 0;
@@ -1539,14 +1762,21 @@ export class GameSession {
       const list = n === views.length ? views : views.slice(0, n);
       const t = w.terrain;
       this.mounds.update(w, this.terrainHeight);
-      this.view.storm = stormLevel(w.s.flood);
+      // (a story rain shower: the storm light while it lasts, easing in and out over 8 s)
+      const rain = w.s.weather ? Math.max(0, Math.min(1, (w.s.weather.rain - w.s.time) / 8)) : 0;
+      this.view.storm = Math.max(stormLevel(w.s.flood), rain);
+      if (this.view.terrainMesh) this.view.terrainMesh.raining = rain > 0;
       // a story level's night (its own day/night clock, sim/story/dayNight.ts): moonlight; wolf spiders' eyeshine
       this.view.nightLevel = w.s.night ?? 0;
       this.surfCreatures.night = w.s.night ?? 0;
       this.surfMarkers.update(shown, SURFACE, this.surfHeight, v.observing ? v.observeRig.distance * 3 : v.surfaceRig.distance, (i) => markerRadius(w, this.player, i), sel, v.time);
       this.surfTrail.update(sel, this.trailEnds(sel, SURFACE, shown), this.surfHeight, v.surfaceRig.distance, v.time);
       // creatures first: climbing ants are placed on their animated legs and backs
+      prof.add('units', performance.now() - pt);
+      pt = performance.now();
       this.surfCreatures.update(w.s.creatures, SURFACE, alpha, realDt, this.surfHeight, cam, vh);
+      prof.add('creatures', performance.now() - pt);
+      pt = performance.now();
       this.surfHit.update(w, SURFACE, this.hitboxes, this.surfHeight, v.surfaceRig.goal.x, v.surfaceRig.goal.z, v.surfaceRig.distance * 2);
       this.surfCombat.update(w, SURFACE, this.combatDebug, this.surfHeight, v.surfaceRig.goal.x, v.surfaceRig.goal.z, v.surfaceRig.distance * 2);
       this.surfAnts.mount = (av, a, out) => {
@@ -1559,6 +1789,7 @@ export class GameSession {
       this.surfFood.update(w, SURFACE, alpha, this.surfMap, (id) => this.surfAnts.holdOf(id));
       this.surfBars.update(w, SURFACE, alpha, cam, vh, (x, y, l, o) => this.surfMap.pos(x, y, l, o), this.player, this.inspect, realDt);
       this.surfDecor.update(w, this.foodView, (f) => edible(this.player, f));
+      prof.add('units', performance.now() - pt);
       if (this.sim.kind === 'worker') {
         const o = this.sim.takeOverlay();
         if (o && this.pheroOn) {
@@ -1594,18 +1825,24 @@ export class GameSession {
       }
     }
     // effects run on game time (frozen while paused)
+    pt = performance.now();
     const px = (vh * 0.5) / Math.tan(THREE.MathUtils.degToRad((cam as THREE.PerspectiveCamera).fov) * 0.5);
     this.surfFx.update(simDt, this.surfHeight, px);
     for (const nv of this.nests.values()) nv.fx.update(simDt, (x, y) => nv.stage.terrain.heightAt(x, y), px);
+    prof.add('fx', performance.now() - pt);
     // a story shot steers the surface camera (input waits until it is over or skipped)
     let cineOn = false;
     if (this.cine) {
       cineOn = this.cine.update(realDt);
       if (!cineOn) this.cine = null;
     }
+    pt = performance.now();
     v.frame(realDt, !cineOn);
-    this.autoQuality.update(v, realDt);
+    prof.add('render', performance.now() - pt);
+    this.autoQuality.update(v, realDt, this.loop.frameCap);
+    pt = performance.now();
     this.onFrame?.();
+    prof.add('ui', performance.now() - pt);
   }
 
   // ---------------------------------------------------------------- story mode (sim/story; claude/story/02-spec)

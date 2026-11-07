@@ -5,10 +5,13 @@ import { arrivalHash, canEnter, canLeave, entranceTop, exitHole, holeIn, passEnt
 import { casteOf } from './species';
 import { hexCoreCells } from './colony';
 import { hexSpeedOf } from './tiles';
-import { BALANCE, ECITON, LAYERS, NASUTE, TERMANT, TRAIL } from './balance';
+import { BALANCE, ECITON, LAYERS, NASUTE, NEST_FLOOD, STORY, TERMANT, TRAIL } from './balance';
+import { isHexFlooded } from './nestFlood';
 import { cartonBlocks, termantSpeedMul } from './termants';
 import { potholeMul, teamLoad } from './eciton';
 import { datan2, dcos, dhypot, dsin, hash01, sq } from './dmath';
+import { halfIn, routeField, stepIndex, usableRoute } from './tunnels';
+import type { TunnelRoute } from './types';
 
 const TAU = Math.PI * 2;
 const tmp = { x: 0, y: 0 };
@@ -47,10 +50,14 @@ export function antSpeed(w: World, a: Ant): number {
     if (owner && g) {
       const q = g.hexAt(a.x, a.y);
       if (q >= 0) v *= hexSpeedOf(w, owner)[q];
+      // swimming in a flooding nest (sim/nestFlood.ts)
+      if (q >= 0 && owner.nestFlood?.q.length && isHexFlooded(w, owner.id, q)) v *= NEST_FLOOD.swimMul;
     }
   }
   // Carabid-style night bonus not for ants; ants slow slightly at night.
   v *= 1 - w.s.night * 0.15;
+  // a story level's hot spell: ants out on the surface walk slower (sim/story/surprises.ts)
+  if (w.s.weather && a.space === SURFACE && w.s.weather.heat > w.s.time) v *= STORY.heatSpeed;
   // layered ground: a little slower walking up a ramp (LAYERS.upSpeed)
   if (a.space === SURFACE && w.terrain.layers) v *= w.terrain.slopeSpeed(a.x, a.y, dcos(a.h), dsin(a.h));
   return v;
@@ -458,10 +465,42 @@ export function approachSurface(w: World, a: Ant, x: number, y: number, dt: numb
   return steerTo(w, a, x, y, dt, speedMul, rate, weave);
 }
 
+/**
+ * Walk a tunnel route (sim/tunnels.ts) out of the ant's nest toward the other: down the space's field to the route's
+ * rim step, then out over the rim (the crossing itself is the tunnel system's, before the ants move). Returns true while
+ * it is on its way (false: no way to the rim here).
+ */
+export function walkRoute(w: World, a: Ant, r: TunnelRoute, dt: number, speedMul = 1): boolean {
+  const g = w.nestOf(a.space);
+  const h = halfIn(r, a.space);
+  if (!g || !h) return false;
+  const q = g.hexAt(a.x, a.y);
+  if (q >= 0 && stepIndex(h, q) === h.steps.length - 1) {
+    // in the rim step: on out over the rim
+    const ctr = g.hexCenter(q, tmp);
+    const ang = ROUTE_EDGE_ANG[h.dir];
+    steerTo(w, a, ctr.x + dcos(ang) * g.R * 0.75, ctr.y + dsin(ang) * g.R * 0.75, dt, speedMul);
+    return true;
+  }
+  const f = routeField(w, a.space, r);
+  if (!f) return false;
+  const res = followNest(w, a, f, dt, speedMul);
+  return res !== 'stuck';
+}
+const ROUTE_EDGE_ANG = [-Math.PI / 6, Math.PI / 6, Math.PI / 2, (5 * Math.PI) / 6, (7 * Math.PI) / 6, -Math.PI / 2];
+
 /** Walk home on the surface; enters the nest when reaching an entrance. Returns true once inside. */
 export function goHome(w: World, a: Ant, dt: number, speedMul = 1): boolean {
   const c = w.colony(a.colony);
   if (!c) return false;
+  // in another nest with a tunnel route home: through it (no climbing out)
+  if (a.space !== SURFACE) {
+    if (a.space === nestSpace(a.colony)) return true;
+    const r = usableRoute(w, a.space, nestSpace(a.colony), a.colony);
+    if (r && walkRoute(w, a, r, dt, speedMul)) return false;
+    goOut(w, a, dt);
+    return false;
+  }
   // the nearest hole; while it is busy, another of the anthill's with room that is not much farther
   let ei = holeIn(w, c.entrances, a.x, a.y);
   if (ei < 0) ei = nearestEntrance(c, a.x, a.y);
@@ -611,7 +650,14 @@ export function goOut(w: World, a: Ant, dt: number): boolean {
   if (a.space === SURFACE) return true;
   const g = w.nestOf(a.space);
   const ents = w.entrancesOf(a.space);
-  if (!g || !ents.length) return false;
+  if (!g) return false;
+  // in another nest with a tunnel route home (sim/tunnels.ts): "out" is back through the tunnel, the shorter way
+  // home (callers leave an area to get home); its own nest is left by the entrance as ever
+  if (a.space !== nestSpace(a.colony)) {
+    const r = usableRoute(w, a.space, nestSpace(a.colony), a.colony);
+    if (r && walkRoute(w, a, r, dt)) return false;
+  }
+  if (!ents.length) return false;
   if (tryExit(w, a)) return true;
   const f = exitFieldIn(w, a.space);
   if (!f) return false;
@@ -645,6 +691,9 @@ export function goToArea(w: World, a: Ant, space: number, dt: number, speedMul =
   if (a.space === space) return true;
   if (space === nestSpace(a.colony)) return goHome(w, a, dt, speedMul);
   if (a.space !== SURFACE) {
+    // a tunnel route from this nest to that one (sim/tunnels.ts): walk it instead of climbing out
+    const r = space !== SURFACE ? usableRoute(w, a.space, space, a.colony) : undefined;
+    if (r && walkRoute(w, a, r, dt, speedMul)) return false;
     goOut(w, a, dt);
     return false;
   }

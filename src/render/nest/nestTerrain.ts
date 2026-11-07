@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { NEST_CHUNK, NestGrid, SOIL_AIR, SOIL_STONE } from '../../world/nestGrid';
+import { prof } from '../../core/profiler';
+import { NEST_CHUNK, NestGrid, SOIL_AIR, SOIL_GATE, SOIL_ROCK, SOIL_ROUTE, SOIL_STONE } from '../../world/nestGrid';
 import { addPatch, globalUniforms, NOISE_GLSL, WORLD_POS_PATCH } from '../shaderPatch';
 import { valueNoise2 } from '../../core/rng';
 
@@ -83,6 +84,60 @@ export class NestTerrain {
     uCarton: { value: 0 },
   };
 
+  /**
+   * Sealed cells (the shared underground, game/fog.ts): a tunnel route's hexes the viewer's side has not dug to, and a
+   * breach not yet joined — drawn as solid rock whatever the simulation has dug there. Null: none.
+   */
+  private sealed: Uint8Array | null = null;
+  private sealedKey = '';
+
+  /** Which hexes draw as sealed rock (see `sealed`); a change rebuilds the whole stage. */
+  setSealed(hexes: ReadonlySet<number> | null): void {
+    const key = hexes && hexes.size ? [...hexes].sort((a, b) => a - b).join(',') : '';
+    if (key === this.sealedKey) return;
+    this.sealedKey = key;
+    const g = this.grid;
+    if (!key) this.sealed = null;
+    else {
+      const m = new Uint8Array(g.w * g.h);
+      for (const q of hexes!) for (const k of g.hexCells[q]) m[k] = 1;
+      this.sealed = m;
+    }
+    this.rebuildAll();
+  }
+
+  /** Is cell k dug floor as drawn (dug and not sealed)? */
+  private airCell(k: number): boolean {
+    return this.grid.soil[k] === SOIL_AIR && !(this.sealed && this.sealed[k]);
+  }
+
+  /**
+   * Fog level per hex (game/fog.ts): 0 seen, 1 remembered (drawn dimmed), 2 dark (drawn as unexplored darkness). Lives in
+   * the per-hex texture's flag bits 1 and 2 beside the designation bit.
+   */
+  setFog(level: ((q: number) => number) | null): void {
+    const g = this.grid;
+    let changed = false;
+    for (let q = 0; q < g.cols * g.rows; q++) {
+      const i = q * 4 + 3;
+      const v = level ? level(q) : 0;
+      const bits = (v === 1 ? 16 : 0) | (v === 2 ? 32 : 0);
+      const nv = (this.hexData[i] & ~48) | bits;
+      if (nv !== this.hexData[i]) {
+        this.hexData[i] = nv;
+        changed = true;
+      }
+    }
+    if (changed) this.hexTex.needsUpdate = true;
+  }
+  /** scratch for the signed distance (chamfer from air, from soil, the blur's other buffer) */
+  private sdA: Float32Array | null = null;
+  /** sliced updates: the light maps wait for the signed distance; a batch of chunks is open */
+  private mapsStale = false;
+  private batchOpen = false;
+  private sdS: Float32Array | null = null;
+  private sdT: Float32Array | null = null;
+
   constructor(public grid: NestGrid) {
     const g = grid;
     this.wallH = g.R * 1.25;
@@ -154,10 +209,16 @@ export class NestTerrain {
     const W = g.w;
     const H = g.h;
     const INF = 1e6;
-    const dA = new Float32Array(W * H);
-    const dS = new Float32Array(W * H);
+    // (scratch kept between rebuilds: a rebuild used to allocate three grids of garbage)
+    if (!this.sdA || this.sdA.length !== W * H) {
+      this.sdA = new Float32Array(W * H);
+      this.sdS = new Float32Array(W * H);
+      this.sdT = new Float32Array(W * H);
+    }
+    const dA = this.sdA;
+    const dS = this.sdS!;
     for (let k = 0; k < W * H; k++) {
-      const air = g.soil[k] === SOIL_AIR;
+      const air = this.airCell(k);
       dA[k] = air ? INF : 0;
       dS[k] = air ? 0 : INF;
       // grid border counts as soil for air cells
@@ -167,28 +228,52 @@ export class NestTerrain {
     }
     chamfer(dA, W, H);
     chamfer(dS, W, H);
-    for (let k = 0; k < W * H; k++) this.sd[k] = g.soil[k] === SOIL_AIR ? dA[k] - 0.5 : -(dS[k] - 0.5);
-    // Blur: cell staircases become smooth organic contours.
-    const tmp = new Float32Array(W * H);
+    for (let k = 0; k < W * H; k++) this.sd[k] = this.airCell(k) ? dA[k] - 0.5 : -(dS[k] - 0.5);
+    // Blur: cell staircases become smooth organic contours. Seven passes of a 3×3 kernel (centre weight 2). The interior
+    // cells skip the bounds checks; every cell adds the same values in the same order as the plain loop (borderBlur),
+    // so the result is the same to the bit (performance pass, tests/performance.ts) at a fraction of the time.
+    let src = this.sd;
+    let dst = this.sdT!;
     for (let pass = 0; pass < 7; pass++) {
-      for (let y = 0; y < H; y++)
-        for (let x = 0; x < W; x++) {
-          let sum = 0;
-          let n = 0;
-          for (let dy = -1; dy <= 1; dy++)
-            for (let dx = -1; dx <= 1; dx++) {
-              const xx = x + dx;
-              const yy = y + dy;
-              if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
-              const wgt = dx === 0 && dy === 0 ? 2 : 1;
-              sum += this.sd[yy * W + xx] * wgt;
-              n += wgt;
-            }
-          tmp[y * W + x] = sum / n;
+      for (let y = 0; y < H; y++) {
+        if (y === 0 || y === H - 1) {
+          for (let x = 0; x < W; x++) dst[y * W + x] = borderBlur(src, W, H, x, y);
+          continue;
         }
-      this.sd.set(tmp);
+        dst[y * W] = borderBlur(src, W, H, 0, y);
+        for (let x = 1; x < W - 1; x++) {
+          const k = y * W + x;
+          let sum = 0;
+          sum += src[k - W - 1];
+          sum += src[k - W];
+          sum += src[k - W + 1];
+          sum += src[k - 1];
+          sum += src[k] * 2;
+          sum += src[k + 1];
+          sum += src[k + W - 1];
+          sum += src[k + W];
+          sum += src[k + W + 1];
+          dst[k] = sum / 10;
+        }
+        dst[y * W + W - 1] = borderBlur(src, W, H, W - 1, y);
+      }
+      const t = src;
+      src = dst;
+      dst = t;
     }
+    // every cell whose distance changed dirties its chunk (and a neighbour it is near the edge of): a change's reach
+    // through the chamfer and the blur is not bounded by `markDirty`'s radius, and a background area kept current in
+    // slices must end with every chunk rebuilt that the final distance touches (tests/performance.ts)
+    const prev = this.sdPrev;
+    if (prev) {
+      for (let k = 0; k < W * H; k++) if (prev[k] !== src[k]) g.markDirty(k % W, (k - (k % W)) / W);
+    } else this.sdPrev = new Float32Array(W * H);
+    if (src !== this.sd) this.sd.set(src);
+    this.sdPrev!.set(this.sd);
   }
+
+  /** the signed distance of the last computation (which cells changed → which chunks rebuild) */
+  private sdPrev: Float32Array | null = null;
 
   /** Light pools (local + wide openness), wall distance and a smooth stone mask. */
   private updateMaps(): void {
@@ -198,8 +283,10 @@ export class NestTerrain {
     const air = new Float32Array(W * H);
     const stone = new Float32Array(W * H);
     for (let k = 0; k < W * H; k++) {
-      air[k] = g.soil[k] === SOIL_AIR ? 1 : 0;
-      stone[k] = g.soil[k] === SOIL_STONE ? 1 : 0;
+      const s = this.sealed && this.sealed[k] ? SOIL_ROUTE : g.soil[k];
+      air[k] = s === SOIL_AIR ? 1 : 0;
+      // (the rock margin and a route's undug soil are drawn as rock slabs, like buried stones but darker)
+      stone[k] = s === SOIL_STONE || s === SOIL_ROCK || s === SOIL_ROUTE ? 1 : 0;
     }
     const rPool = Math.max(2, Math.round((g.R * 0.9) / g.cell));
     const rWide = Math.max(4, Math.round((g.R * 3.2) / g.cell));
@@ -207,9 +294,10 @@ export class NestTerrain {
     const wide = boxBlur(air, W, H, rWide, 2);
     const st = boxBlur(stone, W, H, 1, 1);
     for (let k = 0; k < W * H; k++) {
-      const s = g.soil[k];
+      const s = this.sealed && this.sealed[k] ? SOIL_ROUTE : g.soil[k];
       const i = k * 4;
-      this.soilData[i] = s === SOIL_STONE ? 255 : s * 40;
+      // (R: soil type × 40; stone 255; rock and undug route soil 250 — the "rock" look, type 6; a gate 200, type 5)
+      this.soilData[i] = s === SOIL_STONE ? 255 : s === SOIL_ROCK || s === SOIL_ROUTE ? 250 : s === SOIL_GATE ? 200 : s * 40;
       this.soilData[i + 1] = g.designated[k] ? 255 : 0;
       this.soilData[i + 2] = 0;
       this.soilData[i + 3] = 255;
@@ -242,11 +330,11 @@ export class NestTerrain {
       const i = q * 4;
       if (!v) {
         this.hexData[i] = this.hexData[i + 1] = this.hexData[i + 2] = 0;
-        this.hexData[i + 3] &= 1; // keep the dig designation bit
+        this.hexData[i + 3] &= 1 | 48; // keep the dig designation and fog bits
         continue;
       }
       // alpha: bit0 dig designation (kept), bit1 planned, bit2 pending upgrade, bit3 pending delete
-      this.hexData[i + 3] = (this.hexData[i + 3] & 1) | (v.planned ? 2 : 0) | (v.pend === 1 ? 4 : 0) | (v.pend === 2 ? 8 : 0);
+      this.hexData[i + 3] = (this.hexData[i + 3] & (1 | 48)) | (v.planned ? 2 : 0) | (v.pend === 1 ? 4 : 0) | (v.pend === 2 ? 8 : 0);
       this.hexData[i] = v.type;
       this.hexData[i + 1] = (Math.max(0, Math.min(3, v.level)) & 3) | ((v.edges & 63) << 2);
       this.hexData[i + 2] = v.outline;
@@ -475,21 +563,64 @@ export class NestTerrain {
   }
 
   /** Rebuild dirty chunks (cheap when nothing changed). */
-  update(force = false): void {
+  /**
+   * Bring the mesh up to date with the grid. `budgetMs` (performance pass): an area not on screen is kept current in
+   * slices — one heavy step a call (the signed distance, then the light maps, then chunks until the budget is spent) —
+   * so the work never lands in one frame; the shown area (no budget) does everything at once, as before.
+   */
+  update(force = false, budgetMs = Infinity): void {
     const g = this.grid;
     if (!force && g.dirty.size === 0) return;
+    const t0 = performance.now();
+    const n = g.dirty.size;
+    const sliced = budgetMs !== Infinity;
     if (g.version !== this.builtVersion || force) {
       this.computeSignedDistance();
       this.builtVersion = g.version;
+      this.mapsStale = true;
+      if (sliced) return;
     }
-    this.updateMaps();
-    for (const ci of g.dirty) this.buildChunk(ci);
-    g.dirty.clear();
+    if (!sliced || this.mapsStale || !this.batchOpen) {
+      this.updateMaps();
+      this.mapsStale = false;
+      this.batchOpen = true;
+      if (sliced) return;
+    }
+    let built = 0;
+    for (const ci of g.dirty) {
+      this.buildChunk(ci);
+      g.dirty.delete(ci);
+      built++;
+      if (sliced && performance.now() - t0 > budgetMs) break;
+    }
+    if (g.dirty.size === 0) this.batchOpen = false;
+    if (!sliced || g.dirty.size === 0) prof.note(`nest mesh: ${sliced ? built : n} chunks rebuilt${sliced ? ' (in the background)' : ''} (${(performance.now() - t0).toFixed(0)} ms)`);
+  }
+
+  /** Chunks waiting to be rebuilt (the session keeps areas that are not shown current at a low rate). */
+  get dirty(): number {
+    return this.grid.dirty.size;
   }
 
   setShadows(on: boolean): void {
     for (const m of this.chunks.values()) m.castShadow = on;
   }
+}
+
+/** One cell of the signed distance's 3×3 blur, with the grid's edge taken into account (the original loop's body). */
+function borderBlur(sd: Float32Array, W: number, H: number, x: number, y: number): number {
+  let sum = 0;
+  let n = 0;
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx;
+      const yy = y + dy;
+      if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+      const wgt = dx === 0 && dy === 0 ? 2 : 1;
+      sum += sd[yy * W + xx] * wgt;
+      n += wgt;
+    }
+  return sum / n;
 }
 
 /** Two-pass chamfer distance transform (in cells). */
@@ -804,6 +935,9 @@ vec3 topC = vec3(0.055,0.052,0.034);
 topC = mix(topC, vec3(0.11,0.065,0.045), step(2.5, st)*step(st, 3.5));   // clay: redder
 topC = mix(topC, vec3(0.09,0.085,0.075), step(3.5, st)*step(st, 4.5));   // gravel: greyer
 topC = mix(topC, vec3(0.05,0.045,0.032), step(0.5, st)*step(st, 1.5));   // humus: darker
+// a tunnel route's gate (the shared underground): brownish, loosened soil — a warm, lighter crumb than the nest's
+float gateM = step(4.5, st)*step(st, 5.5);
+topC = mix(topC, vec3(0.30,0.19,0.10) * (0.85 + 0.3*vnoise(gp*4.0)), gateM);
 vec3 cl = worley(gp*0.55);
 float clod = smoothstep(0.5, 0.05, cl.x);
 topC *= 0.7 + 0.5*clod*(0.6 + 0.4*cl.z);
@@ -820,6 +954,9 @@ stoneM = smoothstep(0.42, 0.52, stoneE);
 vec3 sw = worley(gp*0.42);
 // (a little blue-biased so the nest's warm key light, 0xffdcb4, leaves them a neutral stone grey)
 vec3 stoneC = mix(vec3(0.33,0.39,0.50), vec3(0.47,0.55,0.70), fbm(gp*0.3)) * (0.85 + 0.25*vnoise(gp*3.5));
+// the rock margin round the nest (nothing digs it): darker, bluer bedrock than the buried stones
+float rockM = step(5.5, st)*step(st, 6.5);
+stoneC = mix(stoneC, vec3(0.16,0.18,0.24) * (0.8 + 0.3*fbm(gp*0.5)), rockM);
 float crack = smoothstep(0.07, 0.0, sw.y - sw.x);
 stoneC *= 1.0 - crack*0.5;
 stoneC += vec3(0.10,0.10,0.10) * smoothstep(0.52, 0.6, stoneE) * (1.0 - smoothstep(0.6, 0.72, stoneE)); // light rim
@@ -835,6 +972,8 @@ col /= max(covered, 1e-3);
 // darkness grows away from dug ground (soil top and walls); stones stay readable in it
 float darkK = mix(0.17, 1.0, wideL*wideL);
 darkK = mix(darkK, max(darkK, 0.62), stoneM * topM);
+// a tunnel gate stays readable in the dark too (players must spot where tunnels can be dug)
+darkK = mix(darkK, max(darkK, 0.7), gateM * topM);
 col *= mix(1.0, darkK, 1.0 - floorM);
 
 // ---- hex tiles on the floor
@@ -1028,6 +1167,12 @@ if (desig > 0.5) {
   col = mix(col, vec3(0.55,0.36,0.14), 0.45*(1.0 - floorM));
   col = mix(col, vec3(1.0,0.72,0.3), rim*0.8*pulse);
 }
+// fog (the shared underground, game/fog.ts): remembered hexes dimmed, unexplored ones dark
+float fogR = mod(floor(floor(hexT.a*255.0 + 0.5) / 16.0), 2.0) * inGrid;
+float fogD = mod(floor(floor(hexT.a*255.0 + 0.5) / 32.0), 2.0) * inGrid;
+float fogK = 1.0 - fogD;
+col = mix(col, max(col * 0.6, vec3(0.045,0.038,0.028)), fogR);   // remembered: dim but readable
+col = mix(col, vec3(0.012,0.011,0.009), fogD);
 diffuseColor.rgb = col;
 `;
 
@@ -1049,8 +1194,10 @@ const FRAG_EMISSIVE = /* glsl */ `
   // warm light pooling over open dug floor, falling off down tunnels and up the walls
   float spot = 0.65 + 0.7 * smoothstep(0.35, 0.8, fbm(gp*0.012 + 3.0));   // uneven pools, like light through cracks
   float lp = pow(pool, 2.2) * pow(wideL, 1.5) * spot * (floorM + wallM*0.12) * (1.0 - tileK*0.55);
-  totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.84, 0.62) * lp * 1.05 * uPool;
+  totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.84, 0.62) * lp * 1.05 * uPool * fogK;
   if (desig > 0.5) totalEmissiveRadiance += vec3(1.0,0.6,0.2) * smoothstep(0.9, 0.2, edgeProx) * 0.5;
+  // a tunnel gate: a faint warm glow in its loosened soil
+  totalEmissiveRadiance += vec3(0.5,0.3,0.12) * gateM * topM * 0.18 * fogK;
   // daylight down an open entrance tunnel: strongest at the top (level 0), cool white
   if (isEnt > 0.5 && hout < 0.5) {
     // soft-edged: a pool of light down the middle of the ramp, not a lit hexagon; across a nest's wide entrance one shaft,

@@ -10,7 +10,11 @@
   **lamellate club of 4 comb-like plates**.
 - Pronotum black, broad, rounded sides.
 - **Elytra chestnut / reddish-brown**, smooth and glossy, covering the abdomen.
-- Legs black, robust, fore tibiae toothed for digging; tarsal claws strong.
+- Legs black, robust, fore tibiae toothed for digging; tarsal claws strong. The fore tibia (model: `stag_tibia1`,
+  fixed 2026-11-06) is long and slender (about an eighth as wide as long), nearly parallel-sided, bowing slightly
+  outward, with a row of small teeth growing toward the apex along its outer edge, the apex forked into two prongs
+  and two short spurs on the inner face; it lies flat with the toothed edge away from the body, held beside and a
+  little ahead of the head, never past the mandibles.
 
 ## Mandibles (jaws pass, 2026-10-27)
 
@@ -63,3 +67,33 @@ across the front.
 - Male stag beetles use their antler mandibles to wrestle and throw rivals off branches.
 - Stag beetle larvae spend 3–7 years underground feeding on decaying wood.
 - Adult stag beetles live only a few weeks and feed mostly on sap.
+
+## Males of four sizes (2026-11-03; claude/story/06-spec-levels-5-7-and-lengths.md §2)
+
+Besides the titan (a major male, boss), four normal males: `stagMinor`, `stagSmall`, `stagMedium`, `stagLarge`
+(kinds.ts, ai `stagMale`; behaviour numbers in `BALANCE` `STAG_MALE`). They are the same model at male sizes 0, 1, 2, 3
+(of the five the model has, 4 being the titan's major): the head narrows and the antlers shorten with the allometry above
+(antlers 7.5 %, 14 %, 21 % and 27 % of the length; the major's 34 %). Lengths 45, 55, 70 and 85 mm (0.45–0.85 of the
+titan's 100 mm), so drawn, antler tips to elytra apex, about 32, 43, 59 and 77 mm — within the real 35–75 mm of males,
+the minor a little under. Because the short antlers leave the major's layout tail-heavy, a male's model is drawn shifted
+forward so its body is centred on the sim position, and its outline capsule runs from the elytra apex to the antler tips
+(`stagMaleGeom`). Shots: `docs/creatures/shots/stag_sizes_*.jpg` (tests/browser/stag_sizes.py).
+
+| | minor | small | medium | large |
+|---|---|---|---|---|
+| Moves | plods on shoving ants aside; pinches what fights it (threat first) | as the minor | + grabs an ant in its antlers, lifts and tosses it (every 9 s) | + grabs two (every 7 s); rears and slams when hard pressed (under 60 % health, 3+ ants round it); shakes riders off |
+| Wild | forests and rainforests only, rarer than the common creatures | | | the rarest |
+
+**Rival males wrestle** (`stagWrestle.ts`). Two males (any sizes, never the titan) that meet with no ants about square
+up (reared a little, antlers spread), lock antlers and shove back and forth, their heads twisting; then the winner — the
+bigger one mostly, a hurt one less often — rears, lifts the other in its antlers and flicks it off to one side. The loser
+lands on its back, legs waving, rights itself and walks off; neither is hurt, and both leave rivals alone for 40–80 s.
+Ants coming close or a hit on either break the bout off. In the wild, males fight like this over females and sap
+flows; the winner lifts its rival and drops or throws it off the branch. Story levels can stage a bout with
+`startStagWrestle(w, a, b)`.
+
+Facts for the males' cards: how big a male grows and how long its antlers get depends on how well it fed as a larva
+(small males' jaws are about as long as the head); males run from about 35 to 75 mm, antlers included; a big male's
+antlers grow faster than its body (positive allometry); rival males lock antlers and the stronger throws the other off
+the branch; larvae live 3–7 years in dead, rotting wood; adults live a few weeks, mostly on fat stored as larvae,
+drinking a little sap.
