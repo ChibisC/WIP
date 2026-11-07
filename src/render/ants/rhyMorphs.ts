@@ -144,9 +144,10 @@ const queen = {
 // ---------- the larva: a small, pale, soft nymph with a big head and short legs (scaled 0.3 → 0.85 on the brood tile) ----------
 const LARVA_COLORS = {
   ...WORKER_COLORS,
-  head: 0xe8dcc6, headTop: 0xece2ce, headUnder: 0xe0d2b8, clypeus: 0xece2ce, labrum: 0xf0e6d4, mand: 0xd8c4a0, mandTip: 0xb89c74, fontanelle: 0xf4ecdc,
-  thorax: 0xece2cc, thoraxTop: 0xe6dac2, pronotum: 0xeadfc8, abd: 0xeee4d0, abdTop: 0xe6dac4, abdUnder: 0xf2eadc, tergRear: 0xe0d2b8, membrane: 0xf6f0e4, gut: 0xb8a07e,
-  leg: 0xeee6d6, legLight: 0xf4eee4, legBase: 0xe6dcc8, antenna: 0xe8dec8, antennaTip: 0xf0e8d8,
+  // (round-1 render: paper white) a translucent cream with a faint amber cast, the gut a soft grey-brown shadow
+  head: 0xdccaa6, headTop: 0xe2d0ae, headUnder: 0xd2bf9a, clypeus: 0xe0cfae, labrum: 0xe6d8bc, mand: 0xc8ad80, mandTip: 0xa4865a, fontanelle: 0xece2cc,
+  thorax: 0xe0d0b0, thoraxTop: 0xd8c6a2, pronotum: 0xdccaa8, abd: 0xe0cfae, abdTop: 0xd6c29c, abdUnder: 0xe8dcc2, tergRear: 0xccb68e, membrane: 0xeee4ce, gut: 0x8a7656,
+  leg: 0xe2d4b8, legLight: 0xeae0ca, legBase: 0xd8c8a8, antenna: 0xdccdb0, antennaTip: 0xe6dac4,
 };
 const larva = {
   ...worker,
