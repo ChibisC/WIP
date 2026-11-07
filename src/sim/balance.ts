@@ -85,7 +85,7 @@ export const BALANCE = {
     nasute_major: { build: 35, hatch: 7, grow: 32.4 }, // × 3.5 / × 1.8
     // Sickle-Jaw Termites, paid in plant matter: × the baseline worker (10 / 2 / 18) by SICKLE.broodCostMul / broodTimeMul
     rhy_worker: { build: 10, hatch: 2, grow: 18 }, // × 1.0 / × 1.0
-    rhy_soldier: { build: 20, hatch: 2.8, grow: 25.2 }, // × 2.0 / × 1.4
+    rhy_soldier: { build: 22, hatch: 3.1, grow: 25.2 }, // × 2.2 / × 1.4
     // Hell ants (05-implementation-plan Step 2)
     hell_worker: { build: 10, hatch: 3, grow: 22 },
     hell_soldier: { build: 28, hatch: 6, grow: 34 },
