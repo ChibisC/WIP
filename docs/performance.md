@@ -183,3 +183,19 @@ run. Whether anything like it happens on a real GPU is what the device benchmark
 Loading takes longer in exchange: 14.4 s → 26.8 s here (every model and every program now built behind the loading
 screen, with its progress shown). On a real GPU the programs compile in parallel and the difference is a fraction of
 that; the benchmark's report gives the load time per device.
+
+### The benchmark on the build machine (counts only)
+`docs/performance/bench-swiftshader-before.txt` (`main` d1161a0 with the measuring tools) and `-after.txt` (this
+branch before the memory changes), Medium, 15 s a scene, `tests/browser/bench.py`. SwiftShader runs the GPU on two CPU
+cores: frame rates are well under 1 FPS in most scenes for both builds and say nothing about a real device (the
+pre-warm's 150 programs also keep the software GPU busy for minutes after loading). What carries over:
+
+| switching scene | before | after |
+|---|---|---|
+| main thread per frame (average) | 517 ms (nest 265, render 239) | 13.8 ms (nest 3.3, render 7.8) |
+| shader links during the run | 38 | 0 |
+| texture uploads during the run | 272 | 135 |
+| ant models built during the run | yes (lasius_queen 15 s, …) | none |
+| load | 94.7 s | 138.8 s (114.7 s of it the pre-warm) |
+
+The real numbers come from the user's laptop and iPhone (`?bench=1`, below once they arrive).
