@@ -1803,3 +1803,30 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
   she drowned 16 s later, the nest was full at 44.4 s; the home ants ended on the ramp with the brood and drowned there.
   An all-out by a 39-ant Lasius colony on a small colony 580 mm away: in its nest at 60 s, its queen dead at about 110 s.
 - Checks: `tests/nestFlood.ts` (new, in `npm test`), `npm test`, `check-determinism`, `tsc`, the build.
+
+## 2026-11-03 — Stag beetle males of four sizes (claude/story/06-spec-levels-5-7-and-lengths.md §2)
+- **Four normal creatures** (`feature/stag-sizes`): `stagMinor`, `stagSmall`, `stagMedium`, `stagLarge` (*Lucanus cervus*,
+  45 / 55 / 70 / 85 mm, ai `stagMale`), the titan's model at male sizes 0–3 (heads and antlers by the allometry; the model
+  drawn forward so the body is centred on them, the outline from elytra apex to antler tips: `stagMaleGeom`). Not
+  bosses, never raid nests; large creatures for mounting (climb and height data regenerated: only additions).
+- **Moves** (`BALANCE` `STAG_MALE`, creatureAI.ts `stagMale`): the titan's, scaled down — a slow walk that shoves ants
+  aside, a pinch on what fights it (threat first), the antler grab and toss for the medium and large males, the rear and
+  slam plus the rider shake-off for the large one. A male pivots to bite ants on its flanks (they were out of reach).
+- **Wrestling** (`stagWrestle.ts`): two males meeting with no ants about face off, lock antlers and shove, then the
+  winner (the bigger one mostly) lifts the other and throws it on its back; it rights itself and walks off; nobody is
+  hurt; ants or a hit break it off. `startStagWrestle(w, a, b)` lets the story director stage a bout. Deterministic
+  (draws at the start from `w.rng`; the rest a function of the sim time).
+- **Balance** (`tools/balance-matrix.ts -- stags`, docs/balance/castes.md "Stag beetle males"): a minor male takes about
+  10 black garden ant workers, a small one 15, a medium one 20–22 workers or 7–8 soldiers, a large one 40–45 workers
+  or 12 soldiers, each killing many of them (armour 1 / 1.5 / 1.5 / 1.5; health 230 / 400 / 760 / 1150).
+- **Skirmish**: wild on forest and rainforest maps only (`CreatureKind.biomes`; other maps' spawn lists, and so their
+  games, unchanged), rarer than the common creatures, the large male rarest. **Arena**: all four in the roster (first
+  fact in the tooltip); clicking any creature now opens an info card (kind, team, health, what it is doing, its facts;
+  the stag beetles' male size and antler length). **Audio**: beetle family, antler clash pitched by size.
+- The titan unchanged: its stats, moves, model and climbing data; a titan fight, a meadow skirmish with wild creatures
+  and the titan's posed model all match `main` bit for bit.
+- Checks: `tests/stagSizes.ts` (new, in `npm test`); `tsc`; `npm test` (every suite passes; the arena's 600-unit
+  timing check read 25.5 ms against its 25 ms limit once with the machine at load 6 on 2 CPUs, 21.7 ms run alone);
+  `check-determinism`; the build. Shots: `docs/creatures/shots/stag_sizes_*.jpg` (`tests/browser/stag_sizes.py`):
+  the four males beside the titan from above and the side, workers on a medium male, and a bout (face-off, locked, the
+  lift, the loser on its back).

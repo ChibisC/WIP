@@ -1,3 +1,5 @@
+import { STAG_MALE } from '../balance';
+
 /**
  * Creature kinds: stats and info-card text, taken from the reference notes in
  * docs/creatures. Sizes are real body lengths in mm (bosses are scaled up as
@@ -18,6 +20,7 @@ export type CreatureAI =
   | 'antlion'
   | 'spiderling'
   | 'stag'
+  | 'stagMale'
   | 'tarantula'
   | 'scolopendra'
   | 'giantMantis'
@@ -70,6 +73,11 @@ export interface CreatureKind {
   nocturnal?: boolean;
   /** relative abundance when the ecosystem spawns wild creatures (0 = never spawned wild) */
   wild: number;
+  /**
+   * Only spawned wild on maps of these biomes (an authored map's `biome`; a procedural map's style: 'forest' is forest).
+   * Absent: every map.
+   */
+  biomes?: readonly string[];
   ai: CreatureAI;
   facts: string[];
 }
@@ -276,6 +284,114 @@ export const CREATURES: Record<string, CreatureKind> = {
     ai: 'spiderling',
     facts: ['Spiderlings ride on their mother’s abdomen for about a week before dispersing.'],
   }),
+  // ---------------------------------------------------------------- stag beetle males (not bosses)
+  // claude/story/06-spec-levels-5-7-and-lengths.md §2, docs/creatures/lucanus-cervus.md "Males of four sizes": the titan's
+  // model at male sizes 0–3 (BALANCE STAG_MALE.size: msize, behaviour), scaled down from its 100 mm. The numbers are the
+  // balance pass's (docs/balance/castes.md "Stag beetle males"); they never dig into nests (not bosses).
+  stagMinor: K({
+    id: 'stagMinor',
+    name: 'Minor male stag beetle',
+    sci: 'Lucanus cervus',
+    role: 'A small male with short jaws. Plods on, shoving ants aside, and pinches what fights it. Wrestles other males.',
+    length: 45,
+    hp: 230,
+    armor: 1,
+    speed: 11,
+    bite: 9,
+    attackInterval: 1.8,
+    sense: 40,
+    strength: 30,
+    relation: 'hostile',
+    food: 90,
+    mass: 60,
+    fleeAt: 0,
+    wild: 0.6,
+    biomes: ['forest', 'rainforest'],
+    ai: 'stagMale',
+    facts: [
+      'How big a male stag beetle grows, and how long its antlers get, depends on how well it fed as a larva: small males have jaws about as long as their head.',
+      'Stag beetle larvae live 3 to 7 years in dead, rotting wood before they pupate.',
+      'Adult stag beetles live only a few weeks, mostly on fat stored as larvae, drinking a little tree sap.',
+    ],
+  }),
+  stagSmall: K({
+    id: 'stagSmall',
+    name: 'Small male stag beetle',
+    sci: 'Lucanus cervus',
+    role: 'A smallish male. Shoves through ants, pinches its attackers and wrestles other males.',
+    length: 55,
+    hp: 400,
+    armor: 1.5,
+    speed: 10.5,
+    bite: 10.5,
+    attackInterval: 1.8,
+    sense: 45,
+    strength: 42,
+    relation: 'hostile',
+    food: 120,
+    mass: 80,
+    fleeAt: 0,
+    wild: 0.5,
+    biomes: ['forest', 'rainforest'],
+    ai: 'stagMale',
+    facts: [
+      'Male stag beetles range from about 35 to 75 mm, antlers included: the difference is mostly how well each one fed as a larva.',
+      'Rival males lock antlers and wrestle; the stronger one lifts the other and throws it off the branch.',
+      'Stag beetle larvae live 3 to 7 years in dead, rotting wood before they pupate.',
+    ],
+  }),
+  stagMedium: K({
+    id: 'stagMedium',
+    name: 'Medium male stag beetle',
+    sci: 'Lucanus cervus',
+    role: 'A well-armed male. Shoves through ants, grabs one in its antlers and tosses it aside.',
+    length: 70,
+    hp: 760,
+    armor: 1.5,
+    speed: 10,
+    bite: 11,
+    attackInterval: 2,
+    sense: 55,
+    strength: 60,
+    relation: 'hostile',
+    food: 180,
+    mass: 120,
+    fleeAt: 0,
+    wild: 0.35,
+    biomes: ['forest', 'rainforest'],
+    ai: 'stagMale',
+    facts: [
+      'A big male’s antlers grow faster than its body does: the larger the male, the longer its antlers for its size.',
+      'Rival males lock antlers and wrestle; the stronger one lifts the other and throws it off the branch.',
+      'Adult stag beetles live only a few weeks, mostly on fat stored as larvae, drinking a little tree sap.',
+    ],
+  }),
+  stagLarge: K({
+    id: 'stagLarge',
+    name: 'Large male stag beetle',
+    sci: 'Lucanus cervus',
+    role: 'A big male. Ploughs through the swarm, grabs and tosses ants, rears and slams down when hard pressed.',
+    length: 85,
+    hp: 1150,
+    armor: 1.5,
+    speed: 9.5,
+    bite: 13,
+    attackInterval: 2.1,
+    sense: 65,
+    strength: 85,
+    relation: 'hostile',
+    food: 260,
+    mass: 170,
+    fleeAt: 0,
+    wild: 0.15,
+    biomes: ['forest', 'rainforest'],
+    ai: 'stagMale',
+    facts: [
+      'Only well-fed larvae become big males with long antlers; most males are smaller.',
+      'Rival males lock antlers and wrestle; the stronger one lifts the other and throws it off the branch.',
+      'Stag beetle larvae live 3 to 7 years in dead, rotting wood; the adults live only a few weeks and drink sap.',
+    ],
+  }),
   // ---------------------------------------------------------------- bosses
   stagBeetle: K({
     id: 'stagBeetle',
@@ -402,9 +518,55 @@ export function creatureKind(id: string): CreatureKind {
   return CREATURES[id];
 }
 
-/** Kinds the ecosystem spawns in the wild, with their weights. */
-export function wildKinds(): Array<{ id: string; w: number }> {
+/**
+ * Kinds the ecosystem spawns in the wild, with their weights; with `biome`, only those that live there (kinds without
+ * `biomes` live everywhere, so a map whose biome no kind is limited to gets the same list as before).
+ */
+export function wildKinds(biome?: string): Array<{ id: string; w: number }> {
   return Object.values(CREATURES)
-    .filter((k) => k.wild > 0)
+    .filter((k) => k.wild > 0 && (!k.biomes || (biome !== undefined && k.biomes.includes(biome))))
     .map((k) => ({ id: k.id, w: k.wild }));
+}
+
+/** The four stag beetle males (not the titan), smallest first. */
+export const STAG_MALES = ['stagMinor', 'stagSmall', 'stagMedium', 'stagLarge'] as const;
+
+/** Is this kind one of the stag beetle males (not the titan)? */
+export function isStagMale(kind: string): boolean {
+  return CREATURES[kind]?.ai === 'stagMale';
+}
+
+/** A stag beetle male's layout from its model (fractions of its length; BALANCE STAG_MALE.model). */
+export interface StagGeom {
+  /** allometric male size (0..1) */
+  msize: number;
+  /** the antlers' length */
+  share: number;
+  /** how far forward the model is drawn, so its body (elytra apex to antler tips) is centred on the sim position */
+  off: number;
+  /** the outline capsule: half-length of its middle line, radius */
+  hl: number;
+  r: number;
+  /** where the closed antler tips meet, ahead of its centre */
+  jaw: number;
+  /** where its antlers lock with a rival's, ahead of its centre */
+  lock: number;
+}
+
+const GEOM = new Map<string, StagGeom>(); // det-ok: a constant cache of values computed from the balance table
+/** The layout of a stag beetle male (null for any other kind). */
+export function stagMaleGeom(kind: string): StagGeom | null {
+  const z = STAG_MALE.size[kind];
+  if (!z) return null;
+  let g = GEOM.get(kind);
+  if (!g) {
+    const M = STAG_MALE.model;
+    const share = M.share0 + M.shareK * z.msize;
+    const front = M.hinge + M.tipK * share;
+    const off = (-M.back - front) / 2;
+    const half = (front - M.back) / 2;
+    g = { msize: z.msize, share, off, hl: Math.max(0, half - M.r), r: M.r, jaw: off + M.hinge + M.closeK * share, lock: off + M.hinge + M.lockK * share };
+    GEOM.set(kind, g);
+  }
+  return g;
 }

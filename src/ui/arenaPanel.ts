@@ -140,7 +140,8 @@ export class ArenaPanel {
     } else {
       for (const k of Object.values(CREATURES)) {
         if (!arenaUnitOk('cr:' + k.id)) continue;
-        entry('cr:' + k.id, `<span style="color:${k.boss ? '#e0a050' : '#c8b490'}">${BUG}</span>`, k.name.replace(/^Common /, ''), `${k.boss ? 'boss · ' : ''}${k.length} mm · ${k.hp} hp`, `<b>${esc(k.name)}</b><i>${esc(k.sci)}</i><br>${esc(k.role)}<br>${k.length} mm · health ${k.hp} · armour ${k.armor} · bite ${k.bite}${k.venom ? ' · venom' : ''}<br><i>Click: ${s.arenaCount} for Team ${TEAM_NAMES[s.arenaTeam]}. Shift+click: choose for Place.</i>`);
+        // (with its first fact, as the ants' entries have theirs: the stag beetle males' on male size and wrestling)
+        entry('cr:' + k.id, `<span style="color:${k.boss ? '#e0a050' : '#c8b490'}">${BUG}</span>`, k.name.replace(/^Common /, ''), `${k.boss ? 'boss · ' : ''}${k.length} mm · ${k.hp} hp`, `<b>${esc(k.name)}</b><i>${esc(k.sci)}</i><br>${esc(k.role)}<br>${k.length} mm · health ${k.hp} · armour ${k.armor} · bite ${k.bite}${k.venom ? ' · venom' : ''}${k.facts[0] ? `<br>${esc(k.facts[0])}` : ''}<br><i>Click: ${s.arenaCount} for Team ${TEAM_NAMES[s.arenaTeam]}. Shift+click: choose for Place.</i>`);
       }
     }
     // count, level, place
