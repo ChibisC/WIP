@@ -357,6 +357,47 @@ shots and the campaign save are client-side. Two-player co-op could share the pl
 
 ## 8. Balance plan
 
+### Seven levels at a person's pace (2026-11-06, claude/story/06-spec §7)
+
+`PACE=human JSON=1 npx vite-node tools/playtest-story.ts -- <level> <difficulty> <minutes> <seed>`: the colony's own AI
+plus a scripted player that looks every 15 s and acts on a target the second time it sees it, waits for a bigger army
+(× 1.3) before an assault or a boss, defends at home while a stage asks it to hold out (hunters first, then raiders),
+steals from any of the level's rivals and goes to a rival's hole for genes when none come out, calls the army home to
+forage when the colony is starving, goes with 70 % of its army after 20 minutes of a stage, and sends everything (the
+nurses too) at a boss inside the nest. Fixed on the way: it chased goals already met (the garden's raid stood on the
+aphid plants for ever — the reason the garden "ran over 50 minutes"). Minutes to the win; seeds 7 / 11; "not in N" =
+still going at N minutes, with the stage it was on.
+
+| level | Easy | Normal | Hard | Brutal |
+|---|---|---|---|---|
+| The Garden Below | won 23.0 / won 17.5 | won 27.0 / won 19.8 | won 45.8 / won 30.5 | won 74.5 / won 35.0 |
+| The Long Nights | won 38.8 / won 38.8 | won 38.8 / won 38.8 | won 38.8 / won 38.8 | won 38.8 / won 38.8 |
+| Fire on the Banks | not in 100 (stage 3) / won 39.8 | won 42.8 / won 42.8 | not in 100 (stage 5) / won 49.0 | not in 100 (stage 3) / not in 100 (stage 3) |
+| The Spider Mother | won 31.8 / won 35.0 | won 31.8 / won 34.0 | won 32.0 / won 35.0 | won 32.0 / won 31.5 |
+| The Antlered King | won 33.0 / won 29.3 | won 35.8 / won 35.3 | won 33.3 / won 29.8 | won 36.3 / lost at 39.0 (stage 5) |
+| High Water | won 34.8 / won 34.8 | won 34.8 / won 34.8 | won 34.8 / won 34.8 | won 34.8 / won 34.8 |
+| Carton Kingdom | won 20.0 / won 36.3 | won 36.0 / won 23.3 | won 48.0 / won 40.5 | won 45.5 / lost at 15.5 (stage 3) |
+
+- **Normal at 30 minutes or more**: the Long Nights (38.8, its clock), the Spider Mother (31.8–34), the Antlered King
+  (35–36), High Water (34.8, the water's timetable), Fire on the Banks (42.8), Carton Kingdom on seed 7 (36; seed 11:
+  23.3 — the first colony fell during the stages before the assault). **Under 30: the Garden** (27.0 / 19.8), even with
+  its new defence stage (The garden answers, 5–6 min). Its "over 50 minutes" was the bot chasing a goal already met; the
+  tutorial is short for a player who knows the game — whether to lengthen it further is left to the user (the spec's
+  rule for it was "keep its length").
+- **Not won by the bot**: Fire on the Banks Easy seed 7 (its colony stopped growing at 29–42 ants with no food on the
+  bank and never took the majors' genes), Hard seed 7 and Brutal (the mound, or the majors against a fire ant colony of
+  80–90 on Brutal: left to people, as before); the Antlered King and Carton Kingdom Brutal on seed 11. Every level is
+  won by the bot on every difficulty on at least one seed but Fire on the Banks Brutal.
+- **Losses**: High Water 68–306, the Long Nights 48–266 (its Hard and Brutal end with 1–5 ants and the queen alive at
+  the last dawn), Carton Kingdom 106–752 (its sieges are the bloodiest).
+- Surprise events seen in the runs: the Garden beetle hunt, berry party, hot spell, seeds, strawberry, wood ant column;
+  the Long Nights grasshopper, hot day, mantis, moth, rove beetle, seeds, wood ants; Fire on the Banks alates, army ant
+  swarm, cricket, hot sand, mantis, scouts, shower; the Spider Mother beetle, cricket, grasshopper, hot afternoon, moth,
+  stalkers; the Antlered King beetle, fallen beetle, moth, shower, a late small male; High Water beetle, grasshopper,
+  seeds, wolf spider, wood ants; Carton Kingdom alates, army ants, foragers, fruit, mantis, shower, steam.
+
+### Earlier results
+
 Played headless by `tools/playtest-story.ts` (the colony's own AI plus a scripted "player" that builds what a stage
 asks, takes rival corpses for genes, waits for an army before the assault, falls back to regroup) on every difficulty;
 results in PROGRESS.md. Targets: 20–40 min on Normal for a person; the bot (weaker than a person) wins Easy and Normal.

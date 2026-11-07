@@ -1879,3 +1879,57 @@ User (2026-11-06): "a weird protruding thing in front of the stag beetles, at th
   smaller males (sizes 0–3) exist only in the labs (`msize`) until `feature/stag-sizes` lands — fixed there too.
 - New: `tools/creature-hash.ts` (save/check/dump creature-model fingerprints, like `morph-hash.ts` for ants) with
   the baseline `tests/data/creature-hashes.json`.
+
+## 2026-11-06 — Chapter 1 is seven levels; surprise events; every level 30 minutes or more (`feature/story-ch1-7`)
+- **Spec**: claude/story/06-spec-levels-5-7-and-lengths.md (user decisions 2026-11-03). Design: docs/story/DESIGN-STORY.md
+  (levels 5–7, "Surprise events", the framework, §8 the playtest table, §10 sources). Helpers' branches merged in:
+  `feature/stag-sizes` (four stag beetle males, wrestling) and `feature/nest-flood` (nests flood, all-out), each with its
+  own entry above; main's "story titans always get inside" merged and combined.
+- **Campaign**: The Garden Below → The Long Nights → Fire on the Banks → The Spider Mother → **The Antlered King**
+  (Forest Floor, map `oakWoods`) → **High Water** (Riverbank, `floodHill`) → **Carton Kingdom** (Rainforest,
+  `rainforestEdge`). Both regions unmisted in chapter 1; old saves keep their progress; the chapter's closing line moved
+  to level 7.
+- **The Antlered King**: five stages — settle the woods and bring down a small male; hold the sap flow (12 ants, 2½ min)
+  while two males wrestle there (`wrestle` → `startStagWrestle`); hold the woods 10–12 min and kill the large male (he
+  keeps coming back); the old stump (he sees off a younger male without a fight; the colony rebuilds); the titan (0.85
+  of the titan's health; two lesser males at 45 %; digs in at 25 % or after three minutes at the doorstep; softer bites
+  inside, like the Spider Mother's). The oak's sap drips every 45 s to the end. Reward: the trait **Antler Plating** (+1
+  armour, story only). Bonus: kill him within a minute of his breaking in.
+- **High Water**: the colony on the summit, three Lasius colonies below; four warned rises (`floodNests` → each nest
+  under water floods underground; each colony goes all-in on the summit about two minutes before); win when all three
+  are gone. Rival sizes do not grow with the difficulty (`RivalDef.fixedSize`), only strength and aggression. Medals:
+  food stored, losses, `deadBefore`.
+- **Carton Kingdom**: two allied mature conehead termite colonies (`team`, `income` 0.6 food/s); six stages — settle
+  (60 ants, 300 food, 30 wood); steal the **Conehead Termite Sprayer** while escorted foraging parties come to the hollow;
+  the termites answer (the north raids, then the east); an army of 40; the two nests. A shower fills the hollow, the
+  alates fly after it.
+- **Surprise events** in all seven levels (`src/story/surprises.ts`, `sim/story/surprises.ts`): seeded at the start,
+  chance × the difficulty's `events`, one big at a time; visiting columns of other species (nestless `Colony.visitor`),
+  wanderers, windfalls, showers (falling rain `render/rainFX.ts`, wet ground) and hot spells (`STORY.heatSpeed`), rival
+  parties. Per-level lists in DESIGN-STORY.
+- **Lengths** (claude/story/06-spec §7): the Long Nights has four nights (38.8 min; the tarantula 40 s into the fourth,
+  softer inside on Hard and Brutal); the Spider Mother hunts in rounds for 18½–20 minutes after a 10–11½ minute
+  preparation (about 32 min); Fire on the Banks sends more seed guards 10 and 20 minutes in; the Garden gets The garden
+  answers before its raid (hold the nest 5–6 min against two Lasius parties).
+- **Fixes found on the way**: a new stage's timed scenes read the old stage's clock until the mission entered it (the
+  Spider Mother's broods came out together); the boss floor is now the higher of the level's (`ActorDef.floor`) and the
+  dig-in's; "A European stag beetle is digging…", not "An european".
+- **Playtests at a person's pace** (`PACE=human JSON=1 npx vite-node tools/playtest-story.ts -- <level> <diff> <min>
+  <seed>`): a look every 15 s, a target acted on the second look, bigger armies before an assault, defends at home
+  (hunters, then raiders), steals from any of the level's rivals, forages when starving, goes with 70 % of its army
+  after 20 min, sends the nurses at a boss inside. Fixed: it chased goals already met (the reason the Garden "ran over
+  50 minutes"). Debug logs `DEATHS`, `NEAR`, `TARGETS`. Table in DESIGN-STORY §8:
+  | level | Easy | Normal | Hard | Brutal |
+  |---|---|---|---|---|
+  | The Garden Below | won 23.0 / won 17.5 | won 27.0 / won 19.8 | won 45.8 / won 30.5 | won 74.5 / won 35.0 |
+  | The Long Nights | won 38.8 / won 38.8 | won 38.8 / won 38.8 | won 38.8 / won 38.8 | won 38.8 / won 38.8 |
+  | Fire on the Banks | not in 100 (stage 3) / won 39.8 | won 42.8 / won 42.8 | not in 100 (stage 5) / won 49.0 | not in 100 (stage 3) / not in 100 (stage 3) |
+  | The Spider Mother | won 31.8 / won 35.0 | won 31.8 / won 34.0 | won 32.0 / won 35.0 | won 32.0 / won 31.5 |
+  | The Antlered King | won 33.0 / won 29.3 | won 35.8 / won 35.3 | won 33.3 / won 29.8 | won 36.3 / lost at 39.0 (stage 5) |
+  | High Water | won 34.8 / won 34.8 | won 34.8 / won 34.8 | won 34.8 / won 34.8 | won 34.8 / won 34.8 |
+  | Carton Kingdom | won 20.0 / won 36.3 | won 36.0 / won 23.3 | won 48.0 / won 40.5 | won 45.5 / lost at 15.5 (stage 3) |
+  Under 30 on Normal: the Garden (27.0 / 19.8) and Carton Kingdom seed 11 (23.3). Not won by the bot: Fire on the
+  Banks Easy seed 7, Hard seed 7 and Brutal (left to people, as before), the Antlered King and Carton Kingdom Brutal
+  seed 11.
+- Checks: `tests/storyEvents.ts` (new), `tests/storyCh1.ts` (seven levels), `npm test`, `check-determinism`, the build;
+  browser shots `docs/story/shots/ch1_7/` (`tests/browser/story_ch1_7.py`). Protocol `ud-mp-12`.
