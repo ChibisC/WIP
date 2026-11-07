@@ -172,7 +172,12 @@ far above a real GPU's; the counts and causes are what transfer.
 | area 3, first | **13,541** | **41** | 10.7 MB of buffers, lasius_queen built |
 | cave 64, first | **12,885** | **6** | 4.3 MB of buffers |
 | cave 65, first | 21 | 5 | — |
-| round 2, the worst | 18,300 / 14,262 | 576 / 159 | (both builds: SwiftShader's GPU process stalling a buffer upload for seconds; once per run, in either build — not the game's work) |
+| round 2 (everything visited once) | 6–59, but 18,300 and 14,262 | 3–51, but 62,603 then 576, 159 | (see below) |
+
+In round 2 both builds had multi-second frames in which a tiny buffer upload waited on SwiftShader's GPU process (the
+hitch log: "buffer upload 0.0 MB (50,742 ms)"): the main thread blocks until the software GPU catches up with its
+backlog. The before build had them too (18.3 s and 14.3 s here, 49.9 s in an earlier run), at different points each
+run. Whether anything like it happens on a real GPU is what the device benchmark will show.
 
 Loading takes longer in exchange: 14.4 s → 26.8 s here (every model and every program now built behind the loading
 screen, with its progress shown). On a real GPU the programs compile in parallel and the difference is a fraction of
