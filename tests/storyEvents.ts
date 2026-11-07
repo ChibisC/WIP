@@ -10,7 +10,7 @@ import { World } from '../src/sim/world';
 import { AS, SURFACE } from '../src/sim/types';
 import { makeAnt } from '../src/sim/factory';
 import { storySetup } from '../src/sim/story/runner';
-import { storyOf, actorIndex } from '../src/sim/story/state';
+import { storyOf, actorIndex, hasFlag } from '../src/sim/story/state';
 import { members, wherePt } from '../src/sim/story/director';
 import { missionOf } from '../src/sim/missions';
 import { firedSurprises } from '../src/sim/story/surprises';
@@ -261,6 +261,24 @@ const rolled = (id: StoryLevelId, diff: Difficulty, seed: number) => {
     if (m.stage !== 1) break;
   }
   check('antlered king: holding the sap with 12 ants for 150 s finishes the sap run', m.stage === 2, held);
+}
+
+// ---------------------------------------------------------------- the old stump (the king sees off a challenger)
+{
+  const w = level('antleredKing', 'normal', 5);
+  const st = storyOf(w)!;
+  const m = missionOf(w)!;
+  m.stage = 3;
+  m.entered = false;
+  let off = -1;
+  for (let s = 0; s < 200; s++) {
+    run(w, 20);
+    if (off < 0 && hasFlag(st, 'challengerOff')) off = s;
+  }
+  const king = st.actors.find((a) => a.name === 'king')!;
+  const k = w.creatureById.get(king.ids[0])!;
+  const stump = wherePt(w, 'kingStump');
+  check('antlered king: on the old stump the king sees off a challenger without a fight (it climbs to him, turns back and leaves the woods)', hasFlag(st, 'challenger') && off > 0 && members(w, st.actors[actorIndex(st, 'challenger')]).length === 0 && !k.dead && k.hp === k.maxHp && Math.hypot(k.x - stump[0], k.y - stump[1]) < 40, `off at ${off} s; king ${Math.round((k.hp / k.maxHp) * 100)} % at ${Math.hypot(k.x - stump[0], k.y - stump[1]).toFixed(0)} mm from the stump`);
 }
 
 console.log(`\n${failed ? `${failed} FAILED` : 'all passed'} in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
