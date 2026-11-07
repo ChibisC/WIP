@@ -67,6 +67,9 @@ const st = storyOf(w)!;
 const log: string[] = [];
 let stage = -1;
 let assisting = false;
+/** a starving colony stops hunting to forage until then (s); its size three minutes ago, sampled each minute */
+let restUntil = 0;
+const sizes: number[] = [];
 /** the final assault: under way, and the army it set out with (it falls back to regroup below 45 %) */
 let assaulting = false;
 let assaultStart = 0;
@@ -179,8 +182,10 @@ for (let t = 0; t < minutes * 1200; t++) {
       let best = Infinity;
       for (const pass of [true, false]) {
         for (const a of w.s.ants) {
-          if (a.colony !== rivalId || a.state === AS.Dead || a.space !== SURFACE) continue;
-          if (pass && want && a.caste !== want) continue;
+          if (a.state === AS.Dead || a.space !== SURFACE) continue;
+          // (the caste wanted from any of the level's rivals — allied termite colonies both have it; other ants from
+          // the one to go after)
+          if (pass && want ? a.caste !== want || !Object.values(st.rivals).includes(a.colony) : a.colony !== rivalId) continue;
           const d = Math.hypot(a.x - e.sx, a.y - e.sy);
           if (d < best && d < (pass ? reach : 500)) {
             best = d;
@@ -198,12 +203,14 @@ for (let t = 0; t < minutes * 1200; t++) {
       const p = wherePt(w, o.at);
       target = { space: SURFACE, x: p[0], y: p[1] };
     } else if ((o.type === 'killQueen' || o.type === 'killQueens') && rival && rival.alive) {
-      // go when the army is big enough (or, after 20 min of the stage, at the army size alone); fall back below 45 %
+      // go when the army is big enough (or, after 20 min of the stage, with 70 % of it); fall back below 45 %
       // of the army it set out with and rebuild to at least that size before going again, as a player would
       if (assaulting) {
         assaulting = c.living > assaultStart * 0.45;
         if (!assaulting) (pushing = false), (gatherT = 0);
-      } else if (c.living >= Math.max(ARMY, rival.living * 1.5, regroupTo) || (m.t > 1200 && c.living >= Math.max(ARMY, regroupTo))) {
+      // (after 20 min with what the colony has, from 70 % of the army: a colony whose food holds it at 55 waited for
+      // ever for 58, 2026-11-06)
+      } else if (c.living >= Math.max(ARMY, rival.living * 1.5, regroupTo) || (m.t > 1200 && c.living >= Math.max(ARMY * 0.7, Math.min(regroupTo, ARMY)))) {
         assaulting = true;
         assaultStart = c.living;
         regroupTo = Math.round(assaultStart * 0.9);
@@ -304,6 +311,12 @@ for (let t = 0; t < minutes * 1200; t++) {
         }
     }
   }
+  // a person calls the army home to forage when the colony is starving and has stopped growing (a hunt kept going for
+  // ever left every group on the marker and nobody foraging: Fire on the Banks on Easy stood at 29 ants for 50 minutes)
+  while (sizes.length < Math.floor(w.s.time / 60)) sizes.push(c.living);
+  const ago = sizes[sizes.length - 3];
+  if (target && !allIn && assisting && c.food < 5 && ago !== undefined && c.living <= ago && w.s.time >= restUntil + 180) restUntil = w.s.time + 120;
+  if (target && !allIn && w.s.time < restUntil) target = null;
   // a person reacts a look late: a new target is acted on the second time it is seen
   if (HUMAN && target) {
     // (by what it is going after, not where: a moving foe is the same target a look later)
@@ -316,9 +329,9 @@ for (let t = 0; t < minutes * 1200; t++) {
   if (target) {
     if (process.env.TARGETS) log.push(`      ${(w.s.time / 60).toFixed(1)} min: target ${target.space} ${Math.round(target.x)},${Math.round(target.y)}`);
     placeMarker(w, c, ASSIST, target.space, target.x, target.y);
-    // (every look: a group raised since, or one the colony took back, joins too)
-    // (the queen's own nurses too when a boss is in the nest: a person throws everything at it)
-    for (const g of c.groups) if (raisesAnts(g) && (g.type !== 'queen' || allIn) && g.marker !== ASSIST) assignGroup(w, c, g.id, ASSIST);
+    // (when it starts; and with a boss in the nest every look, the queen's own nurses too: a person throws everything at
+    // it — but not every look otherwise: groups raised since go on foraging, or a long hunt starves the colony)
+    if (!assisting || allIn) for (const g of c.groups) if (raisesAnts(g) && (g.type !== 'queen' || allIn) && g.marker !== ASSIST) assignGroup(w, c, g.id, ASSIST);
     assisting = true;
   } else if (assisting) {
     removeMarker(w, c, ASSIST);

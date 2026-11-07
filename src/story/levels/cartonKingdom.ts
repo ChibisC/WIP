@@ -10,7 +10,9 @@ import { column, heat, party, rain, surprisePool, wanderer, windfall } from '../
  *  1. The forest's edge: settle, while termite foragers and their galleries spread toward the colony;
  *  2. The nasus: take nasute soldiers' corpses home and steal the caste (a shower fills the hollow; after it the
  *     termites' winged alates pour out for their mating flight: food for whoever catches them);
- *  3. The first nest and 4. The second: destroy both colonies, in either order.
+ *  3. The termites answer: both colonies' soldiers come for the nest, one after the other; hold out;
+ *  4. Before the assault: raise an army of 40 fighters while the termites' foraging parties keep coming;
+ *  5. The first nest and 6. The second: destroy both colonies, in either order.
  * Win: both termite queens dead. Lose: the queen dies. Reward: the Conehead Termite Sprayer (`nasute_soldier`, the glue
  * squirter: the spec's "Nasute Termite soldier"; main named it the Sprayer, 2026-11-03), kept for the campaign. The
  * chapter's closing line follows its win. About 38 minutes on Normal.
@@ -51,7 +53,17 @@ export const CARTON_KINGDOM_LEVEL: StoryLevelDef = {
   plants: 8,
   reward: { caste: 'nasute_soldier' },
   loadout: true,
-  actors: { ...EV.actors },
+  actors: {
+    ...EV.actors,
+    // the nasus: foraging parties out in the open under their nasute escort, from both colonies in turn — the
+    // Sprayers to steal walk out to the colony (the stage went on for an hour when none came out, 2026-11-06)
+    escortA: { ants: [['nasute_worker', 6], ['nasute_soldier', 3]], colony: 'north', at: 'termitesNorth', spawn: 'action', label: 'a termite foraging party' },
+    escortB: { ants: [['nasute_worker', 6], ['nasute_soldier', 3]], colony: 'east', at: 'termitesEast', spawn: 'action', label: 'a termite foraging party' },
+    escortC: { ants: [['nasute_worker', 6], ['nasute_soldier', 3]], colony: 'north', at: 'termitesNorth', spawn: 'action', label: 'a termite foraging party' },
+    escortD: { ants: [['nasute_worker', 6], ['nasute_soldier', 3]], colony: 'east', at: 'termitesEast', spawn: 'action', label: 'a termite foraging party' },
+    escortE: { ants: [['nasute_worker', 6], ['nasute_soldier', 3]], colony: 'north', at: 'termitesNorth', spawn: 'action', label: 'a termite foraging party' },
+    escortF: { ants: [['nasute_worker', 6], ['nasute_soldier', 3]], colony: 'east', at: 'termitesEast', spawn: 'action', label: 'a termite foraging party' },
+  },
   surprises: EV.surprises,
   visitors: EV.visitors,
   scenes: EV.scenes,
@@ -59,9 +71,10 @@ export const CARTON_KINGDOM_LEVEL: StoryLevelDef = {
     {
       name: 'The forest’s edge',
       objectives: [
-        { type: 'raise', n: 35, text: 'Raise 35 ants' },
-        { type: 'collectFood', amount: 200 },
-        { type: 'storeWood', amount: 20, optional: true },
+        // (60 ants, 300 food and 30 wood, 2026-11-06: with 35 and 200 the stage was over in 2–3 minutes at a person's pace)
+        { type: 'raise', n: 60, text: 'Raise 60 ants' },
+        { type: 'collectFood', amount: 300 },
+        { type: 'storeWood', amount: 30 },
       ],
       say: [
         { key: 'intro1', at: 0.5 },
@@ -85,10 +98,60 @@ export const CARTON_KINGDOM_LEVEL: StoryLevelDef = {
         { key: 'nasus1', at: 3 },
         { key: 'nasus2', at: 90 },
         { key: 'stolen', on: 'caste:nasute_soldier' },
+        { key: 'escort', at: 40 },
       ],
       events: [
         { at: 10, actions: [{ do: 'tip', key: 'nasuteGenes' }] },
         { on: 'caste:nasute_soldier', actions: [{ do: 'tip', key: 'nasuteCaste' }] },
+        { at: 20, actions: [{ do: 'spawn', actor: 'escortA' }] },
+        { at: 150, actions: [{ do: 'spawn', actor: 'escortB' }] },
+        { at: 280, actions: [{ do: 'spawn', actor: 'escortC' }] },
+        { at: 420, actions: [{ do: 'spawn', actor: 'escortD' }] },
+      ],
+      scenes: [
+        { actor: 'escortA', at: 20, cues: [{ mode: 'normal' }, { walkTo: 'shelfWest', timeout: 200 }, { walkTo: 'hollow', timeout: 200 }, { guard: 'hollow', r: 60, s: 150 }, { leave: 'nest', timeout: 240 }] },
+        { actor: 'escortB', at: 150, cues: [{ mode: 'normal' }, { walkTo: 'shelfSouth', timeout: 200 }, { walkTo: 'hollow', timeout: 200 }, { guard: 'hollow', r: 60, s: 150 }, { leave: 'nest', timeout: 240 }] },
+        { actor: 'escortC', at: 280, cues: [{ mode: 'normal' }, { walkTo: 'shelfWest', timeout: 200 }, { walkTo: 'hollow', timeout: 200 }, { guard: 'hollow', r: 60, s: 150 }, { leave: 'nest', timeout: 240 }] },
+        { actor: 'escortD', at: 420, cues: [{ mode: 'normal' }, { walkTo: 'shelfSouth', timeout: 200 }, { walkTo: 'hollow', timeout: 200 }, { guard: 'hollow', r: 60, s: 150 }, { leave: 'nest', timeout: 240 }] },
+      ],
+    },
+    {
+      // (the termites answer the theft, 2026-11-06: a person-paced colony won the level in 17–29 minutes on Easy and
+      // Normal, under the 30 the chapter aims at; both colonies' soldiers now come for the nest before it can go on)
+      name: 'The termites answer',
+      objectives: [
+        { type: 'surviveTime', s: { easy: 330, normal: 360, hard: 390, brutal: 420 }, text: 'Hold the nest against the termites’ answer' },
+        { type: 'killAnts', rival: 'north', n: 25, optional: true },
+      ],
+      say: [
+        { key: 'answer1', at: 3 },
+        { key: 'answer2', at: 140 },
+        { key: 'answer3', at: 250 },
+      ],
+      events: [
+        { actions: [{ do: 'music', mood: 'assault' }] },
+        { at: 12, actions: [{ do: 'raid', rival: 'north' }] },
+        { at: 25, actions: [{ do: 'tip', key: 'termiteRaid' }] },
+        { at: 140, actions: [{ do: 'raid', rival: 'east' }] },
+      ],
+    },
+    {
+      // (2026-11-06: an army before the assault — holding the shelf between the two nests instead, with both colonies
+      // raiding, wiped out a person-paced colony; the termites' foraging parties keep coming meanwhile)
+      name: 'Before the assault',
+      objectives: [{ type: 'fighters', n: 40 }],
+      say: [
+        { key: 'gap1', at: 3 },
+        { key: 'gap2', at: 150 },
+      ],
+      events: [
+        { actions: [{ do: 'music', mood: 'tense' }] },
+        { at: 30, actions: [{ do: 'spawn', actor: 'escortE' }] },
+        { at: 200, actions: [{ do: 'spawn', actor: 'escortF' }] },
+      ],
+      scenes: [
+        { actor: 'escortE', at: 30, cues: [{ mode: 'normal' }, { walkTo: 'shelfWest', timeout: 200 }, { walkTo: 'hollow', timeout: 200 }, { guard: 'hollow', r: 60, s: 150 }, { leave: 'nest', timeout: 240 }] },
+        { actor: 'escortF', at: 200, cues: [{ mode: 'normal' }, { walkTo: 'shelfSouth', timeout: 200 }, { walkTo: 'hollow', timeout: 200 }, { guard: 'hollow', r: 60, s: 150 }, { leave: 'nest', timeout: 240 }] },
       ],
     },
     {

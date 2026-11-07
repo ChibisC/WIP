@@ -149,9 +149,7 @@ export const GARDEN: StoryLevelDef = {
       name: 'Raid the garden',
       rivalRaids: true,
       objectives: [
-        // (taken and held for two minutes, not only reached: with the playtest bot fixed the level ran 27 minutes on Normal
-        // at a person's pace, under the 30 the chapter aims at, claude/story/06-spec §7, 2026-11-06)
-        { type: 'hold', at: 'aphidPlants', r: 55, n: 8, s: 120, name: 'the aphid plants on the flowerbed' },
+        { type: 'reach', at: 'aphidPlants', r: 55, n: 8, text: 'Take the aphid plants on the flowerbed (8 ants)' },
         { type: 'killQueen', rival: 'lasius' },
       ],
       say: [
@@ -166,7 +164,7 @@ export const GARDEN: StoryLevelDef = {
     },
   ],
   medals: {
-    time: [28 * 60, 40 * 60],
+    time: [20 * 60, 32 * 60],
     losses: [25, 60],
     bonus: { type: 'stealBefore', caste: 'lasius_soldier', flag: 'raidComing', text: 'Steal the Black Garden Ant Soldier before the first Lasius raid' },
   },

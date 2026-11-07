@@ -88,6 +88,7 @@ export const RAINFOREST_EDGE: MapDef = {
       termitesEast: [1110, 470],
       shelfWest: [780, 380],
       shelfSouth: [1020, 760],
+      shelfGap: [1030, 330],
       hollow: [600, 590],
       hollowWest: [330, 590],
       evSouth: [700, 986],
