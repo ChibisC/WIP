@@ -695,7 +695,8 @@ export function upgradeWorldTunnels(w: World): void {
   for (const c of w.s.colonies) {
     const space = nestSpace(c.id);
     const g = w.nest(c.id);
-    if (!g || g.margin) continue;
+    // (a visiting party's nest plane has no margin on purpose — colony.ts — and is not an old save's)
+    if (!g || g.margin || c.visitor) continue;
     const ng = g.embed(m);
     const off = g.embedOffset(m);
     const sh = (q: number) => (q < 0 ? q : ng.hexIndex(g.hexCol(q) + m, g.hexRow(q) + m));
