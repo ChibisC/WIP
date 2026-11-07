@@ -347,7 +347,7 @@ export function applyCommandsNow(w: World, cmds: readonly Command[]): void {
   w.prepareQueries();
   for (const c of cmds) {
     const why = applyCommand(w, c);
-    w.events.emit({ t: 'command', player: c.player, seq: c.seq, type: c.type, ok: why === null, why: why ?? undefined });
+    w.events.emit({ t: 'command', player: c.player, seq: c.seq, type: c.type, ok: why === null, why: why ?? undefined, tick: w.s.tick + 1 });
   }
 }
 

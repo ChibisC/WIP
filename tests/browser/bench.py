@@ -3,7 +3,7 @@
 The build machine has no GPU (SwiftShader), so the frame times only compare builds with each other; the counts
 (draw calls, triangles, programs, textures, GL work, hitches and their causes) are real.
 
-Run: tests/browser/with_server.sh python3 tests/browser/bench.py   (BSECS=20 BROUNDS=10 Q=medium OUT=docs/performance/bench-<tag>.txt)
+Run: tests/browser/with_server.sh python3 tests/browser/bench.py   (BSECS=20 BROUNDS=10 Q=medium ONLY=feel,fight OUT=docs/performance/bench-<tag>.txt)
 """
 import json
 import os
@@ -14,6 +14,7 @@ BASE = os.environ.get("BASE", "http://127.0.0.1:5173/")
 BSECS = os.environ.get("BSECS", "20")
 BROUNDS = os.environ.get("BROUNDS", "10")
 Q = os.environ.get("Q", "medium")
+ONLY = os.environ.get("ONLY", "")
 OUT = os.environ.get("OUT", os.path.join(os.path.dirname(__file__), "..", "..", "docs", "performance", "bench-latest.txt"))
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader", "--enable-precise-memory-info"]
 os.makedirs(os.path.dirname(OUT), exist_ok=True)
@@ -27,7 +28,7 @@ with sync_playwright() as p:
     pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.on("console", lambda m: print(m.text[:400], flush=True) if m.text.startswith("[bench]") else None)
     t0 = time.time()
-    pg.goto(BASE + f"?bench=1&q={Q}&bsecs={BSECS}&brounds={BROUNDS}", wait_until="load")
+    pg.goto(BASE + f"?bench=1&q={Q}&bsecs={BSECS}&brounds={BROUNDS}" + (f"&bonly={ONLY}" if ONLY else ""), wait_until="load")
     # (each scene reloads the page; brounds rides along only on the first scene's URL, so pass it through sessionStorage)
     while time.time() - t0 < 7200:
         try:

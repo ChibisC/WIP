@@ -7,6 +7,7 @@
  */
 import type { GameSession } from '../game/session';
 import { prof } from '../core/profiler';
+import { feel } from '../core/feel';
 
 export class DebugOverlay {
   private el = document.createElement('pre');
@@ -63,6 +64,8 @@ export class DebugOverlay {
       `ants ${w.s.ants.length}  creatures ${w.s.creatures.length}  food ${w.s.food.length}  brood ${w.s.brood.length}`,
       `quality ${s.view.quality}${s.view.renderScale < 1 ? ` at ${Math.round(s.view.renderScale * 100)} % resolution` : ''}${s.autoQuality.enabled ? ` (auto${s.autoQuality.lastChange ? `, last ${s.autoQuality.lastChange}` : ''})` : ''}`,
       `pending commands ${s.commands.pending().length}`,
+      // how it feels (core/feel.ts): input → the frame that shows it, → the units acting; command latency; pacing
+      ...feel.lines(),
     ];
     const net = s.net;
     if (net) {

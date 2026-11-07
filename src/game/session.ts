@@ -36,6 +36,7 @@ import { LocalCommands } from './localCommands';
 import { LocalSim, SimHost, WorkerSim } from './simHost';
 import { AutoQuality } from './autoQuality';
 import { prof } from '../core/profiler';
+import { feel, InputKind } from '../core/feel';
 import { overviewCamera, warmScene } from '../render/prewarm';
 import { STOLEN_CASTES } from '../sim/termants';
 import type { NetGame } from '../net/netGame';
@@ -160,6 +161,8 @@ export class GameSession {
   private tabsCache: AreaTab[] = [];
   private tabsFrame = -1;
   private frameNo = 0;
+  /** this animation frame's start (the feel meter's clock) */
+  private frameAt = 0;
   private trailT = 0;
   private surfAnts: AntRenderer;
   private surfFood = new FoodRenderer();
@@ -277,13 +280,22 @@ export class GameSession {
     // the frame profiler (F3, ?bench=1): every frame's parts, GL work and hitches (game/profiler.ts)
     prof.attach(this.view.renderer);
     (window as unknown as { __prof: unknown }).__prof = prof;
-    this.loop.onStepStart = (now) => prof.begin(now);
+    this.loop.onStepStart = (now) => {
+      prof.begin(now);
+      this.frameAt = now;
+    };
     this.loop.onTicks = (ms) => {
       if (this.sim.kind === 'local') prof.add('sim', ms);
     };
-    this.loop.onStepEnd = () => prof.end();
+    this.loop.onStepEnd = () => {
+      prof.end();
+      feel.frameEnd(this.frameAt, this.world.s.tick);
+    };
     this.events.onAny((e) => {
-      if (e.t === 'command') this.commands.acknowledge(e.player, e.seq);
+      if (e.t === 'command') {
+        this.commands.acknowledge(e.player, e.seq);
+        if (e.player === this.player.id) feel.ack(e.seq, e.tick ?? this.world.s.tick + 1);
+      }
       this.routeFx(e);
       this.noteAlert(e);
       // camera shake (the player's setting: off, reduced, full)
@@ -595,9 +607,10 @@ export class GameSession {
     );
     inp.on('nextArea', () => this.nextArea());
     (['marker1', 'marker2', 'marker3', 'marker4', 'marker5'] as const).forEach((a, i) => inp.on(a, () => this.selectMarker(i)));
-    inp.onClick = (p) => this.click(p);
-    inp.onRightClick = (p) => this.rightClick(p);
-    inp.onPaint = (p, phase) => this.paint(p, phase);
+    // (each handler timed: its main-thread cost, and the input's latency to the frame that shows it — core/feel.ts)
+    inp.onClick = (p) => this.timedInput(this.inputKind(), p.t, () => this.click(p));
+    inp.onRightClick = (p) => this.timedInput('order', p.t, () => this.rightClick(p));
+    inp.onPaint = (p, phase) => this.timedInput(this.inputKind(), p.t, () => this.paint(p, phase));
   }
 
   // ------------------------------------------------------------------ areas & spaces
@@ -799,6 +812,24 @@ export class GameSession {
     const np = this.view.pickNest(p.x, p.y);
     if (!np) return -1;
     return this.world.nestOf(this.viewedArea)!.hexAt(np.x, np.y);
+  }
+
+  /** What a left click or a paint stroke does with the tool in hand (for the input latency's kinds). */
+  private inputKind(): InputKind {
+    const t = this.tool;
+    return t === 'dig' || t === 'remove' ? 'dig' : t === 'tile' || t === 'upgrade' ? 'build' : t === 'none' ? 'select' : 'order';
+  }
+
+  /** Run an input's handler: its time counts toward the next frame's main thread, its latency from the event's time. */
+  private timedInput(kind: InputKind, t: number | undefined, f: () => void): void {
+    const t0 = performance.now();
+    feel.input(kind, t ?? t0);
+    try {
+      f();
+    } finally {
+      feel.inputDone();
+      prof.addInput(performance.now() - t0);
+    }
   }
 
   private paint(p: PointerInfo, phase: 'start' | 'move' | 'end'): void {
@@ -1138,7 +1169,9 @@ export class GameSession {
       if (!silent) this.onEvent?.({ t: 'message', text: 'Watching a replay: orders are off.', kind: 'info' });
       return { ...body, tick: 0, player: this.player.id, seq: 0 } as Command;
     }
-    return this.commands.issue(body, { silent });
+    const cmd = this.commands.issue(body, { silent });
+    feel.command(cmd.seq, commandKind(body.type), this.world.s.tick);
+    return cmd;
   }
 
   // ---------------------------------------------------------------- replays
@@ -1250,7 +1283,8 @@ export class GameSession {
   }
 
   assignGroup(group: number, marker: number): void {
-    this.issue({ type: 'assignGroup', group, marker });
+    // (a click on the group panel: its latency is the group card moving and the ants turning, core/feel.ts)
+    this.timedInput('order', undefined, () => this.issue({ type: 'assignGroup', group, marker }));
   }
 
   /** Stance as the player last set it (a pending change shows at once). */
@@ -1921,4 +1955,11 @@ function stormLevel(fl: readonly FloodState[] | undefined): number {
     else if (f.phase === 4) k = Math.max(k, Math.min(1, f.t / FLOOD.drainS));
   }
   return k;
+}
+
+/** The input kind a command answers (the latency's kinds, core/feel.ts). */
+function commandKind(type: string): InputKind {
+  if (type === 'dig' || type === 'digRoute' || type === 'markDelete') return 'dig';
+  if (type === 'buildTile' || type === 'markUpgrade') return 'build';
+  return 'order';
 }
