@@ -16,6 +16,7 @@ import { mapDef } from '../../maps';
 import type { StoryLevelDef } from './types';
 import { storyText } from '../../story/text';
 import { rollSurprises, surprisesSecond } from './surprises';
+import { forceAllOut, startNestFlood } from '../nestFlood';
 
 /**
  * Story levels on the mission runner (claude/story/02-spec §5–6). `missions.ts` plays a story level like any mission
@@ -158,6 +159,23 @@ function act(w: World, st: StoryState, a: Action): void {
     case 'raid':
       forceRaid(w, st, a.rival);
       return;
+    case 'allOut': {
+      // (High Water: the colony whose nest floods next goes all-in on the queen who holds the high ground)
+      const r = w.colony(st.rivals[a.rival] ?? -1);
+      const p = w.s.colonies.find((c) => c.player);
+      if (r?.alive && p) forceAllOut(w, r.id, p.id);
+      return;
+    }
+    case 'floodNests': {
+      // every rival nest whose doorway is under the water now floods underground (sim/nestFlood.ts)
+      for (const [k, id] of Object.entries(st.rivals)) {
+        const r = w.colony(id);
+        if (!r?.alive || r.nestFlood) continue;
+        const wet = r.entrances.some((e) => w.terrain.isWater(e.sx, e.sy));
+        if (wet && startNestFlood(w, r.id)) setFlag(st, `nestFlood:${k}`);
+      }
+      return;
+    }
     case 'endRaid':
       endActorRaid(w, st, a.actor);
       return;

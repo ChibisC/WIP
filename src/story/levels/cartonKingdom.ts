@@ -43,8 +43,8 @@ export const CARTON_KINGDOM_LEVEL: StoryLevelDef = {
   rivals: {
     // (developed 3, 10 workers and 30 at most fell in 15 minutes at a person's pace, 2026-11-03: two mature carton
     // colonies now, each bigger than the colony at the start)
-    north: { species: 'nasutitermes', site: 1, name: 'Conehead termites (north)', developed: 7, startWorkers: 20, popLimit: 90, team: 1, income: 1.5 },
-    east: { species: 'nasutitermes', site: 2, name: 'Conehead termites (east)', developed: 7, startWorkers: 20, popLimit: 90, team: 1, income: 1.5 },
+    north: { species: 'nasutitermes', site: 1, name: 'Conehead termites (north)', developed: 6, startWorkers: 18, popLimit: 70, team: 1, income: 0.8 },
+    east: { species: 'nasutitermes', site: 2, name: 'Conehead termites (east)', developed: 6, startWorkers: 18, popLimit: 70, team: 1, income: 0.8 },
   },
   creatures: 0,
   aphids: 3,
@@ -79,7 +79,7 @@ export const CARTON_KINGDOM_LEVEL: StoryLevelDef = {
       name: 'The nasus',
       objectives: [
         { type: 'stealCaste', caste: 'nasute_soldier' },
-        { type: 'raiseCaste', caste: 'nasute_soldier', n: 4 },
+        { type: 'raiseCaste', caste: 'nasute_soldier', n: 3 },
       ],
       say: [
         { key: 'nasus1', at: 3 },
