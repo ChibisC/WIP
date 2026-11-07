@@ -3,7 +3,7 @@ to a fixed tick — rendered before any optimization, then after each one, and c
 only: docs/performance/golden/<tag>/<name>.png.
 
 Shots: every map's surface at close, gameplay and far zoom; the home nest and an enemy nest; each species' close-up (the
-ant lab line-up); a big fight; water and a flood; a titan in a nest; day and night (The Long Nights); the low and
+ant lab line-up); a big fight in the arena and a close-up of its termites; water and a flood; a titan in a nest; day and night (The Long Nights); the low and
 medium presets (high is every other shot).
 
 The "before" set must come from the same game without the change (a build of main from before the optimization), so
@@ -24,16 +24,18 @@ ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--ignore
 os.makedirs(OUT, exist_ok=True)
 MAPS = ["meadowPond", "forestFloor", "riverbank", "rainforest", "savanna"]
 SPECIES = {
+    # (the ant lab takes model names: a fire ant soldier is the minor's model scaled, the Saiy-Ants' models are saiy_*,
+    #  the nasute termites ride the ant pipeline as termite_*; Rhynchotermes are drawn by the termite kit and appear in
+    #  the arena fight instead)
     "lasius": "lasius_worker,lasius_soldier,lasius_queen",
     "formica": "formica_worker,formica_soldier,formica_mortar,formica_rapid",
     "atta": "atta_minim,atta_media,atta_soldier,atta_major",
-    "solenopsis": "fire_minor,fire_soldier,fire_major",
+    "solenopsis": "fire_minor,fire_major,fire_queen",
     "eciton": "eciton_minor,eciton_submajor,eciton_media,eciton_major",
     "plagiaria": "plagiaria_worker,plagiaria_queen",
-    "nasutitermes": "nasute_worker,nasute_soldier,nasute_major",
-    "rhynchotermes": "rhy_worker,rhy_soldier",
+    "nasutitermes": "termite_worker,termite_nasute,termite_major",
     "hell": "hell_worker,hell_soldier",
-    "aurimyrmex": "aurimyrmex_worker,aurimyrmex_soldier",
+    "aurimyrmex": "saiy_worker,saiy_soldier",
     "termant": "termant_worker,termant_soldier",
 }
 res = []
@@ -131,11 +133,22 @@ with sync_playwright() as p:
         pg.screenshot(path=os.path.join(OUT, f"{n}.png"))
         note(f"{'PASS' if not errs else 'FAIL'}  {n} {errs[:2]}")
 
-    # ---- a big fight (the stress scene)
-    if want("fight"):
-        load(pg, "?stress=1&shot=1&ants=200&creatures=60&bosses=2&q=high&ticks=400", errs)
-        pg.evaluate("() => { const s = window.__session; const r = s.view.surfaceRig; r.jumpTo(s.world.terrain.width / 2, s.world.terrain.depth / 2, 160); r.yaw = r.goalYaw = 0.6; }")
-        shoot(pg, "fight", errs)
+    # ---- a big fight: the battle arena, four teams (ants, fire ants, nasute termites, Rhynchotermes from the termite
+    #      kit) and a tarantula; the arena steps by hand in every build (the stress page only since the performance pass)
+    if want("fight") or want("fight_termites"):
+        load(pg, "?play=1&mode=arena&teams=4&shot=1&noui=1&nocine=1&q=high&seed=5", errs)
+        pg.evaluate("""() => { const s = window.__session;
+          for (const [team, unit, n] of [[0, 'ant:formica_soldier', 60], [0, 'cr:tarantula', 1], [1, 'ant:fire_soldier', 60], [2, 'ant:nasute_soldier', 40], [3, 'ant:rhy_soldier', 40]])
+            s.issue({ type: 'arenaSpawn', team, unit, n, level: 1, at: false, x: 0, y: 0 });
+          s.loop.advance(20 * 8); }""")
+        if want("fight"):
+            pg.evaluate("() => { const s = window.__session; const r = s.view.surfaceRig; r.jumpTo(s.world.terrain.width / 2, s.world.terrain.depth / 2, 170); r.yaw = r.goalYaw = 0.6; }")
+            shoot(pg, "fight", errs)
+        if want("fight_termites"):
+            pg.evaluate("""() => { const s = window.__session; const w = s.world; const t = w.s.ants.filter((a) => a.caste === 'rhy_soldier' && a.hp > 0);
+              const x = t.length ? t.reduce((m, a) => m + a.x, 0) / t.length : w.terrain.width / 2; const z = t.length ? t.reduce((m, a) => m + a.y, 0) / t.length : w.terrain.depth / 2;
+              const r = s.view.surfaceRig; r.jumpTo(x, z, 45); r.yaw = r.goalYaw = 0.6; }""")
+            shoot(pg, "fight_termites", errs)
 
     # ---- water and a flood (Riverbank: the first flood brought forward)
     if want("flood"):
