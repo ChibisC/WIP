@@ -303,14 +303,22 @@ export class CombatFx {
       case 'titanDig': {
         // a titan digging into a nest (sim/creatures/titanDig.ts): soil thrown out behind it at the hole; a burst at the
         // breach; underground, clods bursting from each hex its body breaks
+        // (the throw grows as the hole opens — claude/creatures/02-spec §3: past 75 % the soil fountains up out of it)
         const h = heightAt(e.x, e.y) + 0.4;
-        const n = e.phase === 'dig' ? 10 : e.phase === 'breach' ? 40 : e.phase === 'break' ? 6 : 0;
+        const p = e.prog ?? 0;
+        const n = e.phase === 'dig' ? Math.round(8 + 10 * p) : e.phase === 'breach' ? 40 : e.phase === 'break' ? 6 : 0;
         for (let k = 0; k < n; k++) {
           const a = r() * Math.PI * 2;
-          const sp = e.phase === 'breach' ? 18 + r() * 20 : e.phase === 'dig' ? 8 + r() * 14 : 5 + r() * 8;
+          const sp = e.phase === 'breach' ? 18 + r() * 20 : e.phase === 'dig' ? (7 + r() * 12) * (1 + 0.5 * p) : 5 + r() * 8;
           const col = r() < 0.4 ? 0x6e5a40 : r() < 0.5 ? 0x8a7458 : 0x5a4836;
-          this.spawn(e.x + Math.cos(a) * 3, h, e.y + Math.sin(a) * 3, Math.cos(a) * sp, 6 + r() * 12, Math.sin(a) * sp, 0.6 + r() * 0.6, col, 0.6 + r() * 0.9, 14, 2.4, 1.6);
+          this.spawn(e.x + Math.cos(a) * 3, h, e.y + Math.sin(a) * 3, Math.cos(a) * sp, (6 + r() * 12) * (1 + 0.6 * p), Math.sin(a) * sp, 0.6 + r() * 0.6, col, 0.6 + r() * 0.9, 14, 2.4, 1.6);
         }
+        if (e.phase === 'dig' && p >= 0.75)
+          for (let k = 0; k < 10; k++) {
+            const a = r() * Math.PI * 2;
+            const sp = 3 + r() * 5;
+            this.spawn(e.x + Math.cos(a) * 1.5, h, e.y + Math.sin(a) * 1.5, Math.cos(a) * sp, 26 + r() * 18, Math.sin(a) * sp, 0.8 + r() * 0.6, r() < 0.5 ? 0x5a4836 : 0x7a6448, 0.5 + r() * 0.8, 16, 2.2, 1.6);
+          }
         if (e.phase === 'breach') this.ring(e.x, e.y, 18, heightAt);
         break;
       }

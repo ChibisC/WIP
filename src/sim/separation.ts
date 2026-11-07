@@ -306,14 +306,19 @@ function creatureSpacing(w: World, dt: number): void {
   const cap = S.creatureMaxPush * dt * BALANCE.tickHz;
   for (let i = 0; i < crs.length; i++) {
     const a = crs[i];
-    // (in an attack it stands its ground: the other one gives way — combat v2.1)
-    if (a.dead || creatureHooks.attacking(a)) continue;
+    // (a story titan on its way into the nest is never held back by another creature: it pushes through —
+    // claude/story/05-spec §2; 2026-11-03 a ground beetle on guard at a ramp's top stopped the tarantula for good)
+    if (a.dead || pushesThrough(a)) continue;
+    // (in an attack it stands its ground: the other one gives way — combat v2.1; not against a titan pushing through)
+    const stand = creatureHooks.attacking(a);
     const ra = creatureHooks.radius(a);
     let px = 0;
     let py = 0;
     for (let j = 0; j < crs.length; j++) {
       const o = crs[j];
       if (j === i || o.dead || o.space !== a.space) continue;
+      const through = pushesThrough(o);
+      if (stand && !through) continue;
       const ally = a.faction >= 0 && o.faction >= 0 && w.teamOf(a.faction) === w.teamOf(o.faction);
       const min = (ra + creatureHooks.radius(o)) * (ally ? S.creatureAllyRoom : 1);
       const dx = a.x - o.x;
@@ -332,7 +337,7 @@ function creatureSpacing(w: World, dt: number): void {
         ny = i < j ? dsin(ang) : -dsin(ang);
       }
       // the smaller one gives way more (all of it to one in an attack)
-      const share = creatureHooks.attacking(o) ? 1 : o.scale / (a.scale + o.scale);
+      const share = through || creatureHooks.attacking(o) ? 1 : o.scale / (a.scale + o.scale);
       px += nx * (min - d) * 0.5 * share;
       py += ny * (min - d) * 0.5 * share;
     }
@@ -347,6 +352,11 @@ function creatureSpacing(w: World, dt: number): void {
       a.y += py;
     }
   }
+}
+
+/** A story titan walking to (or digging) the hole of its dig-in (titanDig.ts `rstory`, phases Approach and Dig). */
+function pushesThrough(cr: Creature): boolean {
+  return (cr.data.rstory ?? 0) > 0 && (cr.data.raid ?? 0) > 0 && (cr.data.rph ?? 0) > 0 && (cr.data.rph ?? 0) <= 2;
 }
 
 /** Put an ant that is still inside the current queen's abdomen back on its surface. */

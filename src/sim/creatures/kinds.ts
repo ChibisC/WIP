@@ -295,7 +295,7 @@ export const CREATURES: Record<string, CreatureKind> = {
     mass: 300,
     fleeAt: 0,
     boss: true,
-    dig: { can: true, speed: 0.6, style: 'bulldoze' }, // shoves with its head and mandibles: slow
+    dig: { can: true, speed: 0.8, style: 'bulldoze' }, // shoves with its head and mandibles: slow (0.6 before 2026-11-03)
     wild: 0,
     ai: 'stag',
     facts: ['Male stag beetles use their antler mandibles to wrestle and throw rivals off branches.', 'Stag beetle larvae spend 3 to 7 years underground feeding on decaying wood.', 'Adult stag beetles live only a few weeks and feed mostly on sap.'],
@@ -343,7 +343,7 @@ export const CREATURES: Record<string, CreatureKind> = {
     mass: 200,
     fleeAt: 0,
     boss: true,
-    dig: { can: true, speed: 1.0, style: 'squeeze' }, // squeezes and pushes through
+    dig: { can: true, speed: 1.15, style: 'squeeze' }, // squeezes and pushes through (1.0 before 2026-11-03)
     wild: 0,
     maxTurn: 1.8,
     ai: 'scolopendra',

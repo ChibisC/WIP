@@ -1016,3 +1016,119 @@ devices) in `docs/performance.md`; DESIGN, README, PROGRESS; handoff; merge rule
   the impostor bakes); cached static shadows (the shadow camera follows the view, and units cast
   most of the shadow); termite LOD cross-fade (the kit's instance writes are spread over many setters; it keeps its own
   hard switch).
+
+## 26. Story titans get inside; titans open holes more easily (user specs 2026-11-03: claude/story/05-spec-story-titans-get-inside.md, claude/creatures/02-spec-easier-titan-holes.md)
+
+(§25 is the performance pass's.)
+
+### 26.1 Why the story titans never got in (evidence, before any change: `main` `762d7c3`)
+`tools/titan-raid-probe.ts` (the probe: `tools/titanProbe.ts`) starts each level at its titan's moment and logs the
+titan every tick (`raid`, `rph`, `rprog`, `rstag`, health, space, position, its scene and cue, its creature state,
+riders, `hitT`, the actor's mode). The army is 60 Termants (⅔ soldiers) on marker V; the spider mother is put at 31.5 %
+(the 80 % and 60 % marks pass), and the last blow comes from the army (or a single blow undefended). Normal, seed 5:
+
+| level / setup | the dig cue began | digging from | inside | what happened |
+|---|---|---|---|---|
+| Long Nights / none | 0 s | 30 s | **55 s** | in (25 s of digging) |
+| Long Nights / army at the hole | 0 s | 50 s (39 % left) | never | **died at the hole** after 9 s of digging (rprog never reached 1: hit every tick, 45 % pace, knock-backs) |
+| Long Nights / army on it (no climbing) | 0 s | never | never | **died on the approach**, 30 mm short of its digging spot: latched ants, glue and grip slowed it to 1.7 mm/s (14 % of its speed) for 60 s while 60 ants chewed through 2 030 hp; the raid tick never bites on the approach |
+| Long Nights / riders | never | never | never | **died before its dig cue began**: on its path cue, every hit hands it to its own program (`hitT` > 0), so it stood and fought on the hollow's floor with 12 riders and died 45 s later |
+| Long Nights / army in its way, not attacking | 0 s | 23 s | 48 s | in |
+| Spider Mother / none | 0 s | 16 s | **43 s** | in (27 s of digging) |
+| Spider Mother / army at the hole | 0 s | 17 s (23 %) | never | **died at the hole** after 5.5 s |
+| Spider Mother / army on it | 0 s | 24 s (17 %) | never | **died at the hole** after 20 s |
+| Spider Mother / riders | 0 s | 23 s (11 %) | never | **died at the hole** after 16 s |
+| Spider Mother / army in its way | 0 s | 16 s | 43 s | in |
+| Spider Mother / from her burrow | 0 s | 16 s | 43 s | in |
+
+Even 20 ants at the hole killed both on Easy (the tarantula after 42 s of digging, the spider after 6 s); 20 on Brutal let
+the tarantula in after 56 s of digging. `tools/playtest-story.ts` (its bot fights at the door) on Normal, seed 7: the
+tarantula was killed after `tarantulaDigs` without `tarantulaIn`; the spider mother after `hp:mother:30` without
+`motherIn` — neither ever got in.
+
+The six suspects of the spec:
+1. **The cue gives up silently — confirmed by reading, not the cause here.** `enterCue` ignores `startTitanRaid`'s
+   result and the done check counts "not raiding" (`!data.raid`) as done, so a failed start or a raid ended early
+   (death aside) would move the scene on at once. In these runs the start never failed: creatures never go into caves in
+   this code (lairs are drawn holes; the titans stand at them on the surface), so `space !== SURFACE` cannot happen yet.
+   Fixed anyway (§26.2).
+2. **It dies or stalls at the hole — confirmed: the main cause.** Under attack it digs at `hitSlow` 45 % all the time
+   (any hit restarts the 1.2 s stagger) and heavy ticks knock progress back 15 %; the spider starts at 30 % health.
+   Before the hole, the approach crawls (latched grip floor 35 % × Termant glue × being held) and never fights back.
+3. **The spider's timeout — ruled out.** `digInto` is not a walking cue, so its `timeout: 300` never applied; the
+   `release` after it only clears the director's links (the raid goes on). Removed all the same.
+4. **Something else drives it — partly.** During the raid nothing else moves it (the raid tick runs first and returns
+   true in every phase), but *before* the dig cue the tarantula's path cue hands it to its own program whenever hit, so
+   an army on the hollow's floor stops it there and kills it. A later scene could also replace the dig scene (none does
+   today).
+5. **It can't reach the hole — partly.** The approach uses `walkTo`: straight at the hole (the banks' route only when the
+   line crosses a cliff), turning on the spot when blocked — no sliding round a pebble, no re-route. Not seen to block
+   here, but it can; and the crawl of (2).
+6. **`leaving` / `finishRaid` early — ruled out** (queen and colony alive in every run).
+
+### 26.2 Plan, as built
+Story (spec A; story raids only, skirmish unchanged):
+1. **The dig cue owns the titan.** A story actor with a dig-in ahead (`digInto` in its running scene, not yet inside)
+   is *locked*: a new scene for it waits until it is in (then the newest waiting one starts); nothing ends its raid but
+   death or the level's own `endRaid` (dawn). Boss phase events (the spiderlings, captions) still happen.
+2. **Start reliably.** In a cave (a lair) it first walks out of it to the surface; any other failure retries every
+   second and logs why (`story.log`, the dev view). Done only when inside (`rph ≥ Inside`) or dead.
+3. **Always reach the hole.** Story approaches walk the surface route field (round banks, up ramps), slide round
+   obstacles, push through ants (a floor on its pace whatever holds it: `STORY.titanRaid.minPace`) and re-route
+   (sidestep) after `stuckSec` without progress.
+4. **Digging can't be stalled.** Story pace ≥ `minPace`, no knock-backs, and a cap per difficulty (`digCap`): it
+   breaks through by then whatever happens.
+5. **It can't die before it gets in.** A locked titan's health stops at `hpFloor` (10 %) until it is inside (bites,
+   acid, venom, floods); the boss bar shows a lock and the floor's mark meanwhile.
+6. **The levels.** The tarantula walks its path to the hollow without stopping to fight (passive on the way, its path cue
+   shorter), then digs in; the spider mother rushes straight to the nest at 30 % (`digInto` `speed`), no timeout, the
+   release only once she is in. A breakthrough caption ("It's in the nest!") and a dig ring over the hole.
+7. **Fair.** The fight inside: measured (the queen's time to die with the army inside), tuned in the level data per
+   difficulty (`STORY.titanRaid.queenBite`: the titan's bite on the queen). The spider's bonus becomes "kill her within
+   N s of breaking in" (`killWithin`, N by difficulty); "kill the tarantula before dawn" stays.
+
+All modes (spec B):
+8. **Faster base digging**: `holeWork` lowered and the stag beetle's dig speed raised (undefended: tarantula and wolf
+   spider mother ≈ 10 s, centipede ≈ 15 s, stag beetle ≈ 20 s), times scaled a little by the titan's own size.
+9. **Defence slows by damage rate**, not by "any hit": a smoothed damage per second ÷ its health; pace = floor + (1 −
+   floor) ÷ (1 + (rate ÷ `slowRate`)²) — a few ants barely matter, a big army nears the floor (55 % in skirmish,
+   `STORY.titanRaid.minPace` in story).
+10. **Checkpoints** at 25 / 50 / 75 %: a heavy blow knocks a little back (`heavyBack` 8 %), never below the last one.
+11. **Memory**: partial progress stays on the hole for `holeMemorySec` (60 s); an open breach is still walked into.
+12. **Readable**: the hole's stages in the anthill model (rim crumbling, wider crater, soil fountaining, the breach —
+    sized to the titan), a progress ring over the hole for everyone, the warning toast with the time to breakthrough,
+    the rumble rising with progress.
+13. Verify: `tests/titans.ts`, `tests/storyCh1.ts` (both levels × four difficulties × no defence / army at the hole /
+    riders / from its burrow), `tools/titan-holes.ts` (before/after table: `docs/creatures/titans.md`), the playtests,
+    browser clips (`docs/story/shots/`), determinism, LAN, docs, handoff, merge, publish.
+
+### 26.3 Results
+- **The probe, Normal, 60 Termants** (`tools/titan-raid-probe.ts`), after: every setup gets in. Long Nights — none in
+  at 33 s (dug 10 s), army at the hole 45 s (dug 15 s = the cap, in at 31 %), army on it 42 s (killed inside 40 s
+  later), riders 37 s; from its burrow (walked out of the lair, down the knoll and the ramps) 124 s. Spider Mother —
+  none 27 s, hole / on her / riders 24–27 s (in at the 10 % floor), from her lair (out in 9 s) 33 s. A guard creature
+  on the moss bank's ramp top had held the tarantula for good on the burrow route (`separation.ts`: the guard "stood its
+  ground" in an attack and pushed the titan back each tick) — story raiders now push through other creatures.
+- **`tests/storyCh1.ts`**: both levels × four difficulties × no defence / 40 ants at the hole / 40 riders / in its lair
+  when the cue fires (32 runs): inside every time, never digging longer than the cap, the cue never done before.
+- **The fight inside** (40 ants on it, or none, 150 s after it got in): the queen is never killed at once — with no
+  defence at all she lasts 120–145 s (Long Nights; dawn comes about 140 s after it gets in), the spider never reaches
+  her; with the army the titan dies inside (the spider in 10–20 s) or is still fighting at dawn on Hard / Brutal. The
+  bites inside are softened per difficulty in the level data (`inside`): after a first matrix lost the Spider Mother on
+  Hard (seed 7: a colony of 17 left after the brood phase, where before 20 ants at the hole had killed her) and the Long
+  Nights on Brutal with the hole strategy.
+- **`tools/playtest-story.ts`** (seed 7; default bot / STRATEGY=hole), after the merge with main's AI-style Spider Mother
+  nest — the titan inside in every run that reached it:
+
+  | level | Easy | Normal | Hard | Brutal |
+  |---|---|---|---|---|
+  | The Long Nights | won 23.6 min, 99 / 96 ants | won, 85 / 91 | won, 80 / 78 | won, 13 / 3 |
+  | The Spider Mother | won 9.8 min, 74 / 78 | won 8.8, 28 / 28 | won 8.1 / 8.0, 48 / 51 | seed 7 unfinished (the bot never brings her to 30 %, as before), seed 9 won 7.8 min (16 ants), seeds 8 and 11 lost after she got in |
+
+  Before (`main` `762d7c3`, Normal): neither titan ever got in (the tarantula killed after `tarantulaDigs`, the spider
+  after her 30 % mark).
+- **Skirmish holes**: `docs/creatures/titans.md` (before/after tables; Termant and Lasius soldiers).
+- **AI colonies v titans** (`tools/titan-ai-defence.ts`, Meadow Pond, two AI colonies grown 20 min, the titan from
+  300 mm): before, 10 of 12 kept out (9 driven off, one never reached the hole; the holes took 22–74 s); after, 8 of 12
+  (Formica and the Termants drive off or kill every titan but one that never reached the hole; the Lasius colony lets
+  all four in, 76–99 % health). AI colonies now meet a warned titan at the hole it will dig (`warAI.ts threat`).

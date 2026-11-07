@@ -41,10 +41,18 @@ const TOOL_NAMES: Record<string, string> = { dig: 'digging', tile: 'building', u
  * bottom-left, the marker panel bottom-centre and the build panel
  * bottom-right, plus marker count labels, tooltips, messages and dialogs.
  */
+/** Seconds as a player reads them in a warning: "10 s", "35 s", "1 min 20 s" (rounded to 5 s past 20 s). */
+export function aboutSecs(t: number): string {
+  const r = t <= 20 ? Math.max(1, Math.round(t)) : Math.round(t / 5) * 5;
+  return r < 60 ? `${r} s` : `${Math.floor(r / 60)} min${r % 60 ? ` ${r % 60} s` : ''}`;
+}
+
 export class GameUI {
   root = el('div', 'gui');
   private tips: Tips;
   private toasts = new Toasts();
+  private bannerEl = el('div', 'titan-banner');
+  private bannerT = 0;
   private top: TopBar;
   private minimaps: Minimaps;
   private markers: MarkerPanel;
@@ -101,7 +109,7 @@ export class GameUI {
       this.labels.push(l);
       this.root.appendChild(l);
     }
-    this.root.append(this.vignette, this.tileLayer, this.crBars.root, this.top.root, this.status, this.minimaps.root, this.markers.root, this.build.root, this.info.root, this.boss.root, this.sandbox.root, this.goals, this.caption, this.toasts.root, this.paused, this.obsBar, this.menus.root, this.letterbox);
+    this.root.append(this.vignette, this.tileLayer, this.crBars.root, this.top.root, this.status, this.minimaps.root, this.markers.root, this.build.root, this.info.root, this.boss.root, this.sandbox.root, this.goals, this.caption, this.bannerEl, this.toasts.root, this.paused, this.obsBar, this.menus.root, this.letterbox);
     (this.letterbox.querySelector('.skip') as HTMLElement).addEventListener('click', (e) => {
       e.stopPropagation();
       s.skipShot();
@@ -229,12 +237,17 @@ export class GameUI {
     else if (e.t === 'message') this.toasts.push(e.text, e.kind === 'researcher' ? 'info' : e.kind);
     else if (e.t === 'queenHurt' && e.colony === pid) this.toasts.push('The queen is under attack!', 'warn', 'queen');
     // a titan digging toward the nest (sim/creatures/titanDig.ts): click to look
-    else if (e.t === 'titanDig' && e.colony === pid && (e.phase === 'warn' || e.phase === 'breach')) {
+    else if (e.t === 'titanDig' && e.colony === pid && (e.phase === 'warn' || e.phase === 'start' || e.phase === 'breach')) {
       // (lower case for the sentence, but a proper name keeps its capital: "Mexican red-knee tarantula", "Carolina wolf spider")
       const name = (creatureKind(e.kind)?.name ?? 'titan').replace(/^(?!(?:Mexican|Carolina)\b)([A-Z])/, (c) => c.toLowerCase());
-      const text = e.phase === 'warn' ? `${/^[aeiou]/.test(name) ? 'An' : 'A'} ${name} is digging toward your nest! Click to look.` : `The ${name} has broken into the nest!`;
-      this.toasts.push(text, 'warn', `titan:${e.phase}`, () => this.s.jumpTo(e.phase === 'warn' ? 'surface' : 'nest', e.x, e.y, e.phase === 'warn' ? undefined : e.space));
+      // how long until it breaks through (claude/creatures/02-spec §3): "about 10 s", "about 35 s"
+      const eta = e.eta !== undefined ? ` It breaks through in about ${aboutSecs(e.eta)}.` : '';
+      const text =
+        e.phase === 'warn' ? `${/^[aeiou]/.test(name) ? 'An' : 'A'} ${name} is digging toward your nest!${eta} Click to look.` : e.phase === 'start' ? `The ${name} is digging at your nest’s hole.${eta}` : `The ${name} has broken into the nest!`;
+      this.toasts.push(text, 'warn', `titan:${e.phase}`, () => this.s.jumpTo(e.phase === 'breach' ? 'nest' : 'surface', e.x, e.y, e.phase === 'breach' ? e.space : undefined));
     }
+    // a story titan breaking into your nest (claude/story/05-spec §2): a short banner
+    if (e.t === 'titanDig' && e.colony === pid && e.phase === 'enter' && e.story) this.banner('It’s in the nest!');
     else if (e.t === 'invasion' && e.colony === pid) this.toasts.push('Intruders in the nest!', 'warn', 'invasion');
     else if (e.t === 'colonyLost' && e.colony === pid) this.toasts.push('Your queen has died. The colony is lost.', 'warn');
     else if (e.t === 'colonyLost') {
@@ -269,6 +282,16 @@ export class GameUI {
     if (key === this.goalsKey) return;
     this.goalsKey = key;
     this.goals.innerHTML = `<div class="gm-stage">${esc(info.stage ?? '')}</div>${clock}${info.goals.map((g) => `<div class="gm-goal ${g.done ? 'done' : ''}"><span>${g.done ? '✓' : '○'} ${esc(g.text)}</span><b>${esc(g.progress)}</b></div>`).join('')}`;
+  }
+
+  /** A short banner across the middle of the screen (a story titan breaking in), gone after a few seconds. */
+  private banner(text: string): void {
+    this.bannerEl.textContent = text;
+    this.bannerEl.classList.remove('show');
+    void this.bannerEl.offsetWidth;
+    this.bannerEl.classList.add('show');
+    window.clearTimeout(this.bannerT);
+    this.bannerT = window.setTimeout(() => this.bannerEl.classList.remove('show'), 2600);
   }
 
   /** A narrator caption: shown above the panels, for long enough to read it. */
