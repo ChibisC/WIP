@@ -957,3 +957,54 @@ sprays"; "fix the antennae and mandibles, they are misplaced" (soldiers); "fix t
 Every item 8 (models, worker attacks, the sprayer's glue, the soldier's crush, bulldoze, toss and drum); decision
 "approve with changes". The change (K4): the soldier drums "while walking when approaching enemies" — in bursts
 (0.6 s every 1.5 s) while it walks or charges at a foe (`antViews.drumWalking`), the head only, the walk going on.
+
+## 25. Audio v3 — sound effects reworked: made-for-this-game files, no walking or termite idle sounds, insect-like attacks (user spec 2026-11-06, claude/audio/03-spec-sfx-rework-insect.md)
+Kept: the audio system of `claude/audio/02-spec-eotu-style-audio.md` (buses, mixer and voice limits, the scuffle and
+battle beds, adaptive music, ducking, marker chirps, alerts, ambience).
+
+**Replaced** — every synthesised stand-in (`src/audio/standins.ts`, 1,100 lines of runtime recipes) by files rendered
+offline (`tools/audio/sfx`: `dsp.py` primitives, one recipe per sound in `recipes_combat.py`, `recipes_creatures.py`,
+`recipes_world.py`; `build.py` renders 3–6 takes, trims them to start on their first sound, fades, normalises them to
+the level each had in the tuned mix (`levels.json`) and packs each sound into one Ogg + AAC file with its take offsets
+in `public/audio/manifest.json`). `bank.ts` reads the sprite manifest, corrects encoder delay from the file's first
+sound, decodes lazily (combat, orders and work warm up after the first click), streams the ambience loops and decodes
+them in offline renders. The music's instruments moved to `instruments.ts` (with the stingers and the narration cue,
+the only sounds still made in the game); `dsp.ts` kept only what they use. The stand-in tools (`render-standins.ts`,
+`process.sh`, `build-manifest.ts`) are replaced by `npm run audio:build`; recordings in `audio-src/recordings` still
+override a sound's takes.
+
+**Removed: ant and termite walking (all species)** — `ant.step_soil`, `ant.step_leaf`, `ant.step_bark`,
+`ant.step_stone`, `ant.step_sand`, `ant.step_carton`, `ant.step_queen`, `ant.swarm_bed` (the swarm movement bed and
+its `GrainBed` in `gameAudio.ts`, `audioRender.ts`, `soundBoard.ts`), `species.nasute_move`; in `scanAnts`: the
+walked-distance tracking, the ground-type step choice (`ground()`, its hash), the climbing skitter on creatures' legs
+(and its random scuffle), the Termant skitter and papery shuffle, the moving-ant count; the mixer's `steps` pool.
+Kept: creature and titan footsteps (`scanCreatures`), digging, antenna taps up close (ants only), the battle bed.
+
+**Removed: termite idle sounds** — antenna taps for termites (now ants only); the termite kit's procedural voices
+`render/termite/audio.ts` (`SickleJawAudio`: `biteSnap` and `alarmDrum` were never wired, `acidStream`, `acidFizz` and
+`victimStruggle` ran on every sickle-jaw hold; replaced by `species.sickle_acid` and `combat.struggle` files, timed by
+the hold's ramp and the victim's health), `SICKLE_AUDIO_EVENTS` and its type. Checked and kept as real actions: the
+`headbang` events (the colony alarm ability, `sickleAlarm` when attacked or grabbing, `majorAlarm` when a soldier is
+attacked) and the `alarm` event (now a termite colony drums, `species.termite_headbang`, instead of an ant's
+stridulation); the conehead soldier drumming while it walks or charges at a foe is part of that alarm (animation, no
+extra sound); wood chewing only on a forager's `bite` on wood (`species.termite_chew`, quiet); attacks, glue, digging,
+building and deaths. There were no idle chewing, grooming or royal sounds.
+
+**Changed: attacks, hits and deaths** (§4 of the spec; research in `docs/audio/sound-research.md`): new
+`combat.bite_crush` (fire ant and Atta majors, the Termant soldier), `combat.scissor_cut` (Atta soldiers, 40 % of Atta
+majors' bites), `combat.hit_tick` (light hits), `combat.grip` (the animation's grip and claws catching a creature's
+leg, instead of playing the 7 s scuffle loop as a one-shot), `combat.struggle` (renames `species.hellant_struggle`:
+prey on a jaw, hooks, pins, sickle holds), `combat.termite_bite`, `combat.termite_death`, `combat.mortar_pop` and
+`combat.mortar_land` (the lob and its landing, instead of the spray and the splat), `species.glue_splat` (instead of a
+slowed acid splat), `species.army_hook` (instead of a slowed mandible click), `species.sickle_snap` (instead of a sped-up
+hell ant snap), `species.sickle_acid`, `species.termite_chew`, `cr.beetle_bite` and `cr.centipede_bite` (creatures had
+used the ants' `combat.mandible_snap`), `ant.pick_up` and `ant.put_down`. Stings are sized by the stinger (army ants a
+little stronger); deaths by the caste (quieter for small ants). Carrying is heard on pick-up and set-down and every
+1.5–4 s while carrying (it was 18 % of footsteps). Sim-event sounds wait for the frame that shows their tick
+(`GameSession.renderAlpha`, `GameAudio.lag`), so a bite sounds as the jaws close. The ambience's macro layer (leaf
+litter on the surface, the colony rumble underground) rises a little over a crowd close up (`Place.crowd`).
+
+**Checks:** `tests/audio.ts` (catalog, manifest, files and attributions agree; no removed sound referenced; takes
+3–6), `tests/browser/audio_files.py` (every file decodes as Ogg and as AAC, the takes are cut right, attacks start on
+their contact), `tests/browser/audio_mix.py` (no clipping, budgets, the queen alert cuts through a 400-ant battle),
+`tests/browser/sfx_recordings.py` (before/after in-game recordings for the sound board).

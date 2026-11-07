@@ -201,12 +201,33 @@ def pack():
         for e in ("ogg", "m4a"):
             size[e] += os.path.getsize(f"{base}.{e}")
         sounds[sid] = entry
+    write_attributions(sounds)
     credits = read_credits()
     with open(os.path.join(PUB, "manifest.json"), "w") as f:
         json.dump({"sr": SR, "sounds": sounds, "credits": credits}, f, separators=(",", ":"))
         f.write("\n")
     n = sum(len(e.get("takes", [[0]])) for e in sounds.values())
     print(f"packed {len(sounds)} sounds ({n} takes): Ogg {size['ogg']/1e6:.2f} MB, AAC {size['m4a']/1e6:.2f} MB; {2*len(sounds)} files")
+
+
+def write_attributions(sounds):
+    """The made-for-this-game rows of docs/audio/ATTRIBUTIONS.md (between its markers): one per file."""
+    p = os.path.join(ROOT, "docs/audio/ATTRIBUTIONS.md")
+    text = open(p, encoding="utf8").read()
+    a, b = "<!-- made-for-this-game:start -->", "<!-- made-for-this-game:end -->"
+    if a not in text or b not in text:
+        return
+    rows = []
+    for sid, e in sorted(sounds.items()):
+        folder, name = sid.split(".", 1)
+        rec = bool(glob.glob(os.path.join(REC, folder, f"{name}_[0-9][0-9].*")))
+        if rec:
+            continue
+        mod = REG[sid]["fn"].__module__
+        rows.append(f"| `{e['file']}.ogg`, `.m4a` | {sid} | Underground Dominion (made for this game) | `tools/audio/sfx/{mod}.py` | CC0 (made for this game) | {len(e.get('takes', [0]))} take(s), rendered offline |")
+    body = "\n| File | Title | Author | Source | License | Notes |\n|---|---|---|---|---|---|\n" + "\n".join(rows) + "\n"
+    text = text[: text.index(a) + len(a)] + body + text[text.index(b):]
+    open(p, "w", encoding="utf8").write(text)
 
 
 def read_credits():

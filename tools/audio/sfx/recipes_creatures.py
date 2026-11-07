@@ -264,7 +264,7 @@ def boss_hairs(r, k):
     return o
 
 
-@sound("boss.arrive", takes=2)
+@sound("boss.arrive", takes=3)
 def boss_arrive(r, k):
     # a titan arriving: distant footfalls getting closer under a rising rumble
     dur = r.u(2.3, 2.8)

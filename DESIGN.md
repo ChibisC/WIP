@@ -12,7 +12,7 @@ bosses. Every creature is a real species and must look, move and behave like it.
 > 3.4, 3.6, 3.7, 3.8, 3.10, 4, 5 and 6 below describe the new design. See
 > `CHANGE_PLAN.md` for what was kept, refactored and replaced.
 
-Everything (models, textures, audio) is generated in code. No downloaded assets.
+Everything is made for the game in code: models, textures and music at load, the sound effects rendered offline by `tools/audio/sfx` into `public/audio` (audio v3). No downloaded assets.
 
 ---
 
@@ -35,7 +35,7 @@ src/
   ui/       DOM UI kit: top bar, nest tabs, minimaps, marker panel (drag and
             drop), build panel, in-world marker labels, menus, tooltips, settings
   modes/    sandbox, skirmish, outdoor missions
-  audio/    Web Audio synthesis (sfx, ambience, adaptive music)
+  audio/    Web Audio engine (effects from public/audio, ambience, adaptive music)
   game/     GameSession (input, views, the replica World), commands issued by
             the player, where the simulation runs (LocalSim / WorkerSim), replays
   worker/   the simulation Web Worker, its message protocol and frame builder
@@ -629,7 +629,7 @@ Built from the user's package `claude/sickle-jaw-termites/` (model kit v2.1, use
 
 - **AI** (same command path as players): brood mix 82 / 18, workers first; open foraging columns with soldiers in the row; in defence the soldiers lock attackers down one by one but **commit at most 60 % of the soldiers within 12 body lengths to holds and keep 2 free** (`mayCommit`; the others bite and squirt and turn on whoever attacks a holder). Raids and nest defence use the shared war AI.
 - **Rendering** (`render/termite/termiteLayer.ts` with the kit's `TermiteInstances`, sim hints from `game/antViews.ts`): Snap → the kit's LUNGE on the renderer's own clock from the lunge start (LUNGE until stateT ≥ 0.74, then HOLD with blend 0); in the hold `solveHoldOnVictim` places the head and the jet aim every frame, the jet is `GlueStreams` with `ACID_STREAM` from the nasus tip to the hit point (thickening with the ramp) and `AcidFizz` sits on the victim; free targets use `solveFreeSquirt` (aim clamped to ± 0.4 rad, cached every 4 frames). Held termites play STRUGGLE with acid on an `fxShell` herd; held ants flail (`victimStruggle` mapped onto the ant fields) with acid drawn by the ant glue shell (`max(glue, acid)`). Escort THREAT, alarm ALARM / RUSH, carried leaf scraps `Carry.LEAF`, the rhy larva and presoldier for brood. The nest is dark damp soil (the nest shader's `uCarton` 2, a port of the kit's `createDampSoilMaterial` look: crumbly walls, glossy wet patches, a darker trodden floor, dense soil brood cells) and leaf-litter patches use the kit's `buildLeafLitterGeometry` / `createLeafLitterMaterial`.
-- **Sound:** a grab plays the game's jaw snap and a struggle, a miss a dry mandible click, the alarm the shared termite drumming (`headbang`); the nearest three holds within earshot get the kit's `SickleJawAudio` voices on the combat bus (`acidStream` pulsing faster with the ramp, `acidFizz`, `victimStruggle` by the victim's health).
+- **Sound:** a grab plays the crossed blades snapping (`species.sickle_snap`) and a struggle, a miss the snap on air, the alarm the shared termite drumming (`headbang`); the nearest three holds within earshot repeat the acid smear's fizz (`species.sickle_acid`, faster and louder with the ramp) and the victim's struggle (`combat.struggle`, by its health).
 
 **Balance notes** (`tools/sickle-calibrate.ts`, `tools/termite-income.ts`):
 - The spec's "6–8 s to kill a baseline worker" assumed a 90 HP worker (the ramp kills 90 HP on tick 150, as the tests check). This game's baseline Lasius worker has 16 HP, so with the user's ramp unchanged a hold kills it in 2.8 s from the lunge; a Lasius soldier (44 HP) in 5.3 s, a Formica worker in 3.9 s, a Formica soldier (120 HP) in 9.6 s.
@@ -897,15 +897,15 @@ bronze/gold borders, small-caps serif headers). Layout follows the reference:
   | Esc | Cancel / menu |
 * **Audio** (revised by the user's audio brief, 2026-10-24; details in `docs/audio/README.md`).
   - Nature first, heard as if by a tiny microphone among the ants; nothing electronic in the game world.
-  - Built mostly from real recordings. Each of the 100 sounds in `src/audio/catalog.ts` has file slots for 3–6 takes. Until recordings are added, it plays an organic stand-in synthesised from the physics of the real sound: grains, chitin and wood modes, bubbles, stridulation, friction, air.
+  - Every effect is a file made for this game (audio v3, `claude/audio/03-spec-sfx-rework-insect.md`): each of the 110 sounds in `src/audio/catalog.ts` (all but the music and the narration cue) has 3–6 takes rendered offline by `tools/audio/sfx` from the physics of the real sound (chitin clicks and fractures, stridulation tooth trains, friction, tiny bubbles; research in `docs/audio/sound-research.md`), packed one file per sound (Ogg + AAC). A recording in `audio-src/recordings` replaces a sound's takes.
   - Mixer:
     - six buses (ambience, creatures, combat, interface, music, narration) plus master, each with a slider;
-    - voice budgets by loudness, with the overflow going into swarm and battle beds;
+    - voice budgets by loudness (8 work, 16 combat, 10 creature voices), with the overflow going into the battle bed and grapplers into the scuffle bed;
     - ducking for alerts, boss phases and narration;
     - underground and night filters;
     - only the space on screen is heard; important events elsewhere arrive muffled.
   - Ambience by biome, time of day, zoom and (future) weather.
-  - Ants: footsteps by ground type for the nearest, a granular swarm bed for the rest, digging, carrying, stridulation, combat, brood and the queen.
+  - Ants and termites make no walking sounds and termites no idle sounds (their drum is an alarm). Ants: digging, carrying (on pick-up, set-down and now and then while carrying), stridulation, insect-like combat sized by caste (double clicks, crushing bites, scissor rasps, the held ant's squeak, stings, acid), brood and the queen; sim-event sounds wait for the frame that shows the hit, so they land on the strike frame. Over a crowd close up, the leaf-litter and soil layer of the ambience rises a little.
   - Creatures and bosses by gait and size: bosses are scaled-up real sounds, never roars.
   - Natural interface cues: marker chirps at five pitches, earthy tool taps.
   - Acoustic adaptive music: stems, or the procedural score.

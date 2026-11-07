@@ -1772,3 +1772,26 @@ User spec (project doc `claude/ai/01-spec-ai-allies-chambers.md`). Branch `featu
 - Merged with `main` (the Mimic Ant / Termants rename: the level's colony is "Termants").
 - Round 4 ratings (2026-11-03): every item 8, approved with one change — the soldier drums in bursts while walking or
   charging at a foe (`drumWalking`; anim lab `tdrumwalk`).
+
+## 2026-11-06 — Audio v3: every sound effect remade (insect-like, made for this game); no walking or termite idle sounds
+- **User spec** `claude/audio/03-spec-sfx-rework-insect.md` (branch `feature/sfx-insect`; CHANGE_PLAN §25).
+- **Made for this game:** `tools/audio/sfx` renders every effect offline with numpy/scipy from the physics of the
+  real sound — chitin clicks (inharmonic modes at 2–12 kHz dying in milliseconds), fracture cascades, file-and-scraper
+  stridulation, stick-slip friction, Minnaert bubbles and fizz — 3–6 takes each (401 takes, 103 sounds), trimmed to
+  start on their first sound, normalised to the level each sound had in the tuned mix, packed one Ogg + AAC file per
+  sound (4.6 MB of Ogg; the ambience loops, 2.6 MB of it, stream). Research per sound in
+  `docs/audio/sound-research.md` (termite drumming 11–19 beats a second, trap jaws closing in ~0.1 ms, leafcutters
+  stridulating while they cut, trapped ants stridulating). Downloads were blocked from the build machine; nothing waits
+  on the user (an optional CC0 list is in `docs/audio/download-list.md`). Every file is in `ATTRIBUTIONS.md`.
+- **Removed:** ant and termite walking for every species (the step sounds by ground, the queen's steps, the climbing
+  skitter, the Termant skitter, the nasute shuffle, the swarm movement bed, the `steps` voice pool); termite idles
+  (antenna taps; the kit's procedural `SickleJawAudio` voices, replaced by files); the 1,100-line runtime stand-ins.
+  A termite colony's alarm now drums instead of stridulating; the conehead soldier's drumming walk is part of the alarm.
+- **Attacks:** double-click worker bites, crunching soldier snaps, crushing bites (fire ant and Atta majors, the Termant
+  soldier), scissor rasps (Atta soldiers), grips and struggles with the held ant's squeak, wet stings (fire ants
+  doubled, army ants stronger), fizzy acid, mortar pop and landing, glue sputter, army-ant hooks, sickle-jaw snap and
+  acid, soft termite bites and deaths, hit ticks, deaths with a twitch of legs; creatures' own bites (beetle clack,
+  centipede ripple and snap) instead of the ants' snap; titans the same sounds bigger, the creak before a slam. Sim-event
+  sounds wait for the frame that shows the tick (`renderAlpha`), so a bite lands on the strike frame.
+- **Carrying** is heard on pick-up and set-down and now and then while carrying; over a crowd close up the ambience's
+  leaf-litter and soil layer rises a little (no footstep texture).

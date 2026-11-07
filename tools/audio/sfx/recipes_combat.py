@@ -331,7 +331,7 @@ def saiyant_crackle(r, k):
     return o
 
 
-@sound("species.saiyant_surge", takes=2)
+@sound("species.saiyant_surge", takes=3)
 def saiyant_surge(r, k):
     # the golden surge: a rising rustle of rattled seeds and a stridulating shimmer climbing over it
     dur = r.u(2.0, 2.4)
@@ -356,14 +356,17 @@ def termant_absorb(r, k):
     return lp(o, 6000)
 
 
-@sound("species.termant_caste", takes=1, lufs=-20)
+@sound("species.termant_caste", takes=3, lufs=-20)
 def termant_caste(r, k):
-    # a stolen caste raised: a rising chord of plucked tines (the one musical moment among the effects)
+    # a stolen caste raised: a rising chord of plucked tines (the one musical moment among the effects); the takes
+    # differ in voicing and in how the tines are spread
     o = zeros(1.9)
     base = 392.0
-    for i, semi in enumerate([0, 3, 7, 10, 14]):
+    chord = [[0, 3, 7, 10, 14], [0, 5, 7, 10, 15], [0, 3, 7, 12, 14]][(k - 1) % 3]
+    gap = r.u(0.11, 0.15)
+    for i, semi in enumerate(chord):
         f = base * 2 ** (semi / 12)
-        t0 = 0.02 + i * 0.13
+        t0 = 0.02 + i * gap
         tine = modes(1.6, [f, f * 2.76, f * 5.4], [0.9, 0.25, 0.08], [1, 0.25, 0.08], [0, 0, 0])
         add(o, tine, t0, 0.8 - i * 0.05)
         add(o, lp(burst(r, 0.006, 0.0002, 0.001), 3000), t0, 0.15)

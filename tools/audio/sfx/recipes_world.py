@@ -264,7 +264,7 @@ def ui_alert_queen(r, k):
     return o
 
 
-@sound("ui.alert_starving", takes=2, lufs=-19)
+@sound("ui.alert_starving", takes=3, lufs=-19)
 def ui_alert_starving(r, k):
     # the colony is starving: a slow, dull drumming
     o = zeros(0.9)
@@ -272,7 +272,7 @@ def ui_alert_starving(r, k):
     return o
 
 
-@sound("ui.alert_invasion", takes=2, lufs=-17)
+@sound("ui.alert_invasion", takes=3, lufs=-17)
 def ui_alert_invasion(r, k):
     # intruders in the nest: urgent drumming in two bursts and stridulation
     o = zeros(1.0)
