@@ -132,7 +132,7 @@ You start with a queen, her seven-tile chamber and three small **nanitic** worke
 | Right-click a marker | Lift it |
 | Tab | Surface ⇄ last underground area |
 | Shift + 1 – 6 / area tabs | Show underground area 1–6 |
-| F3 | Debug overlay (frame rate, simulation tick time, network; draws the creatures' climbing points, rails, weak points and mount slots, free and taken) |
+| F3 | Debug overlay and profiler: frame rate, frame time (average, p95, worst), the main thread's time by part, GPU time where the browser measures it, draw calls, triangles, shader programs, textures, the heap and an estimate of GPU memory, the hitch log (every frame over 33 ms and what happened in it), the simulation's tick, the network and each player's tick and frame time; draws the creatures' climbing points, rails, weak points and mount slots, free and taken |
 | Enter | Chat (multiplayer) |
 | N | Next open underground area |
 | G · U · Delete | Dig · Upgrade · Delete tools |
@@ -154,9 +154,12 @@ You start with a queen, her seven-tile chamber and three small **nanitic** worke
 | Drag three fingers up or down | Tilt |
 | ✕ button (top centre) | Cancel the tool / stop following an ant |
 
-Play phones in landscape (in portrait the game asks you to turn the phone). On phones, and on tablets held upright, the interface switches to a compact layout with bigger buttons: the maps fold behind the map button beside the area tabs, the build panel behind **Build**, and the marker panel starts folded to its markers (the arrow button unfolds the group cards). Auto graphics quality starts at Medium on touch devices. On iPhone, sound follows the ring/silent switch.
+Play phones in landscape (in portrait the game asks you to turn the phone). On phones, and on tablets held upright, the interface switches to a compact layout with bigger buttons: the maps fold behind the map button beside the area tabs, the build panel behind **Build**, and the marker panel starts folded to its markers (the arrow button unfolds the group cards). Auto graphics quality starts at Medium on touch devices, and the frame rate is held at 60 there (a 120 Hz screen at 60 runs cooler). On iPhone, sound follows the ring/silent switch.
 
-The pause menu has graphics quality, interface size, edge scrolling and the sandbox setting **Reveal all underground areas**.
+The pause menu has graphics quality, frame rate (match the screen, 60 or 30), interface size, edge scrolling and the sandbox setting **Reveal all underground areas**. Auto quality first lowers the render resolution a little (never below 75 %, with a light sharpen) and only then the preset.
+
+### Benchmark
+Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`) runs six fixed scenes for about four minutes: switching surface ↔ underground ten times, a big fight, a full nest, a story night, the arena at 600 units and a multiplayer-sized world. It ends with a report to copy and send (frame times, hitches and their causes, the switch frames, draw calls, memory). See `docs/performance.md`.
 
 ## Species
 | Species | Castes |

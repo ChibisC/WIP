@@ -240,6 +240,8 @@
 .net-hud { position: absolute; inset: 0; pointer-events: none; }
 .net-banner { position: absolute; top: calc(56 * var(--u)); left: 50%; transform: translateX(-50%); padding: calc(8 * var(--u)) calc(16 * var(--u)); font-size: calc(15 * var(--u)); display: none; white-space: nowrap; }
 .net-banner.show { display: block; }
+.net-perf { position: absolute; top: calc(30 * var(--u)); left: 50%; transform: translateX(-50%); font-size: calc(12 * var(--u)); color: #f3c88a; text-shadow: 0 1px 2px #000; display: none; white-space: nowrap; }
+.net-perf.show { display: block; }
 .net-banner { text-align: center; width: calc(440 * var(--u)); white-space: normal; font-variant-numeric: tabular-nums; }
 /* fixed width and tabular digits, and the button centred on its own line, so it stays put while the seconds count up */
 .net-banner .chip { display: block; margin: 6px auto 0; pointer-events: auto; }

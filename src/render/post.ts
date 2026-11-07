@@ -118,6 +118,7 @@ varying vec2 vUv;
 uniform sampler2D tColor; uniform sampler2D tDepth; uniform vec2 resolution;
 uniform float focusDist; uniform float dofStrength; uniform float dofOn; uniform float uTilt; uniform float uHaze; uniform vec3 uHazeColor;
 uniform float exposure, saturation, contrast, warmth, vignette, grain; uniform vec3 lift; uniform vec3 gain;
+uniform float uSharp;
 ${DEPTH_HELPERS}
 float coc(vec2 uv){
   float z = linDepth(texture2D(tDepth, uv).x);
@@ -130,6 +131,12 @@ float coc(vec2 uv){
 }
 void main(){
   vec3 col = texture2D(tColor, vUv).rgb;
+  // dynamic resolution (performance pass): below full resolution a light sharpening keeps edges crisp; off at full
+  if (uSharp > 0.0) {
+    vec2 px = 1.0 / resolution;
+    vec3 nb = texture2D(tColor, vUv + vec2(px.x, 0.0)).rgb + texture2D(tColor, vUv - vec2(px.x, 0.0)).rgb + texture2D(tColor, vUv + vec2(0.0, px.y)).rgb + texture2D(tColor, vUv - vec2(0.0, px.y)).rgb;
+    col = max(col + uSharp * (col - nb * 0.25), vec3(0.0));
+  }
   if (dofOn > 0.5) {
     float c0 = coc(vUv);
     float maxR = dofStrength * resolution.y / 1080.0 * 9.0;
@@ -184,6 +191,8 @@ export class PostPipeline {
     grade: { exposure: 1, saturation: 1.05, contrast: 1.05, warmth: 0.2, lift: new THREE.Color(0.01, 0.008, 0.004), gain: new THREE.Color(1, 1, 1), vignette: 0.35 },
   };
   enabled = true;
+  /** dynamic resolution's sharpening (0 at full resolution) */
+  sharpen = 0;
   focusDistance = 300;
   tilt = 0.35;
   private sceneRT: THREE.WebGLRenderTarget;
@@ -261,6 +270,7 @@ export class PostPipeline {
         uHazeColor: { value: new THREE.Color(1, 1, 1) },
         vignette: { value: 0.3 },
         grain: { value: 0 },
+        uSharp: { value: 0 },
         lift: { value: new THREE.Color() },
         gain: { value: new THREE.Color(1, 1, 1) },
       },
@@ -320,11 +330,16 @@ export class PostPipeline {
       r.setRenderTarget(this.aoRT);
       this.quad.render(r);
     }
-    this.comp.uniforms.aoOn.value = s.ao ? 1 : 0;
-    this.comp.uniforms.aoStrength.value = s.aoStrength;
-    this.quad.material = this.comp;
-    r.setRenderTarget(this.compRT);
-    this.quad.render(r);
+    // (without ambient occlusion the composite was a full-screen copy: the grade reads the scene directly — the same
+    // pixels, one full-screen pass fewer; performance pass)
+    if (s.ao) {
+      this.comp.uniforms.aoOn.value = 1;
+      this.comp.uniforms.aoStrength.value = s.aoStrength;
+      this.quad.material = this.comp;
+      r.setRenderTarget(this.compRT);
+      this.quad.render(r);
+      this.dof.uniforms.tColor.value = this.compRT.texture;
+    } else this.dof.uniforms.tColor.value = this.sceneRT.texture;
 
     const g = s.grade;
     const u = this.dof.uniforms;
@@ -342,6 +357,7 @@ export class PostPipeline {
     (u.uHazeColor.value as THREE.Color).setHex(md?.hazeColor ?? 0xffffff).convertSRGBToLinear();
     u.vignette.value = g.vignette;
     u.grain.value = g.grain ?? 0;
+    u.uSharp.value = this.sharpen;
     (u.lift.value as THREE.Color).copy(g.lift);
     (u.gain.value as THREE.Color).copy(g.gain);
     this.quad.material = this.dof;

@@ -441,7 +441,7 @@ export class GameUI {
         l.style.display = 'none';
         continue;
       }
-      l.style.display = 'block';
+      if (l.style.display !== 'block') l.style.display = 'block';
       l.style.left = p.x + 'px';
       l.style.top = p.y + 'px';
       const txt = String(markerCounts(s.world, s.player, i).current);
@@ -479,10 +479,12 @@ export class GameUI {
         if (e.style.display !== 'none') e.style.display = 'none';
         return;
       }
-      e.style.display = 'block';
+      // (written only when they change: an unchanged class or display still costs a style pass every frame)
+      if (e.style.display !== 'block') e.style.display = 'block';
       e.style.left = l.x + 'px';
       e.style.top = l.y + 'px';
-      e.className = 'tlabel ' + l.kind;
+      const cls = 'tlabel ' + l.kind;
+      if (e.className !== cls) e.className = cls;
       if (e.innerHTML !== l.html) e.innerHTML = l.html;
     });
     const follow = s.followId ? s.world.antById.get(s.followId) : undefined;

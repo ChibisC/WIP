@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { prof } from '../../core/profiler';
 import { NEST_CHUNK, NestGrid, SOIL_AIR, SOIL_GATE, SOIL_ROCK, SOIL_ROUTE, SOIL_STONE } from '../../world/nestGrid';
 import { addPatch, globalUniforms, NOISE_GLSL, WORLD_POS_PATCH } from '../shaderPatch';
 import { valueNoise2 } from '../../core/rng';
@@ -129,6 +130,13 @@ export class NestTerrain {
     }
     if (changed) this.hexTex.needsUpdate = true;
   }
+  /** scratch for the signed distance (chamfer from air, from soil, the blur's other buffer) */
+  private sdA: Float32Array | null = null;
+  /** sliced updates: the light maps wait for the signed distance; a batch of chunks is open */
+  private mapsStale = false;
+  private batchOpen = false;
+  private sdS: Float32Array | null = null;
+  private sdT: Float32Array | null = null;
 
   constructor(public grid: NestGrid) {
     const g = grid;
@@ -201,8 +209,14 @@ export class NestTerrain {
     const W = g.w;
     const H = g.h;
     const INF = 1e6;
-    const dA = new Float32Array(W * H);
-    const dS = new Float32Array(W * H);
+    // (scratch kept between rebuilds: a rebuild used to allocate three grids of garbage)
+    if (!this.sdA || this.sdA.length !== W * H) {
+      this.sdA = new Float32Array(W * H);
+      this.sdS = new Float32Array(W * H);
+      this.sdT = new Float32Array(W * H);
+    }
+    const dA = this.sdA;
+    const dS = this.sdS!;
     for (let k = 0; k < W * H; k++) {
       const air = this.airCell(k);
       dA[k] = air ? INF : 0;
@@ -215,26 +229,39 @@ export class NestTerrain {
     chamfer(dA, W, H);
     chamfer(dS, W, H);
     for (let k = 0; k < W * H; k++) this.sd[k] = this.airCell(k) ? dA[k] - 0.5 : -(dS[k] - 0.5);
-    // Blur: cell staircases become smooth organic contours.
-    const tmp = new Float32Array(W * H);
+    // Blur: cell staircases become smooth organic contours. Seven passes of a 3×3 kernel (centre weight 2). The interior
+    // cells skip the bounds checks; every cell adds the same values in the same order as the plain loop (borderBlur),
+    // so the result is the same to the bit (performance pass, tests/performance.ts) at a fraction of the time.
+    let src = this.sd;
+    let dst = this.sdT!;
     for (let pass = 0; pass < 7; pass++) {
-      for (let y = 0; y < H; y++)
-        for (let x = 0; x < W; x++) {
-          let sum = 0;
-          let n = 0;
-          for (let dy = -1; dy <= 1; dy++)
-            for (let dx = -1; dx <= 1; dx++) {
-              const xx = x + dx;
-              const yy = y + dy;
-              if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
-              const wgt = dx === 0 && dy === 0 ? 2 : 1;
-              sum += this.sd[yy * W + xx] * wgt;
-              n += wgt;
-            }
-          tmp[y * W + x] = sum / n;
+      for (let y = 0; y < H; y++) {
+        if (y === 0 || y === H - 1) {
+          for (let x = 0; x < W; x++) dst[y * W + x] = borderBlur(src, W, H, x, y);
+          continue;
         }
-      this.sd.set(tmp);
+        dst[y * W] = borderBlur(src, W, H, 0, y);
+        for (let x = 1; x < W - 1; x++) {
+          const k = y * W + x;
+          let sum = 0;
+          sum += src[k - W - 1];
+          sum += src[k - W];
+          sum += src[k - W + 1];
+          sum += src[k - 1];
+          sum += src[k] * 2;
+          sum += src[k + 1];
+          sum += src[k + W - 1];
+          sum += src[k + W];
+          sum += src[k + W + 1];
+          dst[k] = sum / 10;
+        }
+        dst[y * W + W - 1] = borderBlur(src, W, H, W - 1, y);
+      }
+      const t = src;
+      src = dst;
+      dst = t;
     }
+    if (src !== this.sd) this.sd.set(src);
   }
 
   /** Light pools (local + wide openness), wall distance and a smooth stone mask. */
@@ -525,21 +552,64 @@ export class NestTerrain {
   }
 
   /** Rebuild dirty chunks (cheap when nothing changed). */
-  update(force = false): void {
+  /**
+   * Bring the mesh up to date with the grid. `budgetMs` (performance pass): an area not on screen is kept current in
+   * slices — one heavy step a call (the signed distance, then the light maps, then chunks until the budget is spent) —
+   * so the work never lands in one frame; the shown area (no budget) does everything at once, as before.
+   */
+  update(force = false, budgetMs = Infinity): void {
     const g = this.grid;
     if (!force && g.dirty.size === 0) return;
+    const t0 = performance.now();
+    const n = g.dirty.size;
+    const sliced = budgetMs !== Infinity;
     if (g.version !== this.builtVersion || force) {
       this.computeSignedDistance();
       this.builtVersion = g.version;
+      this.mapsStale = true;
+      if (sliced) return;
     }
-    this.updateMaps();
-    for (const ci of g.dirty) this.buildChunk(ci);
-    g.dirty.clear();
+    if (!sliced || this.mapsStale || !this.batchOpen) {
+      this.updateMaps();
+      this.mapsStale = false;
+      this.batchOpen = true;
+      if (sliced) return;
+    }
+    let built = 0;
+    for (const ci of g.dirty) {
+      this.buildChunk(ci);
+      g.dirty.delete(ci);
+      built++;
+      if (sliced && performance.now() - t0 > budgetMs) break;
+    }
+    if (g.dirty.size === 0) this.batchOpen = false;
+    if (!sliced || g.dirty.size === 0) prof.note(`nest mesh: ${sliced ? built : n} chunks rebuilt${sliced ? ' (in the background)' : ''} (${(performance.now() - t0).toFixed(0)} ms)`);
+  }
+
+  /** Chunks waiting to be rebuilt (the session keeps areas that are not shown current at a low rate). */
+  get dirty(): number {
+    return this.grid.dirty.size;
   }
 
   setShadows(on: boolean): void {
     for (const m of this.chunks.values()) m.castShadow = on;
   }
+}
+
+/** One cell of the signed distance's 3×3 blur, with the grid's edge taken into account (the original loop's body). */
+function borderBlur(sd: Float32Array, W: number, H: number, x: number, y: number): number {
+  let sum = 0;
+  let n = 0;
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx;
+      const yy = y + dy;
+      if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+      const wgt = dx === 0 && dy === 0 ? 2 : 1;
+      sum += sd[yy * W + xx] * wgt;
+      n += wgt;
+    }
+  return sum / n;
 }
 
 /** Two-pass chamfer distance transform (in cells). */

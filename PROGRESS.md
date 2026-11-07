@@ -1821,6 +1821,31 @@ User (2026-11-06): "a weird protruding thing in front of the stag beetles, at th
   smaller males (sizes 0–3) exist only in the labs (`msize`) until `feature/stag-sizes` lands — fixed there too.
 - New: `tools/creature-hash.ts` (save/check/dump creature-model fingerprints, like `morph-hash.ts` for ants) with
   the baseline `tests/data/creature-hashes.json`.
+
+## 2026-11-07 — Performance pass: faster in every mode, smooth switching, no loss of looks
+User spec `claude/performance/01-spec-performance-no-visual-loss.md` (branch `feature/performance`). Plan and as-built:
+`CHANGE_PLAN.md` §25; numbers, findings and what was not done: `docs/performance.md`; golden set:
+`docs/performance/golden/`.
+- **Measuring:** F3 is a profiler (frame and main-thread times by part, GPU time where measurable, draw calls, programs,
+  textures, GL work since loading, an estimate of GPU memory, a hitch log naming each frame over 33 ms's causes);
+  `?bench=1` and Menu → Graphics → **Run the benchmark** (six scenes, a report to copy); the golden set (35 shots,
+  compared by SSIM) and the switching probe (`tests/browser/switch_probe.py`).
+- **Switching:** loading pre-warms every space (each model built once and shared, every scene compiled and drawn once
+  with shadows); new models are warmed in the background; other areas are kept current in 3 ms slices, and the area
+  about to show is brought up to date under the fade; nothing is drawn behind a fully opaque fade. On the build
+  machine the first visit to the home nest went from a 119.6 s frame to 11 ms, area 3 from 13.5 s to 41 ms, the worst
+  first visit is now 89 ms (SwiftShader, Medium).
+- **Every mode:** empty instanced meshes hidden; the AO copy skipped when AO is off; dynamic resolution (to 75 %, with a
+  light sharpen) before auto quality drops a preset; the worker's slow state as per-field deltas (16 % of the bytes);
+  the nest distance field 3× faster (same result to the bit); HUD writes only when changed; ant LOD cross-fade with
+  hysteresis (packed into `aE.z`: the ant shader is at 16 attributes); frame cap 30 / 60 / screen (phones 60); a GPU
+  memory estimate with a 600 MB phone budget; each player's tick and frame time in multiplayer.
+- **Looks:** 35 of 35 golden shots match `main` (`docs/performance/golden/compare-after.md`).
+- **Tests:** `tests/performance.ts` (slow-state deltas rebuild the replica exactly; fingerprints; the `aE.z` packing;
+  the distance field to the bit; sliced terrain updates end with the full rebuild's mesh; the frame cap; settings).
+- **Not done:** KTX2, an IndexedDB bake cache, cached static shadows, the termite kit's LOD cross-fade (why:
+  `docs/performance.md`). The protocol is unchanged (`ud-mp-11`): the new pong/delay fields are optional and the
+  simulation is untouched.
 ## 2026-11-06 — A shared underground: set tunnel routes between nests, underground fog (CHANGE_PLAN §27)
 User spec `claude/underground/01-spec-shared-underground-tunnels.md` (2026-11-06); branch `feature/shared-underground`.
 Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).

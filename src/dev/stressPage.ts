@@ -12,8 +12,9 @@ import { DebugOverlay } from '../ui/debugOverlay';
 import { populateStress, stressSetup } from './stressScene';
 import type { Quality } from '../render/view';
 import { animSettings } from '../render/ants/antMotion';
+import { runBenchScene } from './bench';
 
-export function runStressPage(canvas: HTMLCanvasElement, ui: HTMLElement, q: URLSearchParams): void {
+export async function runStressPage(canvas: HTMLCanvasElement, ui: HTMLElement, q: URLSearchParams): Promise<void> {
   const per = Number(q.get('ants') || 400);
   const nCr = Number(q.get('creatures') || 100);
   const secs = Number(q.get('secs') || 60);
@@ -22,6 +23,23 @@ export function runStressPage(canvas: HTMLCanvasElement, ui: HTMLElement, q: URL
   animSettings.v2 = q.get('anim') !== '1';
   const s = new GameSession(canvas, stressSetup(sp && sp.length === 4 ? sp : undefined), (q.get('q') as Quality) || 'medium');
   populateStress(s.world, per, nCr, Number(q.get('bosses') || 0));
+  // ?shot=1 (golden set, browser shots): stepped by hand on a virtual clock, like the game's screenshot harness
+  if (q.get('shot')) {
+    (window as unknown as { __session: GameSession }).__session = s;
+    s.loop.advance(Number(q.get('ticks') || 0));
+    let vt = performance.now();
+    (window as unknown as { __step: (k: number, dt: number) => void }).__step = (k, dt) => {
+      for (let i = 0; i < k; i++) s.loop.step((vt += dt * 1000));
+    };
+    s.view.surfaceRig.jumpTo(s.world.terrain.width / 2, s.world.terrain.depth / 2, 260);
+    await s.prewarm();
+    s.loop.step(vt);
+    s.loop.step((vt += 16));
+    (window as unknown as { __ready: boolean }).__ready = true;
+    return;
+  }
+  // (behind no loading screen here: the page is a test)
+  await s.prewarm();
   if (q.get('worker') !== '0') s.useWorker();
   new GameUI(s, ui);
   const dbg = new DebugOverlay(s, ui);
@@ -31,6 +49,7 @@ export function runStressPage(canvas: HTMLCanvasElement, ui: HTMLElement, q: URL
   const w = window as unknown as { __session: GameSession; __ready: boolean; __stress: unknown };
   w.__session = s;
   s.start();
+  if (q.get('bscene')) runBenchScene(s, q);
   w.__ready = true;
   const frames: number[] = [];
   const ticks: number[] = [];

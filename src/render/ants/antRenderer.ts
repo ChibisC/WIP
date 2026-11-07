@@ -1,6 +1,8 @@
 import * as THREE from 'three';
+import { prof } from '../../core/profiler';
+import { camCuts } from '../cameras';
 import { AntRig, buildAnt } from './antGeometry';
-import { BODY_TEX, createAntMaterials, createAntGlueShell, POSE, TINT_GLSL } from './antMaterial';
+import { BODY_TEX, createAntMaterials, createAntGlueShell, LOD_FADE_GLSL, packExhaustedFade, POSE, TINT_GLSL } from './antMaterial';
 import { ATK, ATTACK_CONTACT, AttackPose, applyAttackBody, attackPose, attackPoseV2, neutralPose } from './attackPoses';
 import { AntMorph, MORPHS } from './morphs';
 import { ANIM_SFX, animV2, AtkPlan, attackPlan, Motion2, newMotion, newMotionOut, stepMotion } from './antMotion';
@@ -189,9 +191,58 @@ interface AnimState {
   ahi?: boolean;
   aho?: boolean;
   piv?: number;
+  /** LOD cross-fade (performance pass): the LOD shown, the one fading out (−1 none), the fade 0..1, last frame drawn */
+  lod?: number;
+  lodFrom?: number;
+  lodT?: number;
+  lodSeen?: number;
 }
 
+/** LOD cross-fade length (s) and the hysteresis round each switching size (×/÷) */
+const LOD_FADE = 0.25;
+const LOD_HYST = 1.06;
+
 const LOD_NAMES = ['lod0', 'lod1', 'imp'] as const;
+
+/**
+ * One copy of each ant model for every area (performance pass): the built geometry and rig per morph and detail, and
+ * the far-LOD impostor atlas per morph. Each area's renderer used to build and bake its own the first time the area
+ * was shown — seconds of work at the moment of a switch on a slow machine. Buckets clone the geometry (they add their
+ * instance attributes) and make their own materials (their own uniforms), so sharing changes nothing drawn.
+ */
+const builtCache = new Map<string, ReturnType<typeof buildAnt>>();
+function builtAnt(m: AntMorph, detail: 0 | 1): ReturnType<typeof buildAnt> {
+  const k = `${m.key}|${detail}`;
+  let b = builtCache.get(k);
+  if (!b) builtCache.set(k, (b = buildAnt(m, detail, 3)));
+  return b;
+}
+/** baked impostors per WebGL renderer (an atlas lives on one context) */
+const impostorCaches = new WeakMap<THREE.WebGLRenderer, Map<string, THREE.MeshStandardMaterial>>();
+function impostorCacheOf(r: THREE.WebGLRenderer): Map<string, THREE.MeshStandardMaterial> {
+  let m = impostorCaches.get(r);
+  if (!m) impostorCaches.set(r, (m = new Map()));
+  return m;
+}
+
+/**
+ * A geometry that shares another's vertex data (the same attribute objects: uploaded once per renderer) and takes its
+ * own instance attributes. Every area's renderer used to clone each model's vertices (performance pass, GPU memory).
+ */
+function sharedGeometry(src: THREE.BufferGeometry): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  g.setIndex(src.index);
+  for (const name of Object.keys(src.attributes)) g.setAttribute(name, src.attributes[name]);
+  const ma = src.morphAttributes as Record<string, Array<THREE.BufferAttribute | THREE.InterleavedBufferAttribute>>;
+  for (const name of Object.keys(ma)) (g.morphAttributes as typeof ma)[name] = ma[name];
+  g.morphTargetsRelative = src.morphTargetsRelative;
+  for (const gr of src.groups) g.addGroup(gr.start, gr.count, gr.materialIndex);
+  g.setDrawRange(src.drawRange.start, src.drawRange.count);
+  g.boundingBox = src.boundingBox;
+  g.boundingSphere = src.boundingSphere;
+  g.userData = src.userData;
+  return g;
+}
 
 class Bucket {
   meshes: THREE.InstancedMesh[] = [];
@@ -209,8 +260,8 @@ class Bucket {
 
   constructor(public key: string, private group: THREE.Group, impostor: { geo: THREE.BufferGeometry; mat: THREE.Material }, shadows: boolean) {
     this.morph = MORPHS[key];
-    const b0 = buildAnt(this.morph, 0, 3);
-    const b1 = buildAnt(this.morph, 1, 3);
+    const b0 = builtAnt(this.morph, 0);
+    const b1 = builtAnt(this.morph, 1);
     this.rig = b1.rig;
     const m0 = createAntMaterials(b0.rig, true, key);
     const m1 = createAntMaterials(b1.rig, true, key);
@@ -225,9 +276,13 @@ class Bucket {
     const old = this.meshes[l];
     if (old) {
       this.group.remove(old);
+      // (the vertices are the model's, shared: only the old instance attributes leave the GPU)
+      for (const name of Object.keys(this.geos[l].attributes)) old.geometry.deleteAttribute(name);
+      old.geometry.setIndex(null);
+      old.geometry.dispose();
       old.dispose();
     }
-    const geo = this.geos[l].clone();
+    const geo = sharedGeometry(this.geos[l]);
     const mk = () => new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4).setUsage(THREE.DynamicDrawUsage);
     const at = { a: mk(), b: mk(), c: mk(), d: mk(), e: mk() };
     geo.setAttribute('aA', at.a);
@@ -238,6 +293,7 @@ class Bucket {
     const mesh = new THREE.InstancedMesh(geo, this.mats[l], cap);
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     mesh.count = 0;
+    mesh.visible = false;
     mesh.frustumCulled = false;
     mesh.castShadow = shadows && l < 2;
     mesh.receiveShadow = l < 2;
@@ -281,7 +337,7 @@ class Bucket {
       this.shellTex[l] = tex;
       const su = shellMat.userData.antUniforms as Record<string, THREE.IUniform>;
       su.uBodyTex.value = tex;
-      const geo = this.geos[l].clone();
+      const geo = sharedGeometry(this.geos[l]);
       const mk = (size = 4) => new THREE.InstancedBufferAttribute(new Float32Array(cap * size), size).setUsage(THREE.DynamicDrawUsage);
       const at = { a: mk(), b: mk(), c: mk(), d: mk(), e: mk(), g: mk(1) };
       geo.setAttribute('aA', at.a);
@@ -305,6 +361,9 @@ class Bucket {
         const old = this.shellAt[l]!;
         for (const key of ['a', 'b', 'c', 'd', 'e', 'g'] as const) (at[key].array as Float32Array).set((old[key].array as Float32Array).subarray(0, k * at[key].itemSize));
         this.group.remove(mesh);
+        // (its vertices are the model's, shared: only its own instance attributes leave the GPU)
+        for (const name of Object.keys(this.geos[l].attributes)) mesh.geometry.deleteAttribute(name);
+        mesh.geometry.setIndex(null);
         mesh.geometry.dispose();
         mesh.dispose();
       }
@@ -329,6 +388,7 @@ class Bucket {
       const mesh = this.shell[l];
       if (!mesh) continue;
       mesh.count = this.shellN[l];
+      mesh.visible = mesh.count > 0;
       if (!mesh.count) continue;
       const at = this.shellAt[l]!;
       mesh.instanceMatrix.needsUpdate = true;
@@ -377,6 +437,11 @@ const atkP = neutralPose({} as AttackPose);
 const plan: AtkPlan = { variant: 0, holdIn: false, holdOut: false, piv: 0 };
 
 const tmpM = new THREE.Matrix4();
+/** the impostor bakes' shared multisampled target (each morph keeps a single-sample copy of its atlas) */
+let bakeTarget: THREE.WebGLRenderTarget | null = null;
+/** the far impostor's matrix when its on-screen size is clamped up (LOD cross-fade: the near model keeps tmpM) */
+const tmpMb = new THREE.Matrix4();
+const vSb = new THREE.Vector3();
 const tmpQ = new THREE.Quaternion();
 const vF = new THREE.Vector3();
 const vU = new THREE.Vector3();
@@ -497,6 +562,7 @@ export class AntRenderer {
   group = new THREE.Group();
   private buckets = new Map<string, Bucket>();
   private anim = new Map<number, AnimState>();
+  private lastCut = -1;
   private frame = 0;
   /**
    * Carried loads (render only): where each carrying ant's jaws are this frame — the posed head (its pitch and yaw
@@ -538,6 +604,33 @@ export class AntRenderer {
     this.buckets.forEach((b) => b.setShadows(on));
   }
 
+  /**
+   * Build every model in `morphs` now (performance pass, CHANGE_PLAN §25): while loading, or in the background when a
+   * new caste appears, instead of at the moment an area is first shown. Empty models are hidden, so this costs no draws.
+   */
+  prepare(morphs: Iterable<string>): number {
+    let n = 0;
+    for (const m of morphs) {
+      if (m.startsWith('termite_') && !NASUTE_ANT_PATH.has(m)) {
+        if (!this.termites) {
+          this.termites = new TermiteLayer();
+          this.termites.mount = this.mount;
+          this.group.add(this.termites.group);
+        }
+        n += this.termites.prepare(m);
+      } else if (MORPHS[m] && !this.buckets.has(m)) {
+        this.bucket(m);
+        n++;
+      }
+    }
+    return n;
+  }
+
+  /** Has this renderer built `morph` yet? */
+  has(morph: string): boolean {
+    return morph.startsWith('termite_') && !NASUTE_ANT_PATH.has(morph) ? !!this.termites?.has(morph) : this.buckets.has(morph);
+  }
+
   rig(morph: string): AntRig {
     return this.bucket(morph).rig;
   }
@@ -545,25 +638,35 @@ export class AntRenderer {
   private bucket(key: string): Bucket {
     let b = this.buckets.get(key);
     if (!b) {
+      const t0 = performance.now();
       const imp = this.impostorFor(key);
       b = new Bucket(key, this.group, { geo: this.impostorGeo, mat: imp }, this.shadows);
       this.buckets.set(key, b);
+      prof.note(`ant model ${key} built for ${this.name} (${(performance.now() - t0).toFixed(0)} ms)`);
     }
     return b;
   }
 
   /** Render the ant from above into an 8-frame gait atlas used by far LOD quads. */
   private impostorFor(key: string): THREE.MeshStandardMaterial {
-    let mat = this.impostorMats.get(key);
-    if (mat) return mat;
+    let mat = this.impostorMats.get(key) ?? impostorCacheOf(this.renderer).get(key);
+    if (mat) {
+      this.impostorMats.set(key, mat);
+      return mat;
+    }
     const morph = MORPHS[key];
-    const built = buildAnt(morph, 1, 3);
+    const built = builtAnt(morph, 1);
     const { material } = createAntMaterials(built.rig, false, key);
     const cols = 4;
     const rows = 2;
     const cell = 128;
-    const rt = new THREE.WebGLRenderTarget(cols * cell, rows * cell, { samples: 4 });
-    rt.texture.colorSpace = THREE.SRGBColorSpace;
+    // (the bake draws into one multisampled target shared by every bake; each morph keeps only the resolved image:
+    //  0.5 MB instead of 4.5 MB of samples, colour and depth — performance pass, GPU memory on phones)
+    if (!bakeTarget) {
+      bakeTarget = new THREE.WebGLRenderTarget(cols * cell, rows * cell, { samples: 4 });
+      bakeTarget.texture.colorSpace = THREE.SRGBColorSpace;
+    }
+    const rt = bakeTarget;
     const scene = new THREE.Scene();
     scene.add(new THREE.AmbientLight(0xffffff, 2.2));
     const dl = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -610,25 +713,33 @@ export class AntRenderer {
     rt.viewport.set(0, 0, cols * cell, rows * cell);
     r.setRenderTarget(prevTarget);
     r.setClearColor(prevClear, prevAlpha);
-    mat = new THREE.MeshStandardMaterial({ map: rt.texture, alphaTest: 0.35, transparent: false, roughness: 0.6, side: THREE.DoubleSide });
+    // the resolved atlas copied as it is (same format, a GPU copy) into the morph's own single-sample texture
+    const atlas = new THREE.WebGLRenderTarget(cols * cell, rows * cell, { depthBuffer: false, samples: 0 });
+    atlas.texture.colorSpace = THREE.SRGBColorSpace;
+    r.initRenderTarget(atlas);
+    r.copyTextureToTexture(rt.texture, atlas.texture);
+    // (the bake's copy of the model leaves the GPU with it)
+    geo.dispose();
+    mat = new THREE.MeshStandardMaterial({ map: atlas.texture, alphaTest: 0.35, transparent: false, roughness: 0.6, side: THREE.DoubleSide });
     patchDapple(mat);
     addPatch(mat, {
       key: 'impostor',
       uniforms: { uSpan: { value: span } },
-      vertexHeader: 'attribute vec4 aA; attribute vec4 aD; attribute vec4 aE; uniform float uSpan; varying vec2 vGoldI; varying float vTintI;',
-      fragmentHeader: 'varying vec2 vGoldI; varying float vTintI;',
+      vertexHeader: 'attribute vec4 aA; attribute vec4 aD; attribute vec4 aE; uniform float uSpan; varying vec2 vGoldI; varying float vTintI; varying float vFadeI;',
+      fragmentHeader: 'varying vec2 vGoldI; varying float vTintI; varying float vFadeI;',
       // far away a Saiy-Ant in its gold surge still reads as a gold speck; exhausted ones look dull
       fragment: [
         [
           '#include <map_fragment>',
           `#include <map_fragment>
+           ${LOD_FADE_GLSL('vFadeI')}
            diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.78, 0.55, 0.16), vec3(1.0, 0.84, 0.38), dot(diffuseColor.rgb, vec3(0.33)) * 1.6), clamp(vGoldI.x, 0.0, 1.0) * 0.85);
            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * 0.8, vGoldI.y * 0.5);
            ${TINT_GLSL('vTintI')}`,
         ],
       ],
       vertex: [
-        ['#include <begin_vertex>', 'vGoldI = vec2(abs(aE.x), aE.z); vTintI = floor((aD.z + 2.0) / 4.0);\n#include <begin_vertex>'],
+        ['#include <begin_vertex>', '{ float fe = floor(aE.z / 256.0); vGoldI = vec2(abs(aE.x), mod(aE.z, 256.0) / 255.0); vFadeI = fe < 0.5 ? 0.0 : fe < 256.5 ? fe / 256.0 : (256.0 - fe) / 256.0; }\nvTintI = floor((aD.z + 2.0) / 4.0);\n#include <begin_vertex>'],
         [
           '#include <uv_vertex>',
           `#include <uv_vertex>
@@ -642,6 +753,7 @@ export class AntRenderer {
       ],
     });
     this.impostorMats.set(key, mat);
+    impostorCacheOf(this.renderer).set(key, mat);
     return mat;
   }
 
@@ -651,6 +763,9 @@ export class AntRenderer {
    */
   update(views: AntView[], alpha: number, dt: number, camera: THREE.PerspectiveCamera, adapter: AntSpaceAdapter, viewportH: number): void {
     this.frame++;
+    // a camera cut (jumpTo) shows every ant at its LOD at once: nothing to cross-fade from
+    const cut = camCuts.n !== this.lastCut;
+    this.lastCut = camCuts.n;
     for (const b of this.buckets.values()) {
       b.counts.fill(0);
       b.shellN.fill(0);
@@ -1040,41 +1155,82 @@ export class AntRenderer {
       if (!frustum.intersectsSphere(sphere)) continue;
       const dist = Math.max(1e-3, camPos.distanceTo(vP));
       const px = (rig.length * scale * pxPerMmAt1) / dist;
-      let lod = px > this.lod0Px / this.lodScale ? 0 : px > this.lod1Px / this.lodScale ? 1 : 2;
-      if (v.selected && lod === 2) lod = 1;
-      if (lod === 2 && px < this.minImpostorPx) {
-        // Keep swarms readable when zoomed far out: clamp the on-screen size.
-        const boost = Math.min(4, this.minImpostorPx / Math.max(px, 0.5));
-        vS.setScalar(scale * boost);
-        tmpM.compose(vP, tmpQ, vS);
+      const T0 = this.lod0Px / this.lodScale;
+      const T1 = this.lod1Px / this.lodScale;
+      let want = px > T0 ? 0 : px > T1 ? 1 : 2;
+      if (v.selected && want === 2) want = 1;
+      // LOD cross-fade (performance pass): a change of model dissolves over LOD_FADE seconds (both drawn, each in the
+      // other's dithered pixels) instead of popping; a little hysteresis keeps an ant at a switching size from
+      // flickering. An ant that just came into view, a camera cut and a new space take the LOD at once, as before.
+      if (s.lod === undefined || s.lodSeen !== this.frame - 1 || cut) {
+        s.lod = want;
+        s.lodFrom = -1;
+        s.lodT = 1;
+      } else if (want !== s.lod) {
+        const edge = want < s.lod ? (s.lod === 2 ? T1 : T0) : s.lod === 0 ? T0 : T1;
+        const hold = want < s.lod ? px < edge * LOD_HYST : px > edge / LOD_HYST;
+        if (!hold || (v.selected && s.lod === 2)) {
+          if (s.lodFrom === want && s.lodT! < 1) {
+            s.lodFrom = s.lod;
+            s.lodT = 1 - s.lodT!;
+          } else {
+            s.lodFrom = s.lod;
+            s.lodT = 0;
+          }
+          s.lod = want;
+        }
       }
-      let n = b.counts[lod];
-      if (n >= b.capacity[lod]) {
-        b.alloc(lod, b.capacity[lod] * 2, this.shadows);
+      if (s.lodT! < 1) {
+        s.lodT = Math.min(1, s.lodT! + dt / LOD_FADE);
+        if (s.lodT >= 1) s.lodFrom = -1;
       }
-      const mesh = b.meshes[lod];
-      const at = b.attrs[lod];
-      n = b.counts[lod]++;
-      mesh.setMatrixAt(n, tmpM);
-      if (lod < 2 && b.bodyTex[lod]) {
-        if (M) b.writeBody(lod, n, bodyBuf);
-        else b.writeBody(lod, n, zeroBody);
+      s.lodSeen = this.frame;
+      const lod = s.lod;
+      const glueAt = lod < 2 ? lod : s.lodFrom! >= 0 && s.lodFrom! < 2 ? s.lodFrom! : -1;
+      // the shown LOD, then the one fading out (fade: 0 whole; t > 0 the pixels below t; −t the pixels at or above t;
+      // packed into aE.z with "exhausted")
+      for (let pass = 0; pass < 2; pass++) {
+        const l = pass === 0 ? lod : s.lodFrom!;
+        if (l < 0) break;
+        const fade = s.lodFrom! < 0 ? 0 : pass === 0 ? Math.max(0.002, s.lodT!) : -s.lodT!;
+        let m = tmpM;
+        if (l === 2 && px < this.minImpostorPx) {
+          // Keep swarms readable when zoomed far out: clamp the on-screen size.
+          const boost = Math.min(4, this.minImpostorPx / Math.max(px, 0.5));
+          vSb.setScalar(scale * boost);
+          m = tmpMb.compose(vP, tmpQ, vSb);
+        }
+        let n = b.counts[l];
+        if (n >= b.capacity[l]) {
+          b.alloc(l, b.capacity[l] * 2, this.shadows);
+        }
+        const mesh = b.meshes[l];
+        const at = b.attrs[l];
+        n = b.counts[l]++;
+        mesh.setMatrixAt(n, m);
+        if (l < 2 && b.bodyTex[l]) {
+          if (M) b.writeBody(l, n, bodyBuf);
+          else b.writeBody(l, n, zeroBody);
+        }
+        at.a.setXYZW(n, s.phase, s.amp, hy, hp);
+        at.b.setXYZW(n, mo, act * 0.3 + (v.antennaPitch > 0.5 ? 0.6 : 0) + (M ? M.antSpread : 0), s.ap, s.wave);
+        // pose id + 0.99 × its weight; the hit flash
+        // (the rage glow rides in the same channel: + 2 × its level 0..10 — user rating E7: a glow in the body, not the
+        // whole ant turned red)
+        at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, (M ? M.flash : 0) + 2 * Math.round(Math.min(1, Math.max(0, v.rageGlow ?? 0)) * 10));
+        // colour variation −1..1, plus 4 × the Termant tint code (decoded in the shader); the planted feet's stance sweep
+        at.d.setXYZW(n, M ? M.deathLeg : s.death, M ? M.Dh : 0, Math.max(-1, Math.min(1, v.colorVar)) + 4 * (v.tint ?? 0), s.pph);
+        // gold × ripple direction, the planted feet's turn per stance, exhausted with the LOD fade, hair sway
+        at.e.setXYZW(n, (v.gold ?? 0) * ((v.goldDir ?? 1) < 0 ? -1 : 1), M ? M.Ps : 0, packExhaustedFade(v.exhausted ?? 0, fade), s.sw ?? 0);
+        // termite glue clinging to the ant (render only), on one of the two while they cross-fade
+        if (pass === 0) {
+          // eases in, wears off slowly; a sickle-jaw's acid uses the same wet shell (the kit's acid and glue colours
+          // are nearly the same pale amber)
+          const gw = Math.max(v.glue ?? 0, v.acid ?? 0);
+          s.gl = damp(s.gl ?? 0, gw, gw > (s.gl ?? 0) ? 4 : 0.6, dt);
+        }
+        if (l === glueAt && s.gl! > 0.02) b.addShell(l, n, s.gl!);
       }
-      at.a.setXYZW(n, s.phase, s.amp, hy, hp);
-      at.b.setXYZW(n, mo, act * 0.3 + (v.antennaPitch > 0.5 ? 0.6 : 0) + (M ? M.antSpread : 0), s.ap, s.wave);
-      // pose id + 0.99 × its weight; the hit flash
-      // (the rage glow rides in the same channel: + 2 × its level 0..10 — user rating E7: a glow in the body, not the
-      // whole ant turned red)
-      at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, (M ? M.flash : 0) + 2 * Math.round(Math.min(1, Math.max(0, v.rageGlow ?? 0)) * 10));
-      // colour variation −1..1, plus 4 × the Termant tint code (decoded in the shader); the planted feet's stance sweep
-      at.d.setXYZW(n, M ? M.deathLeg : s.death, M ? M.Dh : 0, Math.max(-1, Math.min(1, v.colorVar)) + 4 * (v.tint ?? 0), s.pph);
-      // gold × ripple direction, the planted feet's turn per stance, exhausted, hair sway
-      at.e.setXYZW(n, (v.gold ?? 0) * ((v.goldDir ?? 1) < 0 ? -1 : 1), M ? M.Ps : 0, v.exhausted ?? 0, s.sw ?? 0);
-      // termite glue clinging to the ant (render only): eases in, wears off slowly; a sickle-jaw's acid uses the
-      // same wet shell (the kit's acid and glue colours are nearly the same pale amber)
-      const gw = Math.max(v.glue ?? 0, v.acid ?? 0);
-      s.gl = damp(s.gl ?? 0, gw, gw > (s.gl ?? 0) ? 4 : 0.6, dt);
-      if (s.gl > 0.02 && lod < 2) b.addShell(lod, n, s.gl);
       st.drawn++;
       st.lod[lod]++;
     }
@@ -1082,6 +1238,8 @@ export class AntRenderer {
       for (let l = 0; l < 3; l++) {
         const mesh = b.meshes[l];
         mesh.count = b.counts[l];
+        // (an empty model is hidden: the renderer would still bind its program and uniforms every frame)
+        mesh.visible = b.counts[l] > 0;
         if (b.counts[l] > 0) {
           mesh.instanceMatrix.needsUpdate = true;
           const at = b.attrs[l];

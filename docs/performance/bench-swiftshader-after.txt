@@ -1,0 +1,84 @@
+# Underground Dominion benchmark — ud-mp-11 — 2026-11-07T13:33:12.801Z
+Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36
+GPU ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver); 2 cores; screen 1280×760 at 1× (window 1280×760)
+quality medium, 15 s a scene
+
+## Switching surface ↔ underground
+load 138.8 s (pre-warm 114.7 s) · 136 frames · 0.2 FPS · frame avg 4705.82 ms, p95 11549.5, worst 13283 · over 33 ms: 132, over 50 ms: 125
+main thread 13.78 ms (msg 1.91, events 0.13, units 0.56, nest 3.26, fx 0.18, ui 1.52, render 7.8) · GPU n/a ms · sim tick 0.76 ms, msg 55 KB
+draw calls 1 · tris 0k · programs 152 · textures 185 · geometries 600 · heap 180 MB · GPU memory ≈ 340 MB · 62 ants, 2 creatures · quality medium
+GL during the run: 0 shader links, 135 texture uploads
+switch dive in: 4× · worst frame first round 13133 ms, later rounds 8800 ms · frames over 33 ms: first 7, later 21
+switch area: 16× · worst frame first round 13233 ms, later rounds 11783 ms · frames over 33 ms: first 18, later 58
+switch dive out: 4× · worst frame first round 11550 ms, later rounds 13283 ms · frames over 33 ms: first 7, later 22
+  round 1 dive in: 250 ms: render 13 ms | 567 ms: outside this thread (browser, GPU or a background tab) | 6916 ms: render 12 ms, nest 9 ms
+  round 1 area: 8500 ms: ui 22 ms, nest 19 ms, render 15 ms; nest mesh: 2 chunks rebuilt (15 ms) | 7366 ms: texture upload ×6 (0.3 MB, 0 ms); render 15 ms | 13233 ms: texture upload ×2 (0.0 MB, 0 ms); render 5 ms
+  round 1 area: 6516 ms: render 30 ms, nest 8 ms, msg 5 ms; nest mesh: 4 chunks rebuilt (30 ms) | 6600 ms: texture upload ×6 (0.3 MB, 0 ms); buffer upload 0.0 MB (5 ms); render 8 ms | 6350 ms: texture upload ×2 (0.0 MB, 0 ms); ui 17 ms, render 6 ms
+  round 1 area: 6333 ms: outside this thread (browser, GPU or a background tab) | 6700 ms: render 8 ms | 6283 ms: outside this thread (browser, GPU or a background tab)
+  round 1 area: 6200 ms: msg 5 ms | 10500 ms: render 7 ms | 5566 ms: outside this thread (browser, GPU or a background tab)
+  round 1 dive out: 11550 ms: render 6 ms | 100 ms: outside this thread (browser, GPU or a background tab) | 10933 ms: msg 8 ms, ui 6 ms, nest 5 ms
+  round 2 dive in: 4766 ms: render 10 ms | 5016 ms: units 9 ms | 233 ms: outside this thread (browser, GPU or a background tab)
+  round 2 area: 4966 ms: nest 21 ms, render 12 ms; nest mesh: 2 chunks rebuilt (12 ms) | 5050 ms: texture upload ×6 (0.3 MB, 0 ms); nest 16 ms, render 5 ms | 4766 ms: texture upload ×5 (0.3 MB, 0 ms); render 20 ms; nest mesh: 2 chunks rebuilt (18 ms)
+  round 2 area: 5700 ms: render 33 ms, nest 18 ms, fx 7 ms; nest mesh: 4 chunks rebuilt (33 ms) | 5400 ms: texture upload ×5 (0.3 MB, 0 ms); render 35 ms; nest mesh: 4 chunks rebuilt (30 ms) | 5683 ms: texture upload ×2 (0.0 MB, 0 ms); nest 4 ms
+  round 2 area: 83 ms: texture upload ×2 (0.0 MB, 0 ms); render 8 ms | 6300 ms: nest 10 ms | 6383 ms: render 8 ms
+hitches:
+  151.4 s 250 ms: render 13 ms
+  151.9 s 567 ms: outside this thread (browser, GPU or a background tab)
+  158.9 s 6916 ms: render 12 ms, nest 9 ms
+  172.0 s 13133 ms: buffer upload 0.0 MB (7 ms); render 9 ms
+  172.1 s 117 ms: buffer upload 0.0 MB (8 ms); render 12 ms
+  176.3 s 4166 ms: render 6 ms, nest 6 ms
+  184.8 s 8500 ms: ui 22 ms, nest 19 ms, render 15 ms; nest mesh: 2 chunks rebuilt (15 ms)
+  192.1 s 7366 ms: texture upload ×6 (0.3 MB, 0 ms); render 15 ms
+
+## Big fight (4 × 200 ants, 100 creatures, 2 titans)
+load 251.3 s (pre-warm 152.0 s) · 0 frames · 1000 FPS · frame avg 0 ms, p95 0, worst 0 · over 33 ms: 0, over 50 ms: 0
+main thread 0 ms () · GPU n/a ms · sim tick 11.81 ms, msg 720 KB
+draw calls 1 · tris 0k · programs 153 · textures 367 · geometries 936 · heap 361 MB · GPU memory ≈ 704 MB · 889 ants, 102 creatures · quality medium
+GL during the run: 0 shader links, 0 texture uploads
+
+## Full nest
+load 283.5 s (pre-warm 142.3 s) · 4 frames · 0.2 FPS · frame avg 4154.01 ms, p95 8283, worst 8283 · over 33 ms: 3, over 50 ms: 3
+main thread 17.22 ms (msg 17.77, events 0.29, nest 10.63, fx 0.27, ui 0.98, render 4.94) · GPU n/a ms · sim tick 12.97 ms, msg 664 KB
+draw calls 1 · tris 0k · programs 152 · textures 364 · geometries 921 · heap 346 MB · GPU memory ≈ 646 MB · 889 ants, 40 creatures · quality medium
+GL during the run: 0 shader links, 14 texture uploads
+hitches:
+  184.9 s 117 ms: texture upload ×4 (0.1 MB, 0 ms); msg 16 ms, nest 13 ms
+  193.2 s 8283 ms: texture upload ×3 (0.0 MB, 0 ms); buffer upload 0.0 MB (5 ms); msg 10 ms, render 9 ms, nest 8 ms
+  201.4 s 8200 ms: texture upload ×4 (0.0 MB, 0 ms); msg 21 ms, render 5 ms, nest 4 ms
+
+## Story: The Long Nights, last night
+load 336.6 s (pre-warm 159.4 s) · 5 frames · 0.8 FPS · frame avg 1226.62 ms, p95 5899.8, worst 5900 · over 33 ms: 3, over 50 ms: 3
+main thread 8.22 ms (msg 0.36, events 0.49, units 1.15, fx 0.05, ui 0.82, render 5.6) · GPU n/a ms · sim tick 8.92 ms, msg 34 KB
+draw calls 1 · tris 0k · programs 177 · textures 311 · geometries 847 · heap 236 MB · GPU memory ≈ 632 MB · 13 ants, 0 creatures · quality medium
+GL during the run: 0 shader links, 0 texture uploads
+hitches:
+  198.4 s 100 ms: render 5 ms
+  198.5 s 100 ms: render 6 ms
+  204.4 s 5900 ms: render 5 ms
+
+## Battle arena, 600 units
+load 209.8 s (pre-warm 89.0 s) · 9 frames · 0.3 FPS · frame avg 2973.96 ms, p95 13816.1, worst 13816 · over 33 ms: 7, over 50 ms: 3
+main thread 1562.68 ms (msg 1.62, units 15.55, ui 0.88, render 1545.73) · GPU n/a ms · sim tick 3.48 ms, msg 102 KB
+draw calls 1 · tris 0k · programs 152 · textures 105 · geometries 295 · heap 106 MB · GPU memory ≈ 403 MB · 302 ants, 0 creatures · quality medium
+GL during the run: 1 shader links, 53 texture uploads
+hitches:
+  109.4 s 17 ms: texture upload ×6 (0.1 MB, 0 ms); units 22 ms, render 13 ms, msg 5 ms
+  109.4 s 33 ms: texture upload ×6 (0.1 MB, 0 ms); units 27 ms, render 18 ms
+  109.5 s 50 ms: texture upload ×6 (0.1 MB, 0 ms); buffer upload 0.0 MB (6 ms); units 23 ms, render 19 ms
+  109.5 s 50 ms: texture upload ×6 (0.1 MB, 0 ms); units 11 ms, render 10 ms
+  109.6 s 33 ms: texture upload ×6 (0.1 MB, 0 ms); render 10 ms
+  117.2 s 7616 ms: texture upload ×6 (0.1 MB, 0 ms); render 18 ms, units 17 ms
+  122.3 s 5133 ms: shader compile ×1 (0 ms); texture upload ×6 (0.1 MB, 0 ms); GC (heap −41 MB); render 13800 ms, units 10 ms
+  136.1 s 13816 ms: texture upload ×5 (0.0 MB, 0 ms); buffer upload 2.9 MB (1 ms); render 14 ms, units 14 ms
+
+## Multiplayer-sized world (4 colonies, authored map)
+load 347.7 s (pre-warm 144.5 s) · 4 frames · 0.5 FPS · frame avg 2095.76 ms, p95 8166.3, worst 8166 · over 33 ms: 3, over 50 ms: 3
+main thread 6390.41 ms (msg 1.14, events 0.09, units 3.84, ui 0.85, render 6385.47) · GPU n/a ms · sim tick 14.21 ms, msg 102 KB
+draw calls 1 · tris 0k · programs 157 · textures 319 · geometries 804 · heap 343 MB · GPU memory ≈ 627 MB · 77 ants, 0 creatures · quality medium
+GL during the run: 1 shader links, 0 texture uploads
+hitches:
+  189.2 s 100 ms: outside this thread (browser, GPU or a background tab)
+  189.3 s 100 ms: outside this thread (browser, GPU or a background tab)
+  197.5 s 8166 ms: shader compile ×1 (0 ms); render 25533 ms
+
