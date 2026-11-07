@@ -154,6 +154,18 @@ interface Built {
   masses: Mass[];
 }
 
+/** How far a hole being dug has opened at each stage (0 none, 1 the rim crumbling, 2 a wider crater, 3 wider still). */
+const DIG_OPEN = [0, 0.18, 0.42, 0.68];
+
+/** The stage a hole being dug by a titan has reached (its checkpoints: 25 / 50 / 75 %), 0 when none or breached. */
+export function digStage(e: { dprog?: number; breach?: number }): number {
+  if ((e.breach ?? 0) > 0) return 0;
+  const p = e.dprog ?? 0;
+  let n = 0;
+  for (const c of TITAN_DIG.checkpoints) if (p >= c - 1e-9) n++;
+  return n;
+}
+
 export class SurfaceEntrances {
   readonly group = new THREE.Group();
   private built = new Map<string, Built>();
@@ -222,7 +234,7 @@ export class SurfaceEntrances {
       const dug = g ? g.dugHexCount() : 30;
       const size = Math.round(Math.min(0.8, Math.max(0, (dug - 30) / 120)) * 10) / 10;
       const living = Math.round(Math.min(1, Math.sqrt(Math.max(0, c.living)) / 18) * 5) / 5;
-      const sig = `${look}|${size}|${living}|${c.entrances.map((e) => `${e.sx.toFixed(1)},${e.sy.toFixed(1)},${Math.round((e.fall ?? 0) * 4)},${(e.breach ?? 0) ? Math.round((1 - (e.repair ?? 0)) * 6) : 'n'}`).join(';')}`;
+      const sig = `${look}|${size}|${living}|${c.entrances.map((e) => `${e.sx.toFixed(1)},${e.sy.toFixed(1)},${Math.round((e.fall ?? 0) * 4)},${(e.breach ?? 0) ? Math.round((1 - (e.repair ?? 0)) * 6) + ':' + (e.breachMm ?? 0).toFixed(1) : 'n' + digStage(e)}`).join(';')}`;
       const old = this.built.get(key);
       if (old && old.sig === sig) continue;
       if (old) this.dispose(old);
@@ -368,11 +380,15 @@ export class SurfaceEntrances {
     // ---- each hole: its rim, opening and loose details (the three alike: one anthill)
     c.entrances.forEach((e, i) => {
       const k = Math.min(1.35, s);
-      // a titan's breach (sim/creatures/titanDig.ts): a wide, raw crater, shrinking back as the colony repairs it
-      const br = (e.breach ?? 0) ? 1 - (e.repair ?? 0) : 0;
-      const hr = HOLE[look] + (TITAN_DIG.breachHoleMm - HOLE[look]) * br;
+      // a titan's breach (sim/creatures/titanDig.ts): a wide, raw crater (sized to the titan), shrinking back as the colony
+      // repairs it; before it, the hole opening in stages as the titan digs (claude/creatures/02-spec §3): the rim
+      // crumbling (25 %), a wider crater (50 %), wider still with the soil fountaining out (75 %: combatFx)
+      const stage = digStage(e);
+      const br = (e.breach ?? 0) ? 1 - (e.repair ?? 0) : DIG_OPEN[stage];
+      const bigR = (e.breach ?? 0) ? (e.breachMm ?? TITAN_DIG.breachHoleMm) : TITAN_DIG.breachHoleMm;
+      const hr = HOLE[look] + (bigR - HOLE[look]) * br;
       const seed = c.id * 31 + i * 7 + 1;
-      const rim = br > 0 ? { holeR: hr, rimR: hr * 1.9, rimH: (1.2 + 3.5 * br) * k, outR: hr * 4.2, wob: 1.3, seed } : rimFor(look, hr, k, seed, true);
+      const rim = br > 0 ? { holeR: hr, rimR: hr * 1.9, rimH: (1.2 + 3.5 * br) * k * ((e.breach ?? 0) ? 1 : 0.75), outR: hr * 4.2, wob: (e.breach ?? 0) ? 1.3 : 1.6 + 0.2 * stage, seed } : rimFor(look, hr, k, seed, true);
       const hole: Hole = { x: e.sx, y: e.sy, look, rim, plug: 0, fall: e.fall ?? 0 };
       b.holes.push(hole);
       const apron = apronMesh(hole, under, PAL[look]);

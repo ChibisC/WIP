@@ -102,9 +102,9 @@ export const EN: Record<string, string> = {
   'tip.flood': 'Tip: the low margin floods. Pull your ants up the ramps before the water comes.',
   'tip.nights': 'Tip: the clock under the stage name counts down to dusk. At night the hunters come out of the lairs in the banks.',
   'tip.dusk': 'Tip: dusk. Call your groups home and hold the tops of the two ramps with fighters.',
-  'tip.titanDig': 'Tip: the tarantula digs one hole wider and walks in, breaking soil as it goes. Swarm it below and keep it off the queen until dawn.',
+  'tip.titanDig': 'Tip: the tarantula digs one hole wider and walks in, breaking soil as it goes; nothing will keep it out. Swarm it below and keep it off the queen until dawn.',
   'tip.motherHunt': 'Tip: she pounces on lone ants. Fight her in a crowd; ants that climb onto her back hit harder.',
-  'tip.motherDig': 'Tip: she is digging into the nest. Keep fighters below to meet her in the chambers.',
+  'tip.motherDig': 'Tip: she is digging into the nest, and nothing will keep her out now. Have fighters below to meet her in the chambers: kill her within a minute of her breaking in.',
   // ------------------------------------------------------------------ Field journal pages
   'journal.garden.title': 'Lasius niger — the black garden ant',
   'journal.garden.body':

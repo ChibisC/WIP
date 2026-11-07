@@ -269,6 +269,15 @@
 .boss-hp i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(#e2664c, #9a2e1e); transition: width .25s; }
 .boss-bar.enraged .boss-hp i { background: linear-gradient(#ff8a4a, #c0301a); }
 .boss-phase { margin-top: calc(4 * var(--u)); font-size: calc(12.5 * var(--u)); color: #ffc9a8; min-height: calc(15 * var(--u)); }
+/* a story titan locked until it is in the nest (claude/story/05-spec): a padlock by its name, the floor marked on the bar */
+.boss-lock { display: none; width: calc(11 * var(--u)); height: calc(13 * var(--u)); color: #e9bf55; align-self: center; filter: drop-shadow(0 1px 1px #000); }
+.boss-lock svg { display: block; width: 100%; height: 100%; }
+.boss-bar.locked .boss-lock { display: inline-block; }
+.boss-floor { display: none; position: absolute; top: -1px; bottom: -1px; width: 2px; margin-left: -1px; background: #e9bf55; box-shadow: 0 0 calc(3 * var(--u)) rgba(233, 191, 85, 0.8); }
+.boss-bar.locked .boss-floor { display: block; }
+/* "It's in the nest!" — a story titan breaking in */
+.titan-banner { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(0.92); padding: calc(10 * var(--u)) calc(28 * var(--u)); font-family: var(--head-font); font-size: calc(34 * var(--u)); letter-spacing: 0.06em; color: #ffd9b0; text-shadow: 0 2px 6px #000, 0 0 calc(18 * var(--u)) rgba(220, 70, 40, 0.7); background: radial-gradient(ellipse at center, rgba(40, 10, 4, 0.7), rgba(40, 10, 4, 0) 72%); pointer-events: none; opacity: 0; transition: opacity .35s, transform .35s; white-space: nowrap; }
+.titan-banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 .boss-riders { margin-left: auto; font-size: calc(12.5 * var(--u)); color: var(--ink-faint); font-variant-numeric: tabular-nums; }
 /* small bars over climbable creatures: health and riders / cap (CHANGE_PLAN §15.2) */
 .cr-bars { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }

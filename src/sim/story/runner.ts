@@ -278,6 +278,13 @@ export function storySecond(w: World, c: Colony, m: MissionState): void {
     } else if (B.type === 'killBefore') {
       if (hasFlag(st, `killed:${B.actor}`)) st.bonus = st.flags.indexOf(`killed:${B.actor}`) < st.flags.indexOf(B.flag) || !hasFlag(st, B.flag) ? 1 : -1;
       else if (hasFlag(st, B.flag)) st.bonus = -1;
+    } else if (B.type === 'killWithin') {
+      // (decided once a second: killed with the clock still running wins it; the clock running out loses it)
+      const act = st.actors[actorIndex(st, B.actor)];
+      if (act?.inT !== undefined) {
+        if (hasFlag(st, `killed:${B.actor}`)) st.bonus = 1;
+        else if (w.s.time - act.inT > B.s) st.bonus = -1;
+      }
     }
   }
 }
@@ -301,7 +308,8 @@ export function storyWon(w: World): void {
   if (st.bonus === 0) {
     const B = levelOf(st).medals.bonus;
     // a bonus never decided by the end (the wave never came, the caste never stolen, the titan alive) is lost
-    st.bonus = (B.type === 'stealBefore' && hasFlag(st, `caste:${B.caste}`)) || (B.type === 'killBefore' && hasFlag(st, `killed:${B.actor}`)) ? 1 : -1;
+    const act = B.type === 'killWithin' ? st.actors[actorIndex(st, B.actor)] : undefined;
+    st.bonus = (B.type === 'stealBefore' && hasFlag(st, `caste:${B.caste}`)) || (B.type === 'killBefore' && hasFlag(st, `killed:${B.actor}`)) || (B.type === 'killWithin' && hasFlag(st, `killed:${B.actor}`) && act?.inT !== undefined && st.endT - act.inT <= B.s + 1) ? 1 : -1;
   }
 }
 
