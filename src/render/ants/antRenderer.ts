@@ -460,6 +460,12 @@ const lerpAngle = (a: number, b: number, t: number) => {
 };
 const damp = (a: number, b: number, k: number, dt: number) => a + (b - a) * (1 - Math.exp(-k * dt));
 
+/**
+ * The drawn heading's last say (performance v2: game/intents.ts — ants turn toward an order on the frame it is given):
+ * (ant id, plane x, y, interpolated heading, now ms) → the heading to draw. Null: the simulation's.
+ */
+export const antHeadingHook: { fn: ((id: number, x: number, y: number, h: number, now: number) => number) | null; active: () => boolean } = { fn: null, active: () => false };
+
 /** Render-side sound hooks (spec 04): set by the game's audio; (ANIM_SFX.*, plane x, y, space, cause of death, morph). */
 export const animHooks: {
   emit: ((sfx: number, x: number, y: number, space: number, cause: number, morph: string) => void) | null;
@@ -786,6 +792,8 @@ export class AntRenderer {
     // (the glue's pulses run on the termite clock: the kit layer advances it when there is one)
     if (this.nasGlue && !this.termites) termiteTime.value += dt;
 
+    const turnTo = antHeadingHook.fn && antHeadingHook.active() ? antHeadingHook.fn : null;
+    const nowMs = turnTo ? performance.now() : 0;
     for (const v of views) {
       if (v.morph.startsWith('termite_') && !NASUTE_ANT_PATH.has(v.morph)) {
         if (!this.termites) {
@@ -803,7 +811,7 @@ export class AntRenderer {
       let s = this.anim.get(v.id);
       const x = v.px + (v.x - v.px) * alpha;
       const y = v.py + (v.y - v.py) * alpha;
-      const h = lerpAngle(v.pheading, v.heading, alpha);
+      const h = turnTo && v.space === 0 ? turnTo(v.id, x, y, lerpAngle(v.pheading, v.heading, alpha), nowMs) : lerpAngle(v.pheading, v.heading, alpha);
       if (!s) {
         s = { phase: Math.random(), amp: 0, wave: Math.random() * 10, hy: 0, hp: 0, mo: 0, ap: 0, gp: 0, cr: 0, pose: 0, poseW: 0, pph: Math.random() * 10, death: v.dead ? 1 : 0, nx: 0, ny: 1, nz: 0, lastX: x, lastY: y, lastH: h, seen: this.frame, roll: 0 };
         this.anim.set(v.id, s);

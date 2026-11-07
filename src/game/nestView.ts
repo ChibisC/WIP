@@ -153,7 +153,7 @@ export class NestView {
   }
 
   /** Fill all instance buffers for this area as seen from `cam` (owner = the colony whose nest it is; null for caves). */
-  update(w: World, owner: Colony | null, player: Colony, cam: THREE.PerspectiveCamera, alpha: number, dt: number, viewportH: number, camDist: number, markerSel: number, time: number, shown: ReadonlyArray<ShownMarker> = player.markers, pendingHexes: ReadonlyArray<{ q: number; kind: string }> = []): void {
+  update(w: World, owner: Colony | null, player: Colony, cam: THREE.PerspectiveCamera, alpha: number, dt: number, viewportH: number, camDist: number, markerSel: number, time: number, shown: ReadonlyArray<ShownMarker> = player.markers, pendingHexes: ReadonlyArray<{ q: number; kind: string; fade?: number }> = []): void {
     this.updateHexes(w, owner);
     // the fog: sealed hexes drawn as rock, seen/remembered/dark levels, units hidden out of sight (game/fog.ts)
     const g = w.nestOf(this.space)!;
@@ -216,9 +216,11 @@ export class NestView {
   private static WAIT_COL = new THREE.Color(0x9ab0c8);
   /** a player's command on this hex is waiting for its tick (multiplayer input delay) */
   private static PEND_COL = new THREE.Color(0xfff4d6);
+  /** a refused command's ghost, unwinding (performance v2) */
+  private static REFUSED_COL = new THREE.Color(0xe0806a);
 
   /** Rings over hexes being worked; with the overlay, over every incubating larva too. */
-  private updateRings(w: World, owner: Colony, pending: ReadonlyArray<{ q: number; kind: string }>, time: number): void {
+  private updateRings(w: World, owner: Colony, pending: ReadonlyArray<{ q: number; kind: string; fade?: number }>, time: number): void {
     const g = w.nestOf(this.space)!;
     const nt = this.stage.terrain;
     const items = this.ringItems;
@@ -259,7 +261,8 @@ export class NestView {
     // Pending commands: a pulsing full ring on the hex until the command's tick runs.
     for (const p of pending) {
       g.hexCenter(p.q, ctr);
-      push(ctr.x, ctr.y, g.R * (p.kind === 'build' ? 0.7 : 0.55), 0.75 + 0.25 * Math.sin(time * 14 + p.q), NestView.PEND_COL);
+      if (p.kind === 'refused') push(ctr.x, ctr.y, g.R * 0.55, Math.max(0, p.fade ?? 0), NestView.REFUSED_COL);
+      else push(ctr.x, ctr.y, g.R * (p.kind === 'build' ? 0.7 : 0.55), 0.75 + 0.25 * Math.sin(time * 14 + p.q), NestView.PEND_COL);
     }
     items.length = Math.max(items.length, n);
     this.rings.set(items.slice(0, n));
