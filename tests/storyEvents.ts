@@ -208,6 +208,16 @@ const rolled = (id: StoryLevelId, diff: Difficulty, seed: number) => {
   const t = hw.terrain;
   const p = hw.colony(0)!;
   check('high water: the colony nests on the summit', t.levelAt(p.nx, p.ny) === 2);
+  {
+    // (three colonies at once: their sizes stay the same on every difficulty, only strength and aggression grow)
+    const size = (d: Difficulty) => {
+      const x = level('highWater', d, 5);
+      return Object.values(storyOf(x)!.rivals).map((id) => x.colony(id)!.popLimit).join();
+    };
+    const fc = level('fireBanks', 'brutal', 5);
+    const fire = fc.colony(Object.values(storyOf(fc)!.rivals)[0])!.popLimit;
+    check('high water: the three colonies are the same size on Normal and Brutal (other levels still grow theirs)', size('normal') === size('brutal') && size('normal') === '24,24,26' && fire > 18, `${size('normal')} / ${size('brutal')}; fire ants on Brutal ${fire}`);
+  }
   check('high water: the water rises in stages (the plain, the foot, the east shelf, the terrace)', STORY_LEVELS.highWater.stages.map((S) => (S.events ?? []).flatMap((e) => e.actions).find((a) => a.do === 'flood')).filter(Boolean).map((a) => (a as { zone: number }).zone).join() === '0,1,2,3');
   const ck = level('cartonKingdom', 'normal', 5);
   const sk = storyOf(ck)!;

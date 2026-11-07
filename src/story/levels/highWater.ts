@@ -18,7 +18,9 @@ const EV = surprisePool(
   windfall('grasshopper', { window: [150, 420], until: 'stage:1', at: 'plainMid', kind: 'insect', model: 'grasshopper', scale: 2.2, say: 'grasshopper' }),
   windfall('seeds', { window: [60, 240], after: 'stage:1', until: 'stage:2', at: 'footWest', kind: 'seed', model: '', scale: 1.1, n: 10, spread: 30 }),
   wanderer('spider', { window: [100, 300], after: 'stage:2', until: 'stage:4', creature: 'wolfSpider', enter: 'evEast', to: 'footEast', r: 70, s: 100, exit: 'evEast', label: 'a wolf spider', say: 'spider' }),
-  column('woodAnts', { window: [380, 560], until: 'stage:1', from: 'hard', visitor: 'formica', species: 'formica', name: 'Red wood ants', ants: [['formica_worker', 6], ['formica_soldier', 2]], enter: 'evWest', path: 'plainCross', exit: 'evEast', label: 'the wood ant column', say: 'woodAnts' }),
+  // (4 workers and a soldier: with 6 and 2 the column cut the foragers on the plain from 48 ants to 16 on Hard at a
+  // person's pace, and the colony never recovered before the raids, 2026-11-06)
+  column('woodAnts', { window: [380, 560], until: 'stage:1', from: 'hard', visitor: 'formica', species: 'formica', name: 'Red wood ants', ants: [['formica_worker', 4], ['formica_soldier', 1]], enter: 'evWest', path: 'plainCross', exit: 'evEast', label: 'the wood ant column', say: 'woodAnts' }),
 );
 
 export const HIGH_WATER_LEVEL: StoryLevelDef = {
@@ -35,10 +37,12 @@ export const HIGH_WATER_LEVEL: StoryLevelDef = {
     { type: 'food', n: 4 },
     { type: 'brood', caste: 'termant_soldier', n: 3 },
   ],
+  // (three colonies at once: their sizes stay the same on every difficulty, only their strength and aggression grow; with
+  // their sizes × 1.25 and × 1.5 as well a person-paced colony was overrun on Hard and Brutal by 20 minutes, 2026-11-06)
   rivals: {
-    west: { species: 'lasius', site: 1, name: 'Black garden ants (west)', developed: 2, startWorkers: 8, popLimit: 24 },
-    east: { species: 'lasius', site: 2, name: 'Black garden ants (east)', developed: 2, startWorkers: 8, popLimit: 24 },
-    terrace: { species: 'lasius', site: 3, name: 'Black garden ants (terrace)', developed: 3, startWorkers: 9, popLimit: 26 },
+    west: { species: 'lasius', site: 1, name: 'Black garden ants (west)', developed: 2, startWorkers: 8, popLimit: 24, fixedSize: true },
+    east: { species: 'lasius', site: 2, name: 'Black garden ants (east)', developed: 2, startWorkers: 8, popLimit: 24, fixedSize: true },
+    terrace: { species: 'lasius', site: 3, name: 'Black garden ants (terrace)', developed: 3, startWorkers: 9, popLimit: 26, fixedSize: true },
   },
   creatures: 0,
   aphids: 3,

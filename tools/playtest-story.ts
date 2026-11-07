@@ -9,7 +9,8 @@
  *
  * PACE=human (claude/story/06-spec §7): a person's pace — it looks at the map every 15 s instead of every 5, acts on a
  * target only once it has seen it twice in a row, waits for a bigger army (×1.3) before an assault or a boss, and
- * defends at home (no sorties beyond 90 mm) while a stage asks it to hold out. JSON=1 prints one line of results.
+ * defends at home (no sorties beyond 90 mm: hunters, then raiders) while a stage asks it to hold out. JSON=1 prints one
+ * line of results. A goal already met is not chased again.
  * STRATEGY=hole (claude/story/05-spec §4): defend at the hole — once a titan comes to dig into the nest, the whole army
  * waits on the hole it digs and fights it there, then follows it in. The summary says whether (and when) a story titan
  * got inside.
@@ -78,8 +79,15 @@ let deaths = 0;
 /** game time a titan came to dig in / got inside (0 not yet) */
 let titanSeen = 0;
 let titanIn = 0;
+/** the colony's dead since the last minute line, by cause (HIT.*: what killed them) */
+const CAUSE = ['?', 'bite', 'venom', 'acid', 'crush', 'fall', 'drown', 'starve', 'decap', 'exec'];
+let byCause: Record<string, number> = {};
 ev.on('death', (e) => {
-  if (e.kind === 'ant' && e.colony === 0) deaths++;
+  if (e.kind === 'ant' && e.colony === 0) {
+    deaths++;
+    const k = CAUSE[e.cause ?? 0] ?? '?';
+    byCause[k] = (byCause[k] ?? 0) + 1;
+  }
 });
 const t0 = performance.now();
 let end = minutes;
@@ -99,7 +107,9 @@ for (let t = 0; t < minutes * 1200; t++) {
   }
   if (t % 1200 < LOOK) {
     const rv = w.colony(Object.values(st.rivals)[0]);
-    log.push(`    ${(w.s.time / 60).toFixed(0)} min: ${c.living} ants (${Object.entries(c.counts).map(([k, v]) => k.split('_')[1] + ' ' + v).join(', ')}) v rival ${rv?.living ?? 0}; goals ${m.goals.map((g) => g.progress).join(' ')}`);
+    const died = Object.entries(byCause).map(([k, v]) => `${k} ${v}`).join(', ');
+    byCause = {};
+    log.push(`    ${(w.s.time / 60).toFixed(0)} min: ${c.living} ants (${Object.entries(c.counts).map(([k, v]) => k.split('_')[1] + ' ' + v).join(', ')}) v rival ${rv?.living ?? 0}, food ${Math.floor(c.food)}; goals ${m.goals.map((g) => g.progress).join(' ')}${died ? `; died: ${died}` : ''}`);
   }
   // the "player": builds what a stage asks for (a tutorial goal the colony AI would get to late)
   const S = def.story!.stages[m.stage];
@@ -147,7 +157,8 @@ for (let t = 0; t < minutes * 1200; t++) {
       // goes further out for it, as a player would once the rival stopped coming
       const e = c.entrances[0];
       const want = o.type === 'stealCaste' ? o.caste : '';
-      const reach = c.living >= ARMY * 0.8 ? 2000 : 500;
+      // (or, ten minutes into the stage, with 25: a person does not wait for a full army to go for a few corpses)
+      const reach = c.living >= ARMY * 0.8 || (m.t > 600 && c.living >= 25) ? 2000 : 500;
       let best = Infinity;
       for (const pass of [true, false]) {
         for (const a of w.s.ants) {
@@ -160,6 +171,11 @@ for (let t = 0; t < minutes * 1200; t++) {
           }
         }
         if (target) break;
+      }
+      // none out: ten minutes in, with 30, at the nest's hole (its defenders come out to it), as a person would
+      if (!target && want && m.t > 600 && c.living >= 30) {
+        const hole = w.colony(rivalId)?.entrances[0];
+        if (hole) target = { space: SURFACE, x: hole.sx, y: hole.sy };
       }
     } else if ((o.type === 'reach' || o.type === 'hold') && c.living >= 20) {
       const p = wherePt(w, o.at);
@@ -252,6 +268,22 @@ for (let t = 0; t < minutes * 1200; t++) {
           target = { space: SURFACE, x: cr.x, y: cr.y };
         }
       }
+      // no hunter: raiders — ants of another colony inside the nest first, else the nearest at the door (a person
+      // rallies the army at home when a raid comes; the colony's own defence alone lost High Water on Hard, 2026-11-06)
+      if (best === Infinity)
+        for (const a of w.s.ants) {
+          if (a.colony === c.id || a.state === AS.Dead) continue;
+          if (a.space === nestSpace(c.id)) {
+            target = { space: a.space, x: a.x, y: a.y };
+            break;
+          }
+          if (a.space !== SURFACE) continue;
+          const d = Math.hypot(a.x - home.sx, a.y - home.sy);
+          if (d < best && d < NIGHT_R) {
+            best = d;
+            target = { space: SURFACE, x: a.x, y: a.y };
+          }
+        }
     }
   }
   // a person reacts a look late: a new target is acted on the second time it is seen

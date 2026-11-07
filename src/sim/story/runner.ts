@@ -43,7 +43,10 @@ export function storySetup(level: StoryLevelId, diff: Difficulty, loadout: strin
     siteSet: 0,
     colonies: [
       { species: 'termant', player: true, ai: false, team: 0, name: L.player.name, startWorkers: L.player.startWorkers, startFood: Math.round(L.player.startFood * D.food), borrowed: L.loadout ? loadout : undefined, ...(L.nest ? { developPlan: L.nest } : {}) },
-      ...rivals.map((r) => ({ species: r.species, player: false, ai: true, name: r.name, developed: Math.max(0, Math.round(r.developed * D.rival)), startWorkers: Math.max(1, Math.round(r.startWorkers * D.rival)), ...(r.popLimit ? { popLimit: Math.round(r.popLimit * D.rival) } : {}), ...(r.team !== undefined ? { team: r.team } : {}) })),
+      ...rivals.map((r) => {
+        const k = r.fixedSize ? 1 : D.rival;
+        return { species: r.species, player: false, ai: true, name: r.name, developed: Math.max(0, Math.round(r.developed * k)), startWorkers: Math.max(1, Math.round(r.startWorkers * k)), ...(r.popLimit ? { popLimit: Math.round(r.popLimit * k) } : {}), ...(r.team !== undefined ? { team: r.team } : {}) };
+      }),
     ],
     // the night hunters' lairs: dens under the banks (underground areas with a few old kills; story points name them)
     caves: (L.lairs ?? []).map((l) => ({ name: l.name, kind: 'lair' as const, at: { x: lairPt(L.map, l.at)[0], y: lairPt(L.map, l.at)[1] }, food: l.food, size: 2, look: l.look })),

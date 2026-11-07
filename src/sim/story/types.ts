@@ -239,6 +239,11 @@ export interface RivalDef {
    * (the conehead termites' carton nests; story only)
    */
   income?: number;
+  /**
+   * its size (nest, starting workers, population limit) does not grow with the difficulty, only its strength and
+   * aggression: for levels with several rivals at once (High Water's three colonies), where the sizes compound
+   */
+  fixedSize?: boolean;
 }
 
 /** A bonus objective: the third medal. */
