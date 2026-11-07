@@ -196,7 +196,7 @@ export class NestView {
     this.markers.update(shown, this.space, (x, y) => nt.heightAt(x, y), camDist, (i) => markerRadius(w, player, i), markerSel, time);
     if (owner) this.updateRings(w, owner, owner === player ? pendingHexes : [], time);
     else this.rings.set([]);
-    this.signs.update(fog ? fog.signs(w, player, this.space, this.signList) : [], (x, y) => nt.heightAt(x, y), g.R * 1.6, time);
+    this.signs.update(fog ? fog.signs(w, player, this.space, this.signList) : [], (x, y) => nt.floorAt(x, y), Math.max(g.R * 0.6, Math.min(g.R * 2.5, camDist * 0.045)), time, cam);
   }
 
   private static JOB_COL = new THREE.Color(0xffd27a);

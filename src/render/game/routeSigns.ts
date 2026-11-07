@@ -71,23 +71,26 @@ function texture(kind: SignKind): THREE.CanvasTexture {
 
 export class RouteSigns {
   readonly group = new THREE.Group();
-  private sprites: THREE.Sprite[] = [];
-  private mats = new Map<SignKind, THREE.SpriteMaterial>();
+  private sprites: THREE.Mesh[] = [];
+  private mats = new Map<SignKind, THREE.MeshBasicMaterial>();
+  private quad = new THREE.PlaneGeometry(1, 1);
 
-  private mat(kind: SignKind): THREE.SpriteMaterial {
+  private mat(kind: SignKind): THREE.MeshBasicMaterial {
     let m = this.mats.get(kind);
     if (!m) {
-      m = new THREE.SpriteMaterial({ map: texture(kind), depthTest: false, depthWrite: false, transparent: true, toneMapped: false });
+      // (camera-facing quads like the health bars: drawn over everything, no fog, no tone mapping)
+      m = new THREE.MeshBasicMaterial({ map: texture(kind), depthTest: false, depthWrite: false, transparent: true, toneMapped: false, fog: false, side: THREE.DoubleSide });
       this.mats.set(kind, m);
     }
     return m;
   }
 
   /** Draw the signs this frame: positions in nest mm, `height` the floor height there, `scale` sprite size in mm, `time` for the pulse. */
-  update(signs: ReadonlyArray<Sign>, height: (x: number, y: number) => number, scale: number, time: number): void {
+  update(signs: ReadonlyArray<Sign>, height: (x: number, y: number) => number, scale: number, time: number, camera?: THREE.Camera): void {
     while (this.sprites.length < signs.length) {
-      const sp = new THREE.Sprite(this.mat('alert'));
+      const sp = new THREE.Mesh(this.quad, this.mat('alert'));
       sp.renderOrder = 50;
+      sp.frustumCulled = false;
       this.group.add(sp);
       this.sprites.push(sp);
     }
@@ -104,8 +107,10 @@ export class RouteSigns {
       const pulse = big ? 1 + 0.12 * Math.sin(time * 5) : 1;
       const s = scale * (big ? 1 : 0.6) * pulse;
       sp.scale.set(s, s, 1);
-      sp.position.set(sg.x, height(sg.x, sg.y) + s * (big ? 1.1 : 0.7), sg.y);
-      sp.material.opacity = sg.a ?? 1;
+      // just above the floor (a gate sits in the wall: its sign hangs at head height, not over the wall top)
+      sp.position.set(sg.x, height(sg.x, sg.y) + s * (big ? 0.6 : 0.5), sg.y);
+      if (camera) sp.quaternion.copy(camera.quaternion);
+      (sp.material as THREE.MeshBasicMaterial).opacity = sg.a ?? 1;
     }
   }
 

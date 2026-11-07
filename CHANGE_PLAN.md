@@ -1187,5 +1187,26 @@ client-side only.
 (new), `ui/minimaps.ts`, `ui/gameUI.ts`, `audio/gameAudio.ts`, `tests/tunnels.ts` (new), `tools/tunnel-dig-probe.ts`
 (new), docs.
 
-### 27.4 Results
-(filled in as the work lands — see PROGRESS.md "2026-11-06 — A shared underground".)
+### 27.4 Results (2026-11-07)
+- Routes valid on every playable map for 2, 3, 4, 6 and 10 colonies × 2 seeds (`tools/tunnel-check.ts`): three hexes
+  wide (bands of every margin hex within a step of the centreline, rock pockets filled), rock-walled, gates on the
+  interior edge ≥ 4 from the flower and ≥ 5 apart; all pairs ≤ 4 colonies (6 routes for 4), nearest neighbours without
+  surface crossings above (9 routes for 6).
+- Dig times with six level-1 workers (`tests/tunnels.ts`, seed 3): the defender warned at 4.5 min, the route open at
+  5.7 min, the breach into the rival's floor at 6.7 min; both sides digging: open at 3.6 min. `hexWorkMul` went
+  10 → 5 → 4 → 3 to land near the spec's 3–5 min (the hexes dug one step of three at a time, two workers each, so the
+  crew of six is the natural crew size).
+- Changes of plan while building: a half's `breach` is also the owner's own passage from its floor to its gate (the
+  AI's nests never reach the edge; dug first, from the floor outward); `goOut` takes a usable route home from a foreign
+  nest (every "not in own nest → go out" path in antAI then walks the tunnel instead of climbing out — before that,
+  marker groups oscillated between the nests); the `tunnelBreach` event (the gate joining the floor) was added for the
+  "they have dug into your nest" alert; `Fog` lives on the session and is handed to each `NestView`.
+- AI (`tools/tunnel-ai-probe.ts`, Brutal, seed 5, 4 colonies with an AI ally): the fire ants tunnelled toward the idle
+  player — warned 13.3 min, open 13.8, in 14.7 — and the leafcutter ally linked nests at 14 min; the black garden ants
+  guarded (DEFEND) when warned. Easy never tunnels.
+- Checks: `npm test` (32 suites incl. `tests/tunnels.ts`), `tools/check-determinism.ts` (72 files clean), `npm run
+  build`. `tests/run-all.ts` and `tests/entrances.ts` were adjusted for the margin and version 4.
+- Open: the fog's "remembered" dimming is subtle on the dark tunnel floor; hints past the frontier appear only when the
+  rival has ants/food within 3 hexes of its gate (quiet gates give none); the nest renderer's full-grid SDF runs on
+  every grid version change over a grid 2.3× the cells (fine on this machine; a device check with 10 colonies is
+  pending); creatures cross only open routes; the camera switch needs the goal pushed against the rim in a rim step.
