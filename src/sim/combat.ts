@@ -14,7 +14,7 @@ import { BALANCE, GUARD, LAYERS } from './balance';
 import { glueBurst, majorAlarm, majorCharge, nasuteAttack, acquireInRange } from './termites';
 import { startSurge, surging } from './surge';
 import { hellUpdate, isHellState, release, snapEligible, startHunt } from './hellAnts';
-import { isSickle, sickleAlarm, sickleAttack, sickleUpdate } from './sickleJaws';
+import { isSickle, sickleAlarm, sickleAttack, sickleHoldBroken, sickleUpdate } from './sickleJaws';
 import { riding, tryClimb } from './climbing';
 import { climbCap } from './creatures/climb';
 import { afterBite, guardRush, hookMul } from './eciton';
@@ -256,7 +256,8 @@ export function flingAnt(w: World, a: Ant, fromX: number, fromY: number, power: 
   if (a.state === AS.Dead || riding(a)) return;
   const c = w.colony(a.colony);
   if (c && a.id === c.queen) return; // the queen is immune to knockback
-  if (a.state === AS.Hold && isSickle(a)) return; // a holding sickle-jaw is planted
+  // (spec 09 §2.2) a holding sickle-jaw is anchored, but knockback still throws it: the hold ends cleanly
+  if (a.state === AS.Hold && isSickle(a)) sickleHoldBroken(w, a, 'flung');
   dropCarried(w, a);
   releaseGrapple(w, a);
   unanchor(a);
@@ -282,6 +283,7 @@ export function gripAnt(w: World, a: Ant, crId: number, height: number): boolean
   if (a.state === AS.Dead || riding(a)) return false;
   const c = w.colony(a.colony);
   if (c && a.id === c.queen) return false;
+  if (a.state === AS.Hold && isSickle(a)) sickleHoldBroken(w, a, 'flung');
   dropCarried(w, a);
   releaseGrapple(w, a);
   a.state = AS.Flung;

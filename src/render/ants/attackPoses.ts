@@ -328,12 +328,14 @@ const GLUE_K: Key = { fwd: -0.035, up: -0.01, pitch: 0.03, headPitch: 0.05, gast
  *  - S_SQUIRT (a foe too big to hook): planted squarely in front of it, the sickles half open, the head jabbing the
  *    snout's tip against its side on each squirt.
  */
-const SGRAB_W: Key = { fwd: -0.09, up: 0.05, pitch: 0.16, px: -0.3, headPitch: 0.42, mand: 1, gaster: 0.12, spread: 0.45 };
-const SGRAB_S: Key = { fwd: 0.15, up: -0.01, pitch: -0.1, px: 0.3, headPitch: -0.22, mand: 0, spread: 0.45 };
-const SHOLD_B: Key = { fwd: 0.05, up: 0.01, pitch: -0.04, px: 0.2, headPitch: -0.1, mand: 0, gaster: 0.04, spread: 0.5 };
-const SHOLD_P: Key = { fwd: 0.075, up: -0.004, pitch: -0.08, px: 0.25, headPitch: -0.3, mand: 0, gaster: 0.22, spread: 0.5 };
-const SSQ_B: Key = { fwd: 0.0, up: 0.0, pitch: -0.02, headPitch: -0.04, mand: 0.55, gaster: 0.04, spread: 0.5 };
-const SSQ_J: Key = { fwd: 0.07, up: -0.01, pitch: -0.07, px: 0.25, headPitch: -0.26, mand: 0.45, gaster: 0.2, spread: 0.5 };
+// (the snout hangs forward and down at rest, its tip near the ground: holding, the head is raised so the tip lies on the
+// victim's back — the victim's front pinned 1.27 soldier-mm ahead, sim/sickleJaws.ts — and each squirt presses it down)
+const SGRAB_W: Key = { fwd: -0.09, up: 0.05, pitch: 0.16, px: -0.3, headPitch: 0.45, mand: 1, gaster: 0.12, spread: 0.45 };
+const SGRAB_S: Key = { fwd: 0.15, up: -0.01, pitch: -0.08, px: 0.3, headPitch: 0.06, mand: 0, spread: 0.45 };
+const SHOLD_B: Key = { fwd: 0.03, up: 0.01, pitch: -0.02, px: 0.2, headPitch: 0.26, mand: 0, gaster: 0.04, spread: 0.5 };
+const SHOLD_P: Key = { fwd: 0.055, up: -0.004, pitch: -0.05, px: 0.25, headPitch: 0.1, mand: 0, gaster: 0.22, spread: 0.5 };
+const SSQ_B: Key = { fwd: 0.0, up: 0.0, pitch: -0.02, headPitch: 0.3, mand: 0.55, gaster: 0.04, spread: 0.5 };
+const SSQ_J: Key = { fwd: 0.07, up: -0.01, pitch: -0.06, px: 0.25, headPitch: 0.12, mand: 0.45, gaster: 0.2, spread: 0.5 };
 /** the sim's lunge: the snap at this fraction, the hold pose reached 0.16 later (render/termite/rig.ts LUNGE_SNAP) */
 const S_SNAP = 0.58;
 // the finisher's lift (user note 2026-11-02 12:39): the foe held up by the neck — head and front raised, braced on the

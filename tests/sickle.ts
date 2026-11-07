@@ -10,7 +10,7 @@ import { createWorld, placeLitter } from '../src/sim/mapGen';
 import { World } from '../src/sim/world';
 import { Ant, AS, SURFACE, nestSpace } from '../src/sim/types';
 import { makeAnt } from '../src/sim/factory';
-import { damageAnt } from '../src/sim/combat';
+import { damageAnt, flingAnt } from '../src/sim/combat';
 import { killAnt } from '../src/sim/antAI';
 import { SICKLE } from '../src/sim/balance';
 import { CASTES, casteOf } from '../src/sim/species';
@@ -157,6 +157,31 @@ check('lunge: the grab resolves 6 ticks in (round(0.58 × 0.55 s × 20))', LUNGE
   killAnt(w, s);
   run(w, 1);
   check('rescue: killing the soldier frees its victim the next tick', v.heldBy === 0 && v.state !== AS.Dead && before > 0);
+}
+{
+  // (spec 09 §2.2) knockback ends a hold cleanly: the holder thrown lets go at once; a victim knocked out of the
+  // sickles ends the hold on the next tick, the soldier free for another target
+  const w = world();
+  const p = arena(w);
+  const v = dummy(w, 1, 'lasius_worker', p.x + 6, p.y, 1e6);
+  const s = soldierAt(w, p.x, p.y, v);
+  w.reindex();
+  for (let t = 0; t < 40 && v.heldBy !== s.id; t++) run(w, 1);
+  const held1 = v.heldBy === s.id;
+  flingAnt(w, s, p.x - 5, p.y, 1);
+  const free1 = v.heldBy === 0 && s.state === AS.Flung && !s.holdId;
+  run(w, 2);
+  check('hold: a holding sickle-jaw thrown by a knockback lets go at once, its victim free', held1 && free1 && v.heldBy === 0, `held ${held1}, soldier ${AS[s.state]}`);
+  const w2 = world();
+  const p2 = arena(w2);
+  const v2 = dummy(w2, 1, 'lasius_worker', p2.x + 6, p2.y, 1e6);
+  const s2 = soldierAt(w2, p2.x, p2.y, v2);
+  w2.reindex();
+  for (let t = 0; t < 40 && v2.heldBy !== s2.id; t++) run(w2, 1);
+  const held2 = v2.heldBy === s2.id;
+  flingAnt(w2, v2, p2.x - 5, p2.y, 1);
+  run(w2, 1);
+  check('hold: a victim knocked out of the sickles ends the hold (the soldier free, the victim flying)', held2 && v2.heldBy === 0 && s2.state !== AS.Hold && !s2.holdId, `soldier ${AS[s2.state]}, victim ${AS[v2.state]}`);
 }
 {
   // one soldier per victim: two soldiers on one target in the same tick → the lower id wins

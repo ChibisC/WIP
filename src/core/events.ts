@@ -44,7 +44,7 @@ export type SimEvent =
   | { t: 'hook'; x: number; y: number; space: number }
   | { t: 'pin'; x: number; y: number; space: number }
   | { t: 'link'; x: number; y: number; space: number }
-  | { t: 'grabRelease'; x: number; y: number; space: number; soldier: number; target: number; reason: 'victimDied' | 'holderDied' }
+  | { t: 'grabRelease'; x: number; y: number; space: number; soldier: number; target: number; reason: 'victimDied' | 'holderDied' | 'flung' }
   /** Termants: gene samples taken in (`source`: a species id or `cr:<kind>`), a caste stolen, a soldier's glue burst */
   | { t: 'gene'; colony: number; source: string; amount: number }
   | { t: 'caste'; colony: number; caste: string; source: string; forgotten?: boolean }

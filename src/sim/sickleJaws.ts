@@ -265,6 +265,8 @@ export function sickleUpdate(w: World, a: Ant, c: Colony, dt: number, mul: numbe
   a.v = 0;
   const v = victim(w, a.holdKind ?? 0, a.holdId ?? 0);
   if (!v || v.dead || v.space !== a.space) return endHold(w, a, v);
+  // (spec 09 §2.2) the victim knocked out of the sickles (a fling, a creature's jaws): the hold ends cleanly
+  if (v.ant && v.ant.state === AS.Flung) return endHold(w, a, v, 'flung');
   pin(a, v, L);
   a.pose = POSE.GRAPPLE;
   const acid = sickleRampDamage(a.rampN ?? 0) * mul;
@@ -302,15 +304,31 @@ function pin(a: Ant, v: Victim, L: number): void {
   v.y = y;
 }
 
-/** The victim died (or is gone): drop it, reset the ramp, free for the next target. */
-function endHold(w: World, a: Ant, v: Victim | null): boolean {
+/** The victim died, is gone or was knocked loose: drop it, reset the ramp, free for the next target. */
+function endHold(w: World, a: Ant, v: Victim | null, reason: 'victimDied' | 'flung' = 'victimDied'): boolean {
   if (v?.ant && v.ant.heldBy === a.id) v.ant.heldBy = 0;
   if (v?.cr && v.cr.data.heldBy === a.id) v.cr.data.heldBy = 0;
-  w.events.emit({ t: 'grabRelease', x: v?.x ?? a.x, y: v?.y ?? a.y, space: a.space, soldier: a.id, target: a.holdId ?? 0, reason: 'victimDied' });
+  w.events.emit({ t: 'grabRelease', x: v?.x ?? a.x, y: v?.y ?? a.y, space: a.space, soldier: a.id, target: a.holdId ?? 0, reason });
   a.holdId = 0;
   a.holdKind = 0;
   a.holdT = 0;
   return dropTarget(a);
+}
+
+/**
+ * The holding soldier was thrown (combat.flingAnt, a creature's jaws: spec 09 §2.2): it lets go at once, the victim
+ * free on the spot, the ramp reset.
+ */
+export function sickleHoldBroken(w: World, a: Ant, reason: 'flung'): void {
+  const v = victim(w, a.holdKind ?? 0, a.holdId ?? 0);
+  if (v?.ant && v.ant.heldBy === a.id) v.ant.heldBy = 0;
+  if (v?.cr && v.cr.data.heldBy === a.id) v.cr.data.heldBy = 0;
+  w.events.emit({ t: 'grabRelease', x: v?.x ?? a.x, y: v?.y ?? a.y, space: a.space, soldier: a.id, target: a.holdId ?? 0, reason });
+  a.holdId = 0;
+  a.holdKind = 0;
+  a.holdT = 0;
+  a.rampN = 0;
+  a.rampT = 0;
 }
 
 /** The soldier died holding someone (antAI.killAnt → termites.onTermiteDied): the victim is free next tick. */
