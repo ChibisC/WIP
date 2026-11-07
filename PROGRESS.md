@@ -1800,6 +1800,27 @@ User specs `claude/story/05-spec-story-titans-get-inside.md` and `claude/creatur
   skirmish raids unchanged). Playtests (`STRATEGY=hole` new): both levels won on every difficulty (the Spider Mother on
   Brutal on one seed of three that reach her fury). Protocol `ud-mp-11`. Dev: `?story=<level>&stage=N&titan=1`.
 
+## 2026-11-06 — Stag beetle fore legs: the spiked blade ahead of the head (branch `fix/stag-front-legs`)
+User (2026-11-06): "a weird protruding thing in front of the stag beetles, at the front legs". Sheets:
+`docs/realism/stag/` (before and after, every male size in four views and the poses; `tests/browser/stag_legs.py`).
+- **What it was**: the separate fore tibia part `stag_tibia1` (`stagBeetle.ts segGeo('tibia1')`), drawn by
+  `partFrame` with `side = (0, 1, 0)` so its wide, toothed axis lay in the vertical plane: a paddle flaring to twice
+  its base width (radius 0.7 → 1.45 thicknesses), four 1 mm teeth and the apical spurs all pointing ahead and down,
+  reading from the game camera as one dark spike in front of each fore leg. Nothing else protruded: the joints,
+  feet, the rig and `builders.ts`'s old primitive stag are untouched (`tools/creature-hash.ts -- dump`: every other
+  drawn stag part identical before and after; the 13 other creatures' hashes unchanged).
+- **Fix at the source** (so every size, LOD and pose gets it): the fore tibia is slender and nearly parallel-sided
+  (0.72 → 1.02 thicknesses at 0.62 × 0.5 of the leg thickness: about 1.8–2.4 mm wide and 1.2 mm deep on the 100 mm
+  boss, an eighth of its length), bowing a little outward, with four small teeth growing toward the apex on the
+  outer edge, the apex forked into two prongs (the largest tooth, 1.3 mm) and two short spurs on the inner face —
+  as on *Lucanus cervus* (teeth along the outer margin, the apex bifurcate, two apical spurs; reference photos
+  study-only). It is placed with `side = (0, 0, ±1)`: the toothed edge faces away from the body and the flat face
+  lies level, as the legs are held beside and ahead of the head. The feet keep their places (rest fore foot at
+  0.19 L, the jaws of the boss reach 0.5 L), so `tools/climb-data.ts` and `tools/height-data.ts` regenerate unchanged.
+- The far-zoom creature "impostor" is a blob ellipsoid (`creatureRenderer.ts blob`), so nothing to re-bake; the
+  smaller males (sizes 0–3) exist only in the labs (`msize`) until `feature/stag-sizes` lands — fixed there too.
+- New: `tools/creature-hash.ts` (save/check/dump creature-model fingerprints, like `morph-hash.ts` for ants) with
+  the baseline `tests/data/creature-hashes.json`.
 ## 2026-11-06 — A shared underground: set tunnel routes between nests, underground fog (CHANGE_PLAN §27)
 User spec `claude/underground/01-spec-shared-underground-tunnels.md` (2026-11-06); branch `feature/shared-underground`.
 Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).

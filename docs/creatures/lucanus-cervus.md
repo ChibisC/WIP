@@ -10,7 +10,11 @@
   **lamellate club of 4 comb-like plates**.
 - Pronotum black, broad, rounded sides.
 - **Elytra chestnut / reddish-brown**, smooth and glossy, covering the abdomen.
-- Legs black, robust, fore tibiae toothed for digging; tarsal claws strong.
+- Legs black, robust, fore tibiae toothed for digging; tarsal claws strong. The fore tibia (model: `stag_tibia1`,
+  fixed 2026-11-06) is long and slender (about an eighth as wide as long), nearly parallel-sided, bowing slightly
+  outward, with a row of small teeth growing toward the apex along its outer edge, the apex forked into two prongs
+  and two short spurs on the inner face; it lies flat with the toothed edge away from the body, held beside and a
+  little ahead of the head, never past the mandibles.
 
 ## Mandibles (jaws pass, 2026-10-27)
 
