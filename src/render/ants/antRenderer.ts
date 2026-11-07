@@ -1249,8 +1249,9 @@ export class AntRenderer {
         // termite glue clinging to the ant (render only), on one of the two while they cross-fade
         if (pass === 0) {
           // eases in, wears off slowly; a sickle-jaw's acid uses the same wet shell (the kit's acid and glue colours
-          // are nearly the same pale amber)
-          const gw = Math.max(v.glue ?? 0, v.acid ?? 0);
+          // are nearly the same pale amber) — thinner: a wet sheen where it was squirted, not a coat of glue (round-1
+          // clips: at full strength it read as white fuzz over the victim)
+          const gw = Math.max(v.glue ?? 0, (v.acid ?? 0) * 0.35);
           s.gl = damp(s.gl ?? 0, gw, gw > (s.gl ?? 0) ? 4 : 0.6, dt);
         }
         if (l === glueAt && s.gl! > 0.02) b.addShell(l, n, s.gl!);

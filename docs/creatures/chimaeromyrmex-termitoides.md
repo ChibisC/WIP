@@ -23,7 +23,7 @@ From the user's package `claude/termyrms/02-reference-termants.md` (copied befor
 |---|---|
 | Hardened glossy head + mesosoma, elbowed 12-segment antennae, sideways triangular mandibles, compound eyes on workers | Formicine ants (*Formica*, *Lasius*) — the game's existing ant base |
 | Bead-like (moniliform) antenna segments toward the tip | Termites (worker/soldier antennae are strings of beads) |
-| Cone-shaped frontal gland pore on the forehead; soldier's long forward-angled "nasus" that sprays sticky glue | Nasute termites (*Nasutitermes*): soldiers squirt a sticky terpene secretion from the fontanelle at the tip of the nasus; many termite soldiers are eyeless |
+| A small frontal pore (the fontanelle) on the soldier's forehead that oozes a sticky glue — no nasus (user, 2026-11-03) | *Coptotermes* soldiers ooze a milky defensive secretion from the fontanelle; many termite soldiers are eyeless |
 | Soft, pale, translucent abdomen with 9–10 segments and dark gut contents visible | Termite workers; the dark patch is the wood-filled hindgut seen through the cuticle |
 | Short thick waist (petiole broader than an ant's but still a constriction) | Design blend: ants have a one- or two-node waist; termites have a broad join. The hybrid keeps a single node, scaled up |
 | Formic acid from an acidopore, no sting | Formicinae (same as Red Wood Ant in the game) |
@@ -35,7 +35,7 @@ From the user's package `claude/termyrms/02-reference-termants.md` (copied befor
 
 ## 3. Shared body plan (what the models show)
 Every hybrid caste is front-ant / back-termite, blended at the waist:
-- **Head:** rounded heart-shaped capsule; 12-segment elbowed antennae, funiculus segments swelling into beads toward the tip; small compound eyes on workers (none on soldiers); triangular toothed mandibles closing sideways; a short cone-shaped frontal pore between the antenna bases (stubby on workers, 0.4 × head length and angled forward on soldiers, tip glossy).
+- **Head:** (redesign 2026-11-07, §10) a formicine's rounded heart-shaped capsule on workers and royals, a big rectangular *Macrotermes*-style capsule on the soldier; **termite antennae on every caste** — straight and beaded (moniliform), 15 segments on workers, 14 on soldiers, 17 on royals; small compound eyes on workers (none on soldiers); triangular toothed mandibles on workers and royals, two thick sabre jaws crossing at the tips on the soldier; no nasus — the soldier's small pale frontal pore (fontanelle) on the forehead.
 - **Mesosoma:** hardened, glossy, one smooth arch, no spines; queen and king carry scutum/scutellum plates and wing scars.
 - **Waist:** one short, thick petiole with a low node — ~2.6 × a normal ant waist's thickness.
 - **Abdomen:** soft, plump, translucent cream-amber; 9 visible segments (10 on the queen) with darker bands and a dark gut patch low on the underside; acidopore ring at the tip; no sting. The queen's is ~3 × a worker's relative length, creamy-white with amber tergite stripes.
@@ -81,3 +81,20 @@ Branch `feature/termants`; the code is in `sim/termants.ts` (genes, stealing, gl
 - **UI:** a Genome tab in the build panel (progress to each threshold, raised / ready / waiting, Forget, the corpse-priority toggle, creature genes); stolen names on brood tiles, caste cards and the info card; wood in the top bar.
 - **AI:** the brood mix follows the stolen castes; it forgets the stolen caste with the fewest living ants; it builds a carton wall beside each entrance while invaded; it raids sooner a rival whose genes it nearly has; wood and leaves count less as a forage target once the food store is half full.
 - **Not done:** the first-hatch glow of a new stolen caste (optional in the plan); carton-coloured chamber floors (no per-species nest floor in the game); a separate two-client 10-minute sync run (covered by the same-seed determinism test and the lockstep suite); `settings.carryGenome` (no campaign carries anything between missions yet).
+
+## 10. Realistic redesign (2026-11-07, `claude/realism/09-spec-sickle-jaw-termants.md` §3)
+
+Rebuilt on the ant pipeline's realism path (`real: true` in `src/render/ants/termantMorphs.ts`, the baked recipes `TERMANT_W` / `TERMANT_S` in `render/bake/recipes.ts`), each part matched to a real animal. Fractions of the caste's length L (mm in brackets).
+
+| Part | Real reference | Worker (5 mm) | Soldier (7 mm) | Queen (12 mm) / King (7.5 mm) |
+|---|---|---|---|---|
+| Head | *Formica* worker (CI ≈ 0.95); soldier: *Macrotermes* soldier (rectangular, longer than wide, sides nearly parallel, carried level) | 0.22 × 0.21 × 0.15, heart | 0.34 × 0.26 × 0.19 (2.4 × 1.8 mm), rectangular, `#5E3018` hard and shining | 0.14 × 0.14 / 0.21 × 0.20, heart, ocelli |
+| Antennae | termite workers / soldiers / imagos (*Reticulitermes*, *Coptotermes*, *Macrotermes*) | 15 segments, ~0.30 L, a short barrel basal segment then barrel beads, slightly broader toward the tip, one gentle forward curve | 14 segments | 17 segments |
+| Jaws | *Formica* worker; *Macrotermes* soldier | triangular, 6 teeth | sabres 0.62 head lengths (1.5 mm), thick at the base (0.085 of their length), flattened, curving ever more inward, the tips crossing; no teeth | triangular |
+| Frontal pore | *Coptotermes* soldier fontanelle | — | 0.045 head lengths across, 0.6 back on the forehead: a pale raised rim round a moist pale-amber opening (no tube) | — |
+| Eyes | | small | none | with ocelli |
+| Mesosoma, waist, legs | *Formica* | as before (one smooth arch, one short thick waist), legs at their real length | sturdier | wing scars |
+| Abdomen | termite worker (*Nasutitermes*, *Reticulitermes*) | soft, pale, banded, the gut patch showing; the nasute recipe's soft, translucent surface with sunken membranes and a wet glint | as the worker | queen moderately physogastric (~3 × a worker's relative length) |
+
+Animation (planted feet, `ANIM_V2_PREFIXES`): workers bite (lunge, clamp-and-tug) and spray formic acid with the abdomen curled forward; the soldier's heavy bites (a crushing bite, a chomp) and the glue dab — the forehead's pore pressed at the foe; the royals bite; never the same attack twice running. The game rules (the glue burst, the acid, the stolen castes) are unchanged; the card keeps its honesty line: ants and termites cannot hybridize.
+
