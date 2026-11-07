@@ -30,6 +30,9 @@ export interface Place {
   rain: number;
   /** how busy the colony nearby is (0–1), for the underground rumble */
   activity: number;
+  /** ants in view close up (0–1): the macro layer (leaf litter, the soil's rumble) rises a little over a busy patch,
+   * so a crowd is not silent now that ants make no walking sounds (never a footstep texture) */
+  crowd?: number;
 }
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -59,14 +62,15 @@ export class Ambience {
     audio.environment(u, p.night);
     // surface beds
     this.wind.set(open ? s * wide * (0.75 - 0.25 * p.night + 0.3 * p.rain) : 0, 0.8, 5200 - 1800 * p.night);
-    this.litter.set(open ? s * close * (style === 'forest' ? 0.9 : 0.55) * (1 - 0.4 * p.night) : 0, 0.6);
+    const crowd = p.crowd ?? 0;
+    this.litter.set(open ? s * close * (style === 'forest' ? 0.9 : 0.55) * (1 - 0.4 * p.night) * (1 + 0.45 * crowd) : 0, 0.6);
     this.cicada.set(open && (style === 'sandy' || style === 'meadow') ? s * day * day * (style === 'sandy' ? 0.8 : 0.4) * (1 - p.rain) : 0, 2);
     this.stream.set(style === 'riverbank' ? s * (0.6 + 0.4 * close) : 0, 1);
     this.sand.set(style === 'sandy' ? s * (0.5 + 0.3 * wide) : 0, 1);
     this.rainBed.set(open ? s * p.rain : 0, 1.5);
     // underground beds
     this.room.set(u * (style === 'formicarium' ? 0.6 : 1), 0.6);
-    this.rumble.set(u * (0.3 + 0.7 * p.activity), 1);
+    this.rumble.set(u * (0.3 + 0.7 * p.activity) * (1 + 0.3 * crowd), 1);
     this.above.set(open ? u * 0.5 : 0, 0.8, 600);
     // one-shots, each on its own clock
     const t = audio.now;

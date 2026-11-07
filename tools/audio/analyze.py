@@ -30,7 +30,11 @@ for root, _, files in os.walk(src):
             continue
         p = os.path.join(root, f)
         sr, x = wavfile.read(p)
-        x = x.astype(np.float32) / 32768.0
+        x = x.astype(np.float32) / (32768.0 if x.dtype == np.int16 else 1.0)
+        if x.ndim == 2:
+            x = x.mean(axis=1)
+        if len(x) < 2048:
+            x = np.pad(x, (0, 2048 - len(x)))
         peak = float(np.max(np.abs(x)) + 1e-12)
         rms = float(np.sqrt(np.mean(x ** 2)) + 1e-12)
         fr, tt, S = signal.stft(x, sr, nperseg=1024, noverlap=768)

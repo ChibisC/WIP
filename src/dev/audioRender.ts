@@ -18,9 +18,10 @@ export async function renderScenario(name: string, secs: number): Promise<void> 
   const sr = 44100;
   const off = new OfflineAudioContext(2, Math.ceil(sr * secs), sr);
   audio.build(off as unknown as AudioContext);
+  // every sound decoded before the render starts (the game decodes each one the first time it is wanted)
+  await audio.bank.preload();
   const amb = new Ambience();
   const music = new Music();
-  const swarm = new GrainBed('ant.swarm_bed');
   const battle = new GrainBed('combat.battle_bed');
   const scuffle = new GrainBed('combat.grapple_scuffle');
   const rumble = new LoopBed('boss.rumble');
@@ -60,20 +61,20 @@ export async function renderScenario(name: string, secs: number): Promise<void> 
       ants = 60;
       for (let k = pois(4); k--; ) want('ant.dig_bite', 'work', rnd(0.2, 1.5));
       for (let k = pois(1.2); k--; ) want('ant.soil_grains', 'work', rnd(0.2, 1.5));
-      for (let k = pois(40); k--; ) want('ant.step_soil', 'steps', rnd(0.1, 1.2));
       if (t > 3 && t < 3 + step) audio.play('ant.queen_lay');
     }
     if (name === 'battle400') {
-      // 400 ants fighting in view: ~330 bites/s, stings, acid, deaths
+      // 400 ants fighting in view: ~330 bites/s, stings, acid, hits, deaths
       ants = 400;
       fight = 1;
       grapple = 160;
-      for (let k = pois(330); k--; ) want(Math.random() < 0.7 ? 'combat.mandible_click' : 'combat.mandible_snap', 'combat', rnd(0.1, 2.5));
+      for (let k = pois(330); k--; ) want(Math.random() < 0.7 ? 'combat.mandible_click' : Math.random() < 0.7 ? 'combat.mandible_snap' : 'combat.bite_crush', 'combat', rnd(0.1, 2.5));
       for (let k = pois(60); k--; ) want('combat.sting_fire', 'combat', rnd(0.1, 2.5));
       for (let k = pois(25); k--; ) want('combat.acid_spray', 'combat', rnd(0.2, 2.5));
       for (let k = pois(8); k--; ) want('combat.ant_death', 'combat', rnd(0.1, 2.5));
       for (let k = pois(30); k--; ) want('combat.chitin_crack', 'combat', rnd(0.1, 2.5));
-      for (let k = pois(80); k--; ) want('ant.step_soil', 'steps', rnd(0.1, 1.5));
+      for (let k = pois(40); k--; ) want('combat.hit_tick', 'combat', rnd(0.1, 2.5));
+      for (let k = pois(6); k--; ) want('combat.grip', 'combat', rnd(0.1, 2));
       if (t >= 5 && t < 5 + step) {
         audio.duck(0.6, 1.4, 'ui');
         audio.play('ui.alert_queen');
@@ -96,10 +97,7 @@ export async function renderScenario(name: string, secs: number): Promise<void> 
     }
     mixer.flush(step);
     heat *= Math.exp(-step / 5);
-    amb.update({ ...place, rain: 0 });
-    swarm.level = Math.min(1, Math.sqrt(ants) / 16);
-    swarm.density = 10 + Math.min(70, ants * 0.8);
-    swarm.update();
+    amb.update({ ...place, rain: 0, crowd: Math.min(1, ants / 60) });
     scuffle.level = Math.min(1, grapple / 12);
     scuffle.density = 12 + Math.min(50, grapple * 2);
     scuffle.update();

@@ -141,6 +141,8 @@ export class GameSession {
   hoverNeighbours: Array<{ q: number; pts: number }> = [];
   onEvent: ((e: SimEvent) => void) | null = null;
   onFrame: (() => void) | null = null;
+  /** how far this frame is drawn between the last two ticks (0–1): the sound of a tick's events waits for the picture */
+  renderAlpha = 1;
 
   /** one view per underground area, keyed by space id */
   readonly nests = new Map<number, NestView>();
@@ -1492,6 +1494,7 @@ export class GameSession {
     const w = this.world;
     const v = this.view;
     this.frameNo++;
+    this.renderAlpha = alpha;
     this.netFrame();
     this.events.drain();
     if (this.frameNo % 30 === 0) this.autosave();
