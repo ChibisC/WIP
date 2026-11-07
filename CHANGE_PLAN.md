@@ -1139,3 +1139,15 @@ All modes (spec B):
   300 mm): before, 10 of 12 kept out (9 driven off, one never reached the hole; the holes took 22–74 s); after, 8 of 12
   (Formica and the Termants drive off or kill every titan but one that never reached the hole; the Lasius colony lets
   all four in, 76–99 % health). AI colonies now meet a warned titan at the hole it will dig (`warAI.ts threat`).
+
+## 28. Model redo: Saiy-Ants and sickle-jaw termites; the rest of spec 09 (rows, grab-and-squirt fit, balance, Termants) — branch `feature/models-saiy-sickle`
+
+User specs: `claude/realism/10-spec-saiy-ant-sickle-jaw-models.md` (the models, with the fire ant pilot's playbook) and the parts of `claude/realism/09-spec-sickle-jaw-termants.md` it says still apply. (§27 is the audio v3 branch.)
+
+- **Saiy-Ants** on *Camponotus* anatomy (`saiyMorphs.ts`, `antGeometry.ts` `campo` terms: set-back antennal sockets, a keeled clypeus with a dark suture; `mandibleSpecs.ts` `SAIY_*_JAW`, five teeth; baked recipe `SAIY`; planted feet; three bites per caste, no acid — the user's rule; the gold surge's stretch and overshoot in `antViews.speciesExtras`). Hair (briefs 07/08) unchanged.
+- **Sickle-jaw termites** on the ant pipeline (`rhyMorphs.ts`, routed by `NASUTE_ANT_PATH`; `nasuteBuilder.ts`: the sickle mandibles, the snout's down-curve and pore, the worker's flat head and fontanelle, royal eyes and ocelli, wing scales, the queen's pleated physogastric abdomen; presoldier and larva morphs). Animation: `antViews.sickleAntPath` maps the kit states to attack cycles (special 7 grab, 8 hold-and-squirt, 9 free squirt, 5 drum) and poses (THREAT, RUSH), `attackPoses` `S_GRAB` / `S_HOLD` / `S_SQUIRT`; the acid jet and fizz drawn by `antRenderer` from the snout's tip. The kit's sickle-jaw castes stay in `render/termite` (their rig-texture rows are fixed, as the conehead castes' were) but are no longer drawn in the game.
+- **Spec 09 §2.4** the defensive rows removed (`sickleTrail`, `sickleRowSlot`, `sickleGuardIndex`, `SICKLE.escort`, the short guard aggro, `tools/sickle-guard.ts`, `tools/sickleGuardScene.ts`, the tests and docs); soldiers gather or hold the escort ring. No saved fields existed (the posts were derived per tick), so old saves load unchanged.
+- **Spec 09 §2.2** a knockback (`flingAnt`, `gripAnt`) ends a hold cleanly on either side (`sickleHoldBroken`; the victim knocked loose → `endHold(…, 'flung')`); the hold stays anchored (`slots.anchored`); mounted sickle-jaws bite like other riders (they climb first: `tryClimb` runs before `sickleAttack`).
+- **Spec 09 §2.3** balance in `docs/balance/castes.md`.
+- **Spec 09 §3** Termants rebuilt (`termantMorphs.ts` `real`; builder options `antenna.termite`, `head.fontanelle` — the old `head.pore` tube removed — and mandible type `sabre`; recipes `TERMANT_W` / `TERMANT_S`; planted feet and attacks in `antMotion`).
+- Checks: morph hashes (only these three species changed; `tests/data/morph-hashes.json` re-baselined for them), `tools/height-data.ts` regenerated (climb data unchanged: creatures only), `npm test`, review page round 1.

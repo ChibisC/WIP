@@ -1958,3 +1958,11 @@ User spec `claude/performance/01-spec-performance-no-visual-loss.md` (branch `fe
   seed 11.
 - Checks: `tests/storyEvents.ts` (new), `tests/storyCh1.ts` (seven levels), `npm test`, `check-determinism`, the build;
   browser shots `docs/story/shots/ch1_7/` (`tests/browser/story_ch1_7.py`). Protocol `ud-mp-12`.
+
+## 2026-11-07 — Model redo: Saiy-Ants, sickle-jaw termites, Termants (`feature/models-saiy-sickle`, CHANGE_PLAN §28; in review)
+
+- **Saiy-Ants** rebuilt on a real carpenter ant (*Camponotus*): broad rounded head (the soldier's heart-shaped and broader), antennal sockets set back from a keeled clypeus, five-toothed parametric jaws, a smooth arched mesosoma, a scale petiole, an oval gaster with golden-grey hairs, long legs; blue-black satin cuticle from a baked recipe; three bites per caste on planted feet (no acid, the user's rule); the gold surge's stretch and overshoot. The six locks are unchanged.
+- **Sickle-jaw termites**: every caste (worker, soldier, presoldier, king, queen, larva) on the realistic ant pipeline: the soldier's glassy red head and down-curved snout with its pore, long thin crossing sickles traced from the user's photos, beaded antennae, very long legs; the worker's broad flat chestnut head with the fontanelle and long glassy abdomen with the gut; royals with eyes, ocelli and wing scales, the queen's pleated physogastric abdomen. The grab-and-squirt, the free squirt, the threat and the drum as planted-feet attack cycles, the acid jet and fizz from the snout's tip.
+- **No more defensive rows**: sickle-jaw soldiers gather or hold the escort ring like other soldiers. A knockback ends a hold cleanly. Balance: soldier health 20 and brood × 2.2 (+0.79 → +0.03 against the reference soldier), worker bite 2.5.
+- **Termants** redesigned: termite antennae on every caste, no nasus (the soldier's glue from a pore on its forehead), a *Macrotermes*-style soldier head with sabre jaws, realistic materials, planted feet.
+- Other species' models unchanged (hash check); height data regenerated. Review page round 1 sent to the user.
