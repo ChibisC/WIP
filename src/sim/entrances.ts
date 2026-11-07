@@ -227,7 +227,8 @@ export function placeHoles(w: World, c: Colony, g: NestGrid): void {
  * from the queen's hex `q0`), the centre and the inner hex (nearest the queen's hex).
  */
 export function flowerOver(g: NestGrid, q0: number, path: readonly number[]): { flower: number[]; spine: number[] } {
-  const inGrid = (q: number) => g.neighbors(q).every((n) => n >= 0 && g.hexRow(n) > 0 && g.hexCol(n) > 0 && g.hexRow(n) < g.rows - 1 && g.hexCol(n) < g.cols - 1);
+  // (its six hexes and their neighbours all in the diggable interior, clear of the rim and the rock margin)
+  const inGrid = (q: number) => g.neighbors(q).every((n) => n >= 0 && g.isInterior(n) && g.hexRow(n) > 0 && g.hexCol(n) > 0 && g.hexRow(n) < g.rows - 1 && g.hexCol(n) < g.cols - 1);
   let ci = Math.max(0, path.length - 2);
   while (ci > 0 && !inGrid(path[ci])) ci--;
   const centre = path[ci] ?? q0;

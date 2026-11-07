@@ -1,4 +1,5 @@
 import { upgradeWorldEntrances } from './entrances';
+import { upgradeWorldTunnels } from './tunnels';
 import { Rng } from '../core/rng';
 import { EventBus } from '../core/events';
 import { Terrain } from '../world/terrain';
@@ -104,8 +105,11 @@ export class World {
           .replace(/Gene-Thief Termant/g, 'Termant')
           .replace(/gene[ -]?thief ant/gi, (m) => (m[0] === 'G' ? 'Mimic Ant' : 'mimic ant'))
           .replace(/gene[ -]?thie(f|ves)/gi, (m) => (m[0] === 'G' ? 'Mimic Ant' : 'mimic ant') + (/ves$/i.test(m) ? 's' : ''));
-    state.version = Math.max(3, state.version ?? 1);
+    // version 4 (2026-11-06): the shared underground — rock margins round every nest and tunnel routes between them
+    // (sim/tunnels.ts; a binary snapshot attaches its grids after this, and restoreWorld upgrades it then)
+    state.version = Math.max(4, state.version ?? 1);
     this.reindex();
+    if (this.grids.size) upgradeWorldTunnels(this);
   }
 
   get time(): number {
@@ -121,6 +125,13 @@ export class World {
     this.grids.set(space, grid);
     this.gridFlows.set(space, new NestFlow(grid));
     this.s.nests[space] = null; // serialized lazily
+  }
+
+  /** Swap a space's grid for another (save upgrades: sim/tunnels.ts upgradeWorldTunnels). */
+  replaceGrid(space: number, grid: NestGrid): void {
+    this.grids.set(space, grid);
+    this.gridFlows.set(space, new NestFlow(grid));
+    this.s.nests[space] = null;
   }
 
   addNest(colony: number, grid: NestGrid): void {
@@ -403,7 +414,7 @@ export class World {
 
 export function emptyState(seed: number, terrainParams: SimState['terrain']): SimState {
   return {
-    version: 3,
+    version: 4,
     tick: 0,
     time: 0,
     seed,

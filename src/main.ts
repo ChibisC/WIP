@@ -18,6 +18,7 @@ import { battleDemo } from './dev/battleDemo';
 import { TEAM_NAMES, arenaLayout } from './sim/arena';
 import { ARENA } from './sim/balance';
 import { chamberDemo } from './dev/chamberDemo';
+import { tunnelDemo } from './dev/tunnelDemo';
 import { creatureDemo } from './dev/creatureDemo';
 import { runDeterminism } from './dev/determinism';
 import { runStressPage } from './dev/stressPage';
@@ -188,11 +189,12 @@ function startGame(): void {
       if (q.get('layout')) layoutDemo(s);
       if (q.get('battle')) battleDemo(s, q.get('battle')!, !!q.get('raid'));
       if (q.get('chamber')) chamberDemo(s);
+      if (q.get('tunnel')) tunnelDemo(s, q.get('tunnel')!);
       if (q.get('spawn')) creatureDemo(s, q.get('spawn')!);
       if (q.get('climbdebug')) s.setClimbDebug(true);
       if (q.get('hitboxes')) s.setHitboxes(true);
       if (q.get('combatdebug')) s.setCombatDebug(true);
-      if (q.get('layout') || q.get('battle') || q.get('chamber') || q.get('spawn')) s.replayable = false; // test scenes edit the world directly
+      if (q.get('layout') || q.get('battle') || q.get('chamber') || q.get('spawn') || q.get('tunnel')) s.replayable = false; // test scenes edit the world directly
       // dev: a story level from any stage (?story=<level>&stage=N[&ants=N][&titan=1]), to test its scenes
       if (c.mode === 'story' && (q.get('stage') || q.get('night'))) {
         const m = missionOf(s.world);

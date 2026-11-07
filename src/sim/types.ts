@@ -269,6 +269,8 @@ export interface Ant {
   /** nest job: kind (JOB.*, 0 = none) and hex */
   jobK: number;
   jobQ: number;
+  /** the space the job's hex is in when it is not the colony's own nest (a route dig in the partner's half; sim/tunnels.ts) */
+  jobS?: number;
   /** seconds without a route back to its own queen (dies when too long) */
   lostT: number;
   /** team (colonies on the same team are allies); older saves fall back to the colony id */
@@ -674,6 +676,9 @@ export interface Colony {
      * or the colony is dead. Absent (or false) in every other game.
      */
     allOut?: boolean;
+    /** a tunnel raid (sim/tunnels.ts, CHANGE_PLAN §27): the route being dug toward the target (−1 none); `tunnelled` once the raid goes through it */
+    tunnel?: number;
+    tunnelled?: boolean;
   };
   /** its nest is flooding or flooded (sim/nestFlood.ts; NEST_FLOOD in balance.ts). Absent in every other game. */
   nestFlood?: NestFloodState;
@@ -743,6 +748,8 @@ export interface Colony {
   spoil: number[];
   /** pending dig requests by AI */
   aiPlan: number;
+  /** the one tunnel route this colony is digging (sim/tunnels.ts; −1 none; marking another pauses the first) */
+  routeDig?: number;
 }
 
 export interface AphidCluster {
@@ -928,6 +935,8 @@ export interface SimState {
   flood?: FloodState[];
   /** story weather (sim/story/surprises.ts): a rain shower and a hot spell, each until a game time (s) */
   weather?: { rain: number; heat: number };
+  /** the set tunnel routes between nests (sim/tunnels.ts; version ≥ 4; older saves get them on load, all closed) */
+  routes?: TunnelRoute[];
 }
 
 /**
@@ -945,6 +954,40 @@ export interface NestFloodState {
   q: number[];
   /** the game time each of them went under (s), by index in `q` */
   at: number[];
+}
+
+/**
+ * One half of a route between two nests (sim/tunnels.ts, CHANGE_PLAN §27): in `colony`'s nest `space`, from its gate
+ * hex (an interior edge hex, `steps[0]`) outward through the rock margin to the rim; each step the hexes across the
+ * tunnel's width (left, centre, right in the walking direction; the gate step is one hex), `dir` the outward edge at the
+ * rim (0..5). `warned`: the owner has been told something is digging toward this gate.
+ */
+export interface RouteHalf {
+  colony: number;
+  space: number;
+  gate: number;
+  steps: number[][];
+  dir: number;
+  warned: boolean;
+  /**
+   * the breach: the hexes from this gate inward through the owner's undug interior to its dug floor, planned when a
+   * digger from the other nest reaches the gate and the owner's digging has not (sim/tunnels.ts planBreach; undefined
+   * until then, empty when the gate already touches dug floor)
+   */
+  breach?: number[];
+  /** the gate joins the owner's dug floor (set by tunnelTick when first seen; a breach by the other colony, or the owner's digging reaching its gate) */
+  joined?: boolean;
+}
+
+/** A set tunnel route between the nests of colonies `a` and `b`: open for good once both halves are dug through. */
+export interface TunnelRoute {
+  id: number;
+  a: number;
+  b: number;
+  open: boolean;
+  /** game time it opened (s; −1 closed) */
+  openT: number;
+  halves: [RouteHalf, RouteHalf];
 }
 
 /** One flood zone's storm cycle: phase 0 idle, 1 warning, 2 rising, 3 holding, 4 draining. */

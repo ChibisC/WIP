@@ -1958,3 +1958,26 @@ User spec `claude/performance/01-spec-performance-no-visual-loss.md` (branch `fe
   seed 11.
 - Checks: `tests/storyEvents.ts` (new), `tests/storyCh1.ts` (seven levels), `npm test`, `check-determinism`, the build;
   browser shots `docs/story/shots/ch1_7/` (`tests/browser/story_ch1_7.py`). Protocol `ud-mp-12`.
+## 2026-11-06 — A shared underground: set tunnel routes between nests, underground fog (CHANGE_PLAN §27)
+User spec `claude/underground/01-spec-shared-underground-tunnels.md` (2026-11-06); branch `feature/shared-underground`.
+Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).
+- **Layout:** every colony nest grid grew a ring of 8 hexes of unbreakable rock (`SOIL_ROCK`; titans don't break it
+  either) round the unchanged 34 × 30 interior. Routes (`sim/tunnels.ts`) are generated at match start: every pair up
+  to 4 colonies, the nearest 3 neighbours without crossings above; each route two halves meeting at the grids' rims,
+  three hexes wide, from a brownish gate on the nest's edge (readable in the dark; away from the flower). Story levels
+  decide (`GameSetup.tunnels`, default none in story). `tools/tunnel-check.ts`: valid on every map, 2–10 colonies.
+- **Digging:** the Dig tool on a gate (`digRoute`, wire 26); one route a colony at a time, pausing keeps progress;
+  the way to the own gate, the own half, the partner's half from across the rim and inward, the breach into its floor;
+  both ends count. 6 workers: 5.7 min alone, 3.6 min with both sides digging (`tests/tunnels.ts`; spec 3–5 min —
+  `TUNNELS.hexWorkMul` 3). Per-caste and per-species `digRate` hooks for digging specialists.
+- **Moving:** units walk through (the crossing at the rim, mirrored), `goToArea`/`goHome`/`goOut`/`hasRouteHome`
+  take routes; creatures use open routes; markers across nests work; dead colonies' routes stay.
+- **Fog (client-side, `game/fog.ts`):** sealed route hexes drawn as rock; an enemy nest reached by tunnel seen only
+  within 5 hexes of your units (remembered dimmed, else dark); hints near the far gate (red !, food, brood, creature
+  marks); the defender's warning (toast, tab alert, red ! on the gate, dig sound) and breakthrough alert.
+- **AI:** tunnel raids by level (Normal from 15 min, Hard 10, Brutal 7), guards at a warned gate, digging to meet on
+  Hard+, allies link nests and send help through. `tools/tunnel-ai-probe.ts` (Brutal, seed 5): the fire ants warned
+  the player at 13.3 min, opened at 13.8, broke in at 14.7; the leafcutter ally linked at 14 min.
+- **Saves:** version 4 — old grids embedded in the margin (everything in the space shifted), routes generated closed;
+  `BUILD_ID` `ud-mp-13` (12 was taken by the story merge). `tests/tunnels.ts` (35 checks) in `npm test`.
+- Stills: `docs/underground/tunnels/` (`tests/browser/tunnels.py`; dev `?tunnel=<stage>`).

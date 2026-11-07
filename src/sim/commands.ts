@@ -26,12 +26,15 @@ import { CREATURES } from './creatures/kinds';
 import { surgeGroup } from './surge';
 import { arenaClear, arenaSpawn, arenaStance } from './arena';
 import { BALANCE } from './balance';
+import { ownHalf, routeById, routeDone, setRouteDig } from './tunnels';
 
 export type CommandBody =
   | { type: 'placeMarker'; i: number; space: number; x: number; y: number }
   | { type: 'removeMarker'; i: number }
   | { type: 'assignGroup'; group: number; marker: number }
   | { type: 'dig'; q: number; on: boolean }
+  /** dig (or pause digging) a tunnel route from its gate (sim/tunnels.ts); the Dig tool on a gate hex sends `dig`, which maps to this */
+  | { type: 'digRoute'; route: number; on: boolean }
   | { type: 'buildTile'; q: number; tile: TileType; caste: string }
   | { type: 'markUpgrade'; q: number }
   | { type: 'markDelete'; q: number }
@@ -111,6 +114,7 @@ const TYPE_IDS: Record<CommandType, number> = {
   entrance: 23,
   speedVote: 24,
   callHelp: 25,
+  digRoute: 26,
 };
 const TYPE_NAMES: CommandType[] = [];
 for (const [k, v] of Object.entries(TYPE_IDS)) TYPE_NAMES[v] = k as CommandType;
@@ -174,10 +178,28 @@ export function applyCommand(w: World, cmd: Command): string | null {
       return null;
     case 'assignGroup':
       return assignGroup(w, c, cmd.group, cmd.marker) ? null : 'no such group';
-    case 'dig':
+    case 'dig': {
       if (!hexOk(w, c, cmd.q)) return 'bad hex';
-      if (w.nest(c.id)!.isHexDug(cmd.q)) return 'already dug';
+      const g = w.nest(c.id)!;
+      // the Dig tool on a tunnel route's gate: dig the route (its hexes are dug by route jobs, never designated one by one)
+      const rid = g.routeOf(cmd.q);
+      if (rid >= 0) {
+        const r = routeById(w, rid);
+        if (!r) return 'bad route';
+        if (routeDone(w, r, c.id)) return 'The tunnel is open.';
+        if (ownHalf(r, c.id)?.gate !== cmd.q) return 'A tunnel route: dig it from its gate.';
+        return setRouteDig(w, c, cmd.on ? rid : c.routeDig === rid ? -1 : c.routeDig ?? -1) ? null : 'cannot dig there';
+      }
+      if (g.isHexDug(cmd.q)) return 'already dug';
       return designateDig(w, c, cmd.q, cmd.on) ? null : 'cannot dig there';
+    }
+    case 'digRoute': {
+      if (!Number.isInteger(cmd.route)) return 'bad route';
+      const r = routeById(w, cmd.route);
+      if (!r) return 'bad route';
+      if (routeDone(w, r, c.id)) return 'The tunnel is open.';
+      return setRouteDig(w, c, cmd.on ? cmd.route : c.routeDig === cmd.route ? -1 : c.routeDig ?? -1) ? null : 'not your route';
+    }
     case 'buildTile':
       if (!hexOk(w, c, cmd.q)) return 'bad hex';
       if (!(cmd.tile in TILE_INFO)) return 'bad tile';
@@ -462,6 +484,10 @@ function writeBody(b: Bytes, c: CommandBody): void {
       b.u16(c.q);
       b.u8(c.on ? 1 : 0);
       break;
+    case 'digRoute':
+      b.u16(c.route);
+      b.u8(c.on ? 1 : 0);
+      break;
     case 'buildTile':
       b.u16(c.q);
       b.str(c.tile);
@@ -576,6 +602,8 @@ function readBody(r: Cursor): CommandBody {
       return { type, on: r.u8() === 1 };
     case 'dig':
       return { type, q: r.u16(), on: r.u8() === 1 };
+    case 'digRoute':
+      return { type, route: r.u16(), on: r.u8() === 1 };
     case 'buildTile':
       return { type, q: r.u16(), tile: r.str() as TileType, caste: r.str() };
     case 'markUpgrade':

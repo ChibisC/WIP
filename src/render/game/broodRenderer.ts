@@ -147,6 +147,9 @@ export class BroodRenderer {
     this.naked = new InstancedPool(nakedPupaGeo(), soft, this.group, 64);
   }
 
+  /** Underground fog (game/fog.ts): brood out of the viewer's sight is not drawn. */
+  visible: ((x: number, y: number) => boolean) | null = null;
+
   update(w: World, colony: number, map: SpaceMapper, alpha: number): void {
     this.egg.begin();
     this.larva.begin();
@@ -160,6 +163,7 @@ export class BroodRenderer {
       if (b.colony !== colony) continue;
       // termites: larvae are drawn by the model kit, carried eggs by the carrier's own look
       if (termites && (b.stage === 1 || b.carrier !== 0)) continue;
+      if (this.visible && !this.visible(b.x, b.y)) continue;
       const cd = casteOf(b.caste);
       const L = cd.length;
       const carried = b.carrier !== 0;

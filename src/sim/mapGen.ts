@@ -31,6 +31,7 @@ import { termantSystem } from './termants';
 import { arenaSystem, setupArena } from './arena';
 import { floodSystem, initFloods } from './floods';
 import { nestFloodSystem, startNestFlood } from './nestFlood';
+import { RoutePlan, crossings, generateRoutes, tunnelTick } from './tunnels';
 
 export interface ColonySpec {
   species: SpeciesId;
@@ -83,6 +84,11 @@ export interface GameSetup {
   map?: MapId;
   /** which of the map's balanced site sets for this colony count (default: chosen by the seed) */
   siteSet?: number;
+  /**
+   * the set tunnel routes between nests (sim/tunnels.ts, CHANGE_PLAN §27): 'auto' (every pair up to TUNNELS.allPairsMax
+   * colonies, else nearest neighbours), 'none', or authored pairs of colony indices; story levels default to none
+   */
+  tunnels?: RoutePlan;
 }
 
 /** Register all simulation systems in update order. */
@@ -106,6 +112,8 @@ export function registerSystems(w: World): void {
     { name: 'brood', fn: broodSystem },
     // caste abilities: taunt timers, rage fading and the rage aura (casteAbilities.ts)
     { name: 'casteAbility', fn: casteAbilitySystem },
+    // units in a tunnel route's rim step crossing to the other nest (sim/tunnels.ts)
+    { name: 'tunnelCross', fn: (ww) => crossings(ww) },
     { name: 'ants', fn: antSystem },
     { name: 'food', fn: foodSystem },
     { name: 'projectiles', fn: projectileSystem },
@@ -113,6 +121,8 @@ export function registerSystems(w: World): void {
     { name: 'respawn', fn: respawnSystem, every: 20 },
     { name: 'aphidClaims', fn: aphidClaims, every: 20 },
     { name: 'invasion', fn: (ww) => invasionCheck(ww), every: 20 },
+    // tunnel routes opening, the defender's warning (sim/tunnels.ts)
+    { name: 'tunnels', fn: tunnelTick, every: 20 },
     { name: 'lost', fn: lostRouteSystem, every: 20 },
     { name: 'creatures', fn: creatureSystem },
     // titans digging into nests: skirmish raids, breach repairs (sim/creatures/titanDig.ts)
@@ -169,6 +179,8 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
     const opts: ColonyOptions = { species: spec.species, player: spec.player, ai: spec.ai, borrowed: spec.borrowed, nx: at.x, ny: at.y, developed: spec.developed, developPlan: spec.developPlan, startWorkers: spec.startWorkers, startFood: spec.startFood, popLimit: spec.popLimit, name: spec.name, team: spec.team, site };
     createColony(w, opts);
   });
+  // the set tunnel routes between the nests (sim/tunnels.ts): a story level decides; skirmish gets them by the map's size
+  generateRoutes(w, setup.tunnels ?? (setup.story ? 'none' : 'auto'));
   if (setup.mission) startMission(w, setup.mission, w.s.colonies.find((c) => c.player)?.id ?? 0);
   if (setup.mission && setup.story) initStory(w, missionOf(w)!, setup.mission as StoryLevelId, setup.story.difficulty, setup.story.loadout, setup.story);
   if (setup.devTitanRaid) {

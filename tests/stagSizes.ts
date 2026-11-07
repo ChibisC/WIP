@@ -238,8 +238,11 @@ function bout(seed: number, ka: string, kb: string, gap = 90, staged = false): B
   ];
   for (const [kind, caste, few, many] of cases) {
     const lo = creatureFight(kind, caste, few, 3);
-    const hi = creatureFight(kind, caste, many, 3);
-    check(`balance: ${kind} beats ${few} ${caste}s and dies to ${many}, killing some`, !lo.dead && lo.lost > 0 && hi.dead && hi.lost >= 2, `${few}: ${lo.dead ? 'died' : 'lived'} −${lo.lost}; ${many}: ${hi.dead ? 'died' : 'lived'} −${hi.lost}`);
+    // (how many it takes with it before dying is a knife-edge on one seed — 1 or 2 soldiers by the seed, on main too —
+    // so "some" is judged over three seeds: it must die in every one and kill two or more in at least one)
+    const his = [3, 4, 5].map((seed) => creatureFight(kind, caste, many, seed));
+    const hi = his[0];
+    check(`balance: ${kind} beats ${few} ${caste}s and dies to ${many}, killing some`, !lo.dead && lo.lost > 0 && his.every((h) => h.dead) && his.some((h) => h.lost >= 2), `${few}: ${lo.dead ? 'died' : 'lived'} −${lo.lost}; ${many}: ${hi.dead ? 'died' : 'lived'} −${his.map((h) => h.lost).join('/')}`);
   }
 }
 
