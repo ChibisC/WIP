@@ -254,6 +254,31 @@ export function crossIfPastRim(w: World, u: { space: number; x: number; y: numbe
   return true;
 }
 
+/**
+ * Is a point in `space` sealed off from the nest's owner: in a route half's hexes the owner's own digging has not reached
+ * (a closed route: beyond its dug steps from the gate), or in a breach not yet joined to the floor. Units there are in
+ * the tunnel, not in the nest: no alarm, no intruders, unseen (game/fog.ts).
+ */
+export function sealedAt(w: World, space: number, x: number, y: number): boolean {
+  const g = w.nestOf(space);
+  if (!g) return false;
+  const q = g.hexAt(x, y);
+  if (q < 0) return false;
+  const id = g.routeOf(q);
+  if (id >= 0) {
+    const r = routes(w)[id];
+    const h = r ? halfIn(r, space) : undefined;
+    if (!r || !h) return false;
+    if (r.open) return false;
+    return stepIndex(h, q) >= dugFromGate(w, h);
+  }
+  for (const r of routesOf(w, space)) {
+    const h = halfIn(r, space)!;
+    if (h.breach && !h.joined && h.breach.includes(q)) return true;
+  }
+  return false;
+}
+
 /** The step index (from the gate) of a route hex in its half, −1 if not in it. */
 export function stepIndex(h: RouteHalf, q: number): number {
   for (let i = 0; i < h.steps.length; i++) if (h.steps[i].includes(q)) return i;

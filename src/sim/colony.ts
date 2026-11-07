@@ -678,6 +678,7 @@ export function colonySystem(w: World, dt: number): void {
         c.stats.lostQueen = true;
         if (w.s.settings.queenDeathLoses || !c.player) {
           c.alive = false;
+          c.routeDig = -1; // (its tunnel routes stay as they are, open ones usable by everyone: sim/tunnels.ts)
           w.events.emit({ t: 'colonyLost', colony: c.id });
         }
       }

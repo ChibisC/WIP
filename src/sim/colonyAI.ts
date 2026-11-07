@@ -281,7 +281,8 @@ function planChamber(w: World, c: Colony, b: BuildBrain, home: number, need: Nee
   const nearEnt = new Set<number>();
   for (const e of ents) for (const n of g.neighbors(e)) if (n >= 0 && !g.isEntrance(n)) nearEnt.add(n);
   const ok = (q: number, hs: number[]) => {
-    if (hs.length !== size || hs.some((h) => !g.isHexDiggable(h) || g.isEntrance(h) || nearEnt.has(h))) return false;
+    // (never on a tunnel route's gate: the gate stays a gate, sim/tunnels.ts)
+    if (hs.length !== size || hs.some((h) => !g.isHexDiggable(h) || g.isEntrance(h) || nearEnt.has(h) || g.routeOf(h) >= 0)) return false;
     // carved out of solid soil, with a wall of soil all round (the tunnel will cut through it)
     for (const h of hs) for (const n of g.neighbors(h)) if (n < 0 || g.isHexDug(n)) return false;
     for (const t of c.tiles) if (hs.includes(t.q)) return false;
@@ -331,12 +332,12 @@ function planChamber(w: World, c: Colony, b: BuildBrain, home: number, need: Nee
       for (const n of g.neighbors(q)) {
         if (n < 0 || prev[n] !== -2 || blocked.has(n)) continue;
         if (g.isHexDug(n) && !room.has(n)) {
-          if (g.isEntrance(n)) continue;
+          if (g.isEntrance(n) || g.routeOf(n) >= 0) continue;
           prev[n] = q;
           hit = n;
           break;
         }
-        if (!g.isHexDiggable(n) || g.isEntrance(n) || nearEnt.has(n)) continue;
+        if (!g.isHexDiggable(n) || g.isEntrance(n) || nearEnt.has(n) || g.routeOf(n) >= 0) continue;
         prev[n] = q;
         queue.push(n);
       }

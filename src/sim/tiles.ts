@@ -1,6 +1,7 @@
 import { World } from './world';
 import { Ant, AS, Colony, NestGroup, Tile, TileType, nestSpace } from './types';
 import { CASTES, SPECIES, casteOf, naniticCaste, resourceName, tierOf } from './species';
+import type { NestGrid } from '../world/nestGrid';
 import { tunnelSpeed } from './entrances';
 import { BALANCE, NASUTE, TERMANT } from './balance';
 import { makeFood } from './factory';
@@ -158,12 +159,22 @@ export function groupCounts(w: World, c: Colony, id: number): { living: number; 
   return { living, max, level: n ? Math.round(lv / n) : 1 };
 }
 
+/**
+ * May a tile stand on hex q when it is a tunnel route's gate or tunnel (sim/tunnels.ts)? Only for a species that keeps
+ * satellite nests (`SpeciesDef.satelliteNests`, multiple-queen species planned; none yet) — the hook, not a hard "never".
+ */
+export function tileAllowedOnRoute(c: Colony, g: NestGrid, q: number): boolean {
+  if (g.routeOf(q) < 0) return true;
+  return !!SPECIES[c.species].satelliteNests;
+}
+
 /** Why a tile cannot be placed here (null when it can). The food is paid later, when a worker builds it. */
 export function canPlaceTile(w: World, c: Colony, type: TileType, q: number, caste?: string): string | null {
   const g = w.nest(c.id);
   if (!g || q < 0) return 'Outside the nest';
   if (!g.isHexDug(q)) return 'Dig this ground out first';
   if (g.isEntrance(q)) return 'The entrance must stay clear';
+  if (!tileAllowedOnRoute(c, g, q)) return 'A tunnel route: tiles stay inside the nest';
   if (tileAt(c, q)) return 'There is already a tile here';
   if (type === 'queen') return "The queen's chamber cannot be built: every colony starts with its own seven tiles";
   if (type === 'brood') {

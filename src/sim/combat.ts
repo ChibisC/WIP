@@ -1,5 +1,6 @@
 import { antFitsUnderAnt as antFitsUnderAntAt } from './underpass';
 import { World } from './world';
+import { sealedAt } from './tunnels';
 import { casteOnBite, casteOnKill, rageMul, tauntOf } from './casteAbilities';
 import { Ant, AS, Carry, Colony, Creature, HIT, POSE, SURFACE, nestSpace } from './types';
 import type { Projectile } from './types';
@@ -1798,8 +1799,9 @@ export function invasionCheck(w: World): void {
     c.intruders = list;
     if (!c.alive) continue;
     const space = nestSpace(c.id);
-    for (const a of w.s.ants) if (a.space === space && (a.team ?? a.colony) !== c.team && a.state !== AS.Dead) list.push({ x: a.x, y: a.y });
-    for (const cr of w.s.creatures) if (cr.space === space && !cr.dead) list.push({ x: cr.x, y: cr.y });
+    // (enemies digging in along a tunnel route, still sealed off behind its soil, are not in the nest yet: sim/tunnels.ts)
+    for (const a of w.s.ants) if (a.space === space && (a.team ?? a.colony) !== c.team && a.state !== AS.Dead && !sealedAt(w, space, a.x, a.y)) list.push({ x: a.x, y: a.y });
+    for (const cr of w.s.creatures) if (cr.space === space && !cr.dead && !sealedAt(w, space, cr.x, cr.y)) list.push({ x: cr.x, y: cr.y });
     if (list.length > 0) {
       c.alarmT = 25;
       if (c.player && w.s.tick % 200 === 0) w.events.emit({ t: 'invasion', colony: c.id });
