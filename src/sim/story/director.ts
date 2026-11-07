@@ -16,6 +16,7 @@ import type { Pt, Shape } from '../../maps/types';
 import { StoryActor, StoryScene, StoryState, actorIndex, setFlag, storyOf } from './state';
 import type { ActorDef, Anim, Cue, StoryLevelDef, Where } from './types';
 import { storyLevel } from '../../story/levels';
+import { visitorColony } from './surprises';
 
 /**
  * The story director (claude/story/02-spec §6, "Story direction"): the level's cast — creatures, groups of a rival
@@ -56,6 +57,11 @@ function zoneShape(w: World, name: string): Shape {
   const z = w.terrain.map?.story?.zones[name];
   if (!z) throw new Error(`Unknown story zone: ${name}`);
   return z;
+}
+
+/** Is a point by the map's edge (a party walking off the map there is gone once near it: a crowd never all reaches one point)? */
+function atEdge(w: World, p: Pt): boolean {
+  return p[0] < 40 || p[1] < 40 || p[0] > w.terrain.width - 40 || p[1] > w.terrain.depth - 40;
 }
 
 /** A member's place in a loose cluster round a point (member 0 at the point). */
@@ -126,6 +132,7 @@ export function spawnActor(w: World, st: StoryState, i: number): void {
           cr.data.cut1 = def.bossCuts[0];
           cr.data.cut2 = def.bossCuts[1];
         }
+        if (def.floor && !st.flags.includes(def.floor.until)) cr.data.hpFloor = cr.maxHp * def.floor.hp;
         cr.h = cr.ph = face ? datan2(face[1] - p.y, face[0] - p.x) : h;
         cr.homeX = p.x;
         cr.homeY = p.y;
@@ -141,7 +148,8 @@ export function spawnActor(w: World, st: StoryState, i: number): void {
     if (def.wave) setFlag(st, `wave:${act.name}`);
   } else if (def.ants) {
     act.kind = 1;
-    const colony = def.colony === 'player' ? (player?.id ?? 0) : (st.rivals[def.colony ?? ''] ?? -1);
+    const L = levelOf(st);
+    const colony = def.colony === 'player' ? (player?.id ?? 0) : (st.rivals[def.colony ?? ''] ?? (L.visitors?.[def.colony ?? ''] ? visitorColony(w, st, L, def.colony!) : -1));
     const mul = def.wave ? STORY.difficulty[st.diff].wave : 1;
     let k = 0;
     for (const [caste, n0] of def.ants) {
@@ -397,11 +405,15 @@ export function directorTick(w: World, st: StoryState, stage: number, stageT: nu
   if (dig.size)
     st.actors.forEach((act) => {
       if (!act.spawned || act.kind !== 0 || !dig.has(act.name)) return;
+      // (with the level's own floor for the stage, `ActorDef.floor`, when that is higher: the Spider Mother's rounds)
+      const F = L.actors[act.name]?.floor;
+      const f0 = F && !st.flags.includes(F.until) ? F.hp : 0;
       for (const e of members(w, act)) {
         const cr = e as Creature;
         if (dugIn(cr)) {
-          if (cr.data.hpFloor !== undefined) delete cr.data.hpFloor;
-        } else cr.data.hpFloor = cr.maxHp * STORY.titanRaid.hpFloor;
+          if (f0 > 0) cr.data.hpFloor = cr.maxHp * f0;
+          else if (cr.data.hpFloor !== undefined) delete cr.data.hpFloor;
+        } else cr.data.hpFloor = cr.maxHp * Math.max(STORY.titanRaid.hpFloor, f0);
       }
     });
   for (const sc of st.scenes) {
@@ -678,7 +690,7 @@ export function directAnt(w: World, a: Ant, c: Colony, dt: number): boolean {
       p = e ? [e.sx, e.sy] : [a.x, a.y];
     } else p = wherePt(w, cue.leave);
     const d = antWalk(w, a, p[0], p[1], p[0], p[1], key, speed, dt);
-    if (d < 4) w.killAntNow(a.id);
+    if (d < 4 || (cue.leave !== 'nest' && d < STORY.edgeLeave && atEdge(w, p))) w.killAntNow(a.id);
     return true;
   }
   if ('charge' in cue) {
@@ -813,7 +825,8 @@ export function directCreature(w: World, cr: Creature, dt: number): boolean {
   }
   if ('leave' in cue) {
     const p = cue.leave === 'nest' ? ([cr.homeX, cr.homeY] as Pt) : wherePt(w, cue.leave);
-    if (walk(p[0], p[1]) < 6) {
+    const d = walk(p[0], p[1]);
+    if (d < 6 || (cue.leave !== 'nest' && d < STORY.edgeLeave && atEdge(w, p))) {
       cr.data.gone = 1;
       w.removeCreatureNow(cr.id);
     }

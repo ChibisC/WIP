@@ -7,6 +7,10 @@
  *
  *   npx vite-node tools/playtest-story.ts -- [level=garden] [difficulty=normal] [minutes=60] [seed=7] [loadout=]
  *
+ * PACE=human (claude/story/06-spec §7): a person's pace — it looks at the map every 15 s instead of every 5, acts on a
+ * target only once it has seen it twice in a row, waits for a bigger army (×1.3) before an assault or a boss, and
+ * defends at home (no sorties beyond 90 mm: hunters, then raiders) while a stage asks it to hold out. JSON=1 prints one
+ * line of results. A goal already met is not chased again.
  * STRATEGY=hole (claude/story/05-spec §4): defend at the hole — once a titan comes to dig into the nest, the whole army
  * waits on the hole it digs and fights it there, then follows it in. The summary says whether (and when) a story titan
  * got inside.
@@ -34,11 +38,15 @@ const seed = Number(args[3] ?? 7);
 const loadout = (args[4] ?? '').split(',').filter(Boolean);
 const ASSIST = 4;
 /** the army a player would wait for before the final assault */
-const ARMY = Number(process.env.ARMY ?? 45);
+const ARMY0 = Number(process.env.ARMY ?? 45);
 /** …and before going out after a boss on the surface */
-const BOSS_ARMY = Number(process.env.BOSS_ARMY ?? 40);
+const BOSS_ARMY0 = Number(process.env.BOSS_ARMY ?? 40);
 /** …and how far from the nest it goes after the night's hunters */
-const NIGHT_R = Number(process.env.NIGHT_R ?? 130);
+const HUMAN = process.env.PACE === 'human';
+const NIGHT_R = Number(process.env.NIGHT_R ?? (HUMAN ? 90 : 130));
+/** how often the "player" looks (ticks) */
+const LOOK = HUMAN ? 300 : 100;
+const ARMY_MUL = HUMAN ? 1.3 : 1;
 /** 'hole': defend at the hole a titan digs (and follow it in) */
 const STRATEGY = process.env.STRATEGY ?? '';
 
@@ -48,6 +56,10 @@ const setup = storySetup(level, diff, loadout, seed, { traits: (process.env.TRAI
 // ESTAT=x: try another enemy scale on top of the level's and the difficulty's (balancing)
 if (process.env.ESTAT && setup.settings) setup.settings.enemyStatMul = (setup.settings.enemyStatMul ?? 1) * Number(process.env.ESTAT);
 const w = createWorld(setup, ev);
+const ARMY = Math.round(ARMY0 * ARMY_MUL);
+const BOSS_ARMY = Math.round(BOSS_ARMY0 * ARMY_MUL);
+/** a human acts on a target seen on two looks in a row (the key of the last one seen) */
+let seenKey = '';
 const c = w.colony(0)!;
 c.ai = true;
 const def = missionDef(level);
@@ -55,6 +67,9 @@ const st = storyOf(w)!;
 const log: string[] = [];
 let stage = -1;
 let assisting = false;
+/** a starving colony stops hunting to forage until then (s); its size three minutes ago, sampled each minute */
+let restUntil = 0;
+const sizes: number[] = [];
 /** the final assault: under way, and the army it set out with (it falls back to regroup below 45 %) */
 let assaulting = false;
 let assaultStart = 0;
@@ -67,15 +82,27 @@ let deaths = 0;
 /** game time a titan came to dig in / got inside (0 not yet) */
 let titanSeen = 0;
 let titanIn = 0;
+/** the colony's dead since the last minute line, by cause (HIT.*: what killed them) */
+const CAUSE = ['?', 'bite', 'venom', 'acid', 'crush', 'fall', 'drown', 'starve', 'decap', 'exec'];
+let byCause: Record<string, number> = {};
 ev.on('death', (e) => {
-  if (e.kind === 'ant' && e.colony === 0) deaths++;
+  if (e.kind === 'ant' && e.colony === 0) {
+    deaths++;
+    const k = CAUSE[e.cause ?? 0] ?? '?';
+    byCause[k] = (byCause[k] ?? 0) + 1;
+    // DEATHS=1: where (to the nearest 100 mm, and in or out of the nest)
+    if (process.env.DEATHS) {
+      const at = e.space === SURFACE ? `${Math.round(e.x / 100) * 100},${Math.round(e.y / 100) * 100}` : 'nest';
+      byCause['@' + at] = (byCause['@' + at] ?? 0) + 1;
+    }
+  }
 });
 const t0 = performance.now();
 let end = minutes;
 for (let t = 0; t < minutes * 1200; t++) {
   w.step(0.05);
   w.events.drain();
-  if (t % 100 !== 0) continue;
+  if (t % LOOK !== 0) continue;
   const m = missionOf(w)!;
   if (m.stage !== stage) {
     stage = m.stage;
@@ -86,13 +113,26 @@ for (let t = 0; t < minutes * 1200; t++) {
     end = w.s.time / 60;
     break;
   }
-  if (t % 1200 === 0) {
+  if (t % 1200 < LOOK) {
     const rv = w.colony(Object.values(st.rivals)[0]);
-    log.push(`    ${(w.s.time / 60).toFixed(0)} min: ${c.living} ants (${Object.entries(c.counts).map(([k, v]) => k.split('_')[1] + ' ' + v).join(', ')}) v rival ${rv?.living ?? 0}; goals ${m.goals.map((g) => g.progress).join(' ')}`);
+    const died = Object.entries(byCause).map(([k, v]) => `${k} ${v}`).join(', ');
+    byCause = {};
+    // NEAR=x0,y0,x1,y1: the colony's ants on the surface in that box, by state and job (what draws them there)
+    if (process.env.NEAR) {
+      const [x0, y0, x1, y1] = process.env.NEAR.split(',').map(Number);
+      const there = w.s.ants.filter((a) => a.colony === c.id && a.space === SURFACE && a.x > x0 && a.x < x1 && a.y > y0 && a.y < y1);
+      const by: Record<string, number> = {};
+      for (const a of there) by[`${a.caste.split('_')[1]}:s${a.state}:g${a.group ?? -1}`] = (by[`${a.caste.split('_')[1]}:s${a.state}:g${a.group ?? -1}`] ?? 0) + 1;
+      log.push(`      near: ${JSON.stringify(by)}`);
+    }
+    // a story titan on the map: its health and where it is
+    const ti = w.s.creatures.find((cr) => !cr.dead && ((cr.data.rstory ?? 0) || cr.data.hpFloor !== undefined));
+    const tis = ti ? `; titan ${Math.round((ti.hp / ti.maxHp) * 100)} % ${ti.space === SURFACE ? 'outside' : 'inside'}${ti.space !== SURFACE ? ` ${Math.round(Math.hypot(ti.x - (c.queen >= 0 ? w.antById.get(c.queen)?.x ?? 0 : 0), ti.y - (c.queen >= 0 ? w.antById.get(c.queen)?.y ?? 0 : 0)))} mm from the queen` : ''}` : '';
+    log.push(`    ${(w.s.time / 60).toFixed(0)} min: ${c.living} ants (${Object.entries(c.counts).map(([k, v]) => k.split('_')[1] + ' ' + v).join(', ')}) v rival ${rv?.living ?? 0}, food ${Math.floor(c.food)}; goals ${m.goals.map((g) => g.progress).join(' ')}${died ? `; died: ${died}` : ''}${tis}`);
   }
   // the "player": builds what a stage asks for (a tutorial goal the colony AI would get to late)
   const S = def.story!.stages[m.stage];
-  if (t % 400 === 0)
+  if (t % 1200 < LOOK)
     for (const o of S?.objectives ?? []) {
       if (o.type !== 'build' || c.tiles.filter((x) => x.type === o.tile).length >= o.n) continue;
       const g = w.nest(c.id)!;
@@ -104,6 +144,7 @@ for (let t = 0; t < minutes * 1200; t++) {
       }
     }
   let target: { space: number; x: number; y: number } | null = null;
+  let allIn = false;
   // defend at the hole: a titan digging in (any objective) — the army on its hole, then after it into the nest
   if (STRATEGY === 'hole')
     for (const cr of w.s.creatures) {
@@ -122,32 +163,54 @@ for (let t = 0; t < minutes * 1200; t++) {
       titanIn = w.s.time;
       log.push(`${(w.s.time / 60).toFixed(1)} min: the titan is inside the nest (${Math.round((cr.hp / cr.maxHp) * 100)} % health)`);
     }
-  const rivalId = Object.values(st.rivals)[0];
+  // the rival to go after: the objective's, else the first still alive (levels with several)
+  const killObj = (S?.objectives ?? []).find((o) => o.type === 'killQueen' || o.type === 'killQueens');
+  const keys = killObj?.type === 'killQueen' ? [killObj.rival] : killObj?.type === 'killQueens' ? killObj.rivals : Object.keys(st.rivals);
+  const rivalId = keys.map((k) => st.rivals[k]).find((id) => w.colony(id)?.alive) ?? Object.values(st.rivals)[0];
   const rival = w.colony(rivalId);
-  for (const o of S?.objectives ?? []) {
+  for (const [oi, o] of (S?.objectives ?? []).entries()) {
     if (target) break;
+    // (a goal already met is not chased again: the next one is, as a player would)
+    if (m.goals[oi]?.done) continue;
     if ((o.type === 'stealCaste' || o.type === 'killAnts') && c.living >= 12) {
-      // the nearest rival ant on the surface
+      // the nearest rival ant on the surface (of the caste wanted, when stealing it), within reach of home; a bigger army
+      // goes further out for it, as a player would once the rival stopped coming
       const e = c.entrances[0];
+      const want = o.type === 'stealCaste' ? o.caste : '';
+      // (or, ten minutes into the stage, with 25: a person does not wait for a full army to go for a few corpses)
+      const reach = c.living >= ARMY * 0.8 || (m.t > 600 && c.living >= 25) ? 2000 : 500;
       let best = Infinity;
-      for (const a of w.s.ants) {
-        if (a.colony !== rivalId || a.state === AS.Dead || a.space !== SURFACE) continue;
-        const d = Math.hypot(a.x - e.sx, a.y - e.sy);
-        if (d < best && d < 500) {
-          best = d;
-          target = { space: SURFACE, x: a.x, y: a.y };
+      for (const pass of [true, false]) {
+        for (const a of w.s.ants) {
+          if (a.state === AS.Dead || a.space !== SURFACE) continue;
+          // (the caste wanted from any of the level's rivals — allied termite colonies both have it; other ants from
+          // the one to go after)
+          if (pass && want ? a.caste !== want || !Object.values(st.rivals).includes(a.colony) : a.colony !== rivalId) continue;
+          const d = Math.hypot(a.x - e.sx, a.y - e.sy);
+          if (d < best && d < (pass ? reach : 500)) {
+            best = d;
+            target = { space: SURFACE, x: a.x, y: a.y };
+          }
         }
+        if (target) break;
       }
-    } else if (o.type === 'reach' && c.living >= 20) {
+      // none out: ten minutes in, with 30, at the nest's hole (its defenders come out to it), as a person would
+      if (!target && want && m.t > 600 && c.living >= 30) {
+        const hole = w.colony(rivalId)?.entrances[0];
+        if (hole) target = { space: SURFACE, x: hole.sx, y: hole.sy };
+      }
+    } else if ((o.type === 'reach' || o.type === 'hold') && c.living >= 20) {
       const p = wherePt(w, o.at);
       target = { space: SURFACE, x: p[0], y: p[1] };
-    } else if (o.type === 'killQueen' && rival && rival.alive) {
-      // go when the army is big enough (or, after 20 min of the stage, at the army size alone); fall back below 45 %
+    } else if ((o.type === 'killQueen' || o.type === 'killQueens') && rival && rival.alive) {
+      // go when the army is big enough (or, after 20 min of the stage, with 70 % of it); fall back below 45 %
       // of the army it set out with and rebuild to at least that size before going again, as a player would
       if (assaulting) {
         assaulting = c.living > assaultStart * 0.45;
         if (!assaulting) (pushing = false), (gatherT = 0);
-      } else if (c.living >= Math.max(ARMY, rival.living * 1.5, regroupTo) || (m.t > 1200 && c.living >= Math.max(ARMY, regroupTo))) {
+      // (after 20 min with what the colony has, from 70 % of the army: a colony whose food holds it at 55 waited for
+      // ever for 58, 2026-11-06)
+      } else if (c.living >= Math.max(ARMY, rival.living * 1.5, regroupTo) || (m.t > 1200 && c.living >= Math.max(ARMY * 0.7, Math.min(regroupTo, ARMY)))) {
         assaulting = true;
         assaultStart = c.living;
         regroupTo = Math.round(assaultStart * 0.9);
@@ -185,6 +248,7 @@ for (let t = 0; t < minutes * 1200; t++) {
       if (!boss) continue;
       if (boss.space !== SURFACE) {
         target = { space: boss.space, x: boss.x, y: boss.y };
+        allIn = true;
         continue;
       }
       if (assaulting) {
@@ -210,7 +274,7 @@ for (let t = 0; t < minutes * 1200; t++) {
         if ((out && near >= out * 0.6) || gatherT > 18) pushing = true;
       }
       target = pushing ? { space: SURFACE, x: boss.x, y: boss.y } : { space: SURFACE, x: stage.x, y: stage.y };
-    } else if (o.type === 'surviveNight' && c.living >= 12) {
+    } else if ((o.type === 'surviveNight' || (o.type === 'surviveTime' && !o.optional)) && c.living >= 12) {
       // the nights: a titan in the nest first; else the nearest hunter at the door (a careful player's defence: no
       // sorties to the ramps in the dark; NIGHT_R=220 for a bolder one)
       const home = c.entrances[0];
@@ -229,11 +293,45 @@ for (let t = 0; t < minutes * 1200; t++) {
           target = { space: SURFACE, x: cr.x, y: cr.y };
         }
       }
+      // no hunter: raiders — ants of another colony inside the nest first, else the nearest at the door (a person
+      // rallies the army at home when a raid comes; the colony's own defence alone lost High Water on Hard, 2026-11-06)
+      if (best === Infinity)
+        for (const a of w.s.ants) {
+          if (a.colony === c.id || a.state === AS.Dead) continue;
+          if (a.space === nestSpace(c.id)) {
+            target = { space: a.space, x: a.x, y: a.y };
+            break;
+          }
+          if (a.space !== SURFACE) continue;
+          const d = Math.hypot(a.x - home.sx, a.y - home.sy);
+          if (d < best && d < NIGHT_R) {
+            best = d;
+            target = { space: SURFACE, x: a.x, y: a.y };
+          }
+        }
     }
   }
+  // a person calls the army home to forage when the colony is starving and has stopped growing (a hunt kept going for
+  // ever left every group on the marker and nobody foraging: Fire on the Banks on Easy stood at 29 ants for 50 minutes)
+  while (sizes.length < Math.floor(w.s.time / 60)) sizes.push(c.living);
+  const ago = sizes[sizes.length - 3];
+  if (target && !allIn && assisting && c.food < 5 && ago !== undefined && c.living <= ago && w.s.time >= restUntil + 180) restUntil = w.s.time + 120;
+  if (target && !allIn && w.s.time < restUntil) target = null;
+  // a person reacts a look late: a new target is acted on the second time it is seen
+  if (HUMAN && target) {
+    // (by what it is going after, not where: a moving foe is the same target a look later)
+    const key = `${target.space}:${(S?.objectives ?? []).map((o) => o.type).join()}`;
+    if (key !== seenKey && !assisting) {
+      seenKey = key;
+      target = null;
+    } else seenKey = key;
+  }
   if (target) {
+    if (process.env.TARGETS) log.push(`      ${(w.s.time / 60).toFixed(1)} min: target ${target.space} ${Math.round(target.x)},${Math.round(target.y)}`);
     placeMarker(w, c, ASSIST, target.space, target.x, target.y);
-    if (!assisting) for (const g of c.groups) if (raisesAnts(g) && g.type !== 'queen') assignGroup(w, c, g.id, ASSIST);
+    // (when it starts; and with a boss in the nest every look, the queen's own nurses too: a person throws everything at
+    // it — but not every look otherwise: groups raised since go on foraging, or a long hunt starves the colony)
+    if (!assisting || allIn) for (const g of c.groups) if (raisesAnts(g) && (g.type !== 'queen' || allIn) && g.marker !== ASSIST) assignGroup(w, c, g.id, ASSIST);
     assisting = true;
   } else if (assisting) {
     removeMarker(w, c, ASSIST);
@@ -242,6 +340,7 @@ for (let t = 0; t < minutes * 1200; t++) {
   }
 }
 const m = missionOf(w)!;
+if (process.env.JSON) console.log(JSON.stringify({ level, diff, seed, pace: HUMAN ? 'human' : 'bot', result: m.result || 'unfinished', min: Number(end.toFixed(1)), stage: m.stage, ants: c.living, died: deaths, events: (st.flags.filter((f) => f.startsWith('ev:')).map((f) => f.slice(3))), titanIn: titanIn ? Number((titanIn / 60).toFixed(1)) : undefined, wall: Math.round((performance.now() - t0) / 1000) }));
 console.log(`\n${def.title} (${diff}, seed ${seed}${loadout.length ? ', loadout ' + loadout.join('+') : ''}${STRATEGY ? ', strategy ' + STRATEGY : ''}): ${m.result || 'unfinished'} at ${end.toFixed(1)} min — ${c.living} ants, ${deaths} died (${((performance.now() - t0) / 1000).toFixed(0)} s)`);
 if (titanSeen || titanIn) console.log(`  titan: ${titanSeen ? `came to dig in at ${(titanSeen / 60).toFixed(1)} min, ` : ''}${titanIn ? `inside at ${(titanIn / 60).toFixed(1)} min` : 'NEVER INSIDE'}`);
 for (const l of log) console.log('  ' + l);

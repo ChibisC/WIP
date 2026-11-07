@@ -77,6 +77,18 @@ export interface StoryState {
   retry?: number;
   /** the player's food in the stores at the win (the food medal) */
   endFood?: number;
+  /**
+   * surprise events (sim/story/surprises.ts), rolled when the level began: the def's index, its offset in its window (s
+   * after the level's start or its `after` flag), the game time it fires (−1 until its anchor flag is set), 1 once fired
+   * or skipped
+   */
+  surp?: Array<{ i: number; id: string; off: number; at: number; done: number }>;
+  /** a big surprise keeps the map busy until this game time */
+  bigUntil?: number;
+  /** visiting parties' nestless colonies (visitor key → colony id) */
+  visitors?: Record<string, number>;
+  /** the current stage's `hold` objectives: seconds held without a break, by objective index */
+  hold?: number[];
 }
 
 export function storyOf(w: World): StoryState | null {

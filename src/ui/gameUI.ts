@@ -238,12 +238,13 @@ export class GameUI {
     else if (e.t === 'queenHurt' && e.colony === pid) this.toasts.push('The queen is under attack!', 'warn', 'queen');
     // a titan digging toward the nest (sim/creatures/titanDig.ts): click to look
     else if (e.t === 'titanDig' && e.colony === pid && (e.phase === 'warn' || e.phase === 'start' || e.phase === 'breach')) {
-      // (lower case for the sentence, but a proper name keeps its capital: "Mexican red-knee tarantula", "Carolina wolf spider")
-      const name = (creatureKind(e.kind)?.name ?? 'titan').replace(/^(?!(?:Mexican|Carolina)\b)([A-Z])/, (c) => c.toLowerCase());
+      // (lower case for the sentence, but a proper name keeps its capital: "Mexican red-knee tarantula", "Carolina wolf spider",
+      // "European stag beetle" — "a European", not "an european")
+      const name = (creatureKind(e.kind)?.name ?? 'titan').replace(/^(?!(?:Mexican|Carolina|European)\b)([A-Z])/, (c) => c.toLowerCase());
       // how long until it breaks through (claude/creatures/02-spec §3): "about 10 s", "about 35 s"
       const eta = e.eta !== undefined ? ` It breaks through in about ${aboutSecs(e.eta)}.` : '';
       const text =
-        e.phase === 'warn' ? `${/^[aeiou]/.test(name) ? 'An' : 'A'} ${name} is digging toward your nest!${eta} Click to look.` : e.phase === 'start' ? `The ${name} is digging at your nest’s hole.${eta}` : `The ${name} has broken into the nest!`;
+        e.phase === 'warn' ? `${/^[aeiou]/.test(name) && !/^Eu/.test(name) ? 'An' : 'A'} ${name} is digging toward your nest!${eta} Click to look.` : e.phase === 'start' ? `The ${name} is digging at your nest’s hole.${eta}` : `The ${name} has broken into the nest!`;
       this.toasts.push(text, 'warn', `titan:${e.phase}`, () => this.s.jumpTo(e.phase === 'breach' ? 'nest' : 'surface', e.x, e.y, e.phase === 'breach' ? e.space : undefined));
     }
     // a story titan breaking into your nest (claude/story/05-spec §2): a short banner

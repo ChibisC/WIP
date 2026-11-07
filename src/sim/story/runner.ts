@@ -1,5 +1,5 @@
 import type { World } from '../world';
-import { Colony, FloodState, SURFACE } from '../types';
+import { AS, Colony, FloodState, SURFACE } from '../types';
 import { FLOOD, STORY } from '../balance';
 import { makeFood } from '../factory';
 import { genomeOf, isTermant } from '../termants';
@@ -15,6 +15,9 @@ import { storyLevel } from '../../story/levels';
 import { mapDef } from '../../maps';
 import type { StoryLevelDef } from './types';
 import { storyText } from '../../story/text';
+import { rollSurprises, surprisesSecond } from './surprises';
+import { forceAllOut, startNestFlood } from '../nestFlood';
+import { startStagWrestle } from '../creatures/stagWrestle';
 
 /**
  * Story levels on the mission runner (claude/story/02-spec §5–6). `missions.ts` plays a story level like any mission
@@ -40,7 +43,10 @@ export function storySetup(level: StoryLevelId, diff: Difficulty, loadout: strin
     siteSet: 0,
     colonies: [
       { species: 'termant', player: true, ai: false, team: 0, name: L.player.name, startWorkers: L.player.startWorkers, startFood: Math.round(L.player.startFood * D.food), borrowed: L.loadout ? loadout : undefined, ...(L.nest ? { developPlan: L.nest } : {}) },
-      ...rivals.map((r) => ({ species: r.species, player: false, ai: true, name: r.name, developed: Math.max(0, Math.round(r.developed * D.rival)), startWorkers: Math.max(1, Math.round(r.startWorkers * D.rival)), ...(r.popLimit ? { popLimit: Math.round(r.popLimit * D.rival) } : {}) })),
+      ...rivals.map((r) => {
+        const k = r.fixedSize ? 1 : D.rival;
+        return { species: r.species, player: false, ai: true, name: r.name, developed: Math.max(0, Math.round(r.developed * k)), startWorkers: Math.max(1, Math.round(r.startWorkers * k)), ...(r.popLimit ? { popLimit: Math.round(r.popLimit * k) } : {}), ...(r.team !== undefined ? { team: r.team } : {}) };
+      }),
     ],
     // the night hunters' lairs: dens under the banks (underground areas with a few old kills; story points name them)
     caves: (L.lairs ?? []).map((l) => ({ name: l.name, kind: 'lair' as const, at: { x: lairPt(L.map, l.at)[0], y: lairPt(L.map, l.at)[1] }, food: l.food, size: 2, look: l.look })),
@@ -98,6 +104,8 @@ export function initStory(w: World, m: MissionState, level: StoryLevelId, diff: 
   // a scripted flood: the map's flood zones idle until a stage floods them
   const map = w.terrain.map;
   if (map?.floods.length && !w.s.flood) w.s.flood = map.floods.map((): FloodState => ({ phase: 0, t: 0, next: 1e12, level: -9999 }));
+  // the surprise events: which happen and when (a hash of the seed; the sim's RNG is not touched)
+  rollSurprises(w, st, L);
   // the cast that is on the map from the start
   st.actors.forEach((a, i) => {
     if ((L.actors[a.name].spawn ?? 'start') === 'start') spawnActor(w, st, i);
@@ -155,12 +163,68 @@ function act(w: World, st: StoryState, a: Action): void {
     case 'raid':
       forceRaid(w, st, a.rival);
       return;
+    case 'wrestle': {
+      // two male stag beetles lock antlers now (sim/creatures/stagWrestle.ts: the bigger tends to throw the other)
+      const one = (name: string) => {
+        const i = actorIndex(st, name);
+        const act = i >= 0 ? st.actors[i] : null;
+        if (!act?.spawned || act.kind !== 0) return null;
+        for (const id of act.ids) {
+          const cr = w.creatureById.get(id);
+          if (cr && !cr.dead) return cr;
+        }
+        return null;
+      };
+      const ca = one(a.a);
+      const cb = one(a.b);
+      if (ca && cb && !startStagWrestle(w, ca, cb)) st.log.push(`${Math.round(w.s.time)} s: ${a.a} and ${a.b} could not wrestle`);
+      return;
+    }
+    case 'allOut': {
+      // (High Water: the colony whose nest floods next goes all-in on the queen who holds the high ground)
+      const r = w.colony(st.rivals[a.rival] ?? -1);
+      const p = w.s.colonies.find((c) => c.player);
+      if (r?.alive && p) forceAllOut(w, r.id, p.id);
+      return;
+    }
+    case 'floodNests': {
+      // every rival nest whose doorway is under the water now floods underground (sim/nestFlood.ts)
+      for (const [k, id] of Object.entries(st.rivals)) {
+        const r = w.colony(id);
+        if (!r?.alive || r.nestFlood) continue;
+        const wet = r.entrances.some((e) => w.terrain.isWater(e.sx, e.sy));
+        if (wet && startNestFlood(w, r.id)) setFlag(st, `nestFlood:${k}`);
+      }
+      return;
+    }
     case 'endRaid':
       endActorRaid(w, st, a.actor);
       return;
     case 'tip': {
       const text = storyText(`tip.${a.key}`);
       if (text) w.events.emit({ t: 'message', text, kind: 'researcher' });
+      return;
+    }
+    case 'note': {
+      const text = storyText(`${st.level}.${a.key}`);
+      const p = w.s.colonies.find((c) => c.player);
+      if (text) w.events.emit({ t: 'message', text, kind: a.kind ?? 'info', ...(p ? { colony: p.id } : {}) });
+      return;
+    }
+    case 'heal': {
+      const ai = actorIndex(st, a.actor);
+      const act = ai >= 0 ? st.actors[ai] : null;
+      if (!act?.spawned || act.kind !== 0) return;
+      for (const id of act.ids) {
+        const cr = w.creatureById.get(id);
+        if (cr && !cr.dead) cr.hp = Math.max(cr.hp, cr.maxHp * a.to);
+      }
+      return;
+    }
+    case 'weather': {
+      const W = (w.s.weather ??= { rain: 0, heat: 0 });
+      if (a.rain) W.rain = Math.max(W.rain, w.s.time + a.rain);
+      if (a.heat) W.heat = Math.max(W.heat, w.s.time + a.heat);
       return;
     }
   }
@@ -176,6 +240,7 @@ export function storyEnterStage(w: World, m: MissionState, stage: number): void 
   const st = storyOf(w);
   if (!st) return;
   st.latched = [];
+  st.hold = [];
   st.firedSay = [];
   st.firedScene = [];
   st.firedEvent = [];
@@ -227,7 +292,10 @@ export function storySystem(w: World, dt: number): void {
   if (!st || !m || m.result === 'lost') return;
   const D = levelOf(st).dayNight;
   if (D) w.s.night = dayNightAt(D, w.s.time).light;
-  directorTick(w, st, m.stage, m.t, dt);
+  // (until the mission enters a new stage, up to a second later, `m.t` is still the last stage's clock: the new stage's
+  // scenes timed `at` would all start at once — the Spider Mother's broods at 6½ and 10 minutes came out together at
+  // the start of her rounds, 2026-11-06)
+  directorTick(w, st, m.stage, m.entered ? m.t : 0, dt);
 }
 
 /** Flags the world sets (each second, before the captions and actions that wait on them). */
@@ -242,6 +310,15 @@ function worldFlags(w: World, st: StoryState, c: Colony): void {
   }
   // the day/night clock
   if (L.dayNight) for (const f of dayNightFlags(L.dayNight, w.s.time)) setFlag(st, f);
+  // a boss's health floor ends with its flag (the fight to the death)
+  st.actors.forEach((act) => {
+    const F = L.actors[act.name]?.floor;
+    if (!F || !act.spawned || act.kind !== 0 || !hasFlag(st, F.until)) return;
+    for (const id of act.ids) {
+      const cr = w.creatureById.get(id);
+      if (cr?.data.hpFloor !== undefined) delete cr.data.hpFloor;
+    }
+  });
   // a boss's health marks: hp:<actor>:<percent>
   st.actors.forEach((act) => {
     const marks = L.actors[act.name]?.phases;
@@ -254,14 +331,40 @@ function worldFlags(w: World, st: StoryState, c: Colony): void {
   });
 }
 
+/** The stage's `hold` objectives: a second more where enough of the player's ants are there, else back to zero. */
+function holdTick(w: World, st: StoryState, c: Colony, stage: number): void {
+  const S = levelOf(st).stages[stage];
+  S?.objectives.forEach((o, i) => {
+    if (o.type !== 'hold') return;
+    const h = (st.hold ??= []);
+    const p = wherePt(w, o.at);
+    let n = 0;
+    w.antsNear(SURFACE, p[0], p[1], o.r, (a) => {
+      if (a.colony === c.id && a.state !== AS.Dead) n++;
+      return false;
+    });
+    h[i] = n >= o.n ? (h[i] ?? 0) + 1 : 0;
+  });
+}
+
 /** Once a second (from missionSystem, after the stage's clock moved on): flags from the world, timed things, the bonus. */
 export function storySecond(w: World, c: Colony, m: MissionState): void {
   const st = storyOf(w);
   if (!st) return;
   const L = levelOf(st);
   worldFlags(w, st, c);
+  holdTick(w, st, c, m.stage);
+  // rivals with an income (mature colonies: the map alone does not feed them)
+  for (const [k, R] of Object.entries(L.rivals)) {
+    if (!R.income) continue;
+    const r = w.colony(st.rivals[k] ?? -1);
+    if (r?.alive) r.food = Math.min(r.foodCap, r.food + R.income * STORY.difficulty[st.diff].rival);
+  }
   storyFire(w, st, m, m.stage, m.t);
   levelFire(w, st);
+  surprisesSecond(w, st, L, (a) => act(w, st, a), (key) => {
+    if (!st.said.includes(key)) say(w, st, key);
+  });
   // the bonus objective
   const B = L.medals.bonus;
   if (st.bonus === 0) {
@@ -278,6 +381,10 @@ export function storySecond(w: World, c: Colony, m: MissionState): void {
     } else if (B.type === 'killBefore') {
       if (hasFlag(st, `killed:${B.actor}`)) st.bonus = st.flags.indexOf(`killed:${B.actor}`) < st.flags.indexOf(B.flag) || !hasFlag(st, B.flag) ? 1 : -1;
       else if (hasFlag(st, B.flag)) st.bonus = -1;
+    } else if (B.type === 'deadBefore') {
+      // a colony destroyed before the water reached its nest (won), or every colony's nest flooded first (lost)
+      if (B.rivals.some((k) => hasFlag(st, `dead:${k}`) && (!hasFlag(st, `nestFlood:${k}`) || st.flags.indexOf(`dead:${k}`) < st.flags.indexOf(`nestFlood:${k}`)))) st.bonus = 1;
+      else if (B.rivals.every((k) => hasFlag(st, `nestFlood:${k}`))) st.bonus = -1;
     } else if (B.type === 'killWithin') {
       // (decided once a second: killed with the clock still running wins it; the clock running out loses it)
       const act = st.actors[actorIndex(st, B.actor)];

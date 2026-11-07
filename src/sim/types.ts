@@ -326,6 +326,14 @@ export interface Ant {
   xt?: number;
   /** glued by a Termant soldier's burst: slowed (and formic acid hurts double) until this tick */
   glueT?: number;
+  /**
+   * A flooding nest (sim/nestFlood.ts): seconds of breath used under water (it drowns past NEST_FLOOD.breathS; it comes
+   * back out of the water; absent when dry); `fl` 1 once the water has driven it to higher ground (it stays there for the
+   * rest of the flood); `flB` the brood it is fetching up out of the water's way (0 none).
+   */
+  uw?: number;
+  fl?: number;
+  flB?: number;
 }
 
 export interface Brood {
@@ -345,6 +353,8 @@ export interface Brood {
   carrier: number;
   /** brood tile (hex index) this individual is raised for */
   tile: number;
+  /** seconds under water in a flooding nest (sim/nestFlood.ts; it drowns at NEST_FLOOD.breathS + broodS; absent when dry) */
+  uw?: number;
 }
 
 /** `wood`: deadwood (twig, branch, bamboo, palm frond, log, stump — in `from`) and chewed fragments ('chip'); termites only */
@@ -574,6 +584,11 @@ export interface Colony {
   /** human-controlled (stat multiplier `statMul`, player messages). Which human is local is client-side. */
   player: boolean;
   ai: boolean;
+  /**
+   * a story level's visiting party (a marching column of a species not in the level, sim/story/surprises.ts): a colony
+   * with no nest and no queen that only owns its directed ants; never builds, forages, raids or dies of a lost queen
+   */
+  visitor?: boolean;
   /** colonies on one team are allies: they never fight, and allied ants open area tabs */
   team: number;
   alive: boolean;
@@ -653,7 +668,15 @@ export interface Colony {
     joined?: number;
     /** a joint raid's gathering point near the target and when to go anyway (s); `go` once everyone is there */
     gather?: { x: number; y: number; until: number; go: boolean };
+    /**
+     * All-out (sim/nestFlood.ts `forceAllOut`, e.g. a colony whose nest is about to flood): every group but the queen's
+     * marches on `target`'s queen and stays on her — no defence, no retreat, no gathering, no help for allies — until she
+     * or the colony is dead. Absent (or false) in every other game.
+     */
+    allOut?: boolean;
   };
+  /** its nest is flooding or flooded (sim/nestFlood.ts; NEST_FLOOD in balance.ts). Absent in every other game. */
+  nestFlood?: NestFloodState;
   /**
    * The ally brain (sim/warAI.ts, CHANGE_PLAN §23): the ally being helped (−1 none), since when, how many ants were sent,
    * the stage (0 marker on the ally's entrance, 1 on the threat), how long the threat has been clear, the cooldown after
@@ -806,6 +829,8 @@ export interface Creature {
   /** taunted by a leafcutter major (casteAbilities.ts): it turns on that ant for `tauntT` seconds */
   tauntBy?: number;
   tauntT?: number;
+  /** seconds of breath used under water in a flooding nest (sim/nestFlood.ts; absent when dry) */
+  uw?: number;
 }
 
 export interface Projectile {
@@ -901,6 +926,25 @@ export interface SimState {
   host?: number;
   /** authored maps with floods on: each flood zone's storm cycle (sim/floods.ts) */
   flood?: FloodState[];
+  /** story weather (sim/story/surprises.ts): a rain shower and a hot spell, each until a game time (s) */
+  weather?: { rain: number; heat: number };
+}
+
+/**
+ * A colony's nest filling with water (sim/nestFlood.ts). The water pours in at the entrance, runs down the tunnels and
+ * fills the nest from its deepest hexes (farthest from the entrance along the tunnels) back up to the entrance.
+ */
+export interface NestFloodState {
+  /** 0 waiting for `t0`, 1 filling, 2 full */
+  phase: number;
+  /** game time the water starts pouring in (s) */
+  t0: number;
+  /** seconds the whole nest takes to fill */
+  fill: number;
+  /** the hexes under water, in the order they went under (deepest first) */
+  q: number[];
+  /** the game time each of them went under (s), by index in `q` */
+  at: number[];
 }
 
 /** One flood zone's storm cycle: phase 0 idle, 1 warning, 2 rising, 3 holding, 4 draining. */

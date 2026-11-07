@@ -59,6 +59,10 @@ const FAMILY: Record<string, Family> = {
   hogna: 'spider',
   groundBeetle: 'beetle',
   stagBeetle: 'beetle',
+  stagMinor: 'beetle',
+  stagSmall: 'beetle',
+  stagMedium: 'beetle',
+  stagLarge: 'beetle',
   rove: 'beetle',
   pillbug: 'beetle',
   lithobius: 'centipede',
@@ -358,7 +362,8 @@ export class GameAudio {
       const fam = FAMILY[by];
       const rate = sizeRate(kind.length);
       const reach = kind.boss ? 3 : 1.5;
-      const id = by === 'stagBeetle' ? 'cr.stag_clash' : fam === 'spider' ? (Math.random() < 0.25 ? 'cr.spider_pounce' : 'cr.spider_fangs') : fam === 'mantis' ? 'cr.mantis_strike' : by === 'antlion' ? 'cr.antlion_flick' : 'combat.mandible_snap';
+      // (the stag beetle males' antlers clash too, pitched by their size)
+      const id = by === 'stagBeetle' || kind.ai === 'stagMale' ? 'cr.stag_clash' : fam === 'spider' ? (Math.random() < 0.25 ? 'cr.spider_pounce' : 'cr.spider_fangs') : fam === 'mantis' ? 'cr.mantis_strike' : by === 'antlion' ? 'cr.antlion_flick' : 'combat.mandible_snap';
       this.want(id, e.x, e.y, e.space, { pool: 'creature', gain: 0.9, rate, reach, heat: 0.12 });
       if (Math.random() < 0.4) this.want('combat.chitin_crack', e.x, e.y, e.space, { pool: 'combat', gain: 0.6, heat: 0.03 });
       return;

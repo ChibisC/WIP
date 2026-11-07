@@ -162,6 +162,12 @@ export const BALANCE = {
     mantis: { r: 0.3, arc: 0.45 },
     giantMantis: { r: 0.3, arc: 0.65 },
     stagBeetle: { r: 0.15, arc: 0.6 },
+    // the stag beetle males (STAG_MALE): their outline already ends at the antler tips (the model is centred on them);
+    // the head swings the antlers a little further, more the longer they are
+    stagMinor: { r: 0.06, arc: 0.6 },
+    stagSmall: { r: 0.07, arc: 0.6 },
+    stagMedium: { r: 0.09, arc: 0.6 },
+    stagLarge: { r: 0.11, arc: 0.6 },
     scolopendra: { r: 0.1, arc: 2.0 },
   } as Record<string, { r: number; arc: number }>,
   /**
@@ -268,6 +274,10 @@ export const BALANCE = {
       cutworm: 0,
       mantis: 0.1,
       stagBeetle: 0.08,
+      stagMinor: 0.08,
+      stagSmall: 0.08,
+      stagMedium: 0.08,
+      stagLarge: 0.08,
       tarantula: 0.12,
       hogna: 0.12,
       giantMantis: 0.1,
@@ -1132,6 +1142,119 @@ export const STAG = {
   jaw: 0.42,
 };
 
+/** One stag beetle male size (STAG_MALE.size). */
+export interface StagMaleSize {
+  /** the model's allometric male size (render/creatures/stagBeetle.ts: 0 a minor … 1 the titan's major): head and antlers */
+  msize: number;
+  /** the antler grab: ants clamped at once (0: it never grabs) and the seconds between grabs */
+  hold: number;
+  grabEvery: number;
+  /** rears up and slams down (and shakes its riders off) */
+  rear: boolean;
+  /** walking into ants it shoves them aside at this speed (mm/s) */
+  shove: number;
+  /** with this many ants holding on it shakes `shakeN` of them off (every 2 s) */
+  shakeAt: number;
+  shakeN: number;
+}
+
+/**
+ * Stag beetle males (claude/story/06-spec-levels-5-7-and-lengths.md §2; docs/creatures/lucanus-cervus.md "Males of
+ * four sizes"): four normal creatures (kinds `stagMinor` … `stagLarge`, ai `stagMale`) drawn with the titan's model at
+ * male sizes 0–3 and scaled down from its 100 mm. The titan's moves, scaled down: all of them walk slowly and plough
+ * through ants (`shove`), pinching what fights them (threat first, like the titan); the medium and large males also grab
+ * ants in their antlers and toss them (`hold`, `grabEvery`, then the titan's sequence with the numbers below); the large
+ * male rears and slams when hard pressed (below `rearHp` of its health with `rearMinAnts` ants round it, every
+ * `rearEvery` s: `slamDmg` to the ants within `slamR` × its length) and shakes its riders off like a titan.
+ *
+ * `model`: the model's layout as fractions of its length (render/creatures/stagBeetle.ts SB, the antler length from
+ * render/anatomy/mandibleSpecs.ts stagMandibleShare — tests/stagSizes.ts checks they agree). A male's model is drawn
+ * shifted forward so its body, elytra apex to antler tips, is centred on the sim position (its short antlers left the
+ * titan's layout tail-heavy); its outline is a capsule of radius `r` × L round that (kinds.ts stagMaleGeom).
+ *
+ * `wrestle` (stagWrestle.ts): two males meeting with no ants about face off, lock antlers and shove, then the winner —
+ * the bigger one, mostly — lifts the other and throws it on its back; it rights itself and walks off.
+ */
+export const STAG_MALE = {
+  size: {
+    stagMinor: { msize: 0, hold: 0, grabEvery: 0, rear: false, shove: 14, shakeAt: 4, shakeN: 1 },
+    stagSmall: { msize: 0.25, hold: 0, grabEvery: 0, rear: false, shove: 17, shakeAt: 5, shakeN: 1 },
+    stagMedium: { msize: 0.5, hold: 1, grabEvery: 9, rear: false, shove: 21, shakeAt: 6, shakeN: 2 },
+    stagLarge: { msize: 0.75, hold: 2, grabEvery: 7, rear: true, shove: 24, shakeAt: 7, shakeN: 2 },
+  } as Record<string, StagMaleSize>,
+  model: { back: -0.47, hinge: 0.176, share0: 0.075, shareK: 0.265, tipK: 0.9, closeK: 0.7, lockK: 0.55, r: 0.24 },
+  /** the grab (as the titan's STAG): wind-up, the cone it clamps in (radius × L, half-angle), lift, squeeze, toss */
+  windUp: 0.8,
+  coneR: 0.3,
+  coneHalf: 0.9,
+  liftS: 0.8,
+  squeeze: 8,
+  toss: 2.2,
+  sideBite: 0.45,
+  sideFling: 1,
+  liftH: 0.2,
+  ploughHalf: 0.9,
+  /** the large male's rear and slam */
+  rearHp: 0.6,
+  rearEvery: 12,
+  rearMinAnts: 3,
+  slamR: 0.45,
+  slamDmg: 10,
+  slamFling: 1.6,
+  /** ants on it and none in front to pinch for this long (under its body, on its middle): it shrugs `shakeN` off */
+  stuckSec: 2.5,
+  /** turning to aim the grab at most this long (then it grabs where it faces) */
+  aimSec: 1,
+  wrestle: {
+    /** an idle male looks for a rival every `scanSec`; a rival within `meet` × their mean length (centre to centre: it sees it and walks over) */
+    scanSec: 1,
+    meet: 4,
+    /** a look that finds one starts a bout this often */
+    chance: 0.5,
+    /** no ant within `clear` × its length of either; both at least `minHp` of their health */
+    clear: 0.9,
+    minHp: 0.5,
+    /** walking to the face-off (× its speed); given up if they have not faced off `approachSec` after their walks should end */
+    speed: 0.8,
+    approachSec: 5,
+    /** the face-off: `gap` × their mean length further apart than locked, for `faceSec` */
+    gap: 0.12,
+    faceSec: 1.4,
+    /** locked: stepping in over `lockIn` s, then `lockMin`..`lockMax` s of shoving (± `pushAmp` × the mean length at
+     *  `pushHz`, the winner gaining `pushDrift` × it), the locked heads twisting ± `twist` rad */
+    lockIn: 0.35,
+    lockMin: 2.2,
+    lockMax: 4.2,
+    pushAmp: 0.035,
+    pushHz: 0.9,
+    pushDrift: 0.08,
+    twist: 0.1,
+    /** who wins: P = 0.5 + `winK` × (sa − sb) / (sa + sb), within `winMin`..`winMax`; s = length × (0.6 + 0.4 × health) */
+    winK: 2.2,
+    winMin: 0.1,
+    winMax: 0.9,
+    /** the lift: the loser held up at the winner's antlers (`liftZ` × the winner's length high) for `liftSec` */
+    liftSec: 1,
+    liftZ: 0.24,
+    /** (the winner's antlers raised: the loser hangs `heldK` × as far ahead as the closed tips reach on the ground) */
+    heldK: 0.8,
+    /** the throw: `throwSec` in the air, landing `throwDist` × its length to one side, turned `throwSpin` rad */
+    throwSec: 0.55,
+    throwDist: 0.75,
+    throwSpin: 1.2,
+    /** on its back for `downSec`, the last `rightSec` of it righting itself */
+    downSec: 1.8,
+    rightSec: 0.7,
+    /** then the loser walks `partDist` × its length away over `partSec` */
+    partSec: 4,
+    partDist: 1.2,
+    /** no new bout for `cdMin`..`cdMax` s after one (`cdAbort` after one broken off) */
+    cdMin: 40,
+    cdMax: 80,
+    cdAbort: 15,
+  },
+};
+
 /**
  * Battle arena (sim/arena.ts, DESIGN 3.13): 2–4 teams of any ants and creatures fight on an open surface. Units
  * appear in a spiral round their team's spawn point (`spacing` × body length apart); at most `maxUnits` live units
@@ -1173,6 +1296,46 @@ export const FLOOD = {
   drownFrac: 0.06,
   /** paddling toward dry ground (mm/s) */
   swimMmS: 7,
+};
+
+/**
+ * A nest flooding (sim/nestFlood.ts; claude/story/06-spec-levels-5-7-and-lengths.md §4, level 6 "High Water"; DESIGN.md
+ * 3.12c). Only a story (or a dev URL) starts one: `startNestFlood`. The water pours in at the entrance, runs down the
+ * tunnels and fills the nest from its deepest hexes (farthest from the entrance along the tunnels) back up to the
+ * entrance, hex by hex at a steady inflow (a big chamber takes longer to fill than a tunnel).
+ */
+export const NEST_FLOOD = {
+  /** seconds the whole nest takes to fill (startNestFlood's default): a dramatic moment, short enough to watch through */
+  fillSec: 45,
+  /**
+   * seconds an ant, the queen or a creature holds its breath under water before it starts to drown (real ants survive
+   * hours under water; a game keeps it to a short window)
+   */
+  breathS: 6,
+  /** then it loses this share of its maximum health a second (10 s more from full health: about 16 s in all) */
+  drownFrac: 0.1,
+  /** creatures (bigger, more air in them): this share a second */
+  creatureDrownFrac: 0.05,
+  /** brood (no health): an egg or larva under water this long past `breathS` is dead */
+  broodS: 4,
+  /** breath comes back this many times as fast out of the water */
+  breathBack: 2,
+  /** speed in water (swimming, × the walking speed) */
+  swimMul: 0.45,
+  /**
+   * The colony's ants at home keep working until the water comes within this many hexes (along the tunnels) of where
+   * they are; then they climb to higher ground at least `keepAbove` + 1 hexes above the water and stay there; workers
+   * fetch brood lying within `rescueAhead` hexes above the water (and not under it yet) up with them. Jobs within
+   * `keepAbove` of the water stop.
+   */
+  keepAbove: 2,
+  rescueAhead: 3,
+  /** how far (mm) a worker goes for brood to carry up */
+  rescueR: 90,
+  /** render: seconds a hex's water takes to rise from the floor to its full depth after it goes under */
+  riseS: 2.5,
+  /** render: the full water depth as a share of the nest's wall height (the walls' upper slopes still show above it) */
+  depthOfWall: 0.6,
 };
 
 /**
@@ -1312,11 +1475,18 @@ export const LAYERS = {
  */
 export const STORY = {
   difficulty: {
-    easy: { enemyStat: 0.75, wave: 0.6, aggression: 0.6, food: 1.6, rival: 0.7, boss: 0.75 },
-    normal: { enemyStat: 1, wave: 1, aggression: 1, food: 1, rival: 1, boss: 1 },
-    hard: { enemyStat: 1.2, wave: 1.35, aggression: 1.3, food: 0.85, rival: 1.25, boss: 1.1 },
-    brutal: { enemyStat: 1.4, wave: 1.7, aggression: 1.6, food: 0.7, rival: 1.5, boss: 1.2 },
+    // events: the surprise events' chance × this (claude/story/06-spec §6: fewer on Easy, more on Hard and Brutal)
+    easy: { enemyStat: 0.75, wave: 0.6, aggression: 0.6, food: 1.6, rival: 0.7, boss: 0.75, events: 0.6 },
+    normal: { enemyStat: 1, wave: 1, aggression: 1, food: 1, rival: 1, boss: 1, events: 1 },
+    hard: { enemyStat: 1.2, wave: 1.35, aggression: 1.3, food: 0.85, rival: 1.25, boss: 1.1, events: 1.3 },
+    brutal: { enemyStat: 1.4, wave: 1.7, aggression: 1.6, food: 0.7, rival: 1.5, boss: 1.2, events: 1.6 },
   },
+  /** a member leaving the map by an edge point is gone once this near it (mm) */
+  edgeLeave: 26,
+  /** surprise events: a big one due while another runs waits this long after it (s) */
+  eventGap: 20,
+  /** a hot spell: the speed of ants on the surface × this */
+  heatSpeed: 0.8,
   /** stolen-caste slots: one to start, one more per boss beaten (later chapters) */
   slots: { start: 1, perBoss: 1 },
   /** seconds before a cue that waits on the world gives up and the scene moves on */
@@ -1355,10 +1525,12 @@ export const STORY = {
    */
   traits: {
     spiderlingVenom: { name: 'Spiderling Venom', from: 'The Spider Mother', desc: 'Your ants’ bites carry a little spider venom: a weak poison that stacks a little.', dps: 0.6, duration: 4, maxStacks: 3, built: true },
-    antlerPlating: { name: 'Antler Plating', from: 'a stag beetle titan', desc: 'More armour for all your ants.', built: false },
+    // antlerPlating (The Antlered King, chapter 1 level 5): every ant of the colony has `armor` more armour (bites lose
+    // that much more; acid a quarter of it, as with an ant's own armour)
+    antlerPlating: { name: 'Antler Plating', from: 'The Antlered King', desc: 'Harder shells: every one of your ants has a little more armour.', armor: 1, built: true },
     forcipuleStrike: { name: 'Forcipule Strike', from: 'a giant centipede titan', desc: 'Soldiers’ first bite in a fight deals bonus damage.', built: false },
     irritatingHairs: { name: 'Irritating Hairs', from: 'the red-knee tarantula, as a boss', desc: 'Enemies that attack your soldiers are briefly slowed.', built: false },
     ambushReflex: { name: 'Ambush Reflex', from: 'a giant mantis titan', desc: 'Attack speed bonus for the first seconds of each fight.', built: false },
     fungalLarder: { name: 'Fungal Larder', from: 'the leafcutter mega colony', desc: 'Food stores hold more.', built: false },
-  } as Record<string, { name: string; from: string; desc: string; dps?: number; duration?: number; maxStacks?: number; built: boolean }>,
+  } as Record<string, { name: string; from: string; desc: string; dps?: number; duration?: number; maxStacks?: number; armor?: number; built: boolean }>,
 };

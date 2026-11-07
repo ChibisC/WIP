@@ -46,26 +46,32 @@ export const CURRENT_CHAPTER = 1;
 export const REGIONS: Region[] = [
   { id: 'meadow', name: 'Meadow Pond', at: [0.3, 0.68], color: '#7f9a4f', slots: 8, chapter: 1, blurb: 'Garden meadows and a storm-filled pond on the south-west shore, where the queen came ashore.' },
   { id: 'riverbank', name: 'Riverbank', at: [0.55, 0.78], color: '#c2a46a', slots: 7, chapter: 1, blurb: 'Warm sandy banks along the slow river that drains the island to the south.' },
-  { id: 'forest', name: 'Forest Floor', at: [0.25, 0.36], color: '#5d6b3c', slots: 8, chapter: 2, blurb: 'Pine and oak woods on the western hills. Red wood ants build their thatch mounds here.' },
-  { id: 'rainforest', name: 'Rainforest', at: [0.68, 0.3], color: '#3f6b45', slots: 8, chapter: 3, blurb: 'Steaming lowland forest in the north-east, buttress roots and leaf litter.' },
+  { id: 'forest', name: 'Forest Floor', at: [0.25, 0.36], color: '#5d6b3c', slots: 8, chapter: 1, blurb: 'Pine and oak woods on the western hills. Red wood ants build their thatch mounds here.' },
+  { id: 'rainforest', name: 'Rainforest', at: [0.68, 0.3], color: '#3f6b45', slots: 8, chapter: 1, blurb: 'Steaming lowland forest in the north-east, buttress roots and leaf litter.' },
   { id: 'savanna', name: 'Savanna', at: [0.8, 0.58], color: '#c9a95a', slots: 8, chapter: 4, blurb: 'Open grassland and termite mounds on the dry eastern plateau.' },
   { id: 'heart', name: "The Island's Heart", at: [0.52, 0.5], color: '#7a6248', slots: 4, chapter: 5, blurb: 'An old caldera in the middle of the island. Nobody goes there.' },
 ];
 
 /**
- * Chapter 1 runs Garden Below → The Long Nights → Fire on the Banks → The Spider Mother (claude/story/04-spec §1). The
- * nights are at the meadow's east edge where it meets the river woods (between the garden and the river); the spider
- * mother's terrace is the riverbank's sandy upper slot, north of the fire ants' bank.
+ * Chapter 1 runs Garden Below → The Long Nights → Fire on the Banks → The Spider Mother (claude/story/04-spec §1) →
+ * The Antlered King → High Water → Carton Kingdom (claude/story/06-spec §1). The nights are at the meadow's east edge
+ * where it meets the river woods (between the garden and the river); the spider mother's terrace is the riverbank's
+ * sandy upper slot, north of the fire ants' bank. The stag beetles' oak wood is the Forest Floor's southern slot (the
+ * nearest to the river), the hill in the flood plain the riverbank's low western slot near the river mouth, and the
+ * conehead termites' forest edge the Rainforest's southern slot.
  */
 export const NODES: LevelNode[] = [
   { level: 'garden', region: 'meadow', slot: 1, chapter: 1, after: [] },
   { level: 'longNights', region: 'meadow', slot: 4, chapter: 1, after: ['garden'] },
   { level: 'fireBanks', region: 'riverbank', slot: 2, chapter: 1, after: ['longNights'] },
   { level: 'spiderMother', region: 'riverbank', slot: 6, chapter: 1, after: ['fireBanks'], boss: true },
+  { level: 'antleredKing', region: 'forest', slot: 4, chapter: 1, after: ['spiderMother'], boss: true },
+  { level: 'highWater', region: 'riverbank', slot: 5, chapter: 1, after: ['antleredKing'] },
+  { level: 'cartonKingdom', region: 'rainforest', slot: 6, chapter: 1, after: ['highWater'] },
 ];
 
 /** The chapters (the hub's banner and level list, the chapter-end screen; its last level carries the ending line). */
-export const CHAPTERS = [{ n: 1, name: 'Chapter 1 — Landfall', levels: ['garden', 'longNights', 'fireBanks', 'spiderMother'] as Array<StoryLevelDef['id']> }];
+export const CHAPTERS = [{ n: 1, name: 'Chapter 1 — Landfall', levels: ['garden', 'longNights', 'fireBanks', 'spiderMother', 'antleredKing', 'highWater', 'cartonKingdom'] as Array<StoryLevelDef['id']> }];
 
 const slotCache = new Map<string, Array<[number, number]>>();
 

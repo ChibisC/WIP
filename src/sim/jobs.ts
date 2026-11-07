@@ -9,6 +9,7 @@ import { markerRadius } from './markers';
 import { datan2, dcos, dhypot, dsin, sq } from './dmath';
 import { faceToward } from './movement';
 import { abdomenTipBack } from './termites';
+import { floodBlocksJob, queenHexBlocked } from './nestFlood';
 
 /**
  * Nest jobs (Revision 2, EotU — DESIGN.md 3.6). Workers do all nest work
@@ -61,17 +62,22 @@ export function listJobs(w: World, c: Colony): JobSpot[] {
   if (!g) return [];
   const out: JobSpot[] = [];
   const N = g.cols * g.rows;
+  // (a flooding nest, sim/nestFlood.ts: no work under the water or about to go under, no eggs from a queen in it)
+  const wet = !!c.nestFlood?.q.length;
   for (let q = 0; q < N; q++) {
     if (!g.hexDesig[q] || !g.isHexDiggable(q)) continue;
     if (!g.neighbors(q).some((n) => n >= 0 && g.isHexDug(n))) continue; // unreachable: waits
+    if (wet && floodBlocksJob(w, c, q)) continue;
     out.push({ kind: JOB.Dig, q, prio: 0, max: BALANCE.digWorkersPerHex });
   }
   for (const t of c.tiles) {
+    if (wet && floodBlocksJob(w, c, t.q)) continue;
     if (!t.built) out.push({ kind: JOB.Build, q: t.q, prio: 2, max: 1 });
     else if (t.pend === 1) out.push({ kind: JOB.Upgrade, q: t.q, prio: 2, max: 1 });
     else if (t.pend === 2) out.push({ kind: JOB.Delete, q: t.q, prio: 2, max: 1 });
   }
-  for (const t of c.tiles) if (raisesAnts(t) && wantsEgg(w, c, t.q)) out.push({ kind: JOB.Spawn, q: t.q, prio: 3 + (tileAnts(w, t).length >= tileCapacity(t) ? 1 : 0), max: 1 });
+  const eggs = !wet || !queenHexBlocked(w, c);
+  for (const t of c.tiles) if (eggs && raisesAnts(t) && wantsEgg(w, c, t.q) && !(wet && floodBlocksJob(w, c, t.q))) out.push({ kind: JOB.Spawn, q: t.q, prio: 3 + (tileAnts(w, t).length >= tileCapacity(t) ? 1 : 0), max: 1 });
   out.sort((a, b) => a.prio - b.prio);
   return out;
 }
@@ -79,6 +85,8 @@ export function listJobs(w: World, c: Colony): JobSpot[] {
 function jobValid(w: World, c: Colony, kind: number, q: number): boolean {
   const g = w.nest(c.id);
   if (!g) return false;
+  // (a flooding nest: sim/nestFlood.ts)
+  if (c.nestFlood?.q.length && (floodBlocksJob(w, c, q) || (kind === JOB.Spawn && queenHexBlocked(w, c)))) return false;
   switch (kind) {
     case JOB.Dig:
     case JOB.Entrance:
@@ -170,6 +178,8 @@ export function assignJobs(w: World, c: Colony): void {
     // (fighting ants are not drafted: closing in, holding, spraying, recovering after an attack, up on a creature)
     if (a.state === AS.Attack || a.state === AS.Grapple || a.state === AS.Spray || a.state === AS.Climb || a.state === AS.Flung || snapping(a.state) || a.stun > 0 || anchored(a)) continue;
     if (a.carry !== Carry.None && a.carry !== Carry.Soil) continue;
+    // (driven to higher ground by a flood: it stays there, sim/nestFlood.ts)
+    if (a.fl) continue;
     if (a.task === 'marker') {
       const m = a.marker >= 0 ? c.markers[a.marker] : null;
       if (!m || !m.placed || m.space !== nestSpace(c.id)) continue; // out in the world: no nest jobs

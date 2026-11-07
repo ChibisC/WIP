@@ -3,6 +3,7 @@ import { Rig, V, ease, footAt, limb, limbEnd, tetrapod, tripod, wave } from './r
 import { Surface } from './primitives';
 import { chainPoint } from './chainTrail';
 import { stagBeetle2 } from './stagBeetle';
+import { stagMaleGeom } from '../../sim/creatures/kinds';
 
 /**
  * Procedural creature models and their animation (Phase 11), built from the
@@ -13,7 +14,7 @@ import { stagBeetle2 } from './stagBeetle';
  */
 
 /** Creature states (mirror of sim/creatures/creatureAI.ts CS; render must not import sim AI). */
-export const ST = { Wander: 0, Chase: 1, Attack: 2, Flee: 3, Rolled: 4, Curled: 5, Freeze: 6, Pounce: 7, WindUp: 8, Eat: 9, Display: 10, Lurk: 11, Hide: 12, Coil: 13, Whip: 14, Rear: 15, Flick: 16, Leap: 17, Strike: 18, Lift: 19, Dig: 20 } as const;
+export const ST = { Wander: 0, Chase: 1, Attack: 2, Flee: 3, Rolled: 4, Curled: 5, Freeze: 6, Pounce: 7, WindUp: 8, Eat: 9, Display: 10, Lurk: 11, Hide: 12, Coil: 13, Whip: 14, Rear: 15, Flick: 16, Leap: 17, Strike: 18, Lift: 19, Dig: 20, Spar: 21, Lock: 22, Heave: 23, Thrown: 24 } as const;
 
 /**
  * A titan digging a nest's hole wider (sim/creatures/titanDig.ts, CS.Dig) is drawn with the pose of its digging style:
@@ -792,6 +793,12 @@ export function antlion(rig: Rig, p: CrPose): void {
     }
 }
 
+/** A stag beetle male's builder: the titan's model at its male size, drawn forward so its body is centred. */
+function stagMale(kind: string): (rig: Rig, p: CrPose) => void {
+  const g = stagMaleGeom(kind);
+  return (rig, p) => stagBeetle2(rig, p, g ?? undefined);
+}
+
 export const BUILDERS: Record<string, (rig: Rig, p: CrPose) => void> = {
   pillbug,
   cutworm,
@@ -804,6 +811,11 @@ export const BUILDERS: Record<string, (rig: Rig, p: CrPose) => void> = {
   spiderling,
   // realism pass: the sculpted model (stagBeetle.ts); the old primitive build stays below for comparison renders
   stagBeetle: stagBeetle2,
+  // the stag beetle males: the same model at male sizes 0–3, centred on the body (sim STAG_MALE, kinds.ts stagMaleGeom)
+  stagMinor: stagMale('stagMinor'),
+  stagSmall: stagMale('stagSmall'),
+  stagMedium: stagMale('stagMedium'),
+  stagLarge: stagMale('stagLarge'),
   tarantula,
   scolopendra,
   giantMantis,
@@ -823,6 +835,10 @@ export const STRIDE: Record<string, number> = {
   antlion: 0.3,
   spiderling: 0.56,
   stagBeetle: 0.22,
+  stagMinor: 0.22,
+  stagSmall: 0.22,
+  stagMedium: 0.22,
+  stagLarge: 0.22,
   tarantula: 0.56,
   scolopendra: 0.091,
   giantMantis: 0.4,
