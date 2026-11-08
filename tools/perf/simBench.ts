@@ -4,7 +4,7 @@
  * every 50 ticks (tools/perf/canon.ts) so two builds can be compared (the same hash list = the same results).
  *
  *   npx vite-node tools/perf/simBench.ts -- [scenes=fight,economy,nests,ten,titan,tunnel] [ants=500,1000,1500,2000]
- *       [ticks=200] [--out results.json] [--systems] [--prof]
+ *       [ticks=200] [--out results.json] [--systems] [--series] [--prof]
  *
  * Scenes:
  *  - fight:   four colonies' armies meet at the map's middle (the stress scene), 100 wild creatures;
@@ -250,6 +250,15 @@ for (const scene of SCENES)
       for (const [k, v] of Object.entries(sys).sort((a, b) => b[1] - a[1])) if (v / TICKS > 0.05) r.systems[k] = +(v / TICKS).toFixed(2);
     }
     results.push(r);
+    // (--series: the average of each 50 ticks, to see a fight's phases)
+    if (flags.has('--series')) {
+      const seg: string[] = [];
+      for (let k = 0; k < times.length; k += 50) {
+        const part = times.slice(k, k + 50);
+        seg.push(`${(part.reduce((x, y) => x + y, 0) / part.length).toFixed(1)}/${Math.max(...part).toFixed(0)}`);
+      }
+      console.log(`           per 50 ticks (avg/max ms): ${seg.join(' ')}`);
+    }
     console.log(`${scene.padEnd(8)} ${String(ants0).padStart(5)} ants: tick avg ${r.avg.toFixed(2)} ms, p95 ${r.p95.toFixed(2)}, max ${r.max.toFixed(2)}, over 40 ms ${r.over40}/${TICKS}  hash ${hashes[hashes.length - 1]}` + (r.systems ? `\n           ${Object.entries(r.systems).map(([k, v]) => `${k} ${v}`).join(' · ')}` : ''));
   }
 if (OUT) writeFileSync(OUT, JSON.stringify(results, null, 1));
