@@ -339,6 +339,7 @@ export function antSystem(w: World, dt: number): void {
         finish(w, a);
         continue;
       }
+    }
     // on a tree trunk (sim/trees.ts): held on the bark for the climb, nothing else happens to it
     if (a.trunkT && trunkHold(a, dt)) {
       finish(w, a);
