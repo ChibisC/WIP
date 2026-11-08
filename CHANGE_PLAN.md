@@ -1340,3 +1340,46 @@ LAN); only the client changes, plus the multiplayer input delay (when commands a
 8. **Verify:** before/after table in `docs/performance.md` (latencies, pacing, budgets, CPU per frame for 1,000+ ants);
    the golden set; determinism check, replays, LAN two-tab; `npm test`, build; DESIGN, README, PROGRESS, handoff;
    merge; publish v-next of the artifact; ask the user for a new `?bench=1`.
+
+### 29.3 What was done (in order)
+1. **The feel meter** — `core/feel.ts`, F3, the bench's *feel* scene (merged into `main` early, `0eb564a`, so the user
+   could take a baseline on their own devices; handoff 19). With it: a story save with a visiting party restores to the
+   same state again (the save upgrade no longer embeds the visitor's margin-less nest plane).
+2. **Smooth motion** — `game/playout.ts`: a playout clock R on the loop's own pace (ticks asked for + accumulator),
+   kept L ticks behind it (L = the 98th percentile, over the last 64 arrivals, of how far the loop's clock got past the
+   newest tick before the next arrived, + 0.12), pulled toward its target by at most ±10 % of its pace (a gap over 3
+   ticks re-anchors). Each frame with ticks sets every ant's, food's and creature's px/py/ph to where it is drawn
+   (`MotionCarry` through `ColumnReader.read(…, carry)`); a frame with no tick keeps them. α = (R − from)/(to − from)
+   may run past 1 by half a tick when a frame is late, easing off as it does. Teleports snap (space change; a jump over
+   10 mm + 3 × (ticks + 1) × the last tick's travel). Paused: R glides to the newest tick and stops. `tests/smoothMotion.ts`
+   (uneven arrivals at 60/144 Hz: steps within 2 % of the true speed at p99, against 165–347 % off for the old α, which
+   froze in 12 % and jumped in 6–11 % of frames).
+3. **Instant feedback** — `game/intents.ts`: a surface marker moved or a group sent to one turns its ants toward it on
+   the frame of the input (blend rising over 160 ms, h + w·d so the sim's own turn meets it, fading after 1.1 s; refused:
+   200 ms); `antHeadingHook` in the ant renderer. A refused hex order's ghost ring unwinds in 300 ms
+   (`pendingHexes` kind 'refused'); player-facing refusal reasons (capitalised sentences) are said once.
+   `tests/feel.ts`. The rest of the list was already same-frame (selection ring, marker flag and trail preview, ghost
+   hexes, the ack click, the camera).
+4. **Command delay** — `MIN_DELAY` 1; the host's delay is `ceil((path + min(50, path/4 + 25)) / 50)`: one tick on a
+   LAN, the old value on long paths. `tests/net.ts` LAN case (1–4 ms one way: delay 1, 20 ticks/s, no waiting, own
+   commands act 2 ticks after they are given; the 150 ms case unchanged).
+5. **Client-side visuals** — `render/viewCull.ts`: the views leave out ants more than 40 mm outside the camera's view
+   (not those in the air or on a creature); the ant renderer catches a returning ant up in one step (`catchUp`: its
+   timers and springs run the time it missed, up to a second; its gait keeps its pace; its body takes its heading).
+   Zoomed in on a crowd the ant renderer's time falls about tenfold (`tests/clientVisuals.ts`,
+   `tools/perf/antRendererBench.ts`). Seeds hashed from ids (gait phase, antenna wave, pose phase) and places (acid
+   mist), sparks from a seeded sequence: renders no longer differ run to run. Combat particles are written once at
+   spawn and played by the vertex shader in closed form from t − t0 (drag e^(−dτ), gravity, the landing time worked out
+   at spawn); only the new slots are uploaded. The ant shader is untouched (still 16 attributes); health bars and rings
+   were already instanced quads drawn only for the few units that need them.
+6. **Messages** — delta entity columns (`ColumnWriter.write(…, delta)`: when every entity was in the last frame too —
+   rows matched by id, so deaths and reordering do not matter — the columns nobody changed are left out, 50–70 % of
+   them in a fight) and a generated reader
+   (one loop per schema with named stores; the plain loop where a page forbids compiling code). Big fight (829 ants,
+   96 creatures, build machine, Node): 716 → 381 KB a frame, the columns' read 3.1 → 1.8 ms. `tests/performance.ts`
+   checks the replica's ants stay exactly the simulation's. The simulation's systems were profiled
+   (`tools/stress.ts`, a CPU profile): the time is spread over the ant brains, combat and separation with no single
+   hot spot; no change to the simulation (its results are untouched: determinism check, replays).
+7. **UI** — marker counts once a tick instead of every frame (they walk every tile of every group); label and tip
+   styles written only when they change. Pointer events with `touch-action` already (no 300 ms delay, no blocking
+   touch listeners).

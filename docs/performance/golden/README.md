@@ -19,3 +19,11 @@ so two renders of one build differ wherever ants walk. The compare tool takes th
   the fight and its termites: all match the reference (SSIM ≥ 0.9999, the nests within their run-to-run noise). The
   titan shot changed with `main`'s own titan work (the tarantula now digs where the camera points); against `main` at
   d1161a0 it matches (SSIM 0.9906, mean difference 0.56: the nest's floating dust, which is random).
+
+## Performance v2 (CHANGE_PLAN §29)
+`compare-v2after.md`: the twelve shots the branch could touch (Meadow Pond close, gameplay and far, both nests, the
+low preset, the Lasius and fire-ant line-ups, the fight and its termites, the titan in a nest, the story night), from
+`feature/responsiveness` against `main` with only the branch's seeds applied (`seedsbefore`: ids and places hashed,
+seeded sparks — the branch makes renders reproducible, so the reference must use the same seeds): **12 of 12 match
+with no noise set**, ten of them pixel for pixel (the two nests 0.9997: their drifting dust). The ants are drawn the
+same; the closed-form particles follow the old paths within 0.3 mm (`tests/clientVisuals.ts`).

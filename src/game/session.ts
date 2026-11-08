@@ -4,7 +4,9 @@ import { EventBus, SimEvent } from '../core/events';
 import { GameLoop } from '../core/loop';
 import { Input, PointerInfo } from '../core/input';
 import { GameView, Quality } from '../render/view';
-import { AntRenderer, AntSpaceAdapter, AntView, animHooks } from '../render/ants/antRenderer';
+import { AntRenderer, AntSpaceAdapter, AntView, animHooks, antHeadingHook } from '../render/ants/antRenderer';
+import { intentAnts, intents } from './intents';
+import { ViewCull } from '../render/viewCull';
 import { edible } from '../sim/diet';
 import { HitboxOverlay } from './hitboxOverlay';
 import { CombatDebugOverlay } from './combatDebugOverlay';
@@ -23,7 +25,7 @@ import { Fog } from './fog';
 import { halfIn, otherHalf, ownHalf, routeById, routeDone, routeUsable, stepIndex } from '../sim/tunnels';
 const ROUTE_EDGE_ANG = [-Math.PI / 6, Math.PI / 6, Math.PI / 2, (5 * Math.PI) / 6, (7 * Math.PI) / 6, -Math.PI / 2];
 import { createWorld, GameSetup } from '../sim/mapGen';
-import { AS, Colony, FloodState, SURFACE, TileType, colonyOfSpace, nestSpace } from '../sim/types';
+import { AS, Ant, Colony, FloodState, SURFACE, TileType, colonyOfSpace, nestSpace } from '../sim/types';
 import { AreaInfo, areaOpen, areasFor, teamPresence } from '../sim/areas';
 import { CASTES, SPECIES, canonCaste, isTermiteSpecies } from '../sim/species';
 import { affords, canPlaceTile, canUpgrade, notEnough, upgradeCost, groupWouldJoin, hatchCost, neighbourPoints, tileAt, tileCost, TILE_INFO, upgradeNeed, upgradePoints } from '../sim/tiles';
@@ -216,6 +218,10 @@ export class GameSession {
     this.sim = new LocalSim(this.world, this.commands.schedule);
     this.viewedArea = nestSpace(this.player.id);
     animHooks.fx = this.routeDust;
+    // intent poses: an order's ants turn toward it on the frame it is given (game/intents.ts)
+    intents.clear();
+    antHeadingHook.fn = (id, x, y, h, now) => intents.heading(id, x, y, h, now);
+    antHeadingHook.active = () => intents.size > 0;
     this.input = new Input(canvas);
     const st = settings();
     this.input.bindings = bindingsOf(st);
@@ -289,12 +295,20 @@ export class GameSession {
     };
     this.loop.onStepEnd = () => {
       prof.end();
-      feel.frameEnd(this.frameAt, this.world.s.tick);
+      // (acting is when the units are drawn moving: in worker mode the playout runs a little behind the newest tick)
+      const po = this.sim.kind === 'worker' ? (this.sim as WorkerSim).playout : null;
+      feel.frameEnd(this.frameAt, po && Number.isFinite(po.R) ? po.R + 1 : this.world.s.tick);
     };
     this.events.onAny((e) => {
       if (e.t === 'command') {
+        if (e.player === this.player.id) {
+          // (before acknowledging: the hex ghost of a refused order is still in the pending list)
+          if (!e.ok) this.unwindGhost(e.seq);
+          feel.ack(e.seq, e.tick ?? this.world.s.tick + 1);
+          if (!e.ok) this.refused(e);
+        }
         this.commands.acknowledge(e.player, e.seq);
-        if (e.player === this.player.id) feel.ack(e.seq, e.tick ?? this.world.s.tick + 1);
+        if (e.player === this.player.id) this.hexCmds.delete(e.seq);
       }
       this.routeFx(e);
       this.noteAlert(e);
@@ -1171,8 +1185,66 @@ export class GameSession {
     }
     const cmd = this.commands.issue(body, { silent });
     feel.command(cmd.seq, commandKind(body.type), this.world.s.tick);
+    this.intentOf(cmd);
+    const hk = cmd.type === 'dig' ? (cmd.on ? 'dig' : 'undig') : cmd.type === 'buildTile' ? 'build' : cmd.type === 'markUpgrade' ? 'upgrade' : cmd.type === 'markDelete' ? 'delete' : null;
+    if (hk && 'q' in cmd) {
+      this.hexCmds.set(cmd.seq, { q: cmd.q, kind: hk });
+      if (this.hexCmds.size > 128) this.hexCmds.delete(this.hexCmds.keys().next().value as number);
+    }
     return cmd;
   }
+  /** the units' loose view test, and the surface's list of views this frame (performance v2) */
+  private cull = new ViewCull();
+  private viewList: AntView[] = [];
+  /** this player's hex commands not acknowledged yet (by seq), and refused ones unwinding (performance v2) */
+  private hexCmds = new Map<number, { q: number; kind: string }>();
+  private unwinding: Array<{ q: number; t0: number }> = [];
+
+  /** A refused hex command's ghost ring unwinds (300 ms) instead of vanishing. */
+  private unwindGhost(seq: number): void {
+    const h = this.hexCmds.get(seq);
+    if (h) this.unwinding.push({ q: h.q, t0: performance.now() });
+    if (this.unwinding.length > 32) this.unwinding.shift();
+  }
+
+  /**
+   * Intent poses (game/intents.ts): the ants an order sends somewhere start turning toward it on this frame — a
+   * surface marker moved (its ants) or a group sent to a surface marker (the group's ants already up there).
+   */
+  private intentOf(cmd: Command): void {
+    const w = this.world;
+    const c = this.player;
+    if (this.arena) return;
+    let i = -1;
+    let member: ((a: Ant) => boolean) | null = null;
+    if (cmd.type === 'placeMarker' && cmd.space === SURFACE && !entranceAt(w, c, cmd.x, cmd.y)) {
+      i = cmd.i;
+      member = (a) => a.marker === i;
+    } else if (cmd.type === 'assignGroup' && cmd.marker >= 0) {
+      i = cmd.marker;
+      const tiles = new Set<number>();
+      for (const t of c.tiles) if (t.group === cmd.group) tiles.add(t.q);
+      member = (a) => a.tile >= 0 && tiles.has(a.tile);
+    }
+    if (!member) return;
+    const m = this.shownMarkers()[i];
+    if (!m || !m.placed || m.space !== SURFACE) return;
+    const ids = intentAnts(w.s.ants, c, m.x, m.y, markerRadius(w, c, i) * 0.8, member);
+    if (ids.length) intents.add(cmd.seq, ids, m.x, m.y);
+  }
+
+  /** A refused order: its intents fade, its hex ghost unwinds, and a reason meant for the player is said once. */
+  private refused(e: { seq: number; type: string; why?: string }): void {
+    const now = performance.now();
+    intents.reject(e.seq, now);
+    const why = e.why;
+    // (lower-case reasons are the simulation's own checks — a drag over hexes already dug — not news for the player)
+    if (why && /^[A-Z]/.test(why) && (why !== this.lastRefusal.text || now - this.lastRefusal.at > 2500)) {
+      this.lastRefusal = { text: why, at: now };
+      this.onEvent?.({ t: 'message', text: why, kind: 'warn' });
+    }
+  }
+  private lastRefusal = { text: '', at: 0 };
 
   // ---------------------------------------------------------------- replays
 
@@ -1373,9 +1445,14 @@ export class GameSession {
     return { at, nest: nearest(at), preview, nestP: nearest(preview) };
   }
 
-  /** Hexes with a command still waiting (ghost rings in the nest view). */
-  pendingHexes(): Array<{ q: number; kind: 'dig' | 'undig' | 'build' | 'upgrade' | 'delete' }> {
-    const out: Array<{ q: number; kind: 'dig' | 'undig' | 'build' | 'upgrade' | 'delete' }> = [];
+  /** Hexes with a command still waiting (ghost rings in the nest view), and refused ones unwinding (`fade` 1 → 0). */
+  pendingHexes(): Array<{ q: number; kind: 'dig' | 'undig' | 'build' | 'upgrade' | 'delete' | 'refused'; fade?: number }> {
+    const out: Array<{ q: number; kind: 'dig' | 'undig' | 'build' | 'upgrade' | 'delete' | 'refused'; fade?: number }> = [];
+    if (this.unwinding.length) {
+      const now = performance.now();
+      this.unwinding = this.unwinding.filter((u) => now - u.t0 < 300);
+      for (const u of this.unwinding) out.push({ q: u.q, kind: 'refused', fade: 1 - (now - u.t0) / 300 });
+    }
     for (const c of this.commands.pending()) {
       if (c.type === 'dig') out.push({ q: c.q, kind: c.on ? 'dig' : 'undig' });
       else if (c.type === 'buildTile') out.push({ q: c.q, kind: 'build' });
@@ -1741,6 +1818,7 @@ export class GameSession {
     const v = this.view;
     this.frameNo++;
     const f0 = performance.now();
+    if (this.frameNo % 60 === 0) intents.prune(f0);
     this.netFrame();
     this.events.drain();
     if (this.frameNo % 30 === 0) this.autosave();
@@ -1784,13 +1862,21 @@ export class GameSession {
         if (n >= views.length) views.push(blankView());
         return views[n++];
       };
+      // (ants well out of view get no view and no animation this frame: render/viewCull.ts)
+      const cull = this.cull;
+      cull.begin(cam);
+      const pos = this.surfMap.pos;
       for (const a of w.s.ants) {
         if (a.space !== SURFACE) continue;
         if (a.state === AS.Dead && a.deadT > 30) continue;
+        if (!cull.keeps(a, pos)) continue;
         antToView(w, a, take(), 0, 0);
       }
-      for (const f of w.s.food) if (f.space === SURFACE && f.kind === 'corpse' && f.from.includes('_')) corpseToView(f, take(), 0, f.from);
-      const list = n === views.length ? views : views.slice(0, n);
+      for (const f of w.s.food) if (f.space === SURFACE && f.kind === 'corpse' && f.from.includes('_') && cull.keepsPoint(f.x, f.y, pos)) corpseToView(f, take(), 0, f.from);
+      // (the list is kept, not sliced: no garbage per frame)
+      const list = this.viewList;
+      list.length = n;
+      for (let i = 0; i < n; i++) list[i] = views[i];
       const t = w.terrain;
       this.mounds.update(w, this.terrainHeight);
       // (a story rain shower: the storm light while it lasts, easing in and out over 8 s)

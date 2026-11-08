@@ -5,8 +5,8 @@
  * - **Input → feedback**: from the input event (its own timestamp, so the time it waited for the page counts) to the
  *   end of the first animation frame that started after it — the frame that draws the reaction (a selection ring, a
  *   marker, a ghost hex, the camera's move). The compositor shows that frame at the next vsync, a few ms later.
- * - **Input → acting**: from the input to the end of the first frame after the simulation applied the command and ran
- *   a tick with it (the units start to move).
+ * - **Input → acting**: from the input to the end of the first frame that draws the tick the command acts in (the units
+ *   seen to start moving: in worker mode the playout clock's tick, a little behind the newest — game/playout.ts).
  * - **Command latency**: issue → the tick that applies it, in ticks and ms (single-player: the next tick; multiplayer:
  *   the lockstep delay plus the round trip).
  * - **Frame pacing**: the animation frame intervals, their jitter (mean |change| from one interval to the next),
@@ -107,7 +107,7 @@ export class Feel {
     if (this.applied.length > 64) this.applied.shift();
   }
 
-  /** The end of an animation frame (`tick`: the simulation tick drawn). */
+  /** The end of an animation frame (`tick`: the simulation tick drawn, fractional in worker mode). */
   frameEnd(frameStart: number, tick: number): void {
     const now = performance.now();
     // input → feedback: inputs from before this frame started are drawn in it

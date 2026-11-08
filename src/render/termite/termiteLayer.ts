@@ -173,6 +173,11 @@ export class TermiteLayer {
     const scale = (v.scale ?? 1) * (caste === 'worker' ? (v.variant === 1 ? WORKER_VARIANT_SCALE.female : WORKER_VARIANT_SCALE.male) : 1) * (1 + v.sizeVar * 0.05);
     // on a creature: its animated leg or back decides where the termite is (sim/climbing.ts)
     const mounted = !!v.rideCr && !!this.mount && this.mount(v, alpha, mountOut);
+    // (back after frames it was left out of the views — off screen, render/viewCull.ts: no stride from the gap)
+    if (u.seen < this.frame - 1) {
+      u.lastX = x;
+      u.lastY = y;
+    }
     const moved = mounted ? mountOut.speed * dt : Math.hypot(x - u.lastX, y - u.lastY);
     const speed = dt > 0 ? moved / dt : 0;
     u.lastX = x;

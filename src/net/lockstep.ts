@@ -15,7 +15,8 @@
  */
 import { Command, sortCommands } from '../sim/commands';
 
-export const MIN_DELAY = 2;
+/** (a LAN's packets cross in a few ms: one tick is enough there — performance v2, CHANGE_PLAN §29) */
+export const MIN_DELAY = 1;
 export const MAX_DELAY = 8;
 
 interface PlayerState {
