@@ -5,7 +5,7 @@
  * Audio v3 (claude/audio/03-spec-sfx-rework-insect.md): every effect is a file. Each sound's takes are rendered
  * offline by tools/audio/sfx (one recipe per sound, from the physics of the real thing: docs/audio/sound-research.md)
  * or come from a recording in audio-src/recordings, and are packed into one file per sound
- * (`public/audio/<folder>/<name>.ogg` and `.m4a`, its takes one after another) listed in `public/audio/manifest.json`.
+ * (`public/audio/<folder>/<name>.ogg` and `.mp4`, its takes one after another) listed in `public/audio/manifest.json`.
  * Only the music and the narration cue are still made in the game (`recipe`, instruments.ts).
  */
 

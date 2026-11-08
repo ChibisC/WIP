@@ -49,7 +49,7 @@ export class Bank {
     if (typeof window === 'undefined') return;
     try {
       const a = document.createElement('audio');
-      if (!a.canPlayType('audio/ogg; codecs="vorbis"')) this.ext = 'm4a';
+      if (!a.canPlayType('audio/ogg; codecs="vorbis"')) this.ext = 'mp4';
     } catch {
       // keep ogg
     }

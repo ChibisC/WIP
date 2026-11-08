@@ -7,7 +7,7 @@ Generated from `src/audio/catalog.ts` by `npm run audio:list`: edit the catalog,
 
 ## How sounds are made and packed
 
-`npm run audio:build` (Python 3 with numpy, scipy, soundfile and pyloudnorm; ffmpeg) renders every recipe's takes into `audio-src/rendered/` (not committed), finishes them (trimmed to start on their first sound, short fades, loudness-normalised, loops made seamless) and packs each sound's takes into one file, `public/audio/<folder>/<name>.ogg` plus `.m4a` (AAC, for Safari without Ogg), listed with each take's position in `public/audio/manifest.json`. `npm run audio:build render <filter>` re-renders some; `npm run audio:build pack` re-packs.
+`npm run audio:build` (Python 3 with numpy, scipy, soundfile and pyloudnorm; ffmpeg) renders every recipe's takes into `audio-src/rendered/` (not committed), finishes them (trimmed to start on their first sound, short fades, loudness-normalised, loops made seamless) and packs each sound's takes into one file, `public/audio/<folder>/<name>.ogg` plus `.mp4` (AAC, for Safari without Ogg), listed with each take's position in `public/audio/manifest.json`. `npm run audio:build render <filter>` re-renders some; `npm run audio:build pack` re-packs.
 
 ## How to add a recording
 
