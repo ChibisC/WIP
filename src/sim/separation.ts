@@ -1,4 +1,5 @@
 import { World } from './world';
+import type { SpatialHash } from './spatial';
 import { Ant, AS, Creature } from './types';
 import { casteOf } from './species';
 import { BALANCE, GUARD } from './balance';
@@ -144,6 +145,11 @@ export function separationSystem(w: World, dt: number): void {
   P.ps = PS;
   P.ws = BALANCE.combat21.waitSpace;
   P.dt = dt;
+  // (ants are in id order — they are appended with new ids and removed in place — so "the lower id" is "the lower
+  // index": the pair loop drops the pairs the other ant handles before it touches them; checked, else pairCb decides)
+  let sorted = true;
+  for (let i = 1; i < n && sorted; i++) if (ants[i].id <= ants[i - 1].id) sorted = false;
+  rawSpace = -1;
   for (let i = 0; i < n; i++) {
     const fa = flag[i];
     if (!(fa & 1)) continue;
@@ -160,7 +166,7 @@ export function separationSystem(w: World, dt: number): void {
     let q = ra + (P.big ? Math.max(maxR, ra) : maxR);
     // a fighting ant looks as far as a fighting ally's personal space (pairs with big ants are the big one's)
     if (fa & 16) q = Math.max(q, PS * Math.max(len[i], P.big ? maxFightLBig : maxFightL));
-    w.antIdxNear(a.space, a.x, a.y, q, pairCb);
+    pairsNear(w, ants, a.space, a.x, a.y, q, i, P.big, sorted);
   }
   // the feet of tall ants push the small ants standing under them (combat v2.2)
   for (let t = 0; t < n; t++) {
@@ -450,6 +456,46 @@ function engaged(a: Ant, o: Ant): boolean {
 
 function foeId(a: Ant): number {
   return a.state === AS.Grapple ? a.gId : a.tgt;
+}
+
+/** The hash being walked by `pairsNear` (its arrays fetched once per space and tick). */
+let rawSpace = -1; // det-ok: scratch, reset every tick
+let raw: ReturnType<SpatialHash['raw']> | null = null; // det-ok: scratch
+
+/**
+ * The neighbours of ant `self` within r, in the hash's order (as `antIdxNear` gives them), each passed to `pairCb` —
+ * but the ones pairCb would drop at once (itself, not taking part, a pair the other ant handles) are dropped here
+ * without touching them (performance v3: the same pairs in the same order, about half the work in a crowd).
+ */
+function pairsNear(w: World, ants: Ant[], space: number, x: number, y: number, r: number, self: number, selfBig: boolean, sorted: boolean): void {
+  if (space !== rawSpace || !raw) {
+    const h = w.antHash(space);
+    if (!h) return;
+    raw = h.raw();
+    rawSpace = space;
+  }
+  const { head, next, items, xs, ys, w: hw, h: hh, cell: c } = raw;
+  const x0 = Math.max(0, Math.floor((x - r) / c) + 1);
+  const x1 = Math.min(hw - 1, Math.floor((x + r) / c) + 1);
+  const y0 = Math.max(0, Math.floor((y - r) / c) + 1);
+  const y1 = Math.min(hh - 1, Math.floor((y + r) / c) + 1);
+  const r2 = r * r;
+  for (let cy = y0; cy <= y1; cy++)
+    for (let cx = x0; cx <= x1; cx++) {
+      let e = head[cy * hw + cx];
+      while (e !== -1) {
+        const dx = xs[e] - x;
+        const dy = ys[e] - y;
+        if (dx * dx + dy * dy <= r2) {
+          const k = items[e];
+          if (k !== self && flag[k] & 1 && !(sorted && (selfBig === rad[k] > BIG ? k < self : !selfBig))) {
+            const o = ants[k];
+            if (o && o.space === space) pairCb(k);
+          }
+        }
+        e = next[e];
+      }
+    }
 }
 
 function pairCb(j: number): boolean {

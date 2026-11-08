@@ -322,6 +322,11 @@ export class World {
     for (let i = 0; i < cr.length; i++) if (cr[i].space === SURFACE && !cr[i].dead) this.creatureHash.insert(i, cr[i].x, cr[i].y);
   }
 
+  /** The spatial hash of a space's ants (built at the tick start), or undefined (performance v3: separation.ts). */
+  antHash(space: number): SpatialHash | undefined {
+    return space === SURFACE ? this.antHashSurface : this.antHashNest.get(space);
+  }
+
   /** Ants near a point in a space (callback receives the ant). */
   antsNear(space: number, x: number, y: number, r: number, cb: (a: Ant, d2: number) => boolean | void): void {
     const h = space === SURFACE ? this.antHashSurface : this.antHashNest.get(space);

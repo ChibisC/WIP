@@ -27,6 +27,11 @@ export class SpatialHash {
     this.tags = new Int32Array(capacity);
   }
 
+  /** The hash's arrays, for a hot loop that walks the cells itself (performance v3: separation.ts; read only). */
+  raw(): { head: Int32Array; next: Int32Array; items: Int32Array; xs: Float32Array; ys: Float32Array; w: number; h: number; cell: number } {
+    return { head: this.head, next: this.next, items: this.items, xs: this.xs, ys: this.ys, w: this.w, h: this.h, cell: this.cell };
+  }
+
   clear(): void {
     this.head.fill(-1);
     this.count = 0;

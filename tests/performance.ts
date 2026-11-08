@@ -26,7 +26,6 @@ import { createStressWorld } from '../src/dev/stressScene';
 import { ColumnReader, ColumnWriter, columnCodegen } from '../src/sim/columns';
 import { antShape } from '../src/sim/factory';
 import { encodeState, hashState, restoreWorld } from '../src/sim/snapshot';
-import { readFileSync } from 'node:fs';
 
 const t0 = Date.now();
 let failed = 0;
@@ -332,7 +331,8 @@ function check(name: string, ok: boolean, detail = ''): void {
 
 // ---- one object shape for every ant (performance v3: sim/factory.ts antShape)
 {
-  const src = readFileSync(new URL('../src/sim/types.ts', import.meta.url), 'utf8');
+  const fs = (await import(/* @vite-ignore */ 'node:' + 'fs')) as { readFileSync(p: URL, enc: string): string };
+  const src = fs.readFileSync(new URL('../src/sim/types.ts', import.meta.url), 'utf8');
   const body = src.slice(src.indexOf('export interface Ant {'), src.indexOf('\n}\n', src.indexOf('export interface Ant {')));
   const declared = [...body.matchAll(/^ {2}([A-Za-z_][A-Za-z0-9_]*)\??\s*:/gm)].map((m) => m[1]);
   const shape = Object.keys(antShape());
