@@ -21,36 +21,75 @@ def squeak(r, chirps=None, quiet=1.0, rate=(600, 1100), f=(3000, 9500)):
     return quiet * norm(stridulate(r, chirps or r.i(2, 4), f[0], f[1], (0.0003, 0.0014), (0.025, 0.06), (0.04, 0.09), rate, 0.3))
 
 
+def squeal(r, chirps=None, quiet=1.0):
+    """A squeal: faster, shorter, harder-swept stridulation chirps (the file dragged fast under load), dry and close:
+    the body is lower and dies quicker than squeak's, so it chirps instead of ringing."""
+    return quiet * norm(stridulate(r, chirps or r.i(2, 4), 1800, 6500, (0.0002, 0.0008), (0.012, 0.035), (0.02, 0.05), (1300, 2400), 0.55, body_n=2))
+
+
+def zipper(r, dur, catches=(1800, 3200), f=(1400, 5500)):
+    """A zipper: a dense, even train of friction catches (claws dragged across sclerites) with no breathy rub and no
+    slow swell; the pressure is a few quick jerks, so it reads as a zip being pulled, never as a wash."""
+    n = int(dur * SR) + 1
+    t = tlin(n)
+    p = np.full(n, 0.55)
+    for _ in range(r.i(2, 5)):
+        c = r.u(0, dur)
+        w = r.u(0.008, 0.03)
+        p += r.u(0.5, 1) * np.exp(-((t - c) / w) ** 2)
+    p = p / p.max()
+    return norm(friction(r, dur, r.u(*catches), f[0], f[1], (0.0002, 0.0009), rub=0.03, pressure=p, body_n=3))
+
+
+def body(r, f_lo, f_hi, dec=(0.004, 0.011), n=2):
+    """The low-mid body of a bite: the head capsule and the bitten body thumping (150-600 Hz), a few milliseconds
+    long so it adds weight without boom; a lowpassed contact burst gives it its front edge."""
+    m = body_ir(r, f_lo, f_hi, n, dec)
+    b = lp(burst(r, 0.006, 0.0001, 0.0015), f_hi * 2)
+    o = np.zeros(max(len(m), len(b)))
+    o[:len(m)] += norm(m)
+    o[:len(b)] += 0.5 * norm(b)
+    return norm(o)
+
+
 # ------------------------------------------------------------------ bites
 
 
 @sound("combat.mandible_click", takes=6)
 def mandible_click(r, k):
     # a worker's bite: a dry, high double click of the mandible tips closing on chitin
-    o = zeros(0.04)
-    double_click(r, o, 0.001, 3200, 11000, (0.0008, 0.004))
-    add(o, grains(r, 0.012, r.i(1, 3), 4000, 10000, (0.0003, 0.001)), 0.006, 0.25)
+    # (pass 2: deeper, the lightest of the bites still: the tips' modes a third lower and a touch of head-capsule
+    # body under them, the grains kept crisp)
+    o = zeros(0.045)
+    double_click(r, o, 0.001, 2000, 7000, (0.0007, 0.0035))
+    add(o, body(r, 350, 750, (0.003, 0.007)), 0.001, 0.3)
+    add(o, grains(r, 0.012, r.i(1, 3), 3000, 8000, (0.0003, 0.001)), 0.006, 0.25)
     return o
 
 
 @sound("combat.mandible_snap", takes=6)
 def mandible_snap(r, k):
-    # a soldier's or major's bite: a sharper click with a brittle crunch of cuticle giving way
-    o = zeros(0.08)
-    add(o, hp(burst(r, 0.004, 0.00003, 0.0003), 2500), 0.001, 0.9)
-    double_click(r, o, 0.001, 2400, 9000, (0.001, 0.006), sep=(0.002, 0.006), snap=0.8)
-    add(o, crunch(r, r.u(0.022, 0.035), r.i(8, 14), 8000, 3200, 2.0, (0.0004, 0.002)), r.u(0.004, 0.008), 0.55)
+    # a soldier's or major's bite: a sharp click with a brittle crunch of cuticle giving way
+    # (pass 2: deeper: the click's modes and the crunch an octave lower, the contact burst kept sharp, and the major's
+    # head capsule thumping under it)
+    o = zeros(0.09)
+    add(o, hp(burst(r, 0.004, 0.00003, 0.0003), 1800), 0.001, 0.9)
+    double_click(r, o, 0.001, 1200, 4800, (0.001, 0.005), sep=(0.002, 0.006), snap=0.8)
+    add(o, body(r, 220, 520), 0.001, 0.6)
+    add(o, crunch(r, r.u(0.022, 0.035), r.i(8, 14), 4800, 1800, 2.0, (0.0004, 0.002)), r.u(0.004, 0.008), 0.55)
     return o
 
 
 @sound("combat.bite_crush", takes=5)
 def bite_crush(r, k):
     # a crushing bite (fire ant majors, Atta majors, the Termant soldier's Macrotermes jaws): a click, then a dense
-    # crunch of many tiny fractures, its resonance falling as the cuticle breaks down; slightly lower and fuller
+    # crunch of many tiny fractures, its resonance falling as the cuticle breaks down; the lowest and fullest bite
+    # (pass 2: deeper: click and crunch an octave down, a heavy low-mid body, the late cracks down in the low mids)
     o = zeros(0.16)
-    add(o, click(r, 1800, 6500, 4, (0.0015, 0.007), 0.9), 0.001, 1.0)
-    add(o, crunch(r, r.u(0.06, 0.1), r.i(26, 40), 6500, 1700, 1.8, (0.0005, 0.003), 0.6), 0.003, 0.9)
-    add(o, crunch(r, 0.03, r.i(5, 8), 2600, 1200, 1.2, (0.001, 0.005)), r.u(0.01, 0.02), 0.45)
+    add(o, click(r, 900, 3400, 4, (0.0015, 0.006), 0.9), 0.001, 1.0)
+    add(o, body(r, 160, 420, (0.006, 0.014), 3), 0.001, 0.7)
+    add(o, crunch(r, r.u(0.06, 0.1), r.i(26, 40), 4000, 1000, 1.8, (0.0005, 0.003), 0.6), 0.003, 0.9)
+    add(o, crunch(r, 0.03, r.i(5, 8), 1500, 600, 1.2, (0.001, 0.005)), r.u(0.01, 0.02), 0.5)
     return o
 
 
@@ -58,21 +97,26 @@ def bite_crush(r, k):
 def scissor_cut(r, k):
     # a leafcutter's shear: the blades rasp past each other (a short, stridulation-like rasp: Atta stridulate while
     # they cut, the "vibratome") and close with a snip
+    # (pass 2: deeper and no plink: the rasp's body a lot lower and quicker to die, the snip a dull, short closing
+    # click with a body thump instead of a ringing high click)
     o = zeros(0.12)
     L = r.u(0.045, 0.07)
-    rasp = stridulate(r, 1, 3500, 10000, (0.0003, 0.0012), (0.0, 0.0), (L, L), (1600, 2400), 0.3)
+    rasp = stridulate(r, 1, 1600, 5500, (0.0002, 0.0008), (0.0, 0.0), (L, L), (1600, 2400), 0.3, body_n=2)
     add(o, norm(rasp), 0.002, 0.6)
-    add(o, friction(r, L, 1800, 4000, 11000, (0.0003, 0.0012), 0.15), 0.002, 0.35)
-    add(o, click(r, 3000, 10000, 4, (0.0008, 0.004), 0.9), 0.002 + L, 1.0)
+    add(o, friction(r, L, 1800, 1800, 6000, (0.0002, 0.0008), 0.05), 0.002, 0.35)
+    add(o, click(r, 1100, 3600, 3, (0.0005, 0.0018), 1.0), 0.002 + L, 1.0)
+    add(o, body(r, 260, 600, (0.003, 0.008)), 0.002 + L, 0.5)
     return o
 
 
 @sound("combat.chitin_crack", takes=6)
 def chitin_crack(r, k):
     # a heavy hit: a brittle crunch of cuticle cracking
+    # (pass 2: deeper: click and crunch an octave down, the struck body thumping under the crack)
     o = zeros(0.1)
-    add(o, click(r, 2200, 8000, 4, (0.001, 0.005), 1.0), 0.001, 1.0)
-    add(o, crunch(r, r.u(0.035, 0.07), r.i(14, 24), 8500, 2400, 2.0, (0.0004, 0.0025)), 0.002, 0.8)
+    add(o, click(r, 1100, 4200, 4, (0.001, 0.0045), 1.0), 0.001, 1.0)
+    add(o, body(r, 200, 500), 0.001, 0.55)
+    add(o, crunch(r, r.u(0.035, 0.07), r.i(14, 24), 5000, 1400, 2.0, (0.0004, 0.0025)), 0.002, 0.8)
     return o
 
 
@@ -102,11 +146,14 @@ def termite_bite(r, k):
 def grip(r, k):
     # taking hold (a grip at the start of a hold, a claw catching a creature's leg): legs scraping on chitin and the
     # held ant's squeak
+    # (pass 2: dry and insect-like, not ghostly: the scrape is a zipper of claw catches with no breathy rub or slow
+    # swell, and the held ant squeals, fast chirps rather than ringing squeaks)
     o = zeros(0.4)
-    add(o, click(r, 2500, 8000, 3, (0.001, 0.004), 0.7), 0.001, 0.8)
-    add(o, norm(friction(r, r.u(0.18, 0.28), r.u(500, 900), 2500, 9000, (0.0003, 0.0015), 0.2)), 0.004, 0.55)
-    if r.chance(0.8):
-        add(o, squeak(r, r.i(1, 3)), r.u(0.04, 0.1), 0.5)
+    add(o, click(r, 1600, 6000, 3, (0.0008, 0.0035), 0.7), 0.001, 0.8)
+    add(o, body(r, 280, 600, (0.003, 0.007)), 0.001, 0.35)
+    add(o, zipper(r, r.u(0.14, 0.24)), 0.004, 0.55)
+    if r.chance(0.85):
+        add(o, squeal(r, r.i(1, 3)), r.u(0.03, 0.09), 0.5)
     return o
 
 
@@ -127,16 +174,18 @@ def struggle(r, k):
 def grapple_scuffle(r, k):
     # the scuffle bed (ants grappling in view): scrabbling legs, bodies rubbing, grips and squeaks, as one texture the
     # game plays in short grains
+    # (pass 2: the ghostly wash is gone: the scrabbling is short zipper pulls of claw catches with no breathy rub or
+    # slow swells, the squeaks are quick squeals, and the clicks ring low and briefly)
     dur = 8.0
     o = zeros(dur)
     t = 0.0
     while t < dur - 0.4:
-        add(o, norm(friction(r, r.u(0.12, 0.35), r.u(500, 1200), 2200, 9500, (0.0003, 0.0016), 0.2)), t, r.u(0.4, 1.0))
+        add(o, zipper(r, r.u(0.06, 0.22)), t, r.u(0.4, 1.0))
         t += r.u(0.05, 0.16)
     for _ in range(int(dur * 7)):
-        add(o, click(r, 2600, 10000, 3, (0.0006, 0.003), 0.6), r.u(0, dur - 0.05), r.u(0.2, 0.6))
-    for _ in range(int(dur * 1.5)):
-        add(o, squeak(r, r.i(1, 2)), r.u(0, dur - 0.3), r.u(0.15, 0.4))
+        add(o, click(r, 1600, 6000, 3, (0.0005, 0.0025), 0.6), r.u(0, dur - 0.05), r.u(0.2, 0.6))
+    for _ in range(int(dur * 2.5)):
+        add(o, squeal(r, r.i(1, 2)), r.u(0, dur - 0.3), r.u(0.15, 0.4))
     return o
 
 
@@ -279,10 +328,13 @@ def army_hook(r, k):
 @sound("species.sickle_snap", takes=4)
 def sickle_snap(r, k):
     # a sickle-jaw soldier grabbing: long crossed blades snapping shut, the second blade a hair behind
-    o = zeros(0.05)
-    add(o, hp(burst(r, 0.002, 0.00002, 0.0002), 2000), 0.001, 0.8)
-    add(o, click(r, 2800, 10000, 4, (0.0006, 0.003), 0.9), 0.001, 1.0)
-    add(o, click(r, 2400, 8000, 3, (0.0008, 0.004), 0.7), 0.001 + r.u(0.002, 0.005), 0.6)
+    # (pass 2: the same deeper treatment as mandible_snap, which it is built like: blades' modes lower, the burst
+    # kept sharp, a little head-capsule body under the close)
+    o = zeros(0.055)
+    add(o, hp(burst(r, 0.002, 0.00002, 0.0002), 1600), 0.001, 0.8)
+    add(o, click(r, 1500, 5500, 4, (0.0006, 0.003), 0.9), 0.001, 1.0)
+    add(o, click(r, 1300, 4500, 3, (0.0008, 0.0035), 0.7), 0.001 + r.u(0.002, 0.005), 0.6)
+    add(o, body(r, 240, 560, (0.003, 0.008)), 0.001, 0.45)
     return o
 
 
@@ -422,22 +474,22 @@ def termite_death(r, k):
 def battle_bed(r, k):
     # a fight too big for single voices, heard as one texture: a dense insect brawl of clicks, crunches, scrapes,
     # stings and stridulation squeaks (never a crowd of people)
+    # (pass 2: no plinks and nothing ghostly: the high ringing tick layer and the airy fizz are gone, the bites ring
+    # lower and shorter, the scrapes are dry zipper pulls, and squeals join the stridulation)
     dur = 12.0
     o = zeros(dur)
     for _ in range(int(dur * 55)):
         o2 = zeros(0.03)
-        double_click(r, o2, 0.0, r.u(2500, 4000), r.u(8000, 12000), (0.0008, 0.004))
+        double_click(r, o2, 0.0, r.u(1500, 2600), r.u(5000, 8000), (0.0006, 0.0025))
         add(o, o2, r.u(0, dur - 0.05), r.u(0.15, 0.9))
     for _ in range(int(dur * 9)):
-        add(o, crunch(r, r.u(0.02, 0.06), r.i(6, 18), r.u(6000, 9000), r.u(1800, 3000), 2.0, (0.0004, 0.0025)), r.u(0, dur - 0.1), r.u(0.2, 0.7))
+        add(o, crunch(r, r.u(0.02, 0.06), r.i(6, 18), r.u(4000, 6500), r.u(1200, 2200), 2.0, (0.0004, 0.002)), r.u(0, dur - 0.1), r.u(0.2, 0.7))
     t = 0.0
     while t < dur - 0.4:
-        add(o, norm(friction(r, r.u(0.1, 0.3), r.u(500, 1100), 2200, 9500, (0.0003, 0.0016), 0.2)), t, r.u(0.15, 0.45))
+        add(o, zipper(r, r.u(0.06, 0.2)), t, r.u(0.15, 0.45))
         t += r.u(0.04, 0.12)
-    for _ in range(int(dur * 2.5)):
-        add(o, squeak(r, r.i(1, 3)), r.u(0, dur - 0.4), r.u(0.12, 0.35))
-    for _ in range(int(dur * 4)):
-        add(o, click(r, 5500, 12500, 3, (0.0003, 0.0015), 0.7), r.u(0, dur - 0.05), r.u(0.1, 0.4))
-    for _ in range(int(dur * 0.8)):
-        add(o, fizz(r, 0.2, 900, 5000, 13000, 0.15), r.u(0, dur - 0.3), r.u(0.05, 0.15))
+    for _ in range(int(dur * 1.5)):
+        add(o, squeak(r, r.i(1, 3), 1.0, (800, 1300), (2200, 7000)), r.u(0, dur - 0.4), r.u(0.12, 0.3))
+    for _ in range(int(dur * 2.0)):
+        add(o, squeal(r, r.i(1, 3)), r.u(0, dur - 0.3), r.u(0.12, 0.35))
     return o
