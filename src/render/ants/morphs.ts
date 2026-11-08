@@ -7,7 +7,7 @@ import type { MandibleSpec } from '../anatomy/mandible';
 import { ECITON_MINOR_JAW, ATTA_QUEEN_JAW, ATTA_MAJOR_JAW, ATTA_MEDIA_JAW, ATTA_MINIM_JAW, ATTA_SOLDIER_JAW, FIRE_MAJOR, FIRE_WORKER, FORMICA_WORKER, LASIUS_WORKER, LASIUS_SOLDIER_JAW, FORMICA_SOLDIER_JAW } from '../anatomy/mandibleSpecs';
 
 export type HeadShape = 'round' | 'heart' | 'rect' | 'tri' | 'square';
-export type MandibleType = 'triangular' | 'falcate' | 'massive' | 'small';
+export type MandibleType = 'triangular' | 'falcate' | 'massive' | 'small' | 'sabre';
 
 export interface PartLook {
   color: number;
@@ -37,13 +37,23 @@ export interface AntMorph {
     frontMix?: number;
     /** dark antennal sockets (army-ant majors) */
     sockets?: number;
-    /** frontal gland pore (a stubby termite nasus) between the antenna bases: length and radius in head lengths, upward tilt */
-    pore?: { len: number; r: number; up: number };
+    /** the frontal gland's pore (Termant soldiers, spec 09 §3.1: no nasus — the fontanelle, as in Coptotermes): its radius in head lengths */
+    fontanelle?: number;
   };
   /** `none`: eyeless (termite soldiers, Termant soldiers) */
   eyes: { size: number; pos: number; height: number; ocelli: boolean; single?: boolean; none?: boolean; /** length ÷ height of the eye (default 1.15) */ oval?: number };
   /** `bead`: funiculus segments swell toward the tip (moniliform, termite-like; LOD0) */
-  antenna: { segments: number; scape: number; funiculus: number; club: number; thick: number; bead?: number };
+  antenna: {
+    segments: number;
+    scape: number;
+    funiculus: number;
+    club: number;
+    thick: number;
+    bead?: number;
+    /** termite antennae (Termants, spec 09 §3.1): straight and moniliform — a short basal segment (`scape`, head
+     *  lengths) and barrel-shaped beads in one gentle forward curve, no elbow */
+    termite?: boolean;
+  };
   mandible: {
     type: MandibleType;
     len: number;
@@ -713,6 +723,7 @@ import { HELL_MORPHS } from './hellMorphs';
 import { SAIY_MORPHS } from './saiyMorphs';
 import { TERMANT_MORPHS } from './termantMorphs';
 import { NASUTE_MORPHS } from './nasuteMorphs';
+import { RHY_MORPHS } from './rhyMorphs';
 
 export const MORPHS: Record<string, AntMorph> = {
   ...(HELL_MORPHS as unknown as Record<string, AntMorph>),
@@ -720,6 +731,7 @@ export const MORPHS: Record<string, AntMorph> = {
   ...TERMANT_MORPHS,
   // (realism round 3: the nasute worker, soldier and major on the ant pipeline; nasuteBuilder.ts)
   ...(NASUTE_MORPHS as unknown as Record<string, AntMorph>),
+  ...(RHY_MORPHS as unknown as Record<string, AntMorph>),
   plagiaria_worker: plagiariaWorker,
   plagiaria_queen: plagiariaQueen,
   lasius_worker: lasiusWorker,

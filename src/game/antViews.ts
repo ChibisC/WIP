@@ -479,6 +479,15 @@ function speciesExtras(w: World, a: Ant, out: AntView): void {
       out.exhausted = 0;
       if (dur - t < 0.25) out.roll += Math.sin(w.time * 40 + a.id) * 0.08; // the shiver as the ripple passes
       out.antennaPitch -= 0.3;
+      // (model redo, claude/realism/10-spec §2) the stretch as the gold comes on: the head thrown up, the gaster lifted,
+      // overshooting and settling with the ripple
+      if (t > dur - S.rampIn) {
+        const k = Math.min(1, (dur - t) / S.rampIn);
+        const st = Math.sin(Math.PI * k) * (1 + 0.25 * Math.sin(Math.PI * 2 * k));
+        out.headPitch += 0.32 * st;
+        out.gaster += 0.35 * st;
+        out.antennaPitch += 0.5 * st;
+      }
     } else {
       const cdn = a.level >= 2 ? S.cooldownL2 : S.cooldown;
       out.gold = 0;
@@ -612,6 +621,10 @@ function nasuteAntPath(w: World, a: Ant, out: AntView, st: number): void {
   const cd = casteOf(a.caste);
   if (cd.termite === 'worker') out.scale = (out.scale ?? 1) * (a.variant === 1 ? WORKER_VARIANT_SCALE.female : WORKER_VARIANT_SCALE.male);
   if (a.state === AS.Dead) return;
+  if (cd.termite === 'sickle') {
+    sickleAntPath(w, a, out, st);
+    return;
+  }
   if (st === AnimState.FIRE) {
     const rate = 2.4;
     out.special = 6;
@@ -640,6 +653,53 @@ function nasuteAntPath(w: World, a: Ant, out: AntView, st: number): void {
     out.antennaActivity = 1;
   } else if (st === AnimState.CHEW) {
     // chewing wood: the head low, short jerks, the jaws working
+    out.headPitch = -0.3 + 0.08 * Math.sin(w.time * 9 + a.id);
+    out.mandible = 0.45 + 0.4 * Math.sin(w.time * 11 + a.id);
+  }
+}
+
+/**
+ * The sickle-jaw soldier on the ant pipeline (model redo, claude/realism/10-spec §3): the kit's states as attack
+ * cycles and poses of the shared ant views —
+ *  - LUNGE: special 7, the grab (attackPoses S_GRAB), its phase the sim's lunge (the snap at LUNGE_SNAP);
+ *  - HOLD: holding a victim, special 8 (S_HOLD) pulsing with the squirts; a free target too big to hook, special 9
+ *    (S_SQUIRT); the head turned toward the aim point either way;
+ *  - THREAT (an escort slot, or a foe in reach but not yet hooked): planted, the head raised so the snout points forward
+ *    and up, the sickles gaping wide, the antennae busy; RUSH: running at it with the head up and the sickles half open;
+ *  - ALARM: the drum (special 5), the feet planted.
+ */
+function sickleAntPath(w: World, a: Ant, out: AntView, st: number): void {
+  const cycle = (special: number, q: number, gap: number) => {
+    out.special = special;
+    out.atk = q;
+    out.atkGap = gap;
+    out.atkVar = 0;
+    out.atkSide = a.id & 1 ? 1 : -1;
+    out.atkN = 0;
+    out.atkSeq = true;
+    out.antennaActivity = 1;
+  };
+  const aim = () => {
+    if (out.aimX === undefined || out.aimY === undefined) return;
+    let d = Math.atan2(out.aimY - a.y, out.aimX - a.x) - a.h;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    out.headYaw = Math.max(-0.6, Math.min(0.6, d));
+  };
+  if (st === AnimState.LUNGE) {
+    cycle(7, Math.min(0.999, out.tStateT ?? 0), LUNGE_SEC);
+    aim();
+  } else if (st === AnimState.HOLD) {
+    // the squirts' pulse runs faster as the secretion ramps (the kit's acid stream: 3 → 12 a second)
+    const rate = 1.4 + 2.2 * (out.ramp ?? 0);
+    cycle(a.state === AS.Hold ? 8 : 9, out.firing ? (w.time * rate + (a.id % 7) * 0.13) % 1 : 0.6, 1 / rate);
+    aim();
+  } else if (st === AnimState.ALARM) {
+    cycle(5, (w.time * 6 + (a.id % 5) * 0.2) % 1, 1 / 6);
+  } else if (st === AnimState.THREAT || st === AnimState.RUSH) {
+    out.headPitch = (out.headPitch ?? 0) + (st === AnimState.THREAT ? 0.22 : 0.12);
+    out.mandible = Math.max(out.mandible, st === AnimState.THREAT ? 0.85 + 0.15 * Math.sin(w.time * 3 + a.id) : 0.5);
+    out.antennaActivity = 1;
+  } else if (st === AnimState.CHEW) {
     out.headPitch = -0.3 + 0.08 * Math.sin(w.time * 9 + a.id);
     out.mandible = 0.45 + 0.4 * Math.sin(w.time * 11 + a.id);
   }
@@ -874,7 +934,7 @@ export function termiteBroodToView(b: Brood, out: AntView, space: number): AntVi
   const preFrac = rhy ? SICKLE.presoldierFraction : NASUTE.presoldierFraction;
   const pre = soldier && b.t >= 1 - preFrac;
   out.id = -(2_000_000 + b.id);
-  out.morph = pre ? cd.morph : rhy ? 'termite_rhy_larva' : 'termite_larva';
+  out.morph = pre ? (rhy ? 'termite_rhy_presoldier' : cd.morph) : rhy ? 'termite_rhy_larva' : 'termite_larva';
   out.space = space;
   out.x = out.px = b.x;
   out.y = out.py = b.y;

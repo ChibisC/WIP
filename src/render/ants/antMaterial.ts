@@ -254,15 +254,19 @@ vec3 animP = position;
         yaw = mix(yaw, side * 0.15, poseW);
       }
     } else if (pose == 2) {
-      float rub = sin(pph * 6.2831);
-      if (pair == 2) {
-        yaw = mix(yaw, side * (-0.15 + 0.35 * rub), poseW);
-        lft = mix(lft, 0.55 + 0.15 * rub * side, poseW);
-        knee = mix(knee, -0.5, poseW);
-      } else if (pair == 0) {
-        yaw = mix(yaw, side * (0.85 + 0.2 * rub * side), poseW);
-        lft = mix(lft, 0.85, poseW);
-        knee = mix(knee, -1.2, poseW);
+      // (user, review 2026-11-07: "fix the idle animation on all current units with the back legs cos they shouldnt
+      // move like that" — both hind legs swung up and out together, with both fore legs raised: the ant stood on two
+      // legs) one hind leg at a time: it lifts a little, strokes back along the gaster's side twice and is set down,
+      // then the other; the other five stay where they stand
+      float cyc = pph * 0.5;
+      float which = mod(floor(cyc), 2.0) < 0.5 ? -1.0 : 1.0;
+      float u = fract(cyc);
+      if (pair == 2 && side * which > 0.0) {
+        float up = sin(u * 3.14159);
+        float rub = sin(u * 6.2831 * 2.0);
+        yaw = mix(yaw, yaw - side * (0.1 + 0.08 * rub) * up, poseW);
+        lft = mix(lft, lft + 0.28 * up, poseW);
+        knee = mix(knee, knee - 0.3 * up, poseW);
       }
     } else if ((pose == 4 || pose == 5 || pose == 7) && uPlant < 0.5) {
       // (planted-feet species: their feet stay planted; the attack moves the body over them)
