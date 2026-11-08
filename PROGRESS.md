@@ -2037,7 +2037,7 @@ User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch 
 - **UI:** marker counts once a tick, label styles written only when changed.
 - **Fixed on the way:** a story save with a visiting party restored differently (merged early with the meter).
 
-## 2026-11-07 — Model redo: Saiy-Ants, sickle-jaw termites, Termants (`feature/models-saiy-sickle`, CHANGE_PLAN §33; approved after review round 4, merged)
+## 2026-11-07 — Model redo: Saiy-Ants, sickle-jaw termites, Termants (`feature/models-saiy-sickle`, CHANGE_PLAN §30; approved after review round 4, merged)
 
 - **Saiy-Ants** rebuilt on a real carpenter ant (*Camponotus*): broad rounded head (the soldier's heart-shaped and broader), antennal sockets set back from a keeled clypeus, five-toothed parametric jaws, a smooth arched mesosoma, a scale petiole, an oval gaster with golden-grey hairs, long legs; blue-black satin cuticle from a baked recipe; three bites per caste on planted feet (no acid, the user's rule); the gold surge's stretch and overshoot. The six locks are unchanged.
 - **Sickle-jaw termites**: every caste (worker, soldier, presoldier, king, queen, larva) on the realistic ant pipeline: the soldier's glassy red head and down-curved snout with its pore, long thin crossing sickles traced from the user's photos, beaded antennae, very long legs; the worker (rebuilt from the user's field photos in review round 3) a small round glossy orange head and a big glossy chocolate egg-shaped abdomen, its plates pillowed, finely haired and dotted with the spiracles; the soldier's crimson sickles and banded amber-brown abdomen; the king and queen kept on the termite kit (review round 1). The grab-and-squirt, the free squirt, the threat and the drum as planted-feet attack cycles, the acid jet and fizz from the snout's tip.
@@ -2120,3 +2120,19 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
 - Numbers: the canopy grid is 100–120 × 80–105 hexes (530–630 cells a side), built in 0.6–1.1 s at match start on this
   machine (only with the layer on); 740–2,100 walkable hexes a map; the canopy mesh has one vertex a cell in the chunks
   that hold branches.
+
+## 2026-11-08 — Game speed and cutscenes checked; a device's worker never far behind (CHANGE_PLAN §32.4)
+- The user asked whether changing the game speed or cutscenes cause lag: neither had been checked. **Bench scenes**
+  **speed** (the big fight at 1×, 2×, 4× and 8×: the speed reached, frames, main-thread messages and events, the
+  worker's tick time) and **cine** (The Antlered King's opening flight: frames, hitches, shader links, texture uploads);
+  `?bench=1&bonly=speed,cine` runs only these; `tests/browser/speed_check.py`.
+- **Cutscene:** no shader links or texture uploads during the flight (everything it shows is prepared at load).
+- **Game speed:** found that lockstep and replay ticks go to the worker with no limit (an overloaded device falls
+  further behind every second) and single-player batches grew to 24 ticks. Now single-player and replays keep at most
+  ~100 ms of the worker's ticks queued (`game/simHost.ts` `WORKER_LAG_MS`); pacing only, the same results.
+  Multiplayer is unchanged: making the match wait for the slowest device was tried and taken out (a gameplay change;
+  with it the LAN test lost the guest to the 30-second drop in 2 of 7 runs here); the proposal (an automatic speed-down vote) waits
+  for the user.
+- **Checks:** `tests/performance.ts` (the caps; a simulated overloaded device at 4×: 90 ms behind with the limit, 2 s
+  and growing without), `tests/browser/replay.py` (identical to the recording), `worker.py`, `lan.py` two players
+  (hashes match, no desync, the speed vote).

@@ -23,6 +23,27 @@ import type { FromWorker, FrameMsg, ToWorker } from '../worker/protocol';
 
 const TICK_DT = 0.05;
 
+/**
+ * How far a device's worker may fall behind the game's clock (ms of its own tick time) — performance v3, game speed
+ * (CHANGE_PLAN §32.4). At 4× or 8× a big colony can need more ticks a second than a slow device's worker can run.
+ * Past this much queued work the device waits for its worker instead of queueing more: single-player then runs at the
+ * speed the device can do, in smaller and more frequent updates; a replay plays at the speed the device can do instead
+ * of its picture falling further and further behind. A device that keeps up never gets near it. Nothing the
+ * simulation computes changes. (Multiplayer does not wait: holding the lockstep back would slow every player's match
+ * to the slowest device — the user's decision, docs/performance.md "Game speed and cutscenes".)
+ */
+export const WORKER_LAG_MS = 100;
+
+/** Single-player: how many ticks one batch may hold (24, fewer when the worker's ticks are slow). */
+export function workerBatchCap(tickMs: number): number {
+  return tickMs > 0 ? Math.max(2, Math.min(24, Math.floor(WORKER_LAG_MS / tickMs))) : 24;
+}
+
+/** Replays (one tick a step): may another tick go to the worker with `inFlight` ticks not answered yet? */
+export function workerHasRoom(inFlight: number, tickMs: number, lagMs = WORKER_LAG_MS): boolean {
+  return inFlight * Math.max(tickMs, 0.5) < lagMs;
+}
+
 /** Rough size of a worker frame: its typed arrays (the per-tick entity columns and grids). */
 function frameBytes(m: unknown, depth = 0): number {
   if (!m || typeof m !== 'object' || depth > 4) return 0;
@@ -41,6 +62,8 @@ export interface SimHost extends NetSim {
   readonly kind: 'local' | 'worker';
   /** n ticks are due (the loop's clock, or the lockstep scheduler, decided) */
   tick(n: number): void;
+  /** replays: can the next tick be sent (the worker is not too far behind; `WORKER_LAG_MS`)? */
+  canStep(lagMs?: number): boolean;
   /** interpolation alpha for this frame */
   alpha(loopAlpha: number, now: number, paused: boolean): number;
   /** simulation time per tick (ms) */
@@ -76,6 +99,10 @@ export class LocalSim implements SimHost {
   stepWith(cmds: Command[]): void {
     for (const c of cmds) this.schedule.add(c);
     this.tick(1);
+  }
+
+  canStep(): boolean {
+    return true;
   }
 
   hash(): Promise<{ tick: number; hash: string }> {
@@ -164,9 +191,14 @@ export class WorkerSim implements SimHost {
 
   tick(n: number): void {
     const q = this.queued;
-    this.queued = Math.min(this.queued + n, 24);
+    // (at most 24 ticks wait, or fewer when the worker's ticks are slow: `WORKER_LAG_MS`)
+    this.queued = Math.max(q, Math.min(q + n, workerBatchCap(this.tickMs)));
     this.due += this.queued - q;
     this.pump();
+  }
+
+  canStep(lagMs = WORKER_LAG_MS): boolean {
+    return workerHasRoom(this.inFlight, this.tickMs, lagMs);
   }
 
   /** One lockstep tick with its commands (sent at once; the worker queues them in order). */

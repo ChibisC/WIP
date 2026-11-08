@@ -511,7 +511,9 @@ export class GameSession {
   /** One simulation tick (false: it cannot run yet — multiplayer is waiting for a player's packets). */
   private tickOnce(): boolean {
     if (this.net) return this.net.tryTick();
-    if (this.replay) return this.replayTick();
+    // (a replay sends the worker one tick at a time: a device whose worker is too far behind waits for it —
+    // simHost.ts WORKER_LAG_MS)
+    if (this.replay) return this.sim.canStep() && this.replayTick();
     this.sim.tick(1);
     return true;
   }

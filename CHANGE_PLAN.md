@@ -1598,6 +1598,26 @@ LAN two-tab in sync).
 15. **Measured** (bundled, best of 2, `main` 56be698): 1,000 ants 5.7–10.9 ms a tick (target 15), 2,000 ants
     10.2–16.6 (target 25); the big fight at 2,000 33.2 → 15.5. Spikes over 40 ms at 2,000 not gone (1–16 of 300 in
     four scenes: synchronised one-second timers of the stress scenes, minor GCs). Docs: `docs/performance.md` v3.
+
+### 32.4 Game speed and cutscenes (after the merge; the user asked whether they had been checked — they had not)
+1. **Measured:** bench scenes **speed** (the big fight at a fixed camera at 1×, 2×, 4× and 8×: the speed really
+   reached, frame times, the main thread's messages and events a frame, the worker's tick time) and **cine** (The
+   Antlered King's opening flight, from its first frame to the camera's return: frames, hitches and their causes,
+   shader links, texture uploads); `tests/browser/speed_check.py` (the speed steps from a script).
+2. **Cutscenes:** the flight links no shader and uploads no texture (everything it shows is prepared at load).
+3. **Game speed:** a tick costs the same at any speed; at N× the worker runs 20·N a second (this machine holds
+   3.0–4.9× at 2,000 ants, 4.6–8.8× at 1,000). Found: lockstep and replay ticks go to the worker with no limit, so a
+   device whose worker cannot keep up falls further behind every second; single-player batches grew to 24 ticks.
+   **Worker lag limit** (`game/simHost.ts` `WORKER_LAG_MS` = 100 ms of the worker's ticks): single-player batches
+   hold at most that much (still at most 24); replay ticks wait while that much is queued. Pacing only: the same ticks
+   with the same commands (no `BUILD_ID` change). `tests/performance.ts` checks the caps and a simulated overloaded
+   device at 4× (90 ms behind with the limit; 2 s after 10 s, growing, without).
+4. **Multiplayer left as it was, for the user:** making the match wait for a slow device's worker was tried and taken
+   out — it sets every player's speed by the slowest device (a gameplay change), and with it `tests/browser/lan.py` lost the guest
+   (dropped by the host after 30 s of waiting) in 2 of 7 runs here, `main` in none of 4.
+   Proposed instead: a device whose worker stays behind votes the speed down itself (the vote lowers at once) with a
+   message; waiting for the user's choice (docs/performance.md "Game speed and cutscenes").
+
 ## 33. A third layer: the Trees (user spec 2026-11-07, claude/trees/01-spec-trees-layer.md)
 
 Branch `feature/trees-layer` off `main` `21d836f`. Every number in `balance.ts` `TREES`. Deterministic sim. The layer
