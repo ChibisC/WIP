@@ -14,3 +14,8 @@ Stills in `shots/` (`tests/browser/trees.py`, meadow pond, `?trees=1`):
 
 Tools: `npx vite-node tools/trees-check.ts -- <seed>` (every map's canopy, the joined-canopy and reachability checks),
 `npx vite-node tests/trees.ts`.
+
+### 2026-11-08 — the climb as a bark walk (`tests/browser/trunk_climb.py`)
+- `climb_walk.jpg` — ants on a willow's trunk from the ground: feet on the bark, bodies parallel to the trunk, going up.
+- `climb_rim.jpg` — the trees view: two ants over the trunk top's rim, stepping onto the wood.
+- `clips/climb.gif` — a group sent to a branch: from the ground at the climb point, tipping up onto the bark and climbing.

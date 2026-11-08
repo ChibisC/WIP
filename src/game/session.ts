@@ -12,6 +12,7 @@ import { HitboxOverlay } from './hitboxOverlay';
 import { CombatDebugOverlay } from './combatDebugOverlay';
 import { CreatureRenderer } from '../render/creatures/creatureRenderer';
 import { climbCap } from '../sim/creatures/climb';
+import { trunkMountGround } from './trunkMount';
 import { mountBonus } from '../sim/combat';
 import { CREATURES } from '../sim/creatures/kinds';
 import { SurfaceMounds } from '../render/game/mounds';
@@ -1950,6 +1951,8 @@ export class GameSession {
       this.surfHit.update(w, SURFACE, this.hitboxes, this.surfHeight, v.surfaceRig.goal.x, v.surfaceRig.goal.z, v.surfaceRig.distance * 2);
       this.surfCombat.update(w, SURFACE, this.combatDebug, this.surfHeight, v.surfaceRig.goal.x, v.surfaceRig.goal.z, v.surfaceRig.distance * 2);
       this.surfAnts.mount = (av, a, out) => {
+        // (on a tree trunk: walking up or down the bark, game/trunkMount.ts)
+        if (av.trunk) return trunkMountGround(w, av, this.surfHeight, out);
         const cr = w.creatureById.get(av.rideCr || av.heldCr || 0);
         return !!cr && this.surfCreatures.mountPose(cr, av, a, out);
       };

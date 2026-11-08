@@ -169,7 +169,8 @@ function startGame(): void {
         },
         mission: mission?.id,
         sandbox: c.mode === 'sandbox',
-        ...(q.get('trees') ? { trees: true } : {}),
+        // the Trees layer: the sandbox setup's "Trees: On" or ?trees=1, built with the map
+        ...(q.get('trees') || (c.trees && c.mode === 'sandbox') ? { trees: true } : {}),
         ...(q.get('titanRaid') ? { devTitanRaid: q.get('titanRaid')! } : {}),
         // dev: ?floodNest=<colony index>&floodAt=<s>[&floodFill=<s>] floods that colony's nest (sim/nestFlood.ts)
         ...(q.get('floodNest') ? { devNestFlood: { colony: Number(q.get('floodNest')), at: Number(q.get('floodAt') || 0), fillSec: q.get('floodFill') ? Number(q.get('floodFill')) : undefined } } : {}),
