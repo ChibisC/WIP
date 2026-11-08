@@ -74,46 +74,61 @@ export class MotionCarry {
   ran = 1;
   /** test for teleports (off when re-anchoring in place) */
   snap = true;
-  private sx = 0;
-  private sy = 0;
-  private sh = 0;
-  private hasH = false;
-  private ox = 0;
-  private oy = 0;
-  private space = 0;
+  /** per row: the drawn x, y, heading; the old x, y; the space; whether it has a heading */
+  private rec = new Float64Array(0);
+  private hasH = new Uint8Array(0);
 
-  save(o: Moving): void {
-    this.space = o.space ?? 0;
-    this.ox = o.x;
-    this.oy = o.y;
-    this.hasH = o.ph !== undefined && o.h !== undefined;
+  private room(i: number): void {
+    if (i < this.hasH.length) return;
+    const n = Math.max(64, Math.ceil((i + 1) * 1.5));
+    const r = new Float64Array(n * 6);
+    r.set(this.rec);
+    this.rec = r;
+    const h = new Uint8Array(n);
+    h.set(this.hasH);
+    this.hasH = h;
+  }
+
+  save(o: Moving, i = 0): void {
+    this.room(i);
+    const r = this.rec;
+    const k = i * 6;
+    r[k + 3] = o.x;
+    r[k + 4] = o.y;
+    r[k + 5] = o.space ?? 0;
+    const hasH = o.ph !== undefined && o.h !== undefined;
+    this.hasH[i] = hasH ? 1 : 0;
     if (this.mode === 'keep') {
-      this.sx = o.px;
-      this.sy = o.py;
-      if (this.hasH) this.sh = o.ph as number;
+      r[k] = o.px;
+      r[k + 1] = o.py;
+      if (hasH) r[k + 2] = o.ph as number;
       return;
     }
     const a = this.alpha;
-    this.sx = o.px + (o.x - o.px) * a;
-    this.sy = o.py + (o.y - o.py) * a;
-    if (this.hasH) this.sh = lerpAngle(o.ph as number, o.h as number, a);
+    r[k] = o.px + (o.x - o.px) * a;
+    r[k + 1] = o.py + (o.y - o.py) * a;
+    if (hasH) r[k + 2] = lerpAngle(o.ph as number, o.h as number, a);
   }
 
-  restore(o: Moving): void {
-    if ((o.space ?? 0) !== this.space) return; // changed space: the sim's own px (a snap)
+  restore(o: Moving, i = 0): void {
+    const r = this.rec;
+    const k = i * 6;
+    if ((o.space ?? 0) !== r[k + 5]) return; // changed space: the sim's own px (a snap)
+    const sx = r[k];
+    const sy = r[k + 1];
     if (this.snap) {
       if (this.mode === 'keep') {
         // (a frame with no tick does not move anything — unless a command placed it: then the sim's px)
-        if (Math.abs(o.x - this.ox) + Math.abs(o.y - this.oy) > SNAP_MM) return;
+        if (Math.abs(o.x - r[k + 3]) + Math.abs(o.y - r[k + 4]) > SNAP_MM) return;
       } else {
         const step = Math.hypot(o.x - o.px, o.y - o.py);
-        const jump = Math.hypot(o.x - this.sx, o.y - this.sy);
+        const jump = Math.hypot(o.x - sx, o.y - sy);
         if (jump > SNAP_MM + 3 * (this.ran + 1) * step) return;
       }
     }
-    o.px = this.sx;
-    o.py = this.sy;
-    if (this.hasH && o.ph !== undefined) o.ph = this.sh;
+    o.px = sx;
+    o.py = sy;
+    if (this.hasH[i] && o.ph !== undefined) o.ph = r[k + 2];
   }
 }
 

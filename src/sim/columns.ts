@@ -272,11 +272,13 @@ export class ColumnWriter {
 
 /**
  * Something carried over a pooled object's update (game/playout.ts MotionCarry: where it was drawn): `save` before the
- * frame's values overwrite it, `restore` after. Only for objects that were already there.
+ * frame's values overwrite it, `restore` after — every object of the packet is saved first, then all are written,
+ * then restored, so the carry keeps one record per row. Only for objects that were already there.
  */
 export interface ColumnCarry<T> {
-  save(o: T): void;
-  restore(o: T): void;
+  /** `i`: the object's row in this packet (every object is saved before any is written, then restored) */
+  save(o: T, i: number): void;
+  restore(o: T, i: number): void;
 }
 
 /** Decoder side (one per entity list, on the main thread): a pool of objects keyed by id. */
@@ -323,7 +325,7 @@ export class ColumnReader<T extends { id: number }> {
       if (!o) {
         o = {} as T;
         this.pool.set(id, o);
-      } else if (carry) carry.save(o);
+      } else if (carry) carry.save(o, i);
       seen.add(id);
       out[i] = o;
     }
@@ -357,7 +359,7 @@ export class ColumnReader<T extends { id: number }> {
         }
       }
     }
-    if (carry) for (let i = 0; i < n; i++) if (kept[i]) carry.restore(out[i]);
+    if (carry) for (let i = 0; i < n; i++) if (kept[i]) carry.restore(out[i], i);
     for (const [i, j, v] of p.other) (out[i] as unknown as Record<string, unknown>)[keys[j]] = v;
     if (this.pool.size > n) for (const id of this.pool.keys()) if (!seen.has(id)) this.pool.delete(id);
     return out;
