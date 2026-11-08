@@ -350,9 +350,9 @@ export class GameView {
    * below is a backdrop plane carrying a blurred, darkened render of the surface (`refreshBackdrop`). Shown as the area
    * `TREES` through the nest machinery (camera, picking, the per-space view); `riseTo` moves between it and the ground.
    */
-  addTrees(grid: NestGrid, kinds: Uint8Array, height: number): NestStage {
+  addTrees(grid: NestGrid, kinds: Uint8Array, height: number, leaves: Array<{ at: readonly [number, number]; rx: number; ry: number; rot: number }> = []): NestStage {
     const scene = new THREE.Scene();
-    const terrain = new CanopyTerrain(grid, kinds, height);
+    const terrain = new CanopyTerrain(grid, kinds, height, leaves);
     terrain.setShadows(this.preset.shadows);
     scene.add(terrain.group);
     const W = grid.widthMm;
@@ -361,7 +361,7 @@ export class GameView {
     scene.environment = this.surfaceScene.environment;
     scene.background = new THREE.Color(0x9fb7c9);
     const sunDir = this.surfaceLights.sunDir;
-    const sun = new THREE.DirectionalLight(this.surfaceLights.sun.color, Math.max(0.9, this.daySun * 0.8));
+    const sun = new THREE.DirectionalLight(this.surfaceLights.sun.color, Math.max(0.75, this.daySun * 0.65));
     sun.castShadow = this.preset.shadows;
     sun.shadow.mapSize.set(this.preset.shadowSize, this.preset.shadowSize);
     sun.shadow.bias = -0.0008;
@@ -376,7 +376,7 @@ export class GameView {
     sc.near = 10;
     sc.far = 2400;
     sc.updateProjectionMatrix();
-    const hemi = new THREE.HemisphereLight(this.surfaceLights.hemi.color, new THREE.Color(0.25, 0.3, 0.14), Math.max(0.35, this.dayHemi * 0.7));
+    const hemi = new THREE.HemisphereLight(this.surfaceLights.hemi.color, new THREE.Color(0.25, 0.3, 0.14), Math.max(0.28, this.dayHemi * 0.55));
     const fill = new THREE.DirectionalLight(0xbcd0e8, 0.12);
     fill.position.set(-300, 200, 400);
     const ambient = new THREE.AmbientLight(0x9fb0c0, 0.03);

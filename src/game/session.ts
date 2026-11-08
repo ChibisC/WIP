@@ -26,7 +26,7 @@ import { halfIn, otherHalf, ownHalf, routeById, routeDone, routeUsable, stepInde
 const ROUTE_EDGE_ANG = [-Math.PI / 6, Math.PI / 6, Math.PI / 2, (5 * Math.PI) / 6, (7 * Math.PI) / 6, -Math.PI / 2];
 import { createWorld, GameSetup } from '../sim/mapGen';
 import { AS, Ant, Colony, FloodState, SURFACE, TREES, TileType, colonyOfSpace, nestSpace } from '../sim/types';
-import { kindsOf } from '../sim/trees';
+import { canopyLeaves, kindsOf } from '../sim/trees';
 import { TreeDecor } from '../render/trees/treeDecor';
 import { AreaInfo, areaOpen, areasFor, teamPresence } from '../sim/areas';
 import { CASTES, SPECIES, canonCaste, isTermiteSpecies } from '../sim/species';
@@ -675,7 +675,7 @@ export class GameSession {
     const g = w.nestOf(TREES);
     if (!d || !g || this.nests.has(TREES)) return;
     const kinds = kindsOf(d);
-    const stage = this.view.addTrees(g, kinds, d.height);
+    const stage = this.view.addTrees(g, kinds, d.height, canopyLeaves(w));
     const nv = new NestView(this.view, TREES, stage);
     nv.fog = null;
     this.nests.set(TREES, nv);

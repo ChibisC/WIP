@@ -25,6 +25,7 @@ export class CanopyTerrain implements AreaTerrain {
   readonly wallH: number;
   readonly uniforms = {
     tData: { value: null as unknown as THREE.DataTexture },
+    tLeaf: { value: null as unknown as THREE.DataTexture },
     uRaster: { value: new THREE.Vector2() },
     uCell: { value: 1 },
     uWoodH: { value: 1 },
@@ -44,6 +45,8 @@ export class CanopyTerrain implements AreaTerrain {
   private leaf: Float32Array<ArrayBufferLike>;
   private data: Uint8Array;
   private dataTex: THREE.DataTexture;
+  private leafData: Uint8Array;
+  private leafTex: THREE.DataTexture;
   private chunks = new Map<number, THREE.Mesh>();
   private built = false;
   readonly sites: THREE.Group = new THREE.Group();
@@ -52,6 +55,8 @@ export class CanopyTerrain implements AreaTerrain {
     public grid: NestGrid,
     kinds: Uint8Array,
     private height: number,
+    /** the leaf blades (ellipses, mm): each leaf cell gets leaf-local coordinates for the midrib and the side veins */
+    private leaves: Array<{ at: readonly [number, number]; rx: number; ry: number; rot: number }> = [],
   ) {
     const g = grid;
     this.wallH = g.R * 1.3;
@@ -67,8 +72,13 @@ export class CanopyTerrain implements AreaTerrain {
     this.dataTex = new THREE.DataTexture(this.data, g.w, g.h, THREE.RGBAFormat);
     this.dataTex.magFilter = this.dataTex.minFilter = THREE.LinearFilter;
     this.dataTex.flipY = false;
+    this.leafData = new Uint8Array(n * 4);
+    this.leafTex = new THREE.DataTexture(this.leafData, g.w, g.h, THREE.RGBAFormat);
+    this.leafTex.magFilter = this.leafTex.minFilter = THREE.LinearFilter;
+    this.leafTex.flipY = false;
     const u = this.uniforms;
     u.tData.value = this.dataTex;
+    u.tLeaf.value = this.leafTex;
     u.uRaster.value.set(g.w, g.h);
     u.uCell.value = g.cell;
     u.uWoodH.value = this.wallH;
@@ -94,10 +104,10 @@ export class CanopyTerrain implements AreaTerrain {
         ],
       ],
       // (uTime and the noise come with the dapple patch, applied before this one)
-      fragmentHeader: `uniform sampler2D tData; uniform vec2 uRaster; uniform float uCell;
+      fragmentHeader: `uniform sampler2D tData; uniform sampler2D tLeaf; uniform vec2 uRaster; uniform float uCell;
 varying vec4 vCan;
 float canRough = 0.8; vec3 canEmis = vec3(0.0);
-vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, out float rough, out vec3 emis) {
+vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, vec4 lv, out float rough, out vec3 emis) {
   vec2 p = wp.xz;
   // bark: ridges running along the branch (lines of equal distance from its edge), split by cracks, with plates of
   // lichen on the older wood and moss in the damp middle of the thick branches
@@ -112,15 +122,21 @@ vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, out float rough, out
   bark = mix(bark, vec3(0.5, 0.56, 0.42), lichen * 0.6);
   float moss = smoothstep(0.6, 0.78, fbm(p * 0.1 - 3.0)) * smoothstep(2.5, 5.0, sd);
   bark = mix(bark, vec3(0.16, 0.3, 0.1), moss * 0.6);
-  // leaves: a darker blade green, mottled; a web of fine veins (darker lines) and the cells between them, the rim a
-  // little yellower; a faint translucent glow where the sun comes through
+  // leaves: a blade with a midrib down its length (lv.x along, lv.y across, 0..1; lv.z 1 where a blade was found),
+  // side veins leaving the midrib at a slant, finer veins between, the cells between them a little paler, the margin
+  // yellower; the sun through the blade gives it a faint glow
   float blade = vnoise(p * 0.045 + 7.0);
-  vec3 lf = mix(vec3(0.11, 0.27, 0.07), vec3(0.22, 0.42, 0.1), blade);
-  float vein1 = smoothstep(0.03, 0.0, abs(fract(fbm(p * 0.05 + 2.0) * 7.0) - 0.5) - 0.45);
-  float vein2 = smoothstep(0.05, 0.0, abs(fract(vnoise(p * 0.16 + 4.0) * 5.0) - 0.5) - 0.42) * 0.6;
-  float cells = vnoise(p * 0.45 + 1.0) * 0.12;
-  lf *= 1.0 - 0.35 * max(vein1, vein2) + cells;
-  lf = mix(lf, vec3(0.36, 0.48, 0.14), smoothstep(2.2, 0.0, sd) * 0.45);
+  vec3 lf = mix(vec3(0.12, 0.3, 0.07), vec3(0.2, 0.42, 0.1), blade);
+  float along = lv.x;
+  float across = lv.y - 0.5;
+  float mid = smoothstep(0.035, 0.012, abs(across)) * lv.z;
+  float sideCoord = along * 9.0 + abs(across) * 2.2;
+  float side = smoothstep(0.1, 0.03, abs(fract(sideCoord) - 0.5)) * smoothstep(0.02, 0.08, abs(across)) * lv.z;
+  float fine = smoothstep(0.07, 0.02, abs(fract(vnoise(p * 0.22 + 4.0) * 6.0) - 0.5)) * 0.35;
+  float cells = vnoise(p * 0.5 + 1.0) * 0.14;
+  lf *= 1.0 + cells - 0.3 * max(side, fine);
+  lf = mix(lf, vec3(0.5, 0.6, 0.22), mid * 0.8);
+  lf = mix(lf, vec3(0.34, 0.46, 0.13), smoothstep(2.4, 0.0, sd) * 0.5);
   float flower = step(3.5, kind);
   lf = mix(lf, vec3(0.88, 0.5, 0.6), flower * smoothstep(0.45, 0.6, vnoise(p * 0.5)));
   vec3 c = mix(bark, lf, leaf);
@@ -138,7 +154,8 @@ vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, out float rough, out
             float _sd = (_d.r - 0.5) * 16.0;
             if (_sd < -0.45) discard;
             float _rough; vec3 _emis;
-            diffuseColor.rgb = canopyColor(vWP, _d.g, _sd, _d.b * 8.0, _rough, _emis);
+            vec4 _lv = texture2D(tLeaf, _uv);
+            diffuseColor.rgb = canopyColor(vWP, _d.g, _sd, _d.b * 8.0, _lv, _rough, _emis);
             // the branch's rounded edge: darker underneath the curve
             diffuseColor.rgb *= mix(0.45, 1.0, smoothstep(-0.4, 2.0, _sd));
             canRough = _rough;
@@ -195,6 +212,65 @@ vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, out float rough, out
       this.data[i + 3] = 255;
     }
     this.dataTex.needsUpdate = true;
+    this.bakeLeafUV();
+  }
+
+  /** Leaf-local coordinates per cell: for each leaf cell the blade it lies in (the nearest ellipse that holds it). */
+  private bakeLeafUV(): void {
+    const g = this.grid;
+    const W = g.w;
+    const H = g.h;
+    const L = this.leaves;
+    this.leafData.fill(0);
+    if (!L.length) {
+      this.leafTex.needsUpdate = true;
+      return;
+    }
+    // a coarse bucket grid over the leaves so each cell tests only the blades near it
+    const B = 64;
+    const bw = Math.ceil(g.widthMm / B) + 1;
+    const bh = Math.ceil(g.depthMm / B) + 1;
+    const buckets: number[][] = Array.from({ length: bw * bh }, () => []);
+    L.forEach((l, i) => {
+      const m = Math.max(l.rx, l.ry) + 4;
+      for (let by = Math.max(0, Math.floor((l.at[1] - m) / B)); by <= Math.min(bh - 1, Math.floor((l.at[1] + m) / B)); by++)
+        for (let bx = Math.max(0, Math.floor((l.at[0] - m) / B)); bx <= Math.min(bw - 1, Math.floor((l.at[0] + m) / B)); bx++) buckets[by * bw + bx].push(i);
+    });
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const k = y * W + x;
+        if (this.leaf[k] < 0.05) continue;
+        const px = (x + 0.5) * g.cell;
+        const py = (y + 0.5) * g.cell;
+        const bk = buckets[Math.min(bh - 1, Math.floor(py / B)) * bw + Math.min(bw - 1, Math.floor(px / B))];
+        let best = -1;
+        let bd = Infinity;
+        let bu = 0;
+        let bv = 0;
+        for (const i of bk) {
+          const l = L[i];
+          const dx = px - l.at[0];
+          const dy = py - l.at[1];
+          const c = Math.cos(-l.rot);
+          const sn = Math.sin(-l.rot);
+          const lx = dx * c - dy * sn;
+          const ly = dx * sn + dy * c;
+          const d = (lx * lx) / (l.rx * l.rx) + (ly * ly) / (l.ry * l.ry);
+          if (d < bd) {
+            bd = d;
+            best = i;
+            bu = lx / (l.rx * 2) + 0.5;
+            bv = ly / (l.ry * 2) + 0.5;
+          }
+        }
+        if (best < 0 || bd > 1.6) continue;
+        const i = k * 4;
+        this.leafData[i] = Math.round(Math.min(1, Math.max(0, bu)) * 255);
+        this.leafData[i + 1] = Math.round(Math.min(1, Math.max(0, bv)) * 255);
+        this.leafData[i + 2] = 255;
+        this.leafData[i + 3] = 255;
+      }
+    this.leafTex.needsUpdate = true;
   }
 
   private sdAt(px: number, py: number): number {

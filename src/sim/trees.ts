@@ -186,6 +186,16 @@ export function treesOf(w: World): TreeDef[] {
   return out;
 }
 
+/** Every leaf blade of the match's canopy (the render bakes leaf-local coordinates for the veins): ellipses in mm. */
+export function canopyLeaves(w: World): Array<{ at: Pt; rx: number; ry: number; rot: number }> {
+  const defs = treesOf(w);
+  const hexW = T.hexR * Math.sqrt(3);
+  const out: Array<{ at: Pt; rx: number; ry: number; rot: number }> = [];
+  for (const def of defs) for (const l of crownShapes(def, hexW).leaves) out.push(l);
+  for (const b of linkBranches(defs, hexW)) for (const l of b.leaves) out.push({ at: l, rx: hexW * 1.3, ry: hexW * 0.9, rot: b.rot });
+  return out;
+}
+
 /** The trees grid covering the ground map (its hexes in the ground's mm frame). */
 export function treesGrid(w: World): NestGrid {
   const R = T.hexR;

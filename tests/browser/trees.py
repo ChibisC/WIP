@@ -66,10 +66,10 @@ SETUP = {
       let n = 0; for (const a of w.s.ants) if (a.colony === me.id && a.id !== me.queen && n++ < 6) { a.space = 63; a.x = site.x + n * 2; a.y = site.y; a.state = 0; }
       w.touch();
       s.issue({ type: 'sandboxSpawn', kind: 'stagBeetle', space: 63, x: site.x + 18, y: site.y + 4 });
-      s.view.surfaceRig.jumpTo(site.x, site.y + 30, 260); s.view.surfaceRig.pitchBias = -0.35; }""",
+      s.view.surfaceRig.jumpTo(site.x, site.y + 10, 170); }""",
 }
 # which view each still is taken in, and how many ticks run first
-VIEW = {"canopy": ("trees", 10), "ground": ("surface", 10), "bar": ("surface", 10), "climb": ("surface", 140), "leaf": ("trees", 60), "fight": ("trees", 120), "fall": ("surface", 90), "off": ("surface", 10)}
+VIEW = {"canopy": ("trees", 10), "ground": ("surface", 10), "bar": ("surface", 10), "climb": ("surface", 140), "leaf": ("trees", 60), "fight": ("trees", 120), "fall": ("surface", 36), "off": ("surface", 10)}
 
 with sync_playwright() as p:
     b = p.chromium.launch(args=ARGS)
