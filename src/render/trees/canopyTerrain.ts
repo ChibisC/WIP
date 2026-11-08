@@ -112,13 +112,15 @@ vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, out float rough, out
   bark = mix(bark, vec3(0.5, 0.56, 0.42), lichen * 0.6);
   float moss = smoothstep(0.6, 0.78, fbm(p * 0.1 - 3.0)) * smoothstep(2.5, 5.0, sd);
   bark = mix(bark, vec3(0.16, 0.3, 0.1), moss * 0.6);
-  // leaves: blade green mottled by the light, lighter at the rim, a paler midrib-like streak now and then; a soft
-  // translucent glow where the sun comes through
+  // leaves: a darker blade green, mottled; a web of fine veins (darker lines) and the cells between them, the rim a
+  // little yellower; a faint translucent glow where the sun comes through
   float blade = vnoise(p * 0.045 + 7.0);
-  vec3 lf = mix(vec3(0.14, 0.36, 0.09), vec3(0.3, 0.52, 0.13), blade);
-  lf = mix(lf, vec3(0.42, 0.56, 0.17), smoothstep(2.2, 0.0, sd) * 0.5);
-  float rib = smoothstep(0.08, 0.0, abs(fbm(p * 0.06 + 2.0) - 0.5)) * 0.35;
-  lf = mix(lf, vec3(0.5, 0.6, 0.24), rib);
+  vec3 lf = mix(vec3(0.11, 0.27, 0.07), vec3(0.22, 0.42, 0.1), blade);
+  float vein1 = smoothstep(0.03, 0.0, abs(fract(fbm(p * 0.05 + 2.0) * 7.0) - 0.5) - 0.45);
+  float vein2 = smoothstep(0.05, 0.0, abs(fract(vnoise(p * 0.16 + 4.0) * 5.0) - 0.5) - 0.42) * 0.6;
+  float cells = vnoise(p * 0.45 + 1.0) * 0.12;
+  lf *= 1.0 - 0.35 * max(vein1, vein2) + cells;
+  lf = mix(lf, vec3(0.36, 0.48, 0.14), smoothstep(2.2, 0.0, sd) * 0.45);
   float flower = step(3.5, kind);
   lf = mix(lf, vec3(0.88, 0.5, 0.6), flower * smoothstep(0.45, 0.6, vnoise(p * 0.5)));
   vec3 c = mix(bark, lf, leaf);
