@@ -215,6 +215,8 @@ for (const scene of SCENES)
   for (const total of ANTS) {
     const w = build(scene, total);
     const sys: Record<string, number> = {};
+    const sec: Record<string, number> = {};
+    const peak: Record<string, [number, number]> = {};
     if (flags.has('--systems'))
       for (const s of w.systems) {
         const fn = s.fn;
@@ -223,7 +225,11 @@ for (const scene of SCENES)
         s.fn = (ww, dt) => {
           const t0 = performance.now();
           fn(ww, dt);
-          sys[name] += performance.now() - t0;
+          const ms = performance.now() - t0;
+          sys[name] += ms;
+          // (the once-a-second ticks apart, and each system's slowest call)
+          if (ww.s.tick % 20 === 0) sec[name] = (sec[name] ?? 0) + ms;
+          if (ms > (peak[name]?.[1] ?? 0)) peak[name] = [ww.s.tick, ms];
         };
       }
     for (let i = 0; i < WARM; i++) {
@@ -231,6 +237,8 @@ for (const scene of SCENES)
       w.events.drain();
     }
     for (const k of Object.keys(sys)) sys[k] = 0;
+    for (const k of Object.keys(sec)) delete sec[k];
+    for (const k of Object.keys(peak)) delete peak[k];
     const times: number[] = [];
     const hashes: string[] = [];
     const ants0 = w.s.ants.length;
@@ -248,6 +256,9 @@ for (const scene of SCENES)
     if (flags.has('--systems')) {
       r.systems = {};
       for (const [k, v] of Object.entries(sys).sort((a, b) => b[1] - a[1])) if (v / TICKS > 0.05) r.systems[k] = +(v / TICKS).toFixed(2);
+      const nSec = Math.max(1, Math.floor(TICKS / 20));
+      console.log(`           once-a-second ticks, per system: ${Object.entries(sec).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => `${k} ${(v / nSec).toFixed(1)}`).join(' · ')}`);
+      console.log(`           slowest call per system: ${Object.entries(peak).sort((a, b) => b[1][1] - a[1][1]).slice(0, 8).map(([k, [t, v]]) => `${k} ${v.toFixed(0)} (#${t})`).join(' · ')}`);
     }
     results.push(r);
     // (--series: the average of each 50 ticks, to see a fight's phases)
