@@ -110,6 +110,8 @@ export interface AntView {
   special?: number;
   /** the hell ants' finisher: held by the neck in this ant's jaws (its id; the renderer puts the neck on the grip) */
   neckBy?: number;
+  /** Saiy-Ant Blaster: the mouth's glow 0..1 (wind-up, shot flash, the beam), and its aim, braced beam stance */
+  mouthGlow?: number;
   rageGlow?: number;
   stingNext?: boolean;
   /** fore legs raised 0..1 and the body's pitch pivot along it (fraction of L; − behind the middle): a sprayer
@@ -1276,7 +1278,7 @@ export class AntRenderer {
         // pose id + 0.99 × its weight; the hit flash
         // (the rage glow rides in the same channel: + 2 × its level 0..10 — user rating E7: a glow in the body, not the
         // whole ant turned red)
-        at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, (M ? M.flash : 0) + 2 * Math.round(Math.min(1, Math.max(0, v.rageGlow ?? 0)) * 10));
+        at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, (M ? M.flash : 0) + 2 * Math.round(Math.min(1, Math.max(0, v.rageGlow ?? v.mouthGlow ?? 0)) * 10));
         // colour variation −1..1, plus 4 × the Termant tint code (decoded in the shader); the planted feet's stance sweep
         at.d.setXYZW(n, M ? M.deathLeg : s.death, M ? M.Dh : 0, Math.max(-1, Math.min(1, v.colorVar)) + 4 * (v.tint ?? 0), s.pph);
         // gold × ripple direction, the planted feet's turn per stance, exhausted with the LOD fade, hair sway

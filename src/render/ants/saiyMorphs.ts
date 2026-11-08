@@ -87,6 +87,24 @@ const SAIY_QUEEN = {
   // queen: spikes 1-3 x1.5 length, 4-6 unchanged
   hair6: { ...SAIY_WORKER.hair6, queen: true, strands: 8, rough: 0.36, curl: 0.09, spikes: SAIY_WORKER.hair6.spikes.map((s, k) => k < 3 ? { ...s, lenMul: 1.5 } : s) },
 };
-export const SAIY_MORPHS = { saiy_worker: SAIY_WORKER, saiy_soldier: SAIY_SOLDIER, saiy_queen: SAIY_QUEEN };
+// The Blaster (user spec 2026-11-07, claude/saiy-ants/09-spec-saiy-blaster.md; CHANGE_PLAN §31): a fictional ranged caste
+// built on the worker — slimmer and a little longer and lighter, a larger, rounder head with the jaws set wide round a
+// broad mouth (the energy orbs glow there, between the opened jaws, not from any new opening: `mouth`, surface flag
+// 9.5), the same six locks swept back further (lower and longer). Original design, like the hair.
+const SAIY_BLASTER = {
+  ...SAIY_WORKER, key: "saiy_blaster", L: 6.6,
+  head: { len: 0.27, width: 0.25, height: 0.19, shape: "round", notch: 0.0 },
+  eyes: { ...SAIY_WORKER.eyes, size: 0.23, pos: 0.42 },
+  // the jaws set wider apart and a little shorter, so the mouth between them shows
+  mandible: { ...SAIY_WORKER.mandible, len: 0.46, width: 0.86, open: 0.75 },
+  // the glowing mouth: head-local (x in head lengths from the back, y in head heights from the centre line, half sizes
+  // in head length / height / width)
+  mouth: { at: [0.985, -0.24], r: [0.06, 0.12, 0.27] },
+  meso: { ...SAIY_WORKER.meso, len: 0.37, width: 0.108, height: 0.124 },
+  gaster: { len: 0.33, width: 0.2, height: 0.172, sting: false },
+  legs: { hind: 1.24, thick: 0.0122 },
+  hair6: { ...SAIY_WORKER.hair6, lenMul: 1.18, spikes: SAIY_WORKER.hair6.spikes.map((s) => ({ ...s, pitch: Math.max(-4, s.pitch * 0.35 - 2), yaw: s.yaw * 0.65 })) },
+};
+export const SAIY_MORPHS = { saiy_worker: SAIY_WORKER, saiy_soldier: SAIY_SOLDIER, saiy_queen: SAIY_QUEEN, saiy_blaster: SAIY_BLASTER };
 // ===== END SAIY-ANT MORPHS =====
 
