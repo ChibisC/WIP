@@ -68,6 +68,26 @@ function readFn(keys: readonly string[], kinds: readonly number[]): ReadFn | nul
   return f;
 }
 
+/** A constructor per schema setting every column's field (undefined), for the reader's new objects (performance v3). */
+type RowCtor = new () => object;
+const rowClasses = new Map<string, RowCtor>(); // det-ok: compiled row constructors for the main thread's replica; never simulation state
+
+function rowClass(keys: readonly string[], kinds: readonly number[]): RowCtor | null {
+  if (!columnCodegen.on) return null;
+  const sig = sigOf(keys, kinds);
+  let c = rowClasses.get(sig);
+  if (c) return c;
+  const body = keys.map((k, j) => (kinds[j] === K_NUM || kinds[j] === K_BOOL || kinds[j] === K_STR ? `this[${JSON.stringify(k)}] = undefined;` : '')).join('\n');
+  try {
+    c = new Function(`return function Row() {\n${body}\n}`)() as RowCtor;
+  } catch {
+    columnCodegen.on = false;
+    return null;
+  }
+  rowClasses.set(sig, c);
+  return c;
+}
+
 /**
  * A generated writer (performance v3): the columns filled one after the other as before, each from a named property
  * (`o.x`) instead of a keyed one (`o[k]` with k changing per column) — with one hidden class for every ant
@@ -383,13 +403,16 @@ export class ColumnReader<T extends { id: number }> {
     if (this.kept.length < n) this.kept = new Uint8Array(Math.ceil(n * 1.5) + 16);
     const kept = this.kept;
     const idBase = numBase[idCol];
+    // (performance v3) a new object comes from a constructor made for the schema, every field set in it: its fields
+    // stay inside the object (an empty literal grown field by field keeps all but four in a separate array)
+    const Row = rowClass(keys, kinds);
     // the objects (pooled by id), and what the carry keeps of them before they change
     for (let i = 0; i < n; i++) {
       const id = num[idBase + i];
       let o = this.pool.get(id);
       kept[i] = o && carry ? 1 : 0;
       if (!o) {
-        o = {} as T;
+        o = (Row ? new Row() : {}) as T;
         this.pool.set(id, o);
       } else if (carry) carry.save(o, i);
       seen.add(id);
