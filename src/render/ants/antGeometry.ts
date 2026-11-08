@@ -860,6 +860,13 @@ export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
       const [pc, ic] = ellipsoid(new THREE.Vector3(hL * 0.965, headCY - hH * 0.06, 0), new THREE.Vector3(hL * 0.04, hH * 0.09, hW * 0.12), 12);
       acc.piece(transformPts(pc, headM), ic, PART.HEAD, (x, y, z) => headCol(x - neck.x, y - neck.y, z), look.head);
     }
+    // Saiy-Ant Blaster: the broad mouth between the jaw bases that glows before a shot (surface flag 9.5: the shader's
+    // mouth glow, MOUTH_GLOW); dark red-brown when it does not
+    const mouth = (m as { mouth?: { at: number[]; r: number[] } }).mouth;
+    if (mouth) {
+      const [mp, mi] = ellipsoid(new THREE.Vector3(hL * mouth.at[0], headCY + hH * mouth.at[1], 0), new THREE.Vector3(hL * mouth.r[0], hH * mouth.r[1], hW * mouth.r[2]), hi ? 14 : 8);
+      acc.piece(transformPts(mp, headM), mi, PART.HEAD, () => tmpC.setHex(0x3a1a12), { color: 0x3a1a12, rough: 0.35, coat: 0.25, sheen: 0 }, 9.5);
+    }
     if (clypLobe) {
       // the labrum: a dark lip under the clypeus, between the closed jaws' bases
       const [pp, ii] = ellipsoid(new THREE.Vector3(hL * 0.965 + wzSpec * 0.16, headCY - hH * 0.2, 0), new THREE.Vector3(wzSpec * 0.26, hH * 0.06, wzSpec * 0.42), hi ? 12 : 6);

@@ -66,7 +66,9 @@ function weight(caste: string): number {
   const cd = casteOf(caste);
   // a nasute's ramping stream counts at its mean rate over the ramp
   const acid = cd.acid ? (cd.acid.kind === 'ramp' ? (NASUTE.ramp.startDps + NASUTE.ramp.capDps) / 2 : cd.acid.damage / Math.max(0.2, cd.acid.cooldown)) : 0;
-  const dps = cd.bite / Math.max(0.3, cd.attackInterval) + acid;
+  // a Saiy-Ant Blaster's orbs (its gold-form beam not counted: it comes once a gold form)
+  const blast = cd.blast ? BALANCE.blaster.orbDamage / BALANCE.blaster.interval : 0;
+  const dps = cd.bite / Math.max(0.3, cd.attackInterval) + acid + blast;
   return cd.hp * dps;
 }
 

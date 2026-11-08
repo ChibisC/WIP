@@ -18,13 +18,13 @@ import { casteCosts } from '../src/sim/tiles';
 import { creatureFight } from './creatureFight';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
-const what = args[0] ?? 'all';
+const what = args[0] ?? (process.env.BALANCE_MATRIX_LIB ? 'none' : 'all');
 const FOOD = Number(args[1] ?? 150);
 const cost = (c: string) => casteCosts(c).build + casteCosts(c).hatch;
 const nFor = (c: string) => Math.max(1, Math.round(FOOD / cost(c)));
 
 /** Two groups meet on open ground; returns the share of each side alive at the end. */
-export function fight(a: string, na: number, b: string, nb: number, seed = 3, secs = 120, probe?: (w: ReturnType<typeof createWorld>, ids: number[][], t: number) => void): { a: number; b: number; t: number } {
+export function fight(a: string, na: number, b: string, nb: number, seed = 3, secs = 120, probe?: (w: ReturnType<typeof createWorld>, ids: number[][], t: number) => void, gap = 50): { a: number; b: number; t: number } {
   const ev = new EventBus();
   const w = createWorld({ seed, style: 'formicarium', width: 600, depth: 600, colonies: [{ species: CASTES[a].species, player: true, ai: false }, { species: CASTES[b].species, player: false, ai: false }], food: 0, aphids: 0, plants: 0, puddles: 0, settings: { creatures: 0 } }, ev);
   w.s.settings.foodRespawn = 0;
@@ -41,11 +41,12 @@ export function fight(a: string, na: number, b: string, nb: number, seed = 3, se
       c.markers[0].noGather = true;
       c.markers[1].noGather = true;
     }
-    const shooter = !!CASTES[caste].acid && (CASTES[caste].acid!.kind === 'lob' || CASTES[caste].acid!.kind === 'rapid');
+    const shooter = (!!CASTES[caste].acid && (CASTES[caste].acid!.kind === 'lob' || CASTES[caste].acid!.kind === 'rapid')) || !!CASTES[caste].blast;
     for (let i = 0; i < n; i++) {
       const row = Math.floor(i / 8);
       const col = i % 8;
-      const x = 300 + (ci === 0 ? -50 - row * 7 - (shooter ? 18 : 0) : 50 + row * 7 + (shooter ? 18 : 0));
+      // (`gap`: half the distance between the two fronts at the start; a small gap starts them in contact)
+      const x = 300 + (ci === 0 ? -gap - row * 7 - (shooter && gap >= 50 ? 18 : 0) : gap + row * 7 + (shooter && gap >= 50 ? 18 : 0));
       const y = 300 + (col - 3.5) * 8;
       const ant = makeAnt(w, c.id, caste, SURFACE, x, y, ci === 0 ? 0 : Math.PI);
       ant.task = 'marker';
@@ -67,7 +68,7 @@ export function fight(a: string, na: number, b: string, nb: number, seed = 3, se
         const x = w.antById.get(id);
         if (x && x.state !== AS.Dead) {
           x.task = 'marker';
-          x.marker = x.caste.includes('mortar') || x.caste.includes('rapid') ? 1 : 0;
+          x.marker = x.caste.includes('mortar') || x.caste.includes('rapid') || x.caste.includes('blaster') ? 1 : 0;
         }
       }
     // PURSUE=1: each side's marker follows the other side's centre (sickle-jaw soldiers hold a guard line on the trail

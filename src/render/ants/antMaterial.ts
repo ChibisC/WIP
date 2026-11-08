@@ -565,8 +565,17 @@ export function antPatch(): ShaderPatch {
            totalEmissiveRadiance += vHit * vec3(0.55, 0.14, 0.06) * 0.12;
            // rage (user rating E7): a red glow from within the mesosoma, waist and gaster — the legs and head keep
            // their colour
+           #ifdef MOUTH_GLOW
+           // Saiy-Ant Blaster (CHANGE_PLAN §31): the rage channel carries the mouth's glow — white-blue, gold in the
+           // gold form; a dim ember at rest, bright in the wind-up, a flash on the shot
+           if (abs(vSurf.w - 9.5) < 0.25) {
+             vec3 mc = mix(vec3(0.6, 0.84, 1.0), vec3(1.0, 0.72, 0.24), clamp(vGold.x * 1.5, 0.0, 1.0));
+             totalEmissiveRadiance += mc * (3.2 * vRage * vRage);
+           }
+           #else
            int rpart = int(vPartF + 0.5);
            if (vRage > 0.0 && (rpart == 0 || rpart == 8 || rpart == 9)) totalEmissiveRadiance += vRage * vec3(0.85, 0.05, 0.02) * (0.28 + 0.25 * pow(1.0 - abs(dot(normalize(vViewPosition), normalize(normal))), 1.5));
+           #endif
          }`,
       ],
       [
@@ -727,6 +736,8 @@ export function createAntMaterials(rig: AntRig, dapple: boolean, morphKey?: stri
   // animation pass: the pilot species' feet planted by the shader IK
   if (morphKey && animV2(morphKey) && rig.foot) uniforms.uPlant.value = 1;
   if (morphKey && MORPHS[morphKey]?.real) uniforms.uRealV.value = 1;
+  // Saiy-Ant Blaster: the glowing mouth reads the rage channel (its own program)
+  if (morphKey && (MORPHS[morphKey] as { mouth?: unknown } | undefined)?.mouth) material.defines = { ...(material.defines ?? {}), MOUTH_GLOW: '' };
   const recipe = morphKey ? antRecipe(morphKey) : null;
   if (dapple) patchDapple(material);
   addPatch(material, { ...antPatch(), uniforms });

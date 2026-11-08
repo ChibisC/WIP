@@ -22,6 +22,7 @@ import { afterBite, guardRush, hookMul } from './eciton';
 import { acidMulOn, glueBurst as termantGlue, termantArmorMul } from './termants';
 import { underOrder } from './markers';
 import { traitArmor, traitOnBite } from './story/traits';
+import { blastCharge, blastRange, blastShot, fireClear, orbStep, stopBeam } from './saiyBlaster';
 
 /**
  * Swarm combat: target acquisition, grappling (latching onto legs/antennae of
@@ -125,7 +126,8 @@ export function damageAnt(w: World, t: Ant, amount: number, type: DamageType, sr
   let dmg = amount;
   // (a story trait's extra armour: Antler Plating; none outside story levels)
   const armor = cd.armor + traitArmor(c);
-  if (type === 'bite') dmg = Math.max(amount * 0.3, amount - armor);
+  // (a Saiy-Ant Blaster's orbs and beam are physical: armour counts as against a bite)
+  if (type === 'bite' || type === 'blast') dmg = Math.max(amount * 0.3, amount - armor);
   else if (type === 'acid') dmg = Math.max(amount * 0.75, amount - armor * 0.25);
   if (t.pinned > 0 && type !== 'pure') dmg *= 1.5;
   // Termants: formic acid on a glued target; harder shells from beetle genes
@@ -204,7 +206,7 @@ export function damageCreature(w: World, cr: Creature, amount: number, type: Dam
   if (cr.dead) return;
   const armor = creatureHooks.armor(cr);
   let dmg = amount;
-  if (type === 'bite') dmg = Math.max(amount * 0.25, amount - armor);
+  if (type === 'bite' || type === 'blast') dmg = Math.max(amount * 0.25, amount - armor);
   else if (type === 'acid') dmg = Math.max(amount * 0.7, amount - armor * 0.25) * acidMulOn(w, cr.glueT);
   // mount bonus (EotU): enough ants on its back and it takes more damage from everyone
   if (mountBonus(cr)) dmg *= BALANCE.mount.bonusMul;
@@ -259,6 +261,8 @@ export function flingAnt(w: World, a: Ant, fromX: number, fromY: number, power: 
   if (c && a.id === c.queen) return; // the queen is immune to knockback
   // (spec 09 §2.2) a holding sickle-jaw is anchored, but knockback still throws it: the hold ends cleanly
   if (a.state === AS.Hold && isSickle(a)) sickleHoldBroken(w, a, 'flung');
+  // a Saiy-Ant Blaster's beam ends when it is thrown
+  if ((a.beamT ?? 0) > 0) stopBeam(w, a);
   dropCarried(w, a);
   releaseGrapple(w, a);
   unanchor(a);
@@ -285,6 +289,7 @@ export function gripAnt(w: World, a: Ant, crId: number, height: number): boolean
   const c = w.colony(a.colony);
   if (c && a.id === c.queen) return false;
   if (a.state === AS.Hold && isSickle(a)) sickleHoldBroken(w, a, 'flung');
+  if ((a.beamT ?? 0) > 0) stopBeam(w, a);
   dropCarried(w, a);
   releaseGrapple(w, a);
   a.state = AS.Flung;
@@ -350,6 +355,7 @@ function aggroRadius(w: World, a: Ant, c: Colony): number {
   if (cd.hook && a.task === 'marker' && a.state === AS.Guard) r = guardRush(a);
   // shooters see (and engage) as far as they can spray
   if (cd.acid && cd.acid.kind !== 'opener' && cd.acid.kind) r = Math.max(r, cd.acid.range * (a.space === SURFACE ? 1 : 0.7));
+  if (cd.blast) r = Math.max(r, blastRange() * (a.space === SURFACE ? 1 : 0.7));
   if (a.carry !== Carry.None && a.alarm < 0.5) r = Math.min(r, 4);
   // Defend-only stance: outside the home nest, ants engage only when alarmed (attacked or alarm scent).
   if (!c.aggressive && a.alarm < 0.3 && a.space !== nestSpace(c.id)) r = Math.min(r, cd.length * 0.7);
@@ -686,7 +692,7 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   const d = dhypot(t.x - a.x, t.y - a.y);
   if (cd.termite === 'major') majorCharge(a, d - t.r, t.r + cd.length * 0.45);
   // Give up pursuit if it runs far away (not for markers/alarmed soldiers).
-  const leash = (cd.role === 'soldier' || cd.role === 'major' ? 90 : 45) + (cd.acid && cd.acid.kind !== 'opener' ? cd.acid.range : 0);
+  const leash = (cd.role === 'soldier' || cd.role === 'major' ? 90 : 45) + (cd.acid && cd.acid.kind !== 'opener' ? cd.acid.range : 0) + (cd.blast ? blastRange() : 0);
   // (measured from the target's edge: the far side of a titan's legs is no reason to give up)
   const edge = a.tk === 4 ? distToCreatureBody(w.creatureById.get(a.tgt)!, a.x, a.y) : d - t.r;
   if (edge > leash || a.st > 40) {
@@ -697,15 +703,22 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   // hell ants: small prey within reach and the snap ready → stalk it (hellAnts.ts)
   if (cd.snap && startHunt(w, a, d, t.r)) return true;
   const acid = cd.acid;
-  const shooter = acid?.kind === 'lob' || acid?.kind === 'rapid';
-  const range = acid ? acid.range * abilityMods(c).acidRange * (a.level >= 3 && acid.kind === 'opener' ? BALANCE.perkAcidRange : 1) : 0;
+  // (a Saiy-Ant Blaster holds its range like the acid shooters: saiyBlaster.ts)
+  const shooter = acid?.kind === 'lob' || acid?.kind === 'rapid' || !!cd.blast;
+  const range = cd.blast ? blastRange() : acid ? acid.range * abilityMods(c).acidRange * (a.level >= 3 && acid.kind === 'opener' ? BALANCE.perkAcidRange : 1) : 0;
   // Formicines spray acid when ready: workers as they close in (then bite),
   // shooters from range, again and again.
   // (not in the step back of its turn out of the fight: it sprayed from its place, on top of the ant that took it)
   const steppingBack = Math.abs(a.rotT ?? 0) > BALANCE.combat21.rotSec - BALANCE.combat21.rotBackSec;
-  if (acid && a.cd2 <= 0 && d < range + t.r && (shooter || d > t.r + cd.length * 0.3) && !steppingBack) {
+  // a blaster fires only along a clear line (orbs stop at walls): blocked, it walks on toward its target
+  if (cd.blast && a.cd2 <= 0 && d < range + t.r && !steppingBack && !fireClear(w, a, t.x, t.y)) {
+    steerTo(w, a, t.x, t.y, dt, 1.0, 10);
+    return true;
+  }
+  if ((acid || cd.blast) && a.cd2 <= 0 && d < range + t.r && (shooter || d > t.r + cd.length * 0.3) && !steppingBack) {
     a.state = AS.Spray;
     a.st = 0;
+    if (cd.blast) blastCharge(w, a);
     return true;
   }
   if (shooter) {
@@ -719,7 +732,8 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       const away = datan2(a.y - t.y, a.x - t.x);
       const h = a.h;
       a.h = away;
-      moveForward(w, a, antSpeed(w, a) * 0.85, dt);
+      // (the Saiy-Ant Blaster backs off at a walk, gold or not: melee that reaches it catches it — spec 09 §1)
+      moveForward(w, a, cd.blast ? cd.speed * BALANCE.blaster.backoff : antSpeed(w, a) * 0.85, dt);
       a.h = h;
       faceToward(a, t.x, t.y, dt);
       return true;
@@ -1676,6 +1690,14 @@ function regrip(w: World, a: Ant): boolean {
 function sprayUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   const t = targetPos(w, a);
   const cd = casteOf(a.caste);
+  // Saiy-Ant Blaster: an orb, or the beam (saiyBlaster.ts); a target gone mid-wind-up cancels the shot
+  if (cd.blast) {
+    if (!t) {
+      endCombat(w, a);
+      return false;
+    }
+    return blastShot(w, a, c, dt, t.x, t.y, t.alive);
+  }
   if (!t || !cd.acid) {
     endCombat(w, a);
     return false;
@@ -1748,6 +1770,11 @@ export function projectileSystem(w: World, dt: number): void {
         landAcid(w, p);
         hit = true;
       }
+    } else if (p.kind === 'orb') {
+      // an energy orb: the first enemy on its path, a wall, or the end of its reach (saiyBlaster.ts)
+      if (orbStep(w, p, x0, y0)) continue;
+      keep.push(p);
+      continue;
     } else if (p.kind === 'acid') {
       // hit the intended target if within reach, otherwise any enemy on the path
       if (p.tk === 3) {

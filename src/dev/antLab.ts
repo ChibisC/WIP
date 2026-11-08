@@ -20,7 +20,7 @@ import { GlueStreams, NASUTE_GLUE } from '../render/termite/glue';
  * Model review scene: ?scene=antlab&ant=lasius_worker&lod=0&cam=34&phase=0.2&pose=0
  * Also ?ants=lasius_worker,formica_worker,... renders a line-up.
  * Per-ant lists (comma-separated, one value per ant in the line-up): poses=, mopens=, hpitches=, tints= (Termant tint
- * code: 1 stolen caste), scales=; swell=0..1 (crop,
+ * code: 1 stolen caste), scales=; mglow=0..1 (the Saiy-Ant Blaster's mouth glow); swell=0..1 (crop,
  * or an army-ant queen's physogastry); prey=1 draws a pale prey item slung under porter-pose (10) ants.
  */
 export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
@@ -193,7 +193,7 @@ export function runAntLab(canvas: HTMLCanvasElement, q: URLSearchParams): void {
     set('aA', [phase, amp, Number(q.get('hyaw') || 0) + (atk?.headYaw ?? 0), per('hpitches', bi, Number(q.get('hpitch') || 0)) + (atk?.headPitch ?? 0)]);
     set('aB', [atk ? atk.mand : per('mopens', bi, Number(q.get('mopen') || 0)), Number(q.get('aspread') || 0), Number(q.get('apitch') || 0), Number(q.get('awave') || 0.1)]);
     // (aC.z packs the pose id and its weight; aE.x the gold and its ripple direction)
-    set('aC', [Number(q.get('gpitch') || 0), Number(q.get('swell') || 0), pz + (pz ? 0.99 : 0), Number(q.get('hit') || 0)]);
+    set('aC', [Number(q.get('gpitch') || 0), Number(q.get('swell') || 0), pz + (pz ? 0.99 : 0), Number(q.get('hit') || 0) + 2 * Math.round(Math.min(1, Number(q.get('mglow') || 0)) * 10)]);
     set('aD', [Number(q.get('death') || 0), 0, 4 * per('tints', bi, 0), Number(q.get('pph') || 0.1)]);
     set('aE', [Number(q.get('gold') || 0) * (Number(q.get('golddir') || 1) < 0 ? -1 : 1), 0, packExhaustedFade(Number(q.get('exh') || 0), 0), 0]);
     const mx = new THREE.Matrix4();
