@@ -6,10 +6,11 @@
 REF=$1; SCENES=${2:-fight,economy,nests,ten,titan,tunnel}; ANTS=${3:-500,1000}; TICKS=${4:-200}
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
 T=$(mktemp -d)
+# (bundled, as the game's build is: tools/perf/bundle.sh)
 if [ -f "$REF" ]; then cp "$REF" $T/ref.json; else
-(cd "$REF" && npx vite-node tools/perf/simBench.ts -- $SCENES $ANTS $TICKS --out $T/ref.json > $T/ref.log 2>&1) &
+"$HERE/tools/perf/bundle.sh" "$REF" $T/ref.mjs && (node $T/ref.mjs $SCENES $ANTS $TICKS --out $T/ref.json > $T/ref.log 2>&1) &
 fi
-(cd "$HERE" && npx vite-node tools/perf/simBench.ts -- $SCENES $ANTS $TICKS --out $T/this.json > $T/this.log 2>&1)
+"$HERE/tools/perf/bundle.sh" "$HERE" $T/this.mjs && node $T/this.mjs $SCENES $ANTS $TICKS --out $T/this.json > $T/this.log 2>&1
 wait
 python3 - "$T/ref.json" "$T/this.json" <<'PY'
 import json, sys

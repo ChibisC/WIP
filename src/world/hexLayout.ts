@@ -121,6 +121,25 @@ export class HexLayout {
     const cols = this.cols;
     const rows = this.rows;
     const c0 = Math.round((x - R) / C);
+    // (performance v3) the common case at once: the point well inside its column's nearest row (under 0.4 of a row
+    // from that centre, so the rows above and below are farther) and nearer that centre than any centre of the columns
+    // beside it can be (they are at least C − |dx| away across): the hex the loop below would pick, at the same
+    // squared distance, bit for bit — the loop decides everything else
+    if (c0 >= 0 && c0 < cols) {
+      const odd = c0 & 1 ? H * 0.5 : 0;
+      const t = (y - H * 0.5 - odd) / H;
+      const r0 = Math.round(t);
+      const ft = t - r0;
+      if (r0 >= 0 && r0 < rows && ft < 0.4 && ft > -0.4) {
+        const cx = R + c0 * C;
+        const d0 = sq(cx - x) + sq(H * 0.5 + r0 * H + odd - y);
+        const gap = C - Math.abs(cx - x);
+        if (gap > 0 && gap * gap > d0 * (1 + 1e-9) + 1e-9) {
+          this.nearD2 = d0;
+          return r0 * cols + c0;
+        }
+      }
+    }
     let best = -1;
     let bd = Infinity;
     // (each centre from its column and row directly: the same arithmetic as centerX/centerY of its index, so the same
