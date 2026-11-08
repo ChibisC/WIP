@@ -2,7 +2,7 @@ import { audio, playBuffer } from './engine';
 import { LoopBed } from './beds';
 import { SOUND } from './catalog';
 import { rng } from './dsp';
-import { SR, flute, handDrum, kalimba, shaker, string } from './standins';
+import { SR, flute, handDrum, kalimba, shaker, string } from './instruments';
 
 /**
  * Adaptive music (Phase 14 audio): soft, documentary-style, acoustic.
@@ -50,7 +50,7 @@ export class Music {
     const up = intensity > this.intensity;
     this.intensity += (intensity - this.intensity) * (1 - Math.exp(-dt / (up ? 1.2 : 7)));
     this.boss += (boss - this.boss) * (1 - Math.exp(-dt / (boss > this.boss ? 1.5 : 5)));
-    const files = audio.bank.files(SOUND['music.explore']).length > 0;
+    const files = !!audio.bank.file(SOUND['music.explore']);
     if (files) return this.updateStems();
     this.score(ctx);
   }

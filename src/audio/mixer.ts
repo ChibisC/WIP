@@ -8,8 +8,8 @@ import { audio } from './engine';
  * drives the battle bed: past the voice limit, a fight thickens into one
  * dense texture instead of hundreds of separate sounds.
  */
-export type Pool = 'steps' | 'work' | 'combat' | 'creature';
-export const POOL_MAX: Record<Pool, number> = { steps: 8, work: 8, combat: 16, creature: 10 };
+export type Pool = 'work' | 'combat' | 'creature';
+export const POOL_MAX: Record<Pool, number> = { work: 8, combat: 16, creature: 10 };
 
 export interface Req {
   id: string;
@@ -21,11 +21,13 @@ export interface Req {
   pool: Pool;
   muffle: boolean;
   wet: number;
+  /** start this many seconds from now (a sim event waits for the frame that shows it) */
+  delay?: number;
 }
 
 export class Mixer {
   private queue: Req[] = [];
-  private ends: Record<Pool, number[]> = { steps: [], work: [], combat: [], creature: [] };
+  private ends: Record<Pool, number[]> = { work: [], combat: [], creature: [] };
   /** loudness of combat sounds that found no voice, decaying */
   overflow = 0;
   played = 0;
@@ -53,7 +55,7 @@ export class Mixer {
         this.dropped++;
         continue;
       }
-      const v = audio.play(r.id, { gain: r.gain, pan: r.pan, rate: r.rate, muffle: r.muffle, wet: r.wet });
+      const v = audio.play(r.id, { gain: r.gain, pan: r.pan, rate: r.rate, muffle: r.muffle, wet: r.wet, at: r.delay ? t + r.delay : undefined });
       if (v) {
         ends.push(v.end);
         this.played++;
