@@ -874,14 +874,15 @@ export const SICKLE = {
     /** victims up to this × the soldier's length can be grabbed (never bosses or queens) */
     maxTargetSizeMul: 2.0,
     /**
-     * (user review round 1, 2026-11-07: "make the grip more on the body cos the mandibles dont even touch the ant")
-     * where the closed sickles hook (mm ahead of a 4.5 mm soldier's centre, scaled with its size; the ant-pipeline
-     * model's C-hooks): the held victim is pinned across them, side-on, its body centred this far plus its half-width
-     * ahead — the sickles round its waist and mesosoma, the snout pressing on its back
+     * (user review round 1, 2026-11-07: "the mandibles dont even touch the ant"; round 2: "make the two still parallel
+     * to each other (straight), just make the mandibles' clasp better") where the closed sickles hook (mm ahead of a
+     * 4.5 mm soldier's centre, scaled with its size; the ant-pipeline model's C-hooks): the held victim is pinned
+     * head-on in line with the soldier, its front this far ahead less `victimInHooks` of its length — its head and jaws
+     * inside the crossed hooks, the snout lying along its back
      */
     gripMm: 0.82,
-    /** an ant victim's half-width as a fraction of its length (the mesosoma and legs' near side) */
-    victimHalfWidth: 0.11,
+    /** how much of a held ant's length sits inside the hooks (its head and jaws) */
+    victimInHooks: 0.08,
   },
   acid: {
     /** the ramp (inferno-style): pure damage, ignores armour */

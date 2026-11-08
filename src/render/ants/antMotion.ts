@@ -97,7 +97,8 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
   }
   // sickle-jaw termites on the ant pipeline (model redo, claude/realism/10-spec §3): the soldier's grab, hold-and-squirt
   // and free squirt (game/antViews.ts sets them as specials 7–9 from the sim's lunge and hold) and the alarm drum; the
-  // other castes bite as termite workers do (tug, rip, lunge), never the same twice running
+  // other castes bite as ant workers do (user, review round 2: the termite tug, rip and lunge "feel jittery, make them
+  // similar to ant worker attacks"): the lunge, the clamp-and-tug, the chomp, never the same twice running
   if (morph.startsWith('termite_rhy_')) {
     if (v.special === 5) out.variant = ATK.DRUM;
     else if (v.special === 7) out.variant = ATK.S_GRAB;
@@ -105,7 +106,7 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
     else if (v.special === 9) out.variant = ATK.S_SQUIRT;
     else if (morph === 'termite_rhy_soldier' || morph === 'termite_rhy_presoldier') out.variant = [ATK.S_GRAB, ATK.S_SQUIRT, ATK.S_HOLD][av];
     else {
-      const set = [ATK.T_TUG, ATK.T_RIP, ATK.T_LUNGE];
+      const set = [ATK.LUNGE, ATK.CLAMP, ATK.CHOMP];
       if (!v.atkSeq) out.variant = set[av];
       else {
         const pick = (k: number) => Math.floor(hs(k, 8) * 3) % 3;

@@ -397,7 +397,7 @@ function clips(): Record<string, Clip> {
         {
           morph: 'termite_rhy_soldier',
           script: (t, v) => {
-            Object.assign(v, { x: 0, y: 0, heading: 0, tan: 1, special: 0, atk: undefined, firing: false, aimX: 1.15, aimY: 0, aimZ: 0.5, ramp: 0, headPitch: 0, mandible: 0.2, antennaActivity: 1, holding: false });
+            Object.assign(v, { x: 0, y: 0, heading: 0, tan: 1, special: 0, atk: undefined, firing: false, aimX: 2.06, aimY: 0, aimZ: 0.5, ramp: 0, headPitch: 0, mandible: 0.2, antennaActivity: 1, holding: false });
             const t1 = 0.9, lun = 0.55 * 0.74, t2 = t1 + lun, t3 = 5.2;
             if (t < t1) Object.assign(v, { headPitch: 0.22, mandible: 0.85 + 0.15 * Math.sin(t * 3) });
             else if (t < t2) sickleCycle(v, 7, (t - t1) / 0.55, 0.55);
@@ -414,9 +414,9 @@ function clips(): Record<string, Clip> {
           script: (t, v) => {
             const t2 = 0.9 + 0.55 * 0.74, t3 = 5.2;
             const held = t > 0.9 + 0.55 * 0.58 && t < t3;
-            // (review round 1: the grip on the body) side-on across the sickles once caught, as the sim pins it
-            // (SICKLE.grab.gripMm 0.82 + the victim's half-width); before, a step further out, turning to flee
-            Object.assign(v, { x: held || t >= t3 ? 0.82 + 0.33 : 1.75, y: 0, heading: held || t >= t3 ? Math.PI / 2 : Math.PI * 0.62, hp: 100, antennaActivity: 1, mandible: 0.5, pose: 0, roll: 0, pitch: 0, headYaw: 0, acid: 0, dead: false });
+            // (review rounds 1–2: in line, head-on, its head in the crossed hooks) where the sim pins it —
+            // SICKLE.grab.gripMm 0.82 + (0.5 − victimInHooks 0.08) of its 2.96 mm length; before, a step further out
+            Object.assign(v, { x: held || t >= t3 ? 0.82 + 0.42 * 2.96 : 2.6, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: 0, roll: 0, pitch: 0, headYaw: 0, acid: 0, dead: false });
             if (held) {
               const k = Math.min(1, Math.max(0, (t - t2) / 3.2));
               v.acid = 0.1 + 0.9 * k;
@@ -441,14 +441,14 @@ function clips(): Record<string, Clip> {
       noScale: true,
       ants: [
         { morph: 'termite_rhy_worker', script: (t, v) => Object.assign(v, { x: -9, y: -4, heading: 0.3, headPitch: -0.3 + 0.08 * Math.sin(t * 9), mandible: 0.45 + 0.4 * Math.sin(t * 11), antennaActivity: 0.8 }) },
-        { morph: 'termite_rhy_worker', script: (t, v) => Object.assign(v, { x: -10.6, y: 3.5, heading: 0, mandible: 0.55, headPitch: 0.1 + Math.sin(t * 3.1) * 0.05, antennaPitch: 0.25, antennaActivity: 1 }) },
-        { morph: 'termite_rhy_worker', script: (t, v) => Object.assign(v, { x: -6.2, y: 3.5, heading: Math.PI, mandible: 0.55, headPitch: 0.1 + Math.sin(t * 3.1 + 1) * 0.05, antennaPitch: 0.25, antennaActivity: 1 }) },
+        { morph: 'termite_rhy_worker', script: (t, v) => Object.assign(v, { x: -11.1, y: 3.5, heading: 0, mandible: 0.55, headPitch: 0.1 + Math.sin(t * 3.1) * 0.05, antennaPitch: 0.25, antennaActivity: 1 }) },
+        { morph: 'termite_rhy_worker', script: (t, v) => Object.assign(v, { x: -5.4, y: 3.5, heading: Math.PI, mandible: 0.55, headPitch: 0.1 + Math.sin(t * 3.1 + 1) * 0.05, antennaPitch: 0.25, antennaActivity: 1 }) },
         { morph: 'termite_rhy_soldier', script: (t, v) => { Object.assign(v, { x: -1, y: 5, heading: -0.4, tan: 1 }); sickleCycle(v, 5, (t * 6) % 1, 1 / 6); } },
         {
           morph: 'termite_rhy_soldier',
           script: (t, v) => {
             const rate = 2.2;
-            Object.assign(v, { x: 2.5, y: -3, heading: 0, tan: 1, aimX: 6.2, aimY: -3, aimZ: 0.9, firing: t > 0.6, ramp: Math.min(1, Math.max(0, (t - 0.6) / 3)) });
+            Object.assign(v, { x: 3.4, y: -3, heading: 0, tan: 1, aimX: 6.0, aimY: -3, aimZ: 0.9, firing: t > 0.6, ramp: Math.min(1, Math.max(0, (t - 0.6) / 3)) });
             sickleCycle(v, 9, v.firing ? (t * rate) % 1 : 0.6, 1 / rate);
           },
         },
@@ -456,7 +456,7 @@ function clips(): Record<string, Clip> {
         { morph: 'termite_rhy_worker', script: (t, v) => Object.assign(v, { x: 9, y: 4.5, heading: 2.4, dead: t > 1.5 }) },
       ],
       events: [0.17, 0.34, 0.51, 0.68, 2.2, 2.37, 2.54, 2.71, 4.3, 4.47, 4.64].map((t) => ({ t, e: { t: 'headbang', x: 0.4, y: 4.4, space: -1 } as unknown as SimEvent })),
-      cam: { tx: 0, ty: 0.5, tz: 0.5, dir: [0.15, 0.8, 1], dist: 34, fov: 30 },
+      cam: { tx: 0, ty: 0.5, tz: 0.5, dir: [0.15, 0.7, 1], dist: 27, fov: 30 },
     },
     // the Saiy-Ant gold surge (claude/realism/10-spec §2): the ripple in from the head with the stretch and overshoot
     // (as game/antViews.ts speciesExtras), faster bites with spark impacts, the ripple out from the gaster, the
