@@ -5,8 +5,8 @@ friction, tiny bubbles; the naturally tonal calls (birds, crickets, frogs, an ow
 import numpy as np
 
 from dsp import (SR, add, body_ir, brown, bubble, bubbles, burst, click, creak, crunch, env_ad, env_points, fizz, friction,
-                 grains, hiss, hp, impulses, lp, modes, norm, onepole_lp, peak, pink, ring, seamless, squelch, stridulate, swish,
-                 thud, tlin, tone, train, zeros, bp, svf_bp)
+                 grains, hiss, hp, impulses, lp, modes, norm, onepole_lp, peak, pink, ring, seamless, soft_clip, squelch,
+                 stridulate, swish, thud, tlin, tone, train, zeros, bp, svf_bp)
 from recipes_combat import double_click, squeak
 from recipes_creatures import hollow
 from registry import sound
@@ -16,12 +16,14 @@ from registry import sound
 
 @sound("ant.dig_bite", takes=6)
 def dig_bite(r, k):
-    # soil bitten off a tunnel face: the mandibles' click, a small crunch of packed grains, a dull crumble
-    o = zeros(0.15)
-    add(o, click(r, 2500, 8000, 3, (0.0008, 0.003), 0.5), 0.001, 0.5)
-    add(o, crunch(r, r.u(0.05, 0.08), r.i(10, 16), 5500, 1500, 1.6, (0.0006, 0.003)), 0.002, 1.0)
-    n = int(0.08 * SR)
-    add(o, lp(r.noise(n) * env_ad(n, 0.004, 0.02), 900), 0.004, 0.25)
+    # soil bitten off a tunnel face: a low mandible click, a crunch of packed grains whose resonance sits in the
+    # low mids, and a dull soil thud under it (v3.1: deeper, per review)
+    o = zeros(0.18)
+    add(o, click(r, 900, 3200, 3, (0.0012, 0.004), 0.4), 0.001, 0.45)
+    add(o, crunch(r, r.u(0.06, 0.09), r.i(10, 16), 2200, 500, 1.6, (0.001, 0.005)), 0.002, 1.0)
+    add(o, thud(r, r.u(180, 260), r.u(0.01, 0.016)), 0.002, 0.7)
+    n = int(0.1 * SR)
+    add(o, lp(r.noise(n) * env_ad(n, 0.004, 0.025), 500), 0.004, 0.4)
     return o
 
 
@@ -56,12 +58,20 @@ def drag_small(r, k):
 
 @sound("ant.drag_heavy", takes=5, lufs=-22)
 def drag_heavy(r, k):
-    # a large item hauled by a team: a heavier, lower scrape with bumps
+    # a large item hauled by a team: a heavy, low drag body (the load's weight shifting over the soil, no scrape) with
+    # dull bumps as it catches and drops (v3.1: the scraping layer removed, per review)
     dur = r.u(0.45, 0.7)
-    o = zeros(dur + 0.03)
-    add(o, norm(friction(r, dur, r.u(250, 400), 800, 4500, (0.0008, 0.004), 0.4)), 0.005, 1.0)
+    n = int(dur * SR) + 1
+    o = zeros(dur + 0.08)
+    t = tlin(n)
+    pressure = np.full(n, 0.25)
     for _ in range(r.i(2, 4)):
-        add(o, thud(r, r.u(300, 500), 0.008), r.u(0.03, dur), 0.35)
+        pressure += r.u(0.5, 1) * np.exp(-((t - r.u(0.05, dur - 0.05)) / r.u(0.06, 0.16)) ** 2)
+    pressure = pressure / pressure.max() * np.sin(np.pi * np.minimum(1, t / dur)) ** 0.5
+    add(o, norm(lp(brown(r, n), 320, 2)) * pressure, 0.002, 0.9)
+    add(o, norm(lp(r.noise(n), 700, 3)) * pressure ** 2, 0.002, 0.3)
+    for _ in range(r.i(3, 5)):
+        add(o, thud(r, r.u(160, 300), r.u(0.01, 0.016)), r.u(0.03, dur), r.u(0.4, 0.7))
     return o
 
 
@@ -151,11 +161,16 @@ def egg_set(r, k):
 
 @sound("ant.larva_hatch", takes=4, lufs=-22)
 def larva_hatch(r, k):
-    # a new adult breaking out of its cocoon: a soft, wet, fibrous tear
-    o = zeros(0.5)
-    add(o, norm(friction(r, r.u(0.18, 0.28), 1500, 2500, 9000, (0.0002, 0.001), 0.3)), 0.005, 0.7)
-    add(o, squelch(r, 0.1, 1800, 700, 5), 0.12, 0.5)
-    add(o, bubbles(r, 0.2, r.i(3, 6), 1500, 4500, (0.0015, 0.005)), 0.1, 0.35)
+    # a new adult breaking out of its cocoon (v3.1, per review: a clear, satisfying little hatch): a short fibrous
+    # crack of the cocoon splitting, a wet pop as it gives, a rising wet unfurl and a tiny bright shimmer tail
+    o = zeros(0.45)
+    add(o, crunch(r, 0.05, r.i(6, 9), 1800, 900, 1.4, (0.0008, 0.003)), 0.002, 0.6)
+    add(o, click(r, 700, 2200, 3, (0.003, 0.009), 0.5), 0.05, 0.9)                 # the pop: a low, wet, rounded tick
+    add(o, bubble(r, r.u(380, 520), 0.012, 0.6), 0.051, 0.7)
+    add(o, squelch(r, 0.12, 600, 2200, 7), 0.06, 0.55)                               # the unfurl: wet, sweeping up
+    for i in range(3):                                                                # three small bubbles climbing
+        add(o, bubble(r, r.u(900, 1300) * (1.25 ** i), r.u(0.006, 0.01), 0.3), 0.1 + i * r.u(0.035, 0.05), 0.35 - 0.07 * i)
+    add(o, norm(fizz(r, 0.18, 400, 5000, 11000, 0.15, 0.06)), 0.11, 0.18)           # a tiny bright tail of droplets
     return o
 
 
@@ -365,52 +380,58 @@ def amb_katydid(r, k):
 
 @sound("amb.fly_pass", takes=4, lufs=-24)
 def amb_fly_pass(r, k):
-    # a fly or small bee buzzing past (wingbeats near 150-250 Hz and their harmonics), swelling and bending in pitch
+    # a small fly buzzing past (v3.1: built like the old stand-in, which the review preferred, but pitched higher):
+    # one wingbeat = one pulse ringing the 2nd, 3rd and 5th harmonics of the beat rate plus a wisp of air, so the
+    # buzz is a rich pulse train that rises and falls in pitch and level as it passes
     dur = r.u(1.6, 2.6)
-    n = int(dur * SR)
-    t = tlin(n)
-    f0 = r.u(150, 240)
-    c = dur * r.u(0.4, 0.6)
-    dop = 1 + 0.06 * np.tanh((c - t) * 3)
-    f = f0 * dop * (1 + 0.02 * np.sin(2 * np.pi * r.u(3, 6) * t))
-    ph = 2 * np.pi * np.cumsum(f) / SR
-    buzz = sum((1 / h ** 0.9) * np.sin(h * ph + r.u(0, 6)) for h in range(1, 14))
-    e = 1 / (1 + ((t - c) / (dur * 0.18)) ** 2)
-    o = bp(buzz * e, 120, 6000)
-    return onepole_lp(o, 1500 + 6000 * e)
+    n = int(dur * SR) + 1
+    o = np.zeros(n)
+    f0 = r.u(300, 400)       # old stand-in: 170-230 Hz
+    t = 0.0
+    while t < dur:
+        u = t / dur
+        dop = 1 + 0.06 * np.cos(u * np.pi)
+        amp = np.exp(-(((u - 0.5) * 3.2) ** 2))
+        fb = f0 * dop
+        add(o, modes(0.024, [fb * 2, fb * 3, fb * 5], [0.004, 0.003, 0.002], [1, 1, 1]), t, 0.25 * amp)
+        add(o, burst(r, 0.002, 0.0002, 0.0008), t, 0.05 * amp)
+        t += 1 / fb
+    return lp(o, 5500)
 
 
 @sound("amb.frog", takes=5, lufs=-24)
 def amb_frog(r, k):
     # frogs croaking in the distance at night: a pulsed croak (glottal pulses ringing the vocal sac)
-    dur = r.u(0.4, 1.0)
+    # (v3.1, per review: a higher voice and a quicker croak)
+    dur = r.u(0.4, 0.9)
     o = zeros(dur + 0.2)
-    rate = r.u(55, 90)
-    ir = modes(0.05, [r.u(500, 700), r.u(1100, 1500), r.u(2000, 2600)], [0.006, 0.004, 0.003], [1, 0.6, 0.3])
+    rate = r.u(85, 130)      # was 55-90 pulses a second
+    ir = modes(0.04, [r.u(800, 1050), r.u(1700, 2200), r.u(2900, 3600)], [0.005, 0.0035, 0.0025], [1, 0.6, 0.3])
     t = 0.01
     while t < dur:
-        L = r.u(0.12, 0.25)
+        L = r.u(0.09, 0.18)
         ts = train(r, L, rate, rate * 0.9, 0.04, start=t)
         e = [np.sin(np.pi * (x - t) / L) for x in ts]
         exc = impulses(r, dur + 0.1, ts, e)
         add(o, ring(exc, ir)[: len(o)], 0, 1)
-        t += L + r.u(0.08, 0.3)
-    return lp(o, 3500)
+        t += L + r.u(0.05, 0.18)
+    return lp(o, 4500)
 
 
 @sound("amb.owl", takes=3, lufs=-24)
 def amb_owl(r, k):
     # a tawny owl far away: a long hoot, a pause, a wavering run of hoots
-    o = zeros(2.4)
-    f = r.u(700, 820)
+    # (v3.1, per review: pitched a little lower and each "hoo" held longer)
+    o = zeros(3.2)
+    f = r.u(600, 700)        # was 700-820 Hz
     def hoot(L, f0, f1, vib=0.0):
         n = int(L * SR)
         e = np.sin(np.pi * np.linspace(0, 1, n) ** 0.7) ** 1.3
         return tone(np.linspace(f0, f1, n), L, None, (1, 0.12, 0.04), vib, 9)[:n] * e
-    add(o, hoot(0.45, f, f * 0.97), 0.02, 1)
-    t = 0.02 + 0.45 + r.u(0.6, 0.9)
-    add(o, hoot(0.12, f * 0.92, f), t, 0.6)
-    add(o, hoot(r.u(0.6, 0.8), f * 1.02, f * 0.95, 0.03), t + 0.25, 0.8)
+    add(o, hoot(r.u(0.65, 0.8), f, f * 0.97), 0.02, 1)
+    t = 0.02 + 0.8 + r.u(0.6, 0.9)
+    add(o, hoot(0.2, f * 0.92, f), t, 0.6)
+    add(o, hoot(r.u(0.9, 1.15), f * 1.02, f * 0.95, 0.03), t + 0.33, 0.8)
     return lp(o, 2500)
 
 
@@ -435,12 +456,22 @@ def amb_raindrop_big(r, k):
     return o
 
 
-@sound("amb.thunder", takes=3, lufs=-22)
+@sound("amb.thunder", takes=5, lufs=-22)
 def amb_thunder(r, k):
-    # distant thunder rolling: a crackle at the start, then a long low roll swelling and fading
+    # distant thunder rolling: a crackle at the start, then a long low roll swelling and fading. The review liked
+    # both this and the old stand-in, so takes 4-5 are the old character: a soft-clipped low roll with a few cracks
+    # inside it (sharp onsets, each decaying over a third of the length) and a long tail
     dur = r.u(4.5, 7.0)
     n = int(dur * SR)
     t = tlin(n)
+    if k >= 4:
+        peaks = [0.05, r.u(0.3, 0.8), r.u(1.0, 1.8)]
+        e = np.zeros(n)
+        for p in peaks:
+            e = np.maximum(e, np.where(t < p, 0.0, np.exp(-(t - p) / (dur * 0.3))))
+        e *= np.minimum(1, t / 0.04)
+        o = norm(lp(brown(r, n), 160, 2)) * e
+        return soft_clip(o * 1.6, 1.2)
     e = np.zeros(n)
     for _ in range(r.i(3, 6)):
         c = r.u(0.2, dur * 0.6)
@@ -463,11 +494,23 @@ def amb_soil_trickle(r, k):
 
 @sound("amb.root_creak", takes=4, lufs=-25)
 def amb_root_creak(r, k):
-    # a root creaking in the soil as it shifts
-    dur = r.u(0.5, 1.3)
+    # a root creaking in the soil as it shifts (v3.1: rebuilt like the old stand-in, which the review preferred):
+    # slow stick-slip pulses, each ringing the same three woody modes (near 350, 800 and 1600 Hz, detuned a little
+    # pulse to pulse) with a short wisp of noise, the rate wandering upward and the pressure swelling then easing
+    dur = r.u(0.6, 1.4)
     o = zeros(dur + 0.1)
-    add(o, norm(creak(r, dur, r.u(20, 40), r.u(45, 90), 200, 1400, (0.006, 0.03), [(0, 0), (dur * 0.3, 1), (dur, 0.2)])), 0, 1)
-    return lp(o, 3500)
+    body = [r.u(280, 420), r.u(700, 950), r.u(1400, 1800)]
+    rate0, rate1 = r.u(12, 25), r.u(20, 45)
+    s = 0.0
+    while s < dur:
+        u = s / dur
+        rate = rate0 + (rate1 - rate0) * u + r.u(-0.35, 0.35) * rate0
+        e = np.sin(np.pi * u) ** 0.7 * r.u(0.4, 1)
+        fs = [f * r.u(0.92, 1.08) for f in body]
+        add(o, modes(0.02, fs, [0.0025 / (i + 1) for i in range(3)], [1, 1, 1]), s, e)
+        add(o, burst(r, 0.004, 0.0002, 0.003), s, e * 0.3)
+        s += 1 / max(5, rate)
+    return lp(o, 2500)
 
 
 # ------------------------------------------------------------------ ambience: beds (stereo loops)
@@ -552,13 +595,15 @@ def amb_cicada(r, k):
 
 @sound("amb.water_stream", loop=True, stereo=True, lufs=-25, xf=2.0)
 def amb_water_stream(r, k):
-    # a small stream trickling: many small bubbles and a soft wash
+    # a small stream trickling (v3.1: the small bubbles removed, per review): a soft broadband wash whose body
+    # gurgles slowly (the flow's turbulence modulating the low mids) under a steadier fine spray on top
     dur = 24.0
     n = int(dur * SR)
     def ch(r):
-        b = bubbles(r, dur, int(dur * 70), 300, 2500, (0.003, 0.012), (0.1, 0.5), 1.0)[:n]
-        wash = norm(bp(pink(r, n), 200, 3000)) * 0.35
-        return norm(b) + wash
+        mod = 0.6 + 0.4 * norm(lp(r.noise(n), 3, 1))           # slow, irregular gurgle of the flow
+        body = norm(bp(pink(r, n), 250, 1800)) * mod
+        spray = norm(bp(r.noise(n), 1800, 6000)) * (0.25 + 0.1 * norm(lp(r.noise(n), 8, 1)))
+        return body + 0.45 * spray
     return np.stack([ch(r), ch(r)])
 
 
@@ -570,7 +615,7 @@ def amb_sand_hiss(r, k):
     def ch(r):
         g = gusts(r, n, 4)
         h = norm(bp(r.noise(n), 3500, 12000)) * g ** 1.5 * 0.5
-        gr = norm(leafy(r, dur, 60, 5000, 13000, g)[:n]) * 0.6
+        gr = norm(leafy(r, dur, 25, 5000, 13000, g)[:n]) * 0.2    # v3.1: far fewer, quieter crackle grains (review)
         w = norm(lp(pink(r, n), 500)) * (0.2 + 0.5 * g)
         return h + gr + w
     return np.stack([ch(r), ch(r)])
@@ -579,6 +624,7 @@ def amb_sand_hiss(r, k):
 @sound("amb.rain", loop=True, stereo=True, lufs=-24, xf=2.0)
 def amb_rain(r, k):
     # rain heard by an ant: drops thudding into soil and slapping leaves all around, a fine wash under them
+    # (v3.1, per review: no resonant drop plinks; the leaf slaps are soft noise pats, the wash is broadband)
     dur = 20.0
     n = int(dur * SR)
     def ch(r):
@@ -586,10 +632,11 @@ def amb_rain(r, k):
         for _ in range(int(dur * 25)):
             t = r.u(0, dur - 0.1)
             if r.u() < 0.5:
-                add(o, thud(r, r.u(200, 500), r.u(0.004, 0.01)), t, r.u(0.1, 0.6))
+                add(o, thud(r, r.u(200, 450), r.u(0.004, 0.01)), t, r.u(0.1, 0.6))
             else:
-                add(o, click(r, 1500, 6000, 3, (0.001, 0.005), 0.6), t, r.u(0.1, 0.5))
-        wash = norm(bp(pink(r, n), 400, 8000)) * 0.4
+                m = int(0.03 * SR)
+                add(o, norm(bp(r.noise(m) * env_ad(m, 0.001, 0.006), 800, 5000)), t, r.u(0.1, 0.45))
+        wash = norm(bp(pink(r, n), 300, 9000)) * 0.5
         return norm(o) + wash
     return np.stack([ch(r), ch(r)])
 
@@ -608,13 +655,12 @@ def amb_nest_room(r, k):
 
 @sound("amb.colony_rumble", loop=True, stereo=True, lufs=-29, xf=3.0)
 def amb_colony_rumble(r, k):
-    # the colony at work, felt through the soil: a low rumble with a faint, distant scratching of many jaws
+    # the colony at work, felt through the soil: a low rumble, slowly swelling (v3.1: the faint high patter of
+    # many feet removed, per review; the rumble bed alone)
     dur = 24.0
     n = int(dur * SR)
     def ch(r):
         t = tlin(n)
         sw = 0.7 + 0.3 * np.sin(2 * np.pi * t / 6.1 + r.u(0, 6))
-        rum = norm(lp(brown(r, n), 140, 3)) * sw
-        sc = norm(lp(grains(r, dur, int(dur * 120), 1500, 5000, (0.0005, 0.002), 1.0, (0.05, 0.5))[:n], 2500)) * 0.25
-        return rum + sc
+        return norm(lp(brown(r, n), 140, 3)) * sw
     return np.stack([ch(r), ch(r)])
