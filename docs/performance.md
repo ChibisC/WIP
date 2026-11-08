@@ -223,3 +223,44 @@ click on an ant, a marker placed, a group sent, a key, then in the nest a hex ma
 build machine nearer real time; its frame times still mean nothing for a real device).
 
 The real numbers come from the user's laptop and iPhone (`?bench=1`, below once they arrive).
+
+### What was found
+- **Single-player commands already acted on the next tick**: the worker applies a command at the boundary before its
+  next tick as soon as it arrives. The meter confirms it (1 tick).
+- **The 20 Hz stepping was the interpolation, not the tick rate.** In worker mode α ran 0 → 1 from each frame's
+  arrival over the smoothed gap: an early frame jumped the units forward, a late one froze them, and a frame holding two
+  or three ticks (a busy worker) drew the first ticks in one frame. Modelled with uneven arrivals (worker 4–40 ms a
+  tick), 12 % of frames froze and 6–11 % jumped.
+- **Off-screen ants cost as much as on-screen ones**: the ant renderer animated every ant of the space before its view
+  test. Zoomed in on a crowd, 90 % of the time went to ants nobody could see.
+- **Renders differed run to run** (`Math.random` seeds for gait, antenna wave, pose phase; random sparks), which is why
+  the golden set needed a noise set.
+- **The frame message was mostly unchanged data**: half to two thirds of the entity columns are the same from one tick
+  to the next, and reading them was one megamorphic keyed store per value.
+- **Multiplayer on a LAN waited 2 ticks** (100 ms) of input delay plus a packet: the delay's floor and a whole tick of
+  margin on top of the path.
+
+### What changed (no change of looks, no change of the simulation's results)
+| Area | Change |
+|---|---|
+| Motion | `game/playout.ts`: a playout clock on the loop's pace, kept just behind the newest tick (98th percentile of the recent need); each frame with ticks re-anchors every unit's previous position to where it is drawn; late frames run on up to half a tick, easing off; teleports snap; paused glides to the newest tick. |
+| Feedback | `game/intents.ts`: an order's ants turn toward it on the frame of the input (render only); a refused hex order's ghost unwinds; reasons said once. |
+| Multiplayer | `MIN_DELAY` 1; the host's margin a quarter of the path plus a frame and slack, at most a tick: one tick on a LAN. |
+| CPU per frame | `render/viewCull.ts`: ants more than 40 mm out of view get no view and no animation; the renderer catches each up in one step when it returns. |
+| Looks, reproducible | Seeds hashed from ids and places; sparks from a seeded sequence. |
+| Effects | Combat particles written once at spawn, played in the vertex shader in closed form from t − t0; only new slots uploaded. |
+| Messages | Delta entity columns (unchanged columns left out); a reader generated per schema (named stores; the plain loop where compiling is forbidden). |
+| UI | Marker counts once a tick; label and tip styles written only when they change. |
+
+### Measured on the build machine (no GPU: the counts and the CPU parts carry over, the frame times do not)
+| | before | after |
+|---|---|---|
+| Drawn step ÷ true speed, uneven arrivals at 60 Hz, p99 off by (`tests/smoothMotion.ts`) | 1.65 (12 % frozen, 11 % jumped) | 0.02 (none) |
+| … at 144 Hz | 3.47 (12 % frozen, 6 % jumped) | 0.01 (none) |
+| … a busy worker, batches of 2–3 ticks | 2.00 (16 % frozen, 13 % jumped) | eases off in 1 % of frames, no jumps |
+| Single-player command → acting | 1 tick | 1 tick |
+| LAN command → acting (1–4 ms one way, `tests/net.ts`) | delay 2: 3 ticks | delay 1: 2 ticks |
+| Ant renderer, 600–900 ants, zoomed in on a crowd (`tests/clientVisuals.ts`) | 1.8–3.4 ms | 0.2–0.4 ms |
+| Frame message, big fight (829 ants, 96 creatures) | 716 KB, columns read 3.1 ms | 467 KB, 1.8 ms |
+| Golden set run to run | differs where ants walk | identical |
+| Simulation tick, big fight (Node, `tools/stress.ts`) | 24 ms (unchanged: no single hot spot; the simulation was not changed) | 24 ms |
