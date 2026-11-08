@@ -2091,8 +2091,16 @@ User spec `claude/performance/03-spec-performance-v3-big-colonies.md`; branch `f
   fight's triangles are the ants (mid-distance ants at 3,300 triangles, twice with shadows). Changes that would alter
   the picture (simpler shadow casters, resolution, effect settings) wait for the gpu-scene report and the user's yes.
 - **Merged** into `main` as `ad17880` (Pages deployed; game artifact v51); handoff 23.
+## 2026-11-08 — The trunk climb as a bark walk; Trees in the sandbox setup (branch `fix/trunk-climb-walk`)
+User: "fix the animation of the ants and creatures climbing up a tree to use walking animation parallel to the tree";
+"trees is an option you can toggle on sandbox before the game starts". Climbing ants go through the ant renderer's mount
+hook (`game/trunkMount.ts`): feet on the trunk's surface at the climbed height, body along the trunk, legs cycling at
+the climb's speed, tipping up from the ground at the climb point and over the rim onto the wood in the trees view. The
+sandbox setup screen has **Trees: On / Off** (`MenuChoice.trees`). Creatures still do not climb trunks (the sim has no
+creature climb yet), so there is nothing of theirs to animate. `CHANGE_PLAN.md` §33.2 (2026-11-08 note).
+
 ## 2026-11-07 — The Trees: a third layer over the ground (branch `feature/trees-layer`; claude/trees/01-spec-trees-layer.md)
-Plan and record: `CHANGE_PLAN.md` §30. Design: `DESIGN.md` §3.13. Player notes: `README.md` "The trees". Stills:
+Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes: `README.md` "The trees". Stills:
 `docs/trees/shots/` (`tests/browser/trees.py`); the map tool `tools/trees-check.ts`; `tests/trees.ts` in `npm test`.
 - **One canopy map per match** (space `TREES` 63): a hex grid like a cave's in the ground's frame, all rock but the
   branches, twigs and leaves (walkable). The trees come from `MapDef.trees` (3–4 on each of the five maps; procedural

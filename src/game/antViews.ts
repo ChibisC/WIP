@@ -210,34 +210,38 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
   out.colorVar = a.colorVar;
   out.lift = a.state === AS.Flung ? a.fz : 0;
   out.crouch = 0;
-  // on a tree trunk (sim/trees.ts): drawn climbing the bark at its climb point in the ground view — rising when it goes
-  // up, coming down when it leaves — nose to the trunk; in the trees view it rises out of the trunk top
+  // on a tree trunk (sim/trees.ts): the view marks the trunk and the progress; the game's trunk mount
+  // (game/trunkMount.ts) draws it on the bark, walking parallel to the trunk — up head first, down head first too,
+  // as ants do — in the ground view at its climb point, and in the trees view coming over the trunk top's rim
+  out.trunk = 0;
   if (a.trunkT && a.trunkT > 0 && w.s.trees) {
     const k = 1 - a.trunkT / climbSeconds(w);
-    const h = w.s.trees.height;
-    if (space === SURFACE) {
-      const tx = a.trunkX ?? a.x;
-      const ty = a.trunkY ?? a.y;
-      let bx = tx;
-      let by = ty;
-      let bd = Infinity;
-      for (const t of w.s.trees.trunks) {
-        const d = (t.x - tx) * (t.x - tx) + (t.y - ty) * (t.y - ty);
-        if (d < bd) {
-          bd = d;
-          bx = t.x;
-          by = t.y;
-        }
+    const tx = a.trunkX ?? a.x;
+    const ty = a.trunkY ?? a.y;
+    let bi = -1;
+    let bd = Infinity;
+    const ts = w.s.trees.trunks;
+    for (let i = 0; i < ts.length; i++) {
+      const t = ts[i];
+      const d = (t.x - tx) * (t.x - tx) + (t.y - ty) * (t.y - ty);
+      if (d < bd) {
+        bd = d;
+        bi = i;
       }
-      const ang = Math.atan2(by - ty, bx - tx);
-      // on the bark: a little in from the climb point toward the trunk's side
-      out.x = out.px = tx + Math.cos(ang) * 2.5;
-      out.y = out.py = ty + Math.sin(ang) * 2.5;
-      out.heading = out.pheading = ang;
-      out.lift = (a.trunkUp ? k : 1 - k) * h;
-    } else {
-      out.lift = -(1 - k) * Math.min(h, 24);
     }
+    if (bi >= 0) {
+      const t = ts[bi];
+      const ang = Math.atan2(ty - t.y, tx - t.x);
+      out.trunk = bi + 1;
+      out.trunkK = a.trunkUp ? k : 1 - k;
+      out.trunkUp = a.trunkUp ? 1 : 0;
+      out.trunkA = ang;
+      // (the sim's spot for culling and selection: on the bark just outside the trunk at the climb point)
+      out.x = out.px = t.x + Math.cos(ang) * (t.r + 1.5);
+      out.y = out.py = t.y + Math.sin(ang) * (t.r + 1.5);
+      out.heading = out.pheading = ang + Math.PI;
+    }
+    out.lift = 0;
   }
   // animation pass: a drop in hit points starts a hit reaction; a thrown ant tumbles (not one held in antlers)
   out.hp = a.hp;
