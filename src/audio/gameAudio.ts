@@ -2,11 +2,10 @@ import * as THREE from 'three';
 import type { GameSession } from '../game/session';
 import type { SimEvent } from '../core/events';
 import { AS, Carry, SURFACE, nestSpace } from '../sim/types';
-import { CASTES } from '../sim/species';
+import { CASTES, isTermiteSpecies } from '../sim/species';
 import { CREATURES } from '../sim/creatures/kinds';
 import { rampFraction } from '../sim/termites';
 import { isSickle, sickleRampFraction } from '../sim/sickleJaws';
-import { SickleJawAudio } from '../render/termite/audio';
 import { animHooks } from '../render/ants/antRenderer';
 import { ANIM_SFX } from '../render/ants/antMotion';
 import type { MapStyle } from '../world/terrain';
@@ -17,7 +16,8 @@ import { Music } from './music';
 import { Mixer, Pool } from './mixer';
 
 /**
- * The game's sound, driven by the session (Phase 14 audio).
+ * The game's sound, driven by the session (Phase 14 audio; the effects reworked in audio v3,
+ * claude/audio/03-spec-sfx-rework-insect.md).
  *
  * - **Where:** a sound is placed where it happens. Loudness falls off with
  *   distance from the point the camera looks at, relative to the zoom, so
@@ -26,15 +26,20 @@ import { Mixer, Pool } from './mixer';
  *   view); important events elsewhere (a slam, your ants dying in another
  *   area) come through muffled and quiet.
  * - **How many:** each frame's sound requests are sorted by loudness
- *   within their pool and only the loudest play (8 footsteps, 16 combat
- *   sounds, 10 creature sounds…). The rest feed the beds: the swarm rustle
- *   follows the moving ants in view, and the battle bed thickens with a fight
- *   too big for single voices. A 400-ant battle stays dense, readable and
- *   within budget.
+ *   within their pool and only the loudest play (8 work sounds, 16 combat
+ *   sounds, 10 creature sounds). Combat past the limit feeds the battle bed,
+ *   which thickens with a fight too big for single voices; grapplers feed the
+ *   scuffle bed. A 400-ant battle stays dense, readable and within budget.
  * - **What:** simulation events (bites, stings, acid, deaths, digging,
- *   hatching, bosses' wind-ups and slams) and what is visible (footsteps of
- *   the nearest ants by ground type, ants dragging food, creatures walking
- *   by their gait, a boss's footfalls).
+ *   hatching, bosses' wind-ups and slams), the animation's own beats (a grip,
+ *   a crushing bite, a snap) and what is visible close up (ants picking up and
+ *   setting down loads, an antenna tap, sickle-jaw holds, creatures walking by
+ *   their gait, a boss's footfalls). Ants and termites make no walking sounds,
+ *   and termites make no idle sounds: their alarm drum only plays on a real
+ *   alarm.
+ * - **When:** sim events arrive on the damage tick, which is the attack
+ *   animation's strike frame (antViews.ts), and every file starts on its
+ *   first sound, so a bite is heard as the jaws close.
  *
  * Sound only reads the game; it never changes the simulation.
  */
@@ -52,6 +57,8 @@ interface Want {
 }
 
 type Family = 'spider' | 'beetle' | 'centipede' | 'mantis' | 'soft' | 'still';
+/** loads worth a sound when picked up and set down (soil has its own: the dig bite and the spoil heap) */
+const LOADS = new Set<number>([Carry.Food, Carry.Leaf, Carry.Corpse, Carry.Brood]);
 const FAMILY: Record<string, Family> = {
   wolfSpider: 'spider',
   spiderling: 'spider',
@@ -73,16 +80,9 @@ const FAMILY: Record<string, Family> = {
   antlion: 'still',
 };
 
-const hash = (x: number, y: number) => {
-  let h = Math.imul(Math.floor(x) * 374761393 + Math.floor(y) * 668265263, 1274126177);
-  h ^= h >>> 13;
-  return ((h >>> 0) % 1000) / 1000;
-};
-
 export class GameAudio {
   private ambience = new Ambience();
   private music = new Music();
-  private swarm = new GrainBed('ant.swarm_bed');
   private battle = new GrainBed('combat.battle_bed');
   private scuffle = new GrainBed('combat.grapple_scuffle');
   private bossRumble = new LoopBed('boss.rumble');
@@ -100,34 +100,56 @@ export class GameAudio {
   private surfaceMix = 1;
   private last = performance.now();
   private right = new THREE.Vector3();
-  /** walked distance since the last step, per ant / creature */
+  /** creatures' walked distance since their last step */
   private walk = new Map<number, { x: number; y: number; acc: number; t: number }>();
+  /** nearby ants' loads: what each carried at the last look, and when it may next make a carrying sound */
+  private loads = new Map<number, { c: number; next: number; t: number }>();
   private seenBoss = new Set<number>();
   private lastSay = new Map<string, number>();
-  private moving = 0;
+  /** ants in view close up (the ambience's macro layer rises a little over a busy patch) */
+  private crowd = 0;
   private grappling = 0;
   private scanT = 0;
   private activity = 0;
   /** sandbox / future weather: 0 dry … 1 heavy rain */
   rain = 0;
 
+  /** set while a sim event is being voiced: its sounds wait for the picture (see `lag`) */
+  private fromSim = false;
+  /** seconds per tick, measured; and the last tick seen */
+  private tickSec = 0.05;
+  private lastTick = -1;
+  private lastTickAt = 0;
+
   constructor(private s: GameSession) {
-    s.events.onAny((e) => this.event(e));
+    s.events.onAny((e) => {
+      this.fromSim = true;
+      try {
+        this.event(e);
+      } finally {
+        this.fromSim = false;
+      }
+    });
     // the ant animation's own moments (spec 04; the sim's bites, stings and deaths have their sounds already)
     animHooks.emit = (k, x, y, space, cause) => this.anim(k, x, y, space, cause);
   }
 
-  /** Render-side sound hooks (render/ants/antMotion.ts ANIM_SFX): a grip, a crunch, a landing on the back, righting, a death's own sound. */
+  /**
+   * Render-side sound hooks (render/ants/antMotion.ts ANIM_SFX), on the animation's own frame: the grip of a sting
+   * series (scrapes and the held ant's squeak), a major's crushing bite, a hell ant's snap, a landing on the back and
+   * righting (a tick as the feet catch), a death's own sound.
+   */
   private anim(k: number, x: number, y: number, space: number, cause: number): void {
     if (!audio.ctx) return;
-    if (k === ANIM_SFX.GRIP) return this.want('combat.grapple_scuffle', x, y, space, { pool: 'combat', gain: 0.45, rate: 1.4 });
-    if (k === ANIM_SFX.CRUNCH) return this.want('combat.chitin_crack', x, y, space, { pool: 'combat', gain: 0.55, rate: 0.85 });
+    if (k === ANIM_SFX.GRIP) return this.want('combat.grip', x, y, space, { pool: 'combat', gain: 0.5 });
+    if (k === ANIM_SFX.CRUNCH) return this.want('combat.bite_crush', x, y, space, { pool: 'combat', gain: 0.6, rate: 0.9 });
     // a hell ant's melee snap (the hunt's snap has its own sim event): the same sharp crack, a little quieter
     if (k === ANIM_SFX.SNAP) return this.want('species.hellant_snap', x, y, space, { pool: 'combat', gain: 0.6, rate: 1.1, heat: 0.03 });
-    if (k === ANIM_SFX.FLIP || k === ANIM_SFX.RIGHT) return this.want('ant.pellet_drop', x, y, space, { pool: 'work', gain: k === ANIM_SFX.FLIP ? 0.6 : 0.4, rate: 1.3 });
+    // a flip and a righting have no sound of their own (review 2026-11-07: no light-hit ticks)
+    if (k === ANIM_SFX.FLIP || k === ANIM_SFX.RIGHT) return;
     if (k === ANIM_SFX.DEATH) {
       if (cause === 3) return this.want('combat.acid_splat', x, y, space, { pool: 'combat', gain: 0.4, rate: 1.2 });
-      if (cause === 4 || cause === 8 || cause === 9) return this.want('combat.chitin_crack', x, y, space, { pool: 'combat', gain: 0.8, rate: 0.75 });
+      if (cause === 4 || cause === 8 || cause === 9) return this.want('combat.bite_crush', x, y, space, { pool: 'combat', gain: 0.75, rate: 0.85 });
     }
   }
 
@@ -173,7 +195,16 @@ export class GameAudio {
     }
     if (o.heat && !muffle) this.heat += o.heat * Math.min(1, gain * 2);
     if (gain < 0.02) return;
-    this.mixer.push({ id, prio: gain, gain: Math.min(1.2, gain), pan, rate: o.rate ?? 1, pool: o.pool, muffle, wet: this.s.view.space === 'nest' ? 0.15 : 0 });
+    this.mixer.push({ id, prio: gain, gain: Math.min(1.2, gain), pan, rate: o.rate ?? 1, pool: o.pool, muffle, wet: this.s.view.space === 'nest' ? 0.15 : 0, delay: this.fromSim ? this.lag() : 0 });
+  }
+
+  /**
+   * How long until the picture shows the tick a sim event happened on: the renderer draws between the last two ticks,
+   * so a bite's tick is on screen (the jaws closed) once the frame's interpolation reaches it. Waiting that long puts
+   * the sound on the strike frame instead of up to a tick ahead of it.
+   */
+  private lag(): number {
+    return Math.max(0, Math.min(0.12, (1 - this.s.renderAlpha) * this.tickSec));
   }
 
   /** At most one of `key` per `gap` seconds. */
@@ -196,22 +227,20 @@ export class GameAudio {
     const me = this.s.player.id;
     switch (e.t) {
       case 'dig':
-        this.want('ant.dig_bite', e.x, e.y, e.space ?? nestSpace(e.colony), { pool: 'work', gain: 0.8 });
-        if (Math.random() < 0.3) this.want('ant.soil_grains', e.x, e.y, e.space ?? nestSpace(e.colony), { pool: 'work', gain: 0.6 });
-        return;
+        return this.want('ant.dig_bite', e.x, e.y, e.space ?? nestSpace(e.colony), { pool: 'work', gain: 0.8 });
       case 'tunnelDig':
         // enemy diggers behind the wall at a tunnel gate (sim/tunnels.ts): muffled bites and falling grains, low
         if (e.colony !== me) return;
-        this.want('ant.dig_bite', e.x, e.y, e.space, { pool: 'work', gain: 0.7, rate: 0.7, reach: 3, heat: 0.05 });
-        return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 0.6, rate: 0.75, reach: 3 });
+        return this.want('ant.dig_bite', e.x, e.y, e.space, { pool: 'work', gain: 0.7, rate: 0.7, reach: 3, heat: 0.05 });
       case 'tunnelWarn':
         if (e.colony !== me) return;
-        return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 1, rate: 0.7, reach: 6, important: true, heat: 0.3 });
+        // the wall giving: a few deep, muffled bites (the soil-grain sounds were cut in the 2026-11-07 review)
+        return this.want('ant.dig_bite', e.x, e.y, e.space, { pool: 'work', gain: 1, rate: 0.6, reach: 6, important: true, heat: 0.3 });
       case 'tunnelOpen':
-        for (let i = 0; i < e.spaces.length; i++) this.want('ant.soil_grains', e.x[i], e.y[i], e.spaces[i], { pool: 'work', gain: 1, rate: 0.85, reach: 6, important: true, heat: 0.2 });
+        for (let i = 0; i < e.spaces.length; i++) this.want('ant.dig_bite', e.x[i], e.y[i], e.spaces[i], { pool: 'work', gain: 1, rate: 0.7, reach: 6, important: true, heat: 0.2 });
         return;
       case 'spoil':
-        return this.want('ant.pellet_drop', e.x, e.y, e.space, { pool: 'work', gain: 0.7 });
+        return; // pellets dropped at the spoil heap are silent (review 2026-11-07)
       case 'titanDig':
         // a titan digging into a nest: the warning and the breach as heavy slams, its digging as footfalls and soil, the
         // ground breaking round it underground as soil grains
@@ -219,44 +248,55 @@ export class GameAudio {
         if (e.phase === 'dig') {
           // the rumble rises in pitch and grows louder as the hole opens (claude/creatures/02-spec §3)
           const p = Math.max(0, Math.min(1, e.prog ?? 0));
-          this.want('boss.footstep', e.x, e.y, e.space, { pool: 'creature', gain: 0.65 + 0.45 * p, rate: 0.82 + 0.5 * p, reach: 4 + 2 * p, heat: 0.05 + 0.05 * p });
-          return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 0.85 + 0.4 * p, rate: 0.9 + 0.3 * p });
+          return this.want('boss.footstep', e.x, e.y, e.space, { pool: 'creature', gain: 0.65 + 0.45 * p, rate: 0.82 + 0.5 * p, reach: 4 + 2 * p, heat: 0.05 + 0.05 * p });
         }
         if (e.phase === 'start') return this.want('boss.footstep', e.x, e.y, e.space, { pool: 'creature', gain: 0.9, rate: 0.8, reach: 5, heat: 0.1 });
-        if (e.phase === 'break') return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 0.9, heat: 0.02 });
+        if (e.phase === 'break') return this.want('ant.dig_bite', e.x, e.y, e.space, { pool: 'work', gain: 0.9, rate: 0.65, heat: 0.02 });
         return;
       case 'bite':
         return this.bite(e);
       case 'sting': {
-        const fire = !!e.by && CASTES[e.by]?.species === 'solenopsis';
-        return this.want(fire ? 'combat.sting_fire' : 'combat.sting', e.x, e.y, e.space, { pool: 'combat', gain: 0.8, heat: 0.05 });
+        // fire ants: quicker and doubled; army ants: a little stronger; sized by the stinger
+        const c = e.by ? CASTES[e.by] : undefined;
+        const fire = c?.species === 'solenopsis';
+        const army = c?.species === 'eciton';
+        return this.want(fire ? 'combat.sting_fire' : 'combat.sting', e.x, e.y, e.space, { pool: 'combat', gain: army ? 0.95 : 0.8, rate: (c ? sizeRate(c.length * 3) : 1) * (army ? 0.9 : 1), heat: 0.05 });
       }
       case 'acid':
-        return this.want('combat.acid_spray', e.x, e.y, e.space, { pool: 'combat', gain: e.lob ? 0.9 : 0.75, heat: 0.04 });
+        // a mortar's lob pops; a spray hisses
+        if (e.lob) return this.want('combat.mortar_pop', e.x, e.y, e.space, { pool: 'combat', gain: 0.85, heat: 0.04 });
+        return this.want('combat.acid_spray', e.x, e.y, e.space, { pool: 'combat', gain: 0.75, heat: 0.04 });
       case 'acidHit':
-        return this.want('combat.acid_splat', e.x, e.y, e.space, { pool: 'combat', gain: 0.8, heat: 0.03 });
+        // the lobbed droplet landing: a wet fizz, no explosion
+        return this.want('combat.mortar_land', e.x, e.y, e.space, { pool: 'combat', gain: 0.8, heat: 0.03 });
       case 'splash':
         return this.want('combat.acid_splat', e.x, e.y, e.space, { pool: 'combat', gain: 0.5 });
       case 'hit':
-        return this.want('combat.chitin_crack', e.x, e.y, e.space, { pool: 'combat', gain: e.big ? 1 : 0.7, heat: 0.05 });
+        // a hit taken: a crunch when heavy; light hits are silent (review 2026-11-07)
+        return e.big ? this.want('combat.chitin_crack', e.x, e.y, e.space, { pool: 'combat', gain: 1, heat: 0.05 }) : undefined;
       case 'death': {
         if (e.kind === 'creature') {
           const k = e.what ? CREATURES[e.what] : undefined;
-          return this.want('cr.creature_death', e.x, e.y, e.space, { pool: 'creature', gain: 1, rate: k ? sizeRate(k.length) : 1, reach: k?.boss ? 3 : 1.5, important: !!k?.boss, heat: 0.25 });
+          const fam = e.what ? FAMILY[e.what] : undefined;
+          const id = fam === 'spider' ? 'cr.death_spider' : fam === 'beetle' ? 'cr.death_beetle' : fam === 'centipede' ? 'cr.death_centipede' : fam === 'mantis' ? 'cr.death_mantis' : fam === 'soft' || fam === 'still' ? 'cr.death_soft' : 'cr.creature_death';
+          return this.want(id, e.x, e.y, e.space, { pool: 'creature', gain: 1, rate: k ? sizeRate(k.length) : 1, reach: k?.boss ? 3 : 1.5, important: !!k?.boss, heat: 0.25 });
         }
+        // ants and termites die without a sound of their own (review 2026-11-07); a death still warms the fight
         if (e.colony === me) this.heat += 0.08;
-        return this.want('combat.ant_death', e.x, e.y, e.space, { pool: 'combat', gain: 0.85, heat: 0.08, important: e.colony === me && this.every('offdeath', 0.6) });
-      }
-      case 'alarm':
-        if (this.every('alarm' + e.space, 0.35)) this.want('ant.stridulate', e.x, e.y, e.space, { pool: 'work', gain: 0.7, heat: 0.02 });
         return;
+      }
+      case 'alarm': {
+        // ants stridulate; termites drum their heads (only on a real alarm: an attack)
+        const termite = isTermiteSpecies(this.s.world.colony(e.colony)?.species ?? 'lasius');
+        if (this.every((termite ? 'drum' : 'alarm') + e.space, termite ? 0.9 : 0.35)) this.want(termite ? 'species.termite_headbang' : 'ant.stridulate', e.x, e.y, e.space, { pool: 'work', gain: 0.7, heat: 0.02 });
+        return;
+      }
       case 'fling':
         return this.want('combat.fling', e.x, e.y, e.space, { pool: 'combat', gain: 0.9, reach: 1.4, heat: 0.1 });
       case 'climb':
-        // getting onto a creature's leg: a scuffle of claws; dropping off a dying one: a soft thud and a tumble
-        if (e.phase === 'up') return this.want('combat.grapple_scuffle', e.x, e.y, e.space, { pool: 'combat', gain: 0.6, rate: 1.2, heat: 0.03 });
+        // getting onto a creature's leg: claws catching (a grip); dropping off a dying one: a soft landing and a tumble
+        if (e.phase === 'up') return this.want('combat.grip', e.x, e.y, e.space, { pool: 'combat', gain: 0.5, rate: 1.2, heat: 0.03 });
         if (e.phase === 'drop') {
-          this.want('ant.pellet_drop', e.x, e.y, e.space, { pool: 'work', gain: 0.85, rate: 0.75 });
           if (this.every('drop' + e.creature, 0.3)) this.want('combat.fling', e.x, e.y, e.space, { pool: 'combat', gain: 0.5, rate: 1.2 });
         }
         return;
@@ -277,10 +317,9 @@ export class GameAudio {
       case 'hairs':
         return this.want('boss.hairs', e.x, e.y, e.space, { pool: 'creature', gain: 0.9, reach: 3, heat: 0.2 });
       case 'snap':
-        // hell ant: a sharp woody crack; an impale adds the wet impact
-        this.want('species.hellant_snap', e.x, e.y, e.space, { pool: 'combat', gain: 0.9, heat: 0.06 });
+        // hell ant: the fastest, sharpest crack; an impale or a finisher adds the wet crunch; prey kicks on the jaw
+        this.want('species.hellant_snap', e.x, e.y, e.space, { pool: 'combat', gain: 0.95, heat: 0.06 });
         if (e.impale) this.want('species.hellant_impale', e.x, e.y, e.space, { pool: 'combat', gain: 0.8, heat: 0.04 });
-        else if (Math.random() < 0.5) this.want('species.hellant_struggle', e.x, e.y, e.space, { pool: 'combat', gain: 0.6 });
         return;
       case 'surge':
         // Saiy-Ant gold surge (one shimmer per moment, however many ants flash; a crackle each)
@@ -288,23 +327,23 @@ export class GameAudio {
         else this.want('species.saiyant_crackle', e.x, e.y, e.space, { pool: 'combat', gain: 0.55 });
         return;
       case 'glueBurst':
-        return this.want('combat.acid_splat', e.x, e.y, e.space, { pool: 'combat', gain: 0.7, rate: 0.75, heat: 0.03 });
+        // a conehead's glue landing: a sticky, stringy sputter
+        return this.want('species.glue_splat', e.x, e.y, e.space, { pool: 'combat', gain: 0.75, heat: 0.03 });
       case 'grab':
-        // a sickle-jaw hooks its victim: the mandibles snap shut, then it struggles
-        this.want('species.hellant_snap', e.x, e.y, e.space, { pool: 'combat', gain: 0.75, rate: 1.25, heat: 0.06 });
-        if (Math.random() < 0.6) this.want('species.hellant_struggle', e.x, e.y, e.space, { pool: 'combat', gain: 0.55 });
-        return;
+        // a sickle-jaw hooks its victim: the crossed blades snap shut, then it struggles (the hold's acid and the
+        // struggle go on in sickleVoices)
+        return this.want('species.sickle_snap', e.x, e.y, e.space, { pool: 'combat', gain: 0.8, heat: 0.06 });
       case 'hook':
-        // army-ant Soldier: the ice-tong hooks clack shut
-        return this.want('combat.mandible_click', e.x, e.y, e.space, { pool: 'combat', gain: 0.9, rate: 0.8, heat: 0.04 });
+        // an army-ant soldier: the sickle hooks rasp in and seat; the victim stridulates
+        return this.want('species.army_hook', e.x, e.y, e.space, { pool: 'combat', gain: 0.9, heat: 0.04 });
       case 'pin':
-        if (this.every('pin' + e.space, 0.5)) this.want('species.hellant_struggle', e.x, e.y, e.space, { pool: 'combat', gain: 0.55, rate: 1.15 });
-        return;
+        return; // the pinned ant's struggle was cut (review 2026-11-07)
       case 'link':
-        // a living-bridge link hooks its claws on: a dry rustle
-        return this.want('combat.grapple_scuffle', e.x, e.y, e.space, { pool: 'work', gain: 0.4, rate: 1.45 });
+        // a living-bridge link hooks its claws on: a tiny click and scrape
+        return;
       case 'grabMiss':
-        return this.want('combat.mandible_click', e.x, e.y, e.space, { pool: 'combat', gain: 0.7, rate: 1.2 });
+        // the blades closing on air
+        return this.want('species.sickle_snap', e.x, e.y, e.space, { pool: 'combat', gain: 0.55, rate: 1.15 });
       case 'gene':
         // Termants absorb an enemy corpse's genes (only the colony's own player hears it)
         if (e.colony !== me) return;
@@ -320,21 +359,17 @@ export class GameAudio {
         return;
       }
       case 'headbang':
+        // the termite alarm (a soldier attacked or grabbing, the colony's alarm ability): never an idle sound
         return this.want('species.termite_headbang', e.x, e.y, e.space, { pool: 'work', gain: 0.8 });
       case 'hatch':
         return this.want('ant.larva_hatch', e.x, e.y, e.space, { pool: 'work', gain: 0.7 });
       case 'egg': {
         if (e.colony !== me) return;
-        const q = this.s.world.antById.get(this.s.player.queen);
-        if (q) this.want('ant.queen_lay', q.x, q.y, q.space, { pool: 'work', gain: 0.8 });
-        return;
+        return; // laying is silent (review 2026-11-07)
       }
       case 'tileBuilt': {
         if (e.colony !== me || (e.kind !== 'build' && e.kind !== 'upgrade')) return;
-        const g = this.s.world.nest(me);
-        if (!g) return;
-        const c = g.hexCenter(e.q);
-        return this.want('ant.pellet_drop', c.x, c.y, nestSpace(me), { pool: 'work', gain: 0.9, reach: 2 });
+        return; // the UI tool sound covers it; no pellet drop (review 2026-11-07)
       }
       case 'queenHurt':
         if (e.colony !== me || !this.every('queen', 4)) return;
@@ -364,61 +399,85 @@ export class GameAudio {
     }
   }
 
-  /** A bite: whose jaws, on what. */
+  /** A bite: whose jaws, on what (spec §4: insect-like, sized to the animal). */
   private bite(e: Extract<SimEvent, { t: 'bite' }>): void {
     const by = e.by ?? '';
     const kind = CREATURES[by];
     if (kind) {
-      // a creature attacking: its own sound, scaled to its size
+      // a creature attacking: its own sound, scaled to its size (titans: the same, much bigger and lower)
       const fam = FAMILY[by];
       const rate = sizeRate(kind.length);
       const reach = kind.boss ? 3 : 1.5;
-      // (the stag beetle males' antlers clash too, pitched by their size)
-      const id = by === 'stagBeetle' || kind.ai === 'stagMale' ? 'cr.stag_clash' : fam === 'spider' ? (Math.random() < 0.25 ? 'cr.spider_pounce' : 'cr.spider_fangs') : fam === 'mantis' ? 'cr.mantis_strike' : by === 'antlion' ? 'cr.antlion_flick' : 'combat.mandible_snap';
+      const id =
+        by === 'stagBeetle' || kind.ai === 'stagMale' // (the stag beetle males' antlers clash too, pitched by their size)
+          ? 'cr.stag_clash'
+          : fam === 'spider'
+            ? Math.random() < 0.25
+              ? 'cr.spider_pounce'
+              : 'cr.spider_fangs'
+            : fam === 'mantis'
+              ? 'cr.mantis_strike'
+              : fam === 'centipede'
+                ? 'cr.centipede_bite'
+                : by === 'antlion'
+                  ? 'cr.antlion_flick'
+                  : fam === 'soft'
+                    ? 'combat.termite_bite'
+                    : 'cr.beetle_bite';
       this.want(id, e.x, e.y, e.space, { pool: 'creature', gain: 0.9, rate, reach, heat: 0.12 });
-      if (Math.random() < 0.4) this.want('combat.chitin_crack', e.x, e.y, e.space, { pool: 'combat', gain: 0.6, heat: 0.03 });
+      // the ant on the receiving end: a crunch when the hit is heavy
+      if (e.strength > 0.6 && Math.random() < 0.4) this.want('combat.chitin_crack', e.x, e.y, e.space, { pool: 'combat', gain: 0.6, heat: 0.03 });
       return;
     }
     const caste = CASTES[by];
+    const rate = caste ? sizeRate(caste.length * 3) : 1;
     if (e.riding) {
       // riding a creature: bites straight into its back, louder and harder
-      this.want('combat.mandible_snap', e.x, e.y, e.space, { pool: 'combat', gain: 1, rate: caste ? sizeRate(caste.length * 3) : 1, heat: 0.06 });
+      this.want('combat.mandible_snap', e.x, e.y, e.space, { pool: 'combat', gain: 1, rate, heat: 0.06 });
       if (Math.random() < 0.6) this.want('combat.chitin_crack', e.x, e.y, e.space, { pool: 'combat', gain: 0.75, heat: 0.03 });
       return;
     }
     if (e.on === 'ant' || e.on === 'creature') {
-      const big = !!caste && (caste.role === 'major' || caste.role === 'soldier' || e.strength > 0.9);
-      this.want(big ? 'combat.mandible_snap' : 'combat.mandible_click', e.x, e.y, e.space, { pool: 'combat', gain: big ? 0.9 : 0.75, rate: caste ? sizeRate(caste.length * 3) : 1, heat: 0.05 });
-      if (big && Math.random() < 0.35) this.want('combat.chitin_crack', e.x, e.y, e.space, { pool: 'combat', gain: 0.6, heat: 0.02 });
+      const id = this.biteSound(by);
+      const big = id !== 'combat.mandible_click' && id !== 'combat.termite_bite';
+      this.want(id, e.x, e.y, e.space, { pool: 'combat', gain: big ? 0.9 : 0.75, rate, heat: 0.05 });
+      if (big && id === 'combat.mandible_snap' && Math.random() < 0.3) this.want('combat.chitin_crack', e.x, e.y, e.space, { pool: 'combat', gain: 0.55, heat: 0.02 });
       return;
     }
+    // termite workers (and Termant workers) chewing wood loose while foraging: quiet
+    if (e.on === 'wood') return this.want('species.termite_chew', e.x, e.y, e.space, { pool: 'work', gain: 0.55, rate });
     if (e.on === 'leaf') return this.want('ant.leaf_cut', e.x, e.y, e.space, { pool: 'work', gain: 0.8 });
-    if (e.on === 'seed') return this.want(caste?.role === 'major' ? 'ant.seed_crack' : 'ant.food_cut', e.x, e.y, e.space, { pool: 'work', gain: 0.8 });
-    if (e.on === 'brood') return this.want('ant.egg_set', e.x, e.y, e.space, { pool: 'work', gain: 0.6 });
-    return this.want('ant.food_cut', e.x, e.y, e.space, { pool: 'work', gain: 0.7 });
+    return; // cutting food, cracking seeds and tending brood are silent (review 2026-11-07)
+  }
+
+  /** Which bite a caste makes on an animal. */
+  private biteSound(by: string): string {
+    const c = CASTES[by];
+    if (!c) return 'combat.mandible_click';
+    // termites: soft-bodied, a duller and wetter crunch; sickle-jaw soldiers' crossed blades snap
+    if (c.termite === 'sickle') return 'species.sickle_snap';
+    if (c.termite) return 'combat.termite_bite';
+    // the Termant soldier's stolen Macrotermes jaws, fire ant and leafcutter majors: a crushing bite
+    if ((c.species === 'termant' && c.role === 'soldier') || (c.role === 'major' && (c.species === 'solenopsis' || c.species === 'atta'))) {
+      return c.species === 'atta' && Math.random() < 0.4 ? 'combat.scissor_cut' : 'combat.bite_crush';
+    }
+    // leafcutter soldiers shear
+    if (c.species === 'atta' && c.role === 'soldier') return 'combat.scissor_cut';
+    return c.role === 'major' || c.role === 'soldier' ? 'combat.mandible_snap' : 'combat.mandible_click';
   }
 
   // ---------------------------------------------------------------- what is visible
 
-  /** Ground under (x, y): the map's mix of soil, litter, bark, stone and sand (stable per patch). */
-  private ground(x: number, y: number, space: number): string {
-    const st = this.style;
-    if (st === 'formicarium') return 'ant.step_stone';
-    if (space !== SURFACE) return 'ant.step_soil';
-    const h = hash(x / 18, y / 18);
-    if (st === 'sandy') return h < 0.8 ? 'ant.step_sand' : 'ant.step_stone';
-    if (st === 'forest') return h < 0.55 ? 'ant.step_leaf' : h < 0.7 ? 'ant.step_bark' : 'ant.step_soil';
-    if (st === 'riverbank') return h < 0.4 ? 'ant.step_stone' : h < 0.55 ? 'ant.step_sand' : 'ant.step_soil';
-    return h < 0.25 ? 'ant.step_leaf' : 'ant.step_soil';
-  }
-
-  /** Footsteps of the nearest ants, carrying sounds, antennae, and the counts the beds follow. */
-  private scanAnts(dt: number): void {
+  /**
+   * What the nearby ants are doing that has a sound but no sim event: picking up and setting down loads (and now and
+   * then while carrying one), an antenna tap right up close (ants only: termites make no idle sounds); and the
+   * counts the beds follow. Ants and termites make no walking sounds.
+   */
+  private scanAnts(): void {
     const s = this.s;
     const L = this.listener();
-    const near: Array<{ id: number; d: number }> = [];
     const r2 = (L.ref * 1.4) ** 2;
-    let moving = 0;
+    const near: Array<{ id: number; d: number }> = [];
     let grapple = 0;
     let busy = 0;
     let glue = 0;
@@ -436,70 +495,44 @@ export class GameAudio {
         glue++;
         glueRamp = Math.max(glueRamp, rampFraction(a));
       }
-      const w = this.walk.get(a.id);
-      if (!w) {
-        this.walk.set(a.id, { x: a.x, y: a.y, acc: 0, t: now });
-        continue;
-      }
-      const step = Math.hypot(a.x - w.x, a.y - w.y);
-      w.x = a.x;
-      w.y = a.y;
-      w.t = now;
-      if (step > 0.02 && step < 30) {
-        moving++;
-        w.acc += step;
-        near.push({ id: a.id, d: d2 });
-      }
+      near.push({ id: a.id, d: d2 });
     }
-    this.moving = moving;
     this.grappling = grapple;
     this.glue = glue;
     this.glueRamp = glueRamp;
     this.sickleVoices(L);
     this.activity = Math.min(1, busy / 120);
-    // individual footsteps only close up, for the nearest few
-    if (L.ref < 170) {
-      near.sort((a, b) => a.d - b.d);
-      for (const n of near.slice(0, 12)) {
-        const a = s.world.antById.get(n.id);
-        const w = this.walk.get(n.id);
-        if (!a || !w) continue;
-        const caste = CASTES[a.caste];
-        const queen = caste?.role === 'queen';
-        // up or down a creature's leg: claws scrabbling on chitin, quicker and sharper than walking
-        const climbing = a.state === AS.Climb && (a.ridePh === 1 || a.ridePh === 3);
-        // army ants: a quicker, lighter skitter (high-stepping, fast)
-        const army = caste?.species === 'eciton' && !queen;
-        const stride = (caste?.length ?? 4) * (queen ? 0.4 : climbing ? 0.25 : army ? 0.38 : 0.55);
-        if (w.acc < stride) continue;
-        w.acc = 0;
-        if (climbing) {
-          this.want('ant.step_stone', a.x, a.y, a.space, { pool: 'steps', gain: 0.85, rate: (caste ? sizeRate(caste.length * 2.5) : 1) * 1.25 });
-          if (Math.random() < 0.15) this.want('combat.grapple_scuffle', a.x, a.y, a.space, { pool: 'combat', gain: 0.45, rate: 1.3 });
-          continue;
-        }
-        if (caste?.species === 'termant' && !queen) {
-          // Termants: a dry ant skitter with a soft-bodied, papery shuffle under it now and then
-          this.want(this.ground(a.x, a.y, a.space), a.x, a.y, a.space, { pool: 'steps', gain: 0.5, rate: sizeRate(caste.length * 2.5) * 1.05 });
-          if (Math.random() < 0.35) this.want('species.nasute_move', a.x, a.y, a.space, { pool: 'steps', gain: 0.32, rate: sizeRate(caste.length * 2.5) * 0.9 });
-          continue;
-        }
-        if (caste?.species === 'nasutitermes' && !queen) {
-          // termites: soft, papery steps
-          this.want('species.nasute_move', a.x, a.y, a.space, { pool: 'steps', gain: 0.5, rate: sizeRate(caste.length * 2.5) });
-          continue;
-        }
-        this.want(queen ? 'ant.step_queen' : this.ground(a.x, a.y, a.space), a.x, a.y, a.space, { pool: 'steps', gain: queen ? 0.9 : army ? 0.45 : 0.55, rate: (caste ? sizeRate(caste.length * 2.5) : 1) * (army ? 1.2 : 1) });
-        if ((a.carry === Carry.Food || a.carry === Carry.Leaf || a.carry === Carry.Corpse) && Math.random() < 0.18) this.want((CASTES[a.caste]?.carry ?? 0) >= 6 ? 'ant.drag_heavy' : 'ant.drag_small', a.x, a.y, a.space, { pool: 'work', gain: 0.6 });
+    this.crowd = L.ref < 170 ? Math.min(1, near.length / 60) : 0;
+    if (L.ref >= 170) return;
+    near.sort((a, b) => a.d - b.d);
+    for (const n of near.slice(0, 16)) {
+      const a = s.world.antById.get(n.id);
+      if (!a) continue;
+      const c = a.carry ?? Carry.None;
+      const was = this.loads.get(a.id);
+      if (!was) {
+        this.loads.set(a.id, { c, next: now + 1 + Math.random() * 2, t: now });
+        continue;
       }
-      if (L.ref < 50 && near.length && this.every('antenna', 2.5)) {
-        const a = s.world.antById.get(near[0].id);
-        if (a) this.want('ant.antenna_tap', a.x, a.y, a.space, { pool: 'work', gain: 0.8 });
+      was.t = now;
+      const caste = CASTES[a.caste];
+      const rate = caste ? sizeRate(caste.length * 3) : 1;
+      if (c !== was.c) {
+        // picking up and setting down are silent (review 2026-11-07)
+        was.c = c;
+        was.next = now + 1.2 + Math.random() * 1.5;
+      } else if (LOADS.has(c) && now >= was.next) {
+        // now and then while carrying: the load scraping or bumping along
+        was.next = now + 1.5 + Math.random() * 2.5;
+        this.want((caste?.carry ?? 0) >= 6 ? 'ant.drag_heavy' : 'ant.drag_small', a.x, a.y, a.space, { pool: 'work', gain: 0.55, rate });
       }
     }
+    if (L.ref < 50 && near.length && this.every('antenna', 2.5)) {
+      const a = s.world.antById.get(near[0].id);
+      if (a && !CASTES[a.caste]?.termite) this.want('ant.antenna_tap', a.x, a.y, a.space, { pool: 'work', gain: 0.8 });
+    }
     // forget ants not seen for a while
-    if (this.walk.size > 3000) for (const [id, w] of this.walk) if (now - w.t > 2) this.walk.delete(id);
-    void dt;
+    if (this.loads.size > 600) for (const [id, w] of this.loads) if (now - w.t > 2) this.loads.delete(id);
   }
 
   /** Creatures walking by their gait; bosses shake the ground. */
@@ -528,6 +561,9 @@ export class GameAudio {
         }
       }
       if (!here || d > L.ref * (k.boss ? 5 : 2.2)) continue;
+      // a stag beetle rearing or displaying flares its wing cases (render/creatures/stagBeetle.ts): the snap open and
+      // the wings' buzz, once per entry into the state
+      if (cr.kind.startsWith('stag') && (cr.state === 15 || cr.state === 10) && cr.st < 0.25 && this.every('elytra' + cr.id, 1.5)) this.want('cr.beetle_elytra', cr.x, cr.y, cr.space, { pool: 'creature', gain: 0.9, rate: sizeRate(k.length), reach: 3, heat: 0.05 });
       const w = this.walk.get(-cr.id);
       if (!w) {
         this.walk.set(-cr.id, { x: cr.x, y: cr.y, acc: 0, t: now });
@@ -561,6 +597,12 @@ export class GameAudio {
     const dt = Math.min(0.25, (now - this.last) / 1000);
     this.last = now;
     if (!audio.ctx) return;
+    const tick = this.s.world.s.tick;
+    if (tick !== this.lastTick) {
+      if (this.lastTick >= 0 && tick > this.lastTick && this.lastTickAt > 0) this.tickSec += (Math.min(0.25, (now - this.lastTickAt) / 1000 / (tick - this.lastTick)) - this.tickSec) * 0.2;
+      this.lastTick = tick;
+      this.lastTickAt = now;
+    }
     const s = this.s;
     const v = s.view;
     const L = this.listener();
@@ -568,17 +610,13 @@ export class GameAudio {
     this.scanT -= dt;
     if (!paused && this.scanT <= 0) {
       this.scanT = 0.05;
-      this.scanAnts(dt);
+      this.scanAnts();
       this.scanCreatures();
     }
     this.mixer.flush(dt);
     const overflow = this.mixer.overflow;
-    // beds: the swarm, the scuffle of grappling ants, the battle past the voice limit
+    // beds: the scuffle of grappling ants, the battle past the voice limit
     const zoomNear = Math.min(1, 140 / L.ref);
-    this.swarm.level = paused ? 0 : Math.min(1, Math.sqrt(this.moving) / 16) * (0.35 + 0.65 * zoomNear);
-    this.swarm.density = 10 + Math.min(70, this.moving * 0.8);
-    this.swarm.bright = 5000 + 9000 * zoomNear;
-    this.swarm.update();
     this.scuffle.level = paused ? 0 : Math.min(1, this.grappling / 12) * (0.4 + 0.6 * zoomNear);
     this.scuffle.density = 12 + Math.min(50, this.grappling * 2);
     this.scuffle.update();
@@ -591,16 +629,15 @@ export class GameAudio {
     // where we are
     const target = v.space === 'surface' ? 1 : 0;
     this.surfaceMix += (target - this.surfaceMix) * (1 - Math.exp(-dt / 0.5));
-    this.ambience.update({ style: this.style, surface: this.surfaceMix, night: s.world.s.night ?? 0, zoom: Math.max(0, Math.min(1, (L.ref - 40) / 500)), rain: this.rain, activity: this.activity });
+    this.ambience.update({ style: this.style, surface: this.surfaceMix, night: s.world.s.night ?? 0, zoom: Math.max(0, Math.min(1, (L.ref - 40) / 500)), rain: this.rain, activity: this.activity, crowd: paused ? 0 : this.crowd });
     this.music.update(dt, Math.max(this.moodFloor, 1 - Math.exp(-this.heat * 0.8)), Math.max(this.boss, this.moodBoss));
   }
 
   /**
-   * Sickle-Jaw holds close to the listener (the model kit's procedural voices, SickleJawAudio): the wet acid
-   * stream pulsing faster with the ramp, the fizz on the victim and its scrabbling legs. The nearest three.
+   * Sickle-Jaw holds close to the listener (the nearest three): the acid smeared on the victim fizzing, faster as the
+   * hold's ramp climbs, and the victim's struggle (legs scrabbling, its stridulation) while it lives.
    */
-  private sj: SickleJawAudio | null = null;
-  private sjOn = new Set<number>();
+  private holds = new Map<number, { acid: number; struggle: number }>();
   private sickleVoices(L: { x: number; y: number; ref: number; space: number }): void {
     const w = this.s.world;
     const holds: Array<{ a: (typeof w.s.ants)[number]; d: number }> = [];
@@ -612,23 +649,19 @@ export class GameAudio {
         if (d <= r2) holds.push({ a, d });
       }
     holds.sort((p, q) => p.d - q.d);
-    const keep = new Set<number>();
-    if (holds.length && !this.sj && audio.ctx) this.sj = new SickleJawAudio(audio.ctx, audio.input('combat'), 0.5);
+    const now = audio.now;
+    const keep = new Map<number, { acid: number; struggle: number }>();
     for (const { a } of holds.slice(0, 3)) {
+      const st = this.holds.get(a.id) ?? { acid: now + 0.15, struggle: now + 0.3 };
       const ramp = sickleRampFraction(a);
       const v = w.antById.get(a.holdId ?? 0);
-      this.sj!.acidStream(a.id, ramp, true);
-      this.sj!.acidFizz(a.id, ramp);
-      this.sj!.victimStruggle(a.id, v && v.state !== AS.Dead ? 0.35 + 0.65 * Math.min(1, v.hp / Math.max(1, v.maxHp)) : 0);
-      keep.add(a.id);
-    }
-    for (const id of this.sjOn)
-      if (!keep.has(id)) {
-        this.sj?.acidStream(id, 0, false);
-        this.sj?.acidFizz(id, 0);
-        this.sj?.victimStruggle(id, 0);
+      if (now >= st.acid) {
+        st.acid = now + (0.55 - 0.3 * ramp) * (0.8 + Math.random() * 0.4);
+        this.want('species.sickle_acid', a.x, a.y, a.space, { pool: 'combat', gain: 0.35 + 0.45 * ramp, rate: 0.95 + 0.15 * ramp });
       }
-    this.sjOn = keep;
+      keep.set(a.id, st);
+    }
+    this.holds = keep;
   }
 
   /** The end of a game: an acoustic flourish. */
@@ -638,8 +671,8 @@ export class GameAudio {
   }
 
   /** For tests and the debug overlay. */
-  get state(): { ctx: string; heat: number; overflow: number; boss: number; moving: number; grappling: number; voices: number; played: number; dropped: number; memoryMB: number } {
-    return { ctx: audio.ctx?.state ?? 'none', heat: this.heat, overflow: this.mixer.overflow, boss: this.boss, moving: this.moving, grappling: this.grappling, voices: audio.playing(), played: this.mixer.played, dropped: this.mixer.dropped, memoryMB: audio.bank.bytes() / 1048576 };
+  get state(): { ctx: string; heat: number; overflow: number; boss: number; crowd: number; grappling: number; voices: number; played: number; dropped: number; memoryMB: number } {
+    return { ctx: audio.ctx?.state ?? 'none', heat: this.heat, overflow: this.mixer.overflow, boss: this.boss, crowd: this.crowd, grappling: this.grappling, voices: audio.playing(), played: this.mixer.played, dropped: this.mixer.dropped, memoryMB: audio.bank.bytes() / 1048576 };
   }
 }
 

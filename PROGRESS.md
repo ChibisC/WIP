@@ -1958,7 +1958,7 @@ User spec `claude/performance/01-spec-performance-no-visual-loss.md` (branch `fe
   seed 11.
 - Checks: `tests/storyEvents.ts` (new), `tests/storyCh1.ts` (seven levels), `npm test`, `check-determinism`, the build;
   browser shots `docs/story/shots/ch1_7/` (`tests/browser/story_ch1_7.py`). Protocol `ud-mp-12`.
-## 2026-11-06 — A shared underground: set tunnel routes between nests, underground fog (CHANGE_PLAN §27)
+## 2026-11-06 — A shared underground: set tunnel routes between nests, underground fog (CHANGE_PLAN §28)
 User spec `claude/underground/01-spec-shared-underground-tunnels.md` (2026-11-06); branch `feature/shared-underground`.
 Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).
 - **Layout:** every colony nest grid grew a ring of 8 hexes of unbreakable rock (`SOIL_ROCK`; titans don't break it
@@ -1981,6 +1981,42 @@ Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).
 - **Saves:** version 4 — old grids embedded in the margin (everything in the space shifted), routes generated closed;
   `BUILD_ID` `ud-mp-13` (12 was taken by the story merge). `tests/tunnels.ts` (35 checks) in `npm test`.
 - Stills: `docs/underground/tunnels/` (`tests/browser/tunnels.py`; dev `?tunnel=<stage>`).
+## 2026-11-06 — Audio v3: every sound effect remade (insect-like, made for this game); no walking or termite idle sounds
+- **User spec** `claude/audio/03-spec-sfx-rework-insect.md` (branch `feature/sfx-insect`; CHANGE_PLAN §28).
+- **Made for this game:** `tools/audio/sfx` renders every effect offline with numpy/scipy from the physics of the
+  real sound — chitin clicks (inharmonic modes at 2–12 kHz dying in milliseconds), fracture cascades, file-and-scraper
+  stridulation, stick-slip friction, Minnaert bubbles and fizz — 3–6 takes each (401 takes, 103 sounds), trimmed to
+  start on their first sound, normalised to the level each sound had in the tuned mix, packed one Ogg + AAC file per
+  sound (4.6 MB of Ogg; the ambience loops, 2.6 MB of it, stream). Research per sound in
+  `docs/audio/sound-research.md` (termite drumming 11–19 beats a second, trap jaws closing in ~0.1 ms, leafcutters
+  stridulating while they cut, trapped ants stridulating). Downloads were blocked from the build machine; nothing waits
+  on the user (an optional CC0 list is in `docs/audio/download-list.md`). Every file is in `ATTRIBUTIONS.md`.
+- **Removed:** ant and termite walking for every species (the step sounds by ground, the queen's steps, the climbing
+  skitter, the Termant skitter, the nasute shuffle, the swarm movement bed, the `steps` voice pool); termite idles
+  (antenna taps; the kit's procedural `SickleJawAudio` voices, replaced by files); the 1,100-line runtime stand-ins.
+  A termite colony's alarm now drums instead of stridulating; the conehead soldier's drumming walk is part of the alarm.
+- **Attacks:** double-click worker bites, crunching soldier snaps, crushing bites (fire ant and Atta majors, the Termant
+  soldier), scissor rasps (Atta soldiers), grips and struggles with the held ant's squeak, wet stings (fire ants
+  doubled, army ants stronger), fizzy acid, mortar pop and landing, glue sputter, army-ant hooks, sickle-jaw snap and
+  acid, soft termite bites and deaths, hit ticks, deaths with a twitch of legs; creatures' own bites (beetle clack,
+  centipede ripple and snap) instead of the ants' snap; titans the same sounds bigger, the creak before a slam. Sim-event
+  sounds wait for the frame that shows the tick (`renderAlpha`), so a bite lands on the strike frame.
+- **Carrying** is heard on pick-up and set-down and now and then while carrying; over a crowd close up the ambience's
+  leaf-litter and soil layer rises a little (no footstep texture).
+- **Review pass 2 (2026-11-07, the user's sound board):** 15 sounds cut outright (drips, the big raindrop, soil trickles
+  and grains, pellet drops, pick-up and set-down, food cutting, seed cracking, egg setting, laying, light-hit ticks,
+  struggles, ant and termite deaths: ants and termites now die silently and carrying is silent); bites, snaps, crushes,
+  cracks and the scissor cut deeper with a 150–750 Hz body and no ringing "plinks"; the grip, the scuffle and the battle
+  bed trade their breathy swells for zipper-like click trains and fast stridulation squeals; rain, the boss's steps,
+  slam and rumble, the sand hiss and the colony rumble lose their tick layers; the water stream its bubbles; the fly
+  pass, the root creak, the pillbug roll, the boss's phase change and wind-up rebuilt on the old stand-ins' shapes
+  (higher fly, a zipper wind-up, both deeper); thunder and the boss's arrival keep both characters as extra takes;
+  frog higher and faster, owl lower and longer, a satisfying hatch, a softer caterpillar, a dry cricket burrow. Creature
+  deaths are per family — `cr.death_spider` (a katydid-like shrill squeal), `_beetle`, `_centipede`, `_mantis`,
+  `_soft` — dramatic but arthropod. Attack sounds play at 0.6× their old gain. 93 sounds, 348 takes, 4.1 MB of Ogg.
+- **Stag beetle wing-case flare** (the user's note that `cr.beetle_elytra` had no animation): entering a rear or a
+  display the elytra split along the suture (`stag_elytronL/R`), snap open and lift, the hind wings unfold and buzz
+  for most of a second, then fold; the sound plays on the same state entry. `docs/creatures/stag-elytra/`.
 ## 2026-11-07 — Performance v2: feel — instant feedback, smooth motion, math on the client (CHANGE_PLAN §29)
 User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch `feature/responsiveness`.
 - **Measured first:** the feel meter (`core/feel.ts`, F3, the bench's *feel* scene; in `main` early, handoff 19):

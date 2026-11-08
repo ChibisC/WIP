@@ -3,13 +3,11 @@ import { audio } from './engine';
 
 /**
  * Continuous layers (Phase 14 audio).
- * - `LoopBed`: a looping texture (wind, the nest's room tone, rain, a stream)
- *   with a level and a tone control. Recorded loops stream; stand-ins loop a buffer.
- * - `GrainBed`: granular playback of a recorded or stand-in texture. Short
- *   grains are taken from random points of the texture and overlapped, so
- *   the density, brightness and level can follow the game every frame
- *   (hundreds of ants become one rustling swarm; a battle past the voice
- *   limit thickens into one crackling bed).
+ * - `LoopBed`: a looping texture (wind, the nest's room tone, rain, a stream, a glue stream, a boss's rumble)
+ *   with a level and a tone control. Long ambience loops stream; the others loop a decoded buffer.
+ * - `GrainBed`: granular playback of a texture. Short grains are taken from random points of it and overlapped,
+ *   so the density, brightness and level can follow the game every frame (grappling ants become one scuffle; a
+ *   battle past the voice limit thickens into one dense insect brawl).
  */
 export class LoopBed {
   private gain: GainNode | null = null;
