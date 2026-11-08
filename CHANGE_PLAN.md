@@ -1328,6 +1328,21 @@ litter on the surface, the colony rumble underground) rises a little over a crow
 their contact), `tests/browser/audio_mix.py` (no clipping, budgets, the queen alert cuts through a 400-ant battle),
 `tests/browser/sfx_recordings.py` (before/after in-game recordings for the sound board).
 
+**Review pass 2 (2026-11-07):** the user rated the board (66 notes). Cut outright: `amb.drip`, `amb.raindrop_big`,
+`amb.soil_trickle`, `ant.soil_grains`, `ant.pellet_drop`, `ant.pick_up`, `ant.put_down`, `ant.food_cut`,
+`ant.seed_crack`, `ant.egg_set`, `ant.queen_lay`, `combat.hit_tick`, `combat.struggle`, `combat.ant_death`,
+`combat.termite_death` (tunnel and titan soil cues reuse deep, muffled `ant.dig_bite`). "Deeper": the bites, snaps,
+crushes, cracks, scissor cut, dig bite, beetle bite and step, centipede patter, pillbug roll, boss phase and wind-up
+(a 150–750 Hz body under each, lower modes, no narrow ringing above 2 kHz). "No plink": rain, battle bed, boss step /
+slam / rumble, sand hiss, colony rumble, water stream (bubbles), drag (scrape). "Not ghostly": grip, scuffle, battle
+bed and cricket burrow trade airy swells for zipper-like click trains and squeals. "Like the old one": fly pass
+(higher), root creak, pillbug roll, boss phase and wind-up; thunder and boss arrival keep both as extra takes.
+Reshaped: frog, owl, larva hatch, caterpillar. Creature deaths per family (`cr.death_spider/beetle/centipede/mantis/
+soft`; `cr.creature_death` the fallback), chosen in `GameAudio` by the kind's family. Attack gains × 0.6. Approved
+by the user on the board ("add the sfx"); 93 sounds, 348 takes. The stag beetle's wing-case flare
+(`render/creatures/stagBeetle.ts`: `stag_elytronL/R`, `stag_hindwing`; on `ST.Rear` and `ST.Display`, 1.6 s) gives
+`cr.beetle_elytra` its animation; the audio fires it on the same state entry.
+
 ## 29. Responsiveness: instant feedback, smooth motion, math-based client-side visuals (user spec 2026-11-07, claude/performance/02-spec-responsiveness-client-visuals.md)
 
 Branch `feature/responsiveness` off `main` `361ed47`. Everything from §25 stays (pre-warm, shared geometry, dynamic

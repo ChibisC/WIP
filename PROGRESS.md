@@ -2003,6 +2003,20 @@ Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).
   sounds wait for the frame that shows the tick (`renderAlpha`), so a bite lands on the strike frame.
 - **Carrying** is heard on pick-up and set-down and now and then while carrying; over a crowd close up the ambience's
   leaf-litter and soil layer rises a little (no footstep texture).
+- **Review pass 2 (2026-11-07, the user's sound board):** 15 sounds cut outright (drips, the big raindrop, soil trickles
+  and grains, pellet drops, pick-up and set-down, food cutting, seed cracking, egg setting, laying, light-hit ticks,
+  struggles, ant and termite deaths: ants and termites now die silently and carrying is silent); bites, snaps, crushes,
+  cracks and the scissor cut deeper with a 150–750 Hz body and no ringing "plinks"; the grip, the scuffle and the battle
+  bed trade their breathy swells for zipper-like click trains and fast stridulation squeals; rain, the boss's steps,
+  slam and rumble, the sand hiss and the colony rumble lose their tick layers; the water stream its bubbles; the fly
+  pass, the root creak, the pillbug roll, the boss's phase change and wind-up rebuilt on the old stand-ins' shapes
+  (higher fly, a zipper wind-up, both deeper); thunder and the boss's arrival keep both characters as extra takes;
+  frog higher and faster, owl lower and longer, a satisfying hatch, a softer caterpillar, a dry cricket burrow. Creature
+  deaths are per family — `cr.death_spider` (a katydid-like shrill squeal), `_beetle`, `_centipede`, `_mantis`,
+  `_soft` — dramatic but arthropod. Attack sounds play at 0.6× their old gain. 93 sounds, 348 takes, 4.1 MB of Ogg.
+- **Stag beetle wing-case flare** (the user's note that `cr.beetle_elytra` had no animation): entering a rear or a
+  display the elytra split along the suture (`stag_elytronL/R`), snap open and lift, the hind wings unfold and buzz
+  for most of a second, then fold; the sound plays on the same state entry. `docs/creatures/stag-elytra/`.
 ## 2026-11-07 — Performance v2: feel — instant feedback, smooth motion, math on the client (CHANGE_PLAN §29)
 User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch `feature/responsiveness`.
 - **Measured first:** the feel meter (`core/feel.ts`, F3, the bench's *feel* scene; in `main` early, handoff 19):
