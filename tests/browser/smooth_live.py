@@ -35,8 +35,11 @@ with sync_playwright() as p:
       }
       return { tick: w.s.tick, ants: n, worst, far, alpha: a, latency: po.latency, kind: s.sim.kind };
     })()""")
-    pg.screenshot(path=OUT)
-    print(json.dumps(res))
+    print(json.dumps(res), flush=True)
+    try:
+        pg.screenshot(path=OUT, timeout=600000)
+    except Exception as e:  # (a busy software GPU: the numbers above are the check)
+        print("screenshot skipped:", str(e).splitlines()[0])
     ok = res["kind"] == "worker" and res["ants"] > 20 and res["far"] == 0 and res["worst"] < 20 and 0 <= res["alpha"] <= 1.5 and 0.3 <= res["latency"] <= 4 and not errs
     print(("PASS" if ok else "FAIL") + f"  live page: {res['ants']} ants drawn within {res['worst']:.1f} mm of their sim positions, α {res['alpha']:.2f}, latency {res['latency']:.2f} ticks; errors {errs[:3]}")
     b.close()
