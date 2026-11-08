@@ -456,7 +456,7 @@ function clips(): Record<string, Clip> {
         { morph: 'termite_rhy_worker', script: (t, v) => Object.assign(v, { x: 9, y: 4.5, heading: 2.4, dead: t > 1.5 }) },
       ],
       events: [0.17, 0.34, 0.51, 0.68, 2.2, 2.37, 2.54, 2.71, 4.3, 4.47, 4.64].map((t) => ({ t, e: { t: 'headbang', x: 0.4, y: 4.4, space: -1 } as unknown as SimEvent })),
-      cam: { tx: 0, ty: 0.5, tz: 0.5, dir: [0.15, 0.7, 1], dist: 27, fov: 30 },
+      cam: { tx: -1.6, ty: 0.5, tz: 0.5, dir: [0.15, 0.7, 1], dist: 31, fov: 30 },
     },
     // the Saiy-Ant gold surge (claude/realism/10-spec §2): the ripple in from the head with the stretch and overshoot
     // (as game/antViews.ts speciesExtras), faster bites with spark impacts, the ripple out from the gaster, the
