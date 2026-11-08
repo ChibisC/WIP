@@ -1664,7 +1664,7 @@ kind map (wood / leaf / trunk top / site) is kept in `TreesDef` for the render a
   five maps' `lair` zones and the validator's lair rule; story levels keep theirs (`runner.ts`). Creatures arrive as
   before (`ecologySystem`, rates unchanged); without creature zones they now appear near the map's edge.
 - **Saves:** version 5 (`trees` in the state; old saves load without the layer). Replica: `trees` in `slow`. `ud-mp-16`
-  (15 went to performance v3 while this was built). Merged with `main` `MAINREV`: the models redo (§30), the Saiy
+  (15 went to performance v3 while this was built). Merged with `main` `9ae9b56`: the models redo (§30), the Saiy
   Blaster (§31) and performance v3 (§32); conflicts combined (the ant brain's blaster beam and the trunk hold both
   hold the ant before its brain; `combat.ts` imports; the test list; the protocol note; this plan renumbered §33).
 
