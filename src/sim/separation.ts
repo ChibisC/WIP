@@ -69,6 +69,13 @@ export function separationSystem(w: World, dt: number): void {
     len = new Float64Array(n * 2);
     hwl = new Float64Array(n * 2);
     spc = new Int32Array(n * 2);
+    sx = new Float64Array(n * 2);
+    sy = new Float64Array(n * 2);
+    tm = new Float64Array(n * 2);
+    sid = new Float64Array(n * 2);
+    sst = new Int32Array(n * 2);
+    sfk = new Uint8Array(n * 2);
+    sfid = new Float64Array(n * 2);
     prio = new Uint8Array(n * 2);
     tdx = new Float64Array(n * 2);
     tdy = new Float64Array(n * 2);
@@ -131,6 +138,15 @@ export function separationSystem(w: World, dt: number): void {
     len[i] = antLen(a);
     // (its body's half-width, for the pair loop's early out: performance v3)
     hwl[i] = antHeights(a.caste).hw * len[i];
+    // (performance v3: what the pair loop reads of each ant, side by side in typed arrays — the same values; nothing
+    // moves or changes state until the pushes are applied after the loop)
+    sx[i] = a.x;
+    sy[i] = a.y;
+    tm[i] = a.team ?? a.colony;
+    sid[i] = a.id;
+    sst[i] = a.state;
+    sfk[i] = foeKind(a);
+    sfid[i] = sfk[i] ? foeId(a) : 0;
     if (r <= BIG && r > maxR) maxR = r;
     if (flag[i] & 16) {
       if (r <= BIG && len[i] > maxFightL) maxFightL = len[i];
@@ -166,9 +182,12 @@ export function separationSystem(w: World, dt: number): void {
     P.fa = fa;
     P.ra = ra;
     P.big = ra > BIG;
-    P.foeK = foeKind(a);
-    P.foeId = P.foeK ? foeId(a) : 0;
-    P.team = a.team ?? a.colony;
+    P.foeK = sfk[i];
+    P.foeId = sfid[i];
+    P.team = tm[i];
+    P.x = sx[i];
+    P.y = sy[i];
+    P.id = sid[i];
     let q = ra + (P.big ? Math.max(maxR, ra) : maxR);
     // a fighting ant looks as far as a fighting ally's personal space (pairs with big ants are the big one's)
     if (fa & 16) q = Math.max(q, PS * Math.max(len[i], P.big ? maxFightLBig : maxFightL));
@@ -443,7 +462,7 @@ function queenCb(i: number): boolean {
 }
 
 /** The ant whose neighbours are being visited (one shared callback: no closure per ant). */
-const P = { ants: [] as Ant[], i: 0, a: null as unknown as Ant, fa: 0, ra: 0, big: false, strength: 0, fightStrength: 0, ps: 0, ws: 0, foeK: 0, foeId: 0, team: 0, dt: 0 }; // det-ok: scratch
+const P = { ants: [] as Ant[], i: 0, a: null as unknown as Ant, fa: 0, ra: 0, big: false, strength: 0, fightStrength: 0, ps: 0, ws: 0, foeK: 0, foeId: 0, team: 0, dt: 0, x: 0, y: 0, id: 0 }; // det-ok: scratch
 
 /**
  * The foe whose attack slot an ant holds (Grapple), has reserved while closing in, or is spraying as it closes in:
@@ -506,13 +525,15 @@ function pairCb(j: number): boolean {
   const fa = P.fa;
   const fo = flag[j];
   if (!(fo & 1)) return false;
-  const pa = P.a;
-  const po = P.ants[j];
+  // (performance v3: the ants' fields from the typed arrays filled before the loop — the object only where a rare test
+  // needs more of it)
+  const ojx = sx[j];
+  const ojy = sy[j];
   // (performance v3) too far apart for any push between them (the largest spacing any pair can have) and for either to
   // be under the other's body: nothing below can happen — out at once, the same as it would be after all the tests
   {
-    const ex = po.x - pa.x;
-    const ey = po.y - pa.y;
+    const ex = ojx - P.x;
+    const ey = ojy - P.y;
     const lim = Math.max((P.ra + rad[j]) * Math.max(1, GUARD.fightRoom), Math.max(P.ps, P.ws) * Math.max(len[i], len[j])) * BALANCE.separation.antContact;
     const ri = rad[i] * 0.5;
     const rj = rad[j] * 0.5;
@@ -525,20 +546,20 @@ function pairCb(j: number): boolean {
   // its own foe at its hold point). An ant holding a foe (32), which does not give way to the crowd, is eased apart
   // from fighting allies round it.
   // (Guard lines keep their own spacing: an ally standing in a line keeps `GUARD.fightRoom` × the radii as before.)
-  const ally = (po.team ?? po.colony) === P.team;
+  const ally = tm[j] === P.team;
   if (ally && (under[i] || under[j])) return false;
   // …and two enemies each holding someone else (separate duels) drift apart too, so neighbouring duels keep ground
   // between them; enemies closing in, or fighting each other, keep only their bodies' radii
-  const sameFoe = ally && P.foeK !== 0 && foeKind(po) === P.foeK && foeId(po) === P.foeId;
+  const sameFoe = ally && P.foeK !== 0 && sfk[j] === P.foeK && sfid[j] === P.foeId;
   // (a teammate pressing in for a slot: `waitSpace` from any teammate in the fight, same foe or not — the crowd presses
   // up behind the fighters: user 2026-11-01, evening)
   const wait = ally && (fa & fo & 16) !== 0 && (wt[i] | wt[j]) !== 0;
-  const fight = wait || ((fa & fo & 16) !== 0 && (ally ? !sameFoe : pa.state === AS.Grapple && po.state === AS.Grapple && !engaged(pa, po)));
+  const fight = wait || ((fa & fo & 16) !== 0 && (ally ? !sameFoe : sst[i] === AS.Grapple && sst[j] === AS.Grapple && !engaged(P.a, P.ants[j])));
   const line = !fight && ally && ((fa | fo) & 128) !== 0 && (fa & 144) !== 0 && (fo & 144) !== 0;
   const ro = rad[j];
   // each pair once: by the lower id within a size class, else by the big one
   const oBig = ro > BIG;
-  if (P.big === oBig ? po.id <= pa.id : !P.big) return false;
+  if (P.big === oBig ? sid[j] <= P.id : !P.big) return false;
   // under-pass (combat v2.2): the shorter one fits under the taller one where it stands — no body push between them (the
   // taller one's feet push it: below); where it does not fit, beside it, only their bodies' radii (no personal space)
   let mixed = false;
@@ -557,8 +578,8 @@ function pairCb(j: number): boolean {
     if (prio[i] > prio[j]) ma = false;
     else mo = false;
   }
-  const dx = po.x - pa.x;
-  const dy = po.y - pa.y;
+  const dx = ojx - P.x;
+  const dy = ojy - P.y;
   // (user 2026-11-01: "make collision hitboxes 2x smaller … keep hitbox size but collision size of ants colliding each
   // other is smaller") every ant–ant distance × `antContact`; the hit shapes (bites, climbs, creatures) are unchanged
   const min = (fight && !mixed ? (wait ? P.ws : P.ps) * Math.max(len[i], len[j]) : (P.ra + ro) * (line && !mixed ? GUARD.fightRoom : 1)) * BALANCE.separation.antContact;
@@ -572,7 +593,7 @@ function pairCb(j: number): boolean {
     nx = dx / d;
     ny = dy / d;
   } else {
-    const ang = ((pa.id * 7 + po.id * 13) % 360) * (Math.PI / 180);
+    const ang = ((P.id * 7 + sid[j] * 13) % 360) * (Math.PI / 180);
     nx = dcos(ang);
     ny = dsin(ang);
   }
@@ -621,6 +642,14 @@ let mass = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let len = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let hwl = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let spc = new Int32Array(0); // det-ok: scratch, rebuilt every tick
+/** (performance v3) each ant's position, team, id, state and the foe it is on, for the pair loop */
+let sx = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let sy = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let tm = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let sid = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let sst = new Int32Array(0); // det-ok: scratch, rebuilt every tick
+let sfk = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
+let sfid = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let prio = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 let tdx = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let tdy = new Float64Array(0); // det-ok: scratch, rebuilt every tick
