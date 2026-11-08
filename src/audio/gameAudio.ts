@@ -145,8 +145,8 @@ export class GameAudio {
     if (k === ANIM_SFX.CRUNCH) return this.want('combat.bite_crush', x, y, space, { pool: 'combat', gain: 0.6, rate: 0.9 });
     // a hell ant's melee snap (the hunt's snap has its own sim event): the same sharp crack, a little quieter
     if (k === ANIM_SFX.SNAP) return this.want('species.hellant_snap', x, y, space, { pool: 'combat', gain: 0.6, rate: 1.1, heat: 0.03 });
-    if (k === ANIM_SFX.FLIP) return this.want('combat.hit_tick', x, y, space, { pool: 'combat', gain: 0.55, rate: 0.85 });
-    if (k === ANIM_SFX.RIGHT) return this.want('combat.hit_tick', x, y, space, { pool: 'combat', gain: 0.3, rate: 1.2 });
+    // a flip and a righting have no sound of their own (review 2026-11-07: no light-hit ticks)
+    if (k === ANIM_SFX.FLIP || k === ANIM_SFX.RIGHT) return;
     if (k === ANIM_SFX.DEATH) {
       if (cause === 3) return this.want('combat.acid_splat', x, y, space, { pool: 'combat', gain: 0.4, rate: 1.2 });
       if (cause === 4 || cause === 8 || cause === 9) return this.want('combat.bite_crush', x, y, space, { pool: 'combat', gain: 0.75, rate: 0.85 });
@@ -227,22 +227,20 @@ export class GameAudio {
     const me = this.s.player.id;
     switch (e.t) {
       case 'dig':
-        this.want('ant.dig_bite', e.x, e.y, e.space ?? nestSpace(e.colony), { pool: 'work', gain: 0.8 });
-        if (Math.random() < 0.3) this.want('ant.soil_grains', e.x, e.y, e.space ?? nestSpace(e.colony), { pool: 'work', gain: 0.6 });
-        return;
+        return this.want('ant.dig_bite', e.x, e.y, e.space ?? nestSpace(e.colony), { pool: 'work', gain: 0.8 });
       case 'tunnelDig':
         // enemy diggers behind the wall at a tunnel gate (sim/tunnels.ts): muffled bites and falling grains, low
         if (e.colony !== me) return;
-        this.want('ant.dig_bite', e.x, e.y, e.space, { pool: 'work', gain: 0.7, rate: 0.7, reach: 3, heat: 0.05 });
-        return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 0.6, rate: 0.75, reach: 3 });
+        return this.want('ant.dig_bite', e.x, e.y, e.space, { pool: 'work', gain: 0.7, rate: 0.7, reach: 3, heat: 0.05 });
       case 'tunnelWarn':
         if (e.colony !== me) return;
-        return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 1, rate: 0.7, reach: 6, important: true, heat: 0.3 });
+        // the wall giving: a few deep, muffled bites (the soil-grain sounds were cut in the 2026-11-07 review)
+        return this.want('ant.dig_bite', e.x, e.y, e.space, { pool: 'work', gain: 1, rate: 0.6, reach: 6, important: true, heat: 0.3 });
       case 'tunnelOpen':
-        for (let i = 0; i < e.spaces.length; i++) this.want('ant.soil_grains', e.x[i], e.y[i], e.spaces[i], { pool: 'work', gain: 1, rate: 0.85, reach: 6, important: true, heat: 0.2 });
+        for (let i = 0; i < e.spaces.length; i++) this.want('ant.dig_bite', e.x[i], e.y[i], e.spaces[i], { pool: 'work', gain: 1, rate: 0.7, reach: 6, important: true, heat: 0.2 });
         return;
       case 'spoil':
-        return this.want('ant.pellet_drop', e.x, e.y, e.space, { pool: 'work', gain: 0.7 });
+        return; // pellets dropped at the spoil heap are silent (review 2026-11-07)
       case 'titanDig':
         // a titan digging into a nest: the warning and the breach as heavy slams, its digging as footfalls and soil, the
         // ground breaking round it underground as soil grains
@@ -250,11 +248,10 @@ export class GameAudio {
         if (e.phase === 'dig') {
           // the rumble rises in pitch and grows louder as the hole opens (claude/creatures/02-spec §3)
           const p = Math.max(0, Math.min(1, e.prog ?? 0));
-          this.want('boss.footstep', e.x, e.y, e.space, { pool: 'creature', gain: 0.65 + 0.45 * p, rate: 0.82 + 0.5 * p, reach: 4 + 2 * p, heat: 0.05 + 0.05 * p });
-          return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 0.85 + 0.4 * p, rate: 0.9 + 0.3 * p });
+          return this.want('boss.footstep', e.x, e.y, e.space, { pool: 'creature', gain: 0.65 + 0.45 * p, rate: 0.82 + 0.5 * p, reach: 4 + 2 * p, heat: 0.05 + 0.05 * p });
         }
         if (e.phase === 'start') return this.want('boss.footstep', e.x, e.y, e.space, { pool: 'creature', gain: 0.9, rate: 0.8, reach: 5, heat: 0.1 });
-        if (e.phase === 'break') return this.want('ant.soil_grains', e.x, e.y, e.space, { pool: 'work', gain: 0.9, heat: 0.02 });
+        if (e.phase === 'break') return this.want('ant.dig_bite', e.x, e.y, e.space, { pool: 'work', gain: 0.9, rate: 0.65, heat: 0.02 });
         return;
       case 'bite':
         return this.bite(e);
@@ -275,18 +272,18 @@ export class GameAudio {
       case 'splash':
         return this.want('combat.acid_splat', e.x, e.y, e.space, { pool: 'combat', gain: 0.5 });
       case 'hit':
-        // a hit taken: a crunch when heavy, a tiny tick when light
-        return this.want(e.big ? 'combat.chitin_crack' : 'combat.hit_tick', e.x, e.y, e.space, { pool: 'combat', gain: e.big ? 1 : 0.7, heat: 0.05 });
+        // a hit taken: a crunch when heavy; light hits are silent (review 2026-11-07)
+        return e.big ? this.want('combat.chitin_crack', e.x, e.y, e.space, { pool: 'combat', gain: 1, heat: 0.05 }) : undefined;
       case 'death': {
         if (e.kind === 'creature') {
           const k = e.what ? CREATURES[e.what] : undefined;
-          return this.want('cr.creature_death', e.x, e.y, e.space, { pool: 'creature', gain: 1, rate: k ? sizeRate(k.length) : 1, reach: k?.boss ? 3 : 1.5, important: !!k?.boss, heat: 0.25 });
+          const fam = e.what ? FAMILY[e.what] : undefined;
+          const id = fam === 'spider' ? 'cr.death_spider' : fam === 'beetle' ? 'cr.death_beetle' : fam === 'centipede' ? 'cr.death_centipede' : fam === 'mantis' ? 'cr.death_mantis' : fam === 'soft' || fam === 'still' ? 'cr.death_soft' : 'cr.creature_death';
+          return this.want(id, e.x, e.y, e.space, { pool: 'creature', gain: 1, rate: k ? sizeRate(k.length) : 1, reach: k?.boss ? 3 : 1.5, important: !!k?.boss, heat: 0.25 });
         }
+        // ants and termites die without a sound of their own (review 2026-11-07); a death still warms the fight
         if (e.colony === me) this.heat += 0.08;
-        // sized by the body (lower and a little louder for big castes, quieter for small ants); termites die soft
-        const c = e.what ? CASTES[e.what] : undefined;
-        const len = c?.length ?? 5;
-        return this.want(c?.termite ? 'combat.termite_death' : 'combat.ant_death', e.x, e.y, e.space, { pool: 'combat', gain: 0.55 + 0.35 * Math.min(1, len / 9), rate: sizeRate(len * 3), heat: 0.08, important: e.colony === me && this.every('offdeath', 0.6) });
+        return;
       }
       case 'alarm': {
         // ants stridulate; termites drum their heads (only on a real alarm: an attack)
@@ -300,7 +297,6 @@ export class GameAudio {
         // getting onto a creature's leg: claws catching (a grip); dropping off a dying one: a soft landing and a tumble
         if (e.phase === 'up') return this.want('combat.grip', e.x, e.y, e.space, { pool: 'combat', gain: 0.5, rate: 1.2, heat: 0.03 });
         if (e.phase === 'drop') {
-          this.want('ant.put_down', e.x, e.y, e.space, { pool: 'work', gain: 0.85, rate: 0.8 });
           if (this.every('drop' + e.creature, 0.3)) this.want('combat.fling', e.x, e.y, e.space, { pool: 'combat', gain: 0.5, rate: 1.2 });
         }
         return;
@@ -324,7 +320,6 @@ export class GameAudio {
         // hell ant: the fastest, sharpest crack; an impale or a finisher adds the wet crunch; prey kicks on the jaw
         this.want('species.hellant_snap', e.x, e.y, e.space, { pool: 'combat', gain: 0.95, heat: 0.06 });
         if (e.impale) this.want('species.hellant_impale', e.x, e.y, e.space, { pool: 'combat', gain: 0.8, heat: 0.04 });
-        else if (Math.random() < 0.5) this.want('combat.struggle', e.x, e.y, e.space, { pool: 'combat', gain: 0.55 });
         return;
       case 'surge':
         // Saiy-Ant gold surge (one shimmer per moment, however many ants flash; a crackle each)
@@ -337,18 +332,15 @@ export class GameAudio {
       case 'grab':
         // a sickle-jaw hooks its victim: the crossed blades snap shut, then it struggles (the hold's acid and the
         // struggle go on in sickleVoices)
-        this.want('species.sickle_snap', e.x, e.y, e.space, { pool: 'combat', gain: 0.8, heat: 0.06 });
-        if (Math.random() < 0.6) this.want('combat.struggle', e.x, e.y, e.space, { pool: 'combat', gain: 0.5 });
-        return;
+        return this.want('species.sickle_snap', e.x, e.y, e.space, { pool: 'combat', gain: 0.8, heat: 0.06 });
       case 'hook':
         // an army-ant soldier: the sickle hooks rasp in and seat; the victim stridulates
         return this.want('species.army_hook', e.x, e.y, e.space, { pool: 'combat', gain: 0.9, heat: 0.04 });
       case 'pin':
-        if (this.every('pin' + e.space, 0.5)) this.want('combat.struggle', e.x, e.y, e.space, { pool: 'combat', gain: 0.5, rate: 1.15 });
-        return;
+        return; // the pinned ant's struggle was cut (review 2026-11-07)
       case 'link':
         // a living-bridge link hooks its claws on: a tiny click and scrape
-        return this.want('ant.pick_up', e.x, e.y, e.space, { pool: 'work', gain: 0.4, rate: 1.3 });
+        return;
       case 'grabMiss':
         // the blades closing on air
         return this.want('species.sickle_snap', e.x, e.y, e.space, { pool: 'combat', gain: 0.55, rate: 1.15 });
@@ -373,16 +365,11 @@ export class GameAudio {
         return this.want('ant.larva_hatch', e.x, e.y, e.space, { pool: 'work', gain: 0.7 });
       case 'egg': {
         if (e.colony !== me) return;
-        const q = this.s.world.antById.get(this.s.player.queen);
-        if (q) this.want('ant.queen_lay', q.x, q.y, q.space, { pool: 'work', gain: 0.8 });
-        return;
+        return; // laying is silent (review 2026-11-07)
       }
       case 'tileBuilt': {
         if (e.colony !== me || (e.kind !== 'build' && e.kind !== 'upgrade')) return;
-        const g = this.s.world.nest(me);
-        if (!g) return;
-        const c = g.hexCenter(e.q);
-        return this.want('ant.pellet_drop', c.x, c.y, nestSpace(me), { pool: 'work', gain: 0.9, reach: 2 });
+        return; // the UI tool sound covers it; no pellet drop (review 2026-11-07)
       }
       case 'queenHurt':
         if (e.colony !== me || !this.every('queen', 4)) return;
@@ -438,8 +425,8 @@ export class GameAudio {
                     ? 'combat.termite_bite'
                     : 'cr.beetle_bite';
       this.want(id, e.x, e.y, e.space, { pool: 'creature', gain: 0.9, rate, reach, heat: 0.12 });
-      // the ant on the receiving end: a crunch or a tick
-      if (Math.random() < 0.4) this.want(e.strength > 0.6 ? 'combat.chitin_crack' : 'combat.hit_tick', e.x, e.y, e.space, { pool: 'combat', gain: 0.6, heat: 0.03 });
+      // the ant on the receiving end: a crunch when the hit is heavy
+      if (e.strength > 0.6 && Math.random() < 0.4) this.want('combat.chitin_crack', e.x, e.y, e.space, { pool: 'combat', gain: 0.6, heat: 0.03 });
       return;
     }
     const caste = CASTES[by];
@@ -460,9 +447,7 @@ export class GameAudio {
     // termite workers (and Termant workers) chewing wood loose while foraging: quiet
     if (e.on === 'wood') return this.want('species.termite_chew', e.x, e.y, e.space, { pool: 'work', gain: 0.55, rate });
     if (e.on === 'leaf') return this.want('ant.leaf_cut', e.x, e.y, e.space, { pool: 'work', gain: 0.8 });
-    if (e.on === 'seed') return this.want(caste?.role === 'major' ? 'ant.seed_crack' : 'ant.food_cut', e.x, e.y, e.space, { pool: 'work', gain: 0.8 });
-    if (e.on === 'brood') return this.want('ant.egg_set', e.x, e.y, e.space, { pool: 'work', gain: 0.6 });
-    return this.want('ant.food_cut', e.x, e.y, e.space, { pool: 'work', gain: 0.7 });
+    return; // cutting food, cracking seeds and tending brood are silent (review 2026-11-07)
   }
 
   /** Which bite a caste makes on an animal. */
@@ -533,9 +518,7 @@ export class GameAudio {
       const caste = CASTES[a.caste];
       const rate = caste ? sizeRate(caste.length * 3) : 1;
       if (c !== was.c) {
-        // picked up or set down: the mandibles closing on it, a soft tap as it goes down
-        if (LOADS.has(c) && !LOADS.has(was.c)) this.want('ant.pick_up', a.x, a.y, a.space, { pool: 'work', gain: 0.7, rate });
-        else if (LOADS.has(was.c) && !LOADS.has(c)) this.want('ant.put_down', a.x, a.y, a.space, { pool: 'work', gain: 0.7, rate });
+        // picking up and setting down are silent (review 2026-11-07)
         was.c = c;
         was.next = now + 1.2 + Math.random() * 1.5;
       } else if (LOADS.has(c) && now >= was.next) {
@@ -672,10 +655,6 @@ export class GameAudio {
       if (now >= st.acid) {
         st.acid = now + (0.55 - 0.3 * ramp) * (0.8 + Math.random() * 0.4);
         this.want('species.sickle_acid', a.x, a.y, a.space, { pool: 'combat', gain: 0.35 + 0.45 * ramp, rate: 0.95 + 0.15 * ramp });
-      }
-      if (v && v.state !== AS.Dead && now >= st.struggle) {
-        st.struggle = now + 0.45 + Math.random() * 0.4;
-        this.want('combat.struggle', v.x, v.y, v.space, { pool: 'combat', gain: 0.3 + 0.4 * Math.min(1, v.hp / Math.max(1, v.maxHp)) });
       }
       keep.set(a.id, st);
     }

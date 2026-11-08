@@ -89,7 +89,7 @@ export function runSoundBoard(ui: HTMLElement): void {
       fightT -= dt;
       if (on && st.fight > 0.05 && fightT <= 0) {
         fightT = 0.4 / (0.2 + st.fight * 4);
-        const ids = ['combat.mandible_click', 'combat.mandible_snap', 'combat.bite_crush', 'combat.chitin_crack', 'combat.hit_tick', 'combat.sting', 'combat.acid_spray', 'combat.ant_death'];
+        const ids = ['combat.mandible_click', 'combat.mandible_snap', 'combat.bite_crush', 'combat.chitin_crack', 'combat.sting', 'combat.acid_spray', 'cr.death_beetle'];
         audio.play(ids[Math.floor(Math.random() * ids.length)], { gain: 0.5 + Math.random() * 0.5, pan: Math.random() * 1.6 - 0.8 });
       }
     }

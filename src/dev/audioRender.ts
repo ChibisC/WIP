@@ -60,8 +60,6 @@ export async function renderScenario(name: string, secs: number): Promise<void> 
       Object.assign(place, { surface: 0, activity: 0.8, zoom: 0.15 });
       ants = 60;
       for (let k = pois(4); k--; ) want('ant.dig_bite', 'work', rnd(0.2, 1.5));
-      for (let k = pois(1.2); k--; ) want('ant.soil_grains', 'work', rnd(0.2, 1.5));
-      if (t > 3 && t < 3 + step) audio.play('ant.queen_lay');
     }
     if (name === 'battle400') {
       // 400 ants fighting in view: ~330 bites/s, stings, acid, hits, deaths
@@ -71,9 +69,8 @@ export async function renderScenario(name: string, secs: number): Promise<void> 
       for (let k = pois(330); k--; ) want(Math.random() < 0.7 ? 'combat.mandible_click' : Math.random() < 0.7 ? 'combat.mandible_snap' : 'combat.bite_crush', 'combat', rnd(0.1, 2.5));
       for (let k = pois(60); k--; ) want('combat.sting_fire', 'combat', rnd(0.1, 2.5));
       for (let k = pois(25); k--; ) want('combat.acid_spray', 'combat', rnd(0.2, 2.5));
-      for (let k = pois(8); k--; ) want('combat.ant_death', 'combat', rnd(0.1, 2.5));
+      for (let k = pois(3); k--; ) want('cr.death_spider', 'creature', rnd(0.1, 2.5));
       for (let k = pois(30); k--; ) want('combat.chitin_crack', 'combat', rnd(0.1, 2.5));
-      for (let k = pois(40); k--; ) want('combat.hit_tick', 'combat', rnd(0.1, 2.5));
       for (let k = pois(6); k--; ) want('combat.grip', 'combat', rnd(0.1, 2));
       if (t >= 5 && t < 5 + step) {
         audio.duck(0.6, 1.4, 'ui');

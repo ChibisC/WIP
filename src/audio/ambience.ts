@@ -89,14 +89,10 @@ export class Ambience {
       every('katydid', 3, 9, () => p.night > 0.5 && style !== 'sandy' && audio.play('amb.katydid', { gain: s * p.night * rnd(0.3, 0.8), pan: pan() }));
       every('frog', 1.5, 5, () => p.night > 0.4 && style === 'riverbank' && audio.play('amb.frog', { gain: s * p.night * rnd(0.3, 1), pan: pan() }));
       every('owl', 25, 70, () => p.night > 0.6 && style === 'forest' && audio.play('amb.owl', { gain: s * p.night * rnd(0.5, 0.9), pan: pan(), wet: 0.2 }));
-      every('drop', 0.2, 0.9, () => p.rain > 0.2 && audio.play('amb.raindrop_big', { gain: s * p.rain * close * rnd(0.3, 1), pan: pan() }));
       every('thunder', 20, 60, () => p.rain > 0.6 && audio.play('amb.thunder', { gain: s * p.rain * rnd(0.5, 1), pan: pan() * 0.5 }));
-      every('drip', 4, 12, () => style === 'riverbank' && audio.play('amb.drip', { gain: s * rnd(0.2, 0.5), pan: pan() }));
     }
     if (u > 0.3) {
-      every('trickle', 3, 9, () => audio.play('amb.soil_trickle', { gain: u * rnd(0.3, 0.9), pan: pan(), wet: 0.3 }));
       every('creak', 12, 35, () => open && audio.play('amb.root_creak', { gain: u * rnd(0.3, 0.7), pan: pan(), wet: 0.3 }));
-      every('cavedrip', 6, 18, () => (style === 'riverbank' || p.rain > 0.3) && audio.play('amb.drip', { gain: u * rnd(0.2, 0.5), pan: pan(), wet: 0.5 }));
     }
   }
 }

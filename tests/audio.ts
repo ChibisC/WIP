@@ -68,7 +68,9 @@ const noRow = Object.values(man.sounds).filter((f) => !attr.includes(`\`${f.file
 check('every file has a source and licence row in ATTRIBUTIONS.md', noRow.length === 0, noRow.map((f) => f.file).slice(0, 5).join(', '));
 
 // removed: ant and termite walking, the swarm bed, the termite kit's procedural voices; nothing may refer to them
-const REMOVED = ['ant.step_soil', 'ant.step_leaf', 'ant.step_bark', 'ant.step_stone', 'ant.step_sand', 'ant.step_carton', 'ant.step_queen', 'ant.swarm_bed', 'species.nasute_move', 'species.hellant_struggle'];
+const REMOVED = ['ant.step_soil', 'ant.step_leaf', 'ant.step_bark', 'ant.step_stone', 'ant.step_sand', 'ant.step_carton', 'ant.step_queen', 'ant.swarm_bed', 'species.nasute_move', 'species.hellant_struggle',
+  // review 2026-11-07: drips, trickles, pellets, loads, food cutting, brood, light hits, struggles and ant/termite deaths are silent
+  'amb.drip', 'amb.raindrop_big', 'amb.soil_trickle', 'ant.soil_grains', 'ant.pellet_drop', 'ant.pick_up', 'ant.put_down', 'ant.food_cut', 'ant.seed_crack', 'ant.egg_set', 'ant.queen_lay', 'combat.hit_tick', 'combat.struggle', 'combat.ant_death', 'combat.termite_death'];
 check('the walking sounds and the swarm bed are gone from the catalog', REMOVED.every((id) => !SOUND[id]));
 const src: string[] = [];
 const walkSrc = (d: string) => {
@@ -90,6 +92,7 @@ check('no code plays a removed sound', refs.length === 0, refs.slice(0, 5).join(
 const ga = readFileSync('src/audio/gameAudio.ts', 'utf8');
 check('ants have no step pool or ground-type steps', !/'steps'|ground\(/.test(ga) && !/pool: 'steps'/.test(ga));
 check('termites get no antenna taps (no idle sounds)', /antenna_tap/.test(ga) && /!CASTES\[a\.caste\]\?\.termite\) this\.want\('ant\.antenna_tap'/.test(ga));
+check('creature deaths are per family', /cr\.death_spider/.test(ga) && /cr\.death_beetle/.test(ga) && /cr\.death_soft/.test(ga));
 check('a termite alarm drums (headbang), an ant alarm stridulates', /termite \? 'species\.termite_headbang' : 'ant\.stridulate'/.test(ga));
 
 console.log(`audio: ${Object.keys(man.sounds).length} files, ${(bytes / 1e6).toFixed(2)} MB of Ogg`);
