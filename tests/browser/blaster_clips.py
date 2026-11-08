@@ -31,16 +31,17 @@ CAM = """(c) => { const s = window.__session; const A = s.world.s.mode.arena; co
     if (f.length) { x = f.reduce((t, a) => t + a.x, 0) / f.length; y = f.reduce((t, a) => t + a.y, 0) / f.length; } }
   r.jumpTo(x, y, c.d); r.yaw = r.goalYaw = c.yaw ?? 0.6; if (c.p !== undefined) r.pitchBias = c.p; return [x, y]; }"""
 
-# gold held off (the orbs clip: the normal form's white-blue), or switched on for every Blaster now (the beam clip)
+# gold held off (the orbs clip: the normal form's white-blue), or switched on for every Blaster now (the beam clip; the
+# shot counter set to 3, so the beam is its second shot in gold rather than its fifth — staged, to fit the clip)
 GOLD = """(on) => { const s = window.__session; for (const a of s.world.s.ants) { if (!a.caste.startsWith('aurimyrmex')) continue;
-  if (on) { a.surgeCd = 0; } else { a.surgeT = 0; a.surgeCd = 1e6; } } }"""
+  if (on) { a.surgeCd = 0; if (a.caste === 'aurimyrmex_blaster') a.shotN = 3; } else { a.surgeT = 0; a.surgeCd = 1e6; } } }"""
 # what is on screen now: orbs and beams (for the still: the busiest frame)
 BUSY = """() => { const fx = window.__session.surfFx.blast; return fx.liveOrbs + 4 * fx.liveBeams; }"""
 
 # name: (setup commands, gold (None: as the game decides), seconds to advance before recording, camera)
 CLIPS = {
-    "orbs": ([S(0, "ant:aurimyrmex_blaster", 6, (255, 300)), S(1, "ant:lasius_worker", 14, (330, 300))], False, 1.5, {"x": 292, "y": 300, "d": 75, "p": 0.32, "yaw": 0.35}),
-    "beam": ([S(0, "ant:aurimyrmex_blaster", 6, (255, 300)), S(1, "ant:lasius_worker", 24, (335, 300))], True, 3.0, {"x": 295, "y": 300, "d": 80, "p": 0.32, "yaw": 0.35}),
+    "orbs": ([S(0, "ant:aurimyrmex_blaster", 6, (255, 300)), S(1, "ant:lasius_worker", 14, (330, 300))], False, 2.0, {"d": 75, "p": 0.32, "yaw": 0.35, "fight": True}),
+    "beam": ([S(0, "ant:aurimyrmex_blaster", 6, (255, 300)), S(1, "ant:lasius_worker", 24, (335, 300))], True, 2.0, {"d": 80, "p": 0.32, "yaw": 0.35, "fight": True}),
     "line": ([S(0, "ant:aurimyrmex_soldier", 12, (262, 300)), S(0, "ant:aurimyrmex_blaster", 8, (238, 300)), S(1, "ant:fire_soldier", 30, (335, 300))], None, 5.0, {"d": 110, "p": 0.34, "yaw": 0.35, "fight": True}),
 }
 

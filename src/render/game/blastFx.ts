@@ -232,14 +232,14 @@ export class BlastFx {
             gl_Position = projectionMatrix * mv;
             return;
           }
-          // the beam strip: across its screen-space axis, at least ~14 px wide (the glow; the core a third of it)
+          // the beam strip: across its screen-space axis, at least ~11 px wide (the glow; the core a fifth of it)
           vec2 d = mb.xy - ma.xy;
           float dl = length(d);
           vec2 dir = dl > 1e-5 ? d / dl : vec2(1.0, 0.0);
           vec2 nrm = vec2(-dir.y, dir.x);
           float s = corner.x * 0.5 + 0.5;
           vec4 mv = mix(ma, mb, s);
-          float W = max(1.3, 7.0 * -mv.z / uPx);
+          float W = max(1.0, 5.5 * -mv.z / uPx);
           mv.xy += nrm * corner.y * W;
           gl_Position = projectionMatrix * mv;
         }`,
@@ -273,11 +273,11 @@ export class BlastFx {
             // ripples running out along the beam, and a flicker
             float rip = 0.5 + 0.5 * sin(x * 1.9 - uClock * 46.0 + vSeed * 6.0);
             float flick = 0.88 + 0.12 * sin(uClock * 71.0 + vSeed * 13.0) * sin(uClock * 29.0);
-            float wcore = 0.16 + 0.04 * rip;
+            float wcore = 0.1 + 0.03 * rip;
             float core = 1.0 - smoothstep(wcore * 0.5, wcore, y);
             float glow = exp(-y * y / (0.18 + 0.1 * rip)) * (0.55 + 0.25 * rip);
             float ends = smoothstep(0.0, 0.03, s) * (1.0 - smoothstep(0.97, 1.0, s));
-            col = (c * core * 4.5 + sh * glow * 1.0) * flick * ends;
+            col = (c * core * 4.5 + sh * glow * 1.15) * flick * ends;
             a = max(core, glow) * ends;
           }
           col *= vOn;

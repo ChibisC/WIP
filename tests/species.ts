@@ -550,6 +550,8 @@ function rampRun(phases: number[], targetCaste = 'formica_soldier'): { dmg: numb
   const p = arena(w);
   const s = makeAnt(w, 0, 'aurimyrmex_worker', SURFACE, p.x, p.y, 0);
   s.task = 'guard';
+  // (both kept alive: with the 10 s gold form the fight outlasts a worker's health — the timer is what is tested)
+  s.hp = s.maxHp = 1e5;
   const foe = makeAnt(w, 1, 'lasius_worker', SURFACE, p.x + 6, p.y, Math.PI);
   foe.hp = foe.maxHp = 1e5;
   w.reindex();

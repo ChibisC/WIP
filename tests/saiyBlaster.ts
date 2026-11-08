@@ -35,6 +35,14 @@ import { CombatFx } from '../src/render/game/combatFx';
 import { SOUNDS } from '../src/audio/catalog';
 import { guardSlot } from '../src/sim/guardLine';
 import { placeMarker } from '../src/sim/markers';
+import { hashState } from '../src/sim/snapshot';
+import { Command, CommandSchedule, stepWithCommands } from '../src/sim/commands';
+import { LocalHub } from '../src/net/transport';
+import { NetGame, NetSim } from '../src/net/netGame';
+import { Slot } from '../src/net/messages';
+import { DEFAULT_LOBBY, matchPlayers, matchSetup } from '../src/net/match';
+import { Rng } from '../src/core/rng';
+import type { World } from '../src/sim/world';
 
 const t0 = Date.now();
 let failed = 0;
@@ -443,6 +451,87 @@ function blasterFight(seed: number, saveAt = -1): string {
 {
   const ids = ['species.blaster_charge', 'species.blaster_orb', 'species.blaster_hit', 'species.blaster_beam'];
   check('sounds: the charge, the orb, the hit and the beam loop are in the catalog', ids.every((id) => SOUNDS.some((d) => d.id === id)) && !!SOUNDS.find((d) => d.id === 'species.blaster_beam')?.loop);
+}
+
+// ---- multiplayer: two clients in lockstep (an in-memory hub with lag), Blasters and Saiy soldiers fighting black
+// garden ants by each client's base, orbs and beams flying; the same state hash at every checkpoint
+{
+  class Sim implements NetSim {
+    sched = new CommandSchedule();
+    constructor(public w: World) {}
+    stepWith(cmds: Command[]): void {
+      for (const c of cmds) this.sched.add(c);
+      stepWithCommands(this.w, 0.05, this.sched);
+      this.w.events.drain();
+    }
+    hash() {
+      return Promise.resolve({ tick: this.w.s.tick, hash: hashState(this.w) });
+    }
+    snapshot() {
+      return Promise.resolve(encodeState(this.w));
+    }
+  }
+  const slot = (name: string, species: Slot['species'], peer: string): Slot => ({ kind: 'human', name, species, color: 0, ready: true, peer, ping: 0, token: peer, team: 0 });
+  const players = matchPlayers([slot('Host', 'aurimyrmex', 'p0'), slot('Guest', 'lasius', 'p1')]);
+  const setup = matchSetup(players, { ...DEFAULT_LOBBY, seed: 977 });
+  const hub = new LocalHub();
+  const lag = new Rng(3);
+  hub.latency = () => 30 + lag.next() * 60;
+  const eps = [hub.connect('p0', 'p0'), hub.connect('p1', 'p0')];
+  const cl = [0, 1].map((i) => {
+    const w = createWorld(setup, new EventBus());
+    // the same armies on both machines, set up before the first tick (as a scenario would): 8 Blasters and 6 Saiy
+    // soldiers against 24 workers and 6 soldiers, by the Saiy-Ants' entrance; the Blasters ready for their beam
+    const e = w.colony(0)!.entrances[0];
+    const ids: number[] = [];
+    for (let k = 0; k < 14; k++) {
+      const a = makeAnt(w, 0, k < 8 ? 'aurimyrmex_blaster' : 'aurimyrmex_soldier', SURFACE, e.sx + 30 - (k % 7) * 5, e.sy - 15 + Math.floor(k / 7) * 9, 0);
+      // (the shot counter one short of the beam: the first shot in gold is the beam, so a 40 s test sees some)
+      if (k < 8) a.shotN = B.beamEvery - 1;
+      ids.push(a.id);
+    }
+    for (let k = 0; k < 30; k++) ids.push(makeAnt(w, 1, k < 24 ? 'lasius_worker' : 'lasius_soldier', SURFACE, e.sx + 100 + (k % 6) * 5, e.sy - 20 + Math.floor(k / 6) * 8, Math.PI).id);
+    w.reindex();
+    const sim = new Sim(w);
+    const game = new NetGame(eps[i], i, players.map((p) => ({ ...p })), sim, { delay: 3, now: () => hub.now });
+    return { w, sim, game, acc: 0, hashes: new Map<number, string>(), shots: 0, beams: 0, ids };
+  });
+  for (const c of cl) c.w.events.onAny((e) => {
+    if (e.t === 'orb') c.shots++;
+    if (e.t === 'beam') c.beams++;
+  });
+  const end = hub.now + 40_000;
+  while (hub.now < end) {
+    hub.deliver(hub.now + 16);
+    for (const c of cl) {
+      c.game.update();
+      c.acc = Math.min(250, c.acc + 16);
+      while (c.acc >= 50 && c.game.tryTick()) {
+        c.acc -= 50;
+        const t = c.w.s.tick;
+        // keep the armies at it (as a player's attack order would): every ant targets the marker by the fight
+        if (t % 20 === 0)
+          for (const id of c.ids) {
+            const a = c.w.antById.get(id);
+            if (a && a.state !== AS.Dead) {
+              (a as Ant).task = 'marker' as never;
+              a.marker = 0;
+            }
+          }
+        if (t === 1) for (const ci of [0, 1]) placeMarker(c.w, c.w.colony(ci)!, 0, SURFACE, c.w.colony(0)!.entrances[0].sx + 50, c.w.colony(0)!.entrances[0].sy);
+        if (t % 40 === 0) c.hashes.set(t, hashState(c.w));
+      }
+    }
+  }
+  let common = 0;
+  let diff = -1;
+  for (const [t, h] of cl[0].hashes) {
+    const o = cl[1].hashes.get(t);
+    if (o === undefined) continue;
+    common++;
+    if (o !== h && diff < 0) diff = t;
+  }
+  check('multiplayer: two clients in lockstep stay in sync while Blasters fire (beams down the enemy line)', diff < 0 && common >= 15 && cl[0].shots + cl[0].beams >= 5 && cl[0].beams > 0 && cl[0].shots === cl[1].shots && !cl[0].game.status().desync, `${common} checkpoints, ${cl[0].shots} orbs, ${cl[0].beams} beams on each, ticks ${cl.map((c) => c.w.s.tick).join(' / ')}`);
 }
 
 console.log(`\n${failed ? `${failed} FAILED` : 'all Saiy-Ant Blaster tests passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

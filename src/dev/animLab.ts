@@ -237,7 +237,7 @@ function blastClip(): Clip {
         }) as AntScript,
       })),
     ],
-    cam: { tx: 6, ty: 1, tz: 0, dir: [0.25, 0.42, 1], dist: 62, fov: 30 },
+    cam: { tx: 7, ty: 1, tz: 0, dir: [0.2, 0.55, 1], dist: 80, fov: 30 },
   };
 }
 
