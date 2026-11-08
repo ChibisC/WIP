@@ -2064,7 +2064,7 @@ Built on the model redo (§30, merged into this branch during its review; now on
   beams (core, rippling glow, charge ball, end burst, ground light, flash on, fade off) played in closed form from the
   sim's events; bursts and pops in `combatFx`. **Sounds** (made for this game): charge hum, "fwip", sizzle, beam
   roar-hum loop.
-- **Tests:** `tests/saiyBlaster.ts` (35 checks: caste, orbs, five-shot cycle, beam, aim, determinism and a save
-  mid-fight, back-off, guard crowd, pose, effects, sounds); morph hashes (only `saiy_blaster` new); height data; balance
+- **Tests:** `tests/saiyBlaster.ts` (36 checks: caste, orbs, five-shot cycle, beam, aim, determinism, a save
+  mid-fight and two clients in lockstep, back-off, guard crowd, pose, effects, sounds); morph hashes (only `saiy_blaster` new); height data; balance
   in `docs/balance/castes.md` ("Saiy-Ant Blaster"), tools `tools/blaster-balance.ts`; clips
   `docs/creatures/aurimyrmex-renders/` (`tests/browser/blaster_clips.py`); lab `&mglow=`.
