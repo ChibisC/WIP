@@ -68,6 +68,7 @@ export function separationSystem(w: World, dt: number): void {
     mass = new Float64Array(n * 2);
     len = new Float64Array(n * 2);
     hwl = new Float64Array(n * 2);
+    spc = new Int32Array(n * 2);
     prio = new Uint8Array(n * 2);
     tdx = new Float64Array(n * 2);
     tdy = new Float64Array(n * 2);
@@ -152,6 +153,8 @@ export function separationSystem(w: World, dt: number): void {
   // index": the pair loop drops the pairs the other ant handles before it touches them; checked, else pairCb decides)
   let sorted = true;
   for (let i = 1; i < n && sorted; i++) if (ants[i].id <= ants[i - 1].id) sorted = false;
+  // (each ant's space now, so the pair loop need not load an ant to see it has left the space since the hash was built)
+  for (let i = 0; i < n; i++) spc[i] = ants[i].space;
   rawSpace = -1;
   for (let i = 0; i < n; i++) {
     const fa = flag[i];
@@ -477,7 +480,7 @@ function pairsNear(w: World, ants: Ant[], space: number, x: number, y: number, r
     raw = h.raw();
     rawSpace = space;
   }
-  const { head, next, items, xs, ys, w: hw, h: hh, cell: c } = raw;
+  const { start, items, xs, ys, w: hw, h: hh, cell: c } = raw;
   const x0 = Math.max(0, Math.floor((x - r) / c) + 1);
   const x1 = Math.min(hw - 1, Math.floor((x + r) / c) + 1);
   const y0 = Math.max(0, Math.floor((y - r) / c) + 1);
@@ -485,18 +488,14 @@ function pairsNear(w: World, ants: Ant[], space: number, x: number, y: number, r
   const r2 = r * r;
   for (let cy = y0; cy <= y1; cy++)
     for (let cx = x0; cx <= x1; cx++) {
-      let e = head[cy * hw + cx];
-      while (e !== -1) {
+      const cell = cy * hw + cx;
+      for (let e = start[cell], end = start[cell + 1]; e < end; e++) {
         const dx = xs[e] - x;
         const dy = ys[e] - y;
         if (dx * dx + dy * dy <= r2) {
           const k = items[e];
-          if (k !== self && flag[k] & 1 && !(sorted && (selfBig === rad[k] > BIG ? k < self : !selfBig))) {
-            const o = ants[k];
-            if (o && o.space === space) pairCb(k);
-          }
+          if (k !== self && flag[k] & 1 && spc[k] === space && !(sorted && (selfBig === rad[k] > BIG ? k < self : !selfBig))) pairCb(k);
         }
-        e = next[e];
       }
     }
 }
@@ -621,6 +620,7 @@ let rad = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let mass = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let len = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let hwl = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let spc = new Int32Array(0); // det-ok: scratch, rebuilt every tick
 let prio = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 let tdx = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let tdy = new Float64Array(0); // det-ok: scratch, rebuilt every tick
