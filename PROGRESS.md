@@ -2045,7 +2045,7 @@ User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch 
 - **Termants** redesigned: termite antennae on every caste, no nasus (the soldier's glue from a pore on its forehead), a *Macrotermes*-style soldier head with sabre jaws, realistic materials, planted feet.
 - Other species' models unchanged (hash check); height data regenerated. Four review rounds with the user; approved 2026-11-07 ("good. push changes").
 
-## 2026-11-07 — Saiy-Ant Blaster: energy orbs from the mouth, a 3-second beam in gold form; gold form 10 s (`feature/saiy-blaster`, CHANGE_PLAN §31; in review)
+## 2026-11-07 — Saiy-Ant Blaster: energy orbs from the mouth, a 3-second beam in gold form; gold form 10 s (`feature/saiy-blaster`, CHANGE_PLAN §31; merged 2026-11-08 after the user's approval, game artifact v50)
 
 Built on the model redo (§30, merged into this branch during its review; now on `main`).
 - **The caste** `aurimyrmex_blaster` ("Blaster"; Termants steal it as "Saiy-Ant Blaster"): worker-sized and light
