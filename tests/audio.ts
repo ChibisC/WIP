@@ -39,7 +39,7 @@ const walk = (d: string) => {
   for (const f of readdirSync(d)) {
     const p = join(d, f);
     if (statSync(p).isDirectory()) walk(p);
-    else if (/\.(ogg|m4a|mp3|wav|opus)$/.test(f)) onDisk.push(p.replace(/\\/g, '/').replace(/^public\/audio\//, '').replace(/\.\w+$/, ''));
+    else if (/\.(ogg|mp4|mp3|wav|opus)$/.test(f)) onDisk.push(p.replace(/\\/g, '/').replace(/^public\/audio\//, '').replace(/\.\w+$/, ''));
   }
 };
 walk('public/audio');

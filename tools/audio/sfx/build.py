@@ -10,7 +10,7 @@ fades at both ends, loudness-normalised (the loudest 400 ms, K-weighted, to the 
 keeps each sound where the tuned mix had it; never above a -1 dBFS peak), loops made seamless. Recordings in audio-src/recordings/<folder>/<name>_NN.* replace a sound's rendered takes.
 
 Pack: one file per sound (its takes one after another with silence between: an audio sprite, so the whole game is a
-few hundred files, not thousands), Ogg Vorbis plus AAC (.m4a) for browsers without Ogg; long ambience loops are single
+few hundred files, not thousands), Ogg Vorbis plus AAC (.mp4) for browsers without Ogg; long ambience loops are single
 streamed files. public/audio/manifest.json lists each sound's file, takes (start, length in samples at 44.1 kHz) and
 its first sound's position (`lead`), which the game uses to correct any encoder delay before slicing the takes.
 """
@@ -153,7 +153,7 @@ def enc(wav, base, stereo, loop):
     q = ("1" if stereo else "3") if loop else "3"
     subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-i", wav, "-c:a", "libvorbis", "-q:a", q, base + ".ogg"], check=True)
     br = ("96k" if stereo else "64k") if loop else "80k"
-    subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-i", wav, "-c:a", "aac", "-b:a", br, "-movflags", "+faststart", base + ".m4a"], check=True)
+    subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-i", wav, "-c:a", "aac", "-b:a", br, "-movflags", "+faststart", base + ".mp4"], check=True)
 
 
 def pack():
@@ -162,9 +162,9 @@ def pack():
     os.makedirs(tmp, exist_ok=True)
     # clear the old files (a removed sound must not stay behind)
     for f in glob.glob(os.path.join(PUB, "*", "*")):
-        if re.search(r"\.(ogg|m4a|mp3|opus|webm|wav)$", f):
+        if re.search(r"\.(ogg|mp4|mp3|opus|webm|wav)$", f):
             os.remove(f)
-    size = {"ogg": 0, "m4a": 0}
+    size = {"ogg": 0, "mp4": 0}
     for sid in sorted(REG):
         folder, name = sid.split(".", 1)
         files = sorted(glob.glob(os.path.join(OUT_WAV, folder, f"{name}_[0-9][0-9].wav")))
@@ -175,7 +175,7 @@ def pack():
         ch = takes[0].shape[0]
         base = os.path.join(PUB, folder, name)
         os.makedirs(os.path.dirname(base), exist_ok=True)
-        entry = {"file": f"{folder}/{name}", "ext": ["ogg", "m4a"]}
+        entry = {"file": f"{folder}/{name}", "ext": ["ogg", "mp4"]}
         if REG[sid]["loop"]:
             data = takes[0]
             entry["loop"] = True
@@ -198,7 +198,7 @@ def pack():
         wav = os.path.join(tmp, f"{folder}_{name}.wav")
         sf.write(wav, data.T if ch > 1 else data[0], SR, subtype="PCM_16")
         enc(wav, base, ch > 1, REG[sid]["loop"])
-        for e in ("ogg", "m4a"):
+        for e in ("ogg", "mp4"):
             size[e] += os.path.getsize(f"{base}.{e}")
         sounds[sid] = entry
     write_attributions(sounds)
@@ -207,7 +207,7 @@ def pack():
         json.dump({"sr": SR, "sounds": sounds, "credits": credits}, f, separators=(",", ":"))
         f.write("\n")
     n = sum(len(e.get("takes", [[0]])) for e in sounds.values())
-    print(f"packed {len(sounds)} sounds ({n} takes): Ogg {size['ogg']/1e6:.2f} MB, AAC {size['m4a']/1e6:.2f} MB; {2*len(sounds)} files")
+    print(f"packed {len(sounds)} sounds ({n} takes): Ogg {size['ogg']/1e6:.2f} MB, AAC {size["mp4"]/1e6:.2f} MB; {2*len(sounds)} files")
 
 
 def write_attributions(sounds):
@@ -224,7 +224,7 @@ def write_attributions(sounds):
         if rec:
             continue
         mod = REG[sid]["fn"].__module__
-        rows.append(f"| `{e['file']}.ogg`, `.m4a` | {sid} | Underground Dominion (made for this game) | `tools/audio/sfx/{mod}.py` | CC0 (made for this game) | {len(e.get('takes', [0]))} take(s), rendered offline |")
+        rows.append(f"| `{e['file']}.ogg`, `.mp4` | {sid} | Underground Dominion (made for this game) | `tools/audio/sfx/{mod}.py` | CC0 (made for this game) | {len(e.get('takes', [0]))} take(s), rendered offline |")
     body = "\n| File | Title | Author | Source | License | Notes |\n|---|---|---|---|---|---|\n" + "\n".join(rows) + "\n"
     text = text[: text.index(a) + len(a)] + body + text[text.index(b):]
     open(p, "w", encoding="utf8").write(text)

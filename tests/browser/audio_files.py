@@ -51,7 +51,7 @@ async (ext) => {
 res = []
 with sync_playwright() as p:
     b = p.chromium.launch()
-    for ext in ("ogg", "m4a"):
+    for ext in ("ogg", "mp4"):
         pg = b.new_page()
         errs = []
         pg.on("pageerror", lambda e: errs.append(str(e)))
