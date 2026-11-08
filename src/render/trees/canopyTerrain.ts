@@ -111,9 +111,12 @@ vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, vec4 lv, out float r
   vec2 p = wp.xz;
   // bark: ridges running along the branch (lines of equal distance from its edge), split by cracks, with plates of
   // lichen on the older wood and moss in the damp middle of the thick branches
-  float wob = fbm(p * 0.11) * 5.0;
-  float ridge = 0.5 + 0.5 * sin(sd * 4.2 + wob + vnoise(p * 0.6) * 1.5);
-  ridge = smoothstep(0.3, 0.8, ridge) * (0.6 + 0.4 * vnoise(p * 0.25 + 3.0));
+  // (the ridges follow the edge but wander and break up, and fade to plain bark in the middle of thick wood and on
+  // the trunk tops, so a wide stretch does not read as rings)
+  float wob = fbm(p * 0.11) * 9.0 + fbm(p * 0.4 + 9.0) * 3.0;
+  float ridge = 0.5 + 0.5 * sin(sd * 4.2 + wob);
+  ridge = smoothstep(0.3, 0.8, ridge) * (0.5 + 0.5 * vnoise(p * 0.25 + 3.0)) * smoothstep(7.0, 3.0, sd);
+  ridge += smoothstep(3.0, 7.0, sd) * (0.3 + 0.5 * fbm(p * 0.3 + 21.0));
   float crack = smoothstep(0.64, 0.7, fbm(p * 0.21 + 5.0));
   vec3 bark = mix(vec3(0.13, 0.09, 0.055), vec3(0.30, 0.21, 0.13), ridge);
   bark *= 0.85 + 0.3 * vnoise(p * 1.7);
