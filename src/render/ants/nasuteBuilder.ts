@@ -111,6 +111,8 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
     if (o || lod === 1) {
       const [q, fr] = terg(s);
       if (q > 0 || fr > 0.2) r *= 1 - ab.groove * Math.exp(-((fr - 0.02) ** 2) / 0.004) - ab.groove * Math.exp(-((fr - 1) ** 2) / 0.004);
+      // (`ab.pillow`: each tergite a convex plate, so each catches its own highlight — the sickle-jaw worker's photos)
+      if (ab.pillow && (q > 0 || fr > 0.3)) r *= 1 - ab.pillow * (2 * fr - 1) ** 2;
     }
     return r;
   };
@@ -156,6 +158,34 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
           const x = aFront - s * aLen, y = aCy - ab.sag * L * s * s;
           const root = new NV(x, y + Math.sin(a) * ab.h * 0.5 * L * r * 0.97, Math.cos(a) * ab.w * 0.5 * L * r * 0.97);
           seta(n, root, new NV(-0.9, Math.sin(a) * 0.45, Math.cos(a) * 0.4).normalize(), rnd.range(0.018, 0.032) * L, 0.0011 * L, PART.GASTER, C.hair, lk.hair, new NV(0, -0.12, 0));
+        }
+      }
+      // (`ab.hairs`: so many more short fine hairs scattered over each tergite, half-raised, both sides — the
+      // sickle-jaw worker's photos show its abdomen finely hairy all over)
+      if (ab.hairs) {
+        for (let q = 1; q < NT; q++) {
+          for (let k = 0; k < ab.hairs; k++) {
+            const s = (q + rnd.range(0.15, 0.9)) / NT;
+            if (s > 0.97) continue;
+            const r = aProf(s), a = rnd.range(-0.5, Math.PI + 0.5), side = rnd.range(0, 1) < 0.5 ? 1 : -1;
+            const x = aFront - s * aLen, y = aCy - ab.sag * L * s * s;
+            const root = new NV(x, y + Math.sin(a) * ab.h * 0.5 * L * r * 0.96, side * Math.abs(Math.cos(a)) * ab.w * 0.5 * L * r * 0.96);
+            seta(n, root, new NV(-0.7, Math.sin(a) * 0.65, side * Math.abs(Math.cos(a)) * 0.6).normalize(), rnd.range(0.012, 0.024) * L, 0.0008 * L, PART.GASTER, C.hair, lk.hair, new NV(0, -0.06, 0));
+          }
+        }
+      }
+      // (`ab.spiracles`: a row of small pale spots low on each flank, one per tergite — the spiracles, white in the
+      // photos; [height on the side −1..1, radius in L])
+      if (ab.spiracles) {
+        const [d0, sr] = ab.spiracles, a = Math.asin(d0);
+        // flat ovals sunk into the surface (only their tops show), on the middle tergites
+        for (let q = 2; q < NT - 2; q++) {
+          const s = (q + 0.42) / NT, r = aProf(s);
+          const x = aFront - s * aLen, y = aCy - ab.sag * L * s * s;
+          for (const sd of [-1, 1]) {
+            const c = new NV(x, y + Math.sin(a) * ab.h * 0.5 * L * r * 0.982, sd * Math.cos(a) * ab.w * 0.5 * L * r * 0.982);
+            blob(n, c, new NV(sr * 1.7 * L, sr * L, sr * L), S(8, 6, 4), PART.GASTER, C.spiracle ?? C.membrane, lk.abdomen, new NQ());
+          }
         }
       }
     }

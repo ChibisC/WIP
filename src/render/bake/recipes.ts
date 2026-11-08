@@ -258,6 +258,22 @@ export const NASUTE_W: DetailRecipe = { key: 'nasute_w', regions: nasRegions(NAS
 export const NASUTE_S: DetailRecipe = { key: 'nasute_s', regions: nasRegions(NAS_HEAD_S) };
 
 /**
+ * Sickle-jaw worker (Rhynchotermes; review round 3, the user's field photos: "make the workers have more texture in
+ * abdomen like reference photos"): the soft abdomen wet and glossy, the gut contents mottled through a translucent
+ * cuticle, fine hair pits each with a short golden hair lying back, a soft undulation so each plate's highlight
+ * breaks up; the glossy head and the rest as the nasute worker's. (The plates, the spiracles and the longer hairs are
+ * geometry: nasuteBuilder `abdomen.pillow`, `spiracles`, `hairs`.)
+ */
+const RHY_W_GASTER: Sculpt = { tile: [1.2, 1.2], noise: 0.0004, pits: { n: 70, r: 0.0055, depth: 0.0007, pale: 0.35, stub: { len: 0.08, dir: 1, share: 0.85 } }, wave: { cell: 0.16, amp: 0.005 }, rough: [-0.06, 0.18], roughVar: 0.08, dirt: 0.05, mottle: 0.5, cavityDark: 0.2 };
+export const RHY_W: DetailRecipe = {
+  key: 'rhy_w',
+  regions: {
+    ...nasRegions(NAS_HEAD_W),
+    [REGION.GASTER]: { sculpt: RHY_W_GASTER, shade: shade(0.9, 0.12, 0.2, 0.9, 0.5, { coatRough: 0.06, wear: 0.08, dust: 0.04, mid: 0.1 }), px: [1024, 512] as [number, number] },
+  },
+};
+
+/**
  * Termants (spec 09 §3: a fictional hybrid judged part by part against real ones): the front a Formica's — the head and
  * mesosoma finely microreticulate, satin; the back a termite worker's — the soft, translucent abdomen with sunken
  * membranes and a wet glint (the nasute recipe's soft abdomen); the soldier's head a Macrotermes soldier's, hard,
@@ -315,6 +331,7 @@ export function antRecipe(morphKey: string): DetailRecipe | null {
   if (morphKey.startsWith('saiy_')) return SAIY;
   if (morphKey === 'termant_soldier') return TERMANT_S;
   if (morphKey.startsWith('termant_')) return TERMANT_W;
+  if (morphKey === 'termite_rhy_worker') return RHY_W;
   if (morphKey === 'termite_worker') return NASUTE_W;
   if (morphKey === 'termite_nasute' || morphKey === 'termite_major') return NASUTE_S;
   return null;

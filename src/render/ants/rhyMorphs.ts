@@ -32,16 +32,19 @@ const WORKER_COLORS = {
   head: 0xc85818, headTop: 0xd06020, headUnder: 0xa84414, headBand: 0xa04418, clypeus: 0xd06a2a, labrum: 0xc0743c, palp: 0xd8b07a, fontanelle: 0xdc8a52,
   mand: 0x6a2a10, mandTip: 0x200a04,
   thorax: 0xd2843c, thoraxTop: 0xc87a34, pronotum: 0xcc7e36,
-  abd: 0x6c381e, abdTop: 0x5a2e18, abdUnder: 0x86583c, tergRear: 0x381a0c, membrane: 0x8a644a, gut: 0x26160c,
+  abd: 0x6c381e, abdTop: 0x5a2e18, abdUnder: 0x9a5a32, tergRear: 0x381a0c, membrane: 0x8a644a, gut: 0x26160c, spiracle: 0xe8dece,
   leg: 0xd8a862, legLight: 0xe2b874, legBase: 0xcc9a54, claw: 0x7a5a30, antenna: 0xd09c58, antennaTip: 0xdcb070,
-  hair: 0xe8d8b0, seta: 0xe8d8b0,
+  // (round 3: "make the workers have more texture in abdomen like reference photos") golden, as the photos' fine hairs
+  hair: 0xdcb478, seta: 0xdcb478,
 };
 const worker = {
   key: 'termite_rhy_worker', builder: 'nasute', real: true, L: 5.8, stance: 0.06, soft: 1.1,
   // the head and the abdomen both glossy and wet-looking in the photos
   look: { colors: WORKER_COLORS, ...SURF, head: { rough: 0.16, coat: 0.85, sheen: 0.06 }, abdomen: { rough: 0.14, coat: 0.9, sheen: 0.08 } },
   // a big plump egg-shaped abdomen, dark, the tergites divided by dark creases
-  abdomen: { x0: 0.5, len: 0.5, w: 0.32, h: 0.26, cy: 0.155, full: 0.55, front: 0.3, sag: 0.015, groove: 0.09, membrane: 0.3, gut: 0.35, gutLobes: [[0.35, 0.04, 1], [0.55, 0.045, 1], [0.74, 0.03, 0.85]] },
+  // (round 3, "more texture in abdomen like reference photos") each tergite a pillowed plate, the white spiracles in a
+  // row low on each flank, fine golden hairs all over; the mottled gut and the hair pits in the baked recipe (RHY_W)
+  abdomen: { x0: 0.5, len: 0.5, w: 0.32, h: 0.26, cy: 0.155, full: 0.55, front: 0.3, sag: 0.015, groove: 0.1, pillow: 0.06, hairs: 12, spiracles: [-0.24, 0.0068], membrane: 0.3, gut: 0.35, gutLobes: [[0.35, 0.04, 1], [0.55, 0.045, 1], [0.74, 0.03, 0.85]] },
   // a narrow thorax, the pronotum a small saddle
   thorax: { meta: 0.05, meso: 0.05, pro: 0.05, w: 0.12, h: 0.09, cy: 0.1, proW: 0.15, proLift: 0.012, saddle: 0.016 },
   // a small round glossy dome, about as wide as long
