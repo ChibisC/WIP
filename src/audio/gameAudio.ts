@@ -561,6 +561,9 @@ export class GameAudio {
         }
       }
       if (!here || d > L.ref * (k.boss ? 5 : 2.2)) continue;
+      // a stag beetle rearing or displaying flares its wing cases (render/creatures/stagBeetle.ts): the snap open and
+      // the wings' buzz, once per entry into the state
+      if (cr.kind.startsWith('stag') && (cr.state === 15 || cr.state === 10) && cr.st < 0.25 && this.every('elytra' + cr.id, 1.5)) this.want('cr.beetle_elytra', cr.x, cr.y, cr.space, { pool: 'creature', gain: 0.9, rate: sizeRate(k.length), reach: 3, heat: 0.05 });
       const w = this.walk.get(-cr.id);
       if (!w) {
         this.walk.set(-cr.id, { x: cr.x, y: cr.y, acc: 0, t: now });
