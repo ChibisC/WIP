@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { hash2 } from '../../core/rng';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
@@ -189,7 +190,7 @@ export function appleGeometry(): THREE.BufferGeometry {
   const g = new THREE.ExtrudeGeometry(shape, { depth: 0.45, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.04, bevelSegments: 2, curveSegments: 12 });
   g.translate(-0.3, 0, -0.22);
   g.rotateX(-Math.PI / 2);
-  const cg = colorize(g, (p) => (Math.hypot(p.x + 0.3, p.z) > 0.55 ? new THREE.Color(0xa01818) : new THREE.Color(0xf0e2b8).lerp(new THREE.Color(0xc8a868), Math.random() * 0.15)));
+  const cg = colorize(g, (p) => (Math.hypot(p.x + 0.3, p.z) > 0.55 ? new THREE.Color(0xa01818) : new THREE.Color(0xf0e2b8).lerp(new THREE.Color(0xc8a868), hash2(Math.round(p.x * 997), Math.round(p.z * 991), Math.round(p.y * 983)) * 0.15)));
   cg.computeVertexNormals();
   return cg;
 }

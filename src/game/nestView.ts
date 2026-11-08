@@ -25,6 +25,7 @@ import { antToView, blankView, corpseToView, termiteBroodToView } from './antVie
 import { casteColour, casteLook } from '../render/casteLook';
 import { NestWater } from '../render/nest/nestWater';
 import { floodCache } from '../sim/nestFlood';
+import { ViewCull } from '../render/viewCull';
 
 /** Colour of a caste's brood tile and UI (render/casteLook: every caste its own colour and texture). */
 export function casteTint(caste: string): THREE.Color {
@@ -64,6 +65,9 @@ export class NestView {
   private floorHeight: (x: number, z: number) => number;
   private hexKey = '';
   private views: AntView[] = [];
+  /** the units' loose view test and this frame's list of views (performance v2) */
+  private cull = new ViewCull();
+  private viewList: AntView[] = [];
   /** underground fog (game/fog.ts): the viewer's fog for this space this frame, null when everything is shown */
   fog: Fog | null = null;
   private fogTick = -1;
@@ -153,7 +157,7 @@ export class NestView {
   }
 
   /** Fill all instance buffers for this area as seen from `cam` (owner = the colony whose nest it is; null for caves). */
-  update(w: World, owner: Colony | null, player: Colony, cam: THREE.PerspectiveCamera, alpha: number, dt: number, viewportH: number, camDist: number, markerSel: number, time: number, shown: ReadonlyArray<ShownMarker> = player.markers, pendingHexes: ReadonlyArray<{ q: number; kind: string }> = []): void {
+  update(w: World, owner: Colony | null, player: Colony, cam: THREE.PerspectiveCamera, alpha: number, dt: number, viewportH: number, camDist: number, markerSel: number, time: number, shown: ReadonlyArray<ShownMarker> = player.markers, pendingHexes: ReadonlyArray<{ q: number; kind: string; fade?: number }> = []): void {
     this.updateHexes(w, owner);
     // the fog: sealed hexes drawn as rock, seen/remembered/dark levels, units hidden out of sight (game/fog.ts)
     const g = w.nestOf(this.space)!;
@@ -175,16 +179,24 @@ export class NestView {
       if (n >= views.length) views.push(blankView());
       return views[n++];
     };
+    // (ants well out of view get no view and no animation this frame: render/viewCull.ts)
+    const cull = this.cull;
+    cull.begin(cam);
+    const pos = this.map.pos;
     for (const a of w.s.ants) {
       if (a.space !== this.space) continue;
       if (a.state === AS.Dead && a.deadT > 30) continue;
       if (vis && !vis(a.x, a.y)) continue;
+      if (!cull.keeps(a, pos)) continue;
       antToView(w, a, take(), 0, 0);
     }
-    for (const f of w.s.food) if (f.space === this.space && f.kind === 'corpse' && f.from.includes('_') && !(vis && !vis(f.x, f.y))) corpseToView(f, take(), 0, f.from);
+    for (const f of w.s.food) if (f.space === this.space && f.kind === 'corpse' && f.from.includes('_') && !(vis && !vis(f.x, f.y)) && cull.keepsPoint(f.x, f.y, pos)) corpseToView(f, take(), 0, f.from);
     // termite larvae and presoldiers on their tiles: the model kit (eggs stay with the brood renderer)
-    if (owner && isTermiteSpecies(owner.species)) for (const b of w.s.brood) if (b.colony === owner.id && b.stage === 1 && !(vis && !vis(b.x, b.y))) termiteBroodToView(b, take(), 0);
-    const list = n === views.length ? views : views.slice(0, n);
+    if (owner && isTermiteSpecies(owner.species)) for (const b of w.s.brood) if (b.colony === owner.id && b.stage === 1 && !(vis && !vis(b.x, b.y)) && cull.keepsPoint(b.x, b.y, pos)) termiteBroodToView(b, take(), 0);
+    // (the list is kept, not sliced: no garbage per frame)
+    const list = this.viewList;
+    list.length = n;
+    for (let i = 0; i < n; i++) list[i] = views[i];
     // creatures first: climbing ants are placed on their animated legs and backs
     this.creatures.update(w.s.creatures, this.space, alpha, dt, this.floorHeight, cam, viewportH);
     this.ants.mount = (v, a, out) => {
@@ -216,9 +228,11 @@ export class NestView {
   private static WAIT_COL = new THREE.Color(0x9ab0c8);
   /** a player's command on this hex is waiting for its tick (multiplayer input delay) */
   private static PEND_COL = new THREE.Color(0xfff4d6);
+  /** a refused command's ghost, unwinding (performance v2) */
+  private static REFUSED_COL = new THREE.Color(0xe0806a);
 
   /** Rings over hexes being worked; with the overlay, over every incubating larva too. */
-  private updateRings(w: World, owner: Colony, pending: ReadonlyArray<{ q: number; kind: string }>, time: number): void {
+  private updateRings(w: World, owner: Colony, pending: ReadonlyArray<{ q: number; kind: string; fade?: number }>, time: number): void {
     const g = w.nestOf(this.space)!;
     const nt = this.stage.terrain;
     const items = this.ringItems;
@@ -259,7 +273,8 @@ export class NestView {
     // Pending commands: a pulsing full ring on the hex until the command's tick runs.
     for (const p of pending) {
       g.hexCenter(p.q, ctr);
-      push(ctr.x, ctr.y, g.R * (p.kind === 'build' ? 0.7 : 0.55), 0.75 + 0.25 * Math.sin(time * 14 + p.q), NestView.PEND_COL);
+      if (p.kind === 'refused') push(ctr.x, ctr.y, g.R * 0.55, Math.max(0, p.fade ?? 0), NestView.REFUSED_COL);
+      else push(ctr.x, ctr.y, g.R * (p.kind === 'build' ? 0.7 : 0.55), 0.75 + 0.25 * Math.sin(time * 14 + p.q), NestView.PEND_COL);
     }
     items.length = Math.max(items.length, n);
     this.rings.set(items.slice(0, n));

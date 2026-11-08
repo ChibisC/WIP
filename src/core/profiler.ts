@@ -26,7 +26,7 @@ export interface Hitch {
 }
 
 /** Rolling statistics of one quantity. */
-class Stat {
+export class Stat {
   private buf: Float32Array;
   private n = 0;
   private i = 0;
@@ -50,6 +50,12 @@ class Stat {
     let s = 0;
     for (const v of a) s += v;
     return { avg: s / this.n, p95: a[Math.min(this.n - 1, Math.floor(this.n * 0.95))], worst: a[this.n - 1] };
+  }
+  /** the value at fraction q (0–1) of the sorted window */
+  percentile(q: number): number {
+    if (!this.n) return 0;
+    const a = Array.from(this.buf.subarray(0, this.n)).sort((x, y) => x - y);
+    return a[Math.min(this.n - 1, Math.max(0, Math.floor(this.n * q)))];
   }
   reset(): void {
     this.n = 0;
@@ -95,7 +101,7 @@ function bppOf(gl: WebGL2RenderingContext, f: number): number {
 const blankGl = (): GlWork => ({ compiles: 0, links: 0, compileMs: 0, texUploads: 0, texBytes: 0, texMs: 0, bufBytes: 0, bufMs: 0 });
 
 export const HITCH_MS = 33;
-const PARTS = ['sim', 'msg', 'events', 'units', 'creatures', 'nest', 'fx', 'ui', 'render', 'prewarm'] as const;
+const PARTS = ['sim', 'msg', 'input', 'events', 'units', 'creatures', 'nest', 'fx', 'ui', 'render', 'prewarm'] as const;
 export type Part = (typeof PARTS)[number];
 
 export class Profiler {
@@ -278,14 +284,22 @@ export class Profiler {
     this.frameStart = now;
     this.cpuStart = performance.now();
     for (const p of PARTS) this.cur[p] = 0;
-    // worker frames arrive between animation frames: they count toward the next one
+    // worker frames and input handlers run between animation frames: they count toward the next one
     this.cur.msg = this.pendingMsg;
     this.pendingMsg = 0;
+    this.cur.input = this.pendingInput;
+    this.pendingInput = 0;
     this.notes.length = 0;
     this.gl = blankGl();
   }
 
   private pendingMsg = 0;
+  private pendingInput = 0;
+
+  /** An input handler ran between animation frames (ms; it counts toward the next frame's main-thread time). */
+  addInput(ms: number): void {
+    this.pendingInput += ms;
+  }
 
   /** A frame message from the simulation worker was applied (between animation frames). */
   addMsg(ms: number, bytes: number): void {

@@ -432,6 +432,9 @@ export interface MotionIn {
   mounted: boolean;
   mountSpeed: number;
   fighting: boolean;
+  /** the renderer is catching the ant up on time it was not animated (off screen): `lastX/lastY` are set back along its
+   *  pace over `dt`, which is no teleport */
+  catchUp?: boolean;
 }
 
 /**
@@ -517,7 +520,7 @@ export function stepMotion(
   let sd = 0;
   const dx = inp.x - inp.lastX;
   const dy = inp.y - inp.lastY;
-  if (Math.hypot(dx, dy) < L * 2) {
+  if (Math.hypot(dx, dy) < L * 2 || inp.catchUp) {
     fwd = dx * Math.cos(m.hb) + dy * Math.sin(m.hb);
     // (the ant's right in plane coords is (−sin h, cos h): the object's +z)
     sd = -dx * Math.sin(m.hb) + dy * Math.cos(m.hb);

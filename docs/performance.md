@@ -106,7 +106,8 @@ surface and the underground, and no loss of looks.
   its binds, uploads and deletes), the GL work since loading (shader links and their time, texture uploads and bytes),
   and the **hitch log**: every frame over 33 ms with what happened in it (a model built, a shader linked, textures
   uploaded, a nest's terrain rebuilt, a big simulation message…).
-- **`?bench=1`** (Menu → Graphics → Run the benchmark, `src/dev/bench.ts`): six fixed scenes, each loaded fresh, warmed
+- **`?bench=1`** (Menu → Graphics → Run the benchmark, `src/dev/bench.ts`): seven fixed scenes (the first, *feel*, added by
+  performance v2 — below), each loaded fresh, warmed
   up, then timed while the camera flies a fixed path. *switch*: surface → home → every area → surface, ten rounds, every
   switch's frames kept; *fight*: 400 against 400 with two titans; *nest*: a developed nest; *story*: The Long Nights at
   dusk before the third night; *arena*: six teams of 100; *mp4*: a four-colony world. The report has the device, the
@@ -199,3 +200,67 @@ pre-warm's 150 programs also keep the software GPU busy for minutes after loadin
 | load | 94.7 s | 138.8 s (114.7 s of it the pre-warm) |
 
 The real numbers come from the user's laptop and iPhone (`?bench=1`, below once they arrive).
+
+
+## Performance v2: feel (claude/performance/02-spec-responsiveness-client-visuals.md)
+
+### The feel meter (F3 and `?bench=1`)
+`src/core/feel.ts` measures what the player feels, on every page (three lines on F3) and in the benchmark's new first
+scene, *feel*, which plays scripted inputs through the real event handlers every 400 ms — a camera drag and wheel, a
+click on an ant, a marker placed, a group sent, a key, then in the nest a hex marked for digging and a tile placed:
+
+- **input → feedback**: from the input event's own timestamp to the end of the first frame that started after it (the
+  frame that draws the ring, the marker, the ghost hex, the camera's move), by kind;
+- **input → acting**: to the end of the first frame after the simulation ran the tick that applies the command;
+- **command latency**: issue → the tick that applies it, in ticks and ms (single-player: 1 tick; multiplayer: the
+  lockstep delay and one packet);
+- **frame pacing**: the frame intervals (average, p95), their jitter, frames over 16.7 and 33 ms, frames that missed a
+  vsync of the display (its rate estimated from the intervals), and long tasks (over 50 ms) where the browser reports
+  them;
+- the main thread's parts per frame (now with `input`, the time in input handlers) and the worker's tick time.
+
+`tests/browser/bench.py` takes `ONLY=feel,fight` and `VW=480 VH=300` (a small viewport keeps the software GPU of the
+build machine nearer real time; its frame times still mean nothing for a real device).
+
+The real numbers come from the user's laptop and iPhone (`?bench=1`, below once they arrive).
+
+### What was found
+- **Single-player commands already acted on the next tick**: the worker applies a command at the boundary before its
+  next tick as soon as it arrives. The meter confirms it (1 tick).
+- **The 20 Hz stepping was the interpolation, not the tick rate.** In worker mode α ran 0 → 1 from each frame's
+  arrival over the smoothed gap: an early frame jumped the units forward, a late one froze them, and a frame holding two
+  or three ticks (a busy worker) drew the first ticks in one frame. Modelled with uneven arrivals (worker 4–40 ms a
+  tick), 12 % of frames froze and 6–11 % jumped.
+- **Off-screen ants cost as much as on-screen ones**: the ant renderer animated every ant of the space before its view
+  test. Zoomed in on a crowd, 90 % of the time went to ants nobody could see.
+- **Renders differed run to run** (`Math.random` seeds for gait, antenna wave, pose phase; random sparks), which is why
+  the golden set needed a noise set.
+- **The frame message was mostly unchanged data**: half to two thirds of the entity columns are the same from one tick
+  to the next, and reading them was one megamorphic keyed store per value.
+- **Multiplayer on a LAN waited 2 ticks** (100 ms) of input delay plus a packet: the delay's floor and a whole tick of
+  margin on top of the path.
+
+### What changed (no change of looks, no change of the simulation's results)
+| Area | Change |
+|---|---|
+| Motion | `game/playout.ts`: a playout clock on the loop's pace, kept just behind the newest tick (98th percentile of the recent need); each frame with ticks re-anchors every unit's previous position to where it is drawn; late frames run on up to half a tick, easing off; teleports snap; paused glides to the newest tick. |
+| Feedback | `game/intents.ts`: an order's ants turn toward it on the frame of the input (render only); a refused hex order's ghost unwinds; reasons said once. |
+| Multiplayer | `MIN_DELAY` 1; the host's margin a quarter of the path plus a frame and slack, at most a tick: one tick on a LAN. |
+| CPU per frame | `render/viewCull.ts`: ants more than 40 mm out of view get no view and no animation; the renderer catches each up in one step when it returns. |
+| Looks, reproducible | Seeds hashed from ids and places; sparks from a seeded sequence. |
+| Effects | Combat particles written once at spawn, played in the vertex shader in closed form from t − t0; only new slots uploaded. |
+| Messages | Delta entity columns (unchanged columns left out); a reader generated per schema (named stores; the plain loop where compiling is forbidden). |
+| UI | Marker counts once a tick; label and tip styles written only when they change. |
+
+### Measured on the build machine (no GPU: the counts and the CPU parts carry over, the frame times do not)
+| | before | after |
+|---|---|---|
+| Drawn step ÷ true speed, uneven arrivals at 60 Hz, p99 off by (`tests/smoothMotion.ts`) | 1.65 (12 % frozen, 11 % jumped) | 0.02 (none) |
+| … at 144 Hz | 3.47 (12 % frozen, 6 % jumped) | 0.01 (none) |
+| … a busy worker, batches of 2–3 ticks | 2.00 (16 % frozen, 13 % jumped) | eases off in 1 % of frames, no jumps |
+| Single-player command → acting | 1 tick | 1 tick |
+| LAN command → acting (1–4 ms one way, `tests/net.ts`) | delay 2: 3 ticks | delay 1: 2 ticks |
+| Ant renderer, 600–900 ants, zoomed in on a crowd (`tests/clientVisuals.ts`) | 1.8–3.4 ms | 0.2–0.4 ms |
+| Frame message, big fight (829 ants, 96 creatures) | 716 KB, columns read 3.1 ms | 381 KB, 1.8 ms |
+| Golden set (12 shots the branch could touch, `golden/compare-v2after.md`) | needed a run-to-run noise set | 12 of 12 match with no noise set, 10 pixel for pixel |
+| Simulation tick, big fight (Node, `tools/stress.ts`) | 24 ms (unchanged: no single hot spot; the simulation was not changed) | 24 ms |

@@ -9,6 +9,10 @@
  */
 import { Command } from '../sim/commands';
 import { Lockstep, MAX_DELAY, MIN_DELAY } from './lockstep';
+
+/** the delay's margin over the measured path (ms), besides a quarter of the path: a frame (16.7) to read the packet,
+ *  plus slack */
+const DELAY_SLACK_MS = 25;
 import { Control, Slot, fromB64, packControl, packTick, toB64, unpack } from './messages';
 import { encodeTickPacket, decodeTickPacket } from '../sim/commands';
 import type { Transport } from './transport';
@@ -299,7 +303,10 @@ export class NetGame {
 
   private adaptDelay(now: number): void {
     // A client's packet reaches another client through the host: the slowest path is the two
-    // slowest one-way links added together, plus a margin for jitter.
+    // slowest one-way links added together, plus a margin for jitter. The packet for tick T + d is sent as T runs and
+    // must be there before T + d runs: d ticks cover the path plus a margin — a quarter of the path for its tail (a
+    // resent packet, a busy relay), a frame to read it and a little slack, at most a tick (the old margin, which a
+    // long path keeps). So a LAN (a few ms) plays at one tick, 15 ms one way at two (performance v2).
     const links: number[] = [];
     let jitter = 0;
     for (const [peer, r] of this.rtt)
@@ -309,7 +316,7 @@ export class NetGame {
       }
     links.sort((a, b) => b - a);
     const worst = (links[0] ?? 0) + (links[1] ?? 0) + 2 * jitter;
-    const d = Math.min(MAX_DELAY, Math.max(MIN_DELAY, Math.ceil(worst / 50) + 1));
+    const d = Math.min(MAX_DELAY, Math.max(MIN_DELAY, Math.ceil((worst + Math.min(50, worst * 0.25 + DELAY_SLACK_MS)) / 50)));
     const pings: Record<number, number> = {};
     this.slots.forEach((s, i) => {
       if (s.kind === 'human' && i !== this.self) pings[i] = s.ping;

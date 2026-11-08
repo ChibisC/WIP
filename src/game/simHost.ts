@@ -16,6 +16,7 @@ import { Command, CommandSchedule, applyCommandsNow, encodeCommandLog, stepWithC
 import { encodeState, hashState } from '../sim/snapshot';
 import type { NetSim } from '../net/netGame';
 import { Replica } from './replica';
+import { MotionCarry, Playout } from './playout';
 import { prof } from '../core/profiler';
 import { sharedAvailable } from '../worker/sharedPool';
 import type { FromWorker, FrameMsg, ToWorker } from '../worker/protocol';
@@ -116,9 +117,12 @@ export class WorkerSim implements SimHost {
   private inFlight = 0;
   /** ticks due but not yet requested (the worker is busy) */
   private queued = 0;
-  private lastFrameAt = 0;
-  /** smoothed time between ticked frames (ms) */
-  private gap = 50;
+  /** the replica's tick when the worker started, and the ticks asked for since (the loop's clock, with its alpha) */
+  private base: number;
+  private due = 0;
+  /** smooth motion between the worker's frames (game/playout.ts) */
+  readonly playout = new Playout();
+  private carry = new MotionCarry();
   private nextId = 1;
   private waits = new Map<number, (v: Uint8Array) => void>();
   private hashWaits = new Map<number, (v: { tick: number; hash: string }) => void>();
@@ -135,6 +139,8 @@ export class WorkerSim implements SimHost {
     const ctrl = sharedAvailable() ? new Int32Array(new SharedArrayBuffer(4)) : undefined;
     this.shared = !!ctrl;
     this.replica = new Replica(world, ctrl);
+    this.base = world.s.tick;
+    this.playout.reanchor = (a) => this.replica.reanchor(a);
     this.worker = new Worker(new URL('../worker/simWorker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e: MessageEvent<FromWorker>) => this.receive(e.data);
     this.worker.onerror = (e) => this.onError?.(e.message);
@@ -157,7 +163,9 @@ export class WorkerSim implements SimHost {
   }
 
   tick(n: number): void {
+    const q = this.queued;
     this.queued = Math.min(this.queued + n, 24);
+    this.due += this.queued - q;
     this.pump();
   }
 
@@ -166,6 +174,7 @@ export class WorkerSim implements SimHost {
     this.lockstep = true;
     const bytes = cmds.length ? encodeCommandLog(cmds) : undefined;
     this.inFlight++;
+    this.due++;
     this.post({ t: 'step', n: 1, cmds: bytes }, bytes ? [bytes.buffer as ArrayBuffer] : []);
   }
 
@@ -197,14 +206,15 @@ export class WorkerSim implements SimHost {
         break;
       case 'frame': {
         const t0 = performance.now();
-        this.replica.apply(m);
-        prof.addMsg(performance.now() - t0, frameBytes(m));
+        const c = this.carry;
         if (m.ran > 0) {
-          const now = performance.now();
-          if (this.lastFrameAt > 0) this.gap = Math.min(250, Math.max(8, this.gap * 0.8 + (now - this.lastFrameAt) * 0.2));
-          this.lastFrameAt = now;
-          this.inFlight = Math.max(0, this.inFlight - m.ran);
-        }
+          c.mode = 'drawn';
+          c.ran = m.ran;
+          c.alpha = this.playout.arrive(m.slow.tick, this.replica.world.s.tick);
+        } else c.mode = 'keep';
+        this.replica.apply(m, c);
+        prof.addMsg(performance.now() - t0, frameBytes(m));
+        if (m.ran > 0) this.inFlight = Math.max(0, this.inFlight - m.ran);
         this.onFrame?.(m);
         this.pump();
         break;
@@ -230,13 +240,11 @@ export class WorkerSim implements SimHost {
   }
 
   /**
-   * Render between the last two ticks: the replica holds the previous (px)
-   * and current (x) positions, so alpha runs 0 → 1 over the time one tick
-   * takes to arrive.
+   * The playout clock's α (game/playout.ts): the replica holds where each entity was drawn when the newest frame
+   * arrived (px) and where it is in that frame (x); α runs on the loop's own clock, a little behind it.
    */
-  alpha(_loopAlpha: number, now: number, paused: boolean): number {
-    if (paused || this.lastFrameAt === 0) return 1;
-    return Math.min(1, Math.max(0, (now - this.lastFrameAt) / this.gap));
+  alpha(loopAlpha: number, now: number, paused: boolean): number {
+    return this.playout.frame(this.base + this.due + loopAlpha, now, paused);
   }
 
   setOverlay(colony: number): void {

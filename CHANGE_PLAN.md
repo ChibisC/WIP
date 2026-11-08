@@ -1327,3 +1327,109 @@ litter on the surface, the colony rumble underground) rises a little over a crow
 3–6), `tests/browser/audio_files.py` (every file decodes as Ogg and as AAC, the takes are cut right, attacks start on
 their contact), `tests/browser/audio_mix.py` (no clipping, budgets, the queen alert cuts through a 400-ant battle),
 `tests/browser/sfx_recordings.py` (before/after in-game recordings for the sound board).
+
+## 29. Responsiveness: instant feedback, smooth motion, math-based client-side visuals (user spec 2026-11-07, claude/performance/02-spec-responsiveness-client-visuals.md)
+
+Branch `feature/responsiveness` off `main` `361ed47`. Everything from §25 stays (pre-warm, shared geometry, dynamic
+resolution, the golden set, the benchmark). The simulation's results must not change (the determinism check, replays,
+LAN); only the client changes, plus the multiplayer input delay (when commands are scheduled, not what they do).
+
+### 29.1 What the code does now (read before measuring)
+- **Commands, single-player:** the worker applies a command at the boundary before the next tick as soon as it
+  arrives and posts a frame at once (`simWorker.ts 'cmds'`): one tick at most, the right number already. Until the
+  worker acknowledges it, the client shows it as pending (a shimmering marker, ghost rings on hexes, group cards in their
+  new column, a click: `localCommands.ts`, `session.pendingHexes/shownMarkers`).
+- **Commands, multiplayer:** adaptive lockstep delay, `ceil(worst path / 50 ms) + 1` ticks, never under `MIN_DELAY` 2
+  (100 ms) even on a LAN with a 2 ms round trip.
+- **Interpolation (worker mode):** the replica keeps each entity's position at the previous tick (`px`) and the last
+  (`x`); the frame draws `lerp(px, x, α)` with `α = time since the last ticked frame arrived ÷ the smoothed gap`,
+  clamped to 1. Two faults: (1) when a frame carries two or more ticks (the worker was still busy when the next tick
+  fell due — slow phones, big fights), `px` is only one tick back, so the ants jump the other ticks' distance; (2) the
+  arrival of a frame resets α to 0 wherever the drawn position was, so any unevenness in when frames arrive (worker tick
+  time 2–15 ms, message timing against the display's frames) shows as an uneven step, and a late frame freezes motion
+  (α held at 1) and then jumps. This is "20 Hz stepping" and judder.
+- **Per-frame CPU:** the ant renderer runs every ant of the viewed space through its whole animation (the planted-feet
+  motion controller, springs, posing, matrices) and only then tests it against the view: ants off screen cost as much
+  as ants on it. Gait phase, antenna wave and pose phase are `Math.random()` at first draw (renders differ run to run).
+- **Profiler:** frame time, main-thread time and parts, GPU time, GL work, hitches. Nothing about input latency,
+  command latency, jitter, long tasks or missed frames.
+
+### 29.2 Plan (in this order; each step measured before and after)
+1. **Measure feel** (F3 and `?bench=1`, `core/profiler.ts`, `core/feel.ts`): input → first frame showing a reaction
+   (select, move order/marker, build, dig, camera pan and zoom), input → the units acting (the sim applied it and ran a
+   tick); command latency in ticks and ms (single-player, LAN, online); frame pacing (interval distribution, jitter,
+   frames over 16.7 / 33 ms, missed vsync estimated against the display's interval, long tasks via
+   `PerformanceObserver('longtask')`); main-thread budget per part and the worker's tick. A bench scene "feel" scripts
+   the inputs. Baseline on the build machine; ask the user once for `?bench=1` on their laptop and iPhone.
+2. **Smooth motion** (`game/replica.ts`, `game/simHost.ts`): when a ticked frame arrives, each entity's `px/py/ph` is
+   set to where it is drawn now (no jump at arrival, whatever the number of ticks in the frame); α runs over the time
+   the next frame is expected, and may run on to 1.5 when a frame is late (extrapolating half a tick along the motion,
+   then the next frame takes over from where it is drawn). Teleports (space change, > 3 ticks of travel) snap. A test
+   replays uneven and batched arrivals and checks the drawn path's steps.
+3. **Instant feedback** (`localCommands.ts`, session, renderers): every command shows its feedback on the frame of the
+   input (already true for markers and hexes: check each, fill the gaps: selection ring, build ghost solid, dig mark,
+   group move); a render-only **intent turn**: the ants of a group sent to a marker turn their heads and bodies toward
+   it at once, eased out when the sim's own heading takes over or the command is refused; rejected commands drop their
+   pending look with a short fade. Input handlers only record and queue.
+4. **Command delay:** single-player stays at the next tick (verified by the new metric); LAN/online: the host's
+   suggestion `ceil((worst path + margin) / 50 ms)` with `MIN_DELAY` 1 — one tick on a LAN, adaptive elsewhere —
+   shown in F3 and the players panel.
+5. **Less CPU per frame, math-based** (`render/ants/antRenderer.ts`, creatures, termites): an early cheap view test on
+   the sim position (a generous margin) skips the animation of ants off screen; when one comes back, its state is
+   brought forward from formulas (the gait phase from the distance walked since last seen ÷ stride, the springs to
+   their targets, poses at their weights) instead of being stepped every frame. Per-ant seeds hashed from the id
+   (gait phase, antenna wave, pose phase) instead of `Math.random()`. Effects that run a whole animation from one event
+   (sparks, puffs) as closed-form curves of `t − t0`; rings and bars as instanced quads where they are meshes per item;
+   instance buffers uploaded over the used range only.
+6. **Messages and the sim:** measure frame bytes and decode time per message in busy scenes; profile the hot systems
+   of the stress scenes (fights, 10 colonies, story set pieces, tunnels, titan raids) and take the safe wins (squared
+   distances, cached fields, staggering expensive brains deterministically) only where the determinism check and the
+   replays show identical results.
+7. **Main thread and UI:** no per-frame DOM writes for unchanged values, passive touch listeners, no layout reads
+   after writes in the frame.
+8. **Verify:** before/after table in `docs/performance.md` (latencies, pacing, budgets, CPU per frame for 1,000+ ants);
+   the golden set; determinism check, replays, LAN two-tab; `npm test`, build; DESIGN, README, PROGRESS, handoff;
+   merge; publish v-next of the artifact; ask the user for a new `?bench=1`.
+
+### 29.3 What was done (in order)
+1. **The feel meter** — `core/feel.ts`, F3, the bench's *feel* scene (merged into `main` early, `0eb564a`, so the user
+   could take a baseline on their own devices; handoff 19). With it: a story save with a visiting party restores to the
+   same state again (the save upgrade no longer embeds the visitor's margin-less nest plane).
+2. **Smooth motion** — `game/playout.ts`: a playout clock R on the loop's own pace (ticks asked for + accumulator),
+   kept L ticks behind it (L = the 98th percentile, over the last 64 arrivals, of how far the loop's clock got past the
+   newest tick before the next arrived, + 0.12), pulled toward its target by at most ±10 % of its pace (a gap over 3
+   ticks re-anchors). Each frame with ticks sets every ant's, food's and creature's px/py/ph to where it is drawn
+   (`MotionCarry` through `ColumnReader.read(…, carry)`); a frame with no tick keeps them. α = (R − from)/(to − from)
+   may run past 1 by half a tick when a frame is late, easing off as it does. Teleports snap (space change; a jump over
+   10 mm + 3 × (ticks + 1) × the last tick's travel). Paused: R glides to the newest tick and stops. `tests/smoothMotion.ts`
+   (uneven arrivals at 60/144 Hz: steps within 2 % of the true speed at p99, against 165–347 % off for the old α, which
+   froze in 12 % and jumped in 6–11 % of frames).
+3. **Instant feedback** — `game/intents.ts`: a surface marker moved or a group sent to one turns its ants toward it on
+   the frame of the input (blend rising over 160 ms, h + w·d so the sim's own turn meets it, fading after 1.1 s; refused:
+   200 ms); `antHeadingHook` in the ant renderer. A refused hex order's ghost ring unwinds in 300 ms
+   (`pendingHexes` kind 'refused'); player-facing refusal reasons (capitalised sentences) are said once.
+   `tests/feel.ts`. The rest of the list was already same-frame (selection ring, marker flag and trail preview, ghost
+   hexes, the ack click, the camera).
+4. **Command delay** — `MIN_DELAY` 1; the host's delay is `ceil((path + min(50, path/4 + 25)) / 50)`: one tick on a
+   LAN, the old value on long paths. `tests/net.ts` LAN case (1–4 ms one way: delay 1, 20 ticks/s, no waiting, own
+   commands act 2 ticks after they are given; the 150 ms case unchanged).
+5. **Client-side visuals** — `render/viewCull.ts`: the views leave out ants more than 40 mm outside the camera's view
+   (not those in the air or on a creature); the ant renderer catches a returning ant up in one step (`catchUp`: its
+   timers and springs run the time it missed, up to a second; its gait keeps its pace; its body takes its heading).
+   Zoomed in on a crowd the ant renderer's time falls about tenfold (`tests/clientVisuals.ts`,
+   `tools/perf/antRendererBench.ts`). Seeds hashed from ids (gait phase, antenna wave, pose phase) and places (acid
+   mist), sparks from a seeded sequence: renders no longer differ run to run. Combat particles are written once at
+   spawn and played by the vertex shader in closed form from t − t0 (drag e^(−dτ), gravity, the landing time worked out
+   at spawn); only the new slots are uploaded. The ant shader is untouched (still 16 attributes); health bars and rings
+   were already instanced quads drawn only for the few units that need them.
+6. **Messages** — delta entity columns (`ColumnWriter.write(…, delta)`: when every entity was in the last frame too —
+   rows matched by id, so deaths and reordering do not matter — the columns nobody changed are left out, 50–70 % of
+   them in a fight) and a generated reader
+   (one loop per schema with named stores; the plain loop where a page forbids compiling code). Big fight (829 ants,
+   96 creatures, build machine, Node): 716 → 381 KB a frame, the columns' read 3.1 → 1.8 ms. `tests/performance.ts`
+   checks the replica's ants stay exactly the simulation's. The simulation's systems were profiled
+   (`tools/stress.ts`, a CPU profile): the time is spread over the ant brains, combat and separation with no single
+   hot spot; no change to the simulation (its results are untouched: determinism check, replays).
+7. **UI** — marker counts once a tick instead of every frame (they walk every tile of every group); label and tip
+   styles written only when they change. Pointer events with `touch-action` already (no 300 ms delay, no blocking
+   touch listeners).
