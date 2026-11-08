@@ -4,6 +4,8 @@ shots/
 *.log
 underground-dominion-prototype.zip
 
+# rendered stand-in takes (npm run audio:standins)
+audio-src/standins/
 # rendered takes and packing scratch (npm run audio:build)
 audio-src/rendered/
 audio-src/.pack/

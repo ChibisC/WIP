@@ -405,7 +405,7 @@ export function restoreWorld(bytes: Uint8Array, events: EventBus): World {
   for (const [space, d] of root.grids) w.addGrid(space, NestGrid.fromSnap(d));
   // (saves from before the one-entrance rework: the World constructor had no grids to upgrade them with)
   upgradeWorldEntrances(w);
-  upgradeWorldTunnels(w);
+  if (w.loadedVersion < 4) upgradeWorldTunnels(w);
   w.phero.ensureColonies(root.trail.length);
   for (let i = 0; i < root.trail.length; i++) w.phero.trail[i].set(root.trail[i]);
   w.phero.alarm.set(root.alarm);

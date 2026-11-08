@@ -85,7 +85,7 @@ export const BALANCE = {
     nasute_major: { build: 35, hatch: 7, grow: 32.4 }, // × 3.5 / × 1.8
     // Sickle-Jaw Termites, paid in plant matter: × the baseline worker (10 / 2 / 18) by SICKLE.broodCostMul / broodTimeMul
     rhy_worker: { build: 10, hatch: 2, grow: 18 }, // × 1.0 / × 1.0
-    rhy_soldier: { build: 20, hatch: 2.8, grow: 25.2 }, // × 2.0 / × 1.4
+    rhy_soldier: { build: 22, hatch: 3.1, grow: 25.2 }, // × 2.2 / × 1.4
     // Hell ants (05-implementation-plan Step 2)
     hell_worker: { build: 10, hatch: 3, grow: 22 },
     hell_soldier: { build: 28, hatch: 6, grow: 34 },
@@ -873,6 +873,16 @@ export const SICKLE = {
     missCooldownSec: 1.0,
     /** victims up to this × the soldier's length can be grabbed (never bosses or queens) */
     maxTargetSizeMul: 2.0,
+    /**
+     * (user review round 1, 2026-11-07: "the mandibles dont even touch the ant"; round 2: "make the two still parallel
+     * to each other (straight), just make the mandibles' clasp better") where the closed sickles hook (mm ahead of a
+     * 4.5 mm soldier's centre, scaled with its size; the ant-pipeline model's C-hooks): the held victim is pinned
+     * head-on in line with the soldier, its front this far ahead less `victimInHooks` of its length — its head and jaws
+     * inside the crossed hooks, the snout lying along its back
+     */
+    gripMm: 0.82,
+    /** how much of a held ant's length sits inside the hooks (its head and jaws) */
+    victimInHooks: 0.08,
   },
   acid: {
     /** the ramp (inferno-style): pure damage, ignores armour */
@@ -886,16 +896,6 @@ export const SICKLE = {
     freeTargetBiteInterval: 1.0,
   },
   alarm: { radiusBodyLengths: 12, alertSec: 8, cooldownSec: 3 },
-  /**
-   * Eisner's defensive row (user notes 2026-10-25: along the trail the workers really walk, wide enough that they
-   * stay inside it, spare soldiers spread along it): at a surface marker the guards stand on both sides of the
-   * workers' route from the marker back to the nest (the home flow field traced from the marker, refreshed every
-   * `trailRefreshSec`), `halfWidthBodyLengths` out from it, evenly spread over its whole length (at least
-   * `minSpacingBodyLengths` apart; more soldiers than fit stand in further rows `rowGapBodyLengths` out), facing
-   * outward. On a marker with food, `guardShare` of the sickle-jaws there guard (the lowest ids) and the rest
-   * gather; with no food, all guard. Guards only engage enemies within `aggroBodyLengths` (short-ranged fighters).
-   */
-  escort: { halfWidthBodyLengths: 3.5, minSpacingBodyLengths: 1.6, rowGapBodyLengths: 1.6, guardShare: 0.5, trailStepMm: 4, trailRefreshSec: 2, aggroBodyLengths: 3 },
   food: {
     /** plant matter: 1 unit = 1 food unit of the ant economy (the store shared with the Nasute Termites' wood) */
     leafLitterPatch: { amount: 25, bitesPerFragment: 3, biteIntervalSec: 0.3, perFragment: 1 },

@@ -1,17 +1,16 @@
 import { World } from './world';
 import { Ant, AS, Colony, POSE, SURFACE, nestSpace } from './types';
-import { BALANCE, NASUTE, SICKLE } from './balance';
+import { BALANCE, NASUTE } from './balance';
 import { casteOf } from './species';
 import { damageAnt, damageCreature, creatureHooks, friendlyCreature, isEnemyAnt } from './combat';
-import { killAnt, goToNestPoint, foodAt } from './antAI';
-import { antSpeed, faceToward, moveForward, steerTo, turnToward, goHome, goToSurfacePoint, homeField, nearestEntrance } from './movement';
+import { killAnt, goToNestPoint } from './antAI';
+import { faceToward, steerTo, turnToward, goHome, goToSurfacePoint, nearestEntrance } from './movement';
 import { tileAt } from './tiles';
 import { endJob } from './jobs';
 import { tilePoint } from './colony';
 import { datan2, dcos, dhypot, dsin, sq } from './dmath';
 import { TERMITE_ROYALS } from './termiteRoyalData';
 import { holderDied } from './sickleJaws';
-import { markerRoute, Route } from './route';
 
 /**
  * Nasute Termites (docs/creatures/nasutitermes.md; DESIGN "Nasute Termites").
@@ -695,7 +694,6 @@ export function termiteMarkerSlot(w: World, a: Ant, c: Colony, mi: number, radiu
   if (t !== 'nasute' && t !== 'major' && t !== 'sickle') return null;
   const m = c.markers[mi];
   const s = squadOf(w, c, mi);
-  if (t === 'sickle') return sickleRowSlot(w, a, c, mi, radius);
   const L = NASUTE.sizeMm.nasuteSoldier;
   const E = NASUTE.escort;
   const px = -s.uy;
@@ -715,114 +713,6 @@ export function termiteMarkerSlot(w: World, a: Ant, c: Colony, mi: number, radiu
   return { x: m.x + dcos(ang) * R, y: m.y + dsin(ang) * R, h: ang };
 }
 
-/**
- * Which sickle-jaws at a marker guard the trail (Eisner's defensive row) and which gather. With food at the
- * marker, `escort.guardShare` of them guard (the lowest ids; user note 2026-10-25: the spare soldiers go to the
- * trail where the workers are) and the rest gather like ant soldiers; with nothing to gather, all of them guard.
- * Returns this soldier's guard index and the number of guards, or k = -1 for a gatherer.
- */
-export function sickleGuardIndex(w: World, a: Ant, c: Colony, mi: number, hasFood: boolean): { k: number; n: number } {
-  // every sickle-jaw sent to this marker, wherever it is now (one carrying food home stays on the roll, so the
-  // others keep their roles and places)
-  const ids = sickleRoll(w, c, mi);
-  const k = ids.indexOf(a.id);
-  if (k < 0) return { k: -1, n: 0 };
-  const n = hasFood ? Math.ceil(ids.length * SICKLE.escort.guardShare) : ids.length;
-  return { k: k < n ? k : -1, n };
-}
-
-let rollTick = -1; // det-ok: derived per-tick cache
-let rollState: unknown = null; // det-ok: derived per-tick cache
-const rolls = new Map<number, number[]>(); // det-ok: derived per-tick cache, rebuilt from SimState
-
-/** The sickle-jaw soldiers on a marker, in id order (any space). */
-function sickleRoll(w: World, c: Colony, mi: number): number[] {
-  if (rollTick !== w.s.tick || rollState !== w.s) {
-    rollTick = w.s.tick;
-    rollState = w.s;
-    rolls.clear();
-  }
-  const key = c.id * 16 + mi;
-  let r = rolls.get(key);
-  if (r) return r;
-  r = [];
-  for (const o of w.s.ants) if (o.colony === c.id && o.marker === mi && o.task === 'marker' && o.state !== AS.Dead && casteOf(o.caste).termite === 'sickle') r.push(o.id);
-  rolls.set(key, r);
-  return r;
-}
-
-/**
- * The route the workers walk between a surface marker and the nest (route.ts: the home flow field traced from the
- * marker every `trailStepMm`, refreshed when the marker moves and every `trailRefreshSec`).
- */
-export function sickleTrail(w: World, c: Colony, mi: number): Route {
-  return markerRoute(w, c, mi, SICKLE.escort.trailStepMm, SICKLE.escort.trailRefreshSec);
-}
-
-const tdir = { x: 0, y: 0 }; // det-ok: scratch
-const LAT_STEPS = [1, 0.8, 0.6, 0.4, 0.2];
-
-/**
- * Sickle-Jaw guards at a marker (Eisner's defensive row; SICKLE.escort): both sides of the workers' actual route
- * from the work area back to the nest (sickleTrail), spread evenly over its whole length, `halfWidthBodyLengths`
- * out from it, facing outward (mandibles open: THREAT), slots by sorted id; soldiers beyond one row per side
- * stand in further rows. In a nest, or when the marker is beside the entrance: the ring round the marker.
- */
-function sickleRowSlot(w: World, a: Ant, c: Colony, mi: number, radius: number): { x: number; y: number; h: number } {
-  const m = c.markers[mi];
-  const E = SICKLE.escort;
-  const L = casteOf(a.caste).length;
-  // the guard index among the guards (gatherers never ask: antAI.marker sends only guards here). With food at
-  // the marker the guards are the first `guardShare` of the roll, so the indices are the same either way.
-  const g = sickleGuardIndex(w, a, c, mi, foodAt(w, c, m.x, m.y, radius * 1.3));
-  const k = Math.max(0, g.k);
-  const n = Math.max(1, g.n);
-  const tr = m.space === SURFACE && c.entrances.length ? sickleTrail(w, c, mi) : null;
-  const total = tr ? tr.cum[tr.cum.length - 1] : 0;
-  const start = Math.min(total, radius * 0.6);
-  const avail = total - start - L * 2; // stop short of the entrance itself
-  if (!tr || avail < L * 2) {
-    const ang = (k / n) * Math.PI * 2;
-    const R = radius + NASUTE.escort.ringBodyLengths * L;
-    return { x: m.x + dcos(ang) * R, y: m.y + dsin(ang) * R, h: ang };
-  }
-  const side = k % 2 === 0 ? 1 : -1;
-  const j = Math.floor(k / 2);
-  const pairs = Math.ceil(n / 2);
-  const perRow = Math.max(1, Math.min(pairs, Math.floor(avail / (E.minSpacingBodyLengths * L)) + 1));
-  const row = Math.floor(j / perRow);
-  const jj = j % perRow;
-  const s = start + ((jj + 0.5) / perRow) * avail;
-  // the point at arc length s and the route's direction there (toward the nest)
-  let i = 1;
-  while (i < tr.cum.length - 1 && tr.cum[i] < s) i++;
-  const s0 = tr.cum[i - 1];
-  const seg = Math.max(1e-6, tr.cum[i] - s0);
-  const f = Math.min(1, Math.max(0, (s - s0) / seg));
-  const ax = tr.pts[i * 2 - 2];
-  const ay = tr.pts[i * 2 - 1];
-  const bx = tr.pts[i * 2];
-  const by = tr.pts[i * 2 + 1];
-  const ux = (bx - ax) / seg;
-  const uy = (by - ay) / seg;
-  const lat = (E.halfWidthBodyLengths + row * E.rowGapBodyLengths) * L * side;
-  const cx = ax + (bx - ax) * f;
-  const cy = ay + (by - ay) * f;
-  // a post on a rock or in water moves in toward the route until it is on open ground
-  let px = cx;
-  let py = cy;
-  for (const k of LAT_STEPS) {
-    const qx = cx - uy * lat * k;
-    const qy = cy + ux * lat * k;
-    if (w.walkable(SURFACE, qx, qy)) {
-      px = qx;
-      py = qy;
-      break;
-    }
-  }
-  return { x: px, y: py, h: datan2(ux * side, -uy * side) };
-}
-
 /** Walk to the marker slot and hold it, facing out. Returns true when handled. */
 export function holdMarkerSlot(w: World, a: Ant, c: Colony, mi: number, radius: number, dt: number): boolean {
   const p = termiteMarkerSlot(w, a, c, mi, radius);
@@ -832,19 +722,7 @@ export function holdMarkerSlot(w: World, a: Ant, c: Colony, mi: number, radius: 
   const L = casteOf(a.caste).length;
   if (d > Math.min(L * 0.3, 1.5) * (a.state === AS.Rally ? 2 : 1)) {
     if (a.state === AS.Rally) a.state = AS.Idle;
-    const guard = a.space === SURFACE && casteOf(a.caste).termite === 'sickle';
-    if (guard && d <= 30) steerTo(w, a, p.x, p.y, dt, 0.8);
-    else if (guard) {
-      // a guard post on the route: walk along the route toward it (the workers' own flow fields), homeward when
-      // the post is nearer the nest than we are, else out toward the marker; straight in for the last 30 mm
-      if (dhypot(p.x - m.x, p.y - m.y) > dhypot(a.x - m.x, a.y - m.y)) {
-        const f = homeField(w, c);
-        if (w.surfFlow.dir(f, a.x, a.y, tdir)) {
-          turnToward(a, datan2(tdir.y, tdir.x), dt, 6);
-          moveForward(w, a, antSpeed(w, a) * 0.9, dt);
-        } else steerTo(w, a, p.x, p.y, dt, 0.9);
-      } else goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${mi}`, 0.9);
-    } else if (a.space === SURFACE && dhypot(m.x - a.x, m.y - a.y) > radius * 2 + 30) goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${mi}`);
+    if (a.space === SURFACE && dhypot(m.x - a.x, m.y - a.y) > radius * 2 + 30) goToSurfacePoint(w, a, m.x, m.y, dt, `mk:${c.id}:${mi}`);
     else if (a.space === SURFACE) steerTo(w, a, p.x, p.y, dt, 0.8);
     else goToNestPoint(w, a, null, p.x, p.y, dt, 0.8);
     return true;

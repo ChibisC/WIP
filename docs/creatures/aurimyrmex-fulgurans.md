@@ -44,3 +44,23 @@ Target file in the repo: `docs/creatures/aurimyrmex-fulgurans.md`. Copy this doc
 ---
 
 **Game note (2026-10-25, the user's decision):** in the game Saiy-Ants have **no formic acid** — they fight with bites only (pure physical damage). The acidopore is still modelled as real formicine anatomy, but it is never used.
+
+## 6. Model redo (2026-11-07, `claude/realism/10-spec-saiy-ant-sickle-jaw-models.md`): the shape numbers
+
+Rebuilt on the fire ant pilot's playbook (`src/render/ants/saiyMorphs.ts`, the shared builder with the formicine and *Camponotus* terms in `antGeometry.ts`, the baked recipe `SAIY` in `render/bake/recipes.ts`). The numbers below are fractions of body length L unless marked, taken from published *Camponotus* measurements (Mackay 2019, the AntWiki species pages for *C. pennsylvanicus*, *C. ligniperda*, *C. gigas*: head length/width indices, scape index, mesosoma length, eye position) because the specimen photos could not be downloaded into the workspace; **tracing over specimen photos is still to do** when the user supplies them (`tools/mandible-overlay.py`).
+
+| Part | Worker (6 mm) | Soldier (major, 9 mm) | Queen (14 mm) | Source / note |
+|---|---|---|---|---|
+| Head length × width × height | 0.245 × 0.205 × 0.155 (CI 84) | 0.26 × 0.27 × 0.19 (CI 104, heart-shaped, posterior notch 0.07) | 0.20 × 0.215 × 0.15 | *Camponotus* minors CI 80–90, majors 100–115 |
+| Eyes (size, position back along the head, height) | 0.25, 0.42, 0.24 | 0.22, 0.40, 0.22 | 0.26, 0.45, 0.24, three ocelli | eyes set back on the sides |
+| Antennal sockets | 0.73 head lengths back, 0.2 up, 0.17 head widths out | same | same | set clearly behind the clypeus' rear edge (a *Camponotus* feature) |
+| Clypeus | a raised plate with a median keel, its rear margin a dark suture, at 0.9 of the head | same | same | |
+| Antenna | 12 segments, scape 1.12 (× the builder's base), funiculus 1.35 | scape 0.93 (majors' scapes are relatively shorter) | scape 0.87 | SI falls with head width |
+| Mandibles | triangular, 5 teeth, length 0.38, broad 1.2, thick 1.9 (`SAIY_WORKER_JAW`) | 5 teeth, broad 1.4, thick 2.5, heavier teeth (`SAIY_SOLDIER_JAW`) | 5 teeth (`SAIY_QUEEN_JAW`) | *Camponotus* 5–7 teeth; colour darkening to the tips |
+| Mesosoma | length 0.355, one smooth even arch, no spines | 0.34 × 0.135 × 0.15 | 0.35 × 0.185 × 0.2, wing scars | |
+| Petiole | one upright scale, node height 0.13 | same | 0.11 | |
+| Gaster | 0.36 × 0.235 × 0.2, acidopore with a hair fringe (never used: bites only) | 0.35 × 0.24 × 0.2 | 0.43 × 0.30 × 0.25 | |
+| Hind leg | 1.18 × the builder's base (long, leggy), thickness 0.0135 | 1.08, thickness 0.0165 (sturdier) | 0.88 | |
+| Colour | head `#0B0A0E` with a blue-black sheen `#181B2A`, gaster `#0A090C` with golden-grey pubescence `#B8A47A` (70 setae), legs `#161110` | head sheen `#1A1D2C` | as the worker | |
+
+Animation: the planted-feet walk (`ANIM_V2_PREFIXES`), three bites per caste never the same twice running (worker lunge, clamp-and-tug, chomp; soldier crush, head swing, chomp; queen lunge, clamp, crush), **no acid**; the gold surge's stretch (head thrown up, gaster lifted, overshoot) as the ripple comes on, faster bites with gold sparks (`combatFx`), the exhausted droop. The six-lock hair is unchanged (briefs 07 and 08).

@@ -40,7 +40,7 @@ ant's, worker for worker (a design rule in `tests/casteAbilities.ts`).
 | Army Ant minor | 19 | 2.6 | 0.8 | 0 | 30 | sting every third bite (1.4/s a stack); fastest | −0.09 |
 | Plagiaria | 18 | 2.6 | 0.9 | 0.3 | 22 | acid (1.5 every 5 s) | +0.17 |
 | Nasute termite worker | 20 | 2.4 | 1.0 | 0 | 12.8 | — (slow, soft) | −0.18 |
-| Sickle-jaw termite worker | 21 | 2.4 | 1.0 | 0 | 12.8 | — (slow, tough) | −0.04 |
+| Sickle-jaw termite worker | 21 | 2.5 | 1.0 | 0 | 12.8 | — (slow, tough) | +0.15 (2026-11-07; at 2.4 it had drifted to −0.44) |
 | Hell ant worker | 18 | 2.1 | 1.0 | 0 | 19 | pinning snap (3 dps) | −0.14 |
 | Saiy-Ant worker | 16 | 1.9 | 1.0 | 0.2 | 22 | gold surge | +0.13 |
 | Termant worker | 19 | 2.2 | 1.0 | 0.5 | 24 | acid opener | +0.14 |
@@ -60,7 +60,7 @@ the sickle-jaws alone get the "no gathering" order, or they guard a trail to the
 | Tropical Fire Ant | 28 | 2.6 | 0.5 | venom 2.4 | 19 | +0.09 |
 | Army Ant media | 51.5 | 6.2 | 1 | sting 2.0 every third bite, rage | 29 | +0.17 |
 | Nasute | 12 | 0.3 | 0 | glue stream 2 → 20 dps, pure (the user's) | 26.4 | −0.18 |
-| Sickle-jaw | 22 | 3 | 0 | grab and squirt | 22.8 | −0.40 (stalls; see below) |
+| Sickle-jaw | 20 | 3 | 0 | grab and squirt | 25.1 | +0.03 (2026-11-07; +0.79 at 22 health and 22.8 food once the rows were gone) |
 | Hell ant | 49 | 3.9 | 2 | sting 1.25, impale (burst 12.5) | 34 | +0.01 |
 | Saiy-Ant | 68 | 5.2 | 2 | gold surge | 36 | +0.17 |
 | Termant | 55.5 | 4.35 | 1.5 | glue burst | 26.5 | −0.15 |
@@ -71,9 +71,12 @@ ant −0.39. In small fights (150 food, 4–8 a side) the bigger soldiers still 
 - The black garden ant soldier is the cheap numbers soldier: tuned to tie in fights of a dozen a side, it loses the
   small ones (4–8 a side) to the bigger soldiers — "they win by numbers" (its species' blurb). It was trimmed from 44 /
   5 to 42 / 4.8 so the others needed less.
-- Sickle-jaw soldiers win one on one (+1.00) and lose in groups (2 v 2 −0.33, 3 v 3 −0.78 with `PURSUE=1`): each holds
-  one enemy until it dies, and the others go free. On a marker they guard the trail rather than charge (the harness's
-  fights stall at 120 s), as designed.
+- Sickle-jaw soldiers (retuned 2026-11-07, spec 09 §2.3): with the defensive rows gone (§2.4) they no longer hold back
+  on a marker with a short reach, so they charge like other soldiers — and the hold (a victim that cannot fight back)
+  made them the strongest soldier at the old numbers (+0.79 against the black garden ant soldier at 300 food, +0.53 in
+  the round robin). Health 22 → 20 and the brood cost × 2.0 → × 2.2 the baseline worker (22 + 3.1 food) bring them to
+  +0.03; the acid ramp (2 → 18 dps over 6 s) is the user's and stays. Their worker (2.4 → 2.5 bite) had drifted to −0.44
+  against the reference and is +0.15 now (+0.22 at 150 food): slow and tough, a little stronger worker for worker.
 - The nasute's glue stream is the strongest soldier weapon (pure damage from five body lengths, +0.52 at 21.6 food).
   Its ramp (2 → 20 dps) is the user's and stays exactly; the nasute costs more wood instead (× 2.2 the baseline worker,
   was × 1.8: 22 + 4.4), and its health is 12 (was 12.8). (With the ramp at 1.6 → 13.5 it tied at the old price.)

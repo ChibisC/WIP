@@ -2035,3 +2035,12 @@ User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch 
   on the build machine (`tests/performance.ts` keeps the replica exact; `tools/perf/frameBench.ts`).
 - **UI:** marker counts once a tick, label styles written only when changed.
 - **Fixed on the way:** a story save with a visiting party restored differently (merged early with the meter).
+
+
+## 2026-11-07 — Model redo: Saiy-Ants, sickle-jaw termites, Termants (`feature/models-saiy-sickle`, CHANGE_PLAN §28; in review)
+
+- **Saiy-Ants** rebuilt on a real carpenter ant (*Camponotus*): broad rounded head (the soldier's heart-shaped and broader), antennal sockets set back from a keeled clypeus, five-toothed parametric jaws, a smooth arched mesosoma, a scale petiole, an oval gaster with golden-grey hairs, long legs; blue-black satin cuticle from a baked recipe; three bites per caste on planted feet (no acid, the user's rule); the gold surge's stretch and overshoot. The six locks are unchanged.
+- **Sickle-jaw termites**: every caste (worker, soldier, presoldier, king, queen, larva) on the realistic ant pipeline: the soldier's glassy red head and down-curved snout with its pore, long thin crossing sickles traced from the user's photos, beaded antennae, very long legs; the worker (rebuilt from the user's field photos in review round 3) a small round glossy orange head and a big glossy chocolate egg-shaped abdomen, its plates pillowed, finely haired and dotted with the spiracles; the soldier's crimson sickles and banded tan-brown abdomen; the king and queen kept on the termite kit (review round 1). The grab-and-squirt, the free squirt, the threat and the drum as planted-feet attack cycles, the acid jet and fizz from the snout's tip.
+- **No more defensive rows**: sickle-jaw soldiers gather or hold the escort ring like other soldiers. A knockback ends a hold cleanly. Balance: soldier health 20 and brood × 2.2 (+0.79 → +0.03 against the reference soldier), worker bite 2.5.
+- **Termants** redesigned: termite antennae on every caste, no nasus (the soldier's glue from a pore on its forehead), a *Macrotermes*-style soldier head with sabre jaws, realistic materials, planted feet.
+- Other species' models unchanged (hash check); height data regenerated. Review pages rounds 1–4 sent to the user.

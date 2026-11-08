@@ -20,7 +20,15 @@
  "lasius_worker": "baf350e8:25216 3ca4d9b4:3304",
  "plagiaria_queen": "598ecb7b:23724 114f1bdb:3376",
  "plagiaria_worker": "dfe4cc9f:23596 bd4c13c7:3304",
- "saiy_queen": "fea7729a:15537 257310ce:4026",
- "saiy_soldier": "db053536:14487 e11548ed:3938",
- "saiy_worker": "8fa9c664:13075 c26184b4:3954"
+ "saiy_queen": "63063cc4:28912 f3302271:5150",
+ "saiy_soldier": "d3db1e3d:27878 868a4b1f:5078",
+ "saiy_worker": "b74f2442:26450 28f13537:5078",
+ "termant_king": "94fb00db:17572 9d135051:2220",
+ "termant_queen": "db083086:17572 2aa75f1e:2220",
+ "termant_soldier": "a58afe77:16180 6df63d9b:2112",
+ "termant_worker": "882bac10:16892 f0f8cdae:2148",
+ "termite_rhy_larva": "ce69ec48:13534 9bd022eb:3150",
+ "termite_rhy_presoldier": "9d65e2cc:14270 d4555c9d:3226",
+ "termite_rhy_soldier": "c99caa3:14240 aa33d4b4:3226",
+ "termite_rhy_worker": "d8cbe0ed:16452 473793f7:3270"
 }
