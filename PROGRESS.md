@@ -2037,7 +2037,7 @@ User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch 
 - **UI:** marker counts once a tick, label styles written only when changed.
 - **Fixed on the way:** a story save with a visiting party restored differently (merged early with the meter).
 
-## 2026-11-07 — Model redo: Saiy-Ants, sickle-jaw termites, Termants (`feature/models-saiy-sickle`, CHANGE_PLAN §30; approved after review round 4, merged)
+## 2026-11-07 — Model redo: Saiy-Ants, sickle-jaw termites, Termants (`feature/models-saiy-sickle`, CHANGE_PLAN §33; approved after review round 4, merged)
 
 - **Saiy-Ants** rebuilt on a real carpenter ant (*Camponotus*): broad rounded head (the soldier's heart-shaped and broader), antennal sockets set back from a keeled clypeus, five-toothed parametric jaws, a smooth arched mesosoma, a scale petiole, an oval gaster with golden-grey hairs, long legs; blue-black satin cuticle from a baked recipe; three bites per caste on planted feet (no acid, the user's rule); the gold surge's stretch and overshoot. The six locks are unchanged.
 - **Sickle-jaw termites**: every caste (worker, soldier, presoldier, king, queen, larva) on the realistic ant pipeline: the soldier's glassy red head and down-curved snout with its pore, long thin crossing sickles traced from the user's photos, beaded antennae, very long legs; the worker (rebuilt from the user's field photos in review round 3) a small round glossy orange head and a big glossy chocolate egg-shaped abdomen, its plates pillowed, finely haired and dotted with the spiracles; the soldier's crimson sickles and banded amber-brown abdomen; the king and queen kept on the termite kit (review round 1). The grab-and-squirt, the free squirt, the threat and the drum as planted-feet attack cycles, the acid jet and fizz from the snout's tip.
@@ -2091,3 +2091,24 @@ User spec `claude/performance/03-spec-performance-v3-big-colonies.md`; branch `f
   fight's triangles are the ants (mid-distance ants at 3,300 triangles, twice with shadows). Changes that would alter
   the picture (simpler shadow casters, resolution, effect settings) wait for the gpu-scene report and the user's yes.
 - **Merged** into `main` as `ad17880` (Pages deployed; game artifact v51); handoff 23.
+## 2026-11-07 — The Trees: a third layer over the ground (branch `feature/trees-layer`; claude/trees/01-spec-trees-layer.md)
+Plan and record: `CHANGE_PLAN.md` §30. Design: `DESIGN.md` §3.13. Player notes: `README.md` "The trees". Stills:
+`docs/trees/shots/` (`tests/browser/trees.py`); the map tool `tools/trees-check.ts`; `tests/trees.ts` in `npm test`.
+- **One canopy map per match** (space `TREES` 63): a hex grid like a cave's in the ground's frame, all rock but the
+  branches, twigs and leaves (walkable). The trees come from `MapDef.trees` (3–4 on each of the five maps; procedural
+  maps grow a few from the seed); crowns are grown deterministically; **every tree is joined to the others by boughs**
+  (user, mid-session) so the canopy is one walkable network.
+- **Climbing:** trunks block the ground; their climb points are the space's entrances, so the entrance code walks ants
+  up (a timed hold on the bark, `TREES.climbSec`, drawn rising at the climb point) and down, with `TREES.climbPerS`
+  throughput. Markers on branches, markers across crowns (down and up the right trunk), the fall (a fling drops the ant
+  to the ground below, dazed), food and sites on the branches, a tree-nest framework (`treeSite`, `Entrance.space`).
+- **View:** the "TREES" bar beside the ground map rises into the canopy (a fade with a pull-in and pull-back); the
+  canopy is a heightfield from the grid's signed distance (bark ridges, lichen, moss, flush leaves, sway) under daylight,
+  the ground far below as a blurred darkened render; the ground map draws the canopy; tree nests are tabs.
+- **On/off:** a `habitat: 'trees'` species (none yet), the sandbox "Trees on" (built at runtime, also on the worker's
+  replica), or `?trees=1` with a placeholder colony; otherwise nothing is built.
+- **Lairs** removed from skirmish, sandbox and LAN setups and the five maps' zones; wild creatures arrive from the edges.
+- Saves version 5, protocol `ud-mp-16`.
+- Numbers: the canopy grid is 100–120 × 80–105 hexes (530–630 cells a side), built in 0.6–1.1 s at match start on this
+  machine (only with the layer on); 740–2,100 walkable hexes a map; the canopy mesh has one vertex a cell in the chunks
+  that hold branches.

@@ -14,6 +14,7 @@
  * decode.
  */
 import { World } from './world';
+import { createTrees } from './trees';
 import { Colony, SURFACE, TileType } from './types';
 import { assignGroup, placeMarker, recallAll, removeMarker, MARKER_ORDERS, MarkerOrder, setMarkerOrder } from './markers';
 import { designateDig } from './colony';
@@ -54,7 +55,7 @@ export type CommandBody =
   /** sandbox games only: fill the colony's stores */
   | { type: 'sandboxFood' }
   /** sandbox games only: switch infinite food or wild creatures */
-  | { type: 'sandboxSet'; key: 'infiniteFood' | 'creatures'; on: boolean }
+  | { type: 'sandboxSet'; key: 'infiniteFood' | 'creatures' | 'trees'; on: boolean }
   /** battle arena only: spawn `n` units (`ant:<caste>` or `cr:<kind>`) of level 1–3 for a team, round its spawn point or at (x, y) */
   | { type: 'arenaSpawn'; team: number; unit: string; n: number; level: number; at: boolean; x: number; y: number }
   /** battle arena only: a team charges (0), holds (1) or stands passive (2) */
@@ -272,7 +273,10 @@ export function applyCommand(w: World, cmd: Command): string | null {
       if (!w.s.mode.sandbox) return 'sandbox games only';
       if (cmd.key === 'infiniteFood') c.infiniteFood = !!cmd.on;
       else if (cmd.key === 'creatures') w.s.settings.creatures = cmd.on ? 1 : 0;
-      else return 'bad setting';
+      else if (cmd.key === 'trees') {
+        // "Trees on" (sim/trees.ts): the canopy is built once and stays (it cannot be taken down under the ants)
+        if (cmd.on && !w.s.trees && !createTrees(w)) return 'This map has no trees';
+      } else return 'bad setting';
       return null;
     case 'entrance':
       return 'Entrances are always open';

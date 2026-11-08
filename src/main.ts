@@ -45,7 +45,7 @@ import { missionDef, missionOf } from './sim/missions';
 import { actorIndex, storyOf } from './sim/story/state';
 import { campaign } from './game/campaign';
 import { makeAnt } from './sim/factory';
-import { SURFACE } from './sim/types';
+import { SURFACE, TREES } from './sim/types';
 
 installTouchGuards();
 fitMenus();
@@ -135,13 +135,16 @@ function startGame(): void {
         });
       }
       // Underground areas besides the nests: a root hollow with a food cache; ?areas=1 builds the
-      // five-area test level (adds an allied colony and a beetle's den).
+      // four-area test level (adds an allied colony). No creature lairs on skirmish and sandbox maps (user 2026-11-07,
+      // claude/trees/01-spec-trees-layer.md §7): wild creatures wander in from the map's edge; story levels keep theirs.
       const caves: NonNullable<GameSetup['caves']> = [{ name: 'Root hollow', kind: 'cave', food: 70 }];
       if (q.get('areas')) {
         if (!ais.length) colonies.push({ species: 'solenopsis', player: false, ai: true, developed: 6, startWorkers: 14 });
         colonies.push({ species: 'lasius', player: false, ai: true, team: 0, name: 'Allied black ants', developed: 3, startWorkers: 8 });
-        caves.push({ name: 'Beetle den', kind: 'lair', food: 40 });
       }
+      // the Trees layer (claude/trees/01-spec-trees-layer.md): ?trees=1 turns it on with a placeholder tree colony (plain
+      // test ants, clearly a dev stand-in: no tree species exists yet) on the map's first nest site; never in normal games
+      if (q.get('trees')) colonies.push({ species: 'lasius', player: false, ai: true, developed: 2, startWorkers: 6, treeSite: 0, name: 'Canopy test colony (dev placeholder)' });
       // ?developed=N: every colony starts grown by N tiles (test scenes and clips: tests/browser/ai_help.py)
       if (q.get('developed')) for (const col of colonies) col.developed = Number(q.get('developed'));
       // the map grows with the number of colonies so nests are not crowded
@@ -166,6 +169,7 @@ function startGame(): void {
         },
         mission: mission?.id,
         sandbox: c.mode === 'sandbox',
+        ...(q.get('trees') ? { trees: true } : {}),
         ...(q.get('titanRaid') ? { devTitanRaid: q.get('titanRaid')! } : {}),
         // dev: ?floodNest=<colony index>&floodAt=<s>[&floodFill=<s>] floods that colony's nest (sim/nestFlood.ts)
         ...(q.get('floodNest') ? { devNestFlood: { colony: Number(q.get('floodNest')), at: Number(q.get('floodAt') || 0), fillSec: q.get('floodFill') ? Number(q.get('floodFill')) : undefined } } : {}),
@@ -233,6 +237,13 @@ function startGame(): void {
         const n = Number(q.get('ticks') || 0);
         s.loop.advance(n);
         if (q.get('view') === 'nest') s.view.space = 'nest';
+        // the trees view (claude/trees/01-spec-trees-layer.md): straight up into the canopy
+        if (q.get('view') === 'trees' && s.treesOn) {
+          s.viewedArea = TREES;
+          s.view.setActiveNest(TREES);
+          s.view.space = 'nest';
+          s.view.refreshBackdrop(true);
+        }
         if (q.get('nest')) {
           const t = s.areaTabs()[Number(q.get('nest')) - 1];
           if (t) {

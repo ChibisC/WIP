@@ -114,6 +114,32 @@ export interface Ramp {
   style: RampStyle;
 }
 
+/**
+ * The Trees (claude/trees/01-spec-trees-layer.md; sim/trees.ts): a tree is a trunk on the ground (a wall ants walk
+ * round, with climb points at its foot) and a crown in the canopy map above it. The crown's branches, twigs and leaves
+ * are grown deterministically from the tree's style and seed (`sim/trees.ts crownShapes`); `branches` and `leaves` may
+ * be authored outright instead (then nothing is grown).
+ */
+export type CrownStyle = 'oak' | 'beech' | 'tropical' | 'willow' | 'acacia' | 'sapling';
+
+export interface TreeDef {
+  trunk: Pt;
+  /** trunk radius on the ground (mm) */
+  r: number;
+  style: CrownStyle;
+  /** how far the crown reaches from the trunk (mm) */
+  reach: number;
+  seed: number;
+  /** climb points at the foot (mm); grown round the trunk when left out */
+  climbs?: readonly Pt[];
+  branches?: ReadonlyArray<{ path: readonly Pt[]; width: number }>;
+  leaves?: ReadonlyArray<{ at: Pt; rx: number; ry: number; rot?: number }>;
+  /** food sites (berries, fruit) on the crown (mm); a few are grown when left out */
+  flowers?: readonly Pt[];
+  /** set branches for future tree nests (mm): leaf clusters, hollows, sheltered forks (grown when left out) */
+  sites?: ReadonlyArray<{ kind: 'leaf' | 'hollow' | 'fork'; at: Pt }>;
+}
+
 /** A camera key of a story map's opening flight: look at `at` from `dist` mm, `yaw` rad, arriving `t` s in. */
 export interface CamKey {
   at: Pt;
@@ -168,4 +194,6 @@ export interface MapDef {
   ramps?: Ramp[];
   /** story maps (src/maps/story): set pieces, paths and the opening flight */
   story?: StoryMapData;
+  /** the trees of the canopy layer (only built in matches with the layer on); none: the formicarium and the arena */
+  trees?: TreeDef[];
 }

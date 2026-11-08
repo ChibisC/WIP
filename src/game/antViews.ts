@@ -1,3 +1,4 @@
+import { climbSeconds } from '../sim/trees';
 import { BALANCE, ECITON, NASUTE, SICKLE, TERMANT } from '../sim/balance';
 import { isTermant } from '../sim/termants';
 import { AntView } from '../render/ants/antRenderer';
@@ -209,6 +210,35 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
   out.colorVar = a.colorVar;
   out.lift = a.state === AS.Flung ? a.fz : 0;
   out.crouch = 0;
+  // on a tree trunk (sim/trees.ts): drawn climbing the bark at its climb point in the ground view — rising when it goes
+  // up, coming down when it leaves — nose to the trunk; in the trees view it rises out of the trunk top
+  if (a.trunkT && a.trunkT > 0 && w.s.trees) {
+    const k = 1 - a.trunkT / climbSeconds(w);
+    const h = w.s.trees.height;
+    if (space === SURFACE) {
+      const tx = a.trunkX ?? a.x;
+      const ty = a.trunkY ?? a.y;
+      let bx = tx;
+      let by = ty;
+      let bd = Infinity;
+      for (const t of w.s.trees.trunks) {
+        const d = (t.x - tx) * (t.x - tx) + (t.y - ty) * (t.y - ty);
+        if (d < bd) {
+          bd = d;
+          bx = t.x;
+          by = t.y;
+        }
+      }
+      const ang = Math.atan2(by - ty, bx - tx);
+      // on the bark: a little in from the climb point toward the trunk's side
+      out.x = out.px = tx + Math.cos(ang) * 2.5;
+      out.y = out.py = ty + Math.sin(ang) * 2.5;
+      out.heading = out.pheading = ang;
+      out.lift = (a.trunkUp ? k : 1 - k) * h;
+    } else {
+      out.lift = -(1 - k) * Math.min(h, 24);
+    }
+  }
   // animation pass: a drop in hit points starts a hit reaction; a thrown ant tumbles (not one held in antlers)
   out.hp = a.hp;
   out.cause = a.state === AS.Dead ? (a.lastHit ?? 0) : 0;

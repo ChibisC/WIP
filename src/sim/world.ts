@@ -9,7 +9,8 @@ import { Pheromones } from './pheromones';
 import { SpatialHash } from './spatial';
 import { normalizeAnt } from './factory';
 import type { FloodCache } from './nestFlood';
-import { Ant, AphidCluster, Brood, CaveDef, Colony, Creature, Entrance, Food, LeafPlant, SimState, SURFACE, colonyOfSpace, nestSpace, isCaveSpace, Projectile } from './types';
+import { Ant, AphidCluster, Brood, CaveDef, Colony, Creature, Entrance, Food, LeafPlant, SimState, SURFACE, TREES, colonyOfSpace, nestSpace, isCaveSpace, Projectile } from './types';
+import { applyTreesToTerrain, treeEntrances } from './trees';
 
 /**
  * The live simulation: serializable SimState plus runtime acceleration
@@ -110,10 +111,13 @@ export class World {
           .replace(/gene[ -]?thie(f|ves)/gi, (m) => (m[0] === 'G' ? 'Mimic Ant' : 'mimic ant') + (/ves$/i.test(m) ? 's' : ''));
     // version 4 (2026-11-06): the shared underground — rock margins round every nest and tunnel routes between them
     // (sim/tunnels.ts; a binary snapshot attaches its grids after this, and restoreWorld upgrades it then)
+    // version 5 (2026-11-08): the Trees layer (`trees`; older saves load without it)
     this.loadedVersion = state.version ?? 1;
-    state.version = Math.max(4, state.version ?? 1);
+    state.version = Math.max(5, state.version ?? 1);
     this.reindex();
     if (this.grids.size) upgradeWorldTunnels(this);
+    // the Trees layer (sim/trees.ts): the trunks block the ground again on a terrain rebuilt from the state
+    if (state.trees) applyTreesToTerrain(this);
   }
 
   /** the SimState version this world was constructed from (save upgrades that must run once the grids are attached) */
@@ -164,21 +168,27 @@ export class World {
     return isCaveSpace(space) ? this.s.caves.find((c) => c.space === space) : undefined;
   }
 
-  /** Entrances of an underground area (a colony's nest or a cave). */
+  /** Entrances of an area (a colony's nest, a cave; the trees: every trunk's climb points). */
   entrancesOf(space: number): Entrance[] {
+    if (space === TREES) return treeEntrances(this);
     if (isCaveSpace(space)) return this.cave(space)?.entrances ?? NO_ENTRANCES;
     return this.colony(colonyOfSpace(space))?.entrances ?? NO_ENTRANCES;
   }
 
-  /** Surface centre of an underground area (its entrances sit around it). */
+  /** Surface centre of an underground area (its entrances sit around it); the trees: the trunk nearest the point asked about is the caller's business, this gives the map's middle. */
   areaCentre(space: number, out: { x: number; y: number }): { x: number; y: number } {
-    const a = isCaveSpace(space) ? this.cave(space) : this.colony(colonyOfSpace(space));
+    const a = space === TREES ? undefined : isCaveSpace(space) ? this.cave(space) : this.colony(colonyOfSpace(space));
     out.x = a ? a.nx : this.terrain.width / 2;
     out.y = a ? a.ny : this.terrain.depth / 2;
     return out;
   }
 
-  /** Every underground space in the level: colony nests in colony order, then caves. */
+  /** The Trees map's grid (null while the layer is off). */
+  trees(): NestGrid | undefined {
+    return this.s.trees ? this.grids.get(TREES) : undefined;
+  }
+
+  /** Every underground space in the level: colony nests in colony order, then caves (the trees are not an area tab: `TREES`). */
   undergroundSpaces(): number[] {
     const out: number[] = [];
     for (const c of this.s.colonies) if (this.grids.has(nestSpace(c.id))) out.push(nestSpace(c.id));
@@ -315,11 +325,31 @@ export class World {
       }
     }
     this.foodHash.clear();
+    this.foodHashTrees?.clear();
     const food = this.s.food;
-    for (let i = 0; i < food.length; i++) if (food[i].space === SURFACE && food[i].heldBy === 0) this.foodHash.insert(i, food[i].x, food[i].y);
+    for (let i = 0; i < food.length; i++) {
+      if (food[i].heldBy !== 0) continue;
+      if (food[i].space === SURFACE) this.foodHash.insert(i, food[i].x, food[i].y);
+      else if (food[i].space === TREES) this.treesFoodHash().insert(i, food[i].x, food[i].y);
+    }
     this.creatureHash.clear();
+    this.creatureHashTrees?.clear();
     const cr = this.s.creatures;
-    for (let i = 0; i < cr.length; i++) if (cr[i].space === SURFACE && !cr[i].dead) this.creatureHash.insert(i, cr[i].x, cr[i].y);
+    for (let i = 0; i < cr.length; i++) {
+      if (cr[i].dead) continue;
+      if (cr[i].space === SURFACE) this.creatureHash.insert(i, cr[i].x, cr[i].y);
+      else if (cr[i].space === TREES) this.treesCreatureHash().insert(i, cr[i].x, cr[i].y);
+    }
+  }
+
+  /** the trees' own food and creature hashes (same frame as the ground's; made when the layer is on) */
+  private foodHashTrees: SpatialHash | null = null;
+  private creatureHashTrees: SpatialHash | null = null;
+  private treesFoodHash(): SpatialHash {
+    return (this.foodHashTrees ??= new SpatialHash(this.terrain.width, this.terrain.depth, 16, 512));
+  }
+  private treesCreatureHash(): SpatialHash {
+    return (this.creatureHashTrees ??= new SpatialHash(this.terrain.width, this.terrain.depth, 32, 256));
   }
 
   /** The spatial hash of a space's ants (built at the tick start), or undefined (performance v3: separation.ts). */
@@ -348,18 +378,23 @@ export class World {
     h.queryOthersIn(this.s.ants, space, x, y, r, team, cb);
   }
 
-  foodNear(x: number, y: number, r: number, cb: (f: Food, d2: number) => boolean | void): void {
+  /** Food near a point on the surface (`space` the trees: on the branches; other spaces have no hash: none). */
+  foodNear(x: number, y: number, r: number, cb: (f: Food, d2: number) => boolean | void, space = SURFACE): void {
     const food = this.s.food;
-    this.foodHash.query(x, y, r, (i, d2) => {
+    const h = space === SURFACE ? this.foodHash : space === TREES ? this.foodHashTrees : null;
+    if (!h) return;
+    h.query(x, y, r, (i, d2) => {
       const f = food[i];
       if (!f) return false;
       return cb(f, d2);
     });
   }
 
-  creaturesNear(x: number, y: number, r: number, cb: (c: Creature, d2: number) => boolean | void): void {
+  creaturesNear(x: number, y: number, r: number, cb: (c: Creature, d2: number) => boolean | void, space = SURFACE): void {
     const cr = this.s.creatures;
-    this.creatureHash.query(x, y, r + 40, (i, d2) => {
+    const h = space === SURFACE ? this.creatureHash : space === TREES ? this.creatureHashTrees : null;
+    if (!h) return;
+    h.query(x, y, r + 40, (i, d2) => {
       const c = cr[i];
       if (!c || c.dead) return false;
       const rr = r + c.scale * 0.5;
@@ -411,7 +446,7 @@ export class World {
 
 export function emptyState(seed: number, terrainParams: SimState['terrain']): SimState {
   return {
-    version: 4,
+    version: 5,
     tick: 0,
     time: 0,
     seed,

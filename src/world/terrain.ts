@@ -225,6 +225,15 @@ export class Terrain {
 
   /** An authored map's obstacles (world/mapScatter.ts): blocked, drawn by render/mapDecor.ts. */
   mapObs: MapObstacle[] = [];
+  /** the trees' trunks (sim/trees.ts, only with the layer on): walls on the ground, drawn by the session */
+  trunks: Array<{ x: number; y: number; r: number }> = [];
+
+  /** Set the trunks (the Trees layer): they block from now on; the surface fields rebuild (the version bumps). */
+  setTrunks(list: Array<{ x: number; y: number; r: number }>): void {
+    this.trunks = list;
+    for (const t of list) this.block(t.x, t.y, t.r);
+    this.version++;
+  }
   /** layered ground (world/layers.ts): levels, banks, ramps and the cliffs that block; null on flat maps */
   layers: LayerFields | null = null;
 
@@ -423,6 +432,7 @@ export class Terrain {
     const { nx, ny, res } = this;
     if (this.map) {
       this.mapOverlay(this.map);
+      for (const t of this.trunks) this.block(t.x, t.y, t.r);
       this.version++;
       return;
     }
@@ -509,6 +519,7 @@ export class Terrain {
         for (const [x, y] of twigLine(o, n)) this.block(x, y, Math.max(o.r, this.res * 0.75));
       } else this.block(o.x, o.y, o.r);
     }
+    for (const t of this.trunks) this.block(t.x, t.y, t.r);
   }
 
   rebuildWater(): void {

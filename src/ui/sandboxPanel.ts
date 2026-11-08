@@ -13,6 +13,7 @@ export class SandboxPanel {
   private place: HTMLButtonElement;
   private inf: HTMLButtonElement;
   private wild: HTMLButtonElement;
+  private trees: HTMLButtonElement;
 
   constructor(private s: GameSession) {
     shield(this.root);
@@ -26,10 +27,11 @@ export class SandboxPanel {
     const fill = button('', 'Fill stores', 'Fill your food stores to capacity', () => s.issue({ type: 'sandboxFood' }));
     this.inf = button('', 'Infinite food', 'Brood and building never run short of food', () => s.issue({ type: 'sandboxSet', key: 'infiniteFood', on: !s.player.infiniteFood }));
     this.wild = button('', 'Wild creatures', 'Let wild creatures wander in on their own', () => s.issue({ type: 'sandboxSet', key: 'creatures', on: !((s.world.s.settings.creatures ?? 0) > 0) }));
+    this.trees = button('', 'Trees on', 'Build the canopy layer over this map (the TREES bar beside the ground map goes up into it); it stays on', () => s.issue({ type: 'sandboxSet', key: 'trees', on: true }));
     const r1 = el('div', 'sb-row');
     r1.append(sel, this.place);
     const r2 = el('div', 'sb-row');
-    r2.append(fill, this.inf, this.wild);
+    r2.append(fill, this.inf, this.wild, this.trees);
     this.root.append(el('div', 'sb-title sc', 'Sandbox'), r1, r2);
   }
 
@@ -40,5 +42,7 @@ export class SandboxPanel {
     this.place.classList.toggle('on', s.tool === 'spawn');
     this.inf.classList.toggle('on', !!s.player.infiniteFood);
     this.wild.classList.toggle('on', (s.world.s.settings.creatures ?? 0) > 0);
+    this.trees.classList.toggle('on', s.treesOn);
+    this.trees.disabled = s.treesOn;
   }
 }

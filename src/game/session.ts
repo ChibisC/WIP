@@ -25,7 +25,9 @@ import { Fog } from './fog';
 import { halfIn, otherHalf, ownHalf, routeById, routeDone, routeUsable, stepIndex } from '../sim/tunnels';
 const ROUTE_EDGE_ANG = [-Math.PI / 6, Math.PI / 6, Math.PI / 2, (5 * Math.PI) / 6, (7 * Math.PI) / 6, -Math.PI / 2];
 import { createWorld, GameSetup } from '../sim/mapGen';
-import { AS, Ant, Colony, FloodState, SURFACE, TileType, colonyOfSpace, nestSpace } from '../sim/types';
+import { AS, Ant, Colony, FloodState, SURFACE, TREES, TileType, colonyOfSpace, nestSpace } from '../sim/types';
+import { canopyLeaves, kindsOf } from '../sim/trees';
+import { TreeDecor } from '../render/trees/treeDecor';
 import { AreaInfo, areaOpen, areasFor, teamPresence } from '../sim/areas';
 import { CASTES, SPECIES, canonCaste, isTermiteSpecies } from '../sim/species';
 import { affords, canPlaceTile, canUpgrade, notEnough, upgradeCost, groupWouldJoin, hatchCost, neighbourPoints, tileAt, tileCost, TILE_INFO, upgradeNeed, upgradePoints } from '../sim/tiles';
@@ -247,6 +249,7 @@ export class GameSession {
       if (oc && isTermiteSpecies(oc.species)) stage.terrain.uniforms.uCarton.value = oc.species === 'rhynchotermes' ? 2 : 1;
       this.nests.set(a.space, new NestView(this.view, a.space, stage));
     }
+    if (w.s.trees) this.addTreesView();
     this.view.setActiveNest(this.viewedArea);
     this.surfAnts = new AntRenderer(this.view.renderer, 'surfaceAnts');
     this.surfAnts.lodScale = this.view.preset.lodScale;
@@ -650,7 +653,51 @@ export class GameSession {
   }
 
   areaTab(space: number): AreaTab | undefined {
+    if (space === TREES) return this.treesTab;
     return this.areaTabs().find((t) => t.space === space);
+  }
+
+  /** the trees map as a tab: always open (it is not an area tab; the "TREES" bar shows it) */
+  private readonly treesTab: AreaTab = { space: TREES, number: 0, color: '#7fbf5a', kind: 'neutral', name: 'The trees', owner: -1, alive: true, open: true, ants: 0, alertAge: Infinity };
+
+  /** the trunks on the ground and the climb points (render only; with the layer on) */
+  treeDecor: TreeDecor | null = null;
+
+  /** Is the layer on (the trees map exists)? */
+  get treesOn(): boolean {
+    return !!this.world.s.trees;
+  }
+
+  /** Build the trees' stage and view (at the start, or when the sandbox turns the layer on). */
+  private addTreesView(): void {
+    const w = this.world;
+    const d = w.s.trees;
+    const g = w.nestOf(TREES);
+    if (!d || !g || this.nests.has(TREES)) return;
+    const kinds = kindsOf(d);
+    const stage = this.view.addTrees(g, kinds, d.height, canopyLeaves(w));
+    const nv = new NestView(this.view, TREES, stage);
+    nv.fog = null;
+    this.nests.set(TREES, nv);
+    this.treeDecor = new TreeDecor(w, this.surfHeight);
+    this.view.worldGroup.add(this.treeDecor.ground);
+    stage.scene.add(this.treeDecor.canopy);
+    this.warmNew();
+  }
+
+  /** The "TREES" bar: up into the canopy, or back down to the ground. */
+  toggleTrees(): void {
+    const v = this.view;
+    if (!this.nests.has(TREES) || v.transitioning) return;
+    if (v.inTrees) {
+      v.riseTo('surface');
+      this.viewedArea = nestSpace(this.player.id);
+    } else {
+      // (from a nest: straight up as if from the ground)
+      if (v.space === 'nest') v.space = 'surface';
+      this.viewedArea = TREES;
+      v.riseTo('trees');
+    }
   }
 
   /** A point to look at in an area: the queen's chamber in a nest, the cavern in a cave. */
@@ -1833,6 +1880,8 @@ export class GameSession {
       this.showArea(nestSpace(this.player.id));
     }
     if (v.space === 'nest' && !v.transitioning && v.activeNest !== this.viewedArea) v.setActiveNest(this.viewedArea);
+    if (w.s.trees && !this.nests.has(TREES)) this.addTreesView();
+    this.treeDecor?.update(w, v.time);
     this.updateTunnelView();
     this.updateHover();
     const cam = v.activeCamera();
@@ -1849,7 +1898,7 @@ export class GameSession {
       const nv = this.nests.get(v.activeNest);
       const owner = w.colony(colonyOfSpace(v.activeNest)) ?? null;
       if (nv) nv.overlay = this.tileOverlay;
-      if (nv) {
+      if (nv && v.activeNest !== TREES) {
         if (this.fog.advance(w.s.tick) || !nv.fog) this.fog.update(w, this.player, v.activeNest, this.revealAreas);
         nv.fog = this.fog;
       }
@@ -1870,7 +1919,8 @@ export class GameSession {
       cull.begin(cam);
       const pos = this.surfMap.pos;
       for (const a of w.s.ants) {
-        if (a.space !== SURFACE) continue;
+        // (an ant climbing up a trunk is already in the trees: it is still seen on the bark from the ground)
+        if (a.space !== SURFACE && !(a.space === TREES && a.trunkT && a.trunkUp)) continue;
         if (a.state === AS.Dead && a.deadT > 30) continue;
         if (!cull.keeps(a, pos)) continue;
         antToView(w, a, take(), 0, 0);

@@ -8,6 +8,7 @@
  * their identity (the session holds on to its own colony), and entity
  * objects are pooled by id.
  */
+import { attachTreesGrid } from '../sim/trees';
 import { ColumnReader } from '../sim/columns';
 import { World } from '../sim/world';
 import { Ant, Brood, Colony, Creature, Food, Projectile } from '../sim/types';
@@ -57,6 +58,11 @@ export class Replica {
       else s.colonies.push(c as Colony);
     }
     if (sl.caves) s.caves = sl.caves;
+    if (sl.trees) {
+      s.trees = sl.trees;
+      // the layer turned on (the sandbox toggle): this copy builds the same canopy grid (sim/trees.ts)
+      attachTreesGrid(w);
+    }
     if (sl.aphids) s.aphids = sl.aphids;
     if (sl.plants) s.plants = sl.plants;
     // floods: the sim's water lives in the worker; raise (or drain) this copy of the terrain to match

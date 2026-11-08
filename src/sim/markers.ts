@@ -1,7 +1,8 @@
 import { World } from './world';
-import { AS, Ant, Colony, MARKER_COUNT, SURFACE, nestSpace, snapping } from './types';
+import { AS, Ant, Colony, MARKER_COUNT, SURFACE, TREES, nestSpace, snapping } from './types';
 import { groupById, groupCounts, raisesAnts } from './tiles';
 import { sq } from './dmath';
+import { nearestBranch } from './trees';
 
 /**
  * The five pheromone markers (I–V). Every nest group is assigned to the home
@@ -32,11 +33,15 @@ export const ENTRANCE_SNAP = 12;
 export function entranceAt(w: World, c: Colony, x: number, y: number): { space: number; x: number; y: number } | null {
   let best: { space: number; x: number; y: number } | null = null;
   let bd = ENTRANCE_SNAP * ENTRANCE_SNAP;
-  for (const space of w.undergroundSpaces()) {
+  const spaces = w.undergroundSpaces();
+  // (a climb point at a trunk's foot: the marker goes up to the trunk top)
+  if (w.s.trees) spaces.push(TREES);
+  for (const space of spaces) {
     if (space === nestSpace(c.id)) continue;
     const g = w.nestOf(space);
     if (!g) continue;
     for (const e of w.entrancesOf(space)) {
+      if ((e.space ?? SURFACE) !== SURFACE) continue;
       const d2 = sq(e.sx - x) + sq(e.sy - y);
       if (d2 >= bd) continue;
       bd = d2;
@@ -96,6 +101,14 @@ export function placeMarker(w: World, c: Colony, i: number, space: number, x: nu
         x = p.x;
         y = p.y;
       }
+    }
+  }
+  // a marker dropped in the sky of the trees map moves to the nearest branch (sim/trees.ts)
+  if (space === TREES) {
+    const p = nearestBranch(w, x, y);
+    if (p) {
+      x = p.x;
+      y = p.y;
     }
   }
   const m = c.markers[i];

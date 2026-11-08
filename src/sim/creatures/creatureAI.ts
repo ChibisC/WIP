@@ -2267,8 +2267,13 @@ function wildSpot(w: World, clear: number): { x: number; y: number } | null {
       x = L.hex.centerX(q) + w.rng.range(-0.7, 0.7) * L.hex.R;
       y = L.hex.centerY(q) + w.rng.range(-0.7, 0.7) * L.hex.R;
     } else {
-      x = w.rng.range(30, t.width - 30);
-      y = w.rng.range(30, t.depth - 30);
+      // no creature zones (and no lairs since 2026-11-07): wild creatures wander in from the map's edges
+      const band = Math.min(80, t.width * 0.12);
+      const side = w.rng.int(0, 3);
+      const u = w.rng.range(30, (side < 2 ? t.width : t.depth) - 30);
+      const d = w.rng.range(30, band);
+      x = side === 0 ? u : side === 1 ? u : side === 2 ? d : t.width - d;
+      y = side === 0 ? d : side === 1 ? t.depth - d : u;
     }
     if (!t.passable(x, y) || !t.inBounds(x, y, 30)) continue;
     let ok = true;

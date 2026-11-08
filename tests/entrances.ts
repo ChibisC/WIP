@@ -399,7 +399,7 @@ function oldSave(): { st: ReturnType<World['serialize']>; tileQ: number; antId: 
   const g = w.nest(0)!;
   const f = g.flowers[0] ?? [];
   check('an old save loads with one entrance: the extra one and the spots are gone, their hexes plain dug floor', g.entrances.length === 1 && g.flowers.length === 1 && !('spots' in g) && extra.every((q) => g.isHexDug(q) && !g.isEntrance(q)) && !!canPlaceTile(w, c, 'food', extra[1]) === false, `${g.entrances.length} entrances`);
-  check('… its main entrance widened into the 7-hex flower, all dug', f.length === 7 && f.every((q) => g.isHexDug(q)) && w.s.version === 4);
+  check('… its main entrance widened into the 7-hex flower, all dug', f.length === 7 && f.every((q) => g.isHexDug(q)) && w.s.version === 5);
   const t = c.tiles.find((x) => x.type === 'food');
   check('… a tile standing on the widened entrance moved to free floor (and the load log says so)', !!t && t.q !== tileQ && !g.isEntrance(t.q) && g.isHexDug(t.q) && logged.some((s) => s.includes('moved a food tile')), logged.join(' | '));
   check('… its anthill rebuilt with three holes into the flower', c.entrances.length === 3 && c.entrances.every((e) => e.q === f[0] && !('shut' in e)));

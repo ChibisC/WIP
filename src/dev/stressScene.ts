@@ -26,7 +26,6 @@ export function stressSetup(species: readonly string[] = STRESS_SPECIES): GameSe
     colonies: species.map((sp, i) => ({ species: sp as (typeof STRESS_SPECIES)[number], player: i === 0, ai: true, developed: 8, startWorkers: 10, popLimit: 600 })),
     caves: [
       { name: 'Root hollow', kind: 'cave', food: 80 },
-      { name: 'Beetle den', kind: 'lair', food: 50 },
     ],
     food: 1.2,
   };
