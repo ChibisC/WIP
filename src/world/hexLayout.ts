@@ -104,29 +104,46 @@ export class HexLayout {
   hexAt(x: number, y: number): number {
     const best = this.nearestHex(x, y);
     if (best < 0) return -1;
-    if (sq(this.centerX(best) - x) + sq(this.centerY(best) - y) > this.R * this.R * 1.05) return -1;
+    // (the squared distance nearestHex found it at — the same sum, so the same bits — or measured again after its clamp)
+    const d2 = this.nearD2 >= 0 ? this.nearD2 : sq(this.centerX(best) - x) + sq(this.centerY(best) - y);
+    if (d2 > this.R * this.R * 1.05) return -1;
     return best;
   }
 
+  /** nearestHex's squared distance to the hex it returned (−1 after the clamp to the rim). */
+  private nearD2 = -1;
+
   /** Hex whose centre is nearest a point (mm), clamped to the grid; −1 only for an empty grid. */
   nearestHex(x: number, y: number): number {
-    const c0 = Math.round((x - this.R) / this.C);
+    const R = this.R;
+    const C = this.C;
+    const H = this.H;
+    const cols = this.cols;
+    const rows = this.rows;
+    const c0 = Math.round((x - R) / C);
     let best = -1;
     let bd = Infinity;
+    // (each centre from its column and row directly: the same arithmetic as centerX/centerY of its index, so the same
+    // bits — performance v3)
     for (let c = c0 - 1; c <= c0 + 1; c++) {
-      if (c < 0 || c >= this.cols) continue;
-      const r0 = Math.round((y - this.H * 0.5 - (c & 1 ? this.H * 0.5 : 0)) / this.H);
+      if (c < 0 || c >= cols) continue;
+      const odd = c & 1 ? H * 0.5 : 0;
+      const r0 = Math.round((y - H * 0.5 - odd) / H);
+      const cx = R + c * C;
       for (let r = r0 - 1; r <= r0 + 1; r++) {
-        const q = this.hexIndex(c, r);
-        if (q < 0) continue;
-        const d = sq(this.centerX(q) - x) + sq(this.centerY(q) - y);
+        if (r < 0 || r >= rows) continue;
+        const d = sq(cx - x) + sq(H * 0.5 + r * H + odd - y);
         if (d < bd) {
           bd = d;
-          best = q;
+          best = r * cols + c;
         }
       }
     }
-    if (best >= 0) return best;
+    if (best >= 0) {
+      this.nearD2 = bd;
+      return best;
+    }
+    this.nearD2 = -1;
     // far outside: clamp to the rim
     const c = Math.min(this.cols - 1, Math.max(0, c0));
     const r = Math.min(this.rows - 1, Math.max(0, Math.round((y - this.H * 0.5 - (c & 1 ? this.H * 0.5 : 0)) / this.H)));
