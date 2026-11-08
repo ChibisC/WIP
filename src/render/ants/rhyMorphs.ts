@@ -72,9 +72,9 @@ const SOLDIER_COLORS = {
   // the photos' amber-cream body with bold brown tergite bands (species doc §6: #D49E5C, bands #6E3E1E)
   // (round-1 photo comparison: still too pale) a warmer amber
   thorax: 0xc08440, thoraxTop: 0xb47838, pronotum: 0xb87c3a,
-  // (round 3, "as well as their abdomens") browner than before: a warm tan-brown (the photos read #8c674a), each
-  // tergite darkening to a bold brown rear band (#533115), thin pale cream membranes between, the gut a dull shadow
-  abd: 0xa07044, abdTop: 0x8c5e36, abdUnder: 0xc0966a, tergRear: 0x40200a, membrane: 0xdac4a0, gut: 0x4a3a2a,
+  // (round 3, "as well as their abdomens") browner than before: a warm amber-brown (the photos read #8c674a), each
+  // tergite darkening to a bold dark-brown rear band (#533115), down the flanks too; thin pale cream membranes
+  abd: 0x965e2c, abdTop: 0x845024, abdUnder: 0xb8844e, tergRear: 0x2c1202, membrane: 0xdcc296, gut: 0x4a3420,
   leg: 0xd4a258, legLight: 0xdeb26a, legBase: 0xc49048, antenna: 0xc89a54, antennaTip: 0xd8ae68,
 };
 const soldier = {
@@ -82,7 +82,7 @@ const soldier = {
   key: 'termite_rhy_soldier', L: 4.5, stance: 0.09, soft: 1,
   look: { colors: SOLDIER_COLORS, ...SURF, head: GLASSY, mandible: GLASSY },
   // (round 3, the photos) a plump oval abdomen about 1.8 × the capsule's length and a little wider than it
-  abdomen: { x0: 0.38, len: 0.4, w: 0.25, h: 0.2, cy: 0.115, full: 0.52, front: 0.35, sag: 0.012, groove: 0.06, membrane: 0.4, band: 0.85, gut: 0.45, gutLobes: [[0.38, 0.02, 0.9], [0.6, 0.016, 0.75]] },
+  abdomen: { x0: 0.38, len: 0.4, w: 0.25, h: 0.2, cy: 0.115, full: 0.52, front: 0.35, sag: 0.012, groove: 0.06, membrane: 0.35, band: 1.0, gut: 0.45, gutLobes: [[0.38, 0.02, 0.9], [0.6, 0.016, 0.75]] },
   thorax: { meta: 0.05, meso: 0.05, pro: 0.06, w: 0.12, h: 0.1, cy: 0.1, proW: 0.14, proLift: 0.01, saddle: 0.018 },
   // the capsule 1.05 mm (0.233 L) by 1.0 wide; the snout 1.45 mm (0.322 L), down-curved toward its blunt tip
   head: {
