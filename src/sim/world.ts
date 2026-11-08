@@ -7,6 +7,7 @@ import { NestGrid } from '../world/nestGrid';
 import { NestFlow, SurfaceFlow } from './flow';
 import { Pheromones } from './pheromones';
 import { SpatialHash } from './spatial';
+import { normalizeAnt } from './factory';
 import type { FloodCache } from './nestFlood';
 import { Ant, AphidCluster, Brood, CaveDef, Colony, Creature, Entrance, Food, LeafPlant, SimState, SURFACE, colonyOfSpace, nestSpace, isCaveSpace, Projectile } from './types';
 
@@ -89,6 +90,8 @@ export class World {
       if (c.team === undefined) c.team = c.id;
       c.hexSpeed = null; // a cache (and JSON turns typed arrays into plain objects)
     }
+    // every ant in the one object shape (performance v3: factory.ts antShape) — a restored ant has only its saved fields
+    for (let i = 0; i < state.ants.length; i++) state.ants[i] = normalizeAnt(state.ants[i]);
     this.surfFlow = new SurfaceFlow(this.terrain);
     this.phero = new Pheromones(this.terrain.width, this.terrain.depth, Math.max(1, state.colonies.length));
     this.antHashSurface = new SpatialHash(this.terrain.width, this.terrain.depth, 8, 4096);

@@ -175,11 +175,8 @@ export function releaseActor(w: World, st: StoryState, i: number): void {
   for (const e of members(w, act)) {
     if ('caste' in e) {
       const a = e as Ant;
-      delete a.dirA;
-      delete a.dirW;
-      delete a.dirL;
-      delete a.dirX;
-      delete a.dirY;
+      // (cleared, not deleted: every ant keeps the one object shape — factory.ts antShape)
+      a.dirA = a.dirW = a.dirL = a.dirX = a.dirY = undefined;
       const c = w.colony(a.colony);
       if (c && !c.player) setTask(w, a, 'idle');
     } else {
@@ -238,8 +235,7 @@ function resetMember(e: Ant | Creature): void {
     const a = e as Ant;
     a.dirW = 0;
     a.dirL = 0;
-    delete a.dirX;
-    delete a.dirY;
+    a.dirX = a.dirY = undefined;
   } else {
     const cr = e as Creature;
     cr.data.dirW = 0;
@@ -530,7 +526,7 @@ export function directMode(w: World, a: Ant): number {
   if (a.dirA === undefined) return 0;
   const r = cueFor(w, a.dirA);
   if (!r) {
-    delete a.dirA;
+    a.dirA = undefined;
     const c = w.colony(a.colony);
     if (c && !c.player) setTask(w, a, 'idle');
     return 0;

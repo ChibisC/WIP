@@ -24,6 +24,9 @@ import { NestTerrain } from '../src/render/nest/nestTerrain';
 import { SOIL_AIR } from '../src/world/nestGrid';
 import { createStressWorld } from '../src/dev/stressScene';
 import { ColumnReader, ColumnWriter, columnCodegen } from '../src/sim/columns';
+import { antShape } from '../src/sim/factory';
+import { encodeState, hashState, restoreWorld } from '../src/sim/snapshot';
+import { readFileSync } from 'node:fs';
 
 const t0 = Date.now();
 let failed = 0;
@@ -325,6 +328,25 @@ function check(name: string, ok: boolean, detail = ''): void {
     check(`entity columns: delta frames (${gen ? 'generated' : 'plain'} reader) leave the replica's ants exactly as the simulation's, 120 ticks of a fight`, !bad, bad || `${((omitted / sent) * 100).toFixed(0)} % of the columns left out`);
   }
   columnCodegen.on = can;
+}
+
+// ---- one object shape for every ant (performance v3: sim/factory.ts antShape)
+{
+  const src = readFileSync(new URL('../src/sim/types.ts', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('export interface Ant {'), src.indexOf('\n}\n', src.indexOf('export interface Ant {')));
+  const declared = [...body.matchAll(/^ {2}([A-Za-z_][A-Za-z0-9_]*)\??\s*:/gm)].map((m) => m[1]);
+  const shape = Object.keys(antShape());
+  const missing = declared.filter((k) => !shape.includes(k));
+  check('ant shape: every field of the Ant interface is in antShape (a new field must be added there)', missing.length === 0 && shape.length === declared.length, missing.join(', ') || `${shape.length} fields`);
+  const w = createStressWorld(new EventBus(), 20, 5);
+  for (let i = 0; i < 40; i++) {
+    w.step(0.05);
+    w.events.drain();
+  }
+  const w2 = restoreWorld(encodeState(w), new EventBus());
+  const bad = w2.s.ants.filter((a) => Object.keys(a).slice(0, shape.length).join() !== shape.join());
+  check('ant shape: restored ants have the fields in the same order as new ones', bad.length === 0 && w2.s.ants.length === w.s.ants.length, `${bad.length} of ${w2.s.ants.length}`);
+  check('ant shape: the restored state hashes as the original', hashState(w) === hashState(w2));
 }
 
 console.log(`\n${failed ? `${failed} FAILED` : 'all passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

@@ -155,7 +155,7 @@ export function endJob(w: World, a: Ant, c: Colony): void {
   }
   a.jobK = 0;
   a.jobQ = -1;
-  delete a.jobS;
+  a.jobS = undefined;
   a.task = a.marker >= 0 ? 'marker' : 'idle';
   a.taskT = 0;
   a.tgt = 0;
@@ -250,7 +250,7 @@ export function assignJobs(w: World, c: Colony): void {
       a.jobK = j.kind;
       a.jobQ = j.q;
       if (js !== nestSpace(c.id)) a.jobS = js;
-      else delete a.jobS;
+      else a.jobS = undefined;
       a.tgt = 0;
       a.tk = 0;
       a.state = AS.Idle;

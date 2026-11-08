@@ -286,7 +286,7 @@ export function nestFloodSystem(w: World, dt: number): void {
       }
     } else if (a.uw !== undefined) {
       a.uw -= dt * B.breathBack;
-      if (a.uw <= 0) delete a.uw;
+      if (a.uw <= 0) a.uw = undefined;
     }
   }
   if (!wet) return;

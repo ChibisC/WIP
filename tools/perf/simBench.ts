@@ -1,7 +1,7 @@
 /**
  * The simulation's stress scenes (performance v3, claude/performance/03-spec-performance-v3-big-colonies.md §1):
- * deterministic, repeatable worlds at 500–2,000 ants, timed per tick and per system, with a state hash every 50 ticks
- * so two builds can be compared (the same hash list = the same results).
+ * deterministic, repeatable worlds at 500–2,000 ants, timed per tick and per system, with a canonical state hash
+ * every 50 ticks (tools/perf/canon.ts) so two builds can be compared (the same hash list = the same results).
  *
  *   npx vite-node tools/perf/simBench.ts -- [scenes=fight,economy,nests,ten,titan,tunnel] [ants=500,1000,1500,2000]
  *       [ticks=200] [--out results.json] [--systems] [--prof]
@@ -27,7 +27,7 @@ import { spawnCreature } from '../../src/sim/creatures/creatureAI';
 import { startTitanRaid } from '../../src/sim/creatures/titanDig';
 import { designateDig } from '../../src/sim/colony';
 import { routes, ownHalf } from '../../src/sim/tunnels';
-import { hashState } from '../../src/sim/snapshot';
+import { canonHash } from './canon';
 import { stressSetup } from '../../src/dev/stressScene';
 
 const argv = process.argv.slice(2).filter((a) => a !== '--');
@@ -239,7 +239,8 @@ for (const scene of SCENES)
       w.step(0.05);
       times.push(performance.now() - t0);
       w.events.drain();
-      if ((i + 1) % 50 === 0) hashes.push(hashState(w));
+      // (canonical: keys sorted, so a build that only orders an object's fields differently compares equal)
+      if ((i + 1) % 50 === 0) hashes.push(canonHash(w));
     }
     const sorted = times.slice().sort((a, b) => a - b);
     const avg = times.reduce((a, b) => a + b, 0) / times.length;

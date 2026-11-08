@@ -12,87 +12,257 @@ export function idHash(id: number): number {
   return x >>> 0;
 }
 
+/**
+ * Every field an ant can have, in one order (performance v3): an ant made here, or restored from a save
+ * (`normalizeAnt`), has all of them from the start — the optional ones `undefined` — so every ant shares one object
+ * shape and the hot loops read their fields at one place each instead of looking them up among a hundred shapes.
+ * `undefined` is "absent" everywhere (the snapshot and the frames skip it). tests/performance.ts checks the list
+ * against the `Ant` interface: a new field goes here too.
+ */
+export function antShape(): Ant {
+  return {
+    id: undefined,
+    colony: undefined,
+    team: undefined,
+    caste: undefined,
+    space: undefined,
+    x: undefined,
+    y: undefined,
+    px: undefined,
+    py: undefined,
+    h: undefined,
+    ph: undefined,
+    v: undefined,
+    hp: undefined,
+    maxHp: undefined,
+    age: undefined,
+    state: undefined,
+    st: undefined,
+    task: undefined,
+    taskT: undefined,
+    tx: undefined,
+    ty: undefined,
+    tgt: undefined,
+    tk: undefined,
+    carry: undefined,
+    carryId: undefined,
+    carryAmt: undefined,
+    crop: undefined,
+    scoutH: undefined,
+    partner: undefined,
+    contact: undefined,
+    pause: undefined,
+    turn: undefined,
+    alarm: undefined,
+    gId: undefined,
+    gKind: undefined,
+    gSlot: undefined,
+    venom: undefined,
+    venomT: undefined,
+    venomDps: undefined,
+    cd: undefined,
+    cd2: undefined,
+    marker: undefined,
+    ent: undefined,
+    fz: undefined,
+    fvz: undefined,
+    fvx: undefined,
+    fvy: undefined,
+    deadT: undefined,
+    pose: undefined,
+    look: undefined,
+    slowT: undefined,
+    stun: undefined,
+    meetCd: undefined,
+    lost: undefined,
+    sizeVar: undefined,
+    colorVar: undefined,
+    pinned: undefined,
+    ride: undefined,
+    tile: undefined,
+    power: undefined,
+    level: undefined,
+    jobK: undefined,
+    jobQ: undefined,
+    lostT: undefined,
+    udr: undefined,
+    fhd: undefined,
+    gUn: undefined,
+    trf: undefined,
+    avs: undefined,
+    avT: undefined,
+    bN: undefined,
+    rotT: undefined,
+    fsrc: undefined,
+    rushH: undefined,
+    rushT: undefined,
+    waitT: undefined,
+    rsv: undefined,
+    flk: undefined,
+    blkD: undefined,
+    blkT: undefined,
+    repT: undefined,
+    anc: undefined,
+    stp: undefined,
+    stx: undefined,
+    sty: undefined,
+    bkS: undefined,
+    bkI: undefined,
+    garT: undefined,
+    rideId: undefined,
+    ridePh: undefined,
+    rideRail: undefined,
+    rideSlot: undefined,
+    rideT: undefined,
+    climbCd: undefined,
+    rideWalk: undefined,
+    softLand: undefined,
+    dirA: undefined,
+    dirW: undefined,
+    dirL: undefined,
+    dirX: undefined,
+    dirY: undefined,
+    lastHit: undefined,
+    tauntCd: undefined,
+    tauntFx: undefined,
+    tauntBy: undefined,
+    tauntT: undefined,
+    rage: undefined,
+    rageT: undefined,
+    rageFx: undefined,
+    rageAura: undefined,
+    rageTick: undefined,
+    stingN: undefined,
+    jobS: undefined,
+    entT: undefined,
+    rampT: undefined,
+    rampN: undefined,
+    rampG: undefined,
+    fire: undefined,
+    root: undefined,
+    rootImm: undefined,
+    idleT: undefined,
+    chT: undefined,
+    chCd: undefined,
+    glueCd: undefined,
+    alCd: undefined,
+    alertUntil: undefined,
+    alX: undefined,
+    alY: undefined,
+    variant: undefined,
+    snapCd: undefined,
+    holdId: undefined,
+    holdKind: undefined,
+    holdT: undefined,
+    heldBy: undefined,
+    exec: undefined,
+    gripCr: undefined,
+    surgeT: undefined,
+    surgeCd: undefined,
+    ecPh: undefined,
+    ecT: undefined,
+    ecN: undefined,
+    ecY: undefined,
+    helpOf: undefined,
+    ecE: undefined,
+    link: undefined,
+    xing: undefined,
+    xt: undefined,
+    glueT: undefined,
+    uw: undefined,
+    fl: undefined,
+    flB: undefined,
+  } as unknown as Ant;
+}
+
+/** An ant from a save or a snapshot in the one shape (its fields copied over; any unknown old field kept at the end). */
+export function normalizeAnt(o: Ant): Ant {
+  const a = antShape() as unknown as Record<string, unknown>;
+  for (const k in o) a[k] = (o as unknown as Record<string, unknown>)[k];
+  return a as unknown as Ant;
+}
+
 export function makeAnt(w: World, colony: number, caste: string, space: number, x: number, y: number, h = 0): Ant {
   const c = casteOf(caste);
   const col = w.colony(colony);
   const hpMul = col?.player ? w.s.settings.statMul : w.s.settings.enemyStatMul;
   const hp = c.hp * hpMul;
-  const a: Ant = {
-    id: w.nextId(),
-    colony,
-    team: col?.team ?? colony,
-    caste,
-    space,
-    x,
-    y,
-    px: x,
-    py: y,
-    h,
-    ph: h,
-    v: 0,
-    hp,
-    maxHp: hp,
-    age: 0,
-    state: AS.Idle,
-    st: 0,
-    task: 'idle',
-    taskT: 0,
-    tx: x,
-    ty: y,
-    tgt: 0,
-    tk: 0,
-    carry: Carry.None,
-    carryId: 0,
-    carryAmt: 0,
-    crop: 0,
-    scoutH: 0,
-    partner: 0,
-    contact: 0,
-    pause: 0,
-    turn: 0,
-    alarm: 0,
-    gId: 0,
-    gKind: 0,
-    gSlot: 0,
-    venom: 0,
-    venomT: 0,
-    venomDps: 0,
-    cd: 0,
-    cd2: 0,
-    marker: -1,
-    ent: 0,
-    fz: 0,
-    fvz: 0,
-    fvx: 0,
-    fvy: 0,
-    deadT: 0,
-    pose: 0,
-    look: 0,
-    slowT: 0,
-    stun: 0,
-    meetCd: w.rng.range(0, 4),
-    lost: 0,
-    sizeVar: c.role === 'queen' ? 0 : w.rng.range(-1, 1),
-    colorVar: w.rng.range(-1, 1),
-    pinned: 0,
-    ride: 0,
-    tile: -1,
-    power: 1,
-    level: 1,
-    jobK: 0,
-    jobQ: -1,
-    lostT: 0,
-    // combat v2.2 (the under-pass): set from the start so every ant keeps one object shape (written every other tick)
-    udr: 0,
-    fhd: 0,
-    gUn: 0,
-    trf: 0,
-    avs: 0,
-    avT: 0,
-    bN: 0,
-    rotT: 0,
-    fsrc: 0,
-  };
+  // (the fields in the order they were always set: the random draws for meetCd, sizeVar and colorVar keep theirs)
+  const a = antShape();
+  a.id = w.nextId();
+  a.colony = colony;
+  a.team = col?.team ?? colony;
+  a.caste = caste;
+  a.space = space;
+  a.x = x;
+  a.y = y;
+  a.px = x;
+  a.py = y;
+  a.h = h;
+  a.ph = h;
+  a.v = 0;
+  a.hp = hp;
+  a.maxHp = hp;
+  a.age = 0;
+  a.state = AS.Idle;
+  a.st = 0;
+  a.task = 'idle';
+  a.taskT = 0;
+  a.tx = x;
+  a.ty = y;
+  a.tgt = 0;
+  a.tk = 0;
+  a.carry = Carry.None;
+  a.carryId = 0;
+  a.carryAmt = 0;
+  a.crop = 0;
+  a.scoutH = 0;
+  a.partner = 0;
+  a.contact = 0;
+  a.pause = 0;
+  a.turn = 0;
+  a.alarm = 0;
+  a.gId = 0;
+  a.gKind = 0;
+  a.gSlot = 0;
+  a.venom = 0;
+  a.venomT = 0;
+  a.venomDps = 0;
+  a.cd = 0;
+  a.cd2 = 0;
+  a.marker = -1;
+  a.ent = 0;
+  a.fz = 0;
+  a.fvz = 0;
+  a.fvx = 0;
+  a.fvy = 0;
+  a.deadT = 0;
+  a.pose = 0;
+  a.look = 0;
+  a.slowT = 0;
+  a.stun = 0;
+  a.meetCd = w.rng.range(0, 4);
+  a.lost = 0;
+  a.sizeVar = c.role === 'queen' ? 0 : w.rng.range(-1, 1);
+  a.colorVar = w.rng.range(-1, 1);
+  a.pinned = 0;
+  a.ride = 0;
+  a.tile = -1;
+  a.power = 1;
+  a.level = 1;
+  a.jobK = 0;
+  a.jobQ = -1;
+  a.lostT = 0;
+  // combat v2.2 (the under-pass): set from the start so every ant keeps one object shape (written every other tick)
+  a.udr = 0;
+  a.fhd = 0;
+  a.gUn = 0;
+  a.trf = 0;
+  a.avs = 0;
+  a.avT = 0;
+  a.bN = 0;
+  a.rotT = 0;
+  a.fsrc = 0;
   // Species extras, only on the castes that use them (other species' records stay as they were).
   if (c.termite) {
     if (c.termite === 'nasute') {
