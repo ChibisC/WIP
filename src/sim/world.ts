@@ -323,36 +323,21 @@ export class World {
   antsNear(space: number, x: number, y: number, r: number, cb: (a: Ant, d2: number) => boolean | void): void {
     const h = space === SURFACE ? this.antHashSurface : this.antHashNest.get(space);
     if (!h) return;
-    const ants = this.s.ants;
-    h.query(x, y, r, (i, d2) => {
-      const a = ants[i];
-      if (!a || a.space !== space) return false;
-      return cb(a, d2);
-    });
+    h.queryIn(this.s.ants, space, x, y, r, cb);
   }
 
   /** Like `antsNear`, but the callback gets the ant's index in `s.ants` (scratch arrays keyed by index). */
   antIdxNear(space: number, x: number, y: number, r: number, cb: (i: number, d2: number) => boolean | void): void {
     const h = space === SURFACE ? this.antHashSurface : this.antHashNest.get(space);
     if (!h) return;
-    const ants = this.s.ants;
-    h.query(x, y, r, (i, d2) => {
-      const a = ants[i];
-      if (!a || a.space !== space) return false;
-      return cb(i, d2);
-    });
+    h.queryIdxIn(this.s.ants, space, x, y, r, cb);
   }
 
   /** Ants of other teams near a point (friends are skipped inside the hash walk). */
   enemiesNear(space: number, team: number, x: number, y: number, r: number, cb: (a: Ant, d2: number) => boolean | void): void {
     const h = space === SURFACE ? this.antHashSurface : this.antHashNest.get(space);
     if (!h) return;
-    const ants = this.s.ants;
-    h.queryOthers(x, y, r, team, (i, d2) => {
-      const a = ants[i];
-      if (!a || a.space !== space) return false;
-      return cb(a, d2);
-    });
+    h.queryOthersIn(this.s.ants, space, x, y, r, team, cb);
   }
 
   foodNear(x: number, y: number, r: number, cb: (f: Food, d2: number) => boolean | void): void {

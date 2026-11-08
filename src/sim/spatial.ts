@@ -94,6 +94,104 @@ export class SpatialHash {
       }
   }
 
+  /**
+   * `query` over a list's entries in `space` (ants: the hash holds their index; one that has left the space since the
+   * hash was built is skipped) — the callback gets the entry itself, with no closure in between (performance v3: the
+   * same items in the same order as `query` with that filter).
+   */
+  queryIn<T extends { space: number }>(list: readonly T[], space: number, x: number, y: number, r: number, cb: (o: T, d2: number) => boolean | void): void {
+    const c = this.cell;
+    const x0 = Math.max(0, Math.floor((x - r) / c) + 1);
+    const x1 = Math.min(this.w - 1, Math.floor((x + r) / c) + 1);
+    const y0 = Math.max(0, Math.floor((y - r) / c) + 1);
+    const y1 = Math.min(this.h - 1, Math.floor((y + r) / c) + 1);
+    const r2 = r * r;
+    const xs = this.xs;
+    const ys = this.ys;
+    const items = this.items;
+    const next = this.next;
+    const head = this.head;
+    const w = this.w;
+    for (let cy = y0; cy <= y1; cy++)
+      for (let cx = x0; cx <= x1; cx++) {
+        let i = head[cy * w + cx];
+        while (i !== -1) {
+          const dx = xs[i] - x;
+          const dy = ys[i] - y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 <= r2) {
+            const o = list[items[i]];
+            if (o && o.space === space && cb(o, d2)) return;
+          }
+          i = next[i];
+        }
+      }
+  }
+
+  /** `queryIn`, the callback getting the entry's index in the list. */
+  queryIdxIn<T extends { space: number }>(list: readonly T[], space: number, x: number, y: number, r: number, cb: (i: number, d2: number) => boolean | void): void {
+    const c = this.cell;
+    const x0 = Math.max(0, Math.floor((x - r) / c) + 1);
+    const x1 = Math.min(this.w - 1, Math.floor((x + r) / c) + 1);
+    const y0 = Math.max(0, Math.floor((y - r) / c) + 1);
+    const y1 = Math.min(this.h - 1, Math.floor((y + r) / c) + 1);
+    const r2 = r * r;
+    const xs = this.xs;
+    const ys = this.ys;
+    const items = this.items;
+    const next = this.next;
+    const head = this.head;
+    const w = this.w;
+    for (let cy = y0; cy <= y1; cy++)
+      for (let cx = x0; cx <= x1; cx++) {
+        let i = head[cy * w + cx];
+        while (i !== -1) {
+          const dx = xs[i] - x;
+          const dy = ys[i] - y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 <= r2) {
+            const k = items[i];
+            const o = list[k];
+            if (o && o.space === space && cb(k, d2)) return;
+          }
+          i = next[i];
+        }
+      }
+  }
+
+  /** `queryOthers` over a list's entries in `space` (see `queryIn`). */
+  queryOthersIn<T extends { space: number }>(list: readonly T[], space: number, x: number, y: number, r: number, skip: number, cb: (o: T, d2: number) => boolean | void): void {
+    const c = this.cell;
+    const x0 = Math.max(0, Math.floor((x - r) / c) + 1);
+    const x1 = Math.min(this.w - 1, Math.floor((x + r) / c) + 1);
+    const y0 = Math.max(0, Math.floor((y - r) / c) + 1);
+    const y1 = Math.min(this.h - 1, Math.floor((y + r) / c) + 1);
+    const r2 = r * r;
+    const tags = this.tags;
+    const xs = this.xs;
+    const ys = this.ys;
+    const items = this.items;
+    const next = this.next;
+    const head = this.head;
+    const w = this.w;
+    for (let cy = y0; cy <= y1; cy++)
+      for (let cx = x0; cx <= x1; cx++) {
+        let i = head[cy * w + cx];
+        while (i !== -1) {
+          if (tags[i] !== skip) {
+            const dx = xs[i] - x;
+            const dy = ys[i] - y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 <= r2) {
+              const o = list[items[i]];
+              if (o && o.space === space && cb(o, d2)) return;
+            }
+          }
+          i = next[i];
+        }
+      }
+  }
+
   /** Like `query`, but skips items tagged `skip` before measuring them (ants: your own team). */
   queryOthers(x: number, y: number, r: number, skip: number, cb: (item: number, d2: number) => boolean | void): void {
     const c = this.cell;
