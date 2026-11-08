@@ -121,8 +121,6 @@ export const FOREST_FLOOR: MapDef = {
     { kind: 'aphid', shape: { circle: [886.8, 307.6], r: 40 }, name: 'seedlings' },
     { kind: 'plant', shape: { circle: [921.6, 346], r: 45 } },
     { kind: 'plant', shape: { circle: [678.4, 1254], r: 45 } },
-    { kind: 'lair', shape: { circle: [1000, 920], r: 35 }, name: 'spider hollow' },
-    { kind: 'lair', shape: { circle: [600, 680], r: 35 }, name: 'beetle hollow' },
     { kind: 'litter', shape: { circle: [1000, 920], r: 110 } },
     { kind: 'litter', shape: { circle: [600, 680], r: 110 } },
     { kind: 'litter', shape: { circle: [1120, 245.7], r: 90 } },

@@ -38,12 +38,12 @@ export interface CrownShapes {
 }
 
 const STYLE: Record<CrownStyle, { branches: [number, number]; width: number; droop: number; twigs: number; leaf: number; flowers: number; wobble: number }> = {
-  oak: { branches: [5, 6], width: 2.6, droop: 0.3, twigs: 2, leaf: 1.0, flowers: 1, wobble: 0.35 },
-  beech: { branches: [4, 5], width: 2.2, droop: 0.2, twigs: 2, leaf: 1.1, flowers: 0, wobble: 0.25 },
-  tropical: { branches: [5, 7], width: 2.8, droop: 0.15, twigs: 3, leaf: 1.4, flowers: 2, wobble: 0.3 },
-  willow: { branches: [6, 8], width: 1.8, droop: 0.6, twigs: 1, leaf: 0.7, flowers: 0, wobble: 0.5 },
-  acacia: { branches: [4, 5], width: 2.0, droop: 0.05, twigs: 2, leaf: 0.6, flowers: 1, wobble: 0.2 },
-  sapling: { branches: [3, 3], width: 1.6, droop: 0.1, twigs: 1, leaf: 0.8, flowers: 0, wobble: 0.3 },
+  oak: { branches: [5, 6], width: 2.1, droop: 0.3, twigs: 2, leaf: 0.9, flowers: 1, wobble: 0.35 },
+  beech: { branches: [4, 5], width: 1.8, droop: 0.2, twigs: 2, leaf: 1.0, flowers: 0, wobble: 0.25 },
+  tropical: { branches: [5, 7], width: 2.3, droop: 0.15, twigs: 3, leaf: 1.2, flowers: 2, wobble: 0.3 },
+  willow: { branches: [6, 8], width: 1.5, droop: 0.6, twigs: 1, leaf: 0.65, flowers: 0, wobble: 0.5 },
+  acacia: { branches: [4, 5], width: 1.7, droop: 0.05, twigs: 2, leaf: 0.55, flowers: 1, wobble: 0.2 },
+  sapling: { branches: [3, 3], width: 1.4, droop: 0.1, twigs: 1, leaf: 0.75, flowers: 0, wobble: 0.3 },
 };
 
 /**
@@ -116,6 +116,55 @@ export function crownShapes(def: TreeDef, hexW: number): CrownShapes {
   return out;
 }
 
+/**
+ * The boughs that join the trees: the shortest spanning tree over the trunks (deterministic), each link a path from one
+ * trunk top toward the other with a gentle wobble, leaves along it; where the crowns overlap it simply runs through them.
+ */
+export function linkBranches(defs: TreeDef[], hexW: number): Array<{ path: Pt[]; width: number; leaves: Pt[]; rot: number }> {
+  const out: Array<{ path: Pt[]; width: number; leaves: Pt[]; rot: number }> = [];
+  if (defs.length < 2) return out;
+  const inTree = new Set<number>([0]);
+  const edges: Array<[number, number]> = [];
+  while (inTree.size < defs.length) {
+    let best: [number, number] | null = null;
+    let bd = Infinity;
+    for (const a of inTree)
+      defs.forEach((d, b) => {
+        if (inTree.has(b)) return;
+        const dd = dhypot(d.trunk[0] - defs[a].trunk[0], d.trunk[1] - defs[a].trunk[1]);
+        if (dd < bd) {
+          bd = dd;
+          best = [a, b];
+        }
+      });
+    if (!best) break;
+    inTree.add(best[1]);
+    edges.push(best);
+  }
+  edges.forEach(([a, b], i) => {
+    const A = defs[a].trunk;
+    const B = defs[b].trunk;
+    const rng = new Rng(defs[a].seed * 7 + defs[b].seed * 13 + i);
+    const len = dhypot(B[0] - A[0], B[1] - A[1]);
+    const n = Math.max(3, Math.round(len / 90));
+    const h0 = datan2(B[1] - A[1], B[0] - A[0]);
+    const path: Pt[] = [A];
+    const leaves: Pt[] = [];
+    for (let k = 1; k < n; k++) {
+      const u = k / n;
+      // a sine wobble across the straight line, fading at both ends
+      const off = dsin(u * Math.PI * 2 + rng.range(0, 1)) * len * 0.07 * dsin(u * Math.PI);
+      const x = A[0] + (B[0] - A[0]) * u + dcos(h0 + Math.PI / 2) * off;
+      const y = A[1] + (B[1] - A[1]) * u + dsin(h0 + Math.PI / 2) * off;
+      path.push([x, y]);
+      if (k % 2 === 0) leaves.push([x + dcos(h0 + Math.PI / 2) * hexW * 1.4 * rng.sign(), y + dsin(h0 + Math.PI / 2) * hexW * 1.4]);
+    }
+    path.push(B);
+    out.push({ path, width: hexW * 1.15, leaves, rot: h0 });
+  });
+  return out;
+}
+
 /** The trees of a match: the map's authored trees, or on a procedural map a few grown from the seed away from the nests. */
 export function treesOf(w: World): TreeDef[] {
   const map = w.terrain.map;
@@ -178,6 +227,12 @@ export function buildCanopy(w: World): { g: NestGrid; kinds: Uint8Array; comps: 
     const top = g.hexAt(def.trunk[0], def.trunk[1]);
     trunks.push({ x: def.trunk[0], y: def.trunk[1], r: def.r, top, climbs: [], tree: ti, comp: 0 });
   });
+  // every tree is joined to the others by branches reaching out (user 2026-11-07): a spanning tree over the trunks, each
+  // link a long wobbling bough from crown to crown, twig-wide, with a leaf or two along it
+  for (const b of linkBranches(defs, hexW)) {
+    shapesOf.push({ shape: { path: b.path, width: b.width }, kind: TK_WOOD });
+    for (const l of b.leaves) shapesOf.push({ shape: { ellipse: l, rx: hexW * 1.3, ry: hexW * 0.9, rot: b.rot }, kind: TK_LEAF });
+  }
   // paint the hexes: wood first, then leaves over it, the trunk tops last
   for (const kind of [TK_WOOD, TK_LEAF, TK_TOP]) {
     for (const s of shapesOf) {

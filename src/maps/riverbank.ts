@@ -134,8 +134,6 @@ export const RIVERBANK: MapDef = {
     { kind: 'plant', shape: { circle: [1500, 110], r: 45 } },
     { kind: 'plant', shape: { circle: [110, 1300], r: 45 } },
     { kind: 'plant', shape: { circle: [1700, 1300], r: 45 } },
-    { kind: 'lair', shape: { circle: [30, 40], r: 30 }, name: 'north burrow' },
-    { kind: 'lair', shape: { circle: [1770, 1360], r: 30 }, name: 'south burrow' },
     // wild creatures come from the far edges of both banks
     { kind: 'creature', shape: { poly: [
         [0, 0], [1800, 0], [1800, 80], [0, 80],

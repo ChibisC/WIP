@@ -130,8 +130,6 @@ export const MEADOW_POND: MapDef = {
     { kind: 'plant', shape: { circle: [565.0, 392.9], r: 50 } },
     { kind: 'plant', shape: { circle: [565.0, 1207.1], r: 50 } },
     { kind: 'plant', shape: { circle: [1035.0, 392.9], r: 50 } },
-    { kind: 'lair', shape: { circle: [618.8, 1476.1], r: 35 }, name: 'south burrow' },
-    { kind: 'lair', shape: { circle: [981.2, 123.9], r: 35 }, name: 'north burrow' },
     // wild creatures come out of the long grass along the edges
     { kind: 'creature', shape: { poly: [[0, 0], [1600, 0], [1600, 90], [0, 90]] } },
     { kind: 'creature', shape: { poly: [[0, 1510], [1600, 1510], [1600, 1600], [0, 1600]] } },

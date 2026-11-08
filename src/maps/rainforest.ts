@@ -120,8 +120,6 @@ export const RAINFOREST: MapDef = {
     { kind: 'aphid', shape: { circle: [520, 1380], r: 40 }, name: 'seedlings' },
     { kind: 'plant', shape: { circle: [300, 1250], r: 40 } },
     { kind: 'plant', shape: { circle: [1200, 250], r: 40 } },
-    { kind: 'lair', shape: { circle: [560, 380], r: 30 }, name: 'spider roots' },
-    { kind: 'lair', shape: { circle: [940, 1120], r: 30 }, name: 'spider roots' },
     { kind: 'litter', shape: { circle: [470, 520], r: 120 } },
     { kind: 'litter', shape: { circle: [1030, 980], r: 120 } },
     { kind: 'creature', shape: { poly: [

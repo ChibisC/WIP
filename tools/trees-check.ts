@@ -76,6 +76,10 @@ for (const id of ids) {
   let blocked = 0;
   for (const t of d.trunks) if (!w.terrain.passable(t.x, t.y)) blocked++;
   check(`${id}: trunks block the ground`, blocked === d.trunks.length);
+  // every tree joined to the others by boughs (user 2026-11-07): one crown
+  const comps = new Set<number>();
+  for (const t of d.trunks) comps.add(t.comp);
+  check(`${id}: all trees joined into one canopy`, comps.size === 1, `${comps.size} separate crowns`);
 }
 console.log(bad ? `${bad} problems` : 'all trees checks passed');
 process.exit(bad ? 1 : 0);

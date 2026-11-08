@@ -474,3 +474,10 @@ input.vol::-moz-range-thumb { width: calc(14 * var(--u)); height: calc(14 * var(
 .gui.touch .mp-col.ord-open .mp-orders { display: flex; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 6; gap: calc(5 * var(--u)); padding: calc(5 * var(--u)); background: linear-gradient(180deg, #2a2016, #16110c); border: 1px solid var(--bronze-hi); border-radius: calc(4 * var(--u)); box-shadow: 0 calc(4 * var(--u)) calc(14 * var(--u)) rgba(0,0,0,.7); }
 .gui.touch .mp-ord.bbtn { width: calc(42 * var(--u)); height: calc(42 * var(--u)); }
 .gui.touch .mp-ord .ic { width: calc(24 * var(--u)); height: calc(24 * var(--u)); }
+
+/* the Trees layer: the tall "TREES" bar right of the ground map (claude/trees/01-spec-trees-layer.md §3) */
+.mm-trees { position: relative; width: calc(34 * var(--u)); height: calc(196 * var(--u)); padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ink-dim); background: linear-gradient(180deg, rgba(60,92,40,0.55), rgba(28,38,22,0.75)); border: calc(1 * var(--u)) solid var(--bronze); }
+.mm-trees:hover { color: var(--ink); border-color: var(--bronze-hi); }
+.mm-trees.up { border-color: var(--bronze-hi); background: linear-gradient(180deg, rgba(92,70,46,0.6), rgba(40,30,20,0.8)); }
+.mm-trees-lbl { writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--head-font); font-size: calc(15 * var(--u)); letter-spacing: calc(3 * var(--u)); text-shadow: 0 1px 2px #000; pointer-events: none; }
+.mm-trees[hidden] { display: none; }

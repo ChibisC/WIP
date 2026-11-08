@@ -1,3 +1,4 @@
+import type { AreaTerrain } from './nest/areaTerrain';
 import * as THREE from 'three';
 import { setBakeRenderer } from './bake/detailBake';
 import { Input } from '../core/input';
@@ -11,6 +12,8 @@ import { BIOME_LIGHT, applyBiomeLight } from './mapBiomes';
 import { Props } from './props';
 import { Water } from './water';
 import { NestTerrain } from './nest/nestTerrain';
+import { CanopyTerrain } from './trees/canopyTerrain';
+import { TREES } from '../sim/types';
 import { PostPipeline } from './post';
 import { createNestEnvironment, createSurfaceEnvironment, NestLights, SurfaceLights } from './environment';
 import { ObserveCameraRig, SurfaceCameraRig } from './cameras';
@@ -54,7 +57,7 @@ export interface NestStage {
   /** sim space id of the area */
   space: number;
   scene: THREE.Scene;
-  terrain: NestTerrain;
+  terrain: AreaTerrain;
   lights: NestLights;
   cam: { x: number; z: number; dist: number; yaw: number; pitch: number } | null;
 }
@@ -310,7 +313,7 @@ export class GameView {
     return this.nestStage?.scene ?? this.emptyNest;
   }
 
-  get nestTerrain(): NestTerrain | null {
+  get nestTerrain(): AreaTerrain | null {
     return this.nestStage?.terrain ?? null;
   }
 
@@ -340,6 +343,142 @@ export class GameView {
     this.nestStages.set(space, st);
     if (this.activeNest < 0) this.setActiveNest(space);
     return st;
+  }
+
+  /**
+   * The Trees map (CHANGE_PLAN §30): a stage like a nest's, under the daylight, its ground the canopy; the ground far
+   * below is a backdrop plane carrying a blurred, darkened render of the surface (`refreshBackdrop`). Shown as the area
+   * `TREES` through the nest machinery (camera, picking, the per-space view); `riseTo` moves between it and the ground.
+   */
+  addTrees(grid: NestGrid, kinds: Uint8Array, height: number): NestStage {
+    const scene = new THREE.Scene();
+    const terrain = new CanopyTerrain(grid, kinds, height);
+    terrain.setShadows(this.preset.shadows);
+    scene.add(terrain.group);
+    const W = grid.widthMm;
+    const D = grid.depthMm;
+    // daylight: the surface's sky light and image-based light, the sun from the same side
+    scene.environment = this.surfaceScene.environment;
+    scene.background = new THREE.Color(0x9fb7c9);
+    const sunDir = this.surfaceLights.sunDir;
+    const sun = new THREE.DirectionalLight(this.surfaceLights.sun.color, Math.max(0.9, this.daySun * 0.8));
+    sun.castShadow = this.preset.shadows;
+    sun.shadow.mapSize.set(this.preset.shadowSize, this.preset.shadowSize);
+    sun.shadow.bias = -0.0008;
+    sun.shadow.normalBias = 0.6;
+    sun.target.position.set(W / 2, 0, D / 2);
+    sun.position.set(W / 2, 0, D / 2).addScaledVector(sunDir, 900);
+    const sc = sun.shadow.camera as THREE.OrthographicCamera;
+    sc.left = -320;
+    sc.right = 320;
+    sc.top = 320;
+    sc.bottom = -320;
+    sc.near = 10;
+    sc.far = 2400;
+    sc.updateProjectionMatrix();
+    const hemi = new THREE.HemisphereLight(this.surfaceLights.hemi.color, new THREE.Color(0.25, 0.3, 0.14), Math.max(0.35, this.dayHemi * 0.7));
+    const fill = new THREE.DirectionalLight(0xbcd0e8, 0.12);
+    fill.position.set(-300, 200, 400);
+    const ambient = new THREE.AmbientLight(0x9fb0c0, 0.03);
+    scene.add(sun, sun.target, hemi, fill, ambient);
+    // the air between the camera and the ground far below: a thin haze
+    scene.fog = new THREE.FogExp2(0xb9c9d6, 0.35 / Math.max(W, D));
+    // the backdrop: the ground `height` below, drawn from a render of the surface scene (refreshed now and then)
+    const bd = new THREE.Mesh(new THREE.PlaneGeometry(W * 1.6, D * 1.6), new THREE.MeshBasicMaterial({ color: 0x5c6a58, fog: true }));
+    bd.rotation.x = -Math.PI / 2;
+    bd.position.set(W / 2, -height, D / 2);
+    bd.receiveShadow = false;
+    scene.add(bd);
+    this.treesBackdrop = bd;
+    const st: NestStage = { space: TREES, scene, terrain, lights: { key: sun, fill, ambient, points: [] }, cam: null };
+    this.nestStages.set(TREES, st);
+    return st;
+  }
+
+  /** the trees' backdrop plane (the blurred ground far below) and when it was last rendered */
+  private treesBackdrop: THREE.Mesh | null = null;
+  private backdropAt = -1e9;
+  private backdropRT: THREE.WebGLRenderTarget | null = null;
+
+  /** Render the ground into the trees' backdrop: a low-resolution top-down shot of the surface, darkened and desaturated by the material. */
+  refreshBackdrop(force = false): void {
+    const bd = this.treesBackdrop;
+    const t = this.terrain;
+    if (!bd || !t) return;
+    if (!force && this.time - this.backdropAt < 12) return;
+    this.backdropAt = this.time;
+    const W = t.width;
+    const D = t.depth;
+    const res = 384;
+    if (!this.backdropRT) {
+      this.backdropRT = new THREE.WebGLRenderTarget(res, res, { depthBuffer: true });
+      this.backdropRT.texture.minFilter = THREE.LinearFilter;
+      this.backdropRT.texture.magFilter = THREE.LinearFilter;
+      this.backdropRT.texture.colorSpace = THREE.SRGBColorSpace;
+    }
+    const cam = new THREE.OrthographicCamera(-W * 0.8, W * 0.8, D * 0.8, -D * 0.8, 1, 4000);
+    cam.position.set(W / 2, 1500, D / 2);
+    cam.up.set(0, 0, -1);
+    cam.lookAt(W / 2, 0, D / 2);
+    cam.updateMatrixWorld();
+    const prevRT = this.renderer.getRenderTarget();
+    const prevShadow = this.renderer.shadowMap.enabled;
+    this.renderer.shadowMap.enabled = false;
+    this.renderer.setRenderTarget(this.backdropRT);
+    this.renderer.render(this.surfaceScene, cam);
+    this.renderer.setRenderTarget(prevRT);
+    this.renderer.shadowMap.enabled = prevShadow;
+    const m = bd.material as THREE.MeshBasicMaterial;
+    m.map = this.backdropRT.texture;
+    // (darker and greyer than the ground seen up close: it is far below, in the trees' shade)
+    m.color.setRGB(0.42, 0.44, 0.4);
+    m.needsUpdate = true;
+  }
+
+  /** Is the trees map the area shown (the view's space is 'nest' then, as for any area)? */
+  get inTrees(): boolean {
+    return this.space === 'nest' && this.activeNest === TREES;
+  }
+
+  /**
+   * Between the ground and the trees (the "TREES" bar): a short rise (or drop) — the leaving camera pulls in a little,
+   * a quick fade, the arriving camera starts closer over the same spot and pulls back — pre-warmed by the session.
+   */
+  riseTo(to: 'surface' | 'trees'): void {
+    if (this.transitioning) return;
+    const sr = this.surfaceRig;
+    const nr = this.nestRig;
+    this.observing = false;
+    if (to === 'trees') {
+      if (!this.nestStages.has(TREES)) return;
+      const gx = sr.goal.x;
+      const gz = sr.goal.z;
+      const dist = sr.goalDistance;
+      sr.goalDistance = Math.max(sr.minDist, dist * 0.85);
+      this.fadeCut(() => {
+        this.setActiveNest(TREES, { x: gx, z: gz });
+        this.space = 'nest';
+        nr.jumpTo(gx, gz, Math.max(nr.minDist, dist * 0.8));
+        nr.yaw = nr.goalYaw = sr.goalYaw;
+        nr.goalDistance = dist;
+        sr.goalDistance = dist;
+        this.refreshBackdrop(true);
+        this.onSpaceChanged?.(this.space);
+      });
+    } else {
+      const gx = nr.goal.x;
+      const gz = nr.goal.z;
+      const dist = nr.goalDistance;
+      nr.goalDistance = Math.max(nr.minDist, dist * 0.85);
+      this.fadeCut(() => {
+        this.space = 'surface';
+        sr.jumpTo(Math.min(Math.max(gx, 0), this.terrain?.width ?? gx), Math.min(Math.max(gz, 0), this.terrain?.depth ?? gz), Math.max(sr.minDist, dist * 0.8));
+        sr.yaw = sr.goalYaw = nr.goalYaw;
+        sr.goalDistance = Math.min(dist, sr.maxDist);
+        nr.goalDistance = dist;
+        this.onSpaceChanged?.(this.space);
+      });
+    }
   }
 
   /** Show another area; the camera remembers where it was in each one. */
@@ -696,13 +835,34 @@ export class GameView {
       this.water?.rebuild();
     } else {
       this.nestTerrain?.update();
+      if (this.inTrees) {
+        // the trees' sun follows the view like the surface's
+        const st = this.nestStage!;
+        const sun = st.lights.key;
+        const f = this.nestRig.target;
+        const ext = THREE.MathUtils.clamp(this.nestRig.distance * 0.9, 40, 600);
+        const sc = sun.shadow.camera as THREE.OrthographicCamera;
+        if (Math.abs(sc.right - ext) > ext * 0.05) {
+          sc.left = -ext;
+          sc.right = ext;
+          sc.top = ext;
+          sc.bottom = -ext;
+          sc.updateProjectionMatrix();
+        }
+        const texel = (ext * 2) / sun.shadow.mapSize.x;
+        const fx = Math.round(f.x / texel) * texel;
+        const fz = Math.round(f.z / texel) * texel;
+        sun.target.position.set(fx, 0, fz);
+        sun.position.set(fx, 0, fz).addScaledVector(this.surfaceLights.sunDir, 900);
+        this.refreshBackdrop();
+      }
     }
     for (const f of this.beforeRender) f(dt);
 
     // Depth of field focus = distance to what we look at.
     const focus = this.observing ? this.observeRig.distance : this.space === 'surface' ? this.surfaceRig.distance : this.nestRig.distance;
     this.post.focusDistance = focus;
-    this.post.tilt = this.observing ? 0.15 : this.space === 'surface' ? 0.55 : 0.45;
+    this.post.tilt = this.observing ? 0.15 : this.space === 'surface' || this.inTrees ? 0.55 : 0.45;
     this.post.settings.dofStrength = this.observing ? 1.2 : 1;
     this.applyStorm(dt);
     const rig = this.observing ? null : this.surfaceRig;
@@ -723,7 +883,7 @@ export class GameView {
    * (sunny, forest shade; overcast in a storm), underground the nest's own warm, dim environment.
    */
   private applyCreatureLight(): void {
-    if (this.space === 'surface') {
+    if (this.space === 'surface' || this.inTrees) {
       const preset = this.stormShown > 0.5 ? 'overcast' : presetForBiome(this.terrain?.map?.biome);
       const key = `surface:${preset}`;
       if (key === this.crLight) return;
@@ -771,7 +931,7 @@ export class GameView {
 
   private applyGrade(): void {
     const g = this.post.settings.grade;
-    if (this.space === 'surface') {
+    if (this.space === 'surface' || this.inTrees) {
       const s = this.stormShown;
       const n = this.nightShown;
       g.exposure = this.night ? 1.25 : (1.0 - 0.12 * s) * (1 + 0.18 * n);

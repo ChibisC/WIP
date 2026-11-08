@@ -1,3 +1,4 @@
+import type { AreaTerrain } from './areaTerrain';
 import * as THREE from 'three';
 import { World } from '../../sim/world';
 import { Colony } from '../../sim/types';
@@ -93,7 +94,7 @@ export class TileDecor {
   private tick = 0;
   private lastKey = '';
 
-  constructor(private terrain: NestTerrain) {
+  constructor(private terrain: AreaTerrain) {
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 });
     this.crumbs = new InstancedPool(crumbGeometry(), mat, this.group, 256);
     this.seeds = new InstancedPool(seedGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5 }), this.group, 256);

@@ -73,6 +73,7 @@ function world(more: Record<string, unknown> = {}, seed = 5): World {
   check('the canopy grid lies in the ground frame', g.widthMm >= w.terrain.width - 20 && g.depthMm >= w.terrain.depth - 20, `${g.widthMm.toFixed(0)}×${g.depthMm.toFixed(0)} over ${w.terrain.width}×${w.terrain.depth}`);
   check('every trunk blocks the ground', d.trunks.every((t) => !w.terrain.passable(t.x, t.y)));
   check('4–6 sites, all three kinds', d.sites.length >= 4 && d.sites.length <= 6 && ['leaf', 'hollow', 'fork'].every((k) => d.sites.some((s) => s.kind === k)), d.sites.map((s) => s.kind).join(','));
+  check('every tree is joined to the others by boughs (one crown)', new Set(d.trunks.map((t) => t.comp)).size === 1, d.trunks.map((t) => t.comp).join(','));
   check('the climb points are the space’s entrances', w.entrancesOf(TREES).length === d.trunks.reduce((n, t) => n + t.climbs.length, 0));
   const kinds = kindsOf(d);
   let sky = 0;

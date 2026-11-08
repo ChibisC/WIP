@@ -142,8 +142,6 @@ export const SAVANNA: MapDef = {
     { kind: 'aphid', shape: { circle: [1385, 1180], r: 45 }, name: 'acacia shoots' },
     { kind: 'plant', shape: { circle: [752.4, 62.9], r: 50 } },
     { kind: 'plant', shape: { circle: [1047.6, 1737.1], r: 50 } },
-    { kind: 'lair', shape: { circle: [470, 155.2], r: 35 }, name: 'scorpion burrow' },
-    { kind: 'lair', shape: { circle: [1330, 1644.8], r: 35 }, name: 'scorpion burrow' },
     { kind: 'litter', shape: { circle: [740, 190], r: 100 } },
     { kind: 'litter', shape: { circle: [1060, 1610], r: 100 } },
     { kind: 'litter', shape: { circle: [1275, 460], r: 100 } },

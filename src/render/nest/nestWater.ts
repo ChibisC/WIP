@@ -1,3 +1,4 @@
+import type { AreaTerrain } from './areaTerrain';
 import * as THREE from 'three';
 import { NestGrid, SOIL_AIR } from '../../world/nestGrid';
 import { NestTerrain } from './nestTerrain';
@@ -45,7 +46,7 @@ export class NestWater {
 
   constructor(
     private grid: NestGrid,
-    private terrain: NestTerrain,
+    private terrain: AreaTerrain,
   ) {
     const g = grid;
     this.W = g.w;

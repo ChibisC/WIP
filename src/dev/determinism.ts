@@ -37,7 +37,6 @@ export const DET_SETUP: GameSetup = {
   ],
   caves: [
     { name: 'Root hollow', kind: 'cave', food: 60 },
-    { name: 'Beetle den', kind: 'lair', food: 40 },
   ],
   food: 1.2,
   // wild creatures on: they hunt, are hunted and become carcasses, all through the deterministic path
