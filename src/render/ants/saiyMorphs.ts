@@ -99,11 +99,11 @@ const SAIY_BLASTER = {
   mandible: { ...SAIY_WORKER.mandible, len: 0.46, width: 0.86, open: 0.75 },
   // the glowing mouth: head-local (x in head lengths from the back, y in head heights from the centre line, half sizes
   // in head length / height / width)
-  mouth: { at: [0.985, -0.24], r: [0.06, 0.12, 0.27] },
+  mouth: { at: [0.955, -0.2], r: [0.075, 0.1, 0.16] },
   meso: { ...SAIY_WORKER.meso, len: 0.37, width: 0.108, height: 0.124 },
   gaster: { len: 0.33, width: 0.2, height: 0.172, sting: false },
   legs: { hind: 1.24, thick: 0.0122 },
-  hair6: { ...SAIY_WORKER.hair6, lenMul: 1.18, spikes: SAIY_WORKER.hair6.spikes.map((s) => ({ ...s, pitch: Math.max(-4, s.pitch * 0.35 - 2), yaw: s.yaw * 0.65 })) },
+  hair6: { ...SAIY_WORKER.hair6, lenMul: 1.18, curl: 0.02, sag: 0.08, spikes: SAIY_WORKER.hair6.spikes.map((s) => ({ ...s, pitch: Math.max(-4, s.pitch * 0.35 - 2), yaw: s.yaw * 0.65 })) },
 };
 export const SAIY_MORPHS = { saiy_worker: SAIY_WORKER, saiy_soldier: SAIY_SOLDIER, saiy_queen: SAIY_QUEEN, saiy_blaster: SAIY_BLASTER };
 // ===== END SAIY-ANT MORPHS =====

@@ -22,7 +22,7 @@ import { afterBite, guardRush, hookMul } from './eciton';
 import { acidMulOn, glueBurst as termantGlue, termantArmorMul } from './termants';
 import { underOrder } from './markers';
 import { traitArmor, traitOnBite } from './story/traits';
-import { blastRange, blastShot, fireClear, orbStep, stopBeam } from './saiyBlaster';
+import { blastCharge, blastRange, blastShot, fireClear, orbStep, stopBeam } from './saiyBlaster';
 
 /**
  * Swarm combat: target acquisition, grappling (latching onto legs/antennae of
@@ -718,6 +718,7 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
   if ((acid || cd.blast) && a.cd2 <= 0 && d < range + t.r && (shooter || d > t.r + cd.length * 0.3) && !steppingBack) {
     a.state = AS.Spray;
     a.st = 0;
+    if (cd.blast) blastCharge(w, a);
     return true;
   }
   if (shooter) {
@@ -731,7 +732,8 @@ function attackUpdate(w: World, a: Ant, c: Colony, dt: number): boolean {
       const away = datan2(a.y - t.y, a.x - t.x);
       const h = a.h;
       a.h = away;
-      moveForward(w, a, antSpeed(w, a) * 0.85, dt);
+      // (the Saiy-Ant Blaster backs off at a walk, gold or not: melee that reaches it catches it — spec 09 §1)
+      moveForward(w, a, cd.blast ? cd.speed * BALANCE.blaster.backoff : antSpeed(w, a) * 0.85, dt);
       a.h = h;
       faceToward(a, t.x, t.y, dt);
       return true;

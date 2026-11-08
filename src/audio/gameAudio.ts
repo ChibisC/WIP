@@ -90,6 +90,9 @@ export class GameAudio {
   private glueBed = new LoopBed('species.nasute_glue');
   private glue = 0;
   private glueRamp = 0;
+  /** Saiy-Ant Blasters' beams on nearby: their steady roar-hum */
+  private beamBed = new LoopBed('species.blaster_beam');
+  private beams = 0;
   private mixer = new Mixer();
   private heat = 0;
   private boss = 0;
@@ -326,6 +329,18 @@ export class GameAudio {
         if (this.every('surge' + e.space, 0.6)) this.want('species.saiyant_surge', e.x, e.y, e.space, { pool: 'combat', gain: 0.8, heat: 0.1 });
         else this.want('species.saiyant_crackle', e.x, e.y, e.space, { pool: 'combat', gain: 0.55 });
         return;
+      // the Saiy-Ant Blaster (claude/saiy-ants/09-spec): the charge's rising hum, the orb's "fwip", the burst's sizzle (a
+      // fizzle is a soft, quiet pop), the beam's flash (its roar-hum is the beam bed, below)
+      case 'blastCharge':
+        return this.want('species.blaster_charge', e.x, e.y, e.space, { pool: 'combat', gain: e.beam ? 0.95 : 0.6, rate: e.beam ? 0.85 : 1, heat: 0.02 });
+      case 'orb':
+        return this.want('species.blaster_orb', e.x, e.y, e.space, { pool: 'combat', gain: 0.8, heat: 0.03 });
+      case 'orbHit':
+        return this.want('species.blaster_hit', e.x, e.y, e.space, { pool: 'combat', gain: 0.75, heat: 0.04 });
+      case 'orbFizz':
+        return this.want('species.blaster_hit', e.x, e.y, e.space, { pool: 'combat', gain: 0.25, rate: 1.45 });
+      case 'beam':
+        return this.want('species.blaster_orb', e.x, e.y, e.space, { pool: 'combat', gain: 1, rate: 0.62, reach: 1.6, heat: 0.15 });
       case 'glueBurst':
         // a conehead's glue landing: a sticky, stringy sputter
         return this.want('species.glue_splat', e.x, e.y, e.space, { pool: 'combat', gain: 0.75, heat: 0.03 });
@@ -482,6 +497,7 @@ export class GameAudio {
     let busy = 0;
     let glue = 0;
     let glueRamp = 0;
+    let beams = 0;
     const now = audio.now;
     for (const a of s.world.s.ants) {
       if (a.space !== L.space || a.state === AS.Dead) continue;
@@ -491,6 +507,7 @@ export class GameAudio {
       if (a.colony === s.player.id && a.space !== SURFACE) busy++;
       if (d2 > r2) continue;
       if (a.state === AS.Grapple) grapple++;
+      if ((a.beamT ?? 0) > 0) beams++;
       if ((a.fire ?? 0) > 0) {
         glue++;
         glueRamp = Math.max(glueRamp, rampFraction(a));
@@ -500,6 +517,7 @@ export class GameAudio {
     this.grappling = grapple;
     this.glue = glue;
     this.glueRamp = glueRamp;
+    this.beams = beams;
     this.sickleVoices(L);
     this.activity = Math.min(1, busy / 120);
     this.crowd = L.ref < 170 ? Math.min(1, near.length / 60) : 0;
@@ -625,6 +643,7 @@ export class GameAudio {
     this.battle.density = 15 + Math.min(60, overflow * 6);
     this.battle.update();
     this.bossRumble.set(paused ? 0 : this.bossNear, 1.5);
+    this.beamBed.set(paused || !this.beams ? 0 : Math.min(1, 0.6 + Math.sqrt(this.beams) * 0.25) * (0.45 + 0.55 * zoomNear), this.beams ? 0.06 : 0.15);
     this.glueBed.set(paused || !this.glue ? 0 : Math.min(1, 0.35 + Math.sqrt(this.glue) * 0.2) * (0.4 + 0.6 * zoomNear), 0.25, 2500 + 10000 * this.glueRamp);
     // where we are
     const target = v.space === 'surface' ? 1 : 0;

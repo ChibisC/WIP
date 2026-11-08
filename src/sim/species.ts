@@ -413,14 +413,14 @@ export const CASTES: Record<string, CasteDef> = {
   }),
   // ---- Aurimyrmex fulgurans (fictional "Saiy-Ants"; docs/creatures/aurimyrmex-fulgurans.md) ----
   aurimyrmex_worker: C({
-    id: 'aurimyrmex_worker', species: 'aurimyrmex', name: 'Worker', role: 'worker', morph: 'saiy_worker', length: 6, speed: 22, hp: 16, bite: 1.9, attackInterval: 1.0,
+    id: 'aurimyrmex_worker', species: 'aurimyrmex', name: 'Worker', role: 'worker', morph: 'saiy_worker', length: 6, speed: 22, hp: 15, bite: 1.8, attackInterval: 1.0,
     armor: 0.2, carry: 4, grip: 2, mass: 1.8, forage: true, dig: true, nurse: true,
     surge: true, // no acid (the user's design): Saiy-Ants fight with bites only
     cost: 8, devTime: 1.15, pop: 1, cocoon: true,
     fact: 'Fictional species. Inspired by the golden tortoise beetle, whose shell can switch between metallic gold and dull red when it is disturbed.',
   }),
   aurimyrmex_soldier: C({
-    id: 'aurimyrmex_soldier', species: 'aurimyrmex', name: 'Soldier', role: 'soldier', morph: 'saiy_soldier', length: 9, speed: 19, hp: 68, bite: 5.2, attackInterval: 1.2,
+    id: 'aurimyrmex_soldier', species: 'aurimyrmex', name: 'Soldier', role: 'soldier', morph: 'saiy_soldier', length: 9, speed: 19, hp: 57, bite: 4.4, attackInterval: 1.2,
     armor: 2, carry: 5, grip: 4, mass: 4.5, forage: true, dig: true, nurse: false, threat: 2,
     surge: true,
     cost: 20, devTime: 1.5, pop: 1, cocoon: true,

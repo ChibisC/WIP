@@ -741,6 +741,8 @@ export const BALANCE = {
   blaster: {
     /** orbs: reach (mm; the mortar 56, the rapid sprayer 32, a melee reach under 10), damage, seconds between shots */
     range: 40,
+    /** backing off from a foe inside 0.4 × range: this share of its own speed, without the gold form's (melee catches it) */
+    backoff: 0.6,
     orbDamage: 5,
     interval: 1.5,
     /** the shot: seconds of wind-up (head turns to aim, the mouth glows), then recovery until `shotDone` */

@@ -108,13 +108,20 @@ export function blastShot(w: World, a: Ant, c: Colony, dt: number, tx: number, t
   return true;
 }
 
+/** The wind-up begins (render and sound: the charge; `beam` when this one will be the beam). */
+export function blastCharge(w: World, a: Ant): void {
+  const beam = surging(a) && (a.shotN ?? 0) + 1 >= B.beamEvery;
+  w.events.emit({ t: 'blastCharge', x: a.x, y: a.y, space: a.space, id: a.id, beam: beam || undefined });
+}
+
 /** An orb from the mouth, straight at (tx, ty). */
 function fireOrb(w: World, a: Ant, c: Colony, tx: number, ty: number, gold: boolean): void {
   const m = mouth(a);
   const ang = datan2(ty - m.y, tx - m.x);
   const v = B.orbSpeed;
+  const pid = w.nextId();
   w.addProjectile({
-    id: w.nextId(),
+    id: pid,
     kind: 'orb',
     space: a.space,
     x: m.x,
@@ -130,7 +137,7 @@ function fireOrb(w: World, a: Ant, c: Colony, tx: number, ty: number, gold: bool
     gold: gold || undefined,
     by: a.id,
   });
-  w.events.emit({ t: 'orb', x: m.x, y: m.y, tx, ty, space: a.space, id: a.id, gold: gold || undefined });
+  w.events.emit({ t: 'orb', x: m.x, y: m.y, tx, ty, space: a.space, id: a.id, pid, gold: gold || undefined });
 }
 
 /**
@@ -183,15 +190,15 @@ export function orbStep(w: World, p: Projectile, x0: number, y0: number): boolea
       const cr = w.creatureById.get(bestCr);
       if (cr) damageCreature(w, cr, p.dmg, 'blast', src);
     }
-    w.events.emit({ t: 'orbHit', x: hx, y: hy, space: p.space, gold: p.gold || undefined });
+    w.events.emit({ t: 'orbHit', x: hx, y: hy, space: p.space, pid: p.id, gold: p.gold || undefined });
     return true;
   }
   if (wallU < 1) {
-    w.events.emit({ t: 'orbFizz', x: x0 + dx * wallU, y: y0 + dy * wallU, space: p.space, gold: p.gold || undefined, wall: true });
+    w.events.emit({ t: 'orbFizz', x: x0 + dx * wallU, y: y0 + dy * wallU, space: p.space, pid: p.id, gold: p.gold || undefined, wall: true });
     return true;
   }
   if (p.t >= (p.life ?? 0.4)) {
-    w.events.emit({ t: 'orbFizz', x: p.x, y: p.y, space: p.space, gold: p.gold || undefined });
+    w.events.emit({ t: 'orbFizz', x: p.x, y: p.y, space: p.space, pid: p.id, gold: p.gold || undefined });
     return true;
   }
   return false;

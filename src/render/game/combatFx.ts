@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { hash2 } from '../../core/rng';
 import { SimEvent } from '../../core/events';
+import { BlastFx, Sparker } from './blastFx';
 
 /**
  * Small-scale combat effects for one scene (the surface or one nest), as
@@ -78,8 +79,10 @@ export function particleAt(p0: readonly number[], v0: readonly number[], life: n
   return [p0[0] + v0[0] * f, h, p0[2] + v0[2] * f];
 }
 
-export class CombatFx {
+export class CombatFx implements Sparker {
   readonly group = new THREE.Group();
+  /** the Saiy-Ant Blaster's orbs and beams (blastFx.ts): instanced, closed form, on this clock */
+  readonly blast: BlastFx = new BlastFx(this);
   /** per particle: start position, velocity, colour; (t₀, life, size, growth); (gravity, drag, ground, landing time) */
   private p0 = new Float32Array(N * 3);
   private v0 = new Float32Array(N * 3);
@@ -149,7 +152,14 @@ export class CombatFx {
     pts.frustumCulled = false;
     pts.renderOrder = 12;
     this.group.add(pts);
+    this.group.add(this.blast.group);
   }
+
+  /** A particle for the blast effects (blastFx.ts), and their seeded randomness. */
+  particle(x: number, h: number, y: number, vx: number, vh: number, vy: number, life: number, color: number, size: number, grav: number, drag = 0, grow = 0): void {
+    this.spawn(x, h, y, vx, vh, vy, life, color, size, grav, drag, grow);
+  }
+  readonly rand = (): number => this.rnd();
 
   private spawn(x: number, h: number, y: number, vx: number, vh: number, vy: number, life: number, color: number, size: number, grav: number, drag = 0, grow = 0): void {
     const i = this.next;
@@ -409,6 +419,13 @@ export class CombatFx {
         }
         break;
       }
+      case 'orb':
+      case 'orbHit':
+      case 'orbFizz':
+      case 'beam':
+      case 'beamEnd':
+        this.blast.emit(e, heightAt);
+        break;
       case 'death': {
         if (e.kind !== 'creature') break;
         const h = heightAt(e.x, e.y) + 0.5;
@@ -516,6 +533,7 @@ export class CombatFx {
     this.hAt = heightAt;
     this.clock += dt;
     this.mat.uniforms.uClock.value = this.clock;
+    this.blast.update(this.clock, heightAt, pxScale);
     if (this.dirtyHi >= this.dirtyLo) {
       const lo = this.dirtyLo;
       const n = this.dirtyHi - lo + 1;

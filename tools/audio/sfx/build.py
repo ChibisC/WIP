@@ -156,16 +156,21 @@ def enc(wav, base, stereo, loop):
     subprocess.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-i", wav, "-c:a", "aac", "-b:a", br, "-movflags", "+faststart", base + ".mp4"], check=True)
 
 
-def pack():
+def pack(only=""):
+    """Pack every sound (`only`: just the sounds whose id contains it, the rest of the manifest and files kept)."""
     sounds = {}
     tmp = os.path.join(ROOT, "audio-src/.pack")
     os.makedirs(tmp, exist_ok=True)
-    # clear the old files (a removed sound must not stay behind)
-    for f in glob.glob(os.path.join(PUB, "*", "*")):
-        if re.search(r"\.(ogg|mp4|mp3|opus|webm|wav)$", f):
-            os.remove(f)
+    if only:
+        with open(os.path.join(PUB, "manifest.json")) as f:
+            sounds = {k: v for k, v in json.load(f)["sounds"].items() if k in REG and only not in k}
+    else:
+        # clear the old files (a removed sound must not stay behind)
+        for f in glob.glob(os.path.join(PUB, "*", "*")):
+            if re.search(r"\.(ogg|mp4|mp3|opus|webm|wav)$", f):
+                os.remove(f)
     size = {"ogg": 0, "mp4": 0}
-    for sid in sorted(REG):
+    for sid in sorted(s for s in REG if only in s):
         folder, name = sid.split(".", 1)
         files = sorted(glob.glob(os.path.join(OUT_WAV, folder, f"{name}_[0-9][0-9].wav")))
         if not files:
@@ -201,6 +206,7 @@ def pack():
         for e in ("ogg", "mp4"):
             size[e] += os.path.getsize(f"{base}.{e}")
         sounds[sid] = entry
+    sounds = dict(sorted(sounds.items()))
     write_attributions(sounds)
     credits = read_credits()
     with open(os.path.join(PUB, "manifest.json"), "w") as f:
@@ -256,4 +262,5 @@ if __name__ == "__main__":
     if cmd in ("render", "all"):
         render(sys.argv[2] if cmd == "render" and len(sys.argv) > 2 else "")
     if cmd in ("pack", "all"):
-        pack()
+        # (`pack <filter>`: only those sounds, after `render <filter>`)
+        pack(sys.argv[2] if cmd == "pack" and len(sys.argv) > 2 else "")

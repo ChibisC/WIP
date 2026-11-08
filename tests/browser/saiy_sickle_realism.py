@@ -33,6 +33,10 @@ UNITS = {
     "saiy_soldier": ("saiy_soldier", 9.0, "mopen=0.25"),
     "saiy_queen": ("saiy_queen", 14.0, "mopen=0.2"),
     "saiy_gold": ("saiy_worker", 6.0, "mopen=0.3&gold=1"),
+    # the Saiy-Ant Blaster (spec saiy-ants/09): at rest (a faint glow), aiming (jaws wide, the mouth lit), gold
+    "saiy_blaster": ("saiy_blaster", 6.6, "mopen=0.3&mglow=0.1"),
+    "saiy_blaster_aim": ("saiy_blaster", 6.6, "mopen=1&mglow=0.9"),
+    "saiy_blaster_gold": ("saiy_blaster", 6.6, "mopen=1&mglow=0.9&gold=1"),
     "sickle_worker": ("termite_rhy_worker", 6.14, ""),
     "sickle_soldier": ("termite_rhy_soldier", 5.4, ""),
     "sickle_presoldier": ("termite_rhy_presoldier", 5.4, ""),
