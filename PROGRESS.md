@@ -2044,3 +2044,22 @@ User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch 
 - **No more defensive rows**: sickle-jaw soldiers gather or hold the escort ring like other soldiers. A knockback ends a hold cleanly. Balance: soldier health 20 and brood × 2.2 (+0.79 → +0.03 against the reference soldier), worker bite 2.5.
 - **Termants** redesigned: termite antennae on every caste, no nasus (the soldier's glue from a pore on its forehead), a *Macrotermes*-style soldier head with sabre jaws, realistic materials, planted feet.
 - Other species' models unchanged (hash check); height data regenerated. Four review rounds with the user; approved 2026-11-07 ("good. push changes").
+
+## 2026-11-07 — Performance v3: big colonies (500–2,000 ants), same looks, same results (CHANGE_PLAN §31)
+User spec `claude/performance/03-spec-performance-v3-big-colonies.md`; branch `feature/performance-v3`.
+- **Measured first:** `tools/perf/simBench.ts` (fight, economy, full nests, ten colonies, titan raid, tunnel fight at
+  500–2,000 ants; per system, per 50 ticks, slowest ticks), timed bundled as the game ships (`tools/perf/bundle.sh`);
+  `tools/perf/same.sh` proves every simulation change against `main` with canonical state hashes (18 runs, ALL SAME);
+  the user's laptop and iPhone `?bench=1`; the bench's new **gpu** scene (one effect off at a time — in `main` early,
+  handoff 21).
+- **Simulation:** one hidden class for every ant (138 before); separation on the packed hash and typed arrays with
+  exact early outs; per-creature values once a pass; hex lookup fast path; the flow cache's LRU by counter.
+- **Worker frames:** a generated column writer — the same packets byte for byte.
+- **Graphics (no change of looks):** the terrain, grass, pebbles and merged map scenery drawn in culled 5 × 5 chunks;
+  the water draws only the rows a camera sees. Golden set: 11 of 11 match, 8 pixel for pixel (the three far shots
+  differ in 1–11 of 972,800 pixels where grass blades cross).
+- **Checks:** `npm test` (all), the determinism check, the build, `tests/browser/lan.py` two players (hashes match, no
+  desync, the speed vote). `BUILD_ID` `ud-mp-15` (the state hash follows field order, now the same for every ant).
+- **Found and left for the user:** both devices are limited by the GPU at High even with few ants; ~80 % of the big
+  fight's triangles are the ants (mid-distance ants at 3,300 triangles, twice with shadows). Changes that would alter
+  the picture (simpler shadow casters, resolution, effect settings) wait for the gpu-scene report and the user's yes.
