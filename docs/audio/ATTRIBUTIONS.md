@@ -91,6 +91,10 @@ Rendered offline by `tools/audio/sfx` (Python: numpy, scipy) from the physics of
 | `cr/spider_step.ogg`, `.mp4` | cr.spider_step | Underground Dominion (made for this game) | `tools/audio/sfx/recipes_creatures.py` | CC0 (made for this game) | 6 take(s), rendered offline |
 | `cr/stag_clash.ogg`, `.mp4` | cr.stag_clash | Underground Dominion (made for this game) | `tools/audio/sfx/recipes_creatures.py` | CC0 (made for this game) | 5 take(s), rendered offline |
 | `species/army_hook.ogg`, `.mp4` | species.army_hook | Underground Dominion (made for this game) | `tools/audio/sfx/recipes_combat.py` | CC0 (made for this game) | 5 take(s), rendered offline |
+| `species/blaster_beam.ogg`, `.mp4` | species.blaster_beam | Underground Dominion (made for this game) | `tools/audio/sfx/recipes_combat.py` | CC0 (made for this game) | 1 take(s), rendered offline |
+| `species/blaster_charge.ogg`, `.mp4` | species.blaster_charge | Underground Dominion (made for this game) | `tools/audio/sfx/recipes_combat.py` | CC0 (made for this game) | 4 take(s), rendered offline |
+| `species/blaster_hit.ogg`, `.mp4` | species.blaster_hit | Underground Dominion (made for this game) | `tools/audio/sfx/recipes_combat.py` | CC0 (made for this game) | 5 take(s), rendered offline |
+| `species/blaster_orb.ogg`, `.mp4` | species.blaster_orb | Underground Dominion (made for this game) | `tools/audio/sfx/recipes_combat.py` | CC0 (made for this game) | 5 take(s), rendered offline |
 | `species/glue_splat.ogg`, `.mp4` | species.glue_splat | Underground Dominion (made for this game) | `tools/audio/sfx/recipes_combat.py` | CC0 (made for this game) | 4 take(s), rendered offline |
 | `species/hellant_impale.ogg`, `.mp4` | species.hellant_impale | Underground Dominion (made for this game) | `tools/audio/sfx/recipes_combat.py` | CC0 (made for this game) | 4 take(s), rendered offline |
 | `species/hellant_snap.ogg`, `.mp4` | species.hellant_snap | Underground Dominion (made for this game) | `tools/audio/sfx/recipes_combat.py` | CC0 (made for this game) | 5 take(s), rendered offline |

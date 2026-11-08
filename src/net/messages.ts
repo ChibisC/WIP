@@ -23,7 +23,7 @@ import type { MapId } from '../maps/types';
  * visiting colonies of the story's surprise events, claude/story/06-spec — 2026-11-06. 13: the shared underground — rock margins, tunnel routes between nests, the `digRoute` command (wire 26),
  * save version 4, CHANGE_PLAN §27 — 2026-11-07. 14: one tick of lockstep delay on a LAN (MIN_DELAY 1, the host's new
  * margin), CHANGE_PLAN §29 — 2026-11-07. 15: performance v3 — every ant one field order, so the state hash (which
- * follows the order of the fields) differs from 14's for the same state, CHANGE_PLAN §31 — 2026-11-07)
+ * follows the order of the fields) differs from 14's for the same state, CHANGE_PLAN §32 — 2026-11-07)
  */
 export const BUILD_ID = 'ud-mp-15';
 

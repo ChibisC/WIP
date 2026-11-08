@@ -449,3 +449,93 @@ def battle_bed(r, k):
     for _ in range(int(dur * 2.0)):
         add(o, squeal(r, r.i(1, 3)), r.u(0, dur - 0.3), r.u(0.12, 0.35))
     return o
+
+
+# ------------------------------------------------------------------ the Saiy-Ant Blaster (claude/saiy-ants/09-spec)
+# A fictional animal's energy shots, kept to the game's small, quick, dry scale (no movie booms or whooshes): each built
+# from scratch here — a resonant hum climbing under a crackle of chitin ticks, a short pitched "fwip" with a snap of
+# air, a sizzle of bursting sparks, and the beam's steady roar-hum. Nothing is modelled on any show's sound.
+
+
+def hum(f0, f1, dur, harm=(1.0, 0.5, 0.33, 0.2, 0.12), vib=0.004, vib_hz=31.0):
+    """A buzzing harmonic voice gliding f0 -> f1 (exponential), with a fast flutter."""
+    n = int(dur * SR) + 1
+    f = np.geomspace(f0, f1, n)
+    from dsp import tone
+    return tone(f, dur, harm=harm, vib=vib, vib_hz=vib_hz)
+
+
+@sound("species.blaster_charge", takes=4, lufs=-22)
+def blast_charge(r, k):
+    # the wind-up (0.32 s): a hum climbing about an octave and a half, a band of noise rising with it, and a thin
+    # crackle of ticks thickening toward the shot; it stops short (the shot cuts in)
+    dur = r.u(0.3, 0.34)
+    n = int(dur * SR) + 1
+    t = tlin(n)
+    rise = (t / dur) ** 1.6
+    o = zeros(dur + 0.03)
+    v = hum(r.u(380, 460), r.u(1250, 1500), dur) * (0.15 + 0.85 * rise)
+    add(o, norm(bp(v, 300, 7000)), 0.0, 0.55)
+    noise = r.noise(n) * rise
+    f = np.geomspace(r.u(900, 1200), r.u(4500, 6000), n)
+    from dsp import svf_bp
+    add(o, norm(svf_bp(noise, f, 3.5)), 0.0, 0.35)
+    for _ in range(r.i(16, 26)):
+        tt = dur * r.u() ** 0.45
+        add(o, click(r, 3500, 11000, 2, (0.0003, 0.0012), 0.6), tt, r.u(0.1, 0.5) * (tt / dur) ** 1.2)
+    # the very end: snapped off in 4 ms, so the orb's onset follows cleanly
+    m = int(dur * SR)
+    o[m - int(0.004 * SR):m] *= np.linspace(1, 0, int(0.004 * SR))
+    o[m:] = 0
+    return o
+
+
+@sound("species.blaster_orb", takes=5, lufs=-19)
+def blast_orb(r, k):
+    # the shot: a punchy, quick "fwip" — a pitched chirp diving from high to mid in ~50 ms over a snap of air through a
+    # sweeping band, a tick at the start, and a short bright tail as the orb leaves
+    dur = r.u(0.11, 0.14)
+    n = int(dur * SR) + 1
+    t = tlin(n)
+    o = zeros(dur + 0.03)
+    f = np.geomspace(r.u(2600, 3200), r.u(520, 700), n)
+    v = hum(r.u(2600, 3200), r.u(520, 700), dur, harm=(1.0, 0.35, 0.18), vib=0.0)
+    e = np.minimum(1, t / 0.0015) * np.exp(-t / r.u(0.028, 0.04))
+    add(o, norm(v * e), 0.0, 0.75)
+    from dsp import svf_bp
+    air = svf_bp(r.noise(n) * np.minimum(1, t / 0.001) * np.exp(-t / 0.022), f * 1.6, 2.2)
+    add(o, norm(air), 0.0, 0.55)
+    add(o, click(r, 4000, 11000, 3, (0.0003, 0.0012), 0.8), 0.0, 0.6)
+    add(o, grains(r, 0.05, r.i(4, 8), 5000, 12000, (0.0002, 0.0008), 1.3), 0.012, 0.18)
+    return o
+
+
+@sound("species.blaster_hit", takes=5, lufs=-20)
+def blast_hit(r, k):
+    # an orb bursting on a body: a sharp crack, a crackling sizzle of sparks thinning out, a little grit
+    o = zeros(0.38)
+    add(o, click(r, 2500, 9000, 4, (0.0006, 0.003), 0.9), 0.0, 1.0)
+    add(o, crunch(r, 0.025, r.i(8, 14), 7000, 2500, 2.0, (0.0003, 0.0015)), 0.001, 0.55)
+    add(o, fizz(r, r.u(0.26, 0.32), 2600, 4000, 13000, 0.35, 0.08), 0.004, 0.7)
+    add(o, grains(r, 0.08, r.i(6, 11), 2000, 7000, (0.0005, 0.002), 1.4), 0.006, 0.3)
+    return o
+
+
+@sound("species.blaster_beam", loop=True, lufs=-20, xf=0.3)
+def blast_beam(r, k):
+    # the beam (loop): a steady roar-hum — a buzzing harmonic drone with a slow wobble, a roaring band of noise over it,
+    # and a fizz of sparks crackling through; the engine fades it in on the flash and out at the end
+    dur = 2.4
+    n = int(dur * SR) + 1
+    t = tlin(n)
+    o = zeros(dur)
+    from dsp import svf_bp, tone
+    f0 = r.u(300, 330)
+    wob = 1 + 0.012 * np.sin(2 * np.pi * (1 / dur) * 3 * t) + 0.004 * np.sin(2 * np.pi * 47 * t)
+    drone = tone(f0 * wob, dur, harm=(1.0, 0.7, 0.55, 0.42, 0.3, 0.22, 0.15, 0.1))
+    add(o, norm(bp(drone, 250, 6000)), 0.0, 0.5)
+    roar = svf_bp(r.noise(n), 1400 * (1 + 0.15 * np.sin(2 * np.pi * (2 / dur) * t)), 1.4)
+    roar = roar * (0.85 + 0.15 * np.sin(2 * np.pi * 23 * t + r.u(0, 6)))
+    add(o, norm(roar), 0.0, 0.45)
+    add(o, norm(fizz(r, dur, 1800, 4500, 13000, 0.25, 1e6))[: n], 0.0, 0.25)
+    return o

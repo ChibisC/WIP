@@ -34,6 +34,7 @@ import { edible, eatsWood, isWoodSource } from './diet';
 import { BALANCE, ECITON, NASUTE, SICKLE, TERMANT } from './balance';
 import { holdMarkerSlot, onTermiteDied, startTermiteIdle, termiteIdle, termiteTick } from './termites';
 import { surgeTick } from './surge';
+import { beamUpdate, stopBeam } from './saiyBlaster';
 import { isHeld, snapTick } from './hellAnts';
 import { genesWanted, isTermant, tagPiece, termantDeposit, termantKing } from './termants';
 import { holdGuardLine, inGuardLine, trailTraffic } from './guardLine';
@@ -221,6 +222,7 @@ export function enterState(a: Ant, s: AS): void {
 
 export function killAnt(w: World, a: Ant): void {
   if (a.state === AS.Dead) return;
+  if ((a.beamT ?? 0) > 0) stopBeam(w, a);
   dropCarried(w, a);
   releaseGrapple(w, a);
   enterState(a, AS.Dead);
@@ -325,6 +327,16 @@ export function antSystem(w: World, dt: number): void {
     if (a.state === AS.Flung) {
       flungUpdate(w, a, dt);
       continue;
+    }
+    // a Saiy-Ant Blaster's beam: planted for its 3 s whatever else is going on — no order, job or foe moves it
+    // (saiyBlaster.ts); a fling, a grab or death ends it
+    if ((a.beamT ?? 0) > 0) {
+      const cb = w.colony(a.colony);
+      if (cb && beamUpdate(w, a, cb, dt)) {
+        venomTick(w, a, dt);
+        finish(w, a);
+        continue;
+      }
     }
     // army ants: links of a living bridge / pothole plugs hold still; an ant on a bridge walks across it (eciton.ts)
     if (a.state === AS.Bridge || a.state === AS.Plug || (a.xing ?? 0) !== 0) {

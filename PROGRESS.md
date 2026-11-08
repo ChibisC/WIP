@@ -2045,7 +2045,31 @@ User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch 
 - **Termants** redesigned: termite antennae on every caste, no nasus (the soldier's glue from a pore on its forehead), a *Macrotermes*-style soldier head with sabre jaws, realistic materials, planted feet.
 - Other species' models unchanged (hash check); height data regenerated. Four review rounds with the user; approved 2026-11-07 ("good. push changes").
 
-## 2026-11-07 — Performance v3: big colonies (500–2,000 ants), same looks, same results (CHANGE_PLAN §31)
+## 2026-11-07 — Saiy-Ant Blaster: energy orbs from the mouth, a 3-second beam in gold form; gold form 10 s (`feature/saiy-blaster`, CHANGE_PLAN §31; merged 2026-11-08 after the user's approval, game artifact v50)
+
+Built on the model redo (§30, merged into this branch during its review; now on `main`).
+- **The caste** `aurimyrmex_blaster` ("Blaster"; Termants steal it as "Saiy-Ant Blaster"): worker-sized and light
+  (6.6 mm, 12 hp, no armour, speed 24, cost 30 + 6), brood mix 0.14, no climbing. It holds 40 mm off and spits glowing
+  orbs from its mouth (5 physical damage, the first enemy on the path; walls stop them; allies never hit); in the gold
+  form every fifth shot is a 3 s beam down the densest line of enemies (9 body lengths, cut by walls, a pulse every
+  0.25 s on all it crosses), the Blaster planted throughout; a fling, a grab or death ends it, the gold ending does not.
+  It backs off from melee only at a walk and stands behind the melee line in a guard crowd.
+- **Gold form 10 s** (12 at level 3), recovery 30 s (22 at level 2), boosts unchanged; the Saiy worker (15.5 hp / 1.65
+  bite) and soldier (56 / 4.35) scaled back to the tie with the references, which the longer gold form had doubled.
+- **Model** `saiy_blaster` from the redone worker: slimmer, a little longer, a larger rounder head, wide jaws round a
+  mouth that glows faint white-blue at rest, bright in the wind-up and gold in gold form; the six locks swept back
+  further. **Poses:** head aims and jaws part in the wind-up, recoil on each orb, braced beam stance (feet wide, body
+  low, head steady, a tremble).
+- **Effects** `render/game/blastFx.ts`: instanced orbs (core, shell with swirling crackle, trail, ground light) and
+  beams (core, rippling glow, charge ball, end burst, ground light, flash on, fade off) played in closed form from the
+  sim's events; bursts and pops in `combatFx`. **Sounds** (made for this game): charge hum, "fwip", sizzle, beam
+  roar-hum loop.
+- **Tests:** `tests/saiyBlaster.ts` (36 checks: caste, orbs, five-shot cycle, beam, aim, determinism, a save
+  mid-fight and two clients in lockstep, back-off, guard crowd, pose, effects, sounds); morph hashes (only `saiy_blaster` new); height data; balance
+  in `docs/balance/castes.md` ("Saiy-Ant Blaster"), tools `tools/blaster-balance.ts`; clips
+  `docs/creatures/aurimyrmex-renders/` (`tests/browser/blaster_clips.py`); lab `&mglow=`.
+
+## 2026-11-07 — Performance v3: big colonies (500–2,000 ants), same looks, same results (CHANGE_PLAN §32)
 User spec `claude/performance/03-spec-performance-v3-big-colonies.md`; branch `feature/performance-v3`.
 - **Measured first:** `tools/perf/simBench.ts` (fight, economy, full nests, ten colonies, titan raid, tunnel fight at
   500–2,000 ants; per system, per 50 ticks, slowest ticks), timed bundled as the game ships (`tools/perf/bundle.sh`);

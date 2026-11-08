@@ -265,7 +265,7 @@ The real numbers come from the user's laptop and iPhone (`?bench=1`, below once 
 | Golden set (12 shots the branch could touch, `golden/compare-v2after.md`) | needed a run-to-run noise set | 12 of 12 match with no noise set, 10 pixel for pixel |
 | Simulation tick, big fight (Node, `tools/stress.ts`) | 24 ms (unchanged: no single hot spot; the simulation was not changed) | 24 ms |
 
-## Performance v3: big colonies (claude/performance/03-spec-performance-v3-big-colonies.md, CHANGE_PLAN §31)
+## Performance v3: big colonies (claude/performance/03-spec-performance-v3-big-colonies.md, CHANGE_PLAN §32)
 
 ### How it is measured
 - **`tools/perf/simBench.ts`** — the stress scenes at 500–2,000 ants (fight, economy, nests, ten colonies, titan raid,

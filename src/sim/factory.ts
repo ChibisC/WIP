@@ -180,6 +180,14 @@ class AntRecord {
     this.uw = undefined;
     this.fl = undefined;
     this.flB = undefined;
+    // (the Saiy-Ant Blaster's)
+    this.shotN = undefined;
+    this.beamT = undefined;
+    this.beamH = undefined;
+    this.beamL = undefined;
+    this.beamD = undefined;
+    this.beamP = undefined;
+    this.beamCd = undefined;
   }
 }
 

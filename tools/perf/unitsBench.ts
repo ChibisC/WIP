@@ -1,5 +1,5 @@
 /**
- * The main thread's per-frame CPU for the ants in a real fight (performance v3, CHANGE_PLAN §31): the big-fight stress
+ * The main thread's per-frame CPU for the ants in a real fight (performance v3, CHANGE_PLAN §32): the big-fight stress
  * world (the bench's fight scene) is simulated until the armies are engaged; then each frame builds the surface ants'
  * views (game/antViews.ts antToView, as the session does) and runs the ant renderer over them (no WebGL: the impostor
  * materials are stubbed, as in antRendererBench.ts), the sim stepping every third frame (60 fps against 20 Hz).

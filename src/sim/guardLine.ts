@@ -169,7 +169,8 @@ export function guardSlot(w: World, a: Ant, c: Colony, mi: number): { x: number;
   const asp = m.onFoe ? GUARD.chargeAspect : GUARD.aspect;
   const across = dcos(th) * r * asp + jx;
   // a charge (the marker on the enemy): the front edge stands off short of it, and the fight starts from the crowd
-  const back = (dsin(th) * r + R) / asp + jy + (m.onFoe ? L.room[L.room.length - 1] * GUARD.standOff : 0);
+  // (a Saiy-Ant Blaster stands behind the crowd: the melee line in front, it shoots over it — spec saiy-ants/09 §2)
+  const back = (dsin(th) * r + R) / asp + jy + (m.onFoe ? L.room[L.room.length - 1] * GUARD.standOff : 0) + (casteOf(a.caste).blast ? BALANCE.blaster.holdBack : 0);
   // across the front: (−uy, ux)
   out.x = m.x - L.uy * across - L.ux * back;
   out.y = m.y + L.ux * across - L.uy * back;

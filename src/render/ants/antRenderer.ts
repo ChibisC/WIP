@@ -110,6 +110,10 @@ export interface AntView {
   special?: number;
   /** the hell ants' finisher: held by the neck in this ant's jaws (its id; the renderer puts the neck on the grip) */
   neckBy?: number;
+  /** Saiy-Ant Blaster: the mouth's glow 0..1 (wind-up, shot flash, the beam), and its aim, braced beam stance */
+  mouthGlow?: number;
+  /** the feet planted wider 0..1 (the Blaster braced for its beam; joins the crushed spread) */
+  brace?: number;
   rageGlow?: number;
   stingNext?: boolean;
   /** fore legs raised 0..1 and the body's pitch pivot along it (fraction of L; − behind the middle): a sprayer
@@ -161,8 +165,9 @@ interface AnimState {
   ap: number;
   gp: number;
   cr: number;
-  /** crouch (mm, eased) */
+  /** crouch (mm, eased); stance spread (eased) */
   ck?: number;
+  br?: number;
   pose: number;
   poseW: number;
   pph: number;
@@ -1001,6 +1006,7 @@ export class AntRenderer {
       s.gp = damp(s.gp, v.gaster, 6, dt);
       s.cr = damp(s.cr, v.crop, 1.5, dt);
       s.ck = damp(s.ck ?? 0, v.crouch ?? 0, 7, dt);
+      s.br = damp(s.br ?? 0, v.brace ?? 0, 6, dt);
       const act = M ? Math.max(v.antennaActivity, M.antAct) : v.antennaActivity;
       s.wave += dt * clock * (0.5 + act * 2.5 + s.amp * 0.6) * (v.waveMul ?? 1) * (s.m2 ? s.m2.waveK : 1);
       if (!M) s.death = damp(s.death, v.dead ? 1 : 0, 4, dt);
@@ -1137,7 +1143,7 @@ export class AntRenderer {
         // (user, review 2026-11-07, the attack clips: "plant legs on ground better" — an attack's brace moved the planted
         // feet outward along the ground and back with every strike; now the feet stay where they stand and the body
         // moves over them)
-        bodyBuf[7] = M.squash * 0.35;
+        bodyBuf[7] = Math.max(M.squash * 0.35, s.br ?? 0);
         bodyBuf[8] = atkP.gYaw * w;
         bodyBuf[9] = stingW;
         bodyBuf[10] = Math.max(atkP.front * w, v.front ?? 0);
@@ -1324,7 +1330,7 @@ export class AntRenderer {
         // pose id + 0.99 × its weight; the hit flash
         // (the rage glow rides in the same channel: + 2 × its level 0..10 — user rating E7: a glow in the body, not the
         // whole ant turned red)
-        at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, (M ? M.flash : 0) + 2 * Math.round(Math.min(1, Math.max(0, v.rageGlow ?? 0)) * 10));
+        at.c.setXYZW(n, gp, s.cr, poseOut + Math.min(1, Math.max(0, poseWOut)) * 0.99, (M ? M.flash : 0) + 2 * Math.round(Math.min(1, Math.max(0, v.rageGlow ?? 0, v.mouthGlow ?? 0)) * 10));
         // colour variation −1..1, plus 4 × the Termant tint code (decoded in the shader); the planted feet's stance sweep
         at.d.setXYZW(n, M ? M.deathLeg : s.death, M ? M.Dh : 0, Math.max(-1, Math.min(1, v.colorVar)) + 4 * (v.tint ?? 0), s.pph);
         // gold × ripple direction, the planted feet's turn per stance, exhausted with the LOD fade, hair sway

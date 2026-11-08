@@ -1465,14 +1465,76 @@ User specs: `claude/realism/10-spec-saiy-ant-sickle-jaw-models.md` (the models, 
 - Review round 3 (the user's field photos, study only): the worker rebuilt ("redo rhyncotermes workers based on real life images cos they look off") — a small round glossy orange dome of a head (no pale fontanelle or Y suture: `head.suture` removed), a lighter orange thorax, a big glossy chocolate egg-shaped abdomen whose tergites are divided by dark creases, textured as in the photos ("make the workers have more texture in abdomen like reference photos": pillowed plates `abdomen.pillow`, the spiracle row `abdomen.spiracles`, fine golden hairs `abdomen.hairs`, and the castes' first baked cuticle recipe, `RHY_W` in `render/bake/recipes.ts`: mottled gut, hair pits, a soft undulation); the soldier's sickles a quarter slimmer and wine-crimson, black only at the hook ("slightly less thick and more colored like irl counterparts"), and its abdomen fuller and tan-brown with bold brown bands ("as well as their abdomens"). The presoldier takes the soldier's new shape in its own pale colours; the larva is unchanged.
 - Checks: morph hashes (only these three species changed; `tests/data/morph-hashes.json` re-baselined for them), `tools/height-data.ts` regenerated (climb data unchanged: creatures only), `npm test`, review pages rounds 1–4.
 
-## 31. Performance v3 — big colonies (500–2,000 ants) without lag, same looks, same results (user spec 2026-11-07, claude/performance/03-spec-performance-v3-big-colonies.md)
+## 31. Saiy-Ant Blaster: energy orbs from the mouth, a 3-second beam in gold form; gold form at least 10 s (user spec 2026-11-07, claude/saiy-ants/09-spec-saiy-blaster.md) — branch `feature/saiy-blaster`
+
+**Base.** Built on the model redo (§30; merged into this branch while it was in review, then approved and merged into
+`main`, handoff 21): the blaster's morph derives from the redone `saiy_worker`.
+
+**31.1 Caste** — `aurimyrmex_blaster`, display name **Blaster**, role `soldier` (there is no `ranged` role; the mortar and
+rapid sprayer are soldiers too), morph `saiy_blaster`, worker-sized and light (length 6.6, hp 12, armour 0, speed 24),
+`surge: true`, `mount: 'none'` (no climbing: it fires from the ground), a new caste field `blast` (`species.ts`) with
+the shot data; brood times and costs in `BALANCE.castes`; numbers in `BALANCE.blaster`. AI mix (`colonyAI.defaultMix`):
+worker 0.68, soldier 0.18, blaster 0.14. Termants can steal it as **Saiy-Ant Blaster** (`STOLEN_CASTES`, heavy
+threshold, after the soldier; the per-species lookups take every entry of a species).
+
+**31.2 Sim** (`src/sim/saiyBlaster.ts`, deterministic) —
+- Positioning reuses the shooters' (`attackUpdate`: walk to 0.9 × range, back off inside 0.4 × range, hold anchored);
+  the shot is `AS.Spray` → `blastShot`: wind-up (head turns to aim; the mouth glow brightens), fire, recovery.
+- Orb: `Projectile` kind `orb`: straight at where the target is; each tick its swept segment is tested against every
+  enemy ant and creature near it (allies skipped) and the nearest along the path takes the hit (damage type `blast`:
+  physical, armour as a bite); a wall (surface: blocked cells, banks; nest: soil) on the segment ends it first; at
+  1.3 × range it fizzles. Events `orb` (fired), `orbHit`, `orbFizz`.
+- Shot counter `shotN`: reset to 0 whenever a shot is fired outside the gold form; in gold, shots 1–4 orbs, 5 the beam.
+- Beam: aimed at the densest line of enemies within the beam's length (candidate headings toward each enemy in reach,
+  scored by how many the beam would cross; ties keep the target's line); its length cut by the first wall; fixed for
+  `beamTime` 3 s; every `beamTick` each enemy crossing it takes `beamDamage` (× the surge bonus at the moment of firing);
+  the ant is planted for the whole beam (an `antSystem` guard before jobs, orders and combat: nothing moves or turns it);
+  a fling, a grab or death ends it; the gold form ending does not. Then `beamCooldown`. Fields `beamT`, `beamH`, `beamL`,
+  `beamD` (damage a pulse), `beamP` (pulse clock).
+- Gold form: `BALANCE.surge.duration` 4 → 10 s (level 3: 5 → 12); cooldown 20 → 30 s (level 2: 14 → 22) so the gold
+  share stays near the old one (balance matrix).
+- `aggroRadius`, the pursuit leash and `warAI.weight` count the blaster's range and damage.
+
+**31.3 Model** (`saiyMorphs.ts` `SAIY_BLASTER`, from `SAIY_WORKER`): slimmer and a little longer, a larger rounder head
+with the jaws set wide, the six locks the same design swept back further (lower and longer), a mouth-glow piece between
+the jaw bases (surface flag 9.5: emissive, white-blue → gold with the gold level; per-instance level in the rage channel, which
+the blaster's program reads as the mouth glow — `#define MOUTH_GLOW`). Poses (`antViews.ts` `blastPose`): head aims,
+jaws part wide in the wind-up, recoil on each orb, braced for the beam (legs spread, body low, head steady, a tremble).
+Morph hashes re-baselined for `saiy_blaster` only; height data regenerated.
+
+**31.4 Effects** (`render/game/blastFx.ts`, inside each scene's `CombatFx`; instanced, played in closed form in the
+shader from the sim's events — nothing stepped per frame on the CPU but the few live beams' end sparks): orbs from `orb`
+(where and when fired, at the orb's speed; the projectile id `pid` ties `orbHit` / `orbFizz` to its orb, which runs on to
+the hit point and bursts there): core, coloured shell with swirling crackle, a short trail, ground light; bursts of
+light, sparks and dust on a hit, a soft pop on a fizzle (particles in `CombatFx`). Beams from `beam` / `beamEnd`: core,
+rippling flickering glow, the charge ball at the mouth, the far-end burst, ground light, a flash on and a fade out. Bloom
+only on the cores (HDR > the bloom threshold); everything at least a few pixels across at gameplay zoom. Pools: 512 orbs,
+64 beams, the oldest reused. A sim event `blastCharge` marks the wind-up (render and sound).
+
+**31.5 Sounds** (audio v3 recipes in `tools/audio/sfx/recipes_combat.py`, made for this game, original):
+`species.blaster_charge` (rising hum, snapped off at the shot), `species.blaster_orb` (punchy fwip; at 0.62 × the
+beam's flash), `species.blaster_hit` (sizzle; quiet and higher for a fizzle), `species.blaster_beam` (steady roar-hum
+loop, a `LoopBed` that follows the beams near the listener). `build.py pack <filter>` packs only those sounds (the rest
+of the manifest and files kept).
+
+**31.5b Balance as built** (`tools/blaster-balance.ts`; docs/balance/castes.md "Saiy-Ant Blaster"): the Blaster backs
+off from a foe inside 0.4 × range at 60 % of its own speed, gold or not (it out-ran every melee caste in gold and won
+even in contact); in a marker's guard crowd it stands `holdBack` 14 mm behind its place (the melee line in front).
+The 10 s gold form doubled the Saiy worker's and soldier's equal-food margins, so their health and bite were scaled
+back to the tie with the references (the gold boosts themselves are kept).
+
+**31.6 Verify** — `tests/saiyBlaster.ts` (first enemy on the path, allies never hit, walls, physical damage, five-shot
+cycle in gold only, beam length/planting/finishing after gold ends, densest-line aim, 10 s gold, determinism);
+balance matrix runs; replays and two-tab LAN in sync; 50+ blasters cost; clips; a review page for the user; handoff.
+
+## 32. Performance v3 — big colonies (500–2,000 ants) without lag, same looks, same results (user spec 2026-11-07, claude/performance/03-spec-performance-v3-big-colonies.md)
 
 Branch `feature/performance-v3` off `main` `8e07623`. Hard rules: the golden set matches exactly (any visible change —
 LOD, impostors, resolution — only with zoom clips and the user's approval); the simulation's results are identical
 (canonical hash lists from `tools/perf/same.sh` against main for every sim change, the determinism check, replays;
 LAN two-tab in sync).
 
-### 31.1 Measured first
+### 32.1 Measured first
 - **Stress scenes** (`tools/perf/simBench.ts`, Node, build machine; 500/1,000/1,500/2,000 ants): fight, economy
   (foraging), nests (full nests with digging), ten colonies, titan raid into a full nest, the shared-underground tunnel
   fight. Baseline main, ms a tick: fight 19.0 @1,000 / 45.2 @2,000; economy 26.9, nests 23.4, ten 22, titan 29,
@@ -1484,7 +1546,7 @@ LAN two-tab in sync).
   fight, mp4 and arena scenes with the main thread at 2–4 ms and the sim at 5 ms — **GPU-bound**; the full nest 19 FPS
   with 6 ms of render work on the main thread and nest-chunk rebuild hitches of 13–28 ms.
 
-### 31.2 Plan (each step measured before and after; results proven the same)
+### 32.2 Plan (each step measured before and after; results proven the same)
 1. **Sim, without changing a single result:** one object shape for every ant (all fields declared in one literal,
    restored saves normalised, fields cleared instead of deleted); separation walking the hash itself with exact early
    outs; the hash packed cell by cell (same items, same order); cheaper exact lookups (hex centres from column/row).
@@ -1503,7 +1565,7 @@ LAN two-tab in sync).
 7. **Verify:** targets table in `docs/performance.md` ("Performance v3"); golden set; hash lists, replays, LAN;
    `npm test`, determinism, build; docs, handoff 21, merge, publish.
 
-### 31.3 What was done (in order)
+### 32.3 What was done (in order)
 1. `tools/perf` — simBench (the stress scenes), canon.ts (canonical hash: keys sorted), same.sh (hash lists of two
    checkouts compared), ab.sh (alternating timing runs), cpuprof/cpuchildren (profile summaries).
 2. **One shape for every ant** (`factory.ts antShape/normalizeAnt`, `world.ts`, deletes → `= undefined`): fight

@@ -278,6 +278,7 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
       out.headPitch = -0.15;
       break;
     case AS.Spray: {
+      if (cd.blast) break; // the Saiy-Ant Blaster: blastPose, below
       // (user rating F6, round 2: the Rapid Sprayer holds its rear between shots while it keeps firing)
       const held = cd.acid?.kind === 'rapid' && w.time - (rapidShot.get(a.id) ?? -9) < 1;
       if (cd.acid?.kind === 'rapid') rapidShot.set(a.id, w.time);
@@ -332,6 +333,9 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
   if (a.pose === POSE.STING) out.gaster = -0.9;
   // a Rapid Sprayer between its shots (back in the attack state for a moment): still reared up, aiming
   if (cd.acid?.kind === 'rapid' && a.state === AS.Attack && a.v < cd.speed * 0.2 && w.time - (rapidShot.get(a.id) ?? -9) < 1) sprayPose(out, 'rapid', 1, cd.length, true);
+  out.mouthGlow = 0;
+  out.brace = 0;
+  if (cd.blast) blastPose(w, a, out, cd.length);
   armyAnt(w, a, out);
   out.glue = a.state === AS.Dead ? 0 : glueOf(w, a);
   // on a creature (climbing.ts): the renderer puts it on the animated leg or back
@@ -424,6 +428,103 @@ export function sprayPose(out: Pick<AntView, 'gaster' | 'pitch' | 'lift' | 'mand
   out.lift = Math.max(out.lift, kick * len * (kind === 'lob' ? 0.03 : 0.01));
   out.mandible = 0.6;
   out.antennaPitch = 0.4;
+}
+
+/** Render only: each Blaster's last-seen shot cooldown and when it last fired (sim time), for the shot flash and recoil. */
+const blastRecs = new Map<number, { cd2: number; at: number; seen: number }>();
+let blastPrune = 0;
+
+/**
+ * The Saiy-Ant Blaster (spec 09 §3, render only, from the sim's state): faint white-blue in the mouth at rest; aiming,
+ * the head turns to the target and the jaws part wide while the glow builds (the wind-up, `BALANCE.blaster.windup`);
+ * the shot flashes and kicks the head and the front of the body back, the planted legs soak it up; braced for the beam —
+ * feet planted wide, body low, head steady on the line, the whole ant trembling — the mouth blazing. Heads face straight
+ * ahead the rest of the time (user 2026-11-01). The glow is gold in the gold form (the shader mixes by the gold level).
+ */
+function blastPose(w: World, a: Ant, out: AntView, len: number): void {
+  if (a.state === AS.Dead) return;
+  const B = BALANCE.blaster;
+  let r = blastRecs.get(a.id);
+  if (!r) blastRecs.set(a.id, (r = { cd2: a.cd2, at: -9, seen: w.s.tick }));
+  if (a.cd2 > r.cd2 + 0.05) r.at = w.time; // the cooldown jumped: it just fired
+  r.cd2 = a.cd2;
+  r.seen = w.s.tick;
+  if (++blastPrune > 4000) {
+    blastPrune = 0;
+    for (const [id, x] of blastRecs) if (w.s.tick - x.seen > 200) blastRecs.delete(id);
+  }
+  const o = a.tk === 3 ? w.antById.get(a.tgt) : a.tk === 4 ? w.creatureById.get(a.tgt) : undefined;
+  let aim = 0;
+  if (o) {
+    const d = Math.atan2(o.y - a.y, o.x - a.x) - a.h;
+    aim = Math.max(-0.55, Math.min(0.55, Math.atan2(Math.sin(d), Math.cos(d))));
+  }
+  const beamOn = (a.beamT ?? 0) > 0;
+  const spray = a.state === AS.Spray && !beamOn;
+  const holding = a.state === AS.Attack && a.v < casteOf(a.caste).speed * 0.25 && a.tk >= 3 && a.tk <= 4;
+  blasterPose(out, {
+    t: w.time + a.id * 0.37,
+    len,
+    phase: beamOn ? 'beam' : spray ? 'windup' : holding ? 'hold' : 'rest',
+    st: a.st,
+    beamAge: beamOn ? B.beamTime - a.beamT! : 0,
+    since: w.time - r.at,
+    aim,
+    // the fifth gold shot is the beam: it charges harder
+    beamNext: spray && (a.surgeT ?? 0) > 0 && (a.shotN ?? 0) + 1 >= B.beamEvery && a.st < B.windup,
+  });
+}
+
+/**
+ * The Blaster's pose from its phase (shared with the animation lab's `blast` clip): `st` the wind-up's time, `beamAge`
+ * the beam's, `since` the time since the last shot (the recoil), `aim` the head's turn to the target (rad).
+ */
+export function blasterPose(out: Pick<AntView, 'mouthGlow' | 'brace' | 'crouch' | 'headYaw' | 'headPitch' | 'mandible' | 'gaster' | 'antennaPitch' | 'antennaActivity' | 'roll' | 'pitch' | 'pivX' | 'pose'>, p: { t: number; len: number; phase: 'rest' | 'windup' | 'hold' | 'beam'; st: number; beamAge: number; since: number; aim: number; beamNext: boolean }): void {
+  const B = BALANCE.blaster;
+  out.mouthGlow = 0.12 + 0.04 * Math.sin(p.t * 2.3);
+  if (p.phase === 'beam') {
+    // braced: feet wide, body low and steady on the line, the jaws wide open, a fine tremble through the whole body
+    const k = Math.min(1, p.beamAge / 0.25);
+    out.brace = 0.75 * k;
+    out.crouch = Math.max(out.crouch ?? 0, p.len * 0.07 * k);
+    out.headYaw = 0;
+    out.headPitch = 0.04;
+    out.mandible = 1;
+    out.gaster = 0.15;
+    out.antennaPitch = -0.35;
+    out.antennaActivity = 0.2;
+    out.roll = Math.sin(p.t * 53) * 0.022 * k;
+    out.pitch = Math.sin(p.t * 41 + 1.3) * 0.012 * k;
+    out.mouthGlow = 0.92 + 0.08 * Math.sin(p.t * 31);
+    out.pose = POSE.NONE;
+    return;
+  }
+  const kick = p.since >= 0 && p.since < 0.6 ? Math.exp(-p.since * 13) * Math.min(1, p.since * 60 + 0.2) : 0;
+  if (p.phase === 'windup') {
+    const c = Math.min(1, p.st / B.windup);
+    const e = c * c * (3 - 2 * c);
+    out.headYaw = p.aim * (1 - 0.3 * kick);
+    out.headPitch = 0.06 * e + 0.22 * kick;
+    out.mandible = 0.3 + 0.7 * e;
+    out.antennaPitch = 0.1 - 0.5 * e;
+    out.antennaActivity = 0.4;
+    out.gaster = 0.1 + 0.1 * e;
+    out.pitch = 0.06 * kick;
+    out.pivX = -0.3;
+    out.mouthGlow = Math.max(0.1, p.beamNext ? 0.25 + 0.75 * e : 0.15 + 0.6 * e, kick);
+    out.pose = POSE.NONE;
+    return;
+  }
+  if (p.phase === 'hold') {
+    // holding its range between shots: the head stays on the target, the jaws a little open, the glow simmering
+    out.headYaw = p.aim * (1 - 0.3 * kick);
+    out.headPitch = 0.22 * kick;
+    out.mandible = Math.max(0.35, kick);
+    out.antennaPitch = -0.1;
+    out.pitch = 0.06 * kick;
+    out.pivX = -0.3;
+    out.mouthGlow = Math.max(0.18, kick);
+  }
 }
 
 function armyAnt(w: World, a: Ant, out: AntView): void {

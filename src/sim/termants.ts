@@ -40,13 +40,15 @@ export interface StolenCaste {
   as?: string;
 }
 
-/** Data only: one entry per source species (entries whose caste is not in the game are skipped). */
+/** Data only: one or more entries per source species (entries whose caste is not in the game are skipped). */
 export const STOLEN_CASTES: StolenCaste[] = [
   { source: 'hell', caste: 'hell_soldier', heavy: true },
   { source: 'nasutitermes', caste: 'nasute_soldier', heavy: false, as: 'Sprayer' },
   { source: 'rhynchotermes', caste: 'rhy_soldier', heavy: false, as: 'Soldier' },
   { source: 'solenopsis', caste: 'fire_major', heavy: true },
   { source: 'aurimyrmex', caste: 'aurimyrmex_soldier', heavy: false },
+  // (user 2026-11-07: "Saiy-Ant Blaster"; the heavy threshold, so the soldier comes first from the same corpses)
+  { source: 'aurimyrmex', caste: 'aurimyrmex_blaster', heavy: true },
   { source: 'formica', caste: 'formica_rapid', heavy: false },
   { source: 'lasius', caste: 'lasius_soldier', heavy: false },
   { source: 'atta', caste: 'atta_major', heavy: true },
@@ -206,8 +208,9 @@ export function genesWanted(c: Colony, from: string): boolean {
   const src = corpseSource(from);
   if (!src || src === 'termant') return false;
   if (src.startsWith('cr:')) return true;
-  const e = STOLEN_CASTES.find((s) => s.source === src);
-  return !!e && !c.castes.includes(e.caste) && (c.genome.samples[src] ?? 0) < threshold(e);
+  // (a species can give more than one caste: worth fetching while any of them is short)
+  const have = c.genome.samples[src] ?? 0;
+  return STOLEN_CASTES.some((e) => e.source === src && !c.castes.includes(e.caste) && have < threshold(e));
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -355,11 +358,13 @@ export function termantKing(w: World, a: Ant, c: Colony, dt: number): boolean {
 /** A rival species whose genes this Termant colony nearly has: raid it sooner. */
 export function genesNear(c: Colony, species: string): boolean {
   if (!isTermant(c) || !c.genome) return false;
-  const e = STOLEN_CASTES.find((x) => x.source === species);
-  if (!e || c.genome.stolen.includes(e.caste)) return false;
   const have = c.genome.samples[species] ?? 0;
-  const need = threshold(e);
-  return have >= need * (1 - TERMANT.ai.raidNear) && have < need;
+  const G = c.genome;
+  return STOLEN_CASTES.some((e) => {
+    if (e.source !== species || G.stolen.includes(e.caste)) return false;
+    const need = threshold(e);
+    return have >= need * (1 - TERMANT.ai.raidNear) && have < need;
+  });
 }
 
 /** How much a wood or leaf source is worth to the forage AI (more while the food store is low). */

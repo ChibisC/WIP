@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /**
- * Static scenery in culled chunks (performance v3, CHANGE_PLAN §31): a map-wide merged mesh or instanced mesh is one
+ * Static scenery in culled chunks (performance v3, CHANGE_PLAN §32): a map-wide merged mesh or instanced mesh is one
  * object to the renderer, never outside the view, so every one of its triangles is shaded every frame — and again in
  * the shadow pass. Split into square chunks of the ground (each with its own bounding sphere), the renderer culls the
  * chunks out of the camera's or the light's view. The same triangles with the same vertex data, each in exactly one
