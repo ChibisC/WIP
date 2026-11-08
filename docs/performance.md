@@ -262,5 +262,5 @@ The real numbers come from the user's laptop and iPhone (`?bench=1`, below once 
 | LAN command → acting (1–4 ms one way, `tests/net.ts`) | delay 2: 3 ticks | delay 1: 2 ticks |
 | Ant renderer, 600–900 ants, zoomed in on a crowd (`tests/clientVisuals.ts`) | 1.8–3.4 ms | 0.2–0.4 ms |
 | Frame message, big fight (829 ants, 96 creatures) | 716 KB, columns read 3.1 ms | 381 KB, 1.8 ms |
-| Golden set run to run | differs where ants walk | identical |
+| Golden set (12 shots the branch could touch, `golden/compare-v2after.md`) | needed a run-to-run noise set | 12 of 12 match with no noise set, 10 pixel for pixel |
 | Simulation tick, big fight (Node, `tools/stress.ts`) | 24 ms (unchanged: no single hot spot; the simulation was not changed) | 24 ms |
