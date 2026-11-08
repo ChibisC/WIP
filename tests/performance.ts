@@ -31,6 +31,7 @@ import { Grass } from '../src/render/grass';
 import { chunkStatic } from '../src/render/chunks';
 import * as THREE from 'three';
 import { stressSetup } from '../src/dev/stressScene';
+import { WORKER_CATCHUP_LAG_MS, WORKER_LAG_MS, workerBatchCap, workerHasRoom } from '../src/game/simHost';
 
 const t0 = Date.now();
 let failed = 0;
@@ -496,6 +497,45 @@ if (columnCodegen.on) {
   const bad = w2.s.ants.filter((a) => Object.keys(a).slice(0, shape.length).join() !== shape.join());
   check('ant shape: restored ants have the fields in the same order as new ones', bad.length === 0 && w2.s.ants.length === w.s.ants.length, `${bad.length} of ${w2.s.ants.length}`);
   check('ant shape: the restored state hashes as the original', hashState(w) === hashState(w2));
+}
+
+// ---- game speed: a device's worker is never far behind (performance v3 after the merge, game/simHost.ts)
+{
+  const caps = [0, 2, 4, 5, 15, 30, 200].map(workerBatchCap);
+  check('worker lag: single-player batches hold 24 ticks, fewer when the ticks are slow (≈ 100 ms of work)', caps.join() === '24,24,24,20,6,3,2', caps.join());
+  check('worker lag: lockstep sends while under 100 ms of queued work (500 for a rejoin catch-up)',
+    workerHasRoom(0, 15) && workerHasRoom(6, 15) && !workerHasRoom(7, 15) && workerHasRoom(60, 1) && workerHasRoom(30, 15, WORKER_CATCHUP_LAG_MS) && !workerHasRoom(34, 15, WORKER_CATCHUP_LAG_MS));
+  // a multiplayer match at 4× (80 ticks a second asked for, 60 frames a second) on a device whose worker needs 15 ms a
+  // tick (66 a second): without the check the ticks it has not run pile up; with it the device waits (paces the match)
+  const run = (guard: boolean) => {
+    let inFlight = 0;
+    let busy = 0; // ms of the current tick done
+    let acc = 0;
+    let worst = 0;
+    for (let f = 0; f < 600; f++) {
+      acc += (1000 / 60) * 4;
+      while (acc >= 50 && (!guard || workerHasRoom(inFlight, 15))) {
+        acc -= 50;
+        inFlight++;
+      }
+      if (acc > 250) acc = 250;
+      let ms = 1000 / 60;
+      while (ms > 0 && inFlight > 0) {
+        const d = Math.min(ms, 15 - busy);
+        busy += d;
+        ms -= d;
+        if (busy >= 15) {
+          busy = 0;
+          inFlight--;
+        }
+      }
+      worst = Math.max(worst, inFlight * 15);
+    }
+    return worst;
+  };
+  const without = run(false);
+  const withCheck = run(true);
+  check('worker lag: an overloaded device at 4× stays within the limit (10 s simulated)', withCheck <= WORKER_LAG_MS + 15 && without > 1000, `behind by ${withCheck} ms with the check, ${without} ms without`);
 }
 
 console.log(`\n${failed ? `${failed} FAILED` : 'all passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

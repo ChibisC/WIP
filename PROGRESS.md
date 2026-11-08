@@ -2091,3 +2091,16 @@ User spec `claude/performance/03-spec-performance-v3-big-colonies.md`; branch `f
   fight's triangles are the ants (mid-distance ants at 3,300 triangles, twice with shadows). Changes that would alter
   the picture (simpler shadow casters, resolution, effect settings) wait for the gpu-scene report and the user's yes.
 - **Merged** into `main` as `ad17880` (Pages deployed; game artifact v51); handoff 23.
+
+## 2026-11-08 — Game speed and cutscenes checked; a device's worker never far behind (CHANGE_PLAN §32.4)
+- The user asked whether changing the game speed or cutscenes cause lag: neither had been checked. **Bench scenes**
+  **speed** (the big fight at 1×, 2×, 4× and 8×: the speed reached, frames, main-thread messages and events, the
+  worker's tick time) and **cine** (The Antlered King's opening flight: frames, hitches, shader links, texture uploads);
+  `?bench=1&bonly=speed,cine` runs only these; `tests/browser/speed_check.py`.
+- **Cutscene:** no shader links or texture uploads during the flight (everything it shows is prepared at load).
+- **Game speed:** found that lockstep and replay ticks went to the worker with no limit (an overloaded device fell
+  further behind every second) and single-player batches grew to 24 ticks. Now at most ~100 ms of the worker's ticks
+  are queued (`game/simHost.ts` `WORKER_LAG_MS`); pacing only, the same results.
+- **Checks:** `tests/performance.ts` (the caps; a simulated overloaded 4× match: 90 ms behind with the limit, 2 s and
+  growing without), `tests/browser/replay.py` (identical to the recording), `worker.py`, `lan.py` two players (hashes
+  match, no desync, the speed vote).

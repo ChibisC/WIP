@@ -40,6 +40,8 @@ export const BENCH_SCENES: SceneDef[] = [
   { id: 'story', title: 'Story: The Long Nights, last night', query: 'story=longNights&diff=normal&night=3&nocine=1&seed=7' },
   { id: 'arena', title: 'Battle arena, 600 units', query: 'play=1&mode=arena&teams=2&seed=4' },
   { id: 'mp4', title: 'Multiplayer-sized world (4 colonies, authored map)', query: 'play=1&seed=3&map=meadowPond&species=lasius&rival=formica,solenopsis,atta&developed=6&nocine=1' },
+  { id: 'speed', title: 'Game speed: the big fight at 1×, 2×, 4× and 8×', query: 'stress=1&ants=200&creatures=100&bosses=2' },
+  { id: 'cine', title: 'Story cutscene: the opening flight of The Antlered King', query: 'story=antleredKing&diff=normal&seed=7' },
 ];
 
 const KEY = 'ud-bench';
@@ -81,6 +83,9 @@ interface SceneResult {
   switch?: SwitchResult;
   /** the GPU breakdown scene's steps (performance v3) */
   gpuSteps?: GpuStep[];
+  speedSteps?: SpeedStep[];
+  /** the cutscene scene: how long the shot ran (s), and whether it ended before the time limit */
+  cine?: { secs: number; ended: boolean };
   /** latency and pacing (core/feel.ts) */
   feel?: FeelSummary;
 }
@@ -142,7 +147,7 @@ export function startBench(ui: HTMLElement, q: URLSearchParams): void {
   const only = q.get('bonly')?.split(',').filter((id) => BENCH_SCENES.some((d) => d.id === id));
   const st: BenchState = { started: Date.now(), quality: q.get('q') || 'high', secs: Number(q.get('bsecs') || 20), rounds: Number(q.get('brounds') || 10), results: [], only: only?.length ? only : undefined };
   const box = panel(ui);
-  box.innerHTML = `<h2>Benchmark</h2><p>Eight scenes, about ${Math.round((BENCH_SCENES.length * (st.secs + 12) + 60) / 60)} minutes at <b>${st.quality}</b> quality. Each one loads, warms up, then flies the camera along a fixed path while every frame is timed. Leave the mouse and keyboard alone until the report appears; keep this tab in front.</p><p>Starting in 3 s…</p>`;
+  box.innerHTML = `<h2>Benchmark</h2><p>${BENCH_SCENES.length} scenes, about ${Math.round((BENCH_SCENES.length * (st.secs + 12) + 60) / 60)} minutes at <b>${st.quality}</b> quality. Each one loads, warms up, then flies the camera along a fixed path while every frame is timed. Leave the mouse and keyboard alone until the report appears; keep this tab in front.</p><p>Starting in 3 s…</p>`;
   save(st);
   setTimeout(() => go(sceneUrl(nextScene(st, -1), st)), 3000);
 }
@@ -186,9 +191,10 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
   s.autoQuality.enabled = false;
   // (measured uncapped: the frame cap would hide what the device can do)
   s.loop.frameCap = 0;
-  const finish = (sw?: SwitchResult, gpuSteps?: GpuStep[]) => {
+  const finish = (sw?: SwitchResult, gpuSteps?: GpuStep[], extra?: Partial<SceneResult>) => {
     const r = collect(s, def, loadMs, secs, sw);
     if (gpuSteps) r.gpuSteps = gpuSteps;
+    if (extra) Object.assign(r, extra);
     st.results.push(r);
     save(st);
     console.log('[bench]', JSON.stringify(r));
@@ -241,6 +247,8 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
   if (def.id === 'switch') return void runSwitching(s, () => finish(undefined), (sw) => finish(sw));
   if (def.id === 'feel') return void runFeel(s, secs, () => finish());
   if (def.id === 'gpu') return void runGpuSteps(s, cx, cz, (steps) => finish(undefined, steps));
+  if (def.id === 'speed') return void runSpeedSteps(s, cx, cz, (steps) => finish(undefined, undefined, { speedSteps: steps }));
+  if (def.id === 'cine') return void runCine(s, (c) => finish(undefined, undefined, { cine: c }));
   const loop = (t: number) => {
     const el = t - t0;
     if (el < warm) {
@@ -308,6 +316,119 @@ function collect(s: GameSession, def: SceneDef, loadMs: number, secs: number, sw
 }
 
 /** One step of the GPU breakdown: the frame interval with one thing changed (performance v3). */
+/** One game speed of the speed scene (performance v3). */
+interface SpeedStep {
+  speed: number;
+  /** the speed the game actually ran at (ticks a second of real time ÷ 20) */
+  reached: number;
+  /** frame interval avg and p95 (ms), frames over 50 ms */
+  avg: number;
+  p95: number;
+  over50: number;
+  /** main thread a frame (ms), and its messages and events parts */
+  cpu: number;
+  msg: number;
+  events: number;
+  /** the simulation's tick (ms) */
+  tickMs: number;
+}
+
+/**
+ * Game speed under load (performance v3): the big fight at the default zoom, the camera still, at 1×, 2×, 4× and 8×
+ * (2 s to settle, 4 s measured each): does the simulation keep up, and what the speed costs a frame.
+ */
+function runSpeedSteps(s: GameSession, cx: number, cz: number, done: (steps: SpeedStep[]) => void): void {
+  const surf = s.view.surfaceRig;
+  surf.goalYaw = 0.6;
+  surf.goalDistance = 260;
+  surf.goal.set(cx + Math.cos(0.6) * 30, surf.goal.y, cz + Math.sin(0.6) * 30);
+  const speeds = [1, 2, 4, 8];
+  const out: SpeedStep[] = [];
+  const WARM = 3000;
+  const SETTLE = 2000;
+  const MEASURE = 4000;
+  let k = -1;
+  let t0 = 0;
+  let last = 0;
+  let times: number[] = [];
+  let tick0 = 0;
+  let tm0 = 0;
+  const snap = () => ({ cpu: [prof.cpuMs.total, prof.cpuMs.pushes], msg: [prof.parts.msg.total, prof.parts.msg.pushes], ev: [prof.parts.events.total, prof.parts.events.pushes] });
+  let p0 = snap();
+  const per = (a: number[], b: number[]) => (b[1] - a[1] > 0 ? (b[0] - a[0]) / (b[1] - a[1]) : 0);
+  const start = performance.now();
+  const loop = (t: number) => {
+    if (t - start < WARM) {
+      requestAnimationFrame(loop);
+      return;
+    }
+    if (k < 0 || t - t0 > SETTLE + MEASURE) {
+      if (k >= 0) {
+        const srt = times.slice().sort((a, b) => a - b);
+        const p1 = snap();
+        out.push({
+          speed: speeds[k],
+          reached: +((s.world.s.tick - tick0) / ((t - tm0) / 1000) / 20).toFixed(2),
+          avg: +(times.reduce((a, b) => a + b, 0) / Math.max(1, times.length)).toFixed(1),
+          p95: +(srt[Math.floor(srt.length * 0.95)] ?? 0).toFixed(1),
+          over50: times.filter((x) => x > 50).length,
+          cpu: +per(p0.cpu, p1.cpu).toFixed(2),
+          msg: +per(p0.msg, p1.msg).toFixed(2),
+          events: +per(p0.ev, p1.ev).toFixed(2),
+          tickMs: +s.sim.tickMs.toFixed(1),
+        });
+      }
+      k++;
+      if (k >= speeds.length) {
+        s.setSpeed(1);
+        return done(out);
+      }
+      s.setSpeed(speeds[k]);
+      t0 = t;
+      times = [];
+      last = 0;
+    }
+    if (t - t0 > SETTLE) {
+      if (last) times.push(t - last);
+      else {
+        tick0 = s.world.s.tick;
+        tm0 = t;
+        p0 = snap();
+      }
+      last = t;
+    }
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+
+/**
+ * A story cutscene (performance v3): the level's opening camera flight, measured from the first frame to the shot's
+ * end (at most 40 s) — the frame times and the hitch log with their causes (new things coming into view: shader
+ * links, texture uploads, model builds).
+ */
+function runCine(s: GameSession, done: (c: { secs: number; ended: boolean }) => void): void {
+  // the level's own opening flight (it starts on the story's first ticks, a few seconds into a slow device's start):
+  // measured from its first frame to the camera's return
+  const begin = performance.now();
+  let start = 0;
+  const loop = (t: number) => {
+    if (!start) {
+      if (!s.cine) {
+        if (t - begin > 30000) return done({ secs: 0, ended: false });
+        return void requestAnimationFrame(loop);
+      }
+      prof.reset();
+      feel.reset();
+      start = t;
+    }
+    const el = (t - start) / 1000;
+    if (!s.cine || el > 40) return done({ secs: +el.toFixed(1), ended: !s.cine });
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+
 interface GpuStep {
   name: string;
   avg: number;
@@ -645,6 +766,12 @@ function fmtScene(r: SceneResult): string[] {
       `pacing: interval ${fm(F.interval)} ms, jitter ${F.jitter ? F.jitter.avg : '—'} ms, display ${F.vsync} ms · over 16.7 ms ${F.over16}/${F.frames}, over 33 ms ${F.over33}, missed vsync ${F.missed} · long tasks ${F.longTasks ? `${F.longTasks.n} (${F.longTasks.ms} ms)` : 'n/a'}`,
     );
   }
+  if (r.speedSteps) {
+    out.push('  speed  reached   frame avg / p95, over 50 ms   main thread (msg, events)   sim tick');
+    for (const g of r.speedSteps)
+      out.push(`  ${String(g.speed).padStart(3)}×   ${g.reached.toFixed(2)}×     ${g.avg.toFixed(1)} / ${g.p95.toFixed(1)} ms, ${g.over50}`.padEnd(48) + `${g.cpu} ms (${g.msg}, ${g.events})`.padEnd(28) + `${g.tickMs} ms`);
+  }
+  if (r.cine) out.push(r.cine.secs ? `  the shot ran ${r.cine.secs} s${r.cine.ended ? '' : ' (not seen to end)'}` : '  the flight did not start within 30 s');
   if (r.gpuSteps) {
     const base = r.gpuSteps[0]?.avg ?? 0;
     for (const g of r.gpuSteps)

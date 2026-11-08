@@ -35,7 +35,7 @@ import { entranceAt, markerRadius } from '../sim/markers';
 import { abilityOf } from '../sim/abilities';
 import { Command, CommandBody } from '../sim/commands';
 import { LocalCommands } from './localCommands';
-import { LocalSim, SimHost, WorkerSim } from './simHost';
+import { LocalSim, SimHost, WORKER_CATCHUP_LAG_MS, WorkerSim } from './simHost';
 import { AutoQuality } from './autoQuality';
 import { prof } from '../core/profiler';
 import { feel, InputKind } from '../core/feel';
@@ -506,6 +506,9 @@ export class GameSession {
 
   /** One simulation tick (false: it cannot run yet — multiplayer is waiting for a player's packets). */
   private tickOnce(): boolean {
+    // (lockstep and replays send the worker one tick at a time: a device whose worker is too far behind waits for it,
+    // as for a player's packets — simHost.ts WORKER_LAG_MS)
+    if ((this.net || this.replay) && !this.sim.canStep()) return false;
     if (this.net) return this.net.tryTick();
     if (this.replay) return this.replayTick();
     this.sim.tick(1);
@@ -561,7 +564,8 @@ export class GameSession {
     this.loop.speed = net.status().speed * (this.world.s.settings.gameSpeed ?? 1);
     // A player who rejoined plays the missed ticks at full speed (the worker queues them).
     const behind = net.behind();
-    if (behind > 4 && !this.loop.paused) for (let i = 0; i < Math.min(60, behind) && net.tryTick(); i++);
+    if (behind > 4 && !this.loop.paused)
+      for (let i = 0; i < Math.min(60, behind) && this.sim.canStep(WORKER_CATCHUP_LAG_MS) && net.tryTick(); i++);
     if (!this.overSent && this.frameNo % 30 === 0) {
       const win = matchWinner(this.world);
       if (win !== -1) {

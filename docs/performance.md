@@ -280,6 +280,13 @@ The real numbers come from the user's laptop and iPhone (`?bench=1`, below once 
 - **Main thread** (`tools/perf/unitsBench.ts`): the real fight's ant views, ant renderer and creature renderer per
   frame, bundled, no WebGL.
 - **Devices**: `?bench=1` on the laptop and the iPhone; the new **gpu** scene turns one effect off at a time.
+- **Game speed and cutscenes** (added after the merge, when the user asked): the bench's **speed** scene runs the big
+  fight at a fixed camera at 1×, 2×, 4× and 8× (3 s to warm up, then each speed 2 s to settle and 4 s measured): the
+  speed the game really reached (ticks advanced ÷ 20 a second), frame times, the main thread's messages and events per
+  frame and the worker's tick time. The **cine** scene measures The Antlered King's opening camera flight (Oak Woods,
+  10.8 s) from its first frame to the camera's return: frames, hitches and their causes, shader links and texture
+  uploads. `?bench=1&bonly=speed,cine` runs just these two. (`tests/browser/speed_check.py` does the speed steps from a
+  script.)
 - **What a scene holds** (`tests/browser/scene_census.py`): meshes, shadow casters and the biggest meshes by triangles.
 
 ### What was found
@@ -337,6 +344,30 @@ runs the simulation about three times faster than this machine (5 ms a tick for 
 | Meadow Pond: water | 320 k triangles every frame | the rows in view |
 | Every map: terrain | 1 mesh, ~300 k triangles every frame | 25 culled chunks |
 | Golden set (`golden/compare-v3after.md`) | — | 11 of 11 match, 8 pixel for pixel; far shots 1–11 of 972,800 pixels where grass blades cross |
+
+### Game speed and cutscenes (checked after the merge, when the user asked)
+- **A cutscene builds nothing new.** The Antlered King's opening flight (the bench's **cine** scene, on this
+  machine): no shader links and no texture uploads from its first frame to the camera's return (everything it shows was
+  prepared at load); 86–92 draw calls and 420–440 k triangles. Its frame times wait for the devices' bench.
+- **Game speed changes how many ticks a second the worker runs, not what a tick costs.** The fastest speed this
+  machine's worker can hold (50 ms ÷ the tick times above): at 1,000 ants 4.6× (economy) to 8.8× (tunnel fight); at
+  2,000 ants 3.0× (titan raid) to 4.9× (nests). The big fight at 2,000 went from 1.5× (`main` before v3) to 3.2×. The
+  laptop's worker is about three times faster.
+- **A device whose worker could not keep up:** single-player never piled up (at most 24 ticks waited), but each
+  update then held up to 24 ticks (at 30 ms a tick, one update every 0.7 s: the paths drawn as long straight
+  segments). Multiplayer and replays had no limit: each tick went to the worker as it came due, so an overloaded
+  device's picture, and its player's orders, fell further behind every second (a simulated 4× match on a device at
+  15 ms a tick: 2 s behind after 10 s, and growing).
+- **Now** (`game/simHost.ts` `WORKER_LAG_MS`): a device keeps at most about 100 ms of its worker's work queued.
+  Single-player batches are smaller when the ticks are slow (24 ticks at up to 4 ms a tick, 6 at 15 ms, 3 at 30 ms):
+  about four times as many updates for a few per cent less speed (one frame packet a batch). Multiplayer and replays
+  wait for the worker: a replay then plays at the speed the device can do; a match waits as it does for a player's
+  packets, so the slowest device paces it (as it already did when its frames were slow), behind by at most 100 ms
+  (500 for a rejoin's catch-up, whose worker must stay busy). A device
+  that keeps up never reaches the limit, and the simulation computes the same ticks with the same commands.
+- **The main thread at speed:** single-player gets one worker update a batch at any speed, so its message cost does
+  not grow; the events of all the batch's ticks (hits, deaths, sounds, effects) do. Multiplayer sends every tick as its
+  own update (lockstep). The **speed** scene measures both per frame on the devices.
 
 ### Not done, and why
 - **Anything that changes the picture.** Both devices are limited by the GPU at High even in scenes with few ants (the

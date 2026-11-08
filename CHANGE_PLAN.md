@@ -1598,3 +1598,17 @@ LAN two-tab in sync).
 15. **Measured** (bundled, best of 2, `main` 56be698): 1,000 ants 5.7–10.9 ms a tick (target 15), 2,000 ants
     10.2–16.6 (target 25); the big fight at 2,000 33.2 → 15.5. Spikes over 40 ms at 2,000 not gone (1–16 of 300 in
     four scenes: synchronised one-second timers of the stress scenes, minor GCs). Docs: `docs/performance.md` v3.
+
+### 32.4 Game speed and cutscenes (after the merge; the user asked whether they had been checked — they had not)
+1. **Measured:** bench scenes **speed** (the big fight at a fixed camera at 1×, 2×, 4× and 8×: the speed really
+   reached, frame times, the main thread's messages and events a frame, the worker's tick time) and **cine** (The
+   Antlered King's opening flight, from its first frame to the camera's return: frames, hitches and their causes,
+   shader links, texture uploads); `tests/browser/speed_check.py` (the speed steps from a script).
+2. **Cutscenes:** the flight links no shader and uploads no texture (everything it shows is prepared at load).
+3. **Game speed:** a tick costs the same at any speed; at N× the worker runs 20·N a second (this machine holds
+   3.0–4.9× at 2,000 ants, 4.6–8.8× at 1,000). Found: lockstep and replay ticks went to the worker with no limit, so a
+   device whose worker could not keep up fell further behind every second; single-player batches grew to 24 ticks.
+   **Worker lag limit** (`game/simHost.ts` `WORKER_LAG_MS` = 100 ms of the worker's ticks): single-player batches
+   hold at most that much (still at most 24); lockstep and replay ticks wait while that much is queued (a rejoin's
+   catch-up 500 ms). Pacing only: the same ticks with the same commands (no `BUILD_ID` change). `tests/performance.ts`
+   checks the caps and a simulated overloaded 4× match (90 ms behind with the limit; 2 s after 10 s, growing, without).
