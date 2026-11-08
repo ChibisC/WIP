@@ -1372,8 +1372,9 @@ LAN); only the client changes, plus the multiplayer input delay (when commands a
    spawn and played by the vertex shader in closed form from t − t0 (drag e^(−dτ), gravity, the landing time worked out
    at spawn); only the new slots are uploaded. The ant shader is untouched (still 16 attributes); health bars and rings
    were already instanced quads drawn only for the few units that need them.
-6. **Messages** — delta entity columns (`ColumnWriter.write(…, delta)`: when the entities are the same as last frame
-   and in the same order, the columns nobody changed are left out — 50–70 % of them in a fight) and a generated reader
+6. **Messages** — delta entity columns (`ColumnWriter.write(…, delta)`: when every entity was in the last frame too —
+   rows matched by id, so deaths and reordering do not matter — the columns nobody changed are left out, 50–70 % of
+   them in a fight) and a generated reader
    (one loop per schema with named stores; the plain loop where a page forbids compiling code). Big fight (829 ants,
    96 creatures, build machine, Node): 716 → 381 KB a frame, the columns' read 3.1 → 1.8 ms. `tests/performance.ts`
    checks the replica's ants stay exactly the simulation's. The simulation's systems were profiled
