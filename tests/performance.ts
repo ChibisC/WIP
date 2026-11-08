@@ -329,6 +329,33 @@ function check(name: string, ok: boolean, detail = ''): void {
   columnCodegen.on = can;
 }
 
+// ---- the generated column writer (performance v3): the same packets, byte for byte, as the plain loop
+if (columnCodegen.on) {
+  const w = createStressWorld(new EventBus(), 60, 20);
+  const can = columnCodegen.on;
+  const lists = () => [w.s.ants, w.s.food, w.s.creatures] as object[][];
+  const A = lists().map(() => new ColumnWriter());
+  const B = lists().map(() => new ColumnWriter());
+  const same = (x: ArrayLike<number>, y: ArrayLike<number>) => x.length === y.length && Array.prototype.every.call(x, (v: number, i: number) => Object.is(v, y[i]));
+  let bad = '';
+  for (let f = 0; f < 120 && !bad; f++) {
+    w.step(0.05);
+    w.events.drain();
+    lists().forEach((l, k) => {
+      columnCodegen.on = true;
+      const pa = A[k].write(l, null, undefined, true);
+      columnCodegen.on = false;
+      const pb = B[k].write(l, null, undefined, true);
+      columnCodegen.on = can;
+      const J = JSON.stringify;
+      if (!(pa.n === pb.n && J(pa.keys) === J(pb.keys) && same(pa.num, pb.num) && same(pa.str, pb.str) && J(pa.newStrings) === J(pb.newStrings) && J(pa.other) === J(pb.other) && J(pa.omit ? [...pa.omit] : null) === J(pb.omit ? [...pb.omit] : null)))
+        bad ||= `frame ${f}, list ${k}`;
+    });
+  }
+  columnCodegen.on = can;
+  check('entity columns: the generated writer gives the plain loop’s packets byte for byte (ants, food, creatures; 120 ticks of a fight)', !bad, bad);
+}
+
 // ---- one object shape for every ant (performance v3: sim/factory.ts antShape)
 {
   const fs = (await import(/* @vite-ignore */ 'node:' + 'fs')) as { readFileSync(p: URL, enc: string): string };
