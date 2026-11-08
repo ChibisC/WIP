@@ -116,13 +116,13 @@ vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, vec4 lv, out float r
   float wob = fbm(p * 0.11) * 9.0 + fbm(p * 0.4 + 9.0) * 3.0;
   float ridge = 0.5 + 0.5 * sin(sd * 4.2 + wob);
   ridge = smoothstep(0.3, 0.8, ridge) * (0.5 + 0.5 * vnoise(p * 0.25 + 3.0)) * smoothstep(7.0, 3.0, sd);
-  ridge += smoothstep(3.0, 7.0, sd) * (0.3 + 0.5 * fbm(p * 0.3 + 21.0));
+  ridge += smoothstep(3.0, 7.0, sd) * (0.15 + 0.35 * fbm(p * 0.3 + 21.0));
   float crack = smoothstep(0.64, 0.7, fbm(p * 0.21 + 5.0));
-  vec3 bark = mix(vec3(0.13, 0.09, 0.055), vec3(0.30, 0.21, 0.13), ridge);
-  bark *= 0.85 + 0.3 * vnoise(p * 1.7);
+  vec3 bark = mix(vec3(0.09, 0.06, 0.035), vec3(0.24, 0.165, 0.1), ridge);
+  bark *= 0.8 + 0.3 * vnoise(p * 1.7);
   bark = mix(bark, vec3(0.07, 0.05, 0.03), crack * 0.85);
   float lichen = smoothstep(0.66, 0.74, fbm(p * 0.07 + 11.0)) * smoothstep(0.35, 0.6, vnoise(p * 0.9));
-  bark = mix(bark, vec3(0.5, 0.56, 0.42), lichen * 0.6);
+  bark = mix(bark, vec3(0.46, 0.52, 0.38), lichen * 0.45);
   float moss = smoothstep(0.6, 0.78, fbm(p * 0.1 - 3.0)) * smoothstep(2.5, 5.0, sd);
   bark = mix(bark, vec3(0.16, 0.3, 0.1), moss * 0.6);
   // leaves: a blade with a midrib down its length (lv.x along, lv.y across, 0..1; lv.z 1 where a blade was found),
@@ -300,13 +300,15 @@ vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, vec4 lv, out float r
    * distance), leaves a thin platform slightly domed; outside the walkable set it curls under and is discarded.
    */
   heightAt(px: number, py: number): number {
-    const sdv = this.sdAt(px, py) + (valueNoise2(px * 0.13, py * 0.13, 7) - 0.5) * 0.4;
+    const sdv = this.sdAt(px, py) + (valueNoise2(px * 0.13, py * 0.13, 7) - 0.5) * 0.3;
     const leaf = this.leafAt(px, py);
-    const R = this.grid.R * 0.75;
-    const t = Math.max(0, Math.min(1, (sdv + 0.5) / R));
-    const wood = this.wallH * Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t)));
-    // (a leaf lies flush with the wood's top: a thin, slightly domed blade, never a pit in the branch)
-    const lf = this.wallH * (0.86 + 0.1 * Math.sqrt(t)) + valueNoise2(px * 0.03, py * 0.03, 3) * 0.8;
+    // the walkable top is flat (a creature standing on it, legs wide, stays on the surface — user 2026-11-08: nothing
+    // sinks in): the bark rounds off only within about a cell and a half of the edge
+    const edge = this.grid.cell * 1.6;
+    const t = Math.max(0, Math.min(1, (sdv + 0.5) / edge));
+    const round = Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t)));
+    const wood = this.wallH * (0.94 + 0.06 * valueNoise2(px * 0.06, py * 0.06, 5)) * round;
+    const lf = this.wallH * (0.9 + 0.04 * valueNoise2(px * 0.03, py * 0.03, 3)) * round;
     let h = wood * (1 - leaf) + lf * leaf;
     if (sdv < -0.5) h = -1.5 * Math.min(1, (-0.5 - sdv) / 2);
     return h;
