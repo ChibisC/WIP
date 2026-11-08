@@ -1529,3 +1529,10 @@ LAN two-tab in sync).
     (`onBeforeRender`, same index order — it is transparent). On Meadow Pond the grass alone was 1.1 M triangles a
     frame, the pebbles 310 k (twice: they cast shadows), the water 320 k.
 12. Merged `main` twice (audio v3, the model redo); the reference for same.sh is `main` + the tools.
+13. **The ant record a class** (found by bisecting a 20 % slowdown in the bundled full nests to the shape commit): an
+    object literal of ≥ 128 fields keeps them all outside the object and makes a class per copy; a constructor keeps
+    151 inside. Always-set fields start as numbers. All 18 runs the same.
+14. **Replica rows** from a constructor generated per schema (main thread; fields inside the object).
+15. **Measured** (bundled, best of 2, `main` 56be698): 1,000 ants 5.7–10.9 ms a tick (target 15), 2,000 ants
+    10.2–16.6 (target 25); the big fight at 2,000 33.2 → 15.5. Spikes over 40 ms at 2,000 not gone (1–16 of 300 in
+    four scenes: synchronised one-second timers of the stress scenes, minor GCs). Docs: `docs/performance.md` v3.

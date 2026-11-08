@@ -2052,9 +2052,12 @@ User spec `claude/performance/03-spec-performance-v3-big-colonies.md`; branch `f
   `tools/perf/same.sh` proves every simulation change against `main` with canonical state hashes (18 runs, ALL SAME);
   the user's laptop and iPhone `?bench=1`; the bench's new **gpu** scene (one effect off at a time — in `main` early,
   handoff 21).
-- **Simulation:** one hidden class for every ant (138 before); separation on the packed hash and typed arrays with
-  exact early outs; per-creature values once a pass; hex lookup fast path; the flow cache's LRU by counter.
-- **Worker frames:** a generated column writer — the same packets byte for byte.
+- **Simulation:** one hidden class for every ant (138 before; the record a class so its 151 fields stay inside the
+  object); separation on the packed hash and typed arrays with exact early outs; per-creature values once a pass; hex
+  lookup fast path; the flow cache's LRU by counter. Bundled against `main`: 1,000 ants 5.7–10.9 ms a tick (target
+  15), 2,000 ants 10.2–16.6 (target 25; the big fight 33.2 → 15.5); spikes over 40 ms at 2,000 remain (1–16 of 300).
+- **Worker frames:** a generated column writer — the same packets byte for byte; the replica's rows from a
+  constructor per schema (fields inside the object).
 - **Graphics (no change of looks):** the terrain, grass, pebbles and merged map scenery drawn in culled 5 × 5 chunks;
   the water draws only the rows a camera sees. Golden set: 11 of 11 match, 8 pixel for pixel (the three far shots
   differ in 1–11 of 972,800 pixels where grass blades cross).
