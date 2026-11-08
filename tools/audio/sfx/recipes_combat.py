@@ -120,14 +120,6 @@ def chitin_crack(r, k):
     return o
 
 
-@sound("combat.hit_tick", takes=6)
-def hit_tick(r, k):
-    # a light hit taken: a tiny chitin tick
-    o = zeros(0.02)
-    add(o, click(r, 4000, 12000, 3, (0.0005, 0.0025), 0.6), 0.001, 1.0)
-    return o
-
-
 @sound("combat.termite_bite", takes=5)
 def termite_bite(r, k):
     # soft-bodied termites: a duller, wetter crunch (thin, lightly sclerotised heads and soft prey)
@@ -154,19 +146,6 @@ def grip(r, k):
     add(o, zipper(r, r.u(0.14, 0.24)), 0.004, 0.55)
     if r.chance(0.85):
         add(o, squeal(r, r.i(1, 3)), r.u(0.03, 0.09), 0.5)
-    return o
-
-
-@sound("combat.struggle", takes=4)
-def struggle(r, k):
-    # prey held fast (a hell ant's jaw, a sickle-jaw's grip, an army ant's hooks, a pin): its legs scrabbling and its
-    # stridulation, on and off
-    o = zeros(0.75)
-    add(o, norm(friction(r, r.u(0.5, 0.65), r.u(700, 1200), 2500, 9500, (0.0003, 0.0015), 0.25)), 0.0, 0.6)
-    t = r.u(0.0, 0.1)
-    while t < 0.55:
-        add(o, squeak(r, r.i(1, 2)), t, r.u(0.4, 0.8))
-        t += r.u(0.15, 0.3)
     return o
 
 
@@ -445,29 +424,6 @@ def twitch(r, o, t0, dur, n, f_lo, f_hi, g):
     for i in range(n):
         t = t0 + dur * r.u() ** 1.6
         add(o, click(r, f_lo, f_hi, 2, (0.0004, 0.002), 0.5), t, g * r.u(0.25, 1) * np.exp(-(t - t0) / dur))
-
-
-@sound("combat.ant_death", takes=6)
-def ant_death(r, k):
-    # an ant dying: a brittle crack, then a faint, short twitch of clicks as the legs curl
-    o = zeros(0.42)
-    add(o, click(r, 2500, 9000, 4, (0.001, 0.005), 0.9), 0.001, 1.0)
-    add(o, crunch(r, r.u(0.03, 0.05), r.i(10, 16), 8000, 2800, 2.0, (0.0004, 0.002)), 0.002, 0.7)
-    twitch(r, o, r.u(0.07, 0.11), r.u(0.18, 0.28), r.i(6, 12), 3500, 11000, 0.35)
-    return o
-
-
-@sound("combat.termite_death", takes=4)
-def termite_death(r, k):
-    # a termite dying: soft-bodied, a dull wet crunch and a few slow twitches
-    o = zeros(0.45)
-    add(o, lp(crunch(r, 0.05, r.i(8, 12), 4000, 1300, 1.8, (0.0008, 0.004)), 8000), 0.001, 0.9)
-    add(o, squelch(r, 0.07, 1500, 600, 5), 0.004, 0.5)
-    twitch(r, o, 0.1, 0.25, r.i(4, 7), 2500, 8000, 0.25)
-    return o
-
-
-# ------------------------------------------------------------------ the battle bed
 
 
 @sound("combat.battle_bed", loop=True, lufs=-21)

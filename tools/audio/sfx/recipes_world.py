@@ -27,24 +27,6 @@ def dig_bite(r, k):
     return o
 
 
-@sound("ant.soil_grains", takes=5, lufs=-23)
-def soil_grains(r, k):
-    # grains trickling down and bouncing after a bite
-    dur = r.u(0.35, 0.6)
-    o = zeros(dur + 0.05)
-    add(o, grains(r, dur, r.i(25, 45), 1800, 8000, (0.0004, 0.002), 1.6, (0.1, 1.0)), 0.001, 1.0)
-    return o
-
-
-@sound("ant.pellet_drop", takes=5)
-def pellet_drop(r, k):
-    # a soil pellet set down at the spoil heap: a soft thud and a little scatter
-    o = zeros(0.16)
-    add(o, thud(r, r.u(280, 420), r.u(0.008, 0.014)), 0.001, 0.8)
-    add(o, grains(r, 0.06, r.i(4, 8), 2000, 7000, (0.0004, 0.002), 1.5), 0.004, 0.6)
-    return o
-
-
 @sound("ant.drag_small", takes=5, lufs=-23)
 def drag_small(r, k):
     # a small food item dragged a little way: a light scrape with a bump or two
@@ -72,45 +54,6 @@ def drag_heavy(r, k):
     add(o, norm(lp(r.noise(n), 700, 3)) * pressure ** 2, 0.002, 0.3)
     for _ in range(r.i(3, 5)):
         add(o, thud(r, r.u(160, 300), r.u(0.01, 0.016)), r.u(0.03, dur), r.u(0.4, 0.7))
-    return o
-
-
-@sound("ant.pick_up", takes=5, lufs=-23)
-def pick_up(r, k):
-    # picking up a load: the mandibles closing on it (a soft click) and a brief scrape as it lifts
-    o = zeros(0.12)
-    add(o, click(r, 2200, 7000, 3, (0.0008, 0.004), 0.4), 0.001, 0.8)
-    add(o, norm(friction(r, r.u(0.04, 0.07), 400, 2000, 7000, (0.0004, 0.002), 0.3)), 0.008, 0.45)
-    return o
-
-
-@sound("ant.put_down", takes=5, lufs=-23)
-def put_down(r, k):
-    # setting a load down: a soft tap and a grain or two
-    o = zeros(0.12)
-    add(o, thud(r, r.u(350, 600), 0.007), 0.001, 0.7)
-    add(o, click(r, 2000, 6000, 2, (0.001, 0.004), 0.3), 0.002, 0.4)
-    add(o, grains(r, 0.04, r.i(2, 4), 2500, 7000, (0.0004, 0.0015)), 0.006, 0.3)
-    return o
-
-
-@sound("ant.food_cut", takes=5)
-def food_cut(r, k):
-    # mandibles shearing soft food (an insect, fruit): a fibrous crunch with moisture
-    o = zeros(0.18)
-    add(o, crunch(r, r.u(0.05, 0.09), r.i(10, 16), 4500, 1500, 1.5, (0.0006, 0.003)), 0.001, 0.9)
-    add(o, norm(friction(r, 0.06, 1200, 2000, 7000, (0.0003, 0.0015), 0.3)), 0.01, 0.35)
-    add(o, bubbles(r, 0.06, r.i(2, 4), 1500, 4000, (0.0015, 0.004)), 0.02, 0.3)
-    return o
-
-
-@sound("ant.seed_crack", takes=6)
-def seed_crack(r, k):
-    # a seed's coat cracking in a major's jaws: a sharp crack and fragments bouncing
-    o = zeros(0.18)
-    add(o, hollow(r, 1500, 6000, (0.002, 0.008), 4), 0.001, 1.0)
-    add(o, crunch(r, 0.04, r.i(8, 12), 7000, 2500, 2.0), 0.002, 0.5)
-    add(o, grains(r, 0.12, r.i(4, 8), 2500, 8000, (0.0006, 0.003), 1.3), 0.03, 0.4)
     return o
 
 
@@ -150,15 +93,6 @@ def antenna_tap(r, k):
 # ------------------------------------------------------------------ brood
 
 
-@sound("ant.egg_set", takes=4, lufs=-24)
-def egg_set(r, k):
-    # an egg set down on the brood pile: soft and slightly wet
-    o = zeros(0.12)
-    add(o, squelch(r, 0.04, 2400, 1400, 6), 0.001, 0.8)
-    add(o, bubbles(r, 0.02, r.i(1, 2), 2500, 4500, (0.0015, 0.003)), 0.004, 0.5)
-    return o
-
-
 @sound("ant.larva_hatch", takes=4, lufs=-22)
 def larva_hatch(r, k):
     # a new adult breaking out of its cocoon (v3.1, per review: a clear, satisfying little hatch): a short fibrous
@@ -172,18 +106,6 @@ def larva_hatch(r, k):
         add(o, bubble(r, r.u(900, 1300) * (1.25 ** i), r.u(0.006, 0.01), 0.3), 0.1 + i * r.u(0.035, 0.05), 0.35 - 0.07 * i)
     add(o, norm(fizz(r, 0.18, 400, 5000, 11000, 0.15, 0.06)), 0.11, 0.18)           # a tiny bright tail of droplets
     return o
-
-
-@sound("ant.queen_lay", takes=3, lufs=-23)
-def queen_lay(r, k):
-    # the queen laying an egg: a soft, wet sound
-    o = zeros(0.3)
-    add(o, squelch(r, 0.12, 1500, 800, 5), 0.005, 0.8)
-    add(o, bubbles(r, 0.12, r.i(2, 4), 1200, 3500, (0.002, 0.006)), 0.03, 0.4)
-    return o
-
-
-# ------------------------------------------------------------------ orders
 
 
 @sound("ui.marker", takes=3, lufs=-19)
@@ -435,27 +357,6 @@ def amb_owl(r, k):
     return lp(o, 2500)
 
 
-@sound("amb.drip", takes=5, lufs=-23)
-def amb_drip(r, k):
-    # a single water drop falling into a puddle: an impact tick and a bright bubble rising in pitch
-    o = zeros(0.4)
-    add(o, click(r, 2000, 6000, 2, (0.0005, 0.002), 0.4), 0.001, 0.3)
-    add(o, bubble(r, r.u(900, 1700), r.u(0.012, 0.025), r.u(0.6, 1.2)), 0.002, 1.0)
-    add(o, bubbles(r, 0.1, r.i(1, 3), 1500, 3500, (0.004, 0.01)), 0.03, 0.3)
-    return o
-
-
-@sound("amb.raindrop_big", takes=5, lufs=-21)
-def amb_raindrop_big(r, k):
-    # one huge raindrop landing beside an ant: a thump into the soil, a splash of droplets and a bubble
-    o = zeros(0.55)
-    add(o, thud(r, r.u(160, 260), 0.02), 0.001, 0.9)
-    add(o, hiss(r, 0.08, 1500, 9000, [(0, 0), (0.004, 1), (0.08, 0)]), 0.002, 0.45)
-    add(o, grains(r, 0.25, r.i(10, 18), 2500, 9000, (0.0005, 0.002), 1.3), 0.03, 0.4)
-    add(o, bubble(r, r.u(600, 1000), 0.02, 0.5), 0.01, 0.3)
-    return o
-
-
 @sound("amb.thunder", takes=5, lufs=-22)
 def amb_thunder(r, k):
     # distant thunder rolling: a crackle at the start, then a long low roll swelling and fading. The review liked
@@ -481,15 +382,6 @@ def amb_thunder(r, k):
     o = norm(lp(brown(r, n), 180, 3)) * e
     o += 0.3 * norm(lp(r.noise(n), 900)) * e ** 2
     return o
-
-
-@sound("amb.soil_trickle", takes=5, lufs=-25)
-def amb_soil_trickle(r, k):
-    # soil grains trickling down a tunnel wall
-    dur = r.u(0.5, 1.3)
-    o = zeros(dur + 0.05)
-    add(o, grains(r, dur, r.i(30, 70), 1500, 6500, (0.0005, 0.0025), 1.2, (0.05, 0.8)), 0.001, 1.0)
-    return lp(o, 7000)
 
 
 @sound("amb.root_creak", takes=4, lufs=-25)
