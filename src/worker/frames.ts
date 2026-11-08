@@ -39,11 +39,12 @@ export class FrameBuilder {
     pool?.begin();
     const alloc = (key: string): ColumnAlloc | undefined =>
       pool ? { num: (n) => pool.take(`${key}:n`, frame, n, Float64Array), str: (n) => pool.take(`${key}:s`, frame, n, Uint16Array) } : undefined;
-    const ants = this.ants.write(s.ants, null, alloc('ants'));
-    const food = this.food.write(s.food, null, alloc('food'));
-    const brood = this.brood.write(s.brood, null, alloc('brood'));
-    const creatures = this.creatures.write(s.creatures, null, alloc('creatures'));
-    const projectiles = this.projectiles.write(s.projectiles, null, alloc('proj'));
+    // (delta frames: a column no entity changed since the last frame is left out — about half of them in a big fight)
+    const ants = this.ants.write(s.ants, null, alloc('ants'), true);
+    const food = this.food.write(s.food, null, alloc('food'), true);
+    const brood = this.brood.write(s.brood, null, alloc('brood'), true);
+    const creatures = this.creatures.write(s.creatures, null, alloc('creatures'), true);
+    const projectiles = this.projectiles.write(s.projectiles, null, alloc('proj'), true);
     for (const p of [ants, food, brood, creatures, projectiles]) transfer.push(...columnBuffers(p));
     const grids: GridDelta[] = [];
     for (const [space, g] of w.grids) {

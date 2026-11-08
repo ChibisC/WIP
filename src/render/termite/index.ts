@@ -35,5 +35,3 @@ export { createCartonMaterial, cartonPatch, buildGalleryTubeGeometry } from './c
 export { createDampSoilMaterial, dampSoilPatch, dampSoilUniforms, buildLeafLitterGeometry, createLeafLitterMaterial } from './soil';
 export { bakeTermiteImpostor, TermiteImpostors } from './impostor';
 export type { ImpostorAtlas } from './impostor';
-export { SickleJawAudio, SICKLE_AUDIO_EVENTS } from './audio';
-export type { SickleAudioEvent } from './audio';

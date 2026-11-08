@@ -1982,10 +1982,65 @@ Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).
   `BUILD_ID` `ud-mp-13` (12 was taken by the story merge). `tests/tunnels.ts` (35 checks) in `npm test`.
 - Stills: `docs/underground/tunnels/` (`tests/browser/tunnels.py`; dev `?tunnel=<stage>`).
 
-## 2026-11-07 — Model redo: Saiy-Ants, sickle-jaw termites, Termants (`feature/models-saiy-sickle`, CHANGE_PLAN §28; in review)
+## 2026-11-06 — Audio v3: every sound effect remade (insect-like, made for this game); no walking or termite idle sounds
+- **User spec** `claude/audio/03-spec-sfx-rework-insect.md` (branch `feature/sfx-insect`; CHANGE_PLAN §28).
+- **Made for this game:** `tools/audio/sfx` renders every effect offline with numpy/scipy from the physics of the
+  real sound — chitin clicks (inharmonic modes at 2–12 kHz dying in milliseconds), fracture cascades, file-and-scraper
+  stridulation, stick-slip friction, Minnaert bubbles and fizz — 3–6 takes each (401 takes, 103 sounds), trimmed to
+  start on their first sound, normalised to the level each sound had in the tuned mix, packed one Ogg + AAC file per
+  sound (4.6 MB of Ogg; the ambience loops, 2.6 MB of it, stream). Research per sound in
+  `docs/audio/sound-research.md` (termite drumming 11–19 beats a second, trap jaws closing in ~0.1 ms, leafcutters
+  stridulating while they cut, trapped ants stridulating). Downloads were blocked from the build machine; nothing waits
+  on the user (an optional CC0 list is in `docs/audio/download-list.md`). Every file is in `ATTRIBUTIONS.md`.
+- **Removed:** ant and termite walking for every species (the step sounds by ground, the queen's steps, the climbing
+  skitter, the Termant skitter, the nasute shuffle, the swarm movement bed, the `steps` voice pool); termite idles
+  (antenna taps; the kit's procedural `SickleJawAudio` voices, replaced by files); the 1,100-line runtime stand-ins.
+  A termite colony's alarm now drums instead of stridulating; the conehead soldier's drumming walk is part of the alarm.
+- **Attacks:** double-click worker bites, crunching soldier snaps, crushing bites (fire ant and Atta majors, the Termant
+  soldier), scissor rasps (Atta soldiers), grips and struggles with the held ant's squeak, wet stings (fire ants
+  doubled, army ants stronger), fizzy acid, mortar pop and landing, glue sputter, army-ant hooks, sickle-jaw snap and
+  acid, soft termite bites and deaths, hit ticks, deaths with a twitch of legs; creatures' own bites (beetle clack,
+  centipede ripple and snap) instead of the ants' snap; titans the same sounds bigger, the creak before a slam. Sim-event
+  sounds wait for the frame that shows the tick (`renderAlpha`), so a bite lands on the strike frame.
+- **Carrying** is heard on pick-up and set-down and now and then while carrying; over a crowd close up the ambience's
+  leaf-litter and soil layer rises a little (no footstep texture).
+- **Review pass 2 (2026-11-07, the user's sound board):** 15 sounds cut outright (drips, the big raindrop, soil trickles
+  and grains, pellet drops, pick-up and set-down, food cutting, seed cracking, egg setting, laying, light-hit ticks,
+  struggles, ant and termite deaths: ants and termites now die silently and carrying is silent); bites, snaps, crushes,
+  cracks and the scissor cut deeper with a 150–750 Hz body and no ringing "plinks"; the grip, the scuffle and the battle
+  bed trade their breathy swells for zipper-like click trains and fast stridulation squeals; rain, the boss's steps,
+  slam and rumble, the sand hiss and the colony rumble lose their tick layers; the water stream its bubbles; the fly
+  pass, the root creak, the pillbug roll, the boss's phase change and wind-up rebuilt on the old stand-ins' shapes
+  (higher fly, a zipper wind-up, both deeper); thunder and the boss's arrival keep both characters as extra takes;
+  frog higher and faster, owl lower and longer, a satisfying hatch, a softer caterpillar, a dry cricket burrow. Creature
+  deaths are per family — `cr.death_spider` (a katydid-like shrill squeal), `_beetle`, `_centipede`, `_mantis`,
+  `_soft` — dramatic but arthropod. Attack sounds play at 0.6× their old gain. 93 sounds, 348 takes, 4.1 MB of Ogg.
+- **Stag beetle wing-case flare** (the user's note that `cr.beetle_elytra` had no animation): entering a rear or a
+  display the elytra split along the suture (`stag_elytronL/R`), snap open and lift, the hind wings unfold and buzz
+  for most of a second, then fold; the sound plays on the same state entry. `docs/creatures/stag-elytra/`.
+## 2026-11-07 — Performance v2: feel — instant feedback, smooth motion, math on the client (CHANGE_PLAN §29)
+User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch `feature/responsiveness`.
+- **Measured first:** the feel meter (`core/feel.ts`, F3, the bench's *feel* scene; in `main` early, handoff 19):
+  input → feedback and → acting by kind, command latency, frame pacing, missed vsyncs, long tasks.
+- **Smooth motion:** `game/playout.ts` (playout clock, units re-anchored where they are drawn as each frame lands).
+  `tests/smoothMotion.ts`: steps within 2 % of the true speed at p99 with uneven arrivals (the old α: 165–347 % off,
+  frozen in 12 % and jumping in 6–11 % of frames); batches of 2–3 ticks and hitches: no jumps.
+- **Instant feedback:** intent poses (`game/intents.ts`), refused hex ghosts unwind, refusal reasons said once
+  (`tests/feel.ts`).
+- **Multiplayer:** one tick of delay on a LAN (`MIN_DELAY` 1, the host's margin a quarter of the path plus a frame,
+  at most the old tick); `tests/net.ts` LAN case. `BUILD_ID` `ud-mp-14`.
+- **Client visuals:** ants well out of view skipped and caught up in one step (`render/viewCull.ts`; zoomed in on a
+  crowd the ant renderer takes a tenth of the time); id-hashed seeds and seeded sparks (no run-to-run noise); combat
+  particles in closed form in the shader (`tests/clientVisuals.ts`).
+- **Messages:** delta entity columns and a generated reader: big fight 716 → 381 KB a frame, columns read 3.1 → 1.8 ms
+  on the build machine (`tests/performance.ts` keeps the replica exact; `tools/perf/frameBench.ts`).
+- **UI:** marker counts once a tick, label styles written only when changed.
+- **Fixed on the way:** a story save with a visiting party restored differently (merged early with the meter).
+
+## 2026-11-07 — Model redo: Saiy-Ants, sickle-jaw termites, Termants (`feature/models-saiy-sickle`, CHANGE_PLAN §30; approved after review round 4, merged)
 
 - **Saiy-Ants** rebuilt on a real carpenter ant (*Camponotus*): broad rounded head (the soldier's heart-shaped and broader), antennal sockets set back from a keeled clypeus, five-toothed parametric jaws, a smooth arched mesosoma, a scale petiole, an oval gaster with golden-grey hairs, long legs; blue-black satin cuticle from a baked recipe; three bites per caste on planted feet (no acid, the user's rule); the gold surge's stretch and overshoot. The six locks are unchanged.
-- **Sickle-jaw termites**: every caste (worker, soldier, presoldier, king, queen, larva) on the realistic ant pipeline: the soldier's glassy red head and down-curved snout with its pore, long thin crossing sickles traced from the user's photos, beaded antennae, very long legs; the worker (rebuilt from the user's field photos in review round 3) a small round glossy orange head and a big glossy chocolate egg-shaped abdomen, its plates pillowed, finely haired and dotted with the spiracles; the soldier's crimson sickles and banded tan-brown abdomen; the king and queen kept on the termite kit (review round 1). The grab-and-squirt, the free squirt, the threat and the drum as planted-feet attack cycles, the acid jet and fizz from the snout's tip.
+- **Sickle-jaw termites**: every caste (worker, soldier, presoldier, king, queen, larva) on the realistic ant pipeline: the soldier's glassy red head and down-curved snout with its pore, long thin crossing sickles traced from the user's photos, beaded antennae, very long legs; the worker (rebuilt from the user's field photos in review round 3) a small round glossy orange head and a big glossy chocolate egg-shaped abdomen, its plates pillowed, finely haired and dotted with the spiracles; the soldier's crimson sickles and banded amber-brown abdomen; the king and queen kept on the termite kit (review round 1). The grab-and-squirt, the free squirt, the threat and the drum as planted-feet attack cycles, the acid jet and fizz from the snout's tip.
 - **No more defensive rows**: sickle-jaw soldiers gather or hold the escort ring like other soldiers. A knockback ends a hold cleanly. Balance: soldier health 20 and brood × 2.2 (+0.79 → +0.03 against the reference soldier), worker bite 2.5.
 - **Termants** redesigned: termite antennae on every caste, no nasus (the soldier's glue from a pore on its forehead), a *Macrotermes*-style soldier head with sabre jaws, realistic materials, planted feet.
-- Other species' models unchanged (hash check); height data regenerated. Review pages rounds 1–4 sent to the user.
+- Other species' models unchanged (hash check); height data regenerated. Four review rounds with the user; approved 2026-11-07 ("good. push changes").

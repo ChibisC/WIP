@@ -9,6 +9,8 @@
  *  - The nest terrain's signed distance (its faster blur) is the same to the bit as the plain loop's, and faster; an
  *    area kept current in slices ends with the mesh a full rebuild gives.
  *  - The frame cap holds 30 and 60 on a 120 Hz clock and never skips at 60 on a 60 Hz one.
+ *  - Performance v2: the entity columns as deltas (unchanged columns left out), read by the generated reader or the
+ *    plain one, leave the replica's ants exactly as the simulation's.
  *
  *   npx vite-node tests/performance.ts
  */
@@ -20,6 +22,8 @@ import { frameCapOf, sanitizeSettings } from '../src/game/profile';
 import { packExhaustedFade } from '../src/render/ants/antMaterial';
 import { NestTerrain } from '../src/render/nest/nestTerrain';
 import { SOIL_AIR } from '../src/world/nestGrid';
+import { createStressWorld } from '../src/dev/stressScene';
+import { ColumnReader, ColumnWriter, columnCodegen } from '../src/sim/columns';
 
 const t0 = Date.now();
 let failed = 0;
@@ -278,6 +282,49 @@ function check(name: string, ok: boolean, detail = ''): void {
   check('frame cap: the setting is kept (0, 30, 60) and anything else dropped', sanitizeSettings({ frameCap: 30 } as never).frameCap === 30 && sanitizeSettings({ frameCap: 45 } as never).frameCap === undefined);
   check('frame cap: an explicit setting wins', frameCapOf({ ...sanitizeSettings(null), frameCap: 0 }) === 0);
   check('camera shake setting survives a reload (it was dropped before)', sanitizeSettings({ shake: 0.5 } as never).shake === 0.5);
+}
+
+// ---- the entity columns as deltas, read by the generated reader (performance v2: sim/columns.ts)
+{
+  const w = createStressWorld(new EventBus(), 60, 20);
+  for (let i = 0; i < 20; i++) {
+    w.step(0.05);
+    w.events.drain();
+  }
+  const can = columnCodegen.on;
+  for (const gen of can ? [true, false] : [false]) {
+    columnCodegen.on = gen;
+    const wr = new ColumnWriter();
+    const rd = new ColumnReader<{ id: number }>();
+    let bad = '';
+    let omitted = 0;
+    let sent = 0;
+    for (let f = 0; f < 120 && !bad; f++) {
+      if (f > 0) {
+        w.step(0.05);
+        w.events.drain();
+      }
+      const p = wr.write(w.s.ants, null, undefined, true);
+      if (p.omit) omitted += p.omit.reduce((a, b) => a + b, 0);
+      sent += p.keys.length;
+      const list = rd.read(p);
+      // every field of every ant as the simulation has it (absent fields absent)
+      if (list.length !== w.s.ants.length) bad = `frame ${f}: ${list.length} of ${w.s.ants.length}`;
+      for (let i = 0; i < list.length && !bad; i++) {
+        const a = w.s.ants[i] as unknown as Record<string, unknown>;
+        const r = list[i] as unknown as Record<string, unknown>;
+        for (const k of Object.keys(a)) {
+          const x = a[k];
+          if (x === undefined || (typeof x === 'object' && x !== null)) continue;
+          const y = r[k];
+          if (x !== y && !(Number.isNaN(x as number) && Number.isNaN(y as number))) bad = `frame ${f}, ant ${a.id}: ${k} ${String(x)} vs ${String(y)}`;
+        }
+        for (const k of Object.keys(r)) if (a[k] === undefined && r[k] !== undefined) bad = `frame ${f}, ant ${a.id}: ${k} should be absent`;
+      }
+    }
+    check(`entity columns: delta frames (${gen ? 'generated' : 'plain'} reader) leave the replica's ants exactly as the simulation's, 120 ticks of a fight`, !bad, bad || `${((omitted / sent) * 100).toFixed(0)} % of the columns left out`);
+  }
+  columnCodegen.on = can;
 }
 
 console.log(`\n${failed ? `${failed} FAILED` : 'all passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

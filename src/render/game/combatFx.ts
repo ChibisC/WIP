@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { hash2 } from '../../core/rng';
 import { SimEvent } from '../../core/events';
 
 /**
@@ -13,8 +14,14 @@ import { SimEvent } from '../../core/events';
  *    urticating hairs, a puff where a creature dies, and the telegraph
  *    warnings — red ground circles or cones that fill up during a boss's
  *    wind-up, so you can pull your ants out before it lands.
- * Positions are in mm (sim x, height, sim y). Everything is CPU-integrated in
- * a fixed pool (cheap: a few hundred live particles in a big fight).
+ * Positions are in mm (sim x, height, sim y), in a fixed pool of points.
+ *
+ * Performance v2 (claude/performance/02-spec-responsiveness-client-visuals.md §3): every particle is written once,
+ * when it is spawned — where, how fast, when, how long — and the vertex shader plays it from t − t0 in closed form:
+ * the horizontal motion slows with its drag, x(τ) = x₀ + v·(1 − e^(−dτ))/d; the height falls under its gravity,
+ * h(τ) = h₀ + v·τ − ½gτ²; at the time it reaches the ground (worked out at spawn) it stops there and fades. The CPU
+ * no longer steps 2048 particles a frame and the GPU gets only the slots spawned since the last frame. The sparks'
+ * randomness is a seeded sequence (no Math.random), so the same fight sparks the same way.
  */
 
 const N = 2048;
@@ -34,21 +41,59 @@ function warnMat(opacity: number, color = 0xff4a1a): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, toneMapped: false });
 }
 
+/** A small seeded generator (mulberry32) for the sparks' spread. */
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** The first time τ > 0 at which h₀ + v·τ − ½g·τ² comes down to the ground `c` below the start (c = h₀ − ground). */
+export function landTime(v: number, g: number, c: number): number {
+  if (c <= 0 && v <= 0) return 0;
+  const A = -0.5 * g;
+  if (Math.abs(A) < 1e-9) return v < 0 ? c / -v : 1e9;
+  const disc = v * v - 4 * A * c;
+  if (disc < 0) return 1e9;
+  const sq = Math.sqrt(disc);
+  const r1 = (-v - sq) / (2 * A);
+  const r2 = (-v + sq) / (2 * A);
+  let t = 1e9;
+  if (r1 > 1e-6) t = r1;
+  if (r2 > 1e-6 && r2 < t) t = r2;
+  return t;
+}
+
+/** Where a particle is at τ (the shader's formula, for tests): [x, h, y], or null once it is gone. */
+export function particleAt(p0: readonly number[], v0: readonly number[], life: number, grav: number, drag: number, ground: number, tLand: number, tau: number): [number, number, number] | null {
+  if (tau < 0 || tau >= life) return null;
+  const tm = Math.min(tau, tLand);
+  const f = drag > 0 ? (1 - Math.exp(-drag * tm)) / drag : tm;
+  const h = tau >= tLand ? ground : p0[1] + v0[1] * tau - 0.5 * grav * tau * tau;
+  return [p0[0] + v0[0] * f, h, p0[2] + v0[2] * f];
+}
+
 export class CombatFx {
   readonly group = new THREE.Group();
-  private pos = new Float32Array(N * 3);
-  private vel = new Float32Array(N * 3);
+  /** per particle: start position, velocity, colour; (t₀, life, size, growth); (gravity, drag, ground, landing time) */
+  private p0 = new Float32Array(N * 3);
+  private v0 = new Float32Array(N * 3);
   private col = new Float32Array(N * 3);
-  private alpha = new Float32Array(N);
-  private size = new Float32Array(N);
-  private life = new Float32Array(N);
-  private max = new Float32Array(N);
-  private grav = new Float32Array(N);
-  private drag = new Float32Array(N);
-  private grow = new Float32Array(N);
-  private base = new Float32Array(N);
+  private tl = new Float32Array(N * 4);
+  private kin = new Float32Array(N * 4);
   private next = 0;
-  private live = 0;
+  /** the effects' clock (s): the simulation's time as the frames go (a paused game holds its sparks) */
+  private clock = 0;
+  /** the slots spawned since the last upload */
+  private dirtyLo = N;
+  private dirtyHi = -1;
+  private rnd = seeded(0x51ed);
+  private hAt: HeightFn | null = null;
   private geo = new THREE.BufferGeometry();
   private mat: THREE.ShaderMaterial;
   private pending: Array<{ t: number; x: number; y: number }> = [];
@@ -56,23 +101,41 @@ export class CombatFx {
   private warnings: Warning[] = [];
 
   constructor() {
-    this.geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    // (nothing is alive at first: every slot's life is 0)
+    this.geo.setAttribute('position', new THREE.BufferAttribute(this.p0, 3).setUsage(THREE.DynamicDrawUsage));
+    this.geo.setAttribute('aV0', new THREE.BufferAttribute(this.v0, 3).setUsage(THREE.DynamicDrawUsage));
     this.geo.setAttribute('color', new THREE.BufferAttribute(this.col, 3).setUsage(THREE.DynamicDrawUsage));
-    this.geo.setAttribute('alpha', new THREE.BufferAttribute(this.alpha, 1).setUsage(THREE.DynamicDrawUsage));
-    this.geo.setAttribute('size', new THREE.BufferAttribute(this.size, 1).setUsage(THREE.DynamicDrawUsage));
+    this.geo.setAttribute('aT', new THREE.BufferAttribute(this.tl, 4).setUsage(THREE.DynamicDrawUsage));
+    this.geo.setAttribute('aK', new THREE.BufferAttribute(this.kin, 4).setUsage(THREE.DynamicDrawUsage));
     this.mat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
-      uniforms: { uPx: { value: 900 } },
-      vertexShader: `attribute float alpha; attribute float size; attribute vec3 color; uniform float uPx;
+      uniforms: { uPx: { value: 900 }, uClock: { value: 0 } },
+      vertexShader: `attribute vec3 aV0; attribute vec3 color; attribute vec4 aT; attribute vec4 aK;
+        uniform float uPx; uniform float uClock;
         varying float vA; varying vec3 vC;
         void main(){
-          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vC = color;
+          float tau = uClock - aT.x;
+          float life = aT.y;
+          if (tau < 0.0 || tau >= life) { vA = 0.0; gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; return; }
+          // closed form (combatFx.ts particleAt): drag slows the spread, gravity the height, the ground stops it
+          float tm = min(tau, aK.w);
+          float f = aK.y > 0.0 ? (1.0 - exp(-aK.y * tm)) / aK.y : tm;
+          vec3 p = position;
+          p.x += aV0.x * f;
+          p.z += aV0.z * f;
+          p.y = tau >= aK.w ? aK.z : position.y + aV0.y * tau - 0.5 * aK.x * tau * tau;
+          float k = 1.0 - tau / life;
+          // puffs (growing particles) stay faint; specks and droplets are solid
+          float alpha = min(1.0, k * 2.5) * (aT.w > 0.0 ? 0.28 : 0.95);
+          float size = aT.z * (1.0 + aT.w * (1.0 - k));
+          vec4 mv = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mv;
           // a negative size: a marker that keeps at least 9 px on screen (a bite's pop, readable when zoomed out)
-          float mn = alpha > 0.0 ? (size < 0.0 ? 9.0 : 1.5) : 0.0;
+          float mn = size < 0.0 ? 9.0 : 1.5;
           gl_PointSize = clamp(abs(size) * uPx / -mv.z, mn, 40.0);
-          vA = alpha; vC = color;
+          vA = alpha;
         }`,
       fragmentShader: `varying float vA; varying vec3 vC;
         void main(){
@@ -91,24 +154,28 @@ export class CombatFx {
   private spawn(x: number, h: number, y: number, vx: number, vh: number, vy: number, life: number, color: number, size: number, grav: number, drag = 0, grow = 0): void {
     const i = this.next;
     this.next = (this.next + 1) % N;
-    this.pos[i * 3] = x;
-    this.pos[i * 3 + 1] = h;
-    this.pos[i * 3 + 2] = y;
-    this.vel[i * 3] = vx;
-    this.vel[i * 3 + 1] = vh;
-    this.vel[i * 3 + 2] = vy;
+    this.p0[i * 3] = x;
+    this.p0[i * 3 + 1] = h;
+    this.p0[i * 3 + 2] = y;
+    this.v0[i * 3] = vx;
+    this.v0[i * 3 + 1] = vh;
+    this.v0[i * 3 + 2] = vy;
     this.tmpC.setHex(color);
     this.col[i * 3] = this.tmpC.r;
     this.col[i * 3 + 1] = this.tmpC.g;
     this.col[i * 3 + 2] = this.tmpC.b;
-    this.life[i] = life;
-    this.max[i] = life;
-    this.base[i] = size;
-    this.size[i] = size;
-    this.grav[i] = grav;
-    this.drag[i] = drag;
-    this.grow[i] = grow;
-    this.alpha[i] = 1;
+    this.tl[i * 4] = this.clock;
+    this.tl[i * 4 + 1] = life;
+    this.tl[i * 4 + 2] = size;
+    this.tl[i * 4 + 3] = grow;
+    // the ground under where it starts (it moves a few mm at most) and when it gets there
+    const ground = (this.hAt ? this.hAt(x, y) : h - 0.1) + 0.1;
+    this.kin[i * 4] = grav;
+    this.kin[i * 4 + 1] = drag;
+    this.kin[i * 4 + 2] = ground;
+    this.kin[i * 4 + 3] = landTime(vh, grav, h - ground);
+    if (i < this.dirtyLo) this.dirtyLo = i;
+    if (i > this.dirtyHi) this.dirtyHi = i;
   }
 
   /**
@@ -116,7 +183,8 @@ export class CombatFx {
    * off the hair-lock tips and a faint glint left on the ground by the feet.
    */
   goldStreak(x: number, y: number, heading: number, L: number, heightAt: HeightFn): void {
-    const r = Math.random;
+    this.hAt = heightAt;
+    const r = this.rnd;
     const c = Math.cos(heading);
     const s = Math.sin(heading);
     const g = heightAt(x, y);
@@ -133,7 +201,8 @@ export class CombatFx {
   /** React to one simulation event that happened in this scene's space. */
   /** A puff of dust kicked up from the ground (render-only beats: a hell ant's snap), `size` in mm. */
   dust(x: number, y: number, size: number, heightAt: HeightFn): void {
-    const r = Math.random;
+    this.hAt = heightAt;
+    const r = this.rnd;
     const h = heightAt(x, y) + 0.15;
     for (let k = 0; k < 7; k++) {
       const a = r() * Math.PI * 2;
@@ -143,7 +212,8 @@ export class CombatFx {
   }
 
   emit(e: SimEvent, heightAt: HeightFn): void {
-    const r = Math.random;
+    this.hAt = heightAt;
+    const r = this.rnd;
     switch (e.t) {
       case 'bite': {
         const h = heightAt(e.x, e.y) + 0.6;
@@ -434,49 +504,35 @@ export class CombatFx {
       if (p.t > 0) continue;
       const h = heightAt(p.x, p.y) + 1;
       for (let k = 0; k < 5; k++) {
-        const a = Math.random() * Math.PI * 2;
-        this.spawn(p.x, h, p.y, Math.cos(a) * 3, 1 + Math.random() * 2, Math.sin(a) * 3, 0.6 + Math.random() * 0.4, 0xe6eac0, 0.45, -2, 3, 1.4);
+        // (hashed from the place and the puff, not Math.random: the same splash looks the same every time)
+        const sd = Math.floor(p.x * 7.31) ^ Math.floor(p.y * 13.7);
+        const a = hash2(sd, k, 41) * Math.PI * 2;
+        this.spawn(p.x, h, p.y, Math.cos(a) * 3, 1 + hash2(sd, k, 42) * 2, Math.sin(a) * 3, 0.6 + hash2(sd, k, 43) * 0.4, 0xe6eac0, 0.45, -2, 3, 1.4);
       }
       this.pending.splice(i, 1);
     }
-    let live = 0;
-    for (let i = 0; i < N; i++) {
-      if (this.life[i] <= 0) {
-        if (this.alpha[i] !== 0) this.alpha[i] = 0;
-        continue;
+    // (the particles play themselves in the shader: the clock moves on, and only the slots spawned since the last
+    // frame go to the GPU)
+    this.hAt = heightAt;
+    this.clock += dt;
+    this.mat.uniforms.uClock.value = this.clock;
+    if (this.dirtyHi >= this.dirtyLo) {
+      const lo = this.dirtyLo;
+      const n = this.dirtyHi - lo + 1;
+      for (const name of ['position', 'aV0', 'color', 'aT', 'aK']) {
+        const at = this.geo.attributes[name] as THREE.BufferAttribute;
+        at.clearUpdateRanges();
+        at.addUpdateRange(lo * at.itemSize, n * at.itemSize);
+        at.needsUpdate = true;
       }
-      live++;
-      this.life[i] -= dt;
-      const k = Math.max(0, this.life[i] / this.max[i]);
-      const dr = Math.max(0, 1 - this.drag[i] * dt);
-      this.vel[i * 3] *= dr;
-      this.vel[i * 3 + 2] *= dr;
-      this.vel[i * 3 + 1] -= this.grav[i] * dt;
-      let x = this.pos[i * 3] + this.vel[i * 3] * dt;
-      let h = this.pos[i * 3 + 1] + this.vel[i * 3 + 1] * dt;
-      const y = this.pos[i * 3 + 2] + this.vel[i * 3 + 2] * dt;
-      const g = heightAt(x, y) + 0.1;
-      if (h < g) {
-        // land: stick to the ground and fade
-        h = g;
-        this.vel[i * 3] = 0;
-        this.vel[i * 3 + 1] = 0;
-        this.vel[i * 3 + 2] = 0;
-        x = this.pos[i * 3];
-      }
-      this.pos[i * 3] = x;
-      this.pos[i * 3 + 1] = h;
-      this.pos[i * 3 + 2] = y;
-      // puffs (growing particles) stay faint; specks and droplets are solid
-      this.alpha[i] = Math.min(1, k * 2.5) * (this.grow[i] > 0 ? 0.28 : 0.95);
-      this.size[i] = this.base[i] * (1 + this.grow[i] * (1 - k));
-      if (this.life[i] <= 0) this.alpha[i] = 0;
+      this.dirtyLo = N;
+      this.dirtyHi = -1;
     }
-    this.live = live;
-    for (const name of ['position', 'color', 'alpha', 'size']) (this.geo.attributes[name] as THREE.BufferAttribute).needsUpdate = true;
   }
 
   get liveCount(): number {
-    return this.live;
+    let n = 0;
+    for (let i = 0; i < N; i++) if (this.clock - this.tl[i * 4] < this.tl[i * 4 + 1]) n++;
+    return n;
   }
 }

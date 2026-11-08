@@ -12,6 +12,7 @@ import { ColumnReader } from '../sim/columns';
 import { World } from '../sim/world';
 import { Ant, Brood, Colony, Creature, Food, Projectile } from '../sim/types';
 import { FrameMsg } from '../worker/protocol';
+import { MotionCarry, Moving } from './playout';
 
 export class Replica {
   private ants = new ColumnReader<Ant>();
@@ -32,7 +33,11 @@ export class Replica {
     private ctrl?: Int32Array,
   ) {}
 
-  apply(f: FrameMsg): void {
+  /**
+   * Read a frame. `carry` (worker mode's playout, game/playout.ts): the ants', food's and creatures' px/py/ph become
+   * where they are drawn now (a frame with ticks) or stay as they were (one with none), so nothing jumps as it lands.
+   */
+  apply(f: FrameMsg, carry?: MotionCarry | null): void {
     const w = this.world;
     const s = w.s;
     const sl = f.slow;
@@ -64,10 +69,10 @@ export class Replica {
         }
       });
     }
-    s.ants = this.ants.read(f.ants);
-    s.food = this.food.read(f.food);
+    s.ants = this.ants.read(f.ants, carry);
+    s.food = this.food.read(f.food, carry);
     s.brood = this.brood.read(f.brood);
-    s.creatures = this.creatures.read(f.creatures);
+    s.creatures = this.creatures.read(f.creatures, carry);
     s.projectiles = this.projectiles.read(f.projectiles);
     for (const d of f.grids) {
       const g = w.nestOf(d.space);
@@ -104,4 +109,19 @@ export class Replica {
     if (this.ctrl) Atomics.store(this.ctrl, 0, f.frame);
     for (const e of f.events) w.events.emit(e);
   }
+
+  /** Every carried entity's px/py/ph := where it is drawn at α (the playout clock moved at once). */
+  reanchor(alpha: number): void {
+    const c = this.anchor;
+    c.mode = 'drawn';
+    c.alpha = alpha;
+    c.snap = false;
+    const s = this.world.s;
+    for (const list of [s.ants, s.food, s.creatures] as Moving[][])
+      for (const o of list) {
+        c.save(o);
+        c.restore(o);
+      }
+  }
+  private anchor = new MotionCarry();
 }

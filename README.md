@@ -42,7 +42,7 @@ The title screen has **Story**, **Single-player** and **Multiplayer**.
 4. The host starts the match once everyone is ready.
 
 How it works:
-- Every player's computer runs the same deterministic simulation (lockstep at 20 ticks a second). Only commands travel over the network, a few bytes each. The input delay adapts to the connection, from 2 to 8 ticks (100–400 ms). Your markers, tiles and group moves appear at once with a shimmer until the command runs.
+- Every player's computer runs the same deterministic simulation (lockstep at 20 ticks a second). Only commands travel over the network, a few bytes each. The input delay adapts to the connection, from 1 tick on a LAN to 8 ticks (50–400 ms). Your markers, tiles and group moves appear at once with a shimmer until the command runs.
 - If a player stops responding, everyone sees "Waiting for …". After 30 s the AI takes over that colony; the host can also do this at once with **Drop now**.
 - A player who reloads the page or loses the connection rejoins through the same link. The host sends the current state, the client catches up, and the colony is theirs again.
 - Every 100 ticks the players compare a hash of the whole game state. If they ever differ, the match stops with "Desync detected" and offers a report to download. It never carries on out of step.
@@ -159,7 +159,7 @@ Play phones in landscape (in portrait the game asks you to turn the phone). On p
 The pause menu has graphics quality, frame rate (match the screen, 60 or 30), interface size, edge scrolling and the sandbox setting **Reveal all underground areas**. Auto quality first lowers the render resolution a little (never below 75 %, with a light sharpen) and only then the preset.
 
 ### Benchmark
-Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`) runs six fixed scenes for about four minutes: switching surface ↔ underground ten times, a big fight, a full nest, a story night, the arena at 600 units and a multiplayer-sized world. It ends with a report to copy and send (frame times, hitches and their causes, the switch frames, draw calls, memory). See `docs/performance.md`.
+Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`) runs seven fixed scenes for about four minutes: scripted clicks, orders, digging, building and camera moves (how quickly the game answers), switching surface ↔ underground ten times, a big fight, a full nest, a story night, the arena at 600 units and a multiplayer-sized world. It ends with a report to copy and send (frame times, hitches and their causes, the switch frames, draw calls, memory). See `docs/performance.md`.
 
 ## Species
 | Species | Castes |
@@ -264,6 +264,6 @@ npx vite-node tools/battle.ts -- formica_soldier:2,formica_rapid:2 fire_minor:16
 npx vite-node tools/equal.ts -- fire_major fire_soldier 150         # how many of each the same food buys
 python3 tools/crsheet.py out.jpg "wolfSpider|wolf spider;mantis|mantis|state=11"   # creature model sheet (?scene=crlab)
 ```
-Sound: `?scene=sounds` is the sound board (every sound with its takes, file or stand-in, and a soundscape mixer). `docs/audio/` has the sound list for gathering recordings, the attributions and how the audio works. `npm run audio:process` turns recordings in `audio-src/recordings/` into game files.
+Sound: every effect is a file made for this game, rendered offline from the physics of real insect sounds (`npm run audio:build`, Python with numpy, scipy, soundfile and pyloudnorm, plus ffmpeg; recordings in `audio-src/recordings/` replace a sound's takes). `?scene=sounds` is the sound board (every sound with its takes and a soundscape mixer). `docs/audio/` has the research notes, the sound list, the attributions and how the audio works.
 
 Dev URLs: `?scene=crlab&kinds=stagBeetle,tarantula` (creature viewer: `state`, `st`, `walk`, `dead`, `eaten`, `cam`), `?play=1&spawn=wolfSpider:2,mantis` (creatures beside your entrance; add `&rival=formica&battle=lasius_soldier:14&climbdebug=1` to watch them climbed; `&hitboxes=1` draws every hitbox, as F3 does; `&combatdebug=1` the combat debug view: anchored, blocked, backing off, going round, slots), `?play=1&allies=lasius&rival=formica&developed=70` (an AI ally and a rival, everyone well grown; `&ailevel=0..3` the AI level), `?stress=1`, `?scene=determinism`, `?netsim=lat,jit,loss`, `?delay=N`, `?worker=0`.

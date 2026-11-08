@@ -7,33 +7,35 @@ The game should sound like a nature documentary filmed with a tiny microphone am
 
 ## Status
 
-Every sound has a file slot. Until a recording is placed in its slot, the sound plays an **organic stand-in**, synthesised from the physics of the real sound (`src/audio/standins.ts`):
+Every sound effect is a file made for this game (audio v3, `claude/audio/03-spec-sfx-rework-insect.md`): 103 sounds, 3–6 takes each, rendered offline by `tools/audio/sfx` (Python: numpy, scipy) from the physics of the real sound, with the research behind each one in [sound-research.md](sound-research.md). Insects are small, so the effects are mostly high, dry, quick and quiet; bigger animals play a little lower.
 
-| Real sound | How the stand-in makes it |
+| Real sound | How the renderer makes it (`tools/audio/sfx/dsp.py`) |
 |---|---|
-| soil, dry leaves, sand, debris | **grains**: streams of tiny impulses, each ringing a short resonance (crackle) |
-| chitin, mandibles, beetle steps, wood | **modal resonators**: a few inharmonic modes that die within milliseconds, plus a sharp transient |
-| hemolymph, wet impacts, water, drips, rain | **bubbles**: a sine at the bubble's resonance, rising about 10 % per decay (Minnaert / van den Doel) |
-| ant alarms, crickets, katydids, frogs, beetle hisses | **stridulation**: a pulse train, one tick per ridge of the file, ringing the body |
-| dragging, scuffles | **friction**: noise in a wandering band, gated by irregular stick-slip catches |
-| strikes, pounces, flicks | **air**: noise through a fast bandpass sweep |
-| wind, rumble, the nest's hush | filtered brown and white noise with slow gusts |
-| music | **acoustic instruments from physical models**: Karplus–Strong plucked strings (harp, guitar, pizzicato), kalimba tines, frame drums (membrane modes), a seed shaker, a wooden flute |
+| chitin clicks, mandibles, tarsi | **modal clicks**: a contact burst ringing a few narrow, inharmonic modes at 2–12 kHz that die within milliseconds; two mandible tips a few milliseconds apart |
+| cuticle cracking, crushing bites, soil and seeds breaking | **fracture cascades**: many micro-clicks, densest at the start, their resonance falling as the pieces get smaller |
+| ant alarms, a held ant's squeak, leafcutters cutting, a titan's rasp | **stridulation**: a file-and-scraper tooth train (hundreds to thousands of impacts a second) ringing the body, in strokes |
+| legs scrabbling, dragging, rasps, brushing | **friction**: stick-slip catches with a faint rub, following a wandering pressure |
+| venom, acid, glue, wet bites, drops, streams | **bubbles and fizz**: tiny Minnaert bubbles, resonant squelches, effervescent crackle |
+| strikes, pounces | **air**: a short, soft bandpass sweep (never a movie whoosh) |
+| wind, rain, the nest's hush, rumbles | filtered pink and brown noise with gusts and swells |
+| birds, crickets, frogs, an owl, a fly | the naturally tonal calls: tones with contours, pulses through formants, wingbeat harmonics |
+| music | played live by the game on acoustic instruments from physical models (`instruments.ts`) |
 
-Checked by rendering and measuring, not by ear: `npm run audio:standins` writes every take as WAV, and `tools/audio/analyze.py` draws spectrogram sheets and flags any narrow tone held over 80 ms (a beep or whine) outside the naturally tonal calls (birds, crickets, frogs, owls, music).
+Checked by measuring, not by ear: `tools/audio/analyze.py` draws spectrogram sheets and flags any narrow tone held over 80 ms outside the naturally tonal calls; `tests/audio.ts`, `tests/browser/audio_files.py` and `tests/browser/audio_mix.py` check the files, their timing and the mix.
 
 ## How it works
 
 ```
 simulation events ──┐        (bites, stings, acid, deaths, digging, hatching, wind-ups, slams…)
-what is on screen ──┤        (the nearest ants' footsteps, ants dragging food, creatures' gaits)
+what is on screen ──┤        (ants picking up and setting down loads, sickle-jaw holds, creatures' gaits)
+animation beats ────┤        (a grip, a crushing bite, a snap, a landing: on their own frame)
                     ▼
             GameAudio (src/audio/gameAudio.ts)
               place: distance from the camera's focus, relative to the zoom; stereo from the screen;
                      only the space on screen; important events elsewhere arrive muffled
                     ▼
             Mixer (mixer.ts): per frame, per pool, loudest first
-              steps 8 · work 8 · combat 16 · creatures 10 voices
+              work 8 · combat 16 · creatures 10 voices; sim events wait for the frame that shows them
               combat that does not fit → overflow → the battle bed
                     ▼
             AudioEngine (engine.ts)
@@ -42,7 +44,7 @@ what is on screen ──┤        (the nearest ants' footsteps, ants dragging f
               reverb sends: a close room (underground) and open air (surface)
 ```
 
-- **Beds** (`beds.ts`): looping textures (wind, rain, the nest's room tone, the colony's rumble, a boss's rumble), and **granular beds** that play short grains from a texture, so their density, brightness and level follow the game every frame: the **swarm** (moving ants in view), the **scuffle** (grappling ants), the **battle** (combat past the voice limits).
+- **Beds** (`beds.ts`): looping textures (wind, rain, the nest's room tone, the colony's rumble, a boss's rumble, a glue stream), and **granular beds** that play short grains from a texture, so their density, brightness and level follow the game every frame: the **scuffle** (grappling ants) and the **battle** (combat past the voice limits: a dense insect brawl). Ants and termites make no walking sounds; over a crowd close up the ambience's leaf-litter and soil layer rises a little instead.
 - **Ambience** (`ambience.ts`): by biome (the map style), time of day, surface or underground, zoom (wide layers ↔ the macro layer) and rain (a parameter, ready for weather).
 - **Music** (`music.ts`): recorded stems (explore, battle, boss) crossfading in sync when they exist; otherwise the procedural acoustic score: calm harp, bass, kalimba and flute; frame drums, shaker and a pizzicato ostinato with the fighting; big low drums and tremolo strings for a boss. D dorian, 96 BPM, a little swing.
 - **Ducking**: queen alerts, invasions, a boss's phase change and narrator cues lower everything else briefly.
@@ -56,22 +58,23 @@ what is on screen ──┤        (the nearest ants' footsteps, ants dragging f
 - **Howler.js**: adds sprites and HTML5-audio fallbacks, but no filters, sends or granular playback, which this needs. Not used.
 - **Tone.js**: capable, but large (≈ 300 kB) for what it would add. The granular beds and scheduling here use Web Audio directly.
 
-## Adding recordings
+## Making and adding sounds
 
-See [sound-list.md](sound-list.md#how-to-add-a-recording). In short: name the files after their slots in `audio-src/recordings/`, run `npm run audio:process` (ffmpeg), add rows to ATTRIBUTIONS.md, and run `npm run audio:list` to update the list's status column. To audition, open `?scene=sounds`. It shows every sound with its takes and source (file or stand-in), and a mixer for the soundscape (biome, nest, night, zoom, rain, swarm, battle, boss).
+`npm run audio:build` renders every recipe (`tools/audio/sfx/recipes_*.py`) into `audio-src/rendered/` (not committed), finishes the takes (trimmed to start on their first sound, short fades, normalised to the level each sound has in the mix, `levels.json`; loops crossfaded) and packs each sound into one file of takes in `public/audio/<folder>/<name>.ogg` and `.m4a`, with the manifest and the made-for-this-game rows of [ATTRIBUTIONS.md](ATTRIBUTIONS.md). To use a recording instead, put its takes in `audio-src/recordings/<folder>/<name>_01.wav` … (names in [sound-list.md](sound-list.md)), add its row to ATTRIBUTIONS.md and run the build again. To audition, open `?scene=sounds`.
 
 | Command | What it does |
 |---|---|
-| `npm run audio:process [filter]` | recordings → trimmed, faded, normalised `.ogg` + `.m4a` in public/audio, then the manifest |
-| `npm run audio:manifest` | rebuild `public/audio/manifest.json` (which files exist, credits) |
-| `npm run audio:list` | regenerate `docs/audio/sound-list.md` from the catalog |
-| `npm run audio:standins [dir]` | render every stand-in take to WAV |
+| `npm run audio:build` | render, finish and pack every sound (needs Python 3 with numpy, scipy, soundfile, pyloudnorm; and ffmpeg) |
+| `npm run audio:build render <filter>` / `pack` | re-render some sounds / re-pack |
+| `npm run audio:list` | regenerate `docs/audio/sound-list.md` (with the budget) from the catalog and the manifest |
 | `python3 tools/audio/analyze.py <wavs> <out>` | spectrogram sheets, levels, held-tone check |
+| `tests/browser/with_server.sh python3 tests/browser/audio_files.py` | every file decodes as Ogg and AAC, takes cut right, attacks start on their contact |
 | `tests/browser/with_server.sh python3 tests/browser/audio_mix.py` | render whole soundscapes offline through the engine; check clipping, loudness, voice budgets, alert cut-through |
+| `tests/browser/sfx_recordings.py <out> [scene…]` | in-game recordings with sound, frame by frame (before/after pairs for a review) |
 
 ## Budgets
 
-- **Memory:** about 25 MB of decoded audio for all effects and stand-ins (float32). Low, rumbling stand-ins are kept at a half or quarter sample rate, and long one-shots keep three stand-in takes. Recorded one-shots should stay under about 1 s, with 3–6 takes. Loops over 8 s and music stems are **streamed** through audio elements, not decoded.
-- **Voices:** 8 footsteps, 8 work sounds, 16 combat sounds, 10 creature sounds, plus each sound's own limit (the quietest gives way to a louder one), plus the beds. A 400-ant battle rendered offline peaks at −2.6 dBFS with at most 26 voices. Nearly 2,800 combat requests overflow into the battle bed over 8 s.
-- **CPU:** rendering every stand-in take takes about 1.3 s in total, spread over idle slices after the first click; each one-shot is a buffer source and a gain.
-- **Files:** Ogg Vorbis (quality 5) plus AAC `.m4a` for browsers without Ogg; the game picks one with `canPlayType`.
+- **Download:** 4.6 MB of Ogg Vorbis for all 103 files (5.1 MB of AAC on Safari without Ogg); a browser fetches one format. The ambience loops are about 2.6 MB of it and stream, and only the current map's beds are fetched.
+- **Memory:** decoded effects are float32 at the context's rate (48 kHz on most phones): about 30 MB if every effect were decoded. A game decodes combat, orders, alerts and work in the background after the first click (about 17 MB) and the rest when first wanted (the map's ambience one-shots, the creatures and titans met). Low sounds (titans, thunder, an owl, a fly) decode at half or a quarter rate; long ambience loops stream through audio elements and cost no decoded memory. The previous stand-ins took about 27 MB, so iPhone Safari is no worse off. `sound-list.md` gives the current figures.
+- **Voices:** 8 work sounds, 16 combat sounds, 10 creature sounds, plus each sound's own limit (the quietest gives way to a louder one), plus the beds. A 400-ant battle rendered offline peaks at about −5 dBFS within the budgets; most combat requests then go into the battle bed.
+- **Files:** one file per sound with all its takes (an audio sprite): Ogg Vorbis (q3 for effects, q1 for the noise-like ambience beds) plus AAC `.m4a`; the game picks one with `canPlayType` and corrects for encoder delay when it cuts the takes.

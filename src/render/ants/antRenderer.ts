@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { hash2 } from '../../core/rng';
 import { prof } from '../../core/profiler';
 import { camCuts } from '../cameras';
 import { AntRig, buildAnt } from './antGeometry';
@@ -460,6 +461,12 @@ const lerpAngle = (a: number, b: number, t: number) => {
 };
 const damp = (a: number, b: number, k: number, dt: number) => a + (b - a) * (1 - Math.exp(-k * dt));
 
+/**
+ * The drawn heading's last say (performance v2: game/intents.ts — ants turn toward an order on the frame it is given):
+ * (ant id, plane x, y, interpolated heading, now ms) → the heading to draw. Null: the simulation's.
+ */
+export const antHeadingHook: { fn: ((id: number, x: number, y: number, h: number, now: number) => number) | null; active: () => boolean } = { fn: null, active: () => false };
+
 /** Render-side sound hooks (spec 04): set by the game's audio; (ANIM_SFX.*, plane x, y, space, cause of death, morph). */
 export const animHooks: {
   emit: ((sfx: number, x: number, y: number, space: number, cause: number, morph: string) => void) | null;
@@ -766,7 +773,7 @@ export class AntRenderer {
    * Update all instance buffers. `views` are ants in the space being rendered.
    * alpha = sim interpolation factor; dt = real frame time (s).
    */
-  update(views: AntView[], alpha: number, dt: number, camera: THREE.PerspectiveCamera, adapter: AntSpaceAdapter, viewportH: number): void {
+  update(views: AntView[], alpha: number, frameDt: number, camera: THREE.PerspectiveCamera, adapter: AntSpaceAdapter, viewportH: number): void {
     this.frame++;
     // a camera cut (jumpTo) shows every ant at its LOD at once: nothing to cross-fade from
     const cut = camCuts.n !== this.lastCut;
@@ -785,14 +792,18 @@ export class AntRenderer {
     const st = this.stats;
     st.drawn = 0;
     st.lod[0] = st.lod[1] = st.lod[2] = 0;
-    this.termites?.begin(dt);
+    this.termites?.begin(frameDt);
     if (this.termites) this.termites.mount = this.mount;
     this.nasGlueN = 0;
     this.rhyAcidN = this.rhyFizzN = 0;
     // (the glue's pulses run on the termite clock: the kit layer advances it when there is one)
-    if ((this.nasGlue || this.rhyAcid) && !this.termites) termiteTime.value += dt;
+    if ((this.nasGlue || this.rhyAcid) && !this.termites) termiteTime.value += frameDt;
 
+    const turnTo = antHeadingHook.fn && antHeadingHook.active() ? antHeadingHook.fn : null;
+    const nowMs = turnTo ? performance.now() : 0;
     for (const v of views) {
+      // (this ant's time step: the frame's, or the time it missed — below)
+      let dt = frameDt;
       if (v.morph.startsWith('termite_') && !NASUTE_ANT_PATH.has(v.morph)) {
         if (!this.termites) {
           this.termites = new TermiteLayer();
@@ -809,9 +820,11 @@ export class AntRenderer {
       let s = this.anim.get(v.id);
       const x = v.px + (v.x - v.px) * alpha;
       const y = v.py + (v.y - v.py) * alpha;
-      const h = lerpAngle(v.pheading, v.heading, alpha);
+      const h = turnTo && v.space === 0 ? turnTo(v.id, x, y, lerpAngle(v.pheading, v.heading, alpha), nowMs) : lerpAngle(v.pheading, v.heading, alpha);
       if (!s) {
-        s = { phase: Math.random(), amp: 0, wave: Math.random() * 10, hy: 0, hp: 0, mo: 0, ap: 0, gp: 0, cr: 0, pose: 0, poseW: 0, pph: Math.random() * 10, death: v.dead ? 1 : 0, nx: 0, ny: 1, nz: 0, lastX: x, lastY: y, lastH: h, seen: this.frame, roll: 0 };
+        // (seeds hashed from the id, not Math.random: the same ant looks the same in every frame it is rebuilt in, every
+        // reload and every golden shot — performance v2)
+        s = { phase: hash2(v.id, 1, 71), amp: 0, wave: hash2(v.id, 2, 71) * 10, hy: 0, hp: 0, mo: 0, ap: 0, gp: 0, cr: 0, pose: 0, poseW: 0, pph: hash2(v.id, 3, 71) * 10, death: v.dead ? 1 : 0, nx: 0, ny: 1, nz: 0, lastX: x, lastY: y, lastH: h, seen: this.frame, roll: 0 };
         this.anim.set(v.id, s);
       }
       // animation pass (render/ants/antMotion.ts): the pilot species' motion controller
@@ -821,6 +834,13 @@ export class AntRenderer {
         s.wave = s.m2.seed * 10;
         s.pph = s.m2.seed * 7;
       }
+      // performance v2: an ant that was not animated for a while (off screen: the views leave out ants well out of
+      // view) catches up in one step — its timers and springs run the time it missed (a death that happened off
+      // screen is over), its gait keeps its pace and its body takes the heading it has now. None of it was on screen,
+      // and the views keep a wide margin, so it is settled before it comes into view.
+      const missed = this.frame - s.seen - 1;
+      const catchUp = missed > 0;
+      if (catchUp) dt = Math.min(1, frameDt * (missed + 1));
       const M = v2 ? motionOut : null;
       // on a creature: its animated leg or back decides where the ant is (and how fast it climbs)
       const mounted = (!!v.rideCr || !!v.heldCr) && !!this.mount && this.mount(v, alpha, mountOut);
@@ -858,7 +878,14 @@ export class AntRenderer {
         }
       }
       if (M && s.m2) {
-        stepMotion(s, s.m2, v, rig, { x: gx, y: gy, h: gh, lastX: s.lastX, lastY: s.lastY, dt, scale, mounted, mountSpeed: mounted ? mountOut.speed : 0, fighting }, M);
+        if (catchUp) {
+          const m = s.m2;
+          m.hb = m.lastHb = gh + m.shuf;
+          m.hw = 0;
+          s.lastX = gx - Math.cos(gh) * m.vf * dt;
+          s.lastY = gy - Math.sin(gh) * m.vf * dt;
+        }
+        stepMotion(s, s.m2, v, rig, { x: gx, y: gy, h: gh, lastX: s.lastX, lastY: s.lastY, dt, scale, mounted, mountSpeed: mounted ? mountOut.speed : 0, fighting, catchUp }, M);
         s.lastX = gx;
         s.lastY = gy;
         // sound hooks (spec 04): the grip of a sting series, the major's crunch, a landing on the back, righting, a death
@@ -884,6 +911,11 @@ export class AntRenderer {
         s.seen = this.frame;
       } else {
         const stride = rig.stride * scale;
+        if (catchUp) {
+          s.lastX = x;
+          s.lastY = y;
+          s.lastH = h;
+        }
         const moved = mounted ? mountOut.speed * dt : Math.hypot(x - s.lastX, y - s.lastY);
         let dhs = h - s.lastH;
         if (dhs > Math.PI) dhs -= Math.PI * 2;
@@ -896,7 +928,7 @@ export class AntRenderer {
         s.seen = this.frame;
         const speed = dt > 0 ? travel / dt : 0;
         const wantAmp = v.dead ? 0 : Math.min(1, speed / (stride * 1.2) + (speed > 0.05 ? 0.35 : 0));
-        s.amp = damp(s.amp, wantAmp, 12, dt);
+        if (!catchUp) s.amp = damp(s.amp, wantAmp, 12, dt);
         if (s.amp > 0.02 || travel > 0) s.phase += travel / stride;
         else s.phase += (Math.round(s.phase * 2) / 2 - s.phase) * Math.min(1, dt * 4); // settle feet
         const crest0 = (rig as { crest?: unknown }).crest;

@@ -30,6 +30,9 @@ export interface Place {
   rain: number;
   /** how busy the colony nearby is (0–1), for the underground rumble */
   activity: number;
+  /** ants in view close up (0–1): the macro layer (leaf litter, the soil's rumble) rises a little over a busy patch,
+   * so a crowd is not silent now that ants make no walking sounds (never a footstep texture) */
+  crowd?: number;
 }
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -59,14 +62,15 @@ export class Ambience {
     audio.environment(u, p.night);
     // surface beds
     this.wind.set(open ? s * wide * (0.75 - 0.25 * p.night + 0.3 * p.rain) : 0, 0.8, 5200 - 1800 * p.night);
-    this.litter.set(open ? s * close * (style === 'forest' ? 0.9 : 0.55) * (1 - 0.4 * p.night) : 0, 0.6);
+    const crowd = p.crowd ?? 0;
+    this.litter.set(open ? s * close * (style === 'forest' ? 0.9 : 0.55) * (1 - 0.4 * p.night) * (1 + 0.45 * crowd) : 0, 0.6);
     this.cicada.set(open && (style === 'sandy' || style === 'meadow') ? s * day * day * (style === 'sandy' ? 0.8 : 0.4) * (1 - p.rain) : 0, 2);
     this.stream.set(style === 'riverbank' ? s * (0.6 + 0.4 * close) : 0, 1);
     this.sand.set(style === 'sandy' ? s * (0.5 + 0.3 * wide) : 0, 1);
     this.rainBed.set(open ? s * p.rain : 0, 1.5);
     // underground beds
     this.room.set(u * (style === 'formicarium' ? 0.6 : 1), 0.6);
-    this.rumble.set(u * (0.3 + 0.7 * p.activity), 1);
+    this.rumble.set(u * (0.3 + 0.7 * p.activity) * (1 + 0.3 * crowd), 1);
     this.above.set(open ? u * 0.5 : 0, 0.8, 600);
     // one-shots, each on its own clock
     const t = audio.now;
@@ -85,14 +89,10 @@ export class Ambience {
       every('katydid', 3, 9, () => p.night > 0.5 && style !== 'sandy' && audio.play('amb.katydid', { gain: s * p.night * rnd(0.3, 0.8), pan: pan() }));
       every('frog', 1.5, 5, () => p.night > 0.4 && style === 'riverbank' && audio.play('amb.frog', { gain: s * p.night * rnd(0.3, 1), pan: pan() }));
       every('owl', 25, 70, () => p.night > 0.6 && style === 'forest' && audio.play('amb.owl', { gain: s * p.night * rnd(0.5, 0.9), pan: pan(), wet: 0.2 }));
-      every('drop', 0.2, 0.9, () => p.rain > 0.2 && audio.play('amb.raindrop_big', { gain: s * p.rain * close * rnd(0.3, 1), pan: pan() }));
       every('thunder', 20, 60, () => p.rain > 0.6 && audio.play('amb.thunder', { gain: s * p.rain * rnd(0.5, 1), pan: pan() * 0.5 }));
-      every('drip', 4, 12, () => style === 'riverbank' && audio.play('amb.drip', { gain: s * rnd(0.2, 0.5), pan: pan() }));
     }
     if (u > 0.3) {
-      every('trickle', 3, 9, () => audio.play('amb.soil_trickle', { gain: u * rnd(0.3, 0.9), pan: pan(), wet: 0.3 }));
       every('creak', 12, 35, () => open && audio.play('amb.root_creak', { gain: u * rnd(0.3, 0.7), pan: pan(), wet: 0.3 }));
-      every('cavedrip', 6, 18, () => (style === 'riverbank' || p.rain > 0.3) && audio.play('amb.drip', { gain: u * rnd(0.2, 0.5), pan: pan(), wet: 0.5 }));
     }
   }
 }

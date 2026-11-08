@@ -21,9 +21,10 @@ import type { MapId } from '../maps/types';
  * open holes more easily (the slow from the damage rate, checkpoints, the work remembered on the hole), CHANGE_PLAN §26 —
  * 2026-11-03. 12: stag beetle males of four sizes in forest and rainforest skirmishes, nests that flood, the weather and
  * visiting colonies of the story's surprise events, claude/story/06-spec — 2026-11-06. 13: the shared underground — rock margins, tunnel routes between nests, the `digRoute` command (wire 26),
- * save version 4, CHANGE_PLAN §27 — 2026-11-07)
+ * save version 4, CHANGE_PLAN §27 — 2026-11-07. 14: one tick of lockstep delay on a LAN (MIN_DELAY 1, the host's new
+ * margin), CHANGE_PLAN §29 — 2026-11-07)
  */
-export const BUILD_ID = 'ud-mp-13';
+export const BUILD_ID = 'ud-mp-14';
 
 /** A lobby slot (players 0–3; the slot number is the colony id). */
 export interface Slot {

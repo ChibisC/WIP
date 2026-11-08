@@ -6,26 +6,26 @@ import { GrainBed } from '../audio/beds';
 import type { MapStyle } from '../world/terrain';
 
 /**
- * ?scene=sounds: the sound board. Every sound in the catalog with its takes,
- * whether it plays a recording or its stand-in, and a mixer to hear the
- * soundscape without a game: biome, surface or nest, night, zoom, rain,
- * the swarm, a battle and a boss. For auditioning recordings as they are
- * added (docs/audio/sound-list.md).
+ * ?scene=sounds: the sound board. Every sound in the catalog with its takes and
+ * where it comes from (a file, or made in the game: the music stingers), and a
+ * mixer to hear the soundscape without a game: biome, surface or nest, night,
+ * zoom, rain, a crowd close up, a battle and a boss. For auditioning sounds as
+ * they are re-rendered or recorded (docs/audio/sound-list.md).
  */
 export function runSoundBoard(ui: HTMLElement): void {
   const root = document.createElement('div');
   root.className = 'sound-board';
   ui.appendChild(root);
   const groups = [...new Set(SOUNDS.map((s) => s.group))];
-  const st = { style: 'meadow' as MapStyle, surface: 1, night: 0, zoom: 0.3, rain: 0, ants: 0, fight: 0, boss: 0, on: false };
+  const st = { style: 'meadow' as MapStyle, surface: 1, night: 0, zoom: 0.3, rain: 0, crowd: 0, fight: 0, boss: 0, on: false };
   const slider = (key: keyof typeof st, label: string) => `<label>${label}<input type="range" min="0" max="100" value="${Math.round((st[key] as number) * 100)}" data-k="${key}"></label>`;
   root.innerHTML = `
     <h1>Sound board</h1>
-    <p class="dim">Click anywhere to start the audio. <b>file</b> = a recording from public/audio; <b>stand-in</b> = synthesised from the physics of the real sound until a recording is added (docs/audio/sound-list.md).</p>
+    <p class="dim">Click anywhere to start the audio. <b>file</b> = public/audio (rendered by tools/audio/sfx, or recorded); <b>in-game</b> = played by the game's instruments (docs/audio/sound-list.md).</p>
     <div class="sb-mix">
       <button data-mix="1">▶ Soundscape</button>
       <label>Biome <select data-k="style">${['meadow', 'forest', 'sandy', 'riverbank', 'formicarium'].map((s) => `<option>${s}</option>`).join('')}</select></label>
-      ${slider('surface', 'Surface ↔ nest')}${slider('night', 'Night')}${slider('zoom', 'Zoom out')}${slider('rain', 'Rain')}${slider('ants', 'Swarm')}${slider('fight', 'Battle')}${slider('boss', 'Boss')}
+      ${slider('surface', 'Surface ↔ nest')}${slider('night', 'Night')}${slider('zoom', 'Zoom out')}${slider('rain', 'Rain')}${slider('crowd', 'Crowd')}${slider('fight', 'Battle')}${slider('boss', 'Boss')}
     </div>
     ${groups
       .map(
@@ -43,7 +43,7 @@ export function runSoundBoard(ui: HTMLElement): void {
     .sound-board h1 { font-family: serif; margin: 0 0 4px } .sound-board h2 { font-family: serif; font-weight: 500; margin: 18px 0 6px; color: #e0c28a }
     .sound-board .dim { color: #a8977a } .sound-board button { background: #2c2116; color: #efe3c8; border: 1px solid #a8844f; border-radius: 3px; cursor: pointer; padding: 2px 8px }
     .sb-row { display: grid; grid-template-columns: 34px 210px 70px 170px 1fr; gap: 8px; align-items: center; padding: 3px 0; border-bottom: 1px solid #2a2018 }
-    .sb-row .t { padding: 1px 5px; margin-right: 2px; font-size: 11px } .src.file { color: #9be07c } .src.stand-in { color: #e0c28a } .src.none { color: #c66 }
+    .sb-row .t { padding: 1px 5px; margin-right: 2px; font-size: 11px } .src.file { color: #9be07c } .src.in-game { color: #e0c28a } .src.none { color: #c66 }
     .sb-mix { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px; border: 1px solid #5a4428; border-radius: 4px; margin: 10px 0 }
     .sb-mix label { display: flex; gap: 6px; align-items: center } .sb-mix input { width: 110px; accent-color: #c9a25a } .sb-mix select { background: #2c2116; color: #efe3c8; border: 1px solid #a8844f }`;
   document.head.appendChild(style);
@@ -71,7 +71,6 @@ export function runSoundBoard(ui: HTMLElement): void {
   });
   const amb = new Ambience();
   const music = new Music();
-  const swarm = new GrainBed('ant.swarm_bed');
   const battle = new GrainBed('combat.battle_bed');
   let last = performance.now();
   let fightT = 0;
@@ -81,10 +80,7 @@ export function runSoundBoard(ui: HTMLElement): void {
     last = now;
     if (audio.ctx) {
       const on = st.on ? 1 : 0;
-      amb.update({ style: st.style, surface: on ? st.surface : 0, night: st.night, zoom: st.zoom, rain: st.rain * on, activity: 0.5 * on });
-      swarm.level = on * st.ants;
-      swarm.density = 10 + 70 * st.ants;
-      swarm.update();
+      amb.update({ style: st.style, surface: on ? st.surface : 0, night: st.night, zoom: st.zoom, rain: st.rain * on, activity: 0.5 * on, crowd: st.crowd });
       battle.level = on * Math.max(0, st.fight - 0.4) * 1.5;
       battle.density = 15 + 60 * st.fight;
       battle.update();
@@ -93,7 +89,7 @@ export function runSoundBoard(ui: HTMLElement): void {
       fightT -= dt;
       if (on && st.fight > 0.05 && fightT <= 0) {
         fightT = 0.4 / (0.2 + st.fight * 4);
-        const ids = ['combat.mandible_click', 'combat.mandible_snap', 'combat.chitin_crack', 'combat.sting', 'combat.acid_spray', 'combat.ant_death'];
+        const ids = ['combat.mandible_click', 'combat.mandible_snap', 'combat.bite_crush', 'combat.chitin_crack', 'combat.sting', 'combat.acid_spray', 'cr.death_beetle'];
         audio.play(ids[Math.floor(Math.random() * ids.length)], { gain: 0.5 + Math.random() * 0.5, pan: Math.random() * 1.6 - 0.8 });
       }
     }

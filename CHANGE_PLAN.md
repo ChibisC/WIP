@@ -1277,10 +1277,182 @@ client-side only.
   rival has ants/food within 3 hexes of its gate (quiet gates give none); the nest renderer's full-grid SDF runs on
   every grid version change over a grid 2.3× the cells (fine on this machine; a device check with 10 colonies is
   pending); creatures cross only open routes; the camera switch needs the goal pushed against the rim in a rim step.
+## 28. Audio v3 — sound effects reworked: made-for-this-game files, no walking or termite idle sounds, insect-like attacks (user spec 2026-11-06, claude/audio/03-spec-sfx-rework-insect.md)
+Kept: the audio system of `claude/audio/02-spec-eotu-style-audio.md` (buses, mixer and voice limits, the scuffle and
+battle beds, adaptive music, ducking, marker chirps, alerts, ambience).
 
-## 28. Model redo: Saiy-Ants and sickle-jaw termites; the rest of spec 09 (rows, grab-and-squirt fit, balance, Termants) — branch `feature/models-saiy-sickle`
+**Replaced** — every synthesised stand-in (`src/audio/standins.ts`, 1,100 lines of runtime recipes) by files rendered
+offline (`tools/audio/sfx`: `dsp.py` primitives, one recipe per sound in `recipes_combat.py`, `recipes_creatures.py`,
+`recipes_world.py`; `build.py` renders 3–6 takes, trims them to start on their first sound, fades, normalises them to
+the level each had in the tuned mix (`levels.json`) and packs each sound into one Ogg + AAC file with its take offsets
+in `public/audio/manifest.json`). `bank.ts` reads the sprite manifest, corrects encoder delay from the file's first
+sound, decodes lazily (combat, orders and work warm up after the first click), streams the ambience loops and decodes
+them in offline renders. The music's instruments moved to `instruments.ts` (with the stingers and the narration cue,
+the only sounds still made in the game); `dsp.ts` kept only what they use. The stand-in tools (`render-standins.ts`,
+`process.sh`, `build-manifest.ts`) are replaced by `npm run audio:build`; recordings in `audio-src/recordings` still
+override a sound's takes.
 
-User specs: `claude/realism/10-spec-saiy-ant-sickle-jaw-models.md` (the models, with the fire ant pilot's playbook) and the parts of `claude/realism/09-spec-sickle-jaw-termants.md` it says still apply. (§27 is the shared underground on main; the audio v3 branch, not merged yet, renumbers its own section when it lands.)
+**Removed: ant and termite walking (all species)** — `ant.step_soil`, `ant.step_leaf`, `ant.step_bark`,
+`ant.step_stone`, `ant.step_sand`, `ant.step_carton`, `ant.step_queen`, `ant.swarm_bed` (the swarm movement bed and
+its `GrainBed` in `gameAudio.ts`, `audioRender.ts`, `soundBoard.ts`), `species.nasute_move`; in `scanAnts`: the
+walked-distance tracking, the ground-type step choice (`ground()`, its hash), the climbing skitter on creatures' legs
+(and its random scuffle), the Termant skitter and papery shuffle, the moving-ant count; the mixer's `steps` pool.
+Kept: creature and titan footsteps (`scanCreatures`), digging, antenna taps up close (ants only), the battle bed.
+
+**Removed: termite idle sounds** — antenna taps for termites (now ants only); the termite kit's procedural voices
+`render/termite/audio.ts` (`SickleJawAudio`: `biteSnap` and `alarmDrum` were never wired, `acidStream`, `acidFizz` and
+`victimStruggle` ran on every sickle-jaw hold; replaced by `species.sickle_acid` and `combat.struggle` files, timed by
+the hold's ramp and the victim's health), `SICKLE_AUDIO_EVENTS` and its type. Checked and kept as real actions: the
+`headbang` events (the colony alarm ability, `sickleAlarm` when attacked or grabbing, `majorAlarm` when a soldier is
+attacked) and the `alarm` event (now a termite colony drums, `species.termite_headbang`, instead of an ant's
+stridulation); the conehead soldier drumming while it walks or charges at a foe is part of that alarm (animation, no
+extra sound); wood chewing only on a forager's `bite` on wood (`species.termite_chew`, quiet); attacks, glue, digging,
+building and deaths. There were no idle chewing, grooming or royal sounds.
+
+**Changed: attacks, hits and deaths** (§4 of the spec; research in `docs/audio/sound-research.md`): new
+`combat.bite_crush` (fire ant and Atta majors, the Termant soldier), `combat.scissor_cut` (Atta soldiers, 40 % of Atta
+majors' bites), `combat.hit_tick` (light hits), `combat.grip` (the animation's grip and claws catching a creature's
+leg, instead of playing the 7 s scuffle loop as a one-shot), `combat.struggle` (renames `species.hellant_struggle`:
+prey on a jaw, hooks, pins, sickle holds), `combat.termite_bite`, `combat.termite_death`, `combat.mortar_pop` and
+`combat.mortar_land` (the lob and its landing, instead of the spray and the splat), `species.glue_splat` (instead of a
+slowed acid splat), `species.army_hook` (instead of a slowed mandible click), `species.sickle_snap` (instead of a sped-up
+hell ant snap), `species.sickle_acid`, `species.termite_chew`, `cr.beetle_bite` and `cr.centipede_bite` (creatures had
+used the ants' `combat.mandible_snap`), `ant.pick_up` and `ant.put_down`. Stings are sized by the stinger (army ants a
+little stronger); deaths by the caste (quieter for small ants). Carrying is heard on pick-up and set-down and every
+1.5–4 s while carrying (it was 18 % of footsteps). Sim-event sounds wait for the frame that shows their tick
+(`GameSession.renderAlpha`, `GameAudio.lag`), so a bite sounds as the jaws close. The ambience's macro layer (leaf
+litter on the surface, the colony rumble underground) rises a little over a crowd close up (`Place.crowd`).
+
+**Checks:** `tests/audio.ts` (catalog, manifest, files and attributions agree; no removed sound referenced; takes
+3–6), `tests/browser/audio_files.py` (every file decodes as Ogg and as AAC, the takes are cut right, attacks start on
+their contact), `tests/browser/audio_mix.py` (no clipping, budgets, the queen alert cuts through a 400-ant battle),
+`tests/browser/sfx_recordings.py` (before/after in-game recordings for the sound board).
+
+**Review pass 2 (2026-11-07):** the user rated the board (66 notes). Cut outright: `amb.drip`, `amb.raindrop_big`,
+`amb.soil_trickle`, `ant.soil_grains`, `ant.pellet_drop`, `ant.pick_up`, `ant.put_down`, `ant.food_cut`,
+`ant.seed_crack`, `ant.egg_set`, `ant.queen_lay`, `combat.hit_tick`, `combat.struggle`, `combat.ant_death`,
+`combat.termite_death` (tunnel and titan soil cues reuse deep, muffled `ant.dig_bite`). "Deeper": the bites, snaps,
+crushes, cracks, scissor cut, dig bite, beetle bite and step, centipede patter, pillbug roll, boss phase and wind-up
+(a 150–750 Hz body under each, lower modes, no narrow ringing above 2 kHz). "No plink": rain, battle bed, boss step /
+slam / rumble, sand hiss, colony rumble, water stream (bubbles), drag (scrape). "Not ghostly": grip, scuffle, battle
+bed and cricket burrow trade airy swells for zipper-like click trains and squeals. "Like the old one": fly pass
+(higher), root creak, pillbug roll, boss phase and wind-up; thunder and boss arrival keep both as extra takes.
+Reshaped: frog, owl, larva hatch, caterpillar. Creature deaths per family (`cr.death_spider/beetle/centipede/mantis/
+soft`; `cr.creature_death` the fallback), chosen in `GameAudio` by the kind's family. Attack gains × 0.6. Approved
+by the user on the board ("add the sfx"); 93 sounds, 348 takes. The stag beetle's wing-case flare
+(`render/creatures/stagBeetle.ts`: `stag_elytronL/R`, `stag_hindwing`; on `ST.Rear` and `ST.Display`, 1.6 s) gives
+`cr.beetle_elytra` its animation; the audio fires it on the same state entry.
+
+## 29. Responsiveness: instant feedback, smooth motion, math-based client-side visuals (user spec 2026-11-07, claude/performance/02-spec-responsiveness-client-visuals.md)
+
+Branch `feature/responsiveness` off `main` `361ed47`. Everything from §25 stays (pre-warm, shared geometry, dynamic
+resolution, the golden set, the benchmark). The simulation's results must not change (the determinism check, replays,
+LAN); only the client changes, plus the multiplayer input delay (when commands are scheduled, not what they do).
+
+### 29.1 What the code does now (read before measuring)
+- **Commands, single-player:** the worker applies a command at the boundary before the next tick as soon as it
+  arrives and posts a frame at once (`simWorker.ts 'cmds'`): one tick at most, the right number already. Until the
+  worker acknowledges it, the client shows it as pending (a shimmering marker, ghost rings on hexes, group cards in their
+  new column, a click: `localCommands.ts`, `session.pendingHexes/shownMarkers`).
+- **Commands, multiplayer:** adaptive lockstep delay, `ceil(worst path / 50 ms) + 1` ticks, never under `MIN_DELAY` 2
+  (100 ms) even on a LAN with a 2 ms round trip.
+- **Interpolation (worker mode):** the replica keeps each entity's position at the previous tick (`px`) and the last
+  (`x`); the frame draws `lerp(px, x, α)` with `α = time since the last ticked frame arrived ÷ the smoothed gap`,
+  clamped to 1. Two faults: (1) when a frame carries two or more ticks (the worker was still busy when the next tick
+  fell due — slow phones, big fights), `px` is only one tick back, so the ants jump the other ticks' distance; (2) the
+  arrival of a frame resets α to 0 wherever the drawn position was, so any unevenness in when frames arrive (worker tick
+  time 2–15 ms, message timing against the display's frames) shows as an uneven step, and a late frame freezes motion
+  (α held at 1) and then jumps. This is "20 Hz stepping" and judder.
+- **Per-frame CPU:** the ant renderer runs every ant of the viewed space through its whole animation (the planted-feet
+  motion controller, springs, posing, matrices) and only then tests it against the view: ants off screen cost as much
+  as ants on it. Gait phase, antenna wave and pose phase are `Math.random()` at first draw (renders differ run to run).
+- **Profiler:** frame time, main-thread time and parts, GPU time, GL work, hitches. Nothing about input latency,
+  command latency, jitter, long tasks or missed frames.
+
+### 29.2 Plan (in this order; each step measured before and after)
+1. **Measure feel** (F3 and `?bench=1`, `core/profiler.ts`, `core/feel.ts`): input → first frame showing a reaction
+   (select, move order/marker, build, dig, camera pan and zoom), input → the units acting (the sim applied it and ran a
+   tick); command latency in ticks and ms (single-player, LAN, online); frame pacing (interval distribution, jitter,
+   frames over 16.7 / 33 ms, missed vsync estimated against the display's interval, long tasks via
+   `PerformanceObserver('longtask')`); main-thread budget per part and the worker's tick. A bench scene "feel" scripts
+   the inputs. Baseline on the build machine; ask the user once for `?bench=1` on their laptop and iPhone.
+2. **Smooth motion** (`game/replica.ts`, `game/simHost.ts`): when a ticked frame arrives, each entity's `px/py/ph` is
+   set to where it is drawn now (no jump at arrival, whatever the number of ticks in the frame); α runs over the time
+   the next frame is expected, and may run on to 1.5 when a frame is late (extrapolating half a tick along the motion,
+   then the next frame takes over from where it is drawn). Teleports (space change, > 3 ticks of travel) snap. A test
+   replays uneven and batched arrivals and checks the drawn path's steps.
+3. **Instant feedback** (`localCommands.ts`, session, renderers): every command shows its feedback on the frame of the
+   input (already true for markers and hexes: check each, fill the gaps: selection ring, build ghost solid, dig mark,
+   group move); a render-only **intent turn**: the ants of a group sent to a marker turn their heads and bodies toward
+   it at once, eased out when the sim's own heading takes over or the command is refused; rejected commands drop their
+   pending look with a short fade. Input handlers only record and queue.
+4. **Command delay:** single-player stays at the next tick (verified by the new metric); LAN/online: the host's
+   suggestion `ceil((worst path + margin) / 50 ms)` with `MIN_DELAY` 1 — one tick on a LAN, adaptive elsewhere —
+   shown in F3 and the players panel.
+5. **Less CPU per frame, math-based** (`render/ants/antRenderer.ts`, creatures, termites): an early cheap view test on
+   the sim position (a generous margin) skips the animation of ants off screen; when one comes back, its state is
+   brought forward from formulas (the gait phase from the distance walked since last seen ÷ stride, the springs to
+   their targets, poses at their weights) instead of being stepped every frame. Per-ant seeds hashed from the id
+   (gait phase, antenna wave, pose phase) instead of `Math.random()`. Effects that run a whole animation from one event
+   (sparks, puffs) as closed-form curves of `t − t0`; rings and bars as instanced quads where they are meshes per item;
+   instance buffers uploaded over the used range only.
+6. **Messages and the sim:** measure frame bytes and decode time per message in busy scenes; profile the hot systems
+   of the stress scenes (fights, 10 colonies, story set pieces, tunnels, titan raids) and take the safe wins (squared
+   distances, cached fields, staggering expensive brains deterministically) only where the determinism check and the
+   replays show identical results.
+7. **Main thread and UI:** no per-frame DOM writes for unchanged values, passive touch listeners, no layout reads
+   after writes in the frame.
+8. **Verify:** before/after table in `docs/performance.md` (latencies, pacing, budgets, CPU per frame for 1,000+ ants);
+   the golden set; determinism check, replays, LAN two-tab; `npm test`, build; DESIGN, README, PROGRESS, handoff;
+   merge; publish v-next of the artifact; ask the user for a new `?bench=1`.
+
+### 29.3 What was done (in order)
+1. **The feel meter** — `core/feel.ts`, F3, the bench's *feel* scene (merged into `main` early, `0eb564a`, so the user
+   could take a baseline on their own devices; handoff 19). With it: a story save with a visiting party restores to the
+   same state again (the save upgrade no longer embeds the visitor's margin-less nest plane).
+2. **Smooth motion** — `game/playout.ts`: a playout clock R on the loop's own pace (ticks asked for + accumulator),
+   kept L ticks behind it (L = the 98th percentile, over the last 64 arrivals, of how far the loop's clock got past the
+   newest tick before the next arrived, + 0.12), pulled toward its target by at most ±10 % of its pace (a gap over 3
+   ticks re-anchors). Each frame with ticks sets every ant's, food's and creature's px/py/ph to where it is drawn
+   (`MotionCarry` through `ColumnReader.read(…, carry)`); a frame with no tick keeps them. α = (R − from)/(to − from)
+   may run past 1 by half a tick when a frame is late, easing off as it does. Teleports snap (space change; a jump over
+   10 mm + 3 × (ticks + 1) × the last tick's travel). Paused: R glides to the newest tick and stops. `tests/smoothMotion.ts`
+   (uneven arrivals at 60/144 Hz: steps within 2 % of the true speed at p99, against 165–347 % off for the old α, which
+   froze in 12 % and jumped in 6–11 % of frames).
+3. **Instant feedback** — `game/intents.ts`: a surface marker moved or a group sent to one turns its ants toward it on
+   the frame of the input (blend rising over 160 ms, h + w·d so the sim's own turn meets it, fading after 1.1 s; refused:
+   200 ms); `antHeadingHook` in the ant renderer. A refused hex order's ghost ring unwinds in 300 ms
+   (`pendingHexes` kind 'refused'); player-facing refusal reasons (capitalised sentences) are said once.
+   `tests/feel.ts`. The rest of the list was already same-frame (selection ring, marker flag and trail preview, ghost
+   hexes, the ack click, the camera).
+4. **Command delay** — `MIN_DELAY` 1; the host's delay is `ceil((path + min(50, path/4 + 25)) / 50)`: one tick on a
+   LAN, the old value on long paths. `tests/net.ts` LAN case (1–4 ms one way: delay 1, 20 ticks/s, no waiting, own
+   commands act 2 ticks after they are given; the 150 ms case unchanged).
+5. **Client-side visuals** — `render/viewCull.ts`: the views leave out ants more than 40 mm outside the camera's view
+   (not those in the air or on a creature); the ant renderer catches a returning ant up in one step (`catchUp`: its
+   timers and springs run the time it missed, up to a second; its gait keeps its pace; its body takes its heading).
+   Zoomed in on a crowd the ant renderer's time falls about tenfold (`tests/clientVisuals.ts`,
+   `tools/perf/antRendererBench.ts`). Seeds hashed from ids (gait phase, antenna wave, pose phase) and places (acid
+   mist), sparks from a seeded sequence: renders no longer differ run to run. Combat particles are written once at
+   spawn and played by the vertex shader in closed form from t − t0 (drag e^(−dτ), gravity, the landing time worked out
+   at spawn); only the new slots are uploaded. The ant shader is untouched (still 16 attributes); health bars and rings
+   were already instanced quads drawn only for the few units that need them.
+6. **Messages** — delta entity columns (`ColumnWriter.write(…, delta)`: when every entity was in the last frame too —
+   rows matched by id, so deaths and reordering do not matter — the columns nobody changed are left out, 50–70 % of
+   them in a fight) and a generated reader
+   (one loop per schema with named stores; the plain loop where a page forbids compiling code). Big fight (829 ants,
+   96 creatures, build machine, Node): 716 → 381 KB a frame, the columns' read 3.1 → 1.8 ms. `tests/performance.ts`
+   checks the replica's ants stay exactly the simulation's. The simulation's systems were profiled
+   (`tools/stress.ts`, a CPU profile): the time is spread over the ant brains, combat and separation with no single
+   hot spot; no change to the simulation (its results are untouched: determinism check, replays).
+7. **UI** — marker counts once a tick instead of every frame (they walk every tile of every group); label and tip
+   styles written only when they change. Pointer events with `touch-action` already (no 300 ms delay, no blocking
+   touch listeners).
+
+
+## 30. Model redo: Saiy-Ants and sickle-jaw termites; the rest of spec 09 (rows, grab-and-squirt fit, balance, Termants) — branch `feature/models-saiy-sickle`
+
+User specs: `claude/realism/10-spec-saiy-ant-sickle-jaw-models.md` (the models, with the fire ant pilot's playbook) and the parts of `claude/realism/09-spec-sickle-jaw-termants.md` it says still apply. (Numbered 30 at the merge: §27 the shared underground, §28 audio v3, §29 performance v2 landed on main first.)
 
 - **Saiy-Ants** on *Camponotus* anatomy (`saiyMorphs.ts`, `antGeometry.ts` `campo` terms: set-back antennal sockets, a keeled clypeus with a dark suture; `mandibleSpecs.ts` `SAIY_*_JAW`, five teeth; baked recipe `SAIY`; planted feet; three bites per caste, no acid — the user's rule; the gold surge's stretch and overshoot in `antViews.speciesExtras`). Hair (briefs 07/08) unchanged.
 - **Sickle-jaw termites** on the ant pipeline (`rhyMorphs.ts`, routed by `NASUTE_ANT_PATH`; `nasuteBuilder.ts`: the C-hook sickles, the snout's down-curve and pore, the worker's round glossy head (`head.round`) and egg-shaped abdomen (`abdomen.front`), the soldier's bold tergite bands (`abdomen.band`) and crimson sickles darkening only at the hook (`sickle.tip`); presoldier and larva morphs). The king and queen stay on the termite kit, as the conehead royals do (review round 1: the user preferred the kit's queen; the ant-pipeline royals and their builder options were removed). Animation: `antViews.sickleAntPath` maps the kit states to attack cycles (special 7 grab, 8 hold-and-squirt, 9 free squirt, 5 drum) and poses (THREAT, RUSH), `attackPoses` `S_GRAB` / `S_HOLD` / `S_SQUIRT`; the acid jet and fizz drawn by `antRenderer` from the snout's tip. The kit's sickle-jaw worker and soldier castes stay in `render/termite` (their rig-texture rows are fixed, as the conehead castes' were) but are no longer drawn in the game. The hold pins the victim head-on in line with the soldier, its head inside the closed hooks (`SICKLE.grab.gripMm`, `victimInHooks`; the kit-derived `SICKLE_SOCKET` is gone from `termiteRoyalData.ts` and its generator).
