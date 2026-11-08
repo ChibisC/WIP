@@ -65,7 +65,8 @@ export function defaultMix(c: Colony): Record<string, number> {
     case 'hell':
       return { hell_worker: 0.78, hell_soldier: 0.22 };
     case 'aurimyrmex':
-      return { aurimyrmex_worker: 0.78, aurimyrmex_soldier: 0.22 };
+      // Blasters behind the soldiers' line (CHANGE_PLAN §31)
+      return { aurimyrmex_worker: 0.68, aurimyrmex_soldier: 0.18, aurimyrmex_blaster: 0.14 };
     case 'termant': {
       // Termants: workers and soldiers, plus an even share of every caste stolen so far (termants.ts)
       const stolen = c.castes.filter((cs) => CASTES[cs].species !== 'termant');

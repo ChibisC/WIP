@@ -40,9 +40,9 @@ ant's, worker for worker (a design rule in `tests/casteAbilities.ts`).
 | Army Ant minor | 19 | 2.6 | 0.8 | 0 | 30 | sting every third bite (1.4/s a stack); fastest | −0.09 |
 | Plagiaria | 18 | 2.6 | 0.9 | 0.3 | 22 | acid (1.5 every 5 s) | +0.17 |
 | Nasute termite worker | 20 | 2.4 | 1.0 | 0 | 12.8 | — (slow, soft) | −0.18 |
-| Sickle-jaw termite worker | 21 | 2.4 | 1.0 | 0 | 12.8 | — (slow, tough) | −0.04 |
+| Sickle-jaw termite worker | 21 | 2.5 | 1.0 | 0 | 12.8 | — (slow, tough) | +0.15 (2026-11-07; at 2.4 it had drifted to −0.44) |
 | Hell ant worker | 18 | 2.1 | 1.0 | 0 | 19 | pinning snap (3 dps) | −0.14 |
-| Saiy-Ant worker | 16 | 1.9 | 1.0 | 0.2 | 22 | gold surge | +0.13 |
+| Saiy-Ant worker | 15.5 | 1.65 | 1.0 | 0.2 | 22 | gold surge (10 s) | −0.01 (2026-11-07; 16 / 1.9 was +0.13 with the 4 s gold form, +0.63 with 10 s) |
 | Termant worker | 19 | 2.2 | 1.0 | 0.5 | 24 | acid opener | +0.14 |
 
 Before (the first round robin at 150 food) the scores ran from −0.89 (both termite workers, which lost to everything)
@@ -60,9 +60,9 @@ the sickle-jaws alone get the "no gathering" order, or they guard a trail to the
 | Tropical Fire Ant | 28 | 2.6 | 0.5 | venom 2.4 | 19 | +0.09 |
 | Army Ant media | 51.5 | 6.2 | 1 | sting 2.0 every third bite, rage | 29 | +0.17 |
 | Nasute | 12 | 0.3 | 0 | glue stream 2 → 20 dps, pure (the user's) | 26.4 | −0.18 |
-| Sickle-jaw | 22 | 3 | 0 | grab and squirt | 22.8 | −0.40 (stalls; see below) |
+| Sickle-jaw | 20 | 3 | 0 | grab and squirt | 25.1 | +0.03 (2026-11-07; +0.79 at 22 health and 22.8 food once the rows were gone) |
 | Hell ant | 49 | 3.9 | 2 | sting 1.25, impale (burst 12.5) | 34 | +0.01 |
-| Saiy-Ant | 68 | 5.2 | 2 | gold surge | 36 | +0.17 |
+| Saiy-Ant | 56 | 4.35 | 2 | gold surge (10 s) | 36 | +0.02 (2026-11-07; 68 / 5.2 was +0.17 with the 4 s gold form, +0.81 with 10 s) |
 | Termant | 55.5 | 4.35 | 1.5 | glue burst | 26.5 | −0.15 |
 
 Before, at 150 food: the Red Wood Ant soldier −0.67, leafcutter media +0.53, army ant media +0.52, nasute +0.57, hell
@@ -71,9 +71,12 @@ ant −0.39. In small fights (150 food, 4–8 a side) the bigger soldiers still 
 - The black garden ant soldier is the cheap numbers soldier: tuned to tie in fights of a dozen a side, it loses the
   small ones (4–8 a side) to the bigger soldiers — "they win by numbers" (its species' blurb). It was trimmed from 44 /
   5 to 42 / 4.8 so the others needed less.
-- Sickle-jaw soldiers win one on one (+1.00) and lose in groups (2 v 2 −0.33, 3 v 3 −0.78 with `PURSUE=1`): each holds
-  one enemy until it dies, and the others go free. On a marker they guard the trail rather than charge (the harness's
-  fights stall at 120 s), as designed.
+- Sickle-jaw soldiers (retuned 2026-11-07, spec 09 §2.3): with the defensive rows gone (§2.4) they no longer hold back
+  on a marker with a short reach, so they charge like other soldiers — and the hold (a victim that cannot fight back)
+  made them the strongest soldier at the old numbers (+0.79 against the black garden ant soldier at 300 food, +0.53 in
+  the round robin). Health 22 → 20 and the brood cost × 2.0 → × 2.2 the baseline worker (22 + 3.1 food) bring them to
+  +0.03; the acid ramp (2 → 18 dps over 6 s) is the user's and stays. Their worker (2.4 → 2.5 bite) had drifted to −0.44
+  against the reference and is +0.15 now (+0.22 at 150 food): slow and tough, a little stronger worker for worker.
 - The nasute's glue stream is the strongest soldier weapon (pure damage from five body lengths, +0.52 at 21.6 food).
   Its ramp (2 → 20 dps) is the user's and stays exactly; the nasute costs more wood instead (× 2.2 the baseline worker,
   was × 1.8: 22 + 4.4), and its health is 12 (was 12.8). (With the ramp at 1.6 → 13.5 it tied at the old price.)
@@ -87,6 +90,44 @@ ant −0.39. In small fights (150 food, 4–8 a side) the bigger soldiers still 
 | Nasute major | 76 | 5.6 | 1 | 42 | −0.17 |
 
 Before, two of each at 150 food: leafcutter and army ant majors +1.00, nasute major −0.29.
+
+## Saiy-Ant Blaster and the 10-second gold form (2026-11-07, claude/saiy-ants/09-spec-saiy-blaster.md)
+`tools/blaster-balance.ts -- [shooters|gold|beam|mixed] [food]` (CHANGE_PLAN §31).
+
+**The gold form lasts 10 s** (level 3: 12 s; was 4 / 5 s) with its boosts unchanged (speed × 1.5, damage × 1.6, attack
+rate × 1.25), the recovery 30 s (level 2: 22 s; was 20 / 14). Fights at these sizes last 9–20 s, so ten seconds of
+double damage covers nearly all of one: the Saiy worker went from +0.13 to +0.63 against the black garden ant worker and
+the soldier from +0.17 to +0.81 against the soldier (and the cooldown hardly matters inside one fight). Their health and
+bite were scaled back to the tie (`tools/balance-tune.ts`, then measured): worker 16 / 1.9 → 15.5 / 1.65 (−0.01 against
+the reference; +0.36 averaged over the black garden ant, red wood ant, fire ant and hell ant workers, +0.32 before);
+soldier 68 / 5.2 → 56 / 4.35 (+0.02; +0.08 averaged over four soldiers). The margins jump at bite-count thresholds
+(1.76 → 1.78 bite: −0.04 → +0.60 against the reference), so the bites sit clear of them. They are weaker outside the
+gold form and stronger in it — they depend on it more.
+
+**The Blaster** (`aurimyrmex_blaster`): 6.6 mm, 12 hp, armour 0, speed 24, cost 30 + 6 (grows 36 s), mount none (it fires
+from the ground; climbing would put it in melee), brood mix 0.14. `BALANCE.blaster`: range 40 mm (the mortar 56, the
+rapid sprayer 32, melee reach under 10), orbs 5 damage (physical: armour applies; × the gold form's 1.6) every 1.5 s
+(÷ 1.25 in gold), 150 mm/s, the first enemy touched; the beam 9 body lengths, 3 s, 4 damage (× 1.6) every 0.25 s on every
+enemy crossing it, then 2.5 s. It backs off from a foe inside 16 mm at 60 % of its own speed, gold or not (`backoff`; at
+the shooters' 0.85 × its gold speed it out-ran every melee caste and won even in contact), and stands 14 mm behind its
+place in a marker's guard crowd (`holdBack`).
+- Apart / in contact (equal food 150, 4 Blasters; > 0 the Blaster wins): black garden ant worker +0.71 / −0.96, soldier
+  +0.01 / −1.00, leafcutter media −0.12 / −1.00, red wood ant soldier −1.00 / −1.00, fire ant soldier +0.08 / −1.00,
+  Saiy soldier −0.96 / −1.00, fire ant major +0.38 / −0.92. Alone it is a little weaker than the mortar and rapid
+  sprayer at range (mortar +0.79 / +0.58 / +0.83 / −0.42 / +0.25 / −0.58 / +0.96 apart), and it loses whenever melee
+  reaches it (the mortar −0.76 to −1.00, the rapid sprayer −0.29 to −1.00, the Blaster −0.92 to −1.00).
+- In a group behind a line (`mixed`, 300 food: 8 Saiy soldiers alone, or 6 soldiers + 3 Blasters): against the black
+  garden ant soldier −0.12 → +0.78, red wood ant soldier −0.63 → +0.89, fire ant soldier −0.33 → +0.63, leafcutter
+  media +0.96 → +1.00, hell ant soldier +0.34 → +0.93, fire ant major +0.79 → +0.81. The red wood ants' soldiers with
+  mortars behind them do the same (+0.37 to +1.00): shooters protected by a line are strong in this game, and the
+  Blaster is no stronger than the mortar there.
+- One beam in gold down a line (`beam`): six black garden ant workers dead in 0.9 s, six leafcutter medias in 1.15 s;
+  three red wood ant soldiers left at 56 %, two fire ant majors at 44 %, three Saiy soldiers at 6 % — it clears a line
+  of small ants and badly hurts big ones.
+- **Underpass:** like any ant (height data `saiy_blaster`); it walks and fights under majors and creatures.
+- **Stolen caste:** Termants take it as **Saiy-Ant Blaster**, a heavy stolen caste (threshold 18) after the Saiy
+  soldier. The gold form goes with the caste (as for the stolen Saiy soldier), so a stolen Blaster turns gold, fires its
+  orbs and, in gold, its beam like the Saiy-Ants' own.
 
 ## Creatures (buffed)
 Against black garden ant workers (5 / 10 / 20 / 40): does it die, and how many ants does it take?

@@ -177,7 +177,7 @@ Rebuilt to the user's FIX spec (`claude/termite-royals/01-spec-royals-fix.md`). 
 | Soldier attack | Bite and lock with hooked mandibles, then apply a sticky secretion from the snout by contact | **Grab-and-squirt:** lunge, hook the enemy between the crossed mandible tips and hold it immobile, then squirt at point-blank range with **ramping damage** (2 → 18 DPS over 6 s). The point-blank delivery stays close to the real contact application; the ramp is **[game]**. |
 | Hold | The bite locks; soldiers sometimes stick themselves to ants | The hold ends only when the victim or the soldier dies **[game]**. Allies can free the victim by killing the soldier. |
 | Secretion look | A sticky, odorous strand | A thin, clear-to-pale-amber viscous jet that thickens with the ramp, plus droplets, fizz and a faint steam wisp on the victim **[game]** |
-| Foraging | Open on surface litter at night (genus), or covered trails with soldiers lining them (*R. perarmatus*) | Open foraging columns escorted by outward-facing soldiers, as in the brief. Soldiers line the column like Eisner's defensive row. |
+| Foraging | Open on surface litter at night (genus), or covered trails with soldiers lining them (*R. perarmatus*) | Open foraging columns; the soldiers gather with the workers, or hold an escort ring round the work area when there is nothing to gather (the defensive rows along the route were removed at the user's request, 2026-11-03). |
 | Reproductives | Not documented in detail | One queen and one king in a fixed royal chamber. If the queen dies, the colony is lost (game rule shared with the other species). |
 | Food | Leaf litter, debris, wood fibre | The plant-material resource shared with the Nasute Termites |
 | Death | — | Termite corpses are food for ant colonies |
@@ -200,6 +200,7 @@ Rebuilt to the user's FIX spec (`claude/termite-royals/01-spec-royals-fix.md`). 
 
 ---
 
+
 ## 9. Sources
 
 - *Rhynchotermes*. Wikipedia. https://en.wikipedia.org/wiki/Rhynchotermes
@@ -209,3 +210,23 @@ Rebuilt to the user's FIX spec (`claude/termite-royals/01-spec-royals-fix.md`). 
 - Scheffrahn, R. H. (2010). *Rhynchotermes bulbinasus*, a new species with dimorphic soldiers. *Zootaxa* 2387: 63–68 (fore-coxa process; minor and major soldiers).
 - Wizen, G. *Rhynchotermes* (field notes and photographs, Costa Rica). https://gilwizen.com/rhynchotermes/
 - Literature cited by the sources above: Snyder 1925 (original description and measurements); Eisner 2003 (*For Love of Insects*, defensive row); Nickle & Collins 1992 (night foraging); Rocha et al. 2017 (Syntermitinae phylogeny).
+
+## 10. Model redo on the ant pipeline (2026-11-07, `claude/realism/10-spec-saiy-ant-sickle-jaw-models.md`)
+
+The worker, soldier, presoldier and larva are built by the ant pipeline's termite builder (`src/render/ants/nasuteBuilder.ts`, morphs in `rhyMorphs.ts`, routed through `NASUTE_ANT_PATH`), as the conehead termites' were; the king and queen stay on the termite kit, as the conehead royals do. Numbers are fractions of the caste's length L (mm in brackets), from §5 and from tracing the user's photos (four soldier photos in round 1; three worker and four more soldier photos, Gil Wizen's, in review round 3) — study only, never in the game.
+
+| Part | Soldier (L 4.5 mm) | Worker (L 5.8 mm) | Note |
+|---|---|---|---|
+| Head capsule length × width × height | 0.233 × 0.222 × 0.20 (1.05 × 1.0 × 0.9 mm), a glassy dome | 0.19 × 0.20 × 0.18 (1.1 × 1.16 × 1.04 mm), a small round dome (a true elliptical section, `head.round` 2), about as wide as long, the face hardly narrowing | review round 3, from the user's field photos of workers |
+| Snout (labral tube) | 0.30 (1.35 mm), base radius 0.04 → tip 0.017, concave flanks (exponent 2.6), curving down (−0.32 slope, 0.22 bend); darker toward the tip; a dark pore at the open tip | — | §2: about 1.5 × the capsule, projecting slightly down |
+| Sickles | 0.34 along the curve (1.5 mm), blade half-width 0.03 → 0.0099 at the tip (round 3: "slightly less thick"), flattened 0.6; each a C-hook in one plane (the photo comparison): forward and down from the hinge (dip 0.4 rad), round the bottom (dip + 2.0 s²) and the tip curling back and up (a 0.5 rad hook in the last fifth), the plane turned out 0.32 rad and leaned in so the closed tips just cross; a conical marginal tooth at 0.42; a glossy wine-crimson `#8A2218` (the photos read `#7c2018` lit, `#4a0604` in shadow) going black `#140404` only from 0.74 of the blade (round 3: "more colored like irl counterparts"); kept off the ground in play (`mandPts`, the renderer's lowest-point check) | small triangular jaws | gape: the blades swing sideways round their hinges (0.55 rad at full gape) |
+| Antennae | 14 beads, 0.55 (2.5 mm), straight | 14 beads, 0.46 (2.7 mm) | barrel-shaped beads with hairs |
+| Legs (hind femur / tibia / tarsus) | 0.28 / 0.32 / 0.12 (tibia 1.44 mm), a thorn on the fore coxa | 0.20 / 0.22 / 0.10 | long, the body clear of the ground |
+| Abdomen | 0.40 × 0.25 × 0.20, an oval rounding down to a narrow joint (`abdomen.front` 0.35); a warm amber-brown `#965E2C` (the photos read `#8c674a`), each tergite darkening to a bold dark-brown band `#2C1202` (`abdomen.band` 1, so the bands show on the flanks too), thin pale cream membranes | 0.50 × 0.32 × 0.26, egg-shaped (`abdomen.front` 0.3), a glossy chocolate `#6C381E` (the photos read `#623525` to `#785d47`), the tergites pillowed plates (`abdomen.pillow` 0.06) divided by dark creases, each with its own highlight; a row of pale spiracles low on each flank (`abdomen.spiracles`); fine golden hairs all over (`abdomen.hairs` 12 a tergite, and hair pits with short hairs in the baked recipe `RHY_W`); the gut mottled through the translucent cuticle (`RHY_W` mottle 0.5) | round 3: the pale bits on the workers' abdomens in the photos are highlights, not membranes |
+| Colour of the head | `#A23A16`, glassy (roughness 0.1, clearcoat 1) | a glossy orange `#C85818` (the photos read `#c95b07`), the thorax a lighter orange `#D2843C`; no fontanelle or suture visible at this scale (round 3: the Y suture of round 1 removed) | the descriptions (Constantini et al. 2019, Scheffrahn 2010) call the worker's fontanelle conspicuous; the user's field photos do not show it at game scale |
+
+- **Presoldier:** the soldier's shape, pale cream and soft (`termite_rhy_presoldier`, the last part of a soldier's growth on the brood tile).
+- **King and queen:** on the termite kit, as the conehead royals are (review round 1, 2026-11-07: the user preferred the kit's queen, with its segmented abdomen like the conehead queen's, to the ant-pipeline rebuild). The literature has almost nothing on Rhynchotermes royals ("Imago: unknown" for R. armatus and R. bulbinasus); the kit's royals follow the related nasute royals: dark brown, eyes, ocelli, wing scales; the queen physogastric with the dark tergites as islands on the pale stretched membrane.
+- **Larva:** pale and translucent, a large head and short legs; grows 0.3 → 0.85 of its mesh on the brood tile.
+
+**Animation on the ant pipeline** (`game/antViews.ts` `sickleAntPath`, `attackPoses.ts` `S_GRAB` / `S_HOLD` / `S_SQUIRT`): planted feet throughout; the threat (head raised so the snout points forward and up, the sickles agape); the lunge timed to the sim (the sickles snap shut at 0.58 of it) settling into the hold; the hold — the victim held head-on in line with the soldier, its head inside the closed hooks (`SICKLE.grab.gripMm`, `victimInHooks`; review round 2: "make the two still parallel to each other ( straight) just make mandibles clasp of termite better"), the snout pressing on it on each squirt and the abdomen pumping, the acid jet from the snout's tip and the fizz on the victim, faster as the secretion ramps; the free squirt at a foe too big to hook; the alarm drum. Workers bite as the ant workers do (lunge, clamp, chomp; review round 2), chew leaf litter and carry it, and share food mouth to mouth.

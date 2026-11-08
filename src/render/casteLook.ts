@@ -70,6 +70,8 @@ const T: Record<string, [CasteColour, CastePattern]> = {
   hell_soldier: ['purple', 'scales'],
   aurimyrmex_worker: ['orange', 'carton'],
   aurimyrmex_soldier: ['slate', 'cocoons'],
+  // the Blaster: the sky blue of its orbs, wax comb (CHANGE_PLAN §31)
+  aurimyrmex_blaster: ['sky', 'comb'],
   termant_worker: ['grey', 'pellets'],
   termant_soldier: ['grass', 'scales'],
 };

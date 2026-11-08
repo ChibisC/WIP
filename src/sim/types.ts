@@ -10,7 +10,7 @@ import { TerrainParams } from '../world/terrain';
 export const SURFACE: number = 0;
 export const CAVE_BASE: number = 64;
 /**
- * The trees: one canopy map laid over the ground (sim/trees.ts, CHANGE_PLAN §30), a hex grid like a cave's in the
+ * The trees: one canopy map laid over the ground (sim/trees.ts, CHANGE_PLAN §33), a hex grid like a cave's in the
  * ground's mm frame, walkable only on branches and leaves, reached by climbing the trunks (its entrances). It exists only
  * in matches with a tree-dwelling colony, the sandbox toggle or the dev URL.
  */
@@ -330,6 +330,17 @@ export interface Ant {
   /** Saiy-Ants: seconds of gold surge left, and cooldown left */
   surgeT?: number;
   surgeCd?: number;
+  /**
+   * Saiy-Ant Blaster (sim/saiyBlaster.ts): shots fired in the current gold form (the fifth is the beam); the beam's
+   * seconds left, heading, reach (mm, cut by walls), damage a pulse and pulse clock; cooldown after a beam
+   */
+  shotN?: number;
+  beamT?: number;
+  beamH?: number;
+  beamL?: number;
+  beamD?: number;
+  beamP?: number;
+  beamCd?: number;
   /** army ants (eciton.ts): raid pulse phase (0 advance, 1 fall back, 2 wait), its timer and count; steps aside until (s) */
   ecPh?: number;
   ecT?: number;
@@ -863,7 +874,8 @@ export interface Creature {
 
 export interface Projectile {
   id: number;
-  kind: 'acid' | 'hairs';
+  /** `orb`: a Saiy-Ant Blaster's energy orb (sim/saiyBlaster.ts): flies straight, hits the first enemy on its path */
+  kind: 'acid' | 'hairs' | 'orb';
   space: number;
   x: number;
   y: number;
@@ -882,6 +894,9 @@ export interface Projectile {
   splash?: number;
   /** seconds of half speed on a hit (rapid sprayer level 3) */
   slow?: number;
+  /** orb: fired in the gold form (render: gold, not white-blue); the ant that fired it (it fights back at it) */
+  gold?: boolean;
+  by?: number;
 }
 
 /** A neutral underground area: a pre-dug cave or a creature's lair (DESIGN 3.12). */
@@ -927,7 +942,7 @@ export interface TreeSiteDef {
   nest: number;
 }
 
-/** The Trees map (CHANGE_PLAN §30): the canopy grid is `nests[TREES]`; this is what the grid cannot say. */
+/** The Trees map (CHANGE_PLAN §33): the canopy grid is `nests[TREES]`; this is what the grid cannot say. */
 export interface TreesDef {
   space: number;
   trunks: TrunkDef[];

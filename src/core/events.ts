@@ -11,6 +11,14 @@ export type SimEvent =
   | { t: 'climb'; x: number; y: number; space: number; phase: 'up' | 'down' | 'drop'; creature: number; by: string }
   | { t: 'acid'; x: number; y: number; tx: number; ty: number; space: number; lob?: boolean; splash?: number }
   | { t: 'acidHit'; x: number; y: number; space: number; splash: number }
+  /** Saiy-Ant Blaster (sim/saiyBlaster.ts): an orb fired from the mouth toward (tx, ty); it hit something; it fizzled
+   *  (at the end of its reach, or on a wall); a beam began (heading h, `len` mm from the mouth) or ended */
+  | { t: 'orb'; x: number; y: number; tx: number; ty: number; space: number; id: number; pid: number; gold?: boolean }
+  | { t: 'orbHit'; x: number; y: number; space: number; pid: number; gold?: boolean }
+  | { t: 'orbFizz'; x: number; y: number; space: number; pid: number; gold?: boolean; wall?: boolean }
+  | { t: 'blastCharge'; x: number; y: number; space: number; id: number; beam?: boolean }
+  | { t: 'beam'; x: number; y: number; h: number; len: number; space: number; id: number }
+  | { t: 'beamEnd'; x: number; y: number; space: number; id: number }
   | { t: 'sting'; x: number; y: number; space: number; by?: string }
   /** caste abilities (sim/casteAbilities.ts): a leafcutter major's taunt (its reach), an army-ant soldier's rage stack */
   | { t: 'taunt'; x: number; y: number; space: number; radius: number; by: string }
@@ -44,7 +52,7 @@ export type SimEvent =
   | { t: 'hook'; x: number; y: number; space: number }
   | { t: 'pin'; x: number; y: number; space: number }
   | { t: 'link'; x: number; y: number; space: number }
-  | { t: 'grabRelease'; x: number; y: number; space: number; soldier: number; target: number; reason: 'victimDied' | 'holderDied' }
+  | { t: 'grabRelease'; x: number; y: number; space: number; soldier: number; target: number; reason: 'victimDied' | 'holderDied' | 'flung' }
   /** Termants: gene samples taken in (`source`: a species id or `cr:<kind>`), a caste stolen, a soldier's glue burst */
   | { t: 'gene'; colony: number; source: string; amount: number }
   | { t: 'caste'; colony: number; caste: string; source: string; forgotten?: boolean }

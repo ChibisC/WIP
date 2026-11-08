@@ -34,8 +34,9 @@ import { combatPreempt, flungUpdate, venomTick } from './combat';
 import { datan2, dcos, dhypot, dsin, sq } from './dmath';
 import { edible, eatsWood, isWoodSource } from './diet';
 import { BALANCE, ECITON, NASUTE, SICKLE, TERMANT } from './balance';
-import { holdMarkerSlot, onTermiteDied, sickleGuardIndex, startTermiteIdle, termiteIdle, termiteTick } from './termites';
+import { holdMarkerSlot, onTermiteDied, startTermiteIdle, termiteIdle, termiteTick } from './termites';
 import { surgeTick } from './surge';
+import { beamUpdate, stopBeam } from './saiyBlaster';
 import { isHeld, snapTick } from './hellAnts';
 import { genesWanted, isTermant, tagPiece, termantDeposit, termantKing } from './termants';
 import { holdGuardLine, inGuardLine, trailTraffic } from './guardLine';
@@ -223,6 +224,7 @@ export function enterState(a: Ant, s: AS): void {
 
 export function killAnt(w: World, a: Ant): void {
   if (a.state === AS.Dead) return;
+  if ((a.beamT ?? 0) > 0) stopBeam(w, a);
   dropCarried(w, a);
   releaseGrapple(w, a);
   enterState(a, AS.Dead);
@@ -328,6 +330,15 @@ export function antSystem(w: World, dt: number): void {
       flungUpdate(w, a, dt);
       continue;
     }
+    // a Saiy-Ant Blaster's beam: planted for its 3 s whatever else is going on — no order, job or foe moves it
+    // (saiyBlaster.ts); a fling, a grab or death ends it
+    if ((a.beamT ?? 0) > 0) {
+      const cb = w.colony(a.colony);
+      if (cb && beamUpdate(w, a, cb, dt)) {
+        venomTick(w, a, dt);
+        finish(w, a);
+        continue;
+      }
     // on a tree trunk (sim/trees.ts): held on the bark for the climb, nothing else happens to it
     if (a.trunkT && trunkHold(a, dt)) {
       finish(w, a);
@@ -1367,11 +1378,9 @@ function marker(w: World, a: Ant, c: Colony, dt: number): void {
   // EotU: with the stores full they stop collecting and hold the marker like fighters (stores.ts)
   const forager = cd.forage && cd.carry > 0 && !underOrder(c, a, 'noGather') && !storesFull(c);
   let escort = forager && a.space === SURFACE && a.carry === Carry.None && (cd.termite === 'nasute' || cd.termite === 'major' || cd.termite === 'sickle');
-  if (escort) {
-    const food = foodAt(w, c, m.x, m.y, radius * 1.3);
-    // sickle-jaws: a share guards the trail even while there is food (the rest gather); the others only without food
-    escort = cd.termite === 'sickle' ? sickleGuardIndex(w, a, c, a.marker, food).k >= 0 : !food;
-  }
+  // (spec 09 §2.4, user 2026-11-03: no more sickle-jaw defensive rows) every termite soldier gathers where there is
+  // food and takes its escort slot round the workers' work area where there is none
+  if (escort) escort = !foodAt(w, c, m.x, m.y, radius * 1.3);
   if (forager && a.space === SURFACE && !escort) {
     if (a.carry !== Carry.None) {
       returnAndStore(w, a, c, dt);

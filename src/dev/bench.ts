@@ -33,6 +33,7 @@ interface SceneDef {
 
 export const BENCH_SCENES: SceneDef[] = [
   { id: 'feel', title: 'Feel: clicks, orders, digging, building and the camera (scripted inputs)', query: 'play=1&seed=11&species=lasius&rival=solenopsis&developed=6&nocine=1&reveal=1' },
+  { id: 'gpu', title: 'What each effect costs: the big fight at the default zoom, one effect off at a time', query: 'stress=1&ants=200&creatures=100&bosses=2' },
   { id: 'switch', title: 'Switching surface ↔ underground', query: 'play=1&seed=11&areas=1&species=lasius&rival=solenopsis&reveal=1&developed=6&nocine=1' },
   { id: 'fight', title: 'Big fight (4 × 200 ants, 100 creatures, 2 titans)', query: 'stress=1&ants=200&creatures=100&bosses=2' },
   { id: 'nest', title: 'Full nest', query: 'stress=1&ants=200&creatures=40&view=nest' },
@@ -78,6 +79,8 @@ interface SceneResult {
   creatures: number;
   hitches: string[];
   switch?: SwitchResult;
+  /** the GPU breakdown scene's steps (performance v3) */
+  gpuSteps?: GpuStep[];
   /** latency and pacing (core/feel.ts) */
   feel?: FeelSummary;
 }
@@ -139,7 +142,7 @@ export function startBench(ui: HTMLElement, q: URLSearchParams): void {
   const only = q.get('bonly')?.split(',').filter((id) => BENCH_SCENES.some((d) => d.id === id));
   const st: BenchState = { started: Date.now(), quality: q.get('q') || 'high', secs: Number(q.get('bsecs') || 20), rounds: Number(q.get('brounds') || 10), results: [], only: only?.length ? only : undefined };
   const box = panel(ui);
-  box.innerHTML = `<h2>Benchmark</h2><p>Seven scenes, about ${Math.round((BENCH_SCENES.length * (st.secs + 12) + 60) / 60)} minutes at <b>${st.quality}</b> quality. Each one loads, warms up, then flies the camera along a fixed path while every frame is timed. Leave the mouse and keyboard alone until the report appears; keep this tab in front.</p><p>Starting in 3 s…</p>`;
+  box.innerHTML = `<h2>Benchmark</h2><p>Eight scenes, about ${Math.round((BENCH_SCENES.length * (st.secs + 12) + 60) / 60)} minutes at <b>${st.quality}</b> quality. Each one loads, warms up, then flies the camera along a fixed path while every frame is timed. Leave the mouse and keyboard alone until the report appears; keep this tab in front.</p><p>Starting in 3 s…</p>`;
   save(st);
   setTimeout(() => go(sceneUrl(nextScene(st, -1), st)), 3000);
 }
@@ -183,8 +186,9 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
   s.autoQuality.enabled = false;
   // (measured uncapped: the frame cap would hide what the device can do)
   s.loop.frameCap = 0;
-  const finish = (sw?: SwitchResult) => {
+  const finish = (sw?: SwitchResult, gpuSteps?: GpuStep[]) => {
     const r = collect(s, def, loadMs, secs, sw);
+    if (gpuSteps) r.gpuSteps = gpuSteps;
     st.results.push(r);
     save(st);
     console.log('[bench]', JSON.stringify(r));
@@ -236,6 +240,7 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
   let reset = false;
   if (def.id === 'switch') return void runSwitching(s, () => finish(undefined), (sw) => finish(sw));
   if (def.id === 'feel') return void runFeel(s, secs, () => finish());
+  if (def.id === 'gpu') return void runGpuSteps(s, cx, cz, (steps) => finish(undefined, steps));
   const loop = (t: number) => {
     const el = t - t0;
     if (el < warm) {
@@ -300,6 +305,119 @@ function collect(s: GameSession, def: SceneDef, loadMs: number, secs: number, sw
     switch: sw,
     feel: feel.summary(),
   };
+}
+
+/** One step of the GPU breakdown: the frame interval with one thing changed (performance v3). */
+interface GpuStep {
+  name: string;
+  avg: number;
+  p95: number;
+  cpu: number;
+  /** frames measured (a GPU too slow for a few frames in the window cannot be judged) */
+  frames: number;
+}
+
+/**
+ * The GPU breakdown (performance v3): the big fight seen from the default zoom, the camera still, then every 3.7 s one
+ * thing changed (each back as it was before the next): ambient occlusion off, bloom off, depth of field off, all post
+ * effects off, shadows off, one device pixel per screen pixel, the ants hidden, the grass hidden, and everything off at
+ * once. Each step's frame interval (after 1.2 s to settle: shadow toggles recompile) says what that thing costs on this
+ * device; the main thread's time says whether it is the CPU's.
+ */
+function runGpuSteps(s: GameSession, cx: number, cz: number, done: (steps: GpuStep[]) => void): void {
+  const v = s.view;
+  const R = v.renderer;
+  const surf = v.surfaceRig;
+  surf.goalYaw = 0.6;
+  surf.goalDistance = 260;
+  surf.goal.set(cx + Math.cos(0.6) * 30, surf.goal.y, cz + Math.sin(0.6) * 30);
+  const S = s as unknown as { surfAnts?: { group: THREE.Object3D }; surfCreatures?: { group: THREE.Object3D } };
+  const shadows = (on: boolean) => {
+    R.shadowMap.enabled = on && v.preset.shadows;
+    for (const sc of [v.surfaceScene])
+      sc.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+        if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => (mm.needsUpdate = true));
+      });
+  };
+  const pixels = (one: boolean) => {
+    if (!one) return v.resize();
+    R.setPixelRatio(1);
+    R.setSize(window.innerWidth, window.innerHeight, false);
+    v.post.setSize(window.innerWidth, window.innerHeight, 1);
+  };
+  const P = v.post.settings;
+  const keep = { ao: P.ao, bloom: P.bloom, dof: P.dof, post: v.post.enabled };
+  const steps: Array<{ name: string; on: () => void; off: () => void }> = [
+    { name: 'as set', on: () => {}, off: () => {} },
+    { name: 'ambient occlusion off', on: () => (P.ao = false), off: () => (P.ao = keep.ao) },
+    { name: 'bloom off', on: () => (P.bloom = false), off: () => (P.bloom = keep.bloom) },
+    { name: 'depth of field off', on: () => (P.dof = false), off: () => (P.dof = keep.dof) },
+    { name: 'all post effects off', on: () => (v.post.enabled = false), off: () => (v.post.enabled = keep.post) },
+    { name: 'shadows off', on: () => shadows(false), off: () => shadows(true) },
+    { name: '1 device pixel per screen pixel', on: () => pixels(true), off: () => pixels(false) },
+    { name: 'ants hidden', on: () => S.surfAnts && (S.surfAnts.group.visible = false), off: () => S.surfAnts && (S.surfAnts.group.visible = true) },
+    { name: 'grass hidden', on: () => v.grass && (v.grass.mesh.visible = false), off: () => v.grass && (v.grass.mesh.visible = true) },
+    {
+      name: 'all of these off',
+      on: () => {
+        v.post.enabled = false;
+        shadows(false);
+        pixels(true);
+        if (S.surfAnts) S.surfAnts.group.visible = false;
+        if (v.grass) v.grass.mesh.visible = false;
+      },
+      off: () => {
+        v.post.enabled = keep.post;
+        shadows(true);
+        pixels(false);
+        if (S.surfAnts) S.surfAnts.group.visible = true;
+        if (v.grass) v.grass.mesh.visible = true;
+      },
+    },
+  ];
+  const out: GpuStep[] = [];
+  const WARM = 3000;
+  const SETTLE = 1200;
+  const MEASURE = 2500;
+  let k = -1;
+  let t0 = 0;
+  let last = 0;
+  let times: number[] = [];
+  let cpu0 = 0;
+  let frames0 = 0;
+  const start = performance.now();
+  const loop = (t: number) => {
+    if (t - start < WARM) {
+      requestAnimationFrame(loop);
+      return;
+    }
+    if (k < 0 || t - t0 > SETTLE + MEASURE) {
+      if (k >= 0) {
+        const srt = times.slice().sort((a, b) => a - b);
+        const avg = times.reduce((a, b) => a + b, 0) / Math.max(1, times.length);
+        const cpuN = prof.cpuMs.pushes - frames0;
+        out.push({ name: steps[k].name, avg: +avg.toFixed(1), p95: +(srt[Math.floor(srt.length * 0.95)] ?? 0).toFixed(1), cpu: +(cpuN > 0 ? (prof.cpuMs.total - cpu0) / cpuN : 0).toFixed(1), frames: times.length });
+        steps[k].off();
+      }
+      k++;
+      if (k >= steps.length) return done(out);
+      steps[k].on();
+      t0 = t;
+      times = [];
+      last = 0;
+    }
+    if (t - t0 > SETTLE) {
+      if (last) times.push(t - last);
+      else {
+        cpu0 = prof.cpuMs.total;
+        frames0 = prof.cpuMs.pushes;
+      }
+      last = t;
+    }
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
 }
 
 /**
@@ -526,6 +644,15 @@ function fmtScene(r: SceneResult): string[] {
       `input → acting ms: ${kinds.filter((k) => F.acting[k]).map((k) => `${k} ${fm(F.acting[k])}`).join(', ') || '—'} · command ${F.cmdTicks ? `${F.cmdTicks.avg} ticks, ${F.cmdMs?.avg} ms` : '—'}`,
       `pacing: interval ${fm(F.interval)} ms, jitter ${F.jitter ? F.jitter.avg : '—'} ms, display ${F.vsync} ms · over 16.7 ms ${F.over16}/${F.frames}, over 33 ms ${F.over33}, missed vsync ${F.missed} · long tasks ${F.longTasks ? `${F.longTasks.n} (${F.longTasks.ms} ms)` : 'n/a'}`,
     );
+  }
+  if (r.gpuSteps) {
+    const base = r.gpuSteps[0]?.avg ?? 0;
+    for (const g of r.gpuSteps)
+      out.push(
+        g.frames < 5
+          ? `  ${g.name.padEnd(32)} too slow to measure (${g.frames} frames in 2.5 s)`
+          : `  ${g.name.padEnd(32)} frame ${g.avg.toFixed(1)} ms (p95 ${g.p95.toFixed(1)}, ${g.frames} frames)${g === r.gpuSteps[0] ? '' : `, saves ${(base - g.avg).toFixed(1)} ms`} · main thread ${g.cpu} ms`,
+      );
   }
   if (r.hitches.length) {
     out.push('hitches:');

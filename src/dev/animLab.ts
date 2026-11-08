@@ -11,7 +11,7 @@ import { createSurfaceEnvironment } from '../render/environment';
 import { textures } from '../render/textures';
 import { globalUniforms } from '../render/shaderPatch';
 import { applyLabLight } from './labLight';
-import { blankView, sprayPose } from '../game/antViews';
+import { blankView, blasterPose, sprayPose } from '../game/antViews';
 import { CREATURES } from '../sim/creatures/kinds';
 import { BALANCE, STAG } from '../sim/balance';
 import { CASTE_FX } from '../sim/casteAbilities';
@@ -129,6 +129,19 @@ function nasDrum(t: number, v: AntView): void {
   v.atkSeq = true;
   v.antennaActivity = 1;
 }
+/** A sickle-jaw soldier's attack cycle on the ant pipeline (as game/antViews.ts sickleAntPath): 5 the drum, 7 the grab,
+ *  8 the hold-and-squirt, 9 the free squirt; the head turned to the aim point. */
+function sickleCycle(v: AntView, special: number, q: number, gap: number): void {
+  v.special = special;
+  v.atk = Math.min(0.999, q);
+  v.atkGap = gap;
+  v.atkVar = 0;
+  v.atkSide = 1;
+  v.atkN = 0;
+  v.atkSeq = true;
+  v.antennaActivity = 1;
+  if (v.aimX !== undefined && v.aimY !== undefined) v.headYaw = Math.max(-0.6, Math.min(0.6, Math.atan2(v.aimY - v.y, v.aimX - v.x) - v.heading));
+}
 function attacker(x: number, y: number, h: number, variant: number, gap: number, t0: number, onBite?: (t: number) => void): AntScript {
   let lastCycle = -1;
   return (t, v) => {
@@ -158,6 +171,73 @@ function attacker(x: number, y: number, h: number, variant: number, gap: number,
     v.atkSide = cq & 1 ? 1 : -1;
     v.atkGap = gap;
     v.atkN = Math.max(0, cq);
+  };
+}
+
+/** The Blaster clip's timeline: shots (wind-up start, kind), the gold form's start, the beam. */
+function blastClip(): Clip {
+  const B = BALANCE.blaster;
+  const L = MORPHS.saiy_blaster?.L ?? 6.6;
+  const bx = -22;
+  const mouthX = bx + L * 0.5;
+  const foes = [8, 15, 22.5, 29, 36].map((x, k) => ({ x, y: (k % 2 ? 1.2 : -1.2) * (k > 2 ? 1 : 0.5), hp: 100 }));
+  const goldAt = 3.4;
+  // wind-up starts; the last is the beam (its charge harder)
+  const shots: Array<{ t: number; beam?: boolean }> = [{ t: 0.6 }, { t: 2.1 }, { t: 4.0 }, { t: 5.2 }, { t: 6.4, beam: true }];
+  const beamOn = 6.4 + B.windup;
+  const beamOff = beamOn + B.beamTime;
+  const events: NonNullable<Clip['events']> = [];
+  let pid = 1;
+  for (const sh of shots) {
+    const fire = sh.t + B.windup;
+    const gold = fire > goldAt;
+    events.push({ t: sh.t, e: { t: 'blastCharge', x: bx, y: 0, space: -1, id: 1, beam: sh.beam } as SimEvent });
+    if (sh.beam) {
+      events.push({ t: fire, e: { t: 'beam', x: mouthX, y: 0, h: 0, len: L * B.beamReach, space: -1, id: 1 } as SimEvent });
+      events.push({ t: beamOff, e: { t: 'beamEnd', x: bx, y: 0, space: -1, id: 1 } as SimEvent });
+    } else {
+      const f = foes[0];
+      const hitAt = fire + (f.x - 1.6 - mouthX) / B.orbSpeed;
+      events.push({ t: fire, e: { t: 'orb', x: mouthX, y: 0, tx: f.x, ty: f.y, space: -1, id: 1, pid, gold } as SimEvent });
+      events.push({ t: hitAt, e: { t: 'orbHit', x: f.x - 1.6, y: f.y * 0.8, space: -1, pid, gold } as SimEvent });
+      pid++;
+    }
+  }
+  const fires = shots.map((sh) => sh.t + B.windup);
+  return {
+    dur: 10.5,
+    noScale: true,
+    events,
+    ants: [
+      {
+        morph: 'saiy_blaster',
+        script: (t, v) => {
+          Object.assign(v, { x: bx, y: 0, heading: 0, antennaActivity: 0.5, gold: 0, goldDir: 1, exhausted: 0, headPitch: 0, headYaw: 0, gaster: 0, antennaPitch: 0, roll: 0, pitch: 0, pivX: 0, mandible: 0.3, crouch: 0, brace: 0, atk: undefined, special: 0 });
+          // the gold form: in over 0.8 s with its stretch, on to the end
+          if (t > goldAt) {
+            const k = Math.min(1, (t - goldAt) / 0.8);
+            v.gold = Math.min(1, k * 1.08);
+            const st = k < 1 ? Math.sin(Math.PI * k) : 0;
+            v.headPitch += 0.25 * st;
+            v.gaster += 0.3 * st;
+          }
+          const last = [...fires].reverse().find((f) => f <= t);
+          const sh = shots.find((x) => t >= x.t && t < x.t + B.windup);
+          const phase = t >= beamOn && t < beamOff ? 'beam' : sh ? 'windup' : t > 0.4 ? 'hold' : 'rest';
+          blasterPose(v, { t, len: L, phase, st: sh ? t - sh.t : 0, beamAge: t - beamOn, since: last !== undefined ? t - last : 9, aim: 0, beamNext: !!sh?.beam });
+        },
+      },
+      ...foes.map((f, k) => ({
+        morph: 'lasius_worker',
+        script: ((t: number, v: AntView) => {
+          // a hit: the first worker at each orb; every worker the beam crosses at each pulse
+          let hits = fires.filter((x, i) => !shots[i].beam && k === 0 && t > x + 0.17).length;
+          if (t > beamOn) hits += Math.floor((Math.min(t, beamOff) - beamOn) / B.beamTick) + 1;
+          Object.assign(v, { x: f.x, y: f.y, heading: Math.PI + (k - 2) * 0.12, antennaActivity: 1, mandible: 0.6, hp: 100 - hits * 1.5 });
+        }) as AntScript,
+      })),
+    ],
+    cam: { tx: 7, ty: 1, tz: 0, dir: [0.2, 0.55, 1], dist: 80, fov: 30 },
   };
 }
 
@@ -231,6 +311,13 @@ function clips(): Record<string, Clip> {
       cam: { tx: 0, ty: 0.4, tz: 0, dir: [0.1, 0.45, 1], dist: 7, fov: 30 },
     },
     // a hundred workers idling side by side
+    // (review round 1, "fix the idle animation ... with the back legs") six standing ants, close enough to see the
+    // idles: the leg grooming lifts one hind leg at a time
+    idle6: {
+      dur: 12,
+      ants: Array.from({ length: 6 }, (_, i) => ({ script: standing(((i % 3) - 1) * 4.2, (Math.floor(i / 3) - 0.5) * 4.6, 0.4 + i * 1.7) })),
+      cam: { tx: 0, ty: 0.3, tz: 0, dir: [0.2, 0.55, 1], dist: 16, fov: 30 },
+    },
     idle100: {
       dur: 9,
       ants: Array.from({ length: 100 }, (_, i) => ({ script: standing(((i % 10) - 4.5) * 3.9, (Math.floor(i / 10) - 4.5) * 3.9, (i * 2.399) % 6.283) })),
@@ -366,6 +453,116 @@ function clips(): Record<string, Clip> {
       ],
       cam: { tx: -7, ty: 1.5, tz: 0, dir: [0.25, 0.7, 1], dist: 52, fov: 30 },
     },
+    // model redo (claude/realism/10-spec §3): the sickle-jaw soldier's grab-and-squirt, as game/antViews.ts
+    // sickleAntPath drives it from the sim — threat (sickles agape), the lunge with the sickles crossing shut on the
+    // snap, the hold with the snout pressing in and the acid ramping (the jet and the fizz), the victim held and
+    // struggling, then the drop; `speed=0.25` for the slow version
+    sgrab: {
+      dur: 6.4,
+      noScale: true,
+      ants: [
+        {
+          morph: 'termite_rhy_soldier',
+          script: (t, v) => {
+            Object.assign(v, { x: 0, y: 0, heading: 0, tan: 1, special: 0, atk: undefined, firing: false, aimX: 2.06, aimY: 0, aimZ: 0.5, ramp: 0, headPitch: 0, mandible: 0.2, antennaActivity: 1, holding: false });
+            const t1 = 0.9, lun = 0.55 * 0.74, t2 = t1 + lun, t3 = 5.2;
+            if (t < t1) Object.assign(v, { headPitch: 0.22, mandible: 0.85 + 0.15 * Math.sin(t * 3) });
+            else if (t < t2) sickleCycle(v, 7, (t - t1) / 0.55, 0.55);
+            else if (t < t3) {
+              const ramp = Math.min(1, (t - t2) / 3.2);
+              const rate = 1.4 + 2.2 * ramp;
+              Object.assign(v, { firing: true, ramp, holding: true });
+              sickleCycle(v, 8, (t * rate) % 1, 1 / rate);
+            }
+          },
+        },
+        {
+          morph: FIRE,
+          script: (t, v) => {
+            const t2 = 0.9 + 0.55 * 0.74, t3 = 5.2;
+            const held = t > 0.9 + 0.55 * 0.58 && t < t3;
+            // (review rounds 1–2: in line, head-on, its head in the crossed hooks) where the sim pins it —
+            // SICKLE.grab.gripMm 0.82 + (0.5 − victimInHooks 0.08) of its 2.96 mm length; before, a step further out
+            Object.assign(v, { x: held || t >= t3 ? 0.82 + 0.42 * 2.96 : 2.6, y: 0, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.5, pose: 0, roll: 0, pitch: 0, headYaw: 0, acid: 0, dead: false });
+            if (held) {
+              const k = Math.min(1, Math.max(0, (t - t2) / 3.2));
+              v.acid = 0.1 + 0.9 * k;
+              v.pose = POSE.GRAPPLE;
+              v.roll = Math.sin(t * 17) * 0.3 * (1 - 0.6 * k);
+              v.pitch = 0.08 * Math.sin(t * 11);
+              v.headYaw = Math.sin(t * 13) * 0.4 * (1 - 0.6 * k);
+              v.mandible = 0.8;
+            } else if (t >= t3) {
+              v.acid = 1;
+              v.dead = true;
+            }
+          },
+        },
+      ],
+      cam: { tx: 0.8, ty: 0.6, tz: 0, dir: [0.25, 0.32, 1], dist: 10, fov: 30 },
+    },
+    // the sickle-jaw castes side by side: a worker chewing leaf litter, two in trophallaxis, a soldier drumming the alarm
+    // (feet planted), a soldier squirting a foe too big to hook (no grab), a worker dying
+    sickle: {
+      dur: 6,
+      noScale: true,
+      ants: [
+        { morph: 'termite_rhy_worker', script: (t, v) => Object.assign(v, { x: -9, y: -4, heading: 0.3, headPitch: -0.3 + 0.08 * Math.sin(t * 9), mandible: 0.45 + 0.4 * Math.sin(t * 11), antennaActivity: 0.8 }) },
+        { morph: 'termite_rhy_worker', script: (t, v) => Object.assign(v, { x: -11.1, y: 3.5, heading: 0, mandible: 0.55, headPitch: 0.1 + Math.sin(t * 3.1) * 0.05, antennaPitch: 0.25, antennaActivity: 1 }) },
+        { morph: 'termite_rhy_worker', script: (t, v) => Object.assign(v, { x: -5.4, y: 3.5, heading: Math.PI, mandible: 0.55, headPitch: 0.1 + Math.sin(t * 3.1 + 1) * 0.05, antennaPitch: 0.25, antennaActivity: 1 }) },
+        { morph: 'termite_rhy_soldier', script: (t, v) => { Object.assign(v, { x: -1, y: 5, heading: -0.4, tan: 1 }); sickleCycle(v, 5, (t * 6) % 1, 1 / 6); } },
+        {
+          morph: 'termite_rhy_soldier',
+          script: (t, v) => {
+            const rate = 2.2;
+            Object.assign(v, { x: 3.4, y: -3, heading: 0, tan: 1, aimX: 6.0, aimY: -3, aimZ: 0.9, firing: t > 0.6, ramp: Math.min(1, Math.max(0, (t - 0.6) / 3)) });
+            sickleCycle(v, 9, v.firing ? (t * rate) % 1 : 0.6, 1 / rate);
+          },
+        },
+        { morph: 'fire_major', script: (t, v) => Object.assign(v, { x: 8.6, y: -3, heading: Math.PI, hp: 100, antennaActivity: 1, mandible: 0.6, acid: Math.min(1, Math.max(0, (t - 0.8) / 3)) }) },
+        { morph: 'termite_rhy_worker', script: (t, v) => Object.assign(v, { x: 9, y: 4.5, heading: 2.4, dead: t > 1.5 }) },
+      ],
+      events: [0.17, 0.34, 0.51, 0.68, 2.2, 2.37, 2.54, 2.71, 4.3, 4.47, 4.64].map((t) => ({ t, e: { t: 'headbang', x: 0.4, y: 4.4, space: -1 } as unknown as SimEvent })),
+      cam: { tx: -1.6, ty: 0.5, tz: 0.5, dir: [0.15, 0.7, 1], dist: 31, fov: 30 },
+    },
+    // the Saiy-Ant gold surge (claude/realism/10-spec §2): the ripple in from the head with the stretch and overshoot
+    // (as game/antViews.ts speciesExtras), faster bites with spark impacts, the ripple out from the gaster, the
+    // exhausted droop; the six locks swaying
+    sgold: {
+      dur: 8,
+      ants: [
+        {
+          script: (t, v) => {
+            Object.assign(v, { x: 0, y: 0, heading: 0.3, antennaActivity: 0.5, gold: 0, goldDir: 1, exhausted: 0, headPitch: 0, gaster: 0, antennaPitch: 0, roll: 0, atk: undefined, special: 0 });
+            const on0 = 0.8, on1 = 1.8, off0 = 5.4, off1 = 6.4;
+            if (t > on0 && t < off1) {
+              if (t < on1) {
+                const k = (t - on0) / (on1 - on0);
+                v.gold = Math.min(1, k * 1.08);
+                const st = Math.sin(Math.PI * k) * (1 + 0.25 * Math.sin(Math.PI * 2 * k));
+                v.headPitch += 0.32 * st;
+                v.gaster += 0.35 * st;
+                v.antennaPitch += 0.5 * st;
+                if (on1 - t < 0.25) v.roll = Math.sin(t * 40) * 0.08;
+              } else if (t > off0) {
+                v.gold = (off1 - t) / (off1 - off0);
+                v.goldDir = -1;
+              } else v.gold = 1;
+              v.antennaPitch -= 0.3;
+            } else if (t >= off1) {
+              v.exhausted = Math.min(1, (t - off1) / 0.6);
+              v.antennaPitch -= v.exhausted * 0.5;
+            }
+          },
+        },
+        { morph: FIRE, script: (_t, v) => Object.assign(v, { x: 3.4, y: 1.0, heading: Math.PI + 0.3, hp: 100, antennaActivity: 1, mandible: 0.5 }) },
+      ],
+      cam: { tx: 1, ty: 0.5, tz: 0.2, dir: [0.3, 0.5, 1], dist: 11, fov: 30 },
+    },
+    // the Saiy-Ant Blaster (claude/saiy-ants/09-spec): two white-blue orbs, the gold form, two gold orbs and the beam
+    // down the line of black garden ant workers (the game's pose `blasterPose` and effects `blastFx`, from the same
+    // events the sim sends; the targets flinch at each hit)
+    blast: blastClip(),
     // realism rework: one attacker, seen from the side — the hell ants' vertical snap (variant 0: the snap; the soldier's
     // impale), slowed by a long attack gap so the cocked jaws, the trap firing, the hit-stop and the lift read
     snap: {

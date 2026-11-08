@@ -1,5 +1,5 @@
 """Renders for the 2026-10-25 fixes (user notes): the Nasute and Sickle-Jaw workers side by side (model kit v2.2),
-the Sickle-Jaw guard line along the workers' route, ants planted round a centipede (with the F3 hitbox overlay),
+ants planted round a centipede (with the F3 hitbox overlay),
 and undiggable stone in the nest. Fails on page errors or shader warnings.
 
 Run: tests/browser/with_server.sh python3 tests/browser/fixes_renders.py   (ONLY=<name part> for one scene)
@@ -52,36 +52,6 @@ with sync_playwright() as p:
         time.sleep(4)
         pg.screenshot(path=os.path.join(OUT, name + ".png"))
         note(f"{'PASS' if not errs else 'FAIL'}  {name} {errs[:2]}")
-        pg.close()
-
-    # ---- the Sickle-Jaw guard line: a leaf-litter patch 140 mm out, workers and soldiers sent to it
-    if not ONLY or ONLY in "guard_line":
-        errs = []
-        pg = page(ctx, errs)
-        pg.goto(BASE + "?play=1&shot=1&noui=1&q=low&seed=5&creatures=0&species=rhynchotermes&rival=lasius&battle=rhy_soldier:20", wait_until="load")
-        wait_ready(pg)
-        info = pg.evaluate("""async () => {
-          const { placeLitter } = await import('/src/sim/mapGen.ts');
-          const { Rng } = await import('/src/core/rng.ts');
-          const s = window.__session; const w = s.world; const c = s.player; const e = c.entrances[0];
-          let mx = e.sx + 140, my = e.sy;
-          for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2; const x = e.sx + Math.cos(a) * 140, y = e.sy + Math.sin(a) * 140;
-            if (x > 40 && y > 40 && x < w.terrain.width - 40 && y < w.terrain.depth - 40 && w.walkable(0, x, y)) { mx = x; my = y; break; } }
-          placeLitter(w, new Rng(1), mx, my);
-          for (const f of w.s.food) if (f.from === 'litter' && Math.hypot(f.x - mx, f.y - my) < 1) f.amount = f.max = 1e4;
-          s.issue({ type: 'placeMarker', i: 0, space: 0, x: mx, y: my });
-          for (const g of c.groups) s.issue({ type: 'assignGroup', group: g.id, marker: 0 });
-          return { mx, my, ex: e.sx, ey: e.sy };
-        }""")
-        for k in range(40):
-            pg.evaluate("window.__session.loop.advance(40)")
-        n = pg.evaluate("() => window.__session.world.s.ants.filter(a => a.caste === 'rhy_soldier' && a.state === 22).length")
-        pg.evaluate(f"""() => {{ const s = window.__session; const r = s.view.surfaceRig;
-            r.jumpTo(({info['mx']} + {info['ex']}) / 2, ({info['my']} + {info['ey']}) / 2, 175); r.pitchBias = 0.6;
-            if (s.view.grass) s.view.grass.mesh.visible = false; }}""")
-        pg.evaluate("window.__step(3, 0.05)")
-        pg.screenshot(path=os.path.join(OUT, "guard_line.png"))
-        note(f"{'PASS' if not errs else 'FAIL'}  guard_line rally {n} {errs[:2]}")
         pg.close()
 
     # ---- ants planted round a centipede, hitboxes drawn (F3 overlay)

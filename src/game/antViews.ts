@@ -308,6 +308,7 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
       out.headPitch = -0.15;
       break;
     case AS.Spray: {
+      if (cd.blast) break; // the Saiy-Ant Blaster: blastPose, below
       // (user rating F6, round 2: the Rapid Sprayer holds its rear between shots while it keeps firing)
       const held = cd.acid?.kind === 'rapid' && w.time - (rapidShot.get(a.id) ?? -9) < 1;
       if (cd.acid?.kind === 'rapid') rapidShot.set(a.id, w.time);
@@ -362,6 +363,9 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
   if (a.pose === POSE.STING) out.gaster = -0.9;
   // a Rapid Sprayer between its shots (back in the attack state for a moment): still reared up, aiming
   if (cd.acid?.kind === 'rapid' && a.state === AS.Attack && a.v < cd.speed * 0.2 && w.time - (rapidShot.get(a.id) ?? -9) < 1) sprayPose(out, 'rapid', 1, cd.length, true);
+  out.mouthGlow = 0;
+  out.brace = 0;
+  if (cd.blast) blastPose(w, a, out, cd.length);
   armyAnt(w, a, out);
   out.glue = a.state === AS.Dead ? 0 : glueOf(w, a);
   // on a creature (climbing.ts): the renderer puts it on the animated leg or back
@@ -456,6 +460,103 @@ export function sprayPose(out: Pick<AntView, 'gaster' | 'pitch' | 'lift' | 'mand
   out.antennaPitch = 0.4;
 }
 
+/** Render only: each Blaster's last-seen shot cooldown and when it last fired (sim time), for the shot flash and recoil. */
+const blastRecs = new Map<number, { cd2: number; at: number; seen: number }>();
+let blastPrune = 0;
+
+/**
+ * The Saiy-Ant Blaster (spec 09 §3, render only, from the sim's state): faint white-blue in the mouth at rest; aiming,
+ * the head turns to the target and the jaws part wide while the glow builds (the wind-up, `BALANCE.blaster.windup`);
+ * the shot flashes and kicks the head and the front of the body back, the planted legs soak it up; braced for the beam —
+ * feet planted wide, body low, head steady on the line, the whole ant trembling — the mouth blazing. Heads face straight
+ * ahead the rest of the time (user 2026-11-01). The glow is gold in the gold form (the shader mixes by the gold level).
+ */
+function blastPose(w: World, a: Ant, out: AntView, len: number): void {
+  if (a.state === AS.Dead) return;
+  const B = BALANCE.blaster;
+  let r = blastRecs.get(a.id);
+  if (!r) blastRecs.set(a.id, (r = { cd2: a.cd2, at: -9, seen: w.s.tick }));
+  if (a.cd2 > r.cd2 + 0.05) r.at = w.time; // the cooldown jumped: it just fired
+  r.cd2 = a.cd2;
+  r.seen = w.s.tick;
+  if (++blastPrune > 4000) {
+    blastPrune = 0;
+    for (const [id, x] of blastRecs) if (w.s.tick - x.seen > 200) blastRecs.delete(id);
+  }
+  const o = a.tk === 3 ? w.antById.get(a.tgt) : a.tk === 4 ? w.creatureById.get(a.tgt) : undefined;
+  let aim = 0;
+  if (o) {
+    const d = Math.atan2(o.y - a.y, o.x - a.x) - a.h;
+    aim = Math.max(-0.55, Math.min(0.55, Math.atan2(Math.sin(d), Math.cos(d))));
+  }
+  const beamOn = (a.beamT ?? 0) > 0;
+  const spray = a.state === AS.Spray && !beamOn;
+  const holding = a.state === AS.Attack && a.v < casteOf(a.caste).speed * 0.25 && a.tk >= 3 && a.tk <= 4;
+  blasterPose(out, {
+    t: w.time + a.id * 0.37,
+    len,
+    phase: beamOn ? 'beam' : spray ? 'windup' : holding ? 'hold' : 'rest',
+    st: a.st,
+    beamAge: beamOn ? B.beamTime - a.beamT! : 0,
+    since: w.time - r.at,
+    aim,
+    // the fifth gold shot is the beam: it charges harder
+    beamNext: spray && (a.surgeT ?? 0) > 0 && (a.shotN ?? 0) + 1 >= B.beamEvery && a.st < B.windup,
+  });
+}
+
+/**
+ * The Blaster's pose from its phase (shared with the animation lab's `blast` clip): `st` the wind-up's time, `beamAge`
+ * the beam's, `since` the time since the last shot (the recoil), `aim` the head's turn to the target (rad).
+ */
+export function blasterPose(out: Pick<AntView, 'mouthGlow' | 'brace' | 'crouch' | 'headYaw' | 'headPitch' | 'mandible' | 'gaster' | 'antennaPitch' | 'antennaActivity' | 'roll' | 'pitch' | 'pivX' | 'pose'>, p: { t: number; len: number; phase: 'rest' | 'windup' | 'hold' | 'beam'; st: number; beamAge: number; since: number; aim: number; beamNext: boolean }): void {
+  const B = BALANCE.blaster;
+  out.mouthGlow = 0.12 + 0.04 * Math.sin(p.t * 2.3);
+  if (p.phase === 'beam') {
+    // braced: feet wide, body low and steady on the line, the jaws wide open, a fine tremble through the whole body
+    const k = Math.min(1, p.beamAge / 0.25);
+    out.brace = 0.75 * k;
+    out.crouch = Math.max(out.crouch ?? 0, p.len * 0.07 * k);
+    out.headYaw = 0;
+    out.headPitch = 0.04;
+    out.mandible = 1;
+    out.gaster = 0.15;
+    out.antennaPitch = -0.35;
+    out.antennaActivity = 0.2;
+    out.roll = Math.sin(p.t * 53) * 0.022 * k;
+    out.pitch = Math.sin(p.t * 41 + 1.3) * 0.012 * k;
+    out.mouthGlow = 0.92 + 0.08 * Math.sin(p.t * 31);
+    out.pose = POSE.NONE;
+    return;
+  }
+  const kick = p.since >= 0 && p.since < 0.6 ? Math.exp(-p.since * 13) * Math.min(1, p.since * 60 + 0.2) : 0;
+  if (p.phase === 'windup') {
+    const c = Math.min(1, p.st / B.windup);
+    const e = c * c * (3 - 2 * c);
+    out.headYaw = p.aim * (1 - 0.3 * kick);
+    out.headPitch = 0.06 * e + 0.22 * kick;
+    out.mandible = 0.3 + 0.7 * e;
+    out.antennaPitch = 0.1 - 0.5 * e;
+    out.antennaActivity = 0.4;
+    out.gaster = 0.1 + 0.1 * e;
+    out.pitch = 0.06 * kick;
+    out.pivX = -0.3;
+    out.mouthGlow = Math.max(0.1, p.beamNext ? 0.25 + 0.75 * e : 0.15 + 0.6 * e, kick);
+    out.pose = POSE.NONE;
+    return;
+  }
+  if (p.phase === 'hold') {
+    // holding its range between shots: the head stays on the target, the jaws a little open, the glow simmering
+    out.headYaw = p.aim * (1 - 0.3 * kick);
+    out.headPitch = 0.22 * kick;
+    out.mandible = Math.max(0.35, kick);
+    out.antennaPitch = -0.1;
+    out.pitch = 0.06 * kick;
+    out.pivX = -0.3;
+    out.mouthGlow = Math.max(0.18, kick);
+  }
+}
+
 function armyAnt(w: World, a: Ant, out: AntView): void {
   // (overnight spec 3.4: the antennae drum on the aphid — fast)
   out.waveMul = a.state === AS.TendAphids ? 2.6 : undefined;
@@ -509,6 +610,15 @@ function speciesExtras(w: World, a: Ant, out: AntView): void {
       out.exhausted = 0;
       if (dur - t < 0.25) out.roll += Math.sin(w.time * 40 + a.id) * 0.08; // the shiver as the ripple passes
       out.antennaPitch -= 0.3;
+      // (model redo, claude/realism/10-spec §2) the stretch as the gold comes on: the head thrown up, the gaster lifted,
+      // overshooting and settling with the ripple
+      if (t > dur - S.rampIn) {
+        const k = Math.min(1, (dur - t) / S.rampIn);
+        const st = Math.sin(Math.PI * k) * (1 + 0.25 * Math.sin(Math.PI * 2 * k));
+        out.headPitch += 0.32 * st;
+        out.gaster += 0.35 * st;
+        out.antennaPitch += 0.5 * st;
+      }
     } else {
       const cdn = a.level >= 2 ? S.cooldownL2 : S.cooldown;
       out.gold = 0;
@@ -642,6 +752,10 @@ function nasuteAntPath(w: World, a: Ant, out: AntView, st: number): void {
   const cd = casteOf(a.caste);
   if (cd.termite === 'worker') out.scale = (out.scale ?? 1) * (a.variant === 1 ? WORKER_VARIANT_SCALE.female : WORKER_VARIANT_SCALE.male);
   if (a.state === AS.Dead) return;
+  if (cd.termite === 'sickle') {
+    sickleAntPath(w, a, out, st);
+    return;
+  }
   if (st === AnimState.FIRE) {
     const rate = 2.4;
     out.special = 6;
@@ -670,6 +784,53 @@ function nasuteAntPath(w: World, a: Ant, out: AntView, st: number): void {
     out.antennaActivity = 1;
   } else if (st === AnimState.CHEW) {
     // chewing wood: the head low, short jerks, the jaws working
+    out.headPitch = -0.3 + 0.08 * Math.sin(w.time * 9 + a.id);
+    out.mandible = 0.45 + 0.4 * Math.sin(w.time * 11 + a.id);
+  }
+}
+
+/**
+ * The sickle-jaw soldier on the ant pipeline (model redo, claude/realism/10-spec §3): the kit's states as attack
+ * cycles and poses of the shared ant views —
+ *  - LUNGE: special 7, the grab (attackPoses S_GRAB), its phase the sim's lunge (the snap at LUNGE_SNAP);
+ *  - HOLD: holding a victim, special 8 (S_HOLD) pulsing with the squirts; a free target too big to hook, special 9
+ *    (S_SQUIRT); the head turned toward the aim point either way;
+ *  - THREAT (an escort slot, or a foe in reach but not yet hooked): planted, the head raised so the snout points forward
+ *    and up, the sickles gaping wide, the antennae busy; RUSH: running at it with the head up and the sickles half open;
+ *  - ALARM: the drum (special 5), the feet planted.
+ */
+function sickleAntPath(w: World, a: Ant, out: AntView, st: number): void {
+  const cycle = (special: number, q: number, gap: number) => {
+    out.special = special;
+    out.atk = q;
+    out.atkGap = gap;
+    out.atkVar = 0;
+    out.atkSide = a.id & 1 ? 1 : -1;
+    out.atkN = 0;
+    out.atkSeq = true;
+    out.antennaActivity = 1;
+  };
+  const aim = () => {
+    if (out.aimX === undefined || out.aimY === undefined) return;
+    let d = Math.atan2(out.aimY - a.y, out.aimX - a.x) - a.h;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    out.headYaw = Math.max(-0.6, Math.min(0.6, d));
+  };
+  if (st === AnimState.LUNGE) {
+    cycle(7, Math.min(0.999, out.tStateT ?? 0), LUNGE_SEC);
+    aim();
+  } else if (st === AnimState.HOLD) {
+    // the squirts' pulse runs faster as the secretion ramps (the kit's acid stream: 3 → 12 a second)
+    const rate = 1.4 + 2.2 * (out.ramp ?? 0);
+    cycle(a.state === AS.Hold ? 8 : 9, out.firing ? (w.time * rate + (a.id % 7) * 0.13) % 1 : 0.6, 1 / rate);
+    aim();
+  } else if (st === AnimState.ALARM) {
+    cycle(5, (w.time * 6 + (a.id % 5) * 0.2) % 1, 1 / 6);
+  } else if (st === AnimState.THREAT || st === AnimState.RUSH) {
+    out.headPitch = (out.headPitch ?? 0) + (st === AnimState.THREAT ? 0.22 : 0.12);
+    out.mandible = Math.max(out.mandible, st === AnimState.THREAT ? 0.85 + 0.15 * Math.sin(w.time * 3 + a.id) : 0.5);
+    out.antennaActivity = 1;
+  } else if (st === AnimState.CHEW) {
     out.headPitch = -0.3 + 0.08 * Math.sin(w.time * 9 + a.id);
     out.mandible = 0.45 + 0.4 * Math.sin(w.time * 11 + a.id);
   }
@@ -904,7 +1065,7 @@ export function termiteBroodToView(b: Brood, out: AntView, space: number): AntVi
   const preFrac = rhy ? SICKLE.presoldierFraction : NASUTE.presoldierFraction;
   const pre = soldier && b.t >= 1 - preFrac;
   out.id = -(2_000_000 + b.id);
-  out.morph = pre ? cd.morph : rhy ? 'termite_rhy_larva' : 'termite_larva';
+  out.morph = pre ? (rhy ? 'termite_rhy_presoldier' : cd.morph) : rhy ? 'termite_rhy_larva' : 'termite_larva';
   out.space = space;
   out.x = out.px = b.x;
   out.y = out.py = b.y;

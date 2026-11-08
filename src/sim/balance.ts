@@ -85,13 +85,15 @@ export const BALANCE = {
     nasute_major: { build: 35, hatch: 7, grow: 32.4 }, // × 3.5 / × 1.8
     // Sickle-Jaw Termites, paid in plant matter: × the baseline worker (10 / 2 / 18) by SICKLE.broodCostMul / broodTimeMul
     rhy_worker: { build: 10, hatch: 2, grow: 18 }, // × 1.0 / × 1.0
-    rhy_soldier: { build: 20, hatch: 2.8, grow: 25.2 }, // × 2.0 / × 1.4
+    rhy_soldier: { build: 22, hatch: 3.1, grow: 25.2 }, // × 2.2 / × 1.4
     // Hell ants (05-implementation-plan Step 2)
     hell_worker: { build: 10, hatch: 3, grow: 22 },
     hell_soldier: { build: 28, hatch: 6, grow: 34 },
     // Saiy-Ants (03-implementation-plan Step 2)
     aurimyrmex_worker: { build: 10, hatch: 3, grow: 22 },
     aurimyrmex_soldier: { build: 30, hatch: 6, grow: 36 },
+    // the Blaster: a shooter's brood, as the wood ants' mortar (CHANGE_PLAN §31)
+    aurimyrmex_blaster: { build: 30, hatch: 6, grow: 36 },
     // Termants (claude/termyrms plan Step 1)
     termant_worker: { build: 10, hatch: 2.5, grow: 18 },
     termant_soldier: { build: 22, hatch: 4.5, grow: 30 },
@@ -735,14 +737,46 @@ export const BALANCE = {
     hitStop: 0.08,
   },
 
+  // ---------------------------------------------------------------- Saiy-Ant Blaster (sim/saiyBlaster.ts; docs/balance/castes.md)
+  blaster: {
+    /** orbs: reach (mm; the mortar 56, the rapid sprayer 32, a melee reach under 10), damage, seconds between shots */
+    range: 40,
+    /** backing off from a foe inside 0.4 × range: this share of its own speed, without the gold form's (melee catches it) */
+    backoff: 0.6,
+    /** in a marker's guard crowd: this much (mm) behind its place, so the melee line stands in front */
+    holdBack: 14,
+    orbDamage: 5,
+    interval: 1.5,
+    /** the shot: seconds of wind-up (head turns to aim, the mouth glows), then recovery until `shotDone` */
+    windup: 0.32,
+    shotDone: 0.55,
+    /** orb speed (mm/s), radius (mm: what it touches), flight to 1.3 × range */
+    orbSpeed: 150,
+    orbRadius: 0.9,
+    orbLife: 1.3,
+    /** the beam (gold only, every `beamEvery`-th shot): seconds, reach (× the ant's length), half width (mm), a pulse
+     *  every `beamTick` s for `beamDamage` (× the surge bonus at the moment it fires), then `beamCooldown` s */
+    beamEvery: 5,
+    beamTime: 3,
+    beamReach: 9,
+    beamHalfWidth: 1.6,
+    beamTick: 0.25,
+    beamDamage: 4,
+    beamCooldown: 2.5,
+    /** aiming the beam: candidate headings toward this many enemies in reach (nearest first) */
+    beamCandidates: 12,
+  },
+
   // ---------------------------------------------------------------- Saiy-Ants gold surge (docs/creatures/aurimyrmex-fulgurans.md)
   surge: {
-    duration: 4,
+    // (user 2026-11-07: the gold form lasts at least 10 s — 4 → 10, level 3 5 → 12; the cooldown 20 → 30, level 2
+    // 14 → 22, keeps the share of time in gold near a quarter: CHANGE_PLAN §31, docs/balance/castes.md)
+    duration: 10,
     /** level-3 tiles */
-    durationL3: 5,
-    cooldown: 20,
+    durationL3: 12,
+    cooldown: 30,
     /** level-2 tiles and up */
-    cooldownL2: 14,
+    cooldownL2: 22,
     /** visual ramps (render only, derived from surgeT) */
     rampIn: 0.3,
     rampOut: 0.5,
@@ -873,6 +907,16 @@ export const SICKLE = {
     missCooldownSec: 1.0,
     /** victims up to this × the soldier's length can be grabbed (never bosses or queens) */
     maxTargetSizeMul: 2.0,
+    /**
+     * (user review round 1, 2026-11-07: "the mandibles dont even touch the ant"; round 2: "make the two still parallel
+     * to each other (straight), just make the mandibles' clasp better") where the closed sickles hook (mm ahead of a
+     * 4.5 mm soldier's centre, scaled with its size; the ant-pipeline model's C-hooks): the held victim is pinned
+     * head-on in line with the soldier, its front this far ahead less `victimInHooks` of its length — its head and jaws
+     * inside the crossed hooks, the snout lying along its back
+     */
+    gripMm: 0.82,
+    /** how much of a held ant's length sits inside the hooks (its head and jaws) */
+    victimInHooks: 0.08,
   },
   acid: {
     /** the ramp (inferno-style): pure damage, ignores armour */
@@ -886,16 +930,6 @@ export const SICKLE = {
     freeTargetBiteInterval: 1.0,
   },
   alarm: { radiusBodyLengths: 12, alertSec: 8, cooldownSec: 3 },
-  /**
-   * Eisner's defensive row (user notes 2026-10-25: along the trail the workers really walk, wide enough that they
-   * stay inside it, spare soldiers spread along it): at a surface marker the guards stand on both sides of the
-   * workers' route from the marker back to the nest (the home flow field traced from the marker, refreshed every
-   * `trailRefreshSec`), `halfWidthBodyLengths` out from it, evenly spread over its whole length (at least
-   * `minSpacingBodyLengths` apart; more soldiers than fit stand in further rows `rowGapBodyLengths` out), facing
-   * outward. On a marker with food, `guardShare` of the sickle-jaws there guard (the lowest ids) and the rest
-   * gather; with no food, all guard. Guards only engage enemies within `aggroBodyLengths` (short-ranged fighters).
-   */
-  escort: { halfWidthBodyLengths: 3.5, minSpacingBodyLengths: 1.6, rowGapBodyLengths: 1.6, guardShare: 0.5, trailStepMm: 4, trailRefreshSec: 2, aggroBodyLengths: 3 },
   food: {
     /** plant matter: 1 unit = 1 food unit of the ant economy (the store shared with the Nasute Termites' wood) */
     leafLitterPatch: { amount: 25, bitesPerFragment: 3, biteIntervalSec: 0.3, perFragment: 1 },
@@ -1572,7 +1606,7 @@ export const TUNNELS = {
   },
 };
 
-/** The Trees: a canopy layer over the ground (sim/trees.ts; claude/trees/01-spec-trees-layer.md; CHANGE_PLAN §30). */
+/** The Trees: a canopy layer over the ground (sim/trees.ts; claude/trees/01-spec-trees-layer.md; CHANGE_PLAN §33). */
 export const TREES = {
   /** the trees grid's hex circumradius (mm): twigs one hex wide let three or four workers pass abreast */
   hexR: 10,

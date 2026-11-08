@@ -1449,13 +1449,162 @@ LAN); only the client changes, plus the multiplayer input delay (when commands a
    styles written only when they change. Pointer events with `touch-action` already (no 300 ms delay, no blocking
    touch listeners).
 
-## 30. A third layer: the Trees (user spec 2026-11-07, claude/trees/01-spec-trees-layer.md)
+
+## 30. Model redo: Saiy-Ants and sickle-jaw termites; the rest of spec 09 (rows, grab-and-squirt fit, balance, Termants) — branch `feature/models-saiy-sickle`
+
+User specs: `claude/realism/10-spec-saiy-ant-sickle-jaw-models.md` (the models, with the fire ant pilot's playbook) and the parts of `claude/realism/09-spec-sickle-jaw-termants.md` it says still apply. (Numbered 30 at the merge: §27 the shared underground, §28 audio v3, §29 performance v2 landed on main first.)
+
+- **Saiy-Ants** on *Camponotus* anatomy (`saiyMorphs.ts`, `antGeometry.ts` `campo` terms: set-back antennal sockets, a keeled clypeus with a dark suture; `mandibleSpecs.ts` `SAIY_*_JAW`, five teeth; baked recipe `SAIY`; planted feet; three bites per caste, no acid — the user's rule; the gold surge's stretch and overshoot in `antViews.speciesExtras`). Hair (briefs 07/08) unchanged.
+- **Sickle-jaw termites** on the ant pipeline (`rhyMorphs.ts`, routed by `NASUTE_ANT_PATH`; `nasuteBuilder.ts`: the C-hook sickles, the snout's down-curve and pore, the worker's round glossy head (`head.round`) and egg-shaped abdomen (`abdomen.front`), the soldier's bold tergite bands (`abdomen.band`) and crimson sickles darkening only at the hook (`sickle.tip`); presoldier and larva morphs). The king and queen stay on the termite kit, as the conehead royals do (review round 1: the user preferred the kit's queen; the ant-pipeline royals and their builder options were removed). Animation: `antViews.sickleAntPath` maps the kit states to attack cycles (special 7 grab, 8 hold-and-squirt, 9 free squirt, 5 drum) and poses (THREAT, RUSH), `attackPoses` `S_GRAB` / `S_HOLD` / `S_SQUIRT`; the acid jet and fizz drawn by `antRenderer` from the snout's tip. The kit's sickle-jaw worker and soldier castes stay in `render/termite` (their rig-texture rows are fixed, as the conehead castes' were) but are no longer drawn in the game. The hold pins the victim head-on in line with the soldier, its head inside the closed hooks (`SICKLE.grab.gripMm`, `victimInHooks`; the kit-derived `SICKLE_SOCKET` is gone from `termiteRoyalData.ts` and its generator).
+- **Spec 09 §2.4** the defensive rows removed (`sickleTrail`, `sickleRowSlot`, `sickleGuardIndex`, `SICKLE.escort`, the short guard aggro, `tools/sickle-guard.ts`, `tools/sickleGuardScene.ts`, the tests and docs); soldiers gather or hold the escort ring. No saved fields existed (the posts were derived per tick), so old saves load unchanged.
+- **Spec 09 §2.2** a knockback (`flingAnt`, `gripAnt`) ends a hold cleanly on either side (`sickleHoldBroken`; the victim knocked loose → `endHold(…, 'flung')`); the hold stays anchored (`slots.anchored`); mounted sickle-jaws bite like other riders (they climb first: `tryClimb` runs before `sickleAttack`).
+- **Spec 09 §2.3** balance in `docs/balance/castes.md`.
+- **Spec 09 §3** Termants rebuilt (`termantMorphs.ts` `real`; builder options `antenna.termite`, `head.fontanelle` — the old `head.pore` tube removed — and mandible type `sabre`; recipes `TERMANT_W` / `TERMANT_S`; planted feet and attacks in `antMotion`).
+- Review round 1 (all species): the leg-grooming idle lifts one hind leg at a time (`antMaterial` pose 2); planted feet no longer slide outward during attacks (the attack keys' `spread` removed). Saiy-Ants: faceted visible eyes, larger reddish-brown jaws.
+- Review round 2: the hold back to head-on and in line ("make the two still parallel to each other ( straight) just make mandibles clasp of termite better"), the victim's head inside the hooks; the sickle-jaw workers bite with the ant workers' set (lunge, clamp, chomp; "make them similar to ant worker attacks"); bites no longer spray grit (`combatFx` 'bite': "remove the dust particles").
+- Review round 3 (the user's field photos, study only): the worker rebuilt ("redo rhyncotermes workers based on real life images cos they look off") — a small round glossy orange dome of a head (no pale fontanelle or Y suture: `head.suture` removed), a lighter orange thorax, a big glossy chocolate egg-shaped abdomen whose tergites are divided by dark creases, textured as in the photos ("make the workers have more texture in abdomen like reference photos": pillowed plates `abdomen.pillow`, the spiracle row `abdomen.spiracles`, fine golden hairs `abdomen.hairs`, and the castes' first baked cuticle recipe, `RHY_W` in `render/bake/recipes.ts`: mottled gut, hair pits, a soft undulation); the soldier's sickles a quarter slimmer and wine-crimson, black only at the hook ("slightly less thick and more colored like irl counterparts"), and its abdomen fuller and tan-brown with bold brown bands ("as well as their abdomens"). The presoldier takes the soldier's new shape in its own pale colours; the larva is unchanged.
+- Checks: morph hashes (only these three species changed; `tests/data/morph-hashes.json` re-baselined for them), `tools/height-data.ts` regenerated (climb data unchanged: creatures only), `npm test`, review pages rounds 1–4.
+
+## 31. Saiy-Ant Blaster: energy orbs from the mouth, a 3-second beam in gold form; gold form at least 10 s (user spec 2026-11-07, claude/saiy-ants/09-spec-saiy-blaster.md) — branch `feature/saiy-blaster`
+
+**Base.** Built on the model redo (§30; merged into this branch while it was in review, then approved and merged into
+`main`, handoff 21): the blaster's morph derives from the redone `saiy_worker`.
+
+**31.1 Caste** — `aurimyrmex_blaster`, display name **Blaster**, role `soldier` (there is no `ranged` role; the mortar and
+rapid sprayer are soldiers too), morph `saiy_blaster`, worker-sized and light (length 6.6, hp 12, armour 0, speed 24),
+`surge: true`, `mount: 'none'` (no climbing: it fires from the ground), a new caste field `blast` (`species.ts`) with
+the shot data; brood times and costs in `BALANCE.castes`; numbers in `BALANCE.blaster`. AI mix (`colonyAI.defaultMix`):
+worker 0.68, soldier 0.18, blaster 0.14. Termants can steal it as **Saiy-Ant Blaster** (`STOLEN_CASTES`, heavy
+threshold, after the soldier; the per-species lookups take every entry of a species).
+
+**31.2 Sim** (`src/sim/saiyBlaster.ts`, deterministic) —
+- Positioning reuses the shooters' (`attackUpdate`: walk to 0.9 × range, back off inside 0.4 × range, hold anchored);
+  the shot is `AS.Spray` → `blastShot`: wind-up (head turns to aim; the mouth glow brightens), fire, recovery.
+- Orb: `Projectile` kind `orb`: straight at where the target is; each tick its swept segment is tested against every
+  enemy ant and creature near it (allies skipped) and the nearest along the path takes the hit (damage type `blast`:
+  physical, armour as a bite); a wall (surface: blocked cells, banks; nest: soil) on the segment ends it first; at
+  1.3 × range it fizzles. Events `orb` (fired), `orbHit`, `orbFizz`.
+- Shot counter `shotN`: reset to 0 whenever a shot is fired outside the gold form; in gold, shots 1–4 orbs, 5 the beam.
+- Beam: aimed at the densest line of enemies within the beam's length (candidate headings toward each enemy in reach,
+  scored by how many the beam would cross; ties keep the target's line); its length cut by the first wall; fixed for
+  `beamTime` 3 s; every `beamTick` each enemy crossing it takes `beamDamage` (× the surge bonus at the moment of firing);
+  the ant is planted for the whole beam (an `antSystem` guard before jobs, orders and combat: nothing moves or turns it);
+  a fling, a grab or death ends it; the gold form ending does not. Then `beamCooldown`. Fields `beamT`, `beamH`, `beamL`,
+  `beamD` (damage a pulse), `beamP` (pulse clock).
+- Gold form: `BALANCE.surge.duration` 4 → 10 s (level 3: 5 → 12); cooldown 20 → 30 s (level 2: 14 → 22) so the gold
+  share stays near the old one (balance matrix).
+- `aggroRadius`, the pursuit leash and `warAI.weight` count the blaster's range and damage.
+
+**31.3 Model** (`saiyMorphs.ts` `SAIY_BLASTER`, from `SAIY_WORKER`): slimmer and a little longer, a larger rounder head
+with the jaws set wide, the six locks the same design swept back further (lower and longer), a mouth-glow piece between
+the jaw bases (surface flag 9.5: emissive, white-blue → gold with the gold level; per-instance level in the rage channel, which
+the blaster's program reads as the mouth glow — `#define MOUTH_GLOW`). Poses (`antViews.ts` `blastPose`): head aims,
+jaws part wide in the wind-up, recoil on each orb, braced for the beam (legs spread, body low, head steady, a tremble).
+Morph hashes re-baselined for `saiy_blaster` only; height data regenerated.
+
+**31.4 Effects** (`render/game/blastFx.ts`, inside each scene's `CombatFx`; instanced, played in closed form in the
+shader from the sim's events — nothing stepped per frame on the CPU but the few live beams' end sparks): orbs from `orb`
+(where and when fired, at the orb's speed; the projectile id `pid` ties `orbHit` / `orbFizz` to its orb, which runs on to
+the hit point and bursts there): core, coloured shell with swirling crackle, a short trail, ground light; bursts of
+light, sparks and dust on a hit, a soft pop on a fizzle (particles in `CombatFx`). Beams from `beam` / `beamEnd`: core,
+rippling flickering glow, the charge ball at the mouth, the far-end burst, ground light, a flash on and a fade out. Bloom
+only on the cores (HDR > the bloom threshold); everything at least a few pixels across at gameplay zoom. Pools: 512 orbs,
+64 beams, the oldest reused. A sim event `blastCharge` marks the wind-up (render and sound).
+
+**31.5 Sounds** (audio v3 recipes in `tools/audio/sfx/recipes_combat.py`, made for this game, original):
+`species.blaster_charge` (rising hum, snapped off at the shot), `species.blaster_orb` (punchy fwip; at 0.62 × the
+beam's flash), `species.blaster_hit` (sizzle; quiet and higher for a fizzle), `species.blaster_beam` (steady roar-hum
+loop, a `LoopBed` that follows the beams near the listener). `build.py pack <filter>` packs only those sounds (the rest
+of the manifest and files kept).
+
+**31.5b Balance as built** (`tools/blaster-balance.ts`; docs/balance/castes.md "Saiy-Ant Blaster"): the Blaster backs
+off from a foe inside 0.4 × range at 60 % of its own speed, gold or not (it out-ran every melee caste in gold and won
+even in contact); in a marker's guard crowd it stands `holdBack` 14 mm behind its place (the melee line in front).
+The 10 s gold form doubled the Saiy worker's and soldier's equal-food margins, so their health and bite were scaled
+back to the tie with the references (the gold boosts themselves are kept).
+
+**31.6 Verify** — `tests/saiyBlaster.ts` (first enemy on the path, allies never hit, walls, physical damage, five-shot
+cycle in gold only, beam length/planting/finishing after gold ends, densest-line aim, 10 s gold, determinism);
+balance matrix runs; replays and two-tab LAN in sync; 50+ blasters cost; clips; a review page for the user; handoff.
+
+## 32. Performance v3 — big colonies (500–2,000 ants) without lag, same looks, same results (user spec 2026-11-07, claude/performance/03-spec-performance-v3-big-colonies.md)
+
+Branch `feature/performance-v3` off `main` `8e07623`. Hard rules: the golden set matches exactly (any visible change —
+LOD, impostors, resolution — only with zoom clips and the user's approval); the simulation's results are identical
+(canonical hash lists from `tools/perf/same.sh` against main for every sim change, the determinism check, replays;
+LAN two-tab in sync).
+
+### 32.1 Measured first
+- **Stress scenes** (`tools/perf/simBench.ts`, Node, build machine; 500/1,000/1,500/2,000 ants): fight, economy
+  (foraging), nests (full nests with digging), ten colonies, titan raid into a full nest, the shared-underground tunnel
+  fight. Baseline main, ms a tick: fight 19.0 @1,000 / 45.2 @2,000; economy 26.9, nests 23.4, ten 22, titan 29,
+  tunnel 26.4 @2,000. Per system at 2,000: the ant brains 12–16 ms (combat preempt and attack, foraging and flow
+  fields, hex lookup), separation 8–10 ms in dense crowds.
+- **The cause of half of it:** V8 kept 138 hidden classes for ants (fields added in whatever order a code path first
+  set them, `delete` sending some into dictionary mode): every hot loop over ants was megamorphic.
+- **The user's laptop** (`?bench=1`, Safari, Apple 8-core GPU, 1,470×956 at 2×, high quality): 28–37 FPS in the
+  fight, mp4 and arena scenes with the main thread at 2–4 ms and the sim at 5 ms — **GPU-bound**; the full nest 19 FPS
+  with 6 ms of render work on the main thread and nest-chunk rebuild hitches of 13–28 ms.
+
+### 32.2 Plan (each step measured before and after; results proven the same)
+1. **Sim, without changing a single result:** one object shape for every ant (all fields declared in one literal,
+   restored saves normalised, fields cleared instead of deleted); separation walking the hash itself with exact early
+   outs; the hash packed cell by cell (same items, same order); cheaper exact lookups (hex centres from column/row).
+   Then combat (preempt, attack slots, go-round), foraging/flow-field lookups, colony brains, allocations — profile
+   per call site, keep floating-point order, only side-effect-free early outs.
+2. **GPU (the laptop's limit):** a bench scene that turns each effect off in turn at a fixed camera (AO, bloom, DOF,
+   all post, shadows, 1 device pixel, ants hidden, grass hidden) so the user's run shows what each costs; then the
+   cheapest identical-looking wins (shadow casters, overdraw, upload ranges); anything that changes pixels goes to the
+   user with clips first.
+3. **Ants on the GPU:** instance transforms built in the vertex shader from a data texture (position, heading, previous
+   values, state, caste, seeds; dirty rows only) — the golden set must match exactly.
+4. **Full nest:** the render work on the main thread and the chunk rebuild hitches (spread or move the rebuilds).
+5. **Worker → main:** the viewed space at full rate, the others at a low rate with a summary per space for the UI;
+   bytes and decode time at 2,000.
+6. **UI/audio, memory:** cheap with hundreds of ants; no growth over 45 min; GPU memory toward the phone's 600 MB.
+7. **Verify:** targets table in `docs/performance.md` ("Performance v3"); golden set; hash lists, replays, LAN;
+   `npm test`, determinism, build; docs, handoff 21, merge, publish.
+
+### 32.3 What was done (in order)
+1. `tools/perf` — simBench (the stress scenes), canon.ts (canonical hash: keys sorted), same.sh (hash lists of two
+   checkouts compared), ab.sh (alternating timing runs), cpuprof/cpuchildren (profile summaries).
+2. **One shape for every ant** (`factory.ts antShape/normalizeAnt`, `world.ts`, deletes → `= undefined`): fight
+   1,000 −23 %, economy −15 %. `tests/performance.ts` checks every interface field is in the shape and a restored
+   world hashes the same.
+3. **Separation**: the pair loop walks the hash and drops pairs pairCb would drop before touching them; an exact early
+   out for pairs too far apart for any push or for one to be under the other; spaces read from a typed array. 2,000-ant
+   fight 45.2 → 26 ms.
+4. **Hash packed** cell by cell before the first query; **hex lookup** from column/row.
+5. **Bench GPU scene** (`dev/bench.ts` 'gpu'); the profiler counts draw calls and triangles over the whole frame (Safari
+   showed one call before) and keeps running totals.
+6. **Timing bundled** (`tools/perf/bundle.sh`): vite-node reaches every imported function through a module object;
+   the game's worker is one bundle. All timings since are of bundles (same.sh and ab.sh bundle both checkouts).
+7. **Separation's pair loop on typed arrays** (positions, teams, ids, states, foes filled before the loop);
+   **creature spacing** computes each creature's radius, attack, push-through and team once a pass.
+8. **Surface flow cache**: use counter instead of a map re-insert per look-up (same eviction order).
+9. **Hex lookup fast path** (the common case without the 3 × 3 loop; 7.2 M points checked against it).
+10. **Worker frames**: a generated column writer (named loads) and key discovery testing the value first — the same
+    packets byte for byte (`tests/performance.ts`).
+11. **The ground and scenery in culled chunks** (render only, the same triangles): the terrain heightfield (5 × 5
+    chunks sharing one set of attributes), the grass (5 × 5 instanced chunks, spheres padded for lean and wind), the
+    map-wide pebble sets and merged decor (`render/chunks.ts`); the water draws only the contiguous rows a camera sees
+    (`onBeforeRender`, same index order — it is transparent). On Meadow Pond the grass alone was 1.1 M triangles a
+    frame, the pebbles 310 k (twice: they cast shadows), the water 320 k.
+12. Merged `main` twice (audio v3, the model redo); the reference for same.sh is `main` + the tools.
+13. **The ant record a class** (found by bisecting a 20 % slowdown in the bundled full nests to the shape commit): an
+    object literal of ≥ 128 fields keeps them all outside the object and makes a class per copy; a constructor keeps
+    151 inside. Always-set fields start as numbers. All 18 runs the same.
+14. **Replica rows** from a constructor generated per schema (main thread; fields inside the object).
+15. **Measured** (bundled, best of 2, `main` 56be698): 1,000 ants 5.7–10.9 ms a tick (target 15), 2,000 ants
+    10.2–16.6 (target 25); the big fight at 2,000 33.2 → 15.5. Spikes over 40 ms at 2,000 not gone (1–16 of 300 in
+    four scenes: synchronised one-second timers of the stress scenes, minor GCs). Docs: `docs/performance.md` v3.
+## 33. A third layer: the Trees (user spec 2026-11-07, claude/trees/01-spec-trees-layer.md)
 
 Branch `feature/trees-layer` off `main` `21d836f`. Every number in `balance.ts` `TREES`. Deterministic sim. The layer
 exists only in matches with a tree-dwelling colony (`SpeciesDef.habitat === 'trees'`, none yet), the sandbox's "Trees on",
 or the dev URL `?trees=1`; otherwise nothing of it is built and nothing costs.
 
-### 30.1 What exists (survey, main 21d836f)
+### 33.1 What exists (survey, main 21d836f)
 - Spaces: `SURFACE` 0, colony nests 1..63 (`nestSpace`), caves ≥ `CAVE_BASE` 64. Every non-surface space is a `NestGrid`
   hex map registered with `World.addGrid` (its own `NestFlow`, ant hash, `walkable`, serialized in `s.nests[space]`).
   A cave (`createCave`) shows the whole pattern for a pre-made, colony-less space joined to the surface by entrances
@@ -1472,7 +1621,7 @@ or the dev URL `?trees=1`; otherwise nothing of it is built and nothing costs.
   Story levels build their own lairs (`runner.ts` from `StoryLevelDef.lairs`; the director spawns hunters at them).
 - Saves: `SimState.version` 4; the worker sends `caves` in `frames.ts slow`; `BUILD_ID` `ud-mp-14`.
 
-### 30.2 Design
+### 33.2 Design
 **The Trees map is one hex-grid space over the whole ground map** (`TREES = 63`, `isTreesSpace`; `colonyOfSpace` leaves
 it out), built by `sim/trees.ts createTrees(w)` from `MapDef.trees` (authored; procedural maps grow `TREES.procTrees`
 seeded trees) with hex radius `TREES.hexR` (10 mm) in the ground's mm frame, so (x, y) in the trees is the same place on
@@ -1514,9 +1663,12 @@ kind map (wood / leaf / trunk top / site) is kept in `TreesDef` for the render a
 - **Lairs:** gone from skirmish/sandbox/LAN/dev setups (`main.ts`, `net/match.ts`, `stressScene`, `determinism`), the
   five maps' `lair` zones and the validator's lair rule; story levels keep theirs (`runner.ts`). Creatures arrive as
   before (`ecologySystem`, rates unchanged); without creature zones they now appear near the map's edge.
-- **Saves:** version 5 (`trees` in the state; old saves load without the layer). Replica: `trees` in `slow`. `ud-mp-15`.
+- **Saves:** version 5 (`trees` in the state; old saves load without the layer). Replica: `trees` in `slow`. `ud-mp-16`
+  (15 went to performance v3 while this was built). Merged with `main` `MAINREV`: the models redo (§30), the Saiy
+  Blaster (§31) and performance v3 (§32); conflicts combined (the ant brain's blaster beam and the trunk hold both
+  hold the ant before its brain; `combat.ts` imports; the test list; the protocol note; this plan renumbered §33).
 
-### 30.3 Files
+### 33.3 Files
 `sim/types.ts`, `sim/trees.ts` (new), `sim/balance.ts TREES`, `maps/types.ts`+ the five maps (`trees`), `sim/mapGen.ts`,
 `sim/movement.ts`, `sim/combat.ts` (fall), `sim/markers.ts`, `sim/areas.ts`, `sim/entrances.ts`, `sim/antAI.ts`,
 `sim/creatures/creatureAI.ts`, `sim/commands.ts`, `sim/world.ts`, `sim/species.ts habitat`, `sim/snapshot.ts`,

@@ -254,15 +254,19 @@ vec3 animP = position;
         yaw = mix(yaw, side * 0.15, poseW);
       }
     } else if (pose == 2) {
-      float rub = sin(pph * 6.2831);
-      if (pair == 2) {
-        yaw = mix(yaw, side * (-0.15 + 0.35 * rub), poseW);
-        lft = mix(lft, 0.55 + 0.15 * rub * side, poseW);
-        knee = mix(knee, -0.5, poseW);
-      } else if (pair == 0) {
-        yaw = mix(yaw, side * (0.85 + 0.2 * rub * side), poseW);
-        lft = mix(lft, 0.85, poseW);
-        knee = mix(knee, -1.2, poseW);
+      // (user, review 2026-11-07: "fix the idle animation on all current units with the back legs cos they shouldnt
+      // move like that" — both hind legs swung up and out together, with both fore legs raised: the ant stood on two
+      // legs) one hind leg at a time: it lifts a little, strokes back along the gaster's side twice and is set down,
+      // then the other; the other five stay where they stand
+      float cyc = pph * 0.5;
+      float which = mod(floor(cyc), 2.0) < 0.5 ? -1.0 : 1.0;
+      float u = fract(cyc);
+      if (pair == 2 && side * which > 0.0) {
+        float up = sin(u * 3.14159);
+        float rub = sin(u * 6.2831 * 2.0);
+        yaw = mix(yaw, yaw - side * (0.1 + 0.08 * rub) * up, poseW);
+        lft = mix(lft, lft + 0.28 * up, poseW);
+        knee = mix(knee, knee - 0.3 * up, poseW);
       }
     } else if ((pose == 4 || pose == 5 || pose == 7) && uPlant < 0.5) {
       // (planted-feet species: their feet stay planted; the attack moves the body over them)
@@ -561,8 +565,17 @@ export function antPatch(): ShaderPatch {
            totalEmissiveRadiance += vHit * vec3(0.55, 0.14, 0.06) * 0.12;
            // rage (user rating E7): a red glow from within the mesosoma, waist and gaster — the legs and head keep
            // their colour
+           #ifdef MOUTH_GLOW
+           // Saiy-Ant Blaster (CHANGE_PLAN §31): the rage channel carries the mouth's glow — white-blue, gold in the
+           // gold form; a dim ember at rest, bright in the wind-up, a flash on the shot
+           if (abs(vSurf.w - 9.5) < 0.25) {
+             vec3 mc = mix(vec3(0.6, 0.84, 1.0), vec3(1.0, 0.72, 0.24), clamp(vGold.x * 1.5, 0.0, 1.0));
+             totalEmissiveRadiance += mc * (3.2 * vRage * vRage);
+           }
+           #else
            int rpart = int(vPartF + 0.5);
            if (vRage > 0.0 && (rpart == 0 || rpart == 8 || rpart == 9)) totalEmissiveRadiance += vRage * vec3(0.85, 0.05, 0.02) * (0.28 + 0.25 * pow(1.0 - abs(dot(normalize(vViewPosition), normalize(normal))), 1.5));
+           #endif
          }`,
       ],
       [
@@ -723,6 +736,8 @@ export function createAntMaterials(rig: AntRig, dapple: boolean, morphKey?: stri
   // animation pass: the pilot species' feet planted by the shader IK
   if (morphKey && animV2(morphKey) && rig.foot) uniforms.uPlant.value = 1;
   if (morphKey && MORPHS[morphKey]?.real) uniforms.uRealV.value = 1;
+  // Saiy-Ant Blaster: the glowing mouth reads the rage channel (its own program)
+  if (morphKey && (MORPHS[morphKey] as { mouth?: unknown } | undefined)?.mouth) material.defines = { ...(material.defines ?? {}), MOUTH_GLOW: '' };
   const recipe = morphKey ? antRecipe(morphKey) : null;
   if (dapple) patchDapple(material);
   addPatch(material, { ...antPatch(), uniforms });

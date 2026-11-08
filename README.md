@@ -12,7 +12,7 @@ npx vite build      # production build in dist/
 
 - `?play=1` skips the start menu. Further options: `&species=lasius|formica|atta|solenopsis|eciton|plagiaria|nasutitermes|rhynchotermes|hell|aurimyrmex|termant`, `&rival=<species>`, `&seed=N`, `&q=low|medium|high`. `&mode=mission&mission=meadow|forest` starts a mission, `&mode=sandbox` the sandbox. `&mode=arena&teams=2|3|4` opens the battle arena (`&style=meadow|forest|sandy`, default formicarium).
 - `?areas=1` builds the five-area test level: your nest, an enemy nest, an allied nest, a cave and a beetle den.
-- `?scene=antlab&ants=fire_minor,fire_major&cam=side|top|front|34&scales=1,1` is a model viewer (`&gold=1&exh=1` Saiy-Ant surge, `&mopen=0..1` hell-ant jaws, `&glue=1` termite glue on an ant; termites: `ants=termite_nasute&tstate=5&ramp=1&fire=1`; sickle-jaws: `ants=termite_rhy_soldier&tstate=14&statet=0.4` (lunge), `tstate=16` (threat); per-ant lists `poses=10,11,12,13&mopens=&hpitches=`, `swell=0..1` (an army-ant queen's physogastry), `prey=1` (a load under a porter-pose ant), `tints=1,2` (a Termant stolen caste, the neotenic queen)).
+- `?scene=antlab&ants=fire_minor,fire_major&cam=side|top|front|34&scales=1,1` is a model viewer (`&gold=1&exh=1` Saiy-Ant surge, `&mglow=0..1` the Blaster's mouth glow, `&mopen=0..1` hell-ant jaws, `&glue=1` termite glue on an ant; termites: `ants=termite_nasute&tstate=5&ramp=1&fire=1`; sickle-jaws: `ants=termite_rhy_soldier&tstate=14&statet=0.4` (lunge), `tstate=16` (threat); per-ant lists `poses=10,11,12,13&mopens=&hpitches=`, `swell=0..1` (an army-ant queen's physogastry), `prey=1` (a load under a porter-pose ant), `tints=1,2` (a Termant stolen caste, the neotenic queen)).
 
 ## Modes
 
@@ -161,7 +161,7 @@ Play phones in landscape (in portrait the game asks you to turn the phone). On p
 The pause menu has graphics quality, frame rate (match the screen, 60 or 30), interface size, edge scrolling and the sandbox setting **Reveal all underground areas**. Auto quality first lowers the render resolution a little (never below 75 %, with a light sharpen) and only then the preset.
 
 ### Benchmark
-Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`) runs seven fixed scenes for about four minutes: scripted clicks, orders, digging, building and camera moves (how quickly the game answers), switching surface ↔ underground ten times, a big fight, a full nest, a story night, the arena at 600 units and a multiplayer-sized world. It ends with a report to copy and send (frame times, hitches and their causes, the switch frames, draw calls, memory). See `docs/performance.md`.
+Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`; `&bonly=gpu` runs one scene) runs eight fixed scenes for about four minutes: scripted clicks, orders, digging, building and camera moves (how quickly the game answers), what each effect costs (the big fight at a fixed camera with ambient occlusion, bloom, depth of field, all post effects, shadows, double resolution, the ants and the grass turned off one at a time), switching surface ↔ underground ten times, a big fight, a full nest, a story night, the arena at 600 units and a multiplayer-sized world. It ends with a report to copy and send (frame times, hitches and their causes, the switch frames, draw calls, memory). See `docs/performance.md`.
 
 ## Species
 | Species | Castes |
@@ -174,7 +174,7 @@ Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`) r
 | Mimic Ant (*Formica plagiaria*, fictional) | its own worker plus castes borrowed from any species, termite soldiers included |
 | Nasute Termites (*Nasutitermes corniger*) — termites, not ants | worker (two sizes), nasute soldier (ramping glue stream), major soldier (charge, glue hold, drumming alarm); a king guards the royal chamber. They eat only **wood**. |
 | Hell ants (Haidomyrmecinae, extinct) | worker (snaps small prey up against its horn and pins it), soldier (impales it on its paddle) |
-| Saiy-Ants (*Aurimyrmex fulgurans*, fictional) | worker, soldier: bites only (no acid); flash gold in a fight (or by the group's **Gold Surge** button) for more speed and damage, then tire |
+| Saiy-Ants (*Aurimyrmex fulgurans*, fictional) | worker, soldier: bites only (no acid); Blaster: glowing orbs from the mouth, and in gold every fifth shot a 3 s beam; flash gold in a fight for 10 s (or by the group's **Gold Surge** button) for more speed and damage, then tire |
 | Sickle-Jaw Termites (*Rhynchotermes perarmatus*) — termites | worker (bigger than the soldier), sickle-jaw soldier (lunges, hooks an enemy up to twice its size in its crossed mandibles and holds it until one of them dies, squirting acid that ramps 2 → 18 HP/s; bigger enemies get bitten and squirted while free); one queen and a king. They eat **leaf litter** and wood. |
 | Termants (*Chimaeromyrmex termitoides*, fictional ant–termite hybrid) | worker (wood eater, formic acid), soldier (glue burst: slows the target and doubles formic-acid damage on it), a king beside the queen. Eating enemy corpses gives gene samples; enough samples and that species' caste can be raised as their own (up to 3, **Genome** tab). Carton walls from wood. One queen: no replacement queens. |
 
@@ -235,7 +235,6 @@ npx vite-node tools/duels.ts -- ant:lasius_worker 60 ant:fire_soldier 60 20   # 
 npx vite-node tools/spin-check.ts                                   # 50 v 50 spinning, 30 ants on a beetle, tunnel flow
 npx vite-node tools/climb-stress.ts -- 40 400                       # 4 titans with full riders + a 400 v 400 clash: tick time with and without mounting
 npx vite-node tools/chain-check.ts                                  # centipede / caterpillar bodies: neck and joint bends, body vs hitbox
-npx vite-node tools/sickle-guard.ts -- 24 12 5                       # the sickle-jaw guard line along the workers' route
 npx vite-node tools/eciton-raid.ts -- 40 8 5 8 120 5 1               # army-ant raid numbers: front, pulses, lanes, porters, posts, bridge, plugs [puddle=1]
 npx vite-node tools/morph-hash.ts -- check tests/data/morph-hashes.json   # ant model geometry unchanged (save <file> for a new baseline)
 npx vite-node tools/climb-data.ts                                   # re-author climbing points, rails, weak points and mount slots from the creature models
@@ -243,6 +242,11 @@ npx vite-node tools/termite-income.ts -- 3 8                        # termite wo
 npx vite-node tools/nasute-duel.ts                                  # one nasute vs one Lasius soldier, by seconds of head start
 npm run test:determinism -- 20                                      # 20 min of a 4-colony game, run twice + once from a snapshot
 npm run stress -- 400 60 100                                        # tick time: 4 colonies x 400 ants, 60 s, 100 creatures
+tools/perf/bundle.sh . /tmp/sb.mjs && node /tmp/sb.mjs fight,nests 1000,2000 300 --systems --series   # the v3 stress scenes, bundled as the game ships: tick times, per system, slowest ticks
+tools/perf/same.sh <main checkout | ref.json> fight,economy,nests,ten,titan,tunnel 500,1000,2000   # same results as main: the scenes' canonical hash lists (ALL SAME)
+tools/perf/ab.sh <main checkout> fight 2000 300 3                    # main against this checkout, alternating runs, medians
+npx esbuild tools/perf/unitsBench.ts --bundle --platform=node --format=esm --outfile=/tmp/u.mjs && node /tmp/u.mjs 200 300 default   # main thread: ant views, ant and creature renderers in a real fight
+tests/browser/with_server.sh python3 tests/browser/scene_census.py  # what a scene holds: meshes, shadow casters, the biggest meshes by triangles (QUERY=…)
 tests/browser/with_server.sh python3 tests/browser/ui_areas.py      # browser checks (Playwright); also ui_test.py, ui_test2.py, ui_dig.py, ui_camera.py
 tests/browser/with_server.sh python3 tests/browser/mp_local.py      # 3 tabs + AI over BroadcastChannel: lobby, lockstep, chat, drop
 tests/browser/with_server.sh python3 tests/browser/mp_finish.py     # 2 tabs: a match played to the end (surrender, results)

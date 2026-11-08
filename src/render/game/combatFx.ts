@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { hash2 } from '../../core/rng';
 import { SimEvent } from '../../core/events';
+import { BlastFx, Sparker } from './blastFx';
 
 /**
  * Small-scale combat effects for one scene (the surface or one nest), as
  * particles driven by simulation events:
- *  - bite: a few flecks of hemolymph and grit hop off the bitten ant;
+ *  - bite: a brief warm-white pop at the bite (golden sparks in a Saiy-Ant surge);
  *  - sting: a brief hot flash and two venom droplets;
  *  - acid: a fan of fine formic-acid droplets flying from the shooter's
  *    gaster tip to the target, then a pale mist where it lands;
@@ -78,8 +79,10 @@ export function particleAt(p0: readonly number[], v0: readonly number[], life: n
   return [p0[0] + v0[0] * f, h, p0[2] + v0[2] * f];
 }
 
-export class CombatFx {
+export class CombatFx implements Sparker {
   readonly group = new THREE.Group();
+  /** the Saiy-Ant Blaster's orbs and beams (blastFx.ts): instanced, closed form, on this clock */
+  readonly blast: BlastFx = new BlastFx(this);
   /** per particle: start position, velocity, colour; (t₀, life, size, growth); (gravity, drag, ground, landing time) */
   private p0 = new Float32Array(N * 3);
   private v0 = new Float32Array(N * 3);
@@ -149,7 +152,14 @@ export class CombatFx {
     pts.frustumCulled = false;
     pts.renderOrder = 12;
     this.group.add(pts);
+    this.group.add(this.blast.group);
   }
+
+  /** A particle for the blast effects (blastFx.ts), and their seeded randomness. */
+  particle(x: number, h: number, y: number, vx: number, vh: number, vy: number, life: number, color: number, size: number, grav: number, drag = 0, grow = 0): void {
+    this.spawn(x, h, y, vx, vh, vy, life, color, size, grav, drag, grow);
+  }
+  readonly rand = (): number => this.rnd();
 
   private spawn(x: number, h: number, y: number, vx: number, vh: number, vy: number, life: number, color: number, size: number, grav: number, drag = 0, grow = 0): void {
     const i = this.next;
@@ -217,13 +227,8 @@ export class CombatFx {
     switch (e.t) {
       case 'bite': {
         const h = heightAt(e.x, e.y) + 0.6;
-        const n = 2 + Math.round(e.strength * 4);
-        for (let k = 0; k < n; k++) {
-          const a = r() * Math.PI * 2;
-          const sp = 6 + r() * 10 * (0.5 + e.strength);
-          const grit = r() < 0.45;
-          this.spawn(e.x, h, e.y, Math.cos(a) * sp, 8 + r() * 12, Math.sin(a) * sp, 0.35 + r() * 0.3, grit ? 0x6a5236 : 0xd8e0a0, grit ? 0.35 : 0.28 + e.strength * 0.25, 70);
-        }
+        // (user, review 2026-11-07: "remove the dust particles coming out of ants cos its unneeded vfx" — the spray of
+        // grit and droplets thrown out of every bite is gone)
         // the pop: a brief warm-white point at the bite that keeps a few pixels when zoomed out, so a fight reads
         // as fight at the default camera distance (blind review: hits were 1–2 px specks there)
         this.spawn(e.x, h + 0.2, e.y, 0, 0, 0, 0.16, 0xfff0c8, -0.45, 0, 0, 1.2);
@@ -414,6 +419,13 @@ export class CombatFx {
         }
         break;
       }
+      case 'orb':
+      case 'orbHit':
+      case 'orbFizz':
+      case 'beam':
+      case 'beamEnd':
+        this.blast.emit(e, heightAt);
+        break;
       case 'death': {
         if (e.kind !== 'creature') break;
         const h = heightAt(e.x, e.y) + 0.5;
@@ -521,6 +533,7 @@ export class CombatFx {
     this.hAt = heightAt;
     this.clock += dt;
     this.mat.uniforms.uClock.value = this.clock;
+    this.blast.update(this.clock, heightAt, pxScale);
     if (this.dirtyHi >= this.dirtyLo) {
       const lo = this.dirtyLo;
       const n = this.dirtyHi - lo + 1;

@@ -92,7 +92,7 @@ export interface GameSetup {
    * colonies, else nearest neighbours), 'none', or authored pairs of colony indices; story levels default to none
    */
   tunnels?: RoutePlan;
-  /** the Trees layer (sim/trees.ts, CHANGE_PLAN §30): on (also on when a colony's species has `habitat: 'trees'` or a `treeSite`) */
+  /** the Trees layer (sim/trees.ts, CHANGE_PLAN §33): on (also on when a colony's species has `habitat: 'trees'` or a `treeSite`) */
   trees?: boolean;
 }
 

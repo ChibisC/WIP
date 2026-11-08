@@ -16,6 +16,13 @@ export class Water {
   private nx: number;
   private ny: number;
   private builtVersion = -1;
+  /**
+   * Performance v3: the grid's rows in bands, each band's bounds (rebuilt with the heights). Each render draws only the
+   * index range from the first band its camera sees to the last — a contiguous part of the same index, in the same order
+   * (it is transparent: the order of its triangles matters, and stays) — instead of every row of the map.
+   */
+  private bands: THREE.Box3[] = [];
+  private static readonly BAND_ROWS = 12;
 
   constructor(private terrain: Terrain) {
     this.nx = Math.ceil(terrain.width / this.step) + 1;
@@ -99,6 +106,28 @@ export class Water {
     this.mesh.renderOrder = 2;
     this.mesh.name = 'water';
     this.mesh.receiveShadow = true;
+    const frustum = new THREE.Frustum();
+    const pm = new THREE.Matrix4();
+    const full = idx.length;
+    const perRow = (this.nx - 1) * 6;
+    this.mesh.onBeforeRender = (_r, _s, camera, geometry) => {
+      const bands = this.bands;
+      if (!bands.length) return geometry.setDrawRange(0, full);
+      pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      frustum.setFromProjectionMatrix(pm);
+      let first = -1;
+      let last = -1;
+      for (let b = 0; b < bands.length; b++)
+        if (frustum.intersectsBox(bands[b])) {
+          if (first < 0) first = b;
+          last = b;
+        }
+      if (first < 0) return geometry.setDrawRange(0, 0);
+      const R = Water.BAND_ROWS;
+      const r0 = first * R;
+      const r1 = Math.min(this.ny - 1, (last + 1) * R);
+      geometry.setDrawRange(r0 * perRow, (r1 - r0) * perRow);
+    };
     this.rebuild();
     void globalUniforms;
   }
@@ -136,5 +165,20 @@ export class Water {
     this.geo.attributes.position.needsUpdate = true;
     this.geo.attributes.wdepth.needsUpdate = true;
     this.geo.computeBoundingSphere();
+    // each band of rows: the box round its vertices (the rows it draws and the row below them)
+    const R = Water.BAND_ROWS;
+    const bands: THREE.Box3[] = [];
+    const v = new THREE.Vector3();
+    for (let r0 = 0; r0 < this.ny - 1; r0 += R) {
+      const box = new THREE.Box3();
+      const r1 = Math.min(this.ny - 1, r0 + R);
+      for (let j = r0; j <= r1; j++)
+        for (let i = 0; i < this.nx; i++) {
+          const k = j * this.nx + i;
+          box.expandByPoint(v.set(pos[k * 3], pos[k * 3 + 1], pos[k * 3 + 2]));
+        }
+      bands.push(box);
+    }
+    this.bands = bands;
   }
 }

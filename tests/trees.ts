@@ -1,5 +1,5 @@
 /**
- * The Trees layer (sim/trees.ts; claude/trees/01-spec-trees-layer.md; CHANGE_PLAN §30).
+ * The Trees layer (sim/trees.ts; claude/trees/01-spec-trees-layer.md; CHANGE_PLAN §33).
  *
  *   npx vite-node tests/trees.ts
  */
@@ -192,6 +192,6 @@ function world(more: Record<string, unknown> = {}, seed = 5): World {
   check('an ant walks home into the tree nest (up the trunk, along the branch, in)', home && a.space === nestSpace(c.id), `space ${a.space} after ${w.time.toFixed(0)} s`);
 }
 
-check('protocol bumped for the layer', BUILD_ID === 'ud-mp-15', BUILD_ID);
+check('protocol bumped for the layer', BUILD_ID === 'ud-mp-16', BUILD_ID);
 console.log(`${failed ? failed + ' failed' : 'all trees tests passed'} in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 if (failed) (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;

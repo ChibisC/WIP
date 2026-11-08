@@ -68,6 +68,58 @@ function readFn(keys: readonly string[], kinds: readonly number[]): ReadFn | nul
   return f;
 }
 
+/** A constructor per schema setting every column's field (undefined), for the reader's new objects (performance v3). */
+type RowCtor = new () => object;
+const rowClasses = new Map<string, RowCtor>(); // det-ok: compiled row constructors for the main thread's replica; never simulation state
+
+function rowClass(keys: readonly string[], kinds: readonly number[]): RowCtor | null {
+  if (!columnCodegen.on) return null;
+  const sig = sigOf(keys, kinds);
+  let c = rowClasses.get(sig);
+  if (c) return c;
+  const body = keys.map((k, j) => (kinds[j] === K_NUM || kinds[j] === K_BOOL || kinds[j] === K_STR ? `this[${JSON.stringify(k)}] = undefined;` : '')).join('\n');
+  try {
+    c = new Function(`return function Row() {\n${body}\n}`)() as RowCtor;
+  } catch {
+    columnCodegen.on = false;
+    return null;
+  }
+  rowClasses.set(sig, c);
+  return c;
+}
+
+/**
+ * A generated writer (performance v3): the columns filled one after the other as before, each from a named property
+ * (`o.x`) instead of a keyed one (`o[k]` with k changing per column) — with one hidden class for every ant
+ * (sim/factory.ts antShape) each load is monomorphic. The same values in the same order (strings interned in the same
+ * order, the other-typed fields listed in the same order), so the packet is byte for byte the plain loop's.
+ */
+type WriteFn = (items: readonly object[], n: number, num: Float64Array, str: Uint16Array, nb: number[], sb: number[], absent: number, intern: (s: string) => number, other: Array<[number, number, unknown]>) => void;
+const writeFns = new Map<string, WriteFn>(); // det-ok: compiled writers for the worker's frames, keyed by schema; never simulation state
+
+function writeFn(keys: readonly string[], kinds: readonly number[]): WriteFn | null {
+  if (!columnCodegen.on) return null;
+  const sig = sigOf(keys, kinds);
+  let f = writeFns.get(sig);
+  if (f) return f;
+  const body: string[] = [];
+  keys.forEach((k, j) => {
+    const q = JSON.stringify(k);
+    if (kinds[j] === K_NUM) body.push(`{ const b = nb[${j}]; for (let i = 0; i < n; i++) { const v = items[i][${q}]; num[b + i] = typeof v === 'number' ? v : absent; } }`);
+    else if (kinds[j] === K_BOOL) body.push(`{ const b = nb[${j}]; for (let i = 0; i < n; i++) { const v = items[i][${q}]; num[b + i] = v === undefined ? absent : v ? 1 : 0; } }`);
+    else if (kinds[j] === K_STR) body.push(`{ const b = sb[${j}]; for (let i = 0; i < n; i++) { const v = items[i][${q}]; str[b + i] = typeof v === 'string' ? intern(v) : 0xffff; } }`);
+    else body.push(`for (let i = 0; i < n; i++) { const v = items[i][${q}]; if (v !== undefined) other.push([i, ${j}, v]); }`);
+  });
+  try {
+    f = new Function('items', 'n', 'num', 'str', 'nb', 'sb', 'absent', 'intern', 'other', body.join('\n')) as WriteFn;
+  } catch {
+    columnCodegen.on = false;
+    return null;
+  }
+  writeFns.set(sig, f);
+  return f;
+}
+
 export interface ColumnPacket {
   n: number;
   keys: string[];
@@ -108,9 +160,11 @@ export class ColumnWriter {
     for (const it of items) {
       const o = it as Record<string, unknown>;
       for (const k in o) {
-        if (this.keyIndex.has(k)) continue;
+        // (an undefined value first: most of an ant's optional fields are, and it is a cheaper test than the map's —
+        // performance v3; a key is learned when it is new and has a value, as before)
         const v = o[k];
         if (v === undefined) continue;
+        if (this.keyIndex.has(k)) continue;
         const kind = typeof v === 'number' ? K_NUM : typeof v === 'string' ? K_STR : typeof v === 'boolean' ? K_BOOL : K_OTHER;
         this.keyIndex.set(k, this.keys.length);
         this.keys.push(k);
@@ -118,6 +172,9 @@ export class ColumnWriter {
       }
     }
   }
+
+  /** `intern` bound once (for the generated writer) */
+  private internFn = (s: string): number => this.intern(s);
 
   private intern(s: string): number {
     let i = this.strings.get(s);
@@ -168,8 +225,18 @@ export class ColumnWriter {
     numBase.length = strBase.length = keys.length;
     let cn = 0;
     let cs = 0;
-    // (column by column: a generated row-by-row loop is slower here — its stores are scattered over a hundred columns)
-    for (let j = 0; j < keys.length; j++) {
+    // (column by column: a generated row-by-row loop is slower here — its stores are scattered over a hundred columns;
+    // a generated column-by-column one with named loads is faster — performance v3 — when no column is skipped)
+    const gen = skip && skip.size ? null : writeFn(keys, kinds);
+    if (gen) {
+      for (let j = 0; j < keys.length; j++) {
+        const kind = kinds[j];
+        numBase[j] = kind === K_NUM || kind === K_BOOL ? cn++ * n : -1;
+        strBase[j] = kind === K_STR ? cs++ * n : -1;
+      }
+      gen(items, n, num, str, numBase, strBase, ABSENT, this.internFn, other);
+    }
+    for (let j = 0; j < keys.length && !gen; j++) {
       const k = keys[j];
       const kind = kinds[j];
       numBase[j] = kind === K_NUM || kind === K_BOOL ? cn * n : -1;
@@ -336,13 +403,16 @@ export class ColumnReader<T extends { id: number }> {
     if (this.kept.length < n) this.kept = new Uint8Array(Math.ceil(n * 1.5) + 16);
     const kept = this.kept;
     const idBase = numBase[idCol];
+    // (performance v3) a new object comes from a constructor made for the schema, every field set in it: its fields
+    // stay inside the object (an empty literal grown field by field keeps all but four in a separate array)
+    const Row = rowClass(keys, kinds);
     // the objects (pooled by id), and what the carry keeps of them before they change
     for (let i = 0; i < n; i++) {
       const id = num[idBase + i];
       let o = this.pool.get(id);
       kept[i] = o && carry ? 1 : 0;
       if (!o) {
-        o = {} as T;
+        o = (Row ? new Row() : {}) as T;
         this.pool.set(id, o);
       } else if (carry) carry.save(o, i);
       seen.add(id);

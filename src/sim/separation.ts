@@ -1,4 +1,5 @@
 import { World } from './world';
+import type { SpatialHash } from './spatial';
 import { Ant, AS, Creature } from './types';
 import { casteOf } from './species';
 import { BALANCE, GUARD } from './balance';
@@ -66,6 +67,15 @@ export function separationSystem(w: World, dt: number): void {
     rad = new Float64Array(n * 2);
     mass = new Float64Array(n * 2);
     len = new Float64Array(n * 2);
+    hwl = new Float64Array(n * 2);
+    spc = new Int32Array(n * 2);
+    sx = new Float64Array(n * 2);
+    sy = new Float64Array(n * 2);
+    tm = new Float64Array(n * 2);
+    sid = new Float64Array(n * 2);
+    sst = new Int32Array(n * 2);
+    sfk = new Uint8Array(n * 2);
+    sfid = new Float64Array(n * 2);
     prio = new Uint8Array(n * 2);
     tdx = new Float64Array(n * 2);
     tdy = new Float64Array(n * 2);
@@ -126,6 +136,17 @@ export function separationSystem(w: World, dt: number): void {
     rad[i] = r;
     mass[i] = antMass(a);
     len[i] = antLen(a);
+    // (its body's half-width, for the pair loop's early out: performance v3)
+    hwl[i] = antHeights(a.caste).hw * len[i];
+    // (performance v3: what the pair loop reads of each ant, side by side in typed arrays — the same values; nothing
+    // moves or changes state until the pushes are applied after the loop)
+    sx[i] = a.x;
+    sy[i] = a.y;
+    tm[i] = a.team ?? a.colony;
+    sid[i] = a.id;
+    sst[i] = a.state;
+    sfk[i] = foeKind(a);
+    sfid[i] = sfk[i] ? foeId(a) : 0;
     if (r <= BIG && r > maxR) maxR = r;
     if (flag[i] & 16) {
       if (r <= BIG && len[i] > maxFightL) maxFightL = len[i];
@@ -144,6 +165,13 @@ export function separationSystem(w: World, dt: number): void {
   P.ps = PS;
   P.ws = BALANCE.combat21.waitSpace;
   P.dt = dt;
+  // (ants are in id order — they are appended with new ids and removed in place — so "the lower id" is "the lower
+  // index": the pair loop drops the pairs the other ant handles before it touches them; checked, else pairCb decides)
+  let sorted = true;
+  for (let i = 1; i < n && sorted; i++) if (ants[i].id <= ants[i - 1].id) sorted = false;
+  // (each ant's space now, so the pair loop need not load an ant to see it has left the space since the hash was built)
+  for (let i = 0; i < n; i++) spc[i] = ants[i].space;
+  rawSpace = -1;
   for (let i = 0; i < n; i++) {
     const fa = flag[i];
     if (!(fa & 1)) continue;
@@ -154,13 +182,16 @@ export function separationSystem(w: World, dt: number): void {
     P.fa = fa;
     P.ra = ra;
     P.big = ra > BIG;
-    P.foeK = foeKind(a);
-    P.foeId = P.foeK ? foeId(a) : 0;
-    P.team = a.team ?? a.colony;
+    P.foeK = sfk[i];
+    P.foeId = sfid[i];
+    P.team = tm[i];
+    P.x = sx[i];
+    P.y = sy[i];
+    P.id = sid[i];
     let q = ra + (P.big ? Math.max(maxR, ra) : maxR);
     // a fighting ant looks as far as a fighting ally's personal space (pairs with big ants are the big one's)
     if (fa & 16) q = Math.max(q, PS * Math.max(len[i], P.big ? maxFightLBig : maxFightL));
-    w.antIdxNear(a.space, a.x, a.y, q, pairCb);
+    pairsNear(w, ants, a.space, a.x, a.y, q, i, P.big, sorted);
   }
   // the feet of tall ants push the small ants standing under them (combat v2.2)
   for (let t = 0; t < n; t++) {
@@ -304,23 +335,39 @@ function creatureSpacing(w: World, dt: number): void {
   const crs = w.s.creatures;
   const S = BALANCE.separation;
   const cap = S.creatureMaxPush * dt * BALANCE.tickHz;
-  for (let i = 0; i < crs.length; i++) {
+  const n = crs.length;
+  // (performance v3) each creature's radius, attack, push-through and team once, not once per pair: none of them
+  // changes while creatures are pushed apart (only positions do) — the same values in the same sums
+  if (csRad.length < n) {
+    csRad = new Float64Array(n * 2);
+    csTeam = new Float64Array(n * 2);
+    csFlag = new Uint8Array(n * 2);
+  }
+  for (let i = 0; i < n; i++) {
+    const c = crs[i];
+    csFlag[i] = (c.dead ? 1 : 0) | (pushesThrough(c) ? 2 : 0) | (creatureHooks.attacking(c) ? 4 : 0);
+    if (!c.dead) csRad[i] = creatureHooks.radius(c);
+    csTeam[i] = c.faction >= 0 ? w.teamOf(c.faction) : 0;
+  }
+  for (let i = 0; i < n; i++) {
     const a = crs[i];
+    const fa = csFlag[i];
     // (a story titan on its way into the nest is never held back by another creature: it pushes through —
     // claude/story/05-spec §2; 2026-11-03 a ground beetle on guard at a ramp's top stopped the tarantula for good)
-    if (a.dead || pushesThrough(a)) continue;
+    if (fa & 3) continue;
     // (in an attack it stands its ground: the other one gives way — combat v2.1; not against a titan pushing through)
-    const stand = creatureHooks.attacking(a);
-    const ra = creatureHooks.radius(a);
+    const stand = (fa & 4) !== 0;
+    const ra = csRad[i];
     let px = 0;
     let py = 0;
-    for (let j = 0; j < crs.length; j++) {
+    for (let j = 0; j < n; j++) {
       const o = crs[j];
-      if (j === i || o.dead || o.space !== a.space) continue;
-      const through = pushesThrough(o);
+      const fo = csFlag[j];
+      if (j === i || fo & 1 || o.space !== a.space) continue;
+      const through = (fo & 2) !== 0;
       if (stand && !through) continue;
-      const ally = a.faction >= 0 && o.faction >= 0 && w.teamOf(a.faction) === w.teamOf(o.faction);
-      const min = (ra + creatureHooks.radius(o)) * (ally ? S.creatureAllyRoom : 1);
+      const ally = a.faction >= 0 && o.faction >= 0 && csTeam[i] === csTeam[j];
+      const min = (ra + csRad[j]) * (ally ? S.creatureAllyRoom : 1);
       const dx = a.x - o.x;
       const dy = a.y - o.y;
       const d2 = dx * dx + dy * dy;
@@ -337,7 +384,7 @@ function creatureSpacing(w: World, dt: number): void {
         ny = i < j ? dsin(ang) : -dsin(ang);
       }
       // the smaller one gives way more (all of it to one in an attack)
-      const share = through || creatureHooks.attacking(o) ? 1 : o.scale / (a.scale + o.scale);
+      const share = through || fo & 4 ? 1 : o.scale / (a.scale + o.scale);
       px += nx * (min - d) * 0.5 * share;
       py += ny * (min - d) * 0.5 * share;
     }
@@ -353,6 +400,9 @@ function creatureSpacing(w: World, dt: number): void {
     }
   }
 }
+let csRad = new Float64Array(0); // det-ok: scratch, rebuilt every pass
+let csTeam = new Float64Array(0); // det-ok: scratch, rebuilt every pass
+let csFlag = new Uint8Array(0); // det-ok: scratch, rebuilt every pass
 
 /** A story titan walking to (or digging) the hole of its dig-in (titanDig.ts `rstory`, phases Approach and Dig). */
 function pushesThrough(cr: Creature): boolean {
@@ -431,7 +481,7 @@ function queenCb(i: number): boolean {
 }
 
 /** The ant whose neighbours are being visited (one shared callback: no closure per ant). */
-const P = { ants: [] as Ant[], i: 0, a: null as unknown as Ant, fa: 0, ra: 0, big: false, strength: 0, fightStrength: 0, ps: 0, ws: 0, foeK: 0, foeId: 0, team: 0, dt: 0 }; // det-ok: scratch
+const P = { ants: [] as Ant[], i: 0, a: null as unknown as Ant, fa: 0, ra: 0, big: false, strength: 0, fightStrength: 0, ps: 0, ws: 0, foeK: 0, foeId: 0, team: 0, dt: 0, x: 0, y: 0, id: 0 }; // det-ok: scratch
 
 /**
  * The foe whose attack slot an ant holds (Grapple), has reserved while closing in, or is spraying as it closes in:
@@ -452,33 +502,83 @@ function foeId(a: Ant): number {
   return a.state === AS.Grapple ? a.gId : a.tgt;
 }
 
+/** The hash being walked by `pairsNear` (its arrays fetched once per space and tick). */
+let rawSpace = -1; // det-ok: scratch, reset every tick
+let raw: ReturnType<SpatialHash['raw']> | null = null; // det-ok: scratch
+
+/**
+ * The neighbours of ant `self` within r, in the hash's order (as `antIdxNear` gives them), each passed to `pairCb` —
+ * but the ones pairCb would drop at once (itself, not taking part, a pair the other ant handles) are dropped here
+ * without touching them (performance v3: the same pairs in the same order, about half the work in a crowd).
+ */
+function pairsNear(w: World, ants: Ant[], space: number, x: number, y: number, r: number, self: number, selfBig: boolean, sorted: boolean): void {
+  if (space !== rawSpace || !raw) {
+    const h = w.antHash(space);
+    if (!h) return;
+    raw = h.raw();
+    rawSpace = space;
+  }
+  const { start, items, xs, ys, w: hw, h: hh, cell: c } = raw;
+  const x0 = Math.max(0, Math.floor((x - r) / c) + 1);
+  const x1 = Math.min(hw - 1, Math.floor((x + r) / c) + 1);
+  const y0 = Math.max(0, Math.floor((y - r) / c) + 1);
+  const y1 = Math.min(hh - 1, Math.floor((y + r) / c) + 1);
+  const r2 = r * r;
+  for (let cy = y0; cy <= y1; cy++)
+    for (let cx = x0; cx <= x1; cx++) {
+      const cell = cy * hw + cx;
+      for (let e = start[cell], end = start[cell + 1]; e < end; e++) {
+        const dx = xs[e] - x;
+        const dy = ys[e] - y;
+        if (dx * dx + dy * dy <= r2) {
+          const k = items[e];
+          if (k !== self && flag[k] & 1 && spc[k] === space && !(sorted && (selfBig === rad[k] > BIG ? k < self : !selfBig))) pairCb(k);
+        }
+      }
+    }
+}
+
 function pairCb(j: number): boolean {
   const i = P.i;
   if (j === i) return false;
   const fa = P.fa;
   const fo = flag[j];
   if (!(fo & 1)) return false;
-  const pa = P.a;
-  const po = P.ants[j];
+  // (performance v3: the ants' fields from the typed arrays filled before the loop — the object only where a rare test
+  // needs more of it)
+  const ojx = sx[j];
+  const ojy = sy[j];
+  // (performance v3) too far apart for any push between them (the largest spacing any pair can have) and for either to
+  // be under the other's body: nothing below can happen — out at once, the same as it would be after all the tests
+  {
+    const ex = ojx - P.x;
+    const ey = ojy - P.y;
+    const lim = Math.max((P.ra + rad[j]) * Math.max(1, GUARD.fightRoom), Math.max(P.ps, P.ws) * Math.max(len[i], len[j])) * BALANCE.separation.antContact;
+    const ri = rad[i] * 0.5;
+    const rj = rad[j] * 0.5;
+    const ui = (len[j] * 0.5 + ri) * (len[j] * 0.5 + ri) + (hwl[j] + ri) * (hwl[j] + ri);
+    const uj = (len[i] * 0.5 + rj) * (len[i] * 0.5 + rj) + (hwl[i] + rj) * (hwl[i] + rj);
+    if (ex * ex + ey * ey > Math.max(lim * lim, ui, uj) * (1 + 1e-6)) return false;
+  }
   // Combat v2 (step 1): two allies who are both fighting keep a personal space from each other, unless they are going
   // for the same foe (its slots space them). Enemies keep only their bodies' radii (lines can meet; an attacker holds
   // its own foe at its hold point). An ant holding a foe (32), which does not give way to the crowd, is eased apart
   // from fighting allies round it.
   // (Guard lines keep their own spacing: an ally standing in a line keeps `GUARD.fightRoom` × the radii as before.)
-  const ally = (po.team ?? po.colony) === P.team;
+  const ally = tm[j] === P.team;
   if (ally && (under[i] || under[j])) return false;
   // …and two enemies each holding someone else (separate duels) drift apart too, so neighbouring duels keep ground
   // between them; enemies closing in, or fighting each other, keep only their bodies' radii
-  const sameFoe = ally && P.foeK !== 0 && foeKind(po) === P.foeK && foeId(po) === P.foeId;
+  const sameFoe = ally && P.foeK !== 0 && sfk[j] === P.foeK && sfid[j] === P.foeId;
   // (a teammate pressing in for a slot: `waitSpace` from any teammate in the fight, same foe or not — the crowd presses
   // up behind the fighters: user 2026-11-01, evening)
   const wait = ally && (fa & fo & 16) !== 0 && (wt[i] | wt[j]) !== 0;
-  const fight = wait || ((fa & fo & 16) !== 0 && (ally ? !sameFoe : pa.state === AS.Grapple && po.state === AS.Grapple && !engaged(pa, po)));
+  const fight = wait || ((fa & fo & 16) !== 0 && (ally ? !sameFoe : sst[i] === AS.Grapple && sst[j] === AS.Grapple && !engaged(P.a, P.ants[j])));
   const line = !fight && ally && ((fa | fo) & 128) !== 0 && (fa & 144) !== 0 && (fo & 144) !== 0;
   const ro = rad[j];
   // each pair once: by the lower id within a size class, else by the big one
   const oBig = ro > BIG;
-  if (P.big === oBig ? po.id <= pa.id : !P.big) return false;
+  if (P.big === oBig ? sid[j] <= P.id : !P.big) return false;
   // under-pass (combat v2.2): the shorter one fits under the taller one where it stands — no body push between them (the
   // taller one's feet push it: below); where it does not fit, beside it, only their bodies' radii (no personal space)
   let mixed = false;
@@ -497,8 +597,8 @@ function pairCb(j: number): boolean {
     if (prio[i] > prio[j]) ma = false;
     else mo = false;
   }
-  const dx = po.x - pa.x;
-  const dy = po.y - pa.y;
+  const dx = ojx - P.x;
+  const dy = ojy - P.y;
   // (user 2026-11-01: "make collision hitboxes 2x smaller … keep hitbox size but collision size of ants colliding each
   // other is smaller") every ant–ant distance × `antContact`; the hit shapes (bites, climbs, creatures) are unchanged
   const min = (fight && !mixed ? (wait ? P.ws : P.ps) * Math.max(len[i], len[j]) : (P.ra + ro) * (line && !mixed ? GUARD.fightRoom : 1)) * BALANCE.separation.antContact;
@@ -512,7 +612,7 @@ function pairCb(j: number): boolean {
     nx = dx / d;
     ny = dy / d;
   } else {
-    const ang = ((pa.id * 7 + po.id * 13) % 360) * (Math.PI / 180);
+    const ang = ((P.id * 7 + sid[j] * 13) % 360) * (Math.PI / 180);
     nx = dcos(ang);
     ny = dsin(ang);
   }
@@ -559,6 +659,16 @@ let flag = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 let rad = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let mass = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let len = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let hwl = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let spc = new Int32Array(0); // det-ok: scratch, rebuilt every tick
+/** (performance v3) each ant's position, team, id, state and the foe it is on, for the pair loop */
+let sx = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let sy = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let tm = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let sid = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let sst = new Int32Array(0); // det-ok: scratch, rebuilt every tick
+let sfk = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
+let sfid = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let prio = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 let tdx = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let tdy = new Float64Array(0); // det-ok: scratch, rebuilt every tick

@@ -1958,7 +1958,7 @@ User spec `claude/performance/01-spec-performance-no-visual-loss.md` (branch `fe
   seed 11.
 - Checks: `tests/storyEvents.ts` (new), `tests/storyCh1.ts` (seven levels), `npm test`, `check-determinism`, the build;
   browser shots `docs/story/shots/ch1_7/` (`tests/browser/story_ch1_7.py`). Protocol `ud-mp-12`.
-## 2026-11-06 — A shared underground: set tunnel routes between nests, underground fog (CHANGE_PLAN §28)
+## 2026-11-06 — A shared underground: set tunnel routes between nests, underground fog (CHANGE_PLAN §27)
 User spec `claude/underground/01-spec-shared-underground-tunnels.md` (2026-11-06); branch `feature/shared-underground`.
 Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).
 - **Layout:** every colony nest grid grew a ring of 8 hexes of unbreakable rock (`SOIL_ROCK`; titans don't break it
@@ -1981,6 +1981,7 @@ Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).
 - **Saves:** version 4 — old grids embedded in the margin (everything in the space shifted), routes generated closed;
   `BUILD_ID` `ud-mp-13` (12 was taken by the story merge). `tests/tunnels.ts` (35 checks) in `npm test`.
 - Stills: `docs/underground/tunnels/` (`tests/browser/tunnels.py`; dev `?tunnel=<stage>`).
+
 ## 2026-11-06 — Audio v3: every sound effect remade (insect-like, made for this game); no walking or termite idle sounds
 - **User spec** `claude/audio/03-spec-sfx-rework-insect.md` (branch `feature/sfx-insect`; CHANGE_PLAN §28).
 - **Made for this game:** `tools/audio/sfx` renders every effect offline with numpy/scipy from the physics of the
@@ -2036,6 +2037,60 @@ User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch 
 - **UI:** marker counts once a tick, label styles written only when changed.
 - **Fixed on the way:** a story save with a visiting party restored differently (merged early with the meter).
 
+## 2026-11-07 — Model redo: Saiy-Ants, sickle-jaw termites, Termants (`feature/models-saiy-sickle`, CHANGE_PLAN §33; approved after review round 4, merged)
+
+- **Saiy-Ants** rebuilt on a real carpenter ant (*Camponotus*): broad rounded head (the soldier's heart-shaped and broader), antennal sockets set back from a keeled clypeus, five-toothed parametric jaws, a smooth arched mesosoma, a scale petiole, an oval gaster with golden-grey hairs, long legs; blue-black satin cuticle from a baked recipe; three bites per caste on planted feet (no acid, the user's rule); the gold surge's stretch and overshoot. The six locks are unchanged.
+- **Sickle-jaw termites**: every caste (worker, soldier, presoldier, king, queen, larva) on the realistic ant pipeline: the soldier's glassy red head and down-curved snout with its pore, long thin crossing sickles traced from the user's photos, beaded antennae, very long legs; the worker (rebuilt from the user's field photos in review round 3) a small round glossy orange head and a big glossy chocolate egg-shaped abdomen, its plates pillowed, finely haired and dotted with the spiracles; the soldier's crimson sickles and banded amber-brown abdomen; the king and queen kept on the termite kit (review round 1). The grab-and-squirt, the free squirt, the threat and the drum as planted-feet attack cycles, the acid jet and fizz from the snout's tip.
+- **No more defensive rows**: sickle-jaw soldiers gather or hold the escort ring like other soldiers. A knockback ends a hold cleanly. Balance: soldier health 20 and brood × 2.2 (+0.79 → +0.03 against the reference soldier), worker bite 2.5.
+- **Termants** redesigned: termite antennae on every caste, no nasus (the soldier's glue from a pore on its forehead), a *Macrotermes*-style soldier head with sabre jaws, realistic materials, planted feet.
+- Other species' models unchanged (hash check); height data regenerated. Four review rounds with the user; approved 2026-11-07 ("good. push changes").
+
+## 2026-11-07 — Saiy-Ant Blaster: energy orbs from the mouth, a 3-second beam in gold form; gold form 10 s (`feature/saiy-blaster`, CHANGE_PLAN §31; merged 2026-11-08 after the user's approval, game artifact v50)
+
+Built on the model redo (§30, merged into this branch during its review; now on `main`).
+- **The caste** `aurimyrmex_blaster` ("Blaster"; Termants steal it as "Saiy-Ant Blaster"): worker-sized and light
+  (6.6 mm, 12 hp, no armour, speed 24, cost 30 + 6), brood mix 0.14, no climbing. It holds 40 mm off and spits glowing
+  orbs from its mouth (5 physical damage, the first enemy on the path; walls stop them; allies never hit); in the gold
+  form every fifth shot is a 3 s beam down the densest line of enemies (9 body lengths, cut by walls, a pulse every
+  0.25 s on all it crosses), the Blaster planted throughout; a fling, a grab or death ends it, the gold ending does not.
+  It backs off from melee only at a walk and stands behind the melee line in a guard crowd.
+- **Gold form 10 s** (12 at level 3), recovery 30 s (22 at level 2), boosts unchanged; the Saiy worker (15.5 hp / 1.65
+  bite) and soldier (56 / 4.35) scaled back to the tie with the references, which the longer gold form had doubled.
+- **Model** `saiy_blaster` from the redone worker: slimmer, a little longer, a larger rounder head, wide jaws round a
+  mouth that glows faint white-blue at rest, bright in the wind-up and gold in gold form; the six locks swept back
+  further. **Poses:** head aims and jaws part in the wind-up, recoil on each orb, braced beam stance (feet wide, body
+  low, head steady, a tremble).
+- **Effects** `render/game/blastFx.ts`: instanced orbs (core, shell with swirling crackle, trail, ground light) and
+  beams (core, rippling glow, charge ball, end burst, ground light, flash on, fade off) played in closed form from the
+  sim's events; bursts and pops in `combatFx`. **Sounds** (made for this game): charge hum, "fwip", sizzle, beam
+  roar-hum loop.
+- **Tests:** `tests/saiyBlaster.ts` (36 checks: caste, orbs, five-shot cycle, beam, aim, determinism, a save
+  mid-fight and two clients in lockstep, back-off, guard crowd, pose, effects, sounds); morph hashes (only `saiy_blaster` new); height data; balance
+  in `docs/balance/castes.md` ("Saiy-Ant Blaster"), tools `tools/blaster-balance.ts`; clips
+  `docs/creatures/aurimyrmex-renders/` (`tests/browser/blaster_clips.py`); lab `&mglow=`.
+
+## 2026-11-07 — Performance v3: big colonies (500–2,000 ants), same looks, same results (CHANGE_PLAN §32)
+User spec `claude/performance/03-spec-performance-v3-big-colonies.md`; branch `feature/performance-v3`.
+- **Measured first:** `tools/perf/simBench.ts` (fight, economy, full nests, ten colonies, titan raid, tunnel fight at
+  500–2,000 ants; per system, per 50 ticks, slowest ticks), timed bundled as the game ships (`tools/perf/bundle.sh`);
+  `tools/perf/same.sh` proves every simulation change against `main` with canonical state hashes (18 runs, ALL SAME);
+  the user's laptop and iPhone `?bench=1`; the bench's new **gpu** scene (one effect off at a time — in `main` early,
+  handoff 21).
+- **Simulation:** one hidden class for every ant (138 before; the record a class so its 151 fields stay inside the
+  object); separation on the packed hash and typed arrays with exact early outs; per-creature values once a pass; hex
+  lookup fast path; the flow cache's LRU by counter. Bundled against `main`: 1,000 ants 5.7–10.9 ms a tick (target
+  15), 2,000 ants 10.2–16.6 (target 25; the big fight 33.2 → 15.5); spikes over 40 ms at 2,000 remain (1–16 of 300).
+- **Worker frames:** a generated column writer — the same packets byte for byte; the replica's rows from a
+  constructor per schema (fields inside the object).
+- **Graphics (no change of looks):** the terrain, grass, pebbles and merged map scenery drawn in culled 5 × 5 chunks;
+  the water draws only the rows a camera sees. Golden set: 11 of 11 match, 8 pixel for pixel (the three far shots
+  differ in 1–11 of 972,800 pixels where grass blades cross).
+- **Checks:** `npm test` (all), the determinism check, the build, `tests/browser/lan.py` two players (hashes match, no
+  desync, the speed vote). `BUILD_ID` `ud-mp-15` (the state hash follows field order, now the same for every ant).
+- **Found and left for the user:** both devices are limited by the GPU at High even with few ants; ~80 % of the big
+  fight's triangles are the ants (mid-distance ants at 3,300 triangles, twice with shadows). Changes that would alter
+  the picture (simpler shadow casters, resolution, effect settings) wait for the gpu-scene report and the user's yes.
+- **Merged** into `main` as `ad17880` (Pages deployed; game artifact v51); handoff 23.
 ## 2026-11-07 — The Trees: a third layer over the ground (branch `feature/trees-layer`; claude/trees/01-spec-trees-layer.md)
 Plan and record: `CHANGE_PLAN.md` §30. Design: `DESIGN.md` §3.13. Player notes: `README.md` "The trees". Stills:
 `docs/trees/shots/` (`tests/browser/trees.py`); the map tool `tools/trees-check.ts`; `tests/trees.ts` in `npm test`.
@@ -2053,7 +2108,7 @@ Plan and record: `CHANGE_PLAN.md` §30. Design: `DESIGN.md` §3.13. Player notes
 - **On/off:** a `habitat: 'trees'` species (none yet), the sandbox "Trees on" (built at runtime, also on the worker's
   replica), or `?trees=1` with a placeholder colony; otherwise nothing is built.
 - **Lairs** removed from skirmish, sandbox and LAN setups and the five maps' zones; wild creatures arrive from the edges.
-- Saves version 5, protocol `ud-mp-15`.
+- Saves version 5, protocol `ud-mp-16`.
 - Numbers: the canopy grid is 100–120 × 80–105 hexes (530–630 cells a side), built in 0.6–1.1 s at match start on this
   machine (only with the layer on); 740–2,100 walkable hexes a map; the canopy mesh has one vertex a cell in the chunks
   that hold branches.

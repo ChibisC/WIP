@@ -31,10 +31,15 @@ export class Stat {
   private n = 0;
   private i = 0;
   ema = 0;
+  /** every value pushed since the last reset, summed and counted (not just the window's) */
+  total = 0;
+  pushes = 0;
   constructor(size = 600) {
     this.buf = new Float32Array(size);
   }
   push(v: number): void {
+    this.total += v;
+    this.pushes++;
     this.buf[this.i] = v;
     this.i = (this.i + 1) % this.buf.length;
     if (this.n < this.buf.length) this.n++;
@@ -61,6 +66,8 @@ export class Stat {
     this.n = 0;
     this.i = 0;
     this.ema = 0;
+    this.total = 0;
+    this.pushes = 0;
   }
 }
 
@@ -148,6 +155,8 @@ export class Profiler {
   attach(renderer: THREE.WebGLRenderer): void {
     if (this.renderer === renderer) return;
     this.renderer = renderer;
+    // (the draw counts cover the whole frame — every pass, the post effects too — not just its last render call)
+    renderer.info.autoReset = false;
     const gl = renderer.getContext() as WebGL2RenderingContext;
     const g = gl as unknown as Record<string, unknown>;
     if (g.__udProf) return;
@@ -280,6 +289,10 @@ export class Profiler {
   }
 
   /** Start of a frame (the game loop's animation frame). */
+  /** draw calls and triangles of the last whole frame */
+  private frameCalls = 0;
+  private frameTris = 0;
+
   begin(now = performance.now()): void {
     this.frameStart = now;
     this.cpuStart = performance.now();
@@ -352,6 +365,12 @@ export class Profiler {
   /** End of a frame: record it, and log it when it was a hitch. */
   end(): void {
     this.frame++;
+    const info = this.renderer?.info;
+    if (info) {
+      this.frameCalls = info.render.calls;
+      this.frameTris = info.render.triangles;
+      info.reset();
+    }
     const cpu = performance.now() - this.cpuStart;
     const dt = this.lastFrameAt ? this.frameStart - this.lastFrameAt : 16.7;
     this.lastFrameAt = this.frameStart;
@@ -403,8 +422,8 @@ export class Profiler {
     const r = this.renderer;
     const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
     return {
-      calls: r?.info.render.calls ?? 0,
-      triangles: r?.info.render.triangles ?? 0,
+      calls: this.frameCalls,
+      triangles: this.frameTris,
       programs: r?.info.programs?.length ?? 0,
       textures: r?.info.memory.textures ?? 0,
       geometries: r?.info.memory.geometries ?? 0,

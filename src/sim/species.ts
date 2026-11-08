@@ -7,7 +7,8 @@ import { TERMITE_ROYALS } from './termiteRoyalData';
 export type SpeciesId = 'lasius' | 'formica' | 'atta' | 'solenopsis' | 'eciton' | 'plagiaria' | 'nasutitermes' | 'rhynchotermes' | 'hell' | 'aurimyrmex' | 'termant';
 export type Role = 'worker' | 'soldier' | 'major' | 'queen' | 'minim' | 'king';
 /** `pure` ignores armour (the nasute's glue stream) */
-export type DamageType = 'bite' | 'acid' | 'sting' | 'pure';
+/** `blast`: a Saiy-Ant Blaster's orb or beam — physical, armour counts as against a bite */
+export type DamageType = 'bite' | 'acid' | 'sting' | 'pure' | 'blast';
 
 /**
  * In-game display names that may change later live here (one value each).
@@ -76,6 +77,11 @@ export interface CasteDef {
   snap?: { kind: 'pin' | 'impale'; windup: number; dps: number; hold: number; cooldown: number; maxPreyMass: number; burst?: number };
   /** Saiy-Ants: can flash into the gold surge (sim/surge.ts) */
   surge?: boolean;
+  /**
+   * Saiy-Ant Blaster (sim/saiyBlaster.ts; numbers in `BALANCE.blaster`): fires energy orbs from the mouth from range,
+   * and in the gold form every fifth shot is a 3-second beam. Holds its distance like the acid shooters.
+   */
+  blast?: boolean;
   /** Termants: may gather dead wood, leaf litter and leaves, all into the one food store (sim/termants.ts) */
   wood?: boolean;
   /** Termant soldier: the point-blank glue burst from the frontal pore (sim/termants.ts) */
@@ -147,7 +153,7 @@ export interface SpeciesDef {
   satelliteNests?: boolean;
   /**
    * where the species nests: 'ground' (default, an anthill) or 'trees' (a tree nest on a set branch of the Trees map,
-   * CHANGE_PLAN §30; a match with such a colony turns the trees layer on). No tree species exists yet.
+   * CHANGE_PLAN §33; a match with such a colony turns the trees layer on). No tree species exists yet.
    */
   habitat?: 'ground' | 'trees';
 }
@@ -356,7 +362,7 @@ export const CASTES: Record<string, CasteDef> = {
     length: 5.8, // larger than the soldier
     speed: 12.8, // × 0.8
     hp: 21, // (balance pass 2026-11-02: was × 0.75)
-    bite: 2.4, attackInterval: 1.0, // (was 0.87: they still only bite back)
+    bite: 2.5, attackInterval: 1.0, // (was 0.87: they still only bite back)
     armor: 0, carry: 3, grip: 1, mass: 1, forage: true, dig: true, nurse: true,
     cost: 6, devTime: 1, pop: 1, cocoon: false,
     fact: 'Sickle-jaw workers are stout, blind and soft, with a transparent abdomen full of dark leaf litter and a whitish spot (the fontanelle) on the head.',
@@ -364,7 +370,7 @@ export const CASTES: Record<string, CasteDef> = {
   rhy_soldier: C({
     id: 'rhy_soldier', species: 'rhynchotermes', name: 'Sickle-jaw', role: 'soldier', morph: 'termite_rhy_soldier', termite: 'sickle',
     length: 4.5, speed: 14.4, // × 0.9
-    hp: 22, // (balance pass 2026-11-02: was 12.8; wins one on one, loses in groups: it holds one enemy at a time)
+    hp: 20, // (balance pass 2026-11-02: was 12.8; wins one on one, loses in groups: it holds one enemy at a time)
     bite: SICKLE.grab.biteDamage, attackInterval: SICKLE.acid.freeTargetBiteInterval, armor: 0, carry: 2, grip: 3, mass: 0.8,
     forage: true, dig: false, nurse: false, threat: 0.6, // gathers like an ant soldier (user note 2026-10-25)
     cost: 10, devTime: 1.4, pop: 1, cocoon: false,
@@ -412,18 +418,25 @@ export const CASTES: Record<string, CasteDef> = {
   }),
   // ---- Aurimyrmex fulgurans (fictional "Saiy-Ants"; docs/creatures/aurimyrmex-fulgurans.md) ----
   aurimyrmex_worker: C({
-    id: 'aurimyrmex_worker', species: 'aurimyrmex', name: 'Worker', role: 'worker', morph: 'saiy_worker', length: 6, speed: 22, hp: 16, bite: 1.9, attackInterval: 1.0,
+    id: 'aurimyrmex_worker', species: 'aurimyrmex', name: 'Worker', role: 'worker', morph: 'saiy_worker', length: 6, speed: 22, hp: 15.5, bite: 1.65, attackInterval: 1.0,
     armor: 0.2, carry: 4, grip: 2, mass: 1.8, forage: true, dig: true, nurse: true,
     surge: true, // no acid (the user's design): Saiy-Ants fight with bites only
     cost: 8, devTime: 1.15, pop: 1, cocoon: true,
     fact: 'Fictional species. Inspired by the golden tortoise beetle, whose shell can switch between metallic gold and dull red when it is disturbed.',
   }),
   aurimyrmex_soldier: C({
-    id: 'aurimyrmex_soldier', species: 'aurimyrmex', name: 'Soldier', role: 'soldier', morph: 'saiy_soldier', length: 9, speed: 19, hp: 68, bite: 5.2, attackInterval: 1.2,
+    id: 'aurimyrmex_soldier', species: 'aurimyrmex', name: 'Soldier', role: 'soldier', morph: 'saiy_soldier', length: 9, speed: 19, hp: 56, bite: 4.35, attackInterval: 1.2,
     armor: 2, carry: 5, grip: 4, mass: 4.5, forage: true, dig: true, nurse: false, threat: 2,
     surge: true,
     cost: 20, devTime: 1.5, pop: 1, cocoon: true,
     fact: 'A major worker: the same body plan with a broad, square head full of jaw muscle. Carpenter ant majors crush seeds and enemies alike.',
+  }),
+  aurimyrmex_blaster: C({
+    id: 'aurimyrmex_blaster', species: 'aurimyrmex', name: 'Blaster', role: 'soldier', morph: 'saiy_blaster', length: 6.6, speed: 24, mount: 'none',
+    hp: 12, bite: 1.2, attackInterval: 1.1, armor: 0, carry: 3, grip: 1.5, mass: 1.6, forage: true, dig: true, nurse: false,
+    surge: true, blast: true,
+    cost: 22, devTime: 1.5, pop: 1, cocoon: true,
+    fact: 'Fictional caste. Its mouth glows before each shot; in the gold form the glow turns gold and every fifth shot is a beam it holds for three seconds.',
   }),
   aurimyrmex_queen: C({
     id: 'aurimyrmex_queen', species: 'aurimyrmex', name: 'Queen', role: 'queen', morph: 'saiy_queen', length: 14, speed: 7, hp: 900, bite: 5, attackInterval: 1.4,
@@ -516,10 +529,10 @@ export const SPECIES: Record<SpeciesId, SpeciesDef> = {
   },
   aurimyrmex: {
     id: 'aurimyrmex', common: SPECIES_DISPLAY_NAME.aurimyrmex ?? SAIY_FALLBACK_NAME, scientific: 'Aurimyrmex fulgurans', queen: 'aurimyrmex_queen', fictional: true,
-    castes: ['aurimyrmex_worker', 'aurimyrmex_soldier'],
-    ratio: { aurimyrmex_worker: 0.8, aurimyrmex_soldier: 0.2 }, startWorkers: 7, eggInterval: 5.5, color: '#d9a53a',
-    blurb: 'Fictional carpenter-ant relatives whose glossy black cuticle flashes metallic gold for a few seconds when they fight: faster and harder-hitting, then exhausted while they recover.',
-    traits: ['Gold surge: +50 % speed, +60 % damage for 4 s', '20 s recovery (dull, drooping antennae)', 'Bites only: no acid, no sting', 'The queen never transforms'],
+    castes: ['aurimyrmex_worker', 'aurimyrmex_soldier', 'aurimyrmex_blaster'],
+    ratio: { aurimyrmex_worker: 0.7, aurimyrmex_soldier: 0.17, aurimyrmex_blaster: 0.13 }, startWorkers: 7, eggInterval: 5.5, color: '#d9a53a',
+    blurb: 'Fictional carpenter-ant relatives whose glossy black cuticle flashes metallic gold when they fight: faster and harder-hitting, then exhausted while they recover. Blasters fire glowing energy orbs from their mouths, and a beam in the gold form.',
+    traits: ['Gold surge: +50 % speed, +60 % damage for 10 s', '30 s recovery (dull, drooping antennae)', 'Blasters: energy orbs from the mouth; in gold, every fifth shot a 3 s beam', 'No acid, no sting', 'The queen never transforms'],
   },
   termant: {
     id: 'termant', common: SPECIES_DISPLAY_NAME.termant ?? TERMANT_FALLBACK_NAME, scientific: 'Chimaeromyrmex termitoides', queen: 'termant_queen', king: 'termant_king', fictional: true,

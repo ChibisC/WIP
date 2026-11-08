@@ -24,6 +24,13 @@ import { NestTerrain } from '../src/render/nest/nestTerrain';
 import { SOIL_AIR } from '../src/world/nestGrid';
 import { createStressWorld } from '../src/dev/stressScene';
 import { ColumnReader, ColumnWriter, columnCodegen } from '../src/sim/columns';
+import { antShape } from '../src/sim/factory';
+import { encodeState, hashState, restoreWorld } from '../src/sim/snapshot';
+import { chunkTriangles } from '../src/render/terrainMesh';
+import { Grass } from '../src/render/grass';
+import { chunkStatic } from '../src/render/chunks';
+import * as THREE from 'three';
+import { stressSetup } from '../src/dev/stressScene';
 
 const t0 = Date.now();
 let failed = 0;
@@ -325,6 +332,170 @@ function check(name: string, ok: boolean, detail = ''): void {
     check(`entity columns: delta frames (${gen ? 'generated' : 'plain'} reader) leave the replica's ants exactly as the simulation's, 120 ticks of a fight`, !bad, bad || `${((omitted / sent) * 100).toFixed(0)} % of the columns left out`);
   }
   columnCodegen.on = can;
+}
+
+// ---- the generated column writer (performance v3): the same packets, byte for byte, as the plain loop
+if (columnCodegen.on) {
+  const w = createStressWorld(new EventBus(), 60, 20);
+  const can = columnCodegen.on;
+  const lists = () => [w.s.ants, w.s.food, w.s.creatures] as object[][];
+  const A = lists().map(() => new ColumnWriter());
+  const B = lists().map(() => new ColumnWriter());
+  const same = (x: ArrayLike<number>, y: ArrayLike<number>) => x.length === y.length && Array.prototype.every.call(x, (v: number, i: number) => Object.is(v, y[i]));
+  let bad = '';
+  for (let f = 0; f < 120 && !bad; f++) {
+    w.step(0.05);
+    w.events.drain();
+    lists().forEach((l, k) => {
+      columnCodegen.on = true;
+      const pa = A[k].write(l, null, undefined, true);
+      columnCodegen.on = false;
+      const pb = B[k].write(l, null, undefined, true);
+      columnCodegen.on = can;
+      const J = JSON.stringify;
+      if (!(pa.n === pb.n && J(pa.keys) === J(pb.keys) && same(pa.num, pb.num) && same(pa.str, pb.str) && J(pa.newStrings) === J(pb.newStrings) && J(pa.other) === J(pb.other) && J(pa.omit ? [...pa.omit] : null) === J(pb.omit ? [...pb.omit] : null)))
+        bad ||= `frame ${f}, list ${k}`;
+    });
+  }
+  columnCodegen.on = can;
+  check('entity columns: the generated writer gives the plain loop’s packets byte for byte (ants, food, creatures; 120 ticks of a fight)', !bad, bad);
+}
+
+// ---- the ground in culled chunks (performance v3: render/terrainMesh.ts, render/grass.ts) — the same triangles, the same blades
+{
+  // a heightfield index like TerrainMesh's (quads (a, c, b), (b, c, d)), some quads left out as under a bank sculpt
+  const nx = 97;
+  const ny = 61;
+  const full: number[] = [];
+  for (let j = 0; j < ny - 1; j++)
+    for (let i = 0; i < nx - 1; i++) {
+      if ((i * 7 + j * 13) % 11 === 0) continue;
+      const a = j * nx + i;
+      full.push(a, a + nx, a + 1, a + 1, a + nx, a + nx + 1);
+    }
+  const lists = chunkTriangles(full, nx, ny, 6);
+  const tri = (a: ArrayLike<number>) => {
+    const out: string[] = [];
+    for (let i = 0; i < a.length; i += 3) out.push(`${a[i]},${a[i + 1]},${a[i + 2]}`);
+    return out;
+  };
+  const all = lists.flatMap((l) => (l ? tri(l) : []));
+  const ref = tri(full);
+  // each chunk's triangles in the full order, every triangle in exactly one chunk, each within its block of quads
+  let inOrder = true;
+  let inBlock = true;
+  const pos = new Map(ref.map((t, i) => [t, i]));
+  lists.forEach((l, k) => {
+    if (!l) return;
+    const ts = tri(l);
+    for (let i = 1; i < ts.length; i++) if (pos.get(ts[i])! < pos.get(ts[i - 1])!) inOrder = false;
+    for (const t of ts) {
+      const v = t.split(',').map(Number);
+      // (the quad's corner: the first triangle (a, c, b) starts at it, the second (b, c, d) one after it)
+      const a = v[2] === v[0] + 1 ? v[0] : v[0] - 1;
+      const ci = Math.min(5, Math.floor((a % nx) / Math.ceil((nx - 1) / 6)));
+      const cj = Math.min(5, Math.floor(Math.floor(a / nx) / Math.ceil((ny - 1) / 6)));
+      if (cj * 6 + ci !== k) inBlock = false;
+    }
+  });
+  check('terrain chunks: every triangle in exactly one chunk, in the full order, within its block', all.length === ref.length && [...all].sort().join() === [...ref].sort().join() && inOrder && inBlock, `${ref.length} triangles in ${lists.filter(Boolean).length} chunks`);
+  // the grass: the chunks hold exactly the blades the single mesh held (matrices and colours, bit for bit)
+  const w = createWorld(stressSetup(), new EventBus());
+  const g = new Grass(w.terrain, 1);
+  let n = 0;
+  let inSphere = true;
+  for (const c of g.mesh.children) {
+    const m = c as import('three').InstancedMesh;
+    n += m.count;
+    const s = m.boundingSphere!;
+    const a = m.instanceMatrix.array as Float32Array;
+    for (let i = 0; i < m.count; i++) if (Math.hypot(a[i * 16 + 12] - s.center.x, a[i * 16 + 13] - s.center.y, a[i * 16 + 14] - s.center.z) > s.radius) inSphere = false;
+  }
+  check('grass chunks: every blade drawn once, each chunk\'s blades inside its bounding sphere', n > 1000 && inSphere, `${n} blades in ${g.mesh.children.length} chunks`);
+}
+
+// ---- static scenery in culled chunks (performance v3: render/chunks.ts) — the same triangles, the same instances
+{
+  // a merged mesh of 400 small boxes over 1,000 mm (indexed, with colours) and an instanced mesh of 500 pebbles
+  const geos: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 400; i++) {
+    const g = new THREE.BoxGeometry(3, 2, 4);
+    g.rotateY(i * 0.7);
+    g.translate((i * 37) % 1000, (i % 7) * 0.5, (i * 91) % 1000);
+    const c = new Float32Array(g.attributes.position.count * 3).fill(i / 400);
+    g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    geos.push(g);
+  }
+  const { mergeGeometries } = await import('three/examples/jsm/utils/BufferGeometryUtils.js');
+  const merged = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshStandardMaterial({ vertexColors: true }));
+  merged.castShadow = true;
+  const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial(), 500);
+  const m4 = new THREE.Matrix4();
+  for (let i = 0; i < 500; i++) {
+    im.setMatrixAt(i, m4.makeTranslation((i * 53) % 1000, 0, (i * 29) % 1000));
+    im.setColorAt(i, new THREE.Color(i / 500, 0, 0));
+  }
+  const group = new THREE.Group();
+  group.add(merged, im);
+  // every triangle as its three vertices' values (position + colour), every instance as its matrix + colour
+  const triKeys = (g: THREE.BufferGeometry): string[] => {
+    const out: string[] = [];
+    const p = g.attributes.position;
+    const c = g.attributes.color;
+    const n = g.index ? g.index.count : p.count;
+    for (let t = 0; t < n; t += 3) {
+      const vs: string[] = [];
+      for (let k = 0; k < 3; k++) {
+        const v = g.index ? g.index.getX(t + k) : t + k;
+        vs.push([p.getX(v), p.getY(v), p.getZ(v), c.getX(v)].join(','));
+      }
+      out.push(vs.join('|'));
+    }
+    return out;
+  };
+  const before = triKeys(merged.geometry).sort();
+  const instBefore = Array.from({ length: 500 }, (_, i) => Array.from((im.instanceMatrix.array as Float32Array).subarray(i * 16, i * 16 + 16)).join(',') + '|' + (im.instanceColor!.array as Float32Array)[i * 3]).sort();
+  const made = chunkStatic(group, 1000 / 6, 1000, 64);
+  const after: string[] = [];
+  const instAfter: string[] = [];
+  let shadows = true;
+  let spheres = true;
+  group.traverse((o) => {
+    const mm = o as THREE.InstancedMesh;
+    if (mm.isInstancedMesh) {
+      const a = mm.instanceMatrix.array as Float32Array;
+      for (let i = 0; i < mm.count; i++) {
+        instAfter.push(Array.from(a.subarray(i * 16, i * 16 + 16)).join(',') + '|' + (mm.instanceColor!.array as Float32Array)[i * 3]);
+        if (Math.hypot(a[i * 16 + 12] - mm.boundingSphere!.center.x, a[i * 16 + 14] - mm.boundingSphere!.center.z) > mm.boundingSphere!.radius) spheres = false;
+      }
+    } else if ((o as THREE.Mesh).isMesh) {
+      after.push(...triKeys((o as THREE.Mesh).geometry));
+      if (!(o as THREE.Mesh).castShadow) shadows = false;
+    }
+  });
+  after.sort();
+  instAfter.sort();
+  check('static chunks: a merged mesh keeps every triangle (vertex values), an instanced one every instance, settings kept', made > 10 && before.join() === after.join() && instBefore.join() === instAfter.join() && shadows && spheres, `${made} chunks; ${before.length} triangles, 500 instances`);
+}
+
+// ---- one object shape for every ant (performance v3: sim/factory.ts antShape)
+{
+  const fs = (await import(/* @vite-ignore */ 'node:' + 'fs')) as { readFileSync(p: URL, enc: string): string };
+  const src = fs.readFileSync(new URL('../src/sim/types.ts', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('export interface Ant {'), src.indexOf('\n}\n', src.indexOf('export interface Ant {')));
+  const declared = [...body.matchAll(/^ {2}([A-Za-z_][A-Za-z0-9_]*)\??\s*:/gm)].map((m) => m[1]);
+  const shape = Object.keys(antShape());
+  const missing = declared.filter((k) => !shape.includes(k));
+  check('ant shape: every field of the Ant interface is in antShape (a new field must be added there)', missing.length === 0 && shape.length === declared.length, missing.join(', ') || `${shape.length} fields`);
+  const w = createStressWorld(new EventBus(), 20, 5);
+  for (let i = 0; i < 40; i++) {
+    w.step(0.05);
+    w.events.drain();
+  }
+  const w2 = restoreWorld(encodeState(w), new EventBus());
+  const bad = w2.s.ants.filter((a) => Object.keys(a).slice(0, shape.length).join() !== shape.join());
+  check('ant shape: restored ants have the fields in the same order as new ones', bad.length === 0 && w2.s.ants.length === w.s.ants.length, `${bad.length} of ${w2.s.ants.length}`);
+  check('ant shape: the restored state hashes as the original', hashState(w) === hashState(w2));
 }
 
 console.log(`\n${failed ? `${failed} FAILED` : 'all passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

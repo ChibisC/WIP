@@ -429,7 +429,10 @@ export class SurfaceFlow {
    */
   readonly strict: boolean;
   private builtFor = -1;
-  private fields = new Map<string, { stamp: number; dist: Float32Array }>();
+  private fields = new Map<string, { stamp: number; dist: Float32Array; used: number }>();
+  /** (performance v3) a use counter: the least recently used field is the one with the lowest `used` — the order the
+   * map kept before by being re-inserted on every look-up, without changing it on every look-up */
+  private clock = 0;
   private heap = new FlowHeap();
 
   constructor(public terrain: Terrain) {
@@ -533,9 +536,7 @@ export class SurfaceFlow {
     this.rebuildPassable();
     const f = this.fields.get(key);
     if (f) {
-      // most recently used last
-      this.fields.delete(key);
-      this.fields.set(key, f);
+      f.used = ++this.clock;
       if (f.stamp === stamp) return f.dist;
     }
     const dist = f ? f.dist : new Float32Array(this.w * this.h);
@@ -586,8 +587,18 @@ export class SurfaceFlow {
     }
     if (f) f.stamp = stamp;
     else {
-      this.fields.set(key, { stamp, dist });
-      if (this.fields.size > SURFACE_FIELD_CAP) this.fields.delete(this.fields.keys().next().value!);
+      this.fields.set(key, { stamp, dist, used: ++this.clock });
+      if (this.fields.size > SURFACE_FIELD_CAP) {
+        // the least recently used goes
+        let oldest = '';
+        let ou = Infinity;
+        for (const [k, e] of this.fields)
+          if (e.used < ou) {
+            ou = e.used;
+            oldest = k;
+          }
+        this.fields.delete(oldest);
+      }
     }
     return dist;
   }

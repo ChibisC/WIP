@@ -1,5 +1,5 @@
 /**
- * The Trees: a third layer above the ground (claude/trees/01-spec-trees-layer.md; CHANGE_PLAN §30).
+ * The Trees: a third layer above the ground (claude/trees/01-spec-trees-layer.md; CHANGE_PLAN §33).
  *
  * One canopy map per match, the space `TREES`: a `NestGrid` hex map in the ground's mm frame (a point in the trees is
  * over the same point on the ground), all rock except the branches, twigs and leaves, which are dug "air" — walkable.
