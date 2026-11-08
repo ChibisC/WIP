@@ -313,6 +313,8 @@ interface GpuStep {
   avg: number;
   p95: number;
   cpu: number;
+  /** frames measured (a GPU too slow for a few frames in the window cannot be judged) */
+  frames: number;
 }
 
 /**
@@ -395,7 +397,7 @@ function runGpuSteps(s: GameSession, cx: number, cz: number, done: (steps: GpuSt
         const srt = times.slice().sort((a, b) => a - b);
         const avg = times.reduce((a, b) => a + b, 0) / Math.max(1, times.length);
         const cpuN = prof.cpuMs.pushes - frames0;
-        out.push({ name: steps[k].name, avg: +avg.toFixed(1), p95: +(srt[Math.floor(srt.length * 0.95)] ?? 0).toFixed(1), cpu: +(cpuN > 0 ? (prof.cpuMs.total - cpu0) / cpuN : 0).toFixed(1) });
+        out.push({ name: steps[k].name, avg: +avg.toFixed(1), p95: +(srt[Math.floor(srt.length * 0.95)] ?? 0).toFixed(1), cpu: +(cpuN > 0 ? (prof.cpuMs.total - cpu0) / cpuN : 0).toFixed(1), frames: times.length });
         steps[k].off();
       }
       k++;
@@ -645,7 +647,12 @@ function fmtScene(r: SceneResult): string[] {
   }
   if (r.gpuSteps) {
     const base = r.gpuSteps[0]?.avg ?? 0;
-    for (const g of r.gpuSteps) out.push(`  ${g.name.padEnd(32)} frame ${g.avg.toFixed(1)} ms (p95 ${g.p95.toFixed(1)})${g === r.gpuSteps[0] ? '' : `, saves ${(base - g.avg).toFixed(1)} ms`} · main thread ${g.cpu} ms`);
+    for (const g of r.gpuSteps)
+      out.push(
+        g.frames < 5
+          ? `  ${g.name.padEnd(32)} too slow to measure (${g.frames} frames in 2.5 s)`
+          : `  ${g.name.padEnd(32)} frame ${g.avg.toFixed(1)} ms (p95 ${g.p95.toFixed(1)}, ${g.frames} frames)${g === r.gpuSteps[0] ? '' : `, saves ${(base - g.avg).toFixed(1)} ms`} · main thread ${g.cpu} ms`,
+      );
   }
   if (r.hitches.length) {
     out.push('hitches:');
