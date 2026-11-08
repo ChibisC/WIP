@@ -829,7 +829,55 @@ export class AntRenderer {
       if (!s) {
         // (seeds hashed from the id, not Math.random: the same ant looks the same in every frame it is rebuilt in, every
         // reload and every golden shot — performance v2)
-        s = { phase: hash2(v.id, 1, 71), amp: 0, wave: hash2(v.id, 2, 71) * 10, hy: 0, hp: 0, mo: 0, ap: 0, gp: 0, cr: 0, pose: 0, poseW: 0, pph: hash2(v.id, 3, 71) * 10, death: v.dead ? 1 : 0, nx: 0, ny: 1, nz: 0, lastX: x, lastY: y, lastH: h, seen: this.frame, roll: 0 };
+        // (every field in one literal, the optional ones undefined: one hidden class for every ant's state, so the loop's
+        // property accesses stay monomorphic — performance v3; they were spread over six)
+        s = {
+          phase: hash2(v.id, 1, 71),
+          amp: 0,
+          wave: hash2(v.id, 2, 71) * 10,
+          hy: 0,
+          hp: 0,
+          mo: 0,
+          ap: 0,
+          gp: 0,
+          cr: 0,
+          pose: 0,
+          poseW: 0,
+          pph: hash2(v.id, 3, 71) * 10,
+          death: v.dead ? 1 : 0,
+          nx: 0,
+          ny: 1,
+          nz: 0,
+          lastX: x,
+          lastY: y,
+          lastH: h,
+          seen: this.frame,
+          roll: 0,
+          mx: undefined,
+          my: undefined,
+          mz: undefined,
+          wasMounted: undefined,
+          gx: undefined,
+          gy: undefined,
+          gz: undefined,
+          ck: undefined,
+          sw: undefined,
+          swv: undefined,
+          gl: undefined,
+          m2: undefined,
+          aw: undefined,
+          aq: undefined,
+          av: undefined,
+          as: undefined,
+          aqPrev: undefined,
+          ahi: undefined,
+          aho: undefined,
+          piv: undefined,
+          lod: undefined,
+          lodFrom: undefined,
+          lodT: undefined,
+          lodSeen: undefined,
+        };
         this.anim.set(v.id, s);
       }
       // animation pass (render/ants/antMotion.ts): the pilot species' motion controller

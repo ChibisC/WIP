@@ -159,7 +159,7 @@ Play phones in landscape (in portrait the game asks you to turn the phone). On p
 The pause menu has graphics quality, frame rate (match the screen, 60 or 30), interface size, edge scrolling and the sandbox setting **Reveal all underground areas**. Auto quality first lowers the render resolution a little (never below 75 %, with a light sharpen) and only then the preset.
 
 ### Benchmark
-Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`) runs seven fixed scenes for about four minutes: scripted clicks, orders, digging, building and camera moves (how quickly the game answers), switching surface ↔ underground ten times, a big fight, a full nest, a story night, the arena at 600 units and a multiplayer-sized world. It ends with a report to copy and send (frame times, hitches and their causes, the switch frames, draw calls, memory). See `docs/performance.md`.
+Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`; `&bonly=gpu` runs one scene) runs eight fixed scenes for about four minutes: scripted clicks, orders, digging, building and camera moves (how quickly the game answers), what each effect costs (the big fight at a fixed camera with ambient occlusion, bloom, depth of field, all post effects, shadows, double resolution, the ants and the grass turned off one at a time), switching surface ↔ underground ten times, a big fight, a full nest, a story night, the arena at 600 units and a multiplayer-sized world. It ends with a report to copy and send (frame times, hitches and their causes, the switch frames, draw calls, memory). See `docs/performance.md`.
 
 ## Species
 | Species | Castes |
@@ -237,6 +237,11 @@ npx vite-node tools/termite-income.ts -- 3 8                        # termite wo
 npx vite-node tools/nasute-duel.ts                                  # one nasute vs one Lasius soldier, by seconds of head start
 npm run test:determinism -- 20                                      # 20 min of a 4-colony game, run twice + once from a snapshot
 npm run stress -- 400 60 100                                        # tick time: 4 colonies x 400 ants, 60 s, 100 creatures
+tools/perf/bundle.sh . /tmp/sb.mjs && node /tmp/sb.mjs fight,nests 1000,2000 300 --systems --series   # the v3 stress scenes, bundled as the game ships: tick times, per system, slowest ticks
+tools/perf/same.sh <main checkout | ref.json> fight,economy,nests,ten,titan,tunnel 500,1000,2000   # same results as main: the scenes' canonical hash lists (ALL SAME)
+tools/perf/ab.sh <main checkout> fight 2000 300 3                    # main against this checkout, alternating runs, medians
+npx esbuild tools/perf/unitsBench.ts --bundle --platform=node --format=esm --outfile=/tmp/u.mjs && node /tmp/u.mjs 200 300 default   # main thread: ant views, ant and creature renderers in a real fight
+tests/browser/with_server.sh python3 tests/browser/scene_census.py  # what a scene holds: meshes, shadow casters, the biggest meshes by triangles (QUERY=…)
 tests/browser/with_server.sh python3 tests/browser/ui_areas.py      # browser checks (Playwright); also ui_test.py, ui_test2.py, ui_dig.py, ui_camera.py
 tests/browser/with_server.sh python3 tests/browser/mp_local.py      # 3 tabs + AI over BroadcastChannel: lobby, lockstep, chat, drop
 tests/browser/with_server.sh python3 tests/browser/mp_finish.py     # 2 tabs: a match played to the end (surrender, results)

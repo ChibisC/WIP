@@ -4,6 +4,7 @@ import { Input } from '../core/input';
 import { Terrain } from '../world/terrain';
 import { NestGrid } from '../world/nestGrid';
 import { TerrainMesh } from './terrainMesh';
+import { chunkStatic } from './chunks';
 import { RainFX } from './rainFX';
 import { Grass } from './grass';
 import { MapDecor } from './mapDecor';
@@ -233,12 +234,18 @@ export class GameView {
     this.terrainMesh = new TerrainMesh(terrain);
     this.worldGroup.add(this.terrainMesh.mesh);
     this.props = new Props(terrain);
+    // (performance v3: the map-wide pebble sets and merged scenery in culled chunks — render/chunks.ts)
+    const chunkCell = Math.max(terrain.width, terrain.depth) / 5;
+    chunkStatic(this.props.group, chunkCell);
     this.worldGroup.add(this.props.group);
     this.water = new Water(terrain);
     this.worldGroup.add(this.water.mesh);
     // an authored map: rocks, walkways, lilies, flowers (render only); thinner fog on the big maps
     this.decor = terrain.map ? new MapDecor(terrain) : null;
-    if (this.decor) this.worldGroup.add(this.decor.group);
+    if (this.decor) {
+      chunkStatic(this.decor.group, chunkCell);
+      this.worldGroup.add(this.decor.group);
+    }
     const fog = this.surfaceScene.fog as THREE.FogExp2 | null;
     const baseFog = 0.00055 * Math.min(1, (terrain.map ? 800 : 1000) / Math.max(terrain.width, terrain.depth));
     if (fog && 'density' in fog && !this.night) fog.density = baseFog;
@@ -271,7 +278,7 @@ export class GameView {
     if (!this.terrain) return;
     if (this.grass) {
       this.worldGroup.remove(this.grass.mesh);
-      this.grass.mesh.geometry.dispose();
+      this.grass.dispose();
     }
     this.grass = new Grass(this.terrain, this.preset.grassDensity, 320, this.decor?.clumps, this.grassClear);
     this.worldGroup.add(this.grass.mesh);

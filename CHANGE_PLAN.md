@@ -1526,3 +1526,75 @@ back to the tie with the references (the gold boosts themselves are kept).
 **31.6 Verify** — `tests/saiyBlaster.ts` (first enemy on the path, allies never hit, walls, physical damage, five-shot
 cycle in gold only, beam length/planting/finishing after gold ends, densest-line aim, 10 s gold, determinism);
 balance matrix runs; replays and two-tab LAN in sync; 50+ blasters cost; clips; a review page for the user; handoff.
+
+## 32. Performance v3 — big colonies (500–2,000 ants) without lag, same looks, same results (user spec 2026-11-07, claude/performance/03-spec-performance-v3-big-colonies.md)
+
+Branch `feature/performance-v3` off `main` `8e07623`. Hard rules: the golden set matches exactly (any visible change —
+LOD, impostors, resolution — only with zoom clips and the user's approval); the simulation's results are identical
+(canonical hash lists from `tools/perf/same.sh` against main for every sim change, the determinism check, replays;
+LAN two-tab in sync).
+
+### 32.1 Measured first
+- **Stress scenes** (`tools/perf/simBench.ts`, Node, build machine; 500/1,000/1,500/2,000 ants): fight, economy
+  (foraging), nests (full nests with digging), ten colonies, titan raid into a full nest, the shared-underground tunnel
+  fight. Baseline main, ms a tick: fight 19.0 @1,000 / 45.2 @2,000; economy 26.9, nests 23.4, ten 22, titan 29,
+  tunnel 26.4 @2,000. Per system at 2,000: the ant brains 12–16 ms (combat preempt and attack, foraging and flow
+  fields, hex lookup), separation 8–10 ms in dense crowds.
+- **The cause of half of it:** V8 kept 138 hidden classes for ants (fields added in whatever order a code path first
+  set them, `delete` sending some into dictionary mode): every hot loop over ants was megamorphic.
+- **The user's laptop** (`?bench=1`, Safari, Apple 8-core GPU, 1,470×956 at 2×, high quality): 28–37 FPS in the
+  fight, mp4 and arena scenes with the main thread at 2–4 ms and the sim at 5 ms — **GPU-bound**; the full nest 19 FPS
+  with 6 ms of render work on the main thread and nest-chunk rebuild hitches of 13–28 ms.
+
+### 32.2 Plan (each step measured before and after; results proven the same)
+1. **Sim, without changing a single result:** one object shape for every ant (all fields declared in one literal,
+   restored saves normalised, fields cleared instead of deleted); separation walking the hash itself with exact early
+   outs; the hash packed cell by cell (same items, same order); cheaper exact lookups (hex centres from column/row).
+   Then combat (preempt, attack slots, go-round), foraging/flow-field lookups, colony brains, allocations — profile
+   per call site, keep floating-point order, only side-effect-free early outs.
+2. **GPU (the laptop's limit):** a bench scene that turns each effect off in turn at a fixed camera (AO, bloom, DOF,
+   all post, shadows, 1 device pixel, ants hidden, grass hidden) so the user's run shows what each costs; then the
+   cheapest identical-looking wins (shadow casters, overdraw, upload ranges); anything that changes pixels goes to the
+   user with clips first.
+3. **Ants on the GPU:** instance transforms built in the vertex shader from a data texture (position, heading, previous
+   values, state, caste, seeds; dirty rows only) — the golden set must match exactly.
+4. **Full nest:** the render work on the main thread and the chunk rebuild hitches (spread or move the rebuilds).
+5. **Worker → main:** the viewed space at full rate, the others at a low rate with a summary per space for the UI;
+   bytes and decode time at 2,000.
+6. **UI/audio, memory:** cheap with hundreds of ants; no growth over 45 min; GPU memory toward the phone's 600 MB.
+7. **Verify:** targets table in `docs/performance.md` ("Performance v3"); golden set; hash lists, replays, LAN;
+   `npm test`, determinism, build; docs, handoff 21, merge, publish.
+
+### 32.3 What was done (in order)
+1. `tools/perf` — simBench (the stress scenes), canon.ts (canonical hash: keys sorted), same.sh (hash lists of two
+   checkouts compared), ab.sh (alternating timing runs), cpuprof/cpuchildren (profile summaries).
+2. **One shape for every ant** (`factory.ts antShape/normalizeAnt`, `world.ts`, deletes → `= undefined`): fight
+   1,000 −23 %, economy −15 %. `tests/performance.ts` checks every interface field is in the shape and a restored
+   world hashes the same.
+3. **Separation**: the pair loop walks the hash and drops pairs pairCb would drop before touching them; an exact early
+   out for pairs too far apart for any push or for one to be under the other; spaces read from a typed array. 2,000-ant
+   fight 45.2 → 26 ms.
+4. **Hash packed** cell by cell before the first query; **hex lookup** from column/row.
+5. **Bench GPU scene** (`dev/bench.ts` 'gpu'); the profiler counts draw calls and triangles over the whole frame (Safari
+   showed one call before) and keeps running totals.
+6. **Timing bundled** (`tools/perf/bundle.sh`): vite-node reaches every imported function through a module object;
+   the game's worker is one bundle. All timings since are of bundles (same.sh and ab.sh bundle both checkouts).
+7. **Separation's pair loop on typed arrays** (positions, teams, ids, states, foes filled before the loop);
+   **creature spacing** computes each creature's radius, attack, push-through and team once a pass.
+8. **Surface flow cache**: use counter instead of a map re-insert per look-up (same eviction order).
+9. **Hex lookup fast path** (the common case without the 3 × 3 loop; 7.2 M points checked against it).
+10. **Worker frames**: a generated column writer (named loads) and key discovery testing the value first — the same
+    packets byte for byte (`tests/performance.ts`).
+11. **The ground and scenery in culled chunks** (render only, the same triangles): the terrain heightfield (5 × 5
+    chunks sharing one set of attributes), the grass (5 × 5 instanced chunks, spheres padded for lean and wind), the
+    map-wide pebble sets and merged decor (`render/chunks.ts`); the water draws only the contiguous rows a camera sees
+    (`onBeforeRender`, same index order — it is transparent). On Meadow Pond the grass alone was 1.1 M triangles a
+    frame, the pebbles 310 k (twice: they cast shadows), the water 320 k.
+12. Merged `main` twice (audio v3, the model redo); the reference for same.sh is `main` + the tools.
+13. **The ant record a class** (found by bisecting a 20 % slowdown in the bundled full nests to the shape commit): an
+    object literal of ≥ 128 fields keeps them all outside the object and makes a class per copy; a constructor keeps
+    151 inside. Always-set fields start as numbers. All 18 runs the same.
+14. **Replica rows** from a constructor generated per schema (main thread; fields inside the object).
+15. **Measured** (bundled, best of 2, `main` 56be698): 1,000 ants 5.7–10.9 ms a tick (target 15), 2,000 ants
+    10.2–16.6 (target 25); the big fight at 2,000 33.2 → 15.5. Spikes over 40 ms at 2,000 not gone (1–16 of 300 in
+    four scenes: synchronised one-second timers of the stress scenes, minor GCs). Docs: `docs/performance.md` v3.

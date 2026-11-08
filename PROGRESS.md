@@ -2068,3 +2068,25 @@ Built on the model redo (§30, merged into this branch during its review; now on
   mid-fight and two clients in lockstep, back-off, guard crowd, pose, effects, sounds); morph hashes (only `saiy_blaster` new); height data; balance
   in `docs/balance/castes.md` ("Saiy-Ant Blaster"), tools `tools/blaster-balance.ts`; clips
   `docs/creatures/aurimyrmex-renders/` (`tests/browser/blaster_clips.py`); lab `&mglow=`.
+
+## 2026-11-07 — Performance v3: big colonies (500–2,000 ants), same looks, same results (CHANGE_PLAN §32)
+User spec `claude/performance/03-spec-performance-v3-big-colonies.md`; branch `feature/performance-v3`.
+- **Measured first:** `tools/perf/simBench.ts` (fight, economy, full nests, ten colonies, titan raid, tunnel fight at
+  500–2,000 ants; per system, per 50 ticks, slowest ticks), timed bundled as the game ships (`tools/perf/bundle.sh`);
+  `tools/perf/same.sh` proves every simulation change against `main` with canonical state hashes (18 runs, ALL SAME);
+  the user's laptop and iPhone `?bench=1`; the bench's new **gpu** scene (one effect off at a time — in `main` early,
+  handoff 21).
+- **Simulation:** one hidden class for every ant (138 before; the record a class so its 151 fields stay inside the
+  object); separation on the packed hash and typed arrays with exact early outs; per-creature values once a pass; hex
+  lookup fast path; the flow cache's LRU by counter. Bundled against `main`: 1,000 ants 5.7–10.9 ms a tick (target
+  15), 2,000 ants 10.2–16.6 (target 25; the big fight 33.2 → 15.5); spikes over 40 ms at 2,000 remain (1–16 of 300).
+- **Worker frames:** a generated column writer — the same packets byte for byte; the replica's rows from a
+  constructor per schema (fields inside the object).
+- **Graphics (no change of looks):** the terrain, grass, pebbles and merged map scenery drawn in culled 5 × 5 chunks;
+  the water draws only the rows a camera sees. Golden set: 11 of 11 match, 8 pixel for pixel (the three far shots
+  differ in 1–11 of 972,800 pixels where grass blades cross).
+- **Checks:** `npm test` (all), the determinism check, the build, `tests/browser/lan.py` two players (hashes match, no
+  desync, the speed vote). `BUILD_ID` `ud-mp-15` (the state hash follows field order, now the same for every ant).
+- **Found and left for the user:** both devices are limited by the GPU at High even with few ants; ~80 % of the big
+  fight's triangles are the ants (mid-distance ants at 3,300 triangles, twice with shadows). Changes that would alter
+  the picture (simpler shadow casters, resolution, effect settings) wait for the gpu-scene report and the user's yes.

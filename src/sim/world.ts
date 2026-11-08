@@ -7,6 +7,7 @@ import { NestGrid } from '../world/nestGrid';
 import { NestFlow, SurfaceFlow } from './flow';
 import { Pheromones } from './pheromones';
 import { SpatialHash } from './spatial';
+import { normalizeAnt } from './factory';
 import type { FloodCache } from './nestFlood';
 import { Ant, AphidCluster, Brood, CaveDef, Colony, Creature, Entrance, Food, LeafPlant, SimState, SURFACE, colonyOfSpace, nestSpace, isCaveSpace, Projectile } from './types';
 
@@ -89,6 +90,8 @@ export class World {
       if (c.team === undefined) c.team = c.id;
       c.hexSpeed = null; // a cache (and JSON turns typed arrays into plain objects)
     }
+    // every ant in the one object shape (performance v3: factory.ts antShape) — a restored ant has only its saved fields
+    for (let i = 0; i < state.ants.length; i++) state.ants[i] = normalizeAnt(state.ants[i]);
     this.surfFlow = new SurfaceFlow(this.terrain);
     this.phero = new Pheromones(this.terrain.width, this.terrain.depth, Math.max(1, state.colonies.length));
     this.antHashSurface = new SpatialHash(this.terrain.width, this.terrain.depth, 8, 4096);
@@ -319,40 +322,30 @@ export class World {
     for (let i = 0; i < cr.length; i++) if (cr[i].space === SURFACE && !cr[i].dead) this.creatureHash.insert(i, cr[i].x, cr[i].y);
   }
 
+  /** The spatial hash of a space's ants (built at the tick start), or undefined (performance v3: separation.ts). */
+  antHash(space: number): SpatialHash | undefined {
+    return space === SURFACE ? this.antHashSurface : this.antHashNest.get(space);
+  }
+
   /** Ants near a point in a space (callback receives the ant). */
   antsNear(space: number, x: number, y: number, r: number, cb: (a: Ant, d2: number) => boolean | void): void {
     const h = space === SURFACE ? this.antHashSurface : this.antHashNest.get(space);
     if (!h) return;
-    const ants = this.s.ants;
-    h.query(x, y, r, (i, d2) => {
-      const a = ants[i];
-      if (!a || a.space !== space) return false;
-      return cb(a, d2);
-    });
+    h.queryIn(this.s.ants, space, x, y, r, cb);
   }
 
   /** Like `antsNear`, but the callback gets the ant's index in `s.ants` (scratch arrays keyed by index). */
   antIdxNear(space: number, x: number, y: number, r: number, cb: (i: number, d2: number) => boolean | void): void {
     const h = space === SURFACE ? this.antHashSurface : this.antHashNest.get(space);
     if (!h) return;
-    const ants = this.s.ants;
-    h.query(x, y, r, (i, d2) => {
-      const a = ants[i];
-      if (!a || a.space !== space) return false;
-      return cb(i, d2);
-    });
+    h.queryIdxIn(this.s.ants, space, x, y, r, cb);
   }
 
   /** Ants of other teams near a point (friends are skipped inside the hash walk). */
   enemiesNear(space: number, team: number, x: number, y: number, r: number, cb: (a: Ant, d2: number) => boolean | void): void {
     const h = space === SURFACE ? this.antHashSurface : this.antHashNest.get(space);
     if (!h) return;
-    const ants = this.s.ants;
-    h.queryOthers(x, y, r, team, (i, d2) => {
-      const a = ants[i];
-      if (!a || a.space !== space) return false;
-      return cb(a, d2);
-    });
+    h.queryOthersIn(this.s.ants, space, x, y, r, team, cb);
   }
 
   foodNear(x: number, y: number, r: number, cb: (f: Food, d2: number) => boolean | void): void {
