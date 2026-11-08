@@ -307,5 +307,50 @@ The real numbers come from the user's laptop and iPhone (`?bench=1`, below once 
 | Lookups | The hex under a point at once in the common case (well inside its column's nearest row, nearer than any centre beside it can be); the surface flow cache's least-recently-used order kept by a counter, not by re-inserting into the map on every look-up. |
 | Worker frames | A column writer generated per schema (named loads: with one ant shape, monomorphic); key discovery tests the value before the map. The same packets byte for byte. |
 | Ground and scenery | Drawn in culled chunks: the terrain heightfield (5 × 5, sharing one set of vertex attributes), the grass (5 × 5 instanced chunks, bounding spheres padded for lean and wind), the map-wide pebble sets and merged decor (`render/chunks.ts`, 5 × 5 of the map). The water draws, per camera, only the contiguous rows its camera can see (same index order: it is transparent). |
+| Ant record | A class (`AntRecord`), not a literal: V8 keeps an object literal of 128 fields or more wholly outside the object, with a class per copy (this cost the full nests 20 % before it was found); always-set fields start as numbers. |
+| Main-thread replica | New rows from a constructor generated per schema (fields inside the object; an empty literal grown field by field kept all but four outside). |
 | Ant renderer | Its per-ant state in one literal (one hidden class instead of six). |
 | Measuring | `tools/perf/*` (above); the benchmark's **gpu** scene; draw calls and triangles counted over the whole frame (Safari showed one call: the counters reset on every render call). |
+
+### Measured: the simulation (build machine, bundled, best of 2 alternating runs, 300 ticks after 60; `main` 56be698)
+| Scene | 1,000 ants: main → v3 (ms a tick) | 2,000 ants: main → v3 | ticks over 40 ms at 2,000 (of 300) |
+|---|---|---|---|
+| Big surface fight | 15.2 → **8.2** (−46 %) | 33.2 → **15.5** (−53 %) | 105 → 6 |
+| Busy foraging economy | 12.2 → **10.9** (−11 %) | 21.8 → **16.3** (−25 %) | 25 → 16 |
+| Full nests with brood and digging | 5.8 → **5.9** | 11.4 → **10.2** (−11 %) | 3 → 1 |
+| Ten colonies | 12.9 → **10.7** (−17 %) | 18.6 → **13.4** (−28 %) | 7 → 7 |
+| Titan raid into a full nest | 12.9 → **10.8** (−16 %) | 24.6 → **16.6** (−32 %) | 21 → 12 |
+| Shared-underground tunnel fight | 6.1 → **5.7** (−5 %) | 13.1 → **11.5** (−12 %) | 5 → 1 |
+
+Every run's canonical hash list equals `main`'s (same results). **Targets: under 15 ms at 1,000 — met in every scene
+(5.7–10.9); under 25 ms at 2,000 — met in every scene (10.2–16.6). No spikes over 40 ms — not met at 2,000** (1–16 of
+300 ticks in four scenes): in these scenes every ant was made on the same tick, so their one-second timers fire
+together (the once-a-second ticks are about twice the others; in a real game ants hatch apart), and minor garbage
+collections (about one a tick, 0.4 ms median, 9 ms at the 90th percentile) land on some of them. The user's laptop
+runs the simulation about three times faster than this machine (5 ms a tick for the 821-ant fight against ~15 here).
+
+### Measured: the graphics (what was drawn)
+| | before (main) | v3 |
+|---|---|---|
+| Meadow Pond (the multiplayer map): grass | 1 mesh, 1.1 M triangles every frame | 25 culled chunks |
+| Meadow Pond: pebble sets | 4 meshes, 310 k triangles, twice (shadows) | culled chunks, also in the shadow pass |
+| Meadow Pond: water | 320 k triangles every frame | the rows in view |
+| Every map: terrain | 1 mesh, ~300 k triangles every frame | 25 culled chunks |
+| Golden set (`golden/compare-v3after.md`) | — | 11 of 11 match, 8 pixel for pixel; far shots 1–11 of 972,800 pixels where grass blades cross |
+
+### Not done, and why
+- **Anything that changes the picture.** Both devices are limited by the GPU at High even in scenes with few ants (the
+  laptop's menu-like scene with 38 ants: 35 FPS; the phone's: 22 FPS). In the big fight ~80 % of the triangles are
+  the ants (mid-distance ants at 3,300 triangles, drawn for the picture and again for the shadow map). Cheaper shadow
+  casters, a lower resolution or cheaper effects would change pixels: they wait for the **gpu** scene's report from
+  the user's devices and the user's yes, with before/after pictures.
+- **Ant transforms on the GPU.** The matrices are built in doubles on the CPU; built in the vertex shader they would
+  be floats, and edges would move by a pixel here and there (the golden set's exact compare). The ant renderer is
+  0.2–3.5 ms here; on the phone the ants' animation is 12 ms of a 36 ms frame — the motion controller (planted feet,
+  springs), which a shader cannot keep across frames.
+- **Only the viewed space at full rate.** Both minimaps draw ants of the other spaces every sixth frame and the fog
+  of war gathers what every ant sees, so a lower rate for the other spaces would change what they show. The frames
+  are cheaper instead (the generated writer; the reader's rows).
+- **WASM or several workers**: not needed for the targets (and shared memory needs headers Pages cannot send).
+- **Fewer garbage collections**: allocations are spread over many call sites (boxed numbers from small helpers,
+  closures in a few callbacks); left for a later pass.
