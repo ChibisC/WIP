@@ -67,6 +67,7 @@ export function separationSystem(w: World, dt: number): void {
     rad = new Float64Array(n * 2);
     mass = new Float64Array(n * 2);
     len = new Float64Array(n * 2);
+    hwl = new Float64Array(n * 2);
     prio = new Uint8Array(n * 2);
     tdx = new Float64Array(n * 2);
     tdy = new Float64Array(n * 2);
@@ -127,6 +128,8 @@ export function separationSystem(w: World, dt: number): void {
     rad[i] = r;
     mass[i] = antMass(a);
     len[i] = antLen(a);
+    // (its body's half-width, for the pair loop's early out: performance v3)
+    hwl[i] = antHeights(a.caste).hw * len[i];
     if (r <= BIG && r > maxR) maxR = r;
     if (flag[i] & 16) {
       if (r <= BIG && len[i] > maxFightL) maxFightL = len[i];
@@ -506,6 +509,18 @@ function pairCb(j: number): boolean {
   if (!(fo & 1)) return false;
   const pa = P.a;
   const po = P.ants[j];
+  // (performance v3) too far apart for any push between them (the largest spacing any pair can have) and for either to
+  // be under the other's body: nothing below can happen — out at once, the same as it would be after all the tests
+  {
+    const ex = po.x - pa.x;
+    const ey = po.y - pa.y;
+    const lim = Math.max((P.ra + rad[j]) * Math.max(1, GUARD.fightRoom), Math.max(P.ps, P.ws) * Math.max(len[i], len[j])) * BALANCE.separation.antContact;
+    const ri = rad[i] * 0.5;
+    const rj = rad[j] * 0.5;
+    const ui = (len[j] * 0.5 + ri) * (len[j] * 0.5 + ri) + (hwl[j] + ri) * (hwl[j] + ri);
+    const uj = (len[i] * 0.5 + rj) * (len[i] * 0.5 + rj) + (hwl[i] + rj) * (hwl[i] + rj);
+    if (ex * ex + ey * ey > Math.max(lim * lim, ui, uj) * (1 + 1e-6)) return false;
+  }
   // Combat v2 (step 1): two allies who are both fighting keep a personal space from each other, unless they are going
   // for the same foe (its slots space them). Enemies keep only their bodies' radii (lines can meet; an attacker holds
   // its own foe at its hold point). An ant holding a foe (32), which does not give way to the crowd, is eased apart
@@ -605,6 +620,7 @@ let flag = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 let rad = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let mass = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let len = new Float64Array(0); // det-ok: scratch, rebuilt every tick
+let hwl = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let prio = new Uint8Array(0); // det-ok: scratch, rebuilt every tick
 let tdx = new Float64Array(0); // det-ok: scratch, rebuilt every tick
 let tdy = new Float64Array(0); // det-ok: scratch, rebuilt every tick
