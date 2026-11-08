@@ -1452,7 +1452,7 @@ LAN); only the client changes, plus the multiplayer input delay (when commands a
 
 ## 30. Model redo: Saiy-Ants and sickle-jaw termites; the rest of spec 09 (rows, grab-and-squirt fit, balance, Termants) — branch `feature/models-saiy-sickle`
 
-User specs: `claude/realism/10-spec-saiy-ant-sickle-jaw-models.md` (the models, with the fire ant pilot's playbook) and the parts of `claude/realism/09-spec-sickle-jaw-termants.md` it says still apply. (§27 is the shared underground on main; the audio v3 branch, not merged yet, renumbers its own section when it lands.)
+User specs: `claude/realism/10-spec-saiy-ant-sickle-jaw-models.md` (the models, with the fire ant pilot's playbook) and the parts of `claude/realism/09-spec-sickle-jaw-termants.md` it says still apply. (Numbered 30 at the merge: §27 the shared underground, §28 audio v3, §29 performance v2 landed on main first.)
 
 - **Saiy-Ants** on *Camponotus* anatomy (`saiyMorphs.ts`, `antGeometry.ts` `campo` terms: set-back antennal sockets, a keeled clypeus with a dark suture; `mandibleSpecs.ts` `SAIY_*_JAW`, five teeth; baked recipe `SAIY`; planted feet; three bites per caste, no acid — the user's rule; the gold surge's stretch and overshoot in `antViews.speciesExtras`). Hair (briefs 07/08) unchanged.
 - **Sickle-jaw termites** on the ant pipeline (`rhyMorphs.ts`, routed by `NASUTE_ANT_PATH`; `nasuteBuilder.ts`: the C-hook sickles, the snout's down-curve and pore, the worker's round glossy head (`head.round`) and egg-shaped abdomen (`abdomen.front`), the soldier's bold tergite bands (`abdomen.band`) and crimson sickles darkening only at the hook (`sickle.tip`); presoldier and larva morphs). The king and queen stay on the termite kit, as the conehead royals do (review round 1: the user preferred the kit's queen; the ant-pipeline royals and their builder options were removed). Animation: `antViews.sickleAntPath` maps the kit states to attack cycles (special 7 grab, 8 hold-and-squirt, 9 free squirt, 5 drum) and poses (THREAT, RUSH), `attackPoses` `S_GRAB` / `S_HOLD` / `S_SQUIRT`; the acid jet and fizz drawn by `antRenderer` from the snout's tip. The kit's sickle-jaw worker and soldier castes stay in `render/termite` (their rig-texture rows are fixed, as the conehead castes' were) but are no longer drawn in the game. The hold pins the victim head-on in line with the soldier, its head inside the closed hooks (`SICKLE.grab.gripMm`, `victimInHooks`; the kit-derived `SICKLE_SOCKET` is gone from `termiteRoyalData.ts` and its generator).
@@ -1467,10 +1467,8 @@ User specs: `claude/realism/10-spec-saiy-ant-sickle-jaw-models.md` (the models, 
 
 ## 31. Saiy-Ant Blaster: energy orbs from the mouth, a 3-second beam in gold form; gold form at least 10 s (user spec 2026-11-07, claude/saiy-ants/09-spec-saiy-blaster.md) — branch `feature/saiy-blaster`
 
-**Base.** The model redo (`feature/models-saiy-sickle`, handoff 18) is in review, not on `main`; the blaster is built
-on it (merged into this branch: the blaster's morph derives from the redone `saiy_worker`). This branch merges into
-`main` only once the user has approved the redo as well; if the redo were dropped, the derivation carries over to
-whatever `saiy_worker` is.
+**Base.** Built on the model redo (§30; merged into this branch while it was in review, then approved and merged into
+`main`, handoff 21): the blaster's morph derives from the redone `saiy_worker`.
 
 **31.1 Caste** — `aurimyrmex_blaster`, display name **Blaster**, role `soldier` (there is no `ranged` role; the mortar and
 rapid sprayer are soldiers too), morph `saiy_blaster`, worker-sized and light (length 6.6, hp 12, armour 0, speed 24),

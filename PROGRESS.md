@@ -1958,7 +1958,7 @@ User spec `claude/performance/01-spec-performance-no-visual-loss.md` (branch `fe
   seed 11.
 - Checks: `tests/storyEvents.ts` (new), `tests/storyCh1.ts` (seven levels), `npm test`, `check-determinism`, the build;
   browser shots `docs/story/shots/ch1_7/` (`tests/browser/story_ch1_7.py`). Protocol `ud-mp-12`.
-## 2026-11-06 — A shared underground: set tunnel routes between nests, underground fog (CHANGE_PLAN §28)
+## 2026-11-06 — A shared underground: set tunnel routes between nests, underground fog (CHANGE_PLAN §27)
 User spec `claude/underground/01-spec-shared-underground-tunnels.md` (2026-11-06); branch `feature/shared-underground`.
 Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).
 - **Layout:** every colony nest grid grew a ring of 8 hexes of unbreakable rock (`SOIL_ROCK`; titans don't break it
@@ -1981,6 +1981,7 @@ Design: DESIGN.md §3.12c. The game's own feature (EotU seals every nest).
 - **Saves:** version 4 — old grids embedded in the margin (everything in the space shifted), routes generated closed;
   `BUILD_ID` `ud-mp-13` (12 was taken by the story merge). `tests/tunnels.ts` (35 checks) in `npm test`.
 - Stills: `docs/underground/tunnels/` (`tests/browser/tunnels.py`; dev `?tunnel=<stage>`).
+
 ## 2026-11-06 — Audio v3: every sound effect remade (insect-like, made for this game); no walking or termite idle sounds
 - **User spec** `claude/audio/03-spec-sfx-rework-insect.md` (branch `feature/sfx-insect`; CHANGE_PLAN §28).
 - **Made for this game:** `tools/audio/sfx` renders every effect offline with numpy/scipy from the physics of the
@@ -2036,18 +2037,17 @@ User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch 
 - **UI:** marker counts once a tick, label styles written only when changed.
 - **Fixed on the way:** a story save with a visiting party restored differently (merged early with the meter).
 
-
-## 2026-11-07 — Model redo: Saiy-Ants, sickle-jaw termites, Termants (`feature/models-saiy-sickle`, CHANGE_PLAN §28; in review)
+## 2026-11-07 — Model redo: Saiy-Ants, sickle-jaw termites, Termants (`feature/models-saiy-sickle`, CHANGE_PLAN §30; approved after review round 4, merged)
 
 - **Saiy-Ants** rebuilt on a real carpenter ant (*Camponotus*): broad rounded head (the soldier's heart-shaped and broader), antennal sockets set back from a keeled clypeus, five-toothed parametric jaws, a smooth arched mesosoma, a scale petiole, an oval gaster with golden-grey hairs, long legs; blue-black satin cuticle from a baked recipe; three bites per caste on planted feet (no acid, the user's rule); the gold surge's stretch and overshoot. The six locks are unchanged.
-- **Sickle-jaw termites**: every caste (worker, soldier, presoldier, king, queen, larva) on the realistic ant pipeline: the soldier's glassy red head and down-curved snout with its pore, long thin crossing sickles traced from the user's photos, beaded antennae, very long legs; the worker (rebuilt from the user's field photos in review round 3) a small round glossy orange head and a big glossy chocolate egg-shaped abdomen, its plates pillowed, finely haired and dotted with the spiracles; the soldier's crimson sickles and banded tan-brown abdomen; the king and queen kept on the termite kit (review round 1). The grab-and-squirt, the free squirt, the threat and the drum as planted-feet attack cycles, the acid jet and fizz from the snout's tip.
+- **Sickle-jaw termites**: every caste (worker, soldier, presoldier, king, queen, larva) on the realistic ant pipeline: the soldier's glassy red head and down-curved snout with its pore, long thin crossing sickles traced from the user's photos, beaded antennae, very long legs; the worker (rebuilt from the user's field photos in review round 3) a small round glossy orange head and a big glossy chocolate egg-shaped abdomen, its plates pillowed, finely haired and dotted with the spiracles; the soldier's crimson sickles and banded amber-brown abdomen; the king and queen kept on the termite kit (review round 1). The grab-and-squirt, the free squirt, the threat and the drum as planted-feet attack cycles, the acid jet and fizz from the snout's tip.
 - **No more defensive rows**: sickle-jaw soldiers gather or hold the escort ring like other soldiers. A knockback ends a hold cleanly. Balance: soldier health 20 and brood × 2.2 (+0.79 → +0.03 against the reference soldier), worker bite 2.5.
 - **Termants** redesigned: termite antennae on every caste, no nasus (the soldier's glue from a pore on its forehead), a *Macrotermes*-style soldier head with sabre jaws, realistic materials, planted feet.
-- Other species' models unchanged (hash check); height data regenerated. Review pages rounds 1–4 sent to the user.
+- Other species' models unchanged (hash check); height data regenerated. Four review rounds with the user; approved 2026-11-07 ("good. push changes").
 
 ## 2026-11-07 — Saiy-Ant Blaster: energy orbs from the mouth, a 3-second beam in gold form; gold form 10 s (`feature/saiy-blaster`, CHANGE_PLAN §31; in review)
 
-Built on the model redo (merged into this branch; it goes to `main` with the redo once the user approves both).
+Built on the model redo (§30, merged into this branch during its review; now on `main`).
 - **The caste** `aurimyrmex_blaster` ("Blaster"; Termants steal it as "Saiy-Ant Blaster"): worker-sized and light
   (6.6 mm, 12 hp, no armour, speed 24, cost 30 + 6), brood mix 0.14, no climbing. It holds 40 mm off and spits glowing
   orbs from its mouth (5 physical damage, the first enemy on the path; walls stop them; allies never hit); in the gold
