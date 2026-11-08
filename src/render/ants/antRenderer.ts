@@ -131,6 +131,13 @@ export interface AntView {
   rideRail?: number;
   rideSlot?: number;
   rideT?: number;
+  /** climbing a tree trunk (sim/trees.ts): the trunk's index + 1 (0 = not), progress up the trunk 0..1 (height
+   *  fraction climbed, whichever way it goes), 1 going up / 0 coming down, the angle round the trunk of its climb
+   *  point; the game's trunk mount (game/trunkMount.ts) puts it on the bark, walking parallel to the trunk */
+  trunk?: number;
+  trunkK?: number;
+  trunkUp?: number;
+  trunkA?: number;
 }
 
 /**
@@ -896,7 +903,7 @@ export class AntRenderer {
       if (catchUp) dt = Math.min(1, frameDt * (missed + 1));
       const M = v2 ? motionOut : null;
       // on a creature: its animated leg or back decides where the ant is (and how fast it climbs)
-      const mounted = (!!v.rideCr || !!v.heldCr) && !!this.mount && this.mount(v, alpha, mountOut);
+      const mounted = (!!v.rideCr || !!v.heldCr || !!v.trunk) && !!this.mount && this.mount(v, alpha, mountOut);
       // Gait: phase advances by distance travelled / stride length, so feet never slide.
       const scale = (1 + v.sizeVar * 0.12) * (v.scale ?? 1) * (s.m2 ? s.m2.sizeK : 1);
       const fighting = v.atk !== undefined;

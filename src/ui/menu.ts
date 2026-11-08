@@ -37,6 +37,8 @@ export interface MenuChoice {
   floods?: boolean;
   /** titans now and then dig into a nest (on unless false; claude/creatures/01-spec-digging-titans.md) */
   titanRaids?: boolean;
+  /** sandbox: the Trees layer built with the map (claude/trees/01-spec-trees-layer.md; off by default) */
+  trees?: boolean;
   /** AI colonies' level (CHANGE_PLAN §23): 0 Easy, 1 Normal (default), 2 Hard, 3 Brutal */
   aiLevel?: number;
   /** 'auto' follows the frame rate, starting from high */
@@ -117,6 +119,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       const m = MAPS[id]!;
       return `<button class="map-card ${choice.map === id ? 'on' : ''}" data-map="${id}"><span class="map-thumb" data-thumb="${id}"></span><b>${m.name}</b><i>${(m.width / 1000).toFixed(1)} × ${(m.depth / 1000).toFixed(1)} m${m.floods.length ? ' · floods' : ''}</i></button>`;
     }).join('')}</div>`;
+    const trees = choice.mode === 'sandbox' ? `<div class="opt-row"><span class="dim">Trees:</span><button class="chip ${choice.trees ? 'on' : ''}" data-trees="1">On: a canopy over the map (the TREES bar beside the ground map)</button><button class="chip ${!choice.trees ? 'on' : ''}" data-trees="0">Off</button></div>` : '';
     const titans = `<div class="opt-row"><span class="dim">Titans raid nests:</span><button class="chip ${choice.titanRaids !== false ? 'on' : ''}" data-titans="1">On: now and then a titan digs into a nest</button><button class="chip ${choice.titanRaids === false ? 'on' : ''}" data-titans="0">Off</button></div>`;
     const md = choice.map ? MAPS[choice.map] : undefined;
     const mapNote = md
@@ -154,7 +157,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
            <h2>Colony</h2><div class="species-grid">${sp}</div>${borrow}`
         : `<h2>Colony</h2><div class="species-grid">${sp}</div>${borrow}
            <h2>AI colonies</h2>${rivals}
-           <h2>Map</h2>${map}${mapNote}${titans}`;
+           <h2>Map</h2>${map}${mapNote}${titans}${trees}`;
     const go = choice.mode === 'story' ? 'Open the island map' : choice.mode === 'mission' ? `Start ${MISSIONS[choice.mission].title}` : choice.mode === 'sandbox' ? 'Open the sandbox' : choice.mode === 'arena' ? 'Open the arena' : 'Found the colony';
     root.innerHTML = `<div class="menu-card">
       <h1>UNDERGROUND DOMINION</h1>
@@ -221,6 +224,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
     } else if (d.map) choice.map = d.map as MapId;
     else if (d.floods) choice.floods = d.floods === '1';
     else if (d.titans) choice.titanRaids = d.titans === '1';
+    else if (d.trees) choice.trees = d.trees === '1';
     else if (d.ailevel) choice.aiLevel = Number(d.ailevel);
     else if (d.q) choice.quality = d.q as Quality | 'auto';
     else if (t.classList.contains('go')) {

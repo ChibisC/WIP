@@ -1637,6 +1637,16 @@ kind map (wood / leaf / trunk top / site) is kept in `TreesDef` for the render a
   on entering or leaving; while it runs the ant is held (no brain, no moving, not a target) and the render draws it on the
   bark — rising at the climb point in the ground view, arriving at the top in the trees view (`TREES.height` mm above
   the ground). Creatures whose kind has `climbs` may follow their prey up (`cr.data.trunkT`).
+  - *2026-11-08 (user: "use walking animation parallel to the tree"):* the climb is a **bark walk**, not a rise. The
+    ant renderer's mount hook (the one that puts riders on a creature's animated legs) takes climbing ants too
+    (`AntView.trunk/trunkK/trunkUp/trunkA`, `game/trunkMount.ts`): feet on the drawn trunk's surface at the climbed
+    height (its radius from `trunkGeometry`'s flare, `trunkRadiusAt`), body along the trunk (up head first, down head
+    first), back outward, the gait driven at `height / climbSec` mm/s. Ground view: it starts on the ground at its climb
+    point and tips up onto the bark over the first 6 % of the height (tips down and walks away at the end of a descent);
+    the ground's trunk is drawn `height + 8` tall so the climb ends on bark. Trees view: it comes up the outside of the
+    trunk top and tips over the rim onto the wood in the last 6 %. Stills `docs/trees/shots/climb_walk.jpg`,
+    `climb_rim.jpg`, clip `docs/trees/clips/climb.gif` (`tests/browser/trunk_climb.py`). Also: the sandbox setup screen
+    has **Trees: On / Off** (user: the layer is chosen before the game starts), `MenuChoice.trees` → `GameSetup.trees`.
 - **Falling:** only flings. A fling in the trees (`flingAnt`) moves the ant to the SURFACE at once with `fz = TREES.height`
   (so it is seen dropping in the ground view), lands dazed (`TREES.fallDaze`) with `TREES.fallDamage`. Ants never walk off
   a branch (the grid's rock is a wall).
@@ -1674,4 +1684,6 @@ kind map (wood / leaf / trunk top / site) is kept in `TreesDef` for the render a
 `sim/creatures/creatureAI.ts`, `sim/commands.ts`, `sim/world.ts`, `sim/species.ts habitat`, `sim/snapshot.ts`,
 `worker/frames.ts`, `game/replica.ts`, `render/view.ts`, `render/trees/canopyTerrain.ts` (new), `game/session.ts`,
 `game/nestView.ts`, `ui/minimaps.ts`, `ui/theme.css`, `ui/sandboxPanel.ts`, `main.ts`, `net/match.ts`, `net/messages.ts`,
-`tools/trees-check.ts`, `tests/trees.ts`, `tests/browser/trees.py`, `docs/trees/`.
+`tools/trees-check.ts`, `tests/trees.ts`, `tests/browser/trees.py`, `docs/trees/`; 2026-11-08: `game/trunkMount.ts` (new),
+`render/ants/antRenderer.ts` (AntView trunk fields, mount condition), `game/antViews.ts`, `render/trees/treeDecor.ts`,
+`ui/menu.ts`, `tests/browser/trunk_climb.py`.

@@ -6,6 +6,7 @@ import { patchDapple } from '../shaderPatch';
 import { World } from '../../sim/world';
 import { TREES } from '../../sim/types';
 import { TREES as T } from '../../sim/balance';
+import { trunkDrawHeight } from '../../game/trunkMount';
 
 /**
  * What the Trees layer adds to the two scenes (render only; with the layer on):
@@ -27,7 +28,7 @@ export class TreeDecor {
     const tex = textures();
     const trunks: THREE.BufferGeometry[] = [];
     d.trunks.forEach((t, i) => {
-      const geo = trunkGeometry({ circle: [t.x, t.y], r: t.r }, Math.max(140, d.height * 0.9), groundAt, 2100 + i * 41);
+      const geo = trunkGeometry({ circle: [t.x, t.y], r: t.r }, trunkDrawHeight(d), groundAt, 2100 + i * 41);
       if (geo) trunks.push(barkReady(geo));
     });
     if (trunks.length) {

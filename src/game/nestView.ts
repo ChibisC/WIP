@@ -23,6 +23,7 @@ import { CASTES, isTermiteSpecies } from '../sim/species';
 import { MARKER_COLORS, markerRadius } from '../sim/markers';
 import { groupById, raisesAnts } from '../sim/tiles';
 import { antToView, blankView, corpseToView, termiteBroodToView } from './antViews';
+import { trunkMountCanopy } from './trunkMount';
 import { casteColour, casteLook } from '../render/casteLook';
 import { NestWater } from '../render/nest/nestWater';
 import { floodCache } from '../sim/nestFlood';
@@ -201,6 +202,8 @@ export class NestView {
     // creatures first: climbing ants are placed on their animated legs and backs
     this.creatures.update(w.s.creatures, this.space, alpha, dt, this.floorHeight, cam, viewportH);
     this.ants.mount = (v, a, out) => {
+      // (the trees: an ant coming up the trunk top's side and over its rim, game/trunkMount.ts)
+      if (v.trunk) return trunkMountCanopy(w, v, out);
       const cr = w.creatureById.get(v.rideCr || v.heldCr || 0);
       return !!cr && this.creatures.mountPose(cr, v, a, out);
     };
