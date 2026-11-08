@@ -41,7 +41,7 @@ export function fight(a: string, na: number, b: string, nb: number, seed = 3, se
       c.markers[0].noGather = true;
       c.markers[1].noGather = true;
     }
-    const shooter = !!CASTES[caste].acid && (CASTES[caste].acid!.kind === 'lob' || CASTES[caste].acid!.kind === 'rapid');
+    const shooter = (!!CASTES[caste].acid && (CASTES[caste].acid!.kind === 'lob' || CASTES[caste].acid!.kind === 'rapid')) || !!CASTES[caste].blast;
     for (let i = 0; i < n; i++) {
       const row = Math.floor(i / 8);
       const col = i % 8;
@@ -67,7 +67,7 @@ export function fight(a: string, na: number, b: string, nb: number, seed = 3, se
         const x = w.antById.get(id);
         if (x && x.state !== AS.Dead) {
           x.task = 'marker';
-          x.marker = x.caste.includes('mortar') || x.caste.includes('rapid') ? 1 : 0;
+          x.marker = x.caste.includes('mortar') || x.caste.includes('rapid') || x.caste.includes('blaster') ? 1 : 0;
         }
       }
     // PURSUE=1: each side's marker follows the other side's centre (sickle-jaw soldiers hold a guard line on the trail

@@ -555,15 +555,17 @@ function rampRun(phases: number[], targetCaste = 'formica_soldier'): { dmg: numb
   w.reindex();
   let goldTicks = 0;
   let started = -1;
-  for (let i = 0; i < 600 && goldTicks < 200; i++) {
+  const SG = BALANCE.surge;
+  for (let i = 0; i < 1200 && goldTicks < 400; i++) {
     w.step(0.05);
     if ((s.surgeT ?? 0) > 0) {
       if (started < 0) started = i;
       goldTicks++;
     } else if (started >= 0) break;
   }
-  check('Saiy-Ant: turns gold on entering combat and stays gold 4 s (80 ticks)', goldTicks === 80, `${goldTicks} ticks`);
-  check('…then a 20 s cooldown', near(s.surgeCd ?? 0, 20, 0.051), `${s.surgeCd}`);
+  // (user 2026-11-07: at least 10 s of gold; CHANGE_PLAN §31)
+  check(`Saiy-Ant: turns gold on entering combat and stays gold ${SG.duration} s (${SG.duration * 20} ticks; at least 10 s)`, goldTicks === Math.round(SG.duration * 20) && SG.duration >= 10, `${goldTicks} ticks`);
+  check(`…then a ${SG.cooldown} s cooldown`, near(s.surgeCd ?? 0, SG.cooldown, 0.051), `${s.surgeCd}`);
   // timers and perks on a lone ant (no fight to re-trigger it)
   const { antSpeed } = await import('../src/sim/movement');
   const { startSurge, surgeTick } = await import('../src/sim/surge');
@@ -572,21 +574,21 @@ function rampRun(phases: number[], targetCaste = 'formica_soldier'): { dmg: numb
   lone.surgeT = 2;
   check('…+50 % speed while gold', near(antSpeed(w, lone) / base, 1.5, 1e-9));
   lone.surgeT = 0;
-  lone.surgeCd = 20;
+  lone.surgeCd = SG.cooldown;
   let n = 0;
   while ((lone.surgeCd ?? 0) > 0 && n < 1000) {
     surgeTick(lone, 0.05);
     n++;
   }
-  check('…ready again after exactly 20 s (400 ticks)', n === 400, `${n} ticks`);
+  check(`…ready again after exactly ${SG.cooldown} s (${SG.cooldown * 20} ticks)`, n === Math.round(SG.cooldown * 20), `${n} ticks`);
   applyLevel(lone, 2);
   lone.surgeT = 0.05;
   surgeTick(lone, 0.05);
-  check('level-2 tiles: 14 s cooldown', near(lone.surgeCd ?? 0, 14, 1e-9), `${lone.surgeCd}`);
+  check(`level-2 tiles: ${SG.cooldownL2} s cooldown`, near(lone.surgeCd ?? 0, SG.cooldownL2, 1e-9), `${lone.surgeCd}`);
   applyLevel(lone, 3);
   lone.surgeCd = 0;
   startSurge(w, lone);
-  check('level-3 tiles: 5 s of gold', lone.surgeT === 5);
+  check(`level-3 tiles: ${SG.durationL3} s of gold`, lone.surgeT === SG.durationL3);
   // damage: +60 % while gold
   const victim = dummy(w, 1, 'lasius_queen', lone.x + 6, lone.y);
   victim.stun = 1e6;

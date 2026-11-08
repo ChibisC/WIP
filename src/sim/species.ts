@@ -7,7 +7,8 @@ import { TERMITE_ROYALS } from './termiteRoyalData';
 export type SpeciesId = 'lasius' | 'formica' | 'atta' | 'solenopsis' | 'eciton' | 'plagiaria' | 'nasutitermes' | 'rhynchotermes' | 'hell' | 'aurimyrmex' | 'termant';
 export type Role = 'worker' | 'soldier' | 'major' | 'queen' | 'minim' | 'king';
 /** `pure` ignores armour (the nasute's glue stream) */
-export type DamageType = 'bite' | 'acid' | 'sting' | 'pure';
+/** `blast`: a Saiy-Ant Blaster's orb or beam — physical, armour counts as against a bite */
+export type DamageType = 'bite' | 'acid' | 'sting' | 'pure' | 'blast';
 
 /**
  * In-game display names that may change later live here (one value each).
@@ -76,6 +77,11 @@ export interface CasteDef {
   snap?: { kind: 'pin' | 'impale'; windup: number; dps: number; hold: number; cooldown: number; maxPreyMass: number; burst?: number };
   /** Saiy-Ants: can flash into the gold surge (sim/surge.ts) */
   surge?: boolean;
+  /**
+   * Saiy-Ant Blaster (sim/saiyBlaster.ts; numbers in `BALANCE.blaster`): fires energy orbs from the mouth from range,
+   * and in the gold form every fifth shot is a 3-second beam. Holds its distance like the acid shooters.
+   */
+  blast?: boolean;
   /** Termants: may gather dead wood, leaf litter and leaves, all into the one food store (sim/termants.ts) */
   wood?: boolean;
   /** Termant soldier: the point-blank glue burst from the frontal pore (sim/termants.ts) */
@@ -420,6 +426,13 @@ export const CASTES: Record<string, CasteDef> = {
     cost: 20, devTime: 1.5, pop: 1, cocoon: true,
     fact: 'A major worker: the same body plan with a broad, square head full of jaw muscle. Carpenter ant majors crush seeds and enemies alike.',
   }),
+  aurimyrmex_blaster: C({
+    id: 'aurimyrmex_blaster', species: 'aurimyrmex', name: 'Blaster', role: 'soldier', morph: 'saiy_blaster', length: 6.6, speed: 24, mount: 'none',
+    hp: 12, bite: 1.2, attackInterval: 1.1, armor: 0, carry: 3, grip: 1.5, mass: 1.6, forage: true, dig: true, nurse: false,
+    surge: true, blast: true,
+    cost: 22, devTime: 1.5, pop: 1, cocoon: true,
+    fact: 'Fictional caste. Its mouth glows before each shot; in the gold form the glow turns gold and every fifth shot is a beam it holds for three seconds.',
+  }),
   aurimyrmex_queen: C({
     id: 'aurimyrmex_queen', species: 'aurimyrmex', name: 'Queen', role: 'queen', morph: 'saiy_queen', length: 14, speed: 7, hp: 900, bite: 5, attackInterval: 1.4,
     armor: 4, carry: 0, grip: 5, mass: 14, forage: false, dig: false, nurse: false, cost: 0, devTime: 1, pop: 0, cocoon: true,
@@ -511,10 +524,10 @@ export const SPECIES: Record<SpeciesId, SpeciesDef> = {
   },
   aurimyrmex: {
     id: 'aurimyrmex', common: SPECIES_DISPLAY_NAME.aurimyrmex ?? SAIY_FALLBACK_NAME, scientific: 'Aurimyrmex fulgurans', queen: 'aurimyrmex_queen', fictional: true,
-    castes: ['aurimyrmex_worker', 'aurimyrmex_soldier'],
-    ratio: { aurimyrmex_worker: 0.8, aurimyrmex_soldier: 0.2 }, startWorkers: 7, eggInterval: 5.5, color: '#d9a53a',
-    blurb: 'Fictional carpenter-ant relatives whose glossy black cuticle flashes metallic gold for a few seconds when they fight: faster and harder-hitting, then exhausted while they recover.',
-    traits: ['Gold surge: +50 % speed, +60 % damage for 4 s', '20 s recovery (dull, drooping antennae)', 'Bites only: no acid, no sting', 'The queen never transforms'],
+    castes: ['aurimyrmex_worker', 'aurimyrmex_soldier', 'aurimyrmex_blaster'],
+    ratio: { aurimyrmex_worker: 0.7, aurimyrmex_soldier: 0.17, aurimyrmex_blaster: 0.13 }, startWorkers: 7, eggInterval: 5.5, color: '#d9a53a',
+    blurb: 'Fictional carpenter-ant relatives whose glossy black cuticle flashes metallic gold when they fight: faster and harder-hitting, then exhausted while they recover. Blasters fire glowing energy orbs from their mouths, and a beam in the gold form.',
+    traits: ['Gold surge: +50 % speed, +60 % damage for 10 s', '30 s recovery (dull, drooping antennae)', 'Blasters: energy orbs from the mouth; in gold, every fifth shot a 3 s beam', 'No acid, no sting', 'The queen never transforms'],
   },
   termant: {
     id: 'termant', common: SPECIES_DISPLAY_NAME.termant ?? TERMANT_FALLBACK_NAME, scientific: 'Chimaeromyrmex termitoides', queen: 'termant_queen', king: 'termant_king', fictional: true,
