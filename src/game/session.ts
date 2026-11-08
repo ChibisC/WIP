@@ -295,7 +295,9 @@ export class GameSession {
     };
     this.loop.onStepEnd = () => {
       prof.end();
-      feel.frameEnd(this.frameAt, this.world.s.tick);
+      // (acting is when the units are drawn moving: in worker mode the playout runs a little behind the newest tick)
+      const po = this.sim.kind === 'worker' ? (this.sim as WorkerSim).playout : null;
+      feel.frameEnd(this.frameAt, po && Number.isFinite(po.R) ? po.R + 1 : this.world.s.tick);
     };
     this.events.onAny((e) => {
       if (e.t === 'command') {
