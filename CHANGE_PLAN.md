@@ -1499,18 +1499,31 @@ threshold, after the soldier; the per-species lookups take every entry of a spec
 
 **31.3 Model** (`saiyMorphs.ts` `SAIY_BLASTER`, from `SAIY_WORKER`): slimmer and a little longer, a larger rounder head
 with the jaws set wide, the six locks the same design swept back further (lower and longer), a mouth-glow piece between
-the jaw bases (surface flag 9: emissive, white-blue → gold with `aE.x`; per-instance level in the rage channel, which
+the jaw bases (surface flag 9.5: emissive, white-blue → gold with the gold level; per-instance level in the rage channel, which
 the blaster's program reads as the mouth glow — `#define MOUTH_GLOW`). Poses (`antViews.ts` `blastPose`): head aims,
 jaws part wide in the wind-up, recoil on each orb, braced for the beam (legs spread, body low, head steady, a tremble).
 Morph hashes re-baselined for `saiy_blaster` only; height data regenerated.
 
-**31.4 Effects** (`render/game/blastFx.ts`, instanced, closed form in the shader): orbs read from the replica's
-projectiles (position extrapolated by the playout α): core, coloured shell, swirling streaks, a short trail, ground
-light; impacts and fizzles as closed-form bursts (`combatFx`); beams read from the ants' `beamT/H/L`: core, glow,
-ripple, the charge ball at the mouth, the far-end burst, ground light, a flash on and a fade out. Bloom only on cores.
+**31.4 Effects** (`render/game/blastFx.ts`, inside each scene's `CombatFx`; instanced, played in closed form in the
+shader from the sim's events — nothing stepped per frame on the CPU but the few live beams' end sparks): orbs from `orb`
+(where and when fired, at the orb's speed; the projectile id `pid` ties `orbHit` / `orbFizz` to its orb, which runs on to
+the hit point and bursts there): core, coloured shell with swirling crackle, a short trail, ground light; bursts of
+light, sparks and dust on a hit, a soft pop on a fizzle (particles in `CombatFx`). Beams from `beam` / `beamEnd`: core,
+rippling flickering glow, the charge ball at the mouth, the far-end burst, ground light, a flash on and a fade out. Bloom
+only on the cores (HDR > the bloom threshold); everything at least a few pixels across at gameplay zoom. Pools: 512 orbs,
+64 beams, the oldest reused. A sim event `blastCharge` marks the wind-up (render and sound).
 
-**31.5 Sounds** (audio v3 recipes, original): `blast.charge` (rising hum), `blast.orb` (punchy fwip), `blast.hit`
-(sizzle), `blast.beam` (steady roar-hum, looped for the beam).
+**31.5 Sounds** (audio v3 recipes in `tools/audio/sfx/recipes_combat.py`, made for this game, original):
+`species.blaster_charge` (rising hum, snapped off at the shot), `species.blaster_orb` (punchy fwip; at 0.62 × the
+beam's flash), `species.blaster_hit` (sizzle; quiet and higher for a fizzle), `species.blaster_beam` (steady roar-hum
+loop, a `LoopBed` that follows the beams near the listener). `build.py pack <filter>` packs only those sounds (the rest
+of the manifest and files kept).
+
+**31.5b Balance as built** (`tools/blaster-balance.ts`; docs/balance/castes.md "Saiy-Ant Blaster"): the Blaster backs
+off from a foe inside 0.4 × range at 60 % of its own speed, gold or not (it out-ran every melee caste in gold and won
+even in contact); in a marker's guard crowd it stands `holdBack` 14 mm behind its place (the melee line in front).
+The 10 s gold form doubled the Saiy worker's and soldier's equal-food margins, so their health and bite were scaled
+back to the tie with the references (the gold boosts themselves are kept).
 
 **31.6 Verify** — `tests/saiyBlaster.ts` (first enemy on the path, allies never hit, walls, physical damage, five-shot
 cycle in gold only, beam length/planting/finishing after gold ends, densest-line aim, 10 s gold, determinism);

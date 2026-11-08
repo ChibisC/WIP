@@ -7,7 +7,11 @@
  *  - in the gold form every fifth shot is the beam, never outside it;
  *  - the beam: 3 s, the ant planted and facing along it, every enemy along it hurt each pulse, never a teammate, cut
  *    short by a wall, finished when the gold form ends during it, broken by a fling; aimed at the densest line;
- *  - determinism: the same fight twice gives the same result, and a save in the middle of a beam goes on the same.
+ *  - determinism: the same fight twice gives the same result, and a save in the middle of a beam goes on the same;
+ *  - balance rules: it backs off from melee only at a walk (melee catches it, gold or not); in a guard crowd it stands
+ *    behind the melee line;
+ *  - render: the pose (glow at rest, aiming with the jaws wide, braced for the beam); the effects (an orb runs on to the
+ *    point it hit and bursts there; a beam shows until its end event and fades; pools reused); the sounds' catalog.
  *
  *   npx vite-node tests/saiyBlaster.ts
  */
@@ -25,6 +29,12 @@ import { aimBeam, orbStep } from '../src/sim/saiyBlaster';
 import { flingAnt } from '../src/sim/combat';
 import { casteLook } from '../src/render/casteLook';
 import { encodeState, restoreWorld } from '../src/sim/snapshot';
+import { antToView } from '../src/game/antViews';
+import type { AntView } from '../src/render/ants/antRenderer';
+import { CombatFx } from '../src/render/game/combatFx';
+import { SOUNDS } from '../src/audio/catalog';
+import { guardSlot } from '../src/sim/guardLine';
+import { placeMarker } from '../src/sim/markers';
 
 const t0 = Date.now();
 let failed = 0;
@@ -333,6 +343,106 @@ function blasterFight(seed: number, saveAt = -1): string {
   // a save taken while a beam is under way (found by running once and looking)
   const c = blasterFight(7, 20 * 12);
   check('determinism: a save in the middle of the fight goes on exactly the same', a === c);
+}
+
+// ---- balance rules: backing off at a walk; behind the melee line in a guard crowd
+{
+  const { w, ev } = arena(5);
+  const b = put(w, 0, 'aurimyrmex_blaster', 300, 300, 0);
+  const foe = put(w, 1, 'lasius_worker', 310, 300, Math.PI);
+  w.reindex();
+  freeze([foe]);
+  engage(b, foe);
+  b.surgeT = 9; // gold: × 1.5 speed — the back-off ignores it
+  b.cd2 = 1;
+  const x0 = b.x;
+  for (let i = 0; i < 10; i++) {
+    w.step(0.05);
+    ev.drain();
+    freeze([foe]);
+    b.cd2 = Math.max(b.cd2, 0.5);
+  }
+  const v = (x0 - b.x) / 0.5;
+  check('it backs off from melee at a walk (60 % of its own speed), gold or not', v > 0 && v <= casteOf(b.caste).speed * B.backoff * 1.05 + 1e-6, `${v.toFixed(1)} mm/s, its speed ${casteOf(b.caste).speed}, gold ${(casteOf(b.caste).speed * BALANCE.surge.speedMul).toFixed(0)}`);
+}
+{
+  const { w } = arena(6);
+  const c = w.colony(0)!;
+  placeMarker(w, c, 0, SURFACE, 300, 300);
+  const sol: Ant[] = [];
+  const bl: Ant[] = [];
+  for (let i = 0; i < 6; i++) sol.push(put(w, 0, 'aurimyrmex_soldier', 290 + i, 300 + i * 3, 0));
+  for (let i = 0; i < 3; i++) bl.push(put(w, 0, 'aurimyrmex_blaster', 290 - i, 296 + i * 3, 0));
+  for (const a of [...sol, ...bl]) {
+    a.task = 'marker' as never;
+    a.marker = 0;
+  }
+  c.markers[0].noGather = true;
+  w.reindex();
+  const m = c.markers[0];
+  guardSlot(w, sol[0], c, 0);
+  const face = m.face ?? 0;
+  const depth = (a: Ant) => {
+    const p = guardSlot(w, a, c, 0);
+    return p ? (m.x - p.x) * Math.cos(face) + (m.y - p.y) * Math.sin(face) : NaN;
+  };
+  const ds = sol.map(depth);
+  const db = bl.map(depth);
+  check('in a guard crowd the Blasters stand behind the melee line', db.every((d) => d > Math.min(...ds) + B.holdBack * 0.6), `soldiers ${ds.map((d) => d.toFixed(0)).join(',')} mm back, Blasters ${db.map((d) => d.toFixed(0)).join(',')}`);
+}
+
+// ---- render: the pose
+{
+  const { w, ev } = arena(8);
+  const b = put(w, 0, 'aurimyrmex_blaster', 300, 300, 0);
+  const foe = put(w, 1, 'lasius_worker', 330, 310, Math.PI);
+  w.reindex();
+  const v = {} as AntView;
+  antToView(w, b, v, 0, 0);
+  check('pose: a faint mouth glow at rest, head straight', (v.mouthGlow ?? 0) > 0.02 && (v.mouthGlow ?? 0) < 0.2 && v.headYaw === 0, `glow ${v.mouthGlow?.toFixed(2)}`);
+  engage(b, foe);
+  b.state = AS.Spray;
+  b.st = B.windup * 0.95;
+  antToView(w, b, v, 0, 0);
+  check('pose: aiming, the jaws part wide, the head turns to the target and the glow builds', v.mandible > 0.9 && Math.abs(v.headYaw) > 0.1 && (v.mouthGlow ?? 0) > 0.6, `jaws ${v.mandible.toFixed(2)}, head ${v.headYaw.toFixed(2)}, glow ${v.mouthGlow?.toFixed(2)}`);
+  b.beamT = B.beamTime - 1;
+  b.beamH = 0;
+  b.beamL = 40;
+  antToView(w, b, v, 0, 0);
+  check('pose: braced for the beam (feet wide, body low, head steady, the mouth blazing)', (v.brace ?? 0) > 0.5 && (v.crouch ?? 0) > 0.2 && v.headYaw === 0 && (v.mouthGlow ?? 0) > 0.8, `brace ${v.brace?.toFixed(2)}, crouch ${v.crouch?.toFixed(2)}`);
+  void ev;
+}
+
+// ---- render: the effects
+{
+  const fx = new CombatFx();
+  const flat = () => 0;
+  fx.emit({ t: 'orb', x: 0, y: 0, tx: 30, ty: 0, space: SURFACE, id: 1, pid: 77 }, flat);
+  fx.update(0.05, flat, 900);
+  check('effects: a fired orb is on screen', fx.blast.liveOrbs === 1);
+  // the sim says it hit 30 mm on; the orb has flown 7.5 mm so far: it runs on (at most 60 ms more) and bursts there
+  fx.emit({ t: 'orbHit', x: 30, y: 0, space: SURFACE, pid: 77 }, flat);
+  fx.update(0.03, flat, 900);
+  const still = fx.blast.liveOrbs;
+  for (let i = 0; i < 4; i++) fx.update(0.03, flat, 900);
+  check('effects: on a hit the orb runs on to the point and bursts there', still === 1 && fx.blast.liveOrbs === 0);
+  fx.emit({ t: 'beam', x: 0, y: 0, h: 0, len: 50, space: SURFACE, id: 5 }, flat);
+  for (let i = 0; i < 20; i++) fx.update(0.05, flat, 900);
+  const on = fx.blast.liveBeams;
+  fx.emit({ t: 'beamEnd', x: 0, y: 0, space: SURFACE, id: 5 }, flat);
+  fx.update(0.1, flat, 900);
+  const fading = fx.blast.liveBeams;
+  fx.update(0.2, flat, 900);
+  check('effects: a beam shows until its end and then fades out', on === 1 && fading === 1 && fx.blast.liveBeams === 0);
+  for (let i = 0; i < 700; i++) fx.emit({ t: 'orb', x: 0, y: 0, tx: 30, ty: 0, space: SURFACE, id: 1, pid: 1000 + i }, flat);
+  fx.update(0.01, flat, 900);
+  check('effects: the orb pool reuses its oldest slots (512)', fx.blast.liveOrbs === 512);
+}
+
+// ---- sounds
+{
+  const ids = ['species.blaster_charge', 'species.blaster_orb', 'species.blaster_hit', 'species.blaster_beam'];
+  check('sounds: the charge, the orb, the hit and the beam loop are in the catalog', ids.every((id) => SOUNDS.some((d) => d.id === id)) && !!SOUNDS.find((d) => d.id === 'species.blaster_beam')?.loop);
 }
 
 console.log(`\n${failed ? `${failed} FAILED` : 'all Saiy-Ant Blaster tests passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

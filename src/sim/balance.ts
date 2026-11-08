@@ -743,6 +743,8 @@ export const BALANCE = {
     range: 40,
     /** backing off from a foe inside 0.4 × range: this share of its own speed, without the gold form's (melee catches it) */
     backoff: 0.6,
+    /** in a marker's guard crowd: this much (mm) behind its place, so the melee line stands in front */
+    holdBack: 14,
     orbDamage: 5,
     interval: 1.5,
     /** the shot: seconds of wind-up (head turns to aim, the mouth glows), then recovery until `shotDone` */
