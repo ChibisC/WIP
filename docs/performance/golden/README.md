@@ -27,3 +27,9 @@ low preset, the Lasius and fire-ant line-ups, the fight and its termites, the ti
 seeded sparks — the branch makes renders reproducible, so the reference must use the same seeds): **12 of 12 match
 with no noise set**, ten of them pixel for pixel (the two nests 0.9997: their drifting dust). The ants are drawn the
 same; the closed-form particles follow the old paths within 0.3 mm (`tests/clientVisuals.ts`).
+
+## Performance v3 (CHANGE_PLAN §31)
+`compare-v3after.md`: Meadow Pond, Riverbank and Savanna at three zooms, the fight and its termites, from
+`feature/performance-v3` (the ground, grass, water and map scenery in culled chunks) against `main` 56be698: **11 of 11
+match**, 8 pixel for pixel; the far shots differ in 1–11 pixels of 972,800 where grass blades cross (equal depths
+drawn in another order).
