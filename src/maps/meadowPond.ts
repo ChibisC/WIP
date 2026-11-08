@@ -142,4 +142,11 @@ export const MEADOW_POND: MapDef = {
     // storms flood the low grass round the pond (never the sites: the inner ring stands 380 mm out)
     { shape: { circle: [800, 800], r: 310 }, level: 0.5, first: [540, 780], every: [600, 960], hold: [40, 90] },
   ],
+  // the Trees (claude/trees/01-spec-trees-layer.md): willows by the pond, an oak and a beech on the meadow's far corners
+  trees: [
+    { trunk: [1250, 1230], r: 30, style: 'willow', reach: 240, seed: 11 },
+    { trunk: [350, 370], r: 28, style: 'willow', reach: 220, seed: 12 },
+    { trunk: [1450, 1450], r: 34, style: 'oak', reach: 250, seed: 13 },
+    { trunk: [150, 1450], r: 30, style: 'beech', reach: 230, seed: 14 },
+  ],
 };

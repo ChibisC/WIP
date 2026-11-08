@@ -160,4 +160,11 @@ export const RIVERBANK: MapDef = {
         [160, 760.3], [100, 777.9], [40, 776.6], [-20, 746.4],
       ] }, level: -1, first: [480, 720], every: [600, 900], hold: [45, 90] },
   ],
+  // the Trees: willows along the water, an oak on the high bank
+  trees: [
+    { trunk: [250, 870], r: 30, style: 'willow', reach: 240, seed: 31 },
+    { trunk: [1230, 930], r: 30, style: 'willow', reach: 240, seed: 32 },
+    { trunk: [650, 420], r: 28, style: 'willow', reach: 220, seed: 33 },
+    { trunk: [1650, 1000], r: 34, style: 'oak', reach: 260, seed: 34 },
+  ],
 };

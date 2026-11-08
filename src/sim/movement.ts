@@ -1,7 +1,8 @@
 import { antClear, antMostClear, antNeed } from './underpass';
 import { World } from './world';
-import { Ant, AS, Carry, Colony, Entrance, SURFACE, nestSpace, colonyOfSpace } from './types';
-import { arrivalHash, canEnter, canLeave, entranceTop, exitHole, holeIn, passEntrance, usableMask } from './entrances';
+import { Ant, AS, Carry, Colony, Entrance, SURFACE, TREES, nestSpace, colonyOfSpace } from './types';
+import { arrivalHash, canEnter, canLeave, entranceTop, exitHole, exitTops, holeIn, passEntrance, usableMask } from './entrances';
+import { holeSpace, startClimb, trunkOf } from './trees';
 import { casteOf } from './species';
 import { hexCoreCells } from './colony';
 import { hexSpeedOf } from './tiles';
@@ -360,7 +361,7 @@ export function exitFieldIn(w: World, space: number): Float32Array | null {
   const ents = w.entrancesOf(space);
   // (fallen-in holes lead nowhere)
   const open = ents.some(canLeave);
-  return flow.field('exit', () => (open ? entranceTop(g).flatMap((q) => hexCoreCells(g, q, 0.35)) : []), ents.length + 32 * usableMask(ents, true));
+  return flow.field('exit', () => (open ? exitTops(g).flatMap((q) => hexCoreCells(g, q, 0.35)) : []), ents.length + 32 * usableMask(ents, true));
 }
 
 /** Surface field toward an underground area's entrances. */
@@ -368,6 +369,36 @@ export function areaField(w: World, space: number): Float32Array {
   const ents = w.entrancesOf(space);
   const stamp = ents.reduce((s, e) => s + e.sx * 7 + e.sy * 13, 0) + usableMask(ents, false) * 0.001;
   return w.surfFlow.field('area:' + space, stamp, ents.filter(canEnter).map((e) => ({ x: e.sx, y: e.sy })));
+}
+
+/** The trees grid's field toward an area whose holes lie on the branches (a tree nest). */
+function treesAreaField(w: World, space: number): Float32Array | null {
+  const flow = w.flowOf(TREES);
+  const g = w.nestOf(TREES);
+  if (!flow || !g) return null;
+  const ents = w.entrancesOf(space);
+  return flow.field('area:' + space, () => ents.filter(canEnter).flatMap((e) => hexCoreCells(g, g.hexAt(e.sx, e.sy), 0.35)), ents.length + 32 * usableMask(ents, false));
+}
+
+/** Walk in the trees to a hole on a branch (a tree nest's entrance) and go in. Returns true once inside. */
+function goToHoleInTrees(w: World, a: Ant, space: number, dt: number, speedMul: number): boolean {
+  const ents = w.entrancesOf(space);
+  const bi = holeIn(w, ents, a.x, a.y);
+  if (bi < 0) return false;
+  const e = ents[bi];
+  const de = dhypot(e.sx - a.x, e.sy - a.y);
+  if (de < 3) {
+    if (!passEntrance(w, e, false)) return waitAtHole(w, a, e, dt);
+    enterArea(w, a, space, bi);
+    return true;
+  }
+  const f = treesAreaField(w, space);
+  if (f && de >= 8) {
+    const res = followNest(w, a, f, dt, speedMul);
+    if (res === 'moving') return false;
+  }
+  steerTo(w, a, e.sx, e.sy, dt, speedMul);
+  return false;
 }
 
 /** Nearest entrance (index) of a list to a surface point (−1 when empty). */
@@ -496,9 +527,17 @@ export function goHome(w: World, a: Ant, dt: number, speedMul = 1): boolean {
   // in another nest with a tunnel route home: through it (no climbing out)
   if (a.space !== SURFACE) {
     if (a.space === nestSpace(a.colony)) return true;
+    // a tree colony's ant in the trees: along the branches to its hole
+    if (a.space === TREES && c.entrances.length && holeSpace(c.entrances[0]) === TREES) return goToHoleInTrees(w, a, nestSpace(a.colony), dt, speedMul);
     const r = usableRoute(w, a.space, nestSpace(a.colony), a.colony);
     if (r && walkRoute(w, a, r, dt, speedMul)) return false;
     goOut(w, a, dt);
+    return false;
+  }
+  // a tree colony's holes lie on the branches: up the nearest trunk first, then along the branches to a hole
+  if (c.entrances.length && holeSpace(c.entrances[0]) === TREES) {
+    if (a.space === TREES) return goToHoleInTrees(w, a, nestSpace(a.colony), dt, speedMul);
+    goToArea(w, a, TREES, dt, speedMul);
     return false;
   }
   // the nearest hole; while it is busy, another of the anthill's with room that is not much farther
@@ -595,6 +634,8 @@ export function enterArea(w: World, a: Ant, space: number, ei: number): void {
   a.ent = ei;
   a.v = 0;
   a.entT = 0;
+  // the trees: the climb up the trunk takes its time (sim/trees.ts)
+  if (space === TREES) startClimb(w, a, e, true);
 }
 
 export function exitNest(w: World, a: Ant, ei: number): void {
@@ -606,15 +647,18 @@ const ctrTmp = { x: 0, y: 0 };
 function exitAreaTo(w: World, a: Ant, space: number, ei: number): void {
   const e = w.entrancesOf(space)[ei];
   if (!e) return;
-  const ctr = w.areaCentre(space, ctrTmp);
+  const tr = space === TREES ? trunkOf(w, e) : null;
+  const ctr = tr ?? w.areaCentre(space, ctrTmp);
   const ang = datan2(e.sy - ctr.y, e.sx - ctr.x) + w.rng.range(-0.8, 0.8);
-  a.space = SURFACE;
+  a.space = holeSpace(e);
   a.x = a.px = e.sx + dcos(ang) * 1.5;
   a.y = a.py = e.sy + dsin(ang) * 1.5;
   a.h = a.ph = ang;
   a.ent = ei;
   a.v = 0;
   a.entT = 0;
+  // down the trunk: held on the bark for the climb (sim/trees.ts)
+  if (space === TREES) startClimb(w, a, e, false);
 }
 
 /**
@@ -628,13 +672,25 @@ export function tryExit(w: World, a: Ant): boolean {
   if (!g) return false;
   const ents = w.entrancesOf(a.space);
   if (!ents.length || !ents.some(canLeave)) return false;
+  let i: number;
   if (g.flowers[0]?.length) {
     if (!entranceTop(g).includes(g.hexAt(a.x, a.y))) return false;
+    i = exitHole(w, a, ents);
+  } else if (a.space === TREES) {
+    // on a trunk top: down one of that trunk's climb points
+    const here = g.hexAt(a.x, a.y);
+    const top = exitTops(g).find((q) => q === here);
+    if (top === undefined) return false;
+    const p = g.hexCenter(top);
+    if (sq(p.x - a.x) + sq(p.y - a.y) >= sq(g.R * 0.6)) return false;
+    const mine = ents.map((e, k) => (e.q === top ? k : -1)).filter((k) => k >= 0);
+    if (!mine.length) return false;
+    i = mine[exitHole(w, a, mine.map((k) => ents[k]))];
   } else {
     const p = g.hexCenter(ents[0].q);
     if (sq(p.x - a.x) + sq(p.y - a.y) >= sq(g.R * 0.3)) return false;
+    i = exitHole(w, a, ents);
   }
-  const i = exitHole(w, a, ents);
   // wait in the entrance, facing up, while the hole is busy
   if (!passEntrance(w, ents[i], true)) {
     a.v = 0;
@@ -666,7 +722,7 @@ export function goOut(w: World, a: Ant, dt: number): boolean {
     // climb the last bit of the ramp, to the nearest of its top hexes
     let best = -1;
     let bd = Infinity;
-    for (const q of entranceTop(g)) {
+    for (const q of exitTops(g)) {
       const p = g.hexCenter(q);
       const d = sq(p.x - a.x) + sq(p.y - a.y);
       if (d < bd) {
@@ -690,6 +746,15 @@ export function goOut(w: World, a: Ant, dt: number): boolean {
 export function goToArea(w: World, a: Ant, space: number, dt: number, speedMul = 1): boolean {
   if (a.space === space) return true;
   if (space === nestSpace(a.colony)) return goHome(w, a, dt, speedMul);
+  const ents0 = w.entrancesOf(space);
+  // an area whose holes lie on the branches (a tree nest): up a trunk, then along the branches to a hole
+  if (ents0.length && holeSpace(ents0[0]) === TREES) {
+    if (a.space === TREES) return goToHoleInTrees(w, a, space, dt, speedMul);
+    if (a.space === SURFACE) {
+      goToArea(w, a, TREES, dt, speedMul);
+      return false;
+    }
+  }
   if (a.space !== SURFACE) {
     // a tunnel route from this nest to that one (sim/tunnels.ts): walk it instead of climbing out
     const r = space !== SURFACE ? usableRoute(w, a.space, space, a.colony) : undefined;
@@ -697,7 +762,7 @@ export function goToArea(w: World, a: Ant, space: number, dt: number, speedMul =
     goOut(w, a, dt);
     return false;
   }
-  const ents = w.entrancesOf(space);
+  const ents = ents0;
   // (any hole: the nearest; while it is busy, another of the anthill's with room not much farther)
   const bi = holeIn(w, ents, a.x, a.y);
   if (bi < 0) return false;

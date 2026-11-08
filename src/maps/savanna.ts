@@ -166,4 +166,10 @@ export const SAVANNA: MapDef = {
     // a storm swells the waterhole over its flat margin
     { shape: { circle: [900, 900], r: 260 }, level: -1.5, first: [600, 900], every: [900, 1200], hold: [60, 120] },
   ],
+  // the Trees: a few scattered acacias, flat and wide
+  trees: [
+    { trunk: [1500, 420], r: 30, style: 'acacia', reach: 300, seed: 51 },
+    { trunk: [300, 1500], r: 30, style: 'acacia', reach: 300, seed: 52 },
+    { trunk: [1620, 1600], r: 28, style: 'acacia', reach: 260, seed: 53 },
+  ],
 };

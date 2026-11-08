@@ -137,4 +137,10 @@ export const RAINFOREST: MapDef = {
     { shape: { circle: [1180, 700], r: 60 }, level: -2, first: [240, 420], every: [300, 540], hold: [25, 50] },
     { shape: { circle: [320, 800], r: 60 }, level: -2, first: [240, 420], every: [300, 540], hold: [25, 50] },
   ],
+  // the Trees: the two giant trunks carry broad tropical crowns; a smaller tree between the pools
+  trees: [
+    { trunk: [480, 516], r: 81, style: 'tropical', reach: 400, seed: 41 },
+    { trunk: [1020, 984], r: 81, style: 'tropical', reach: 400, seed: 42 },
+    { trunk: [750, 620], r: 30, style: 'tropical', reach: 230, seed: 43 },
+  ],
 };

@@ -91,6 +91,7 @@ export class FrameBuilder {
         settings: s.settings,
         colonies: this.slow.colonyDelta(s.colonies),
         caves: this.slow.part('caves', s.caves),
+        trees: this.slow.part('trees', s.trees ?? null),
         aphids: this.slow.part('aphids', s.aphids),
         plants: this.slow.part('plants', s.plants),
         ...(s.flood ? { flood: s.flood } : {}),

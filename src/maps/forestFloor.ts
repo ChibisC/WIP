@@ -146,4 +146,11 @@ export const FOREST_FLOOR: MapDef = {
     { shape: { circle: [1000, 920], r: 100 }, level: -3.5, first: [420, 660], every: [540, 900], hold: [40, 80] },
     { shape: { circle: [600, 680], r: 100 }, level: -3.5, first: [420, 660], every: [540, 900], hold: [40, 80] },
   ],
+  // the Trees: oak and beech crowns over the forest floor
+  trees: [
+    { trunk: [1250, 300], r: 36, style: 'oak', reach: 290, seed: 21 },
+    { trunk: [350, 1250], r: 36, style: 'oak', reach: 290, seed: 22 },
+    { trunk: [1480, 1480], r: 32, style: 'beech', reach: 250, seed: 23 },
+    { trunk: [130, 130], r: 30, style: 'beech', reach: 240, seed: 24 },
+  ],
 };

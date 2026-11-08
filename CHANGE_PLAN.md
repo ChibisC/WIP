@@ -1448,3 +1448,78 @@ LAN); only the client changes, plus the multiplayer input delay (when commands a
 7. **UI** — marker counts once a tick instead of every frame (they walk every tile of every group); label and tip
    styles written only when they change. Pointer events with `touch-action` already (no 300 ms delay, no blocking
    touch listeners).
+
+## 30. A third layer: the Trees (user spec 2026-11-07, claude/trees/01-spec-trees-layer.md)
+
+Branch `feature/trees-layer` off `main` `21d836f`. Every number in `balance.ts` `TREES`. Deterministic sim. The layer
+exists only in matches with a tree-dwelling colony (`SpeciesDef.habitat === 'trees'`, none yet), the sandbox's "Trees on",
+or the dev URL `?trees=1`; otherwise nothing of it is built and nothing costs.
+
+### 30.1 What exists (survey, main 21d836f)
+- Spaces: `SURFACE` 0, colony nests 1..63 (`nestSpace`), caves ≥ `CAVE_BASE` 64. Every non-surface space is a `NestGrid`
+  hex map registered with `World.addGrid` (its own `NestFlow`, ant hash, `walkable`, serialized in `s.nests[space]`).
+  A cave (`createCave`) shows the whole pattern for a pre-made, colony-less space joined to the surface by entrances
+  (`CaveDef.entrances`, `makeEntrance(q, sx, sy)`); `goToArea`/`enterArea`/`tryExit`/`goOut` walk ants in and out through
+  any area's holes with `ENTRANCE.passPerS` throughput; markers may lie in any space (`placeMarker(space)`, the ant brain
+  takes `goToArea` to a marker's space). Flung ants (`combat.ts flingAnt/flungUpdate`) carry `fz/fvz`; `stun` is dazed.
+- Render: `GameView.ViewSpace` is `'surface' | 'nest'`; a nest space is a `NestStage` (scene, `NestTerrain`, lights,
+  remembered camera) drawn through one `NestView` per space (ants, food, creatures, markers, fx, bars … from a
+  `stage.terrain` that gives `floorAt`/`heightAt`/normals). The area tabs list `w.undergroundSpaces()` (`areasFor`).
+  Minimap: `ui/minimaps.ts` `row = [nestBox, surfBox]`. Trunks exist only as `Wall` kind `'trunk'`/`'buttress'`
+  (`mapDecor.walls`, `trunkGeometry`), a few on Rainforest and two story maps.
+- Lairs: skirmish/sandbox lairs are caves of kind `'lair'` ("Beetle den": `net/match.ts`, `?areas=1`, dev scenes) placed
+  on the maps' `lair` zones; nothing ever spawns from them (`ecologySystem` spawns in `creature` zones or anywhere).
+  Story levels build their own lairs (`runner.ts` from `StoryLevelDef.lairs`; the director spawns hunters at them).
+- Saves: `SimState.version` 4; the worker sends `caves` in `frames.ts slow`; `BUILD_ID` `ud-mp-14`.
+
+### 30.2 Design
+**The Trees map is one hex-grid space over the whole ground map** (`TREES = 63`, `isTreesSpace`; `colonyOfSpace` leaves
+it out), built by `sim/trees.ts createTrees(w)` from `MapDef.trees` (authored; procedural maps grow `TREES.procTrees`
+seeded trees) with hex radius `TREES.hexR` (10 mm) in the ground's mm frame, so (x, y) in the trees is the same place on
+the ground below. All of it is `SOIL_ROCK` (nothing digs it) except the hexes of branches (paths with a width), twigs
+and leaves (ellipses), which are dug "air" = walkable; everything the grid already gives — flow fields, separation,
+`walkable`, ant hashes, markers, combat, squads, anchoring, save/restore of `s.nests[63]` — works unchanged. A per-hex
+kind map (wood / leaf / trunk top / site) is kept in `TreesDef` for the render and the validator.
+- `TreesDef` (`s.trees`): `{ space, trunks: [{ x, y, r, top: q, climbs: Entrance[] }], sites: [{ kind, q, x, y, nest? }],
+  kinds: Uint8Array per hex }`. **Climb points are the space's entrances** (`entrancesOf(TREES)` = every trunk's climbs,
+  `Entrance.q` the trunk-top hex): `goToArea(TREES)` walks an ant to the nearest climb point and up; `goOut` from the
+  trees walks it to the nearest trunk top and down; the entrance credit gives `TREES.climbPerS` throughput.
+- **Climbing takes time:** `Ant.trunkT` (seconds left on the trunk, `TREES.climbSec` scaled by the trunk's height) is set
+  on entering or leaving; while it runs the ant is held (no brain, no moving, not a target) and the render draws it on the
+  bark — rising at the climb point in the ground view, arriving at the top in the trees view (`TREES.height` mm above
+  the ground). Creatures whose kind has `climbs` may follow their prey up (`cr.data.trunkT`).
+- **Falling:** only flings. A fling in the trees (`flingAnt`) moves the ant to the SURFACE at once with `fz = TREES.height`
+  (so it is seen dropping in the ground view), lands dazed (`TREES.fallDaze`) with `TREES.fallDamage`. Ants never walk off
+  a branch (the grid's rock is a wall).
+- **Switching:** `ViewSpace` gains `'trees'`: a `TreesStage` (scene, `CanopyTerrain`, daylight, its own rig) drawn by a
+  `NestView` (the same per-space renderer the nests use; `CanopyTerrain` implements the `AreaTerrain` interface) — so
+  ants, food, creatures, markers, fights and bars in the trees come for free. The "TREES" bar: a tall narrow bar right of
+  the ground minimap (`.mm-trees`), label written vertically; click = `session.toggleTrees()` → a short upward camera
+  move + fade (`view.riseTo('trees')`, the dive's style, pre-warmed); in the trees view the ground minimap draws the
+  canopy (branches, units, markers, sites) and the bar reads "GROUND". Tree nests (future) are grid spaces with their
+  entrance **in the trees space** (`Entrance.space`), listed by `undergroundSpaces()` → the same tabs.
+- **Looks:** `render/trees/canopyTerrain.ts`: chunks only where a chunk has walkable cells; a heightfield from the SDF
+  (rounded bark profile for wood, flat slightly-domed leaves), one shader (bark ridges/lichen/moss by noise, leaf veins
+  and translucency, dappled light; sway in the vertex shader, render only); sky cells are discarded. Under it a
+  backdrop plane `TREES.height` below: the ground rendered once from above (`renderToCanvas` of the surface scene),
+  blurred and darkened. Trunk tops: a bark disc. Sites: a subtle ring per kind. Trunks on the ground: `Wall` kind
+  `'trunk'` is added to the map for every tree (blocks), with the climb points left walkable.
+- **Content:** `TREES.food` insects, berries (fruit) and honeydew-free aphid-like "flowers" (berry food on flower hexes),
+  wild creatures that climb (mantis, wolf spider, spiderling, cutworm) spawned in the trees by `ecologySystem` when the
+  layer is on; 4–6 sites per map of kinds leaf / hollow / fork.
+- **On/off:** `GameSetup.trees` or any colony with `habitat: 'trees'`; sandbox `sandboxSet trees` builds it at runtime
+  (the session adds the stage when `s.trees` appears); `?trees=1` adds the placeholder colony "Canopy test colony (dev
+  placeholder)" (species `formica`, `treeNest` on site 0): its nest is a normal grid whose entrance lies on the site's
+  branch; `goHome`/`goToArea`/`exitAreaTo` read `Entrance.space`.
+- **Lairs:** gone from skirmish/sandbox/LAN/dev setups (`main.ts`, `net/match.ts`, `stressScene`, `determinism`), the
+  five maps' `lair` zones and the validator's lair rule; story levels keep theirs (`runner.ts`). Creatures arrive as
+  before (`ecologySystem`, rates unchanged); without creature zones they now appear near the map's edge.
+- **Saves:** version 5 (`trees` in the state; old saves load without the layer). Replica: `trees` in `slow`. `ud-mp-15`.
+
+### 30.3 Files
+`sim/types.ts`, `sim/trees.ts` (new), `sim/balance.ts TREES`, `maps/types.ts`+ the five maps (`trees`), `sim/mapGen.ts`,
+`sim/movement.ts`, `sim/combat.ts` (fall), `sim/markers.ts`, `sim/areas.ts`, `sim/entrances.ts`, `sim/antAI.ts`,
+`sim/creatures/creatureAI.ts`, `sim/commands.ts`, `sim/world.ts`, `sim/species.ts habitat`, `sim/snapshot.ts`,
+`worker/frames.ts`, `game/replica.ts`, `render/view.ts`, `render/trees/canopyTerrain.ts` (new), `game/session.ts`,
+`game/nestView.ts`, `ui/minimaps.ts`, `ui/theme.css`, `ui/sandboxPanel.ts`, `main.ts`, `net/match.ts`, `net/messages.ts`,
+`tools/trees-check.ts`, `tests/trees.ts`, `tests/browser/trees.py`, `docs/trees/`.

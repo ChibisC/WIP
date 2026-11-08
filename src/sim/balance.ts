@@ -1571,3 +1571,33 @@ export const TUNNELS = {
     allyLinkFrom: 300,
   },
 };
+
+/** The Trees: a canopy layer over the ground (sim/trees.ts; claude/trees/01-spec-trees-layer.md; CHANGE_PLAN §30). */
+export const TREES = {
+  /** the trees grid's hex circumradius (mm): twigs one hex wide let three or four workers pass abreast */
+  hexR: 10,
+  /** the canopy's height over the ground (mm): the fall, the backdrop's distance, the climb's length */
+  height: 160,
+  /** climbing the trunk: seconds for `height` mm (slower than walking: a worker walks about 40 mm/s) */
+  climbSec: 6,
+  /** climb points per trunk (around its foot) and how many ants a climb point passes a second */
+  climbPoints: 3,
+  climbPerS: 4,
+  /** only a fling knocks an ant off: it lands below dazed for `fallDaze` s and takes `fallDamage` (hp; 0 none) */
+  fallDaze: 1.6,
+  fallDamage: 1.5,
+  /** nest sites per map (set branches: leaf clusters, hollows, sheltered forks) */
+  sitesMin: 4,
+  sitesMax: 6,
+  /** food on the branches at the start, × the map's food setting; and respawn like the ground's */
+  food: 10,
+  /** wild creatures kept in the trees (× the creature setting), from the kinds that climb */
+  creatures: 3,
+  /** procedural (unauthored) maps: trees grown from the seed */
+  procTrees: 3,
+  /** trunk radius on the ground (mm) and the crown's reach from the trunk (mm) on procedural maps */
+  procTrunkR: 28,
+  procCrown: 260,
+  /** ants walk a little slower on bark than on flat ground */
+  speed: 0.9,
+};

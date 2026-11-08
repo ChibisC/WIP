@@ -2,7 +2,8 @@ import { antFitsUnderAnt as antFitsUnderAntAt } from './underpass';
 import { World } from './world';
 import { sealedAt } from './tunnels';
 import { casteOnBite, casteOnKill, rageMul, tauntOf } from './casteAbilities';
-import { Ant, AS, Carry, Colony, Creature, HIT, POSE, SURFACE, nestSpace } from './types';
+import { Ant, AS, Carry, Colony, Creature, HIT, POSE, SURFACE, TREES, nestSpace } from './types';
+import { nearestWalkable } from './markers';
 import type { Projectile } from './types';
 import { casteOf, DamageType, isKing } from './species';
 import { angleDiff, antSpeed, faceToward, moveForward, steerAvoid, steerTo, turnToward, goHome, goOut } from './movement';
@@ -11,7 +12,7 @@ import { killAnt, releaseGrapple } from './antAI';
 import { dropCarried, setTask } from './colony';
 import { abilityMods } from './abilities';
 import { datan2, dcos, dhypot, dsin, hash01, sq } from './dmath';
-import { BALANCE, GUARD, SICKLE, LAYERS } from './balance';
+import { BALANCE, GUARD, SICKLE, LAYERS, TREES as TREES_B } from './balance';
 import { glueBurst, majorAlarm, majorCharge, nasuteAttack, acquireInRange } from './termites';
 import { startSurge, surging } from './surge';
 import { hellUpdate, isHellState, release, snapEligible, startHunt } from './hellAnts';
@@ -273,6 +274,21 @@ export function flingAnt(w: World, a: Ant, fromX: number, fromY: number, power: 
   a.state = AS.Flung;
   a.st = 0;
   w.events.emit({ t: 'fling', x: a.x, y: a.y, space: a.space });
+  // knocked off a branch (the only way down but the trunk, sim/trees.ts): it falls to the ground below, seen dropping
+  // from the canopy's height in the ground view, and lands dazed
+  if (a.space === TREES && w.s.trees) {
+    a.space = SURFACE;
+    a.fz += w.s.trees.height;
+    a.fvz *= 0.3;
+    a.fell = 1;
+    if (!w.walkable(SURFACE, a.x, a.y)) {
+      const p = nearestWalkable(w, a.x, a.y);
+      if (p) {
+        a.x = p.x;
+        a.y = p.y;
+      }
+    }
+  }
 }
 
 /**
@@ -322,7 +338,16 @@ export function flungUpdate(w: World, a: Ant, dt: number): void {
     a.fz = 0;
     a.state = AS.Idle;
     a.st = 0;
-    if (a.softLand) {
+    if (a.fell) {
+      // down from the trees: dazed a moment, a little hurt (TREES.fallDaze, fallDamage)
+      a.fell = 0;
+      a.softLand = false;
+      a.stun = TREES_B.fallDaze;
+      if (TREES_B.fallDamage > 0) {
+        a.lastHit = HIT.FALL;
+        damageAnt(w, a, TREES_B.fallDamage, 'bite', null);
+      }
+    } else if (a.softLand) {
       // dropped off a dying creature: a short tumble, no harm
       a.softLand = false;
       a.stun = 0.4;

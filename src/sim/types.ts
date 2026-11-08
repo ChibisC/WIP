@@ -7,12 +7,19 @@ import { TerrainParams } from '../world/terrain';
  * CAVE_BASE and above = neutral caves and lairs (DESIGN 3.12). Every
  * underground space is an "area" with its own hex map.
  */
-export const SURFACE = 0;
-export const CAVE_BASE = 64;
+export const SURFACE: number = 0;
+export const CAVE_BASE: number = 64;
+/**
+ * The trees: one canopy map laid over the ground (sim/trees.ts, CHANGE_PLAN §30), a hex grid like a cave's in the
+ * ground's mm frame, walkable only on branches and leaves, reached by climbing the trunks (its entrances). It exists only
+ * in matches with a tree-dwelling colony, the sandbox toggle or the dev URL.
+ */
+export const TREES: number = 63;
 export const nestSpace = (colony: number) => colony + 1;
-/** Colony whose nest a space is (−1 for the surface and for caves). */
-export const colonyOfSpace = (space: number) => (space > 0 && space < CAVE_BASE ? space - 1 : -1);
+/** Colony whose nest a space is (−1 for the surface, the trees and caves). */
+export const colonyOfSpace = (space: number) => (space > 0 && space < TREES ? space - 1 : -1);
 export const isCaveSpace = (space: number) => space >= CAVE_BASE;
+export const isTreesSpace = (space: number) => space === TREES;
 
 export enum AS {
   Idle = 0,
@@ -249,6 +256,16 @@ export interface Ant {
   slowT: number;
   /** stun time */
   stun: number;
+  /**
+   * On a tree trunk (sim/trees.ts): seconds left of the climb, up (`trunkUp` 1) to the trees or down (0) to the ground;
+   * the ant is held meanwhile and drawn on the bark at its climb point (`trunkX/Y`, the hole it uses).
+   */
+  trunkT?: number;
+  trunkUp?: number;
+  /** flung off a branch: falling to the ground (lands dazed, TREES.fallDaze) */
+  fell?: number;
+  trunkX?: number;
+  trunkY?: number;
   /** antennation/encounter cooldown */
   meetCd: number;
   /** path integration: last known home direction memory */
@@ -461,6 +478,8 @@ export interface Entrance {
   /** surface hole */
   sx: number;
   sy: number;
+  /** the space the hole opens onto (default the surface; a tree nest's hole lies on a branch: the trees space) */
+  space?: number;
   /** throughput credit of this hole (ants that may pass now) and the sim time it was last topped up */
   cr?: number;
   crT?: number;
@@ -610,6 +629,8 @@ export interface Colony {
   nextGroupId: number;
   /** bumped whenever tiles change (cache key for flow fields) */
   tileVersion: number;
+  /** a tree nest (sim/trees.ts): the Trees map's site it sits on; its holes lie on that branch (`Entrance.space`) */
+  treeSite?: number;
   entrances: Entrance[];
   markers: MarkerSlot[];
   eggT: number;
@@ -877,6 +898,44 @@ export interface CaveDef {
   look?: 'den' | 'burrow';
 }
 
+/** A tree of the Trees map (sim/trees.ts): its trunk on the ground and the climb points round its foot. */
+export interface TrunkDef {
+  x: number;
+  y: number;
+  /** trunk radius on the ground (mm) */
+  r: number;
+  /** the trunk-top hex in the trees grid (every climb point arrives there) */
+  top: number;
+  /** climb points at the foot: entrances of the trees space (`sx, sy` on the ground, `q` the trunk top) */
+  climbs: Entrance[];
+  /** the trees of this map, index */
+  tree: number;
+}
+
+export type TreeSiteKind = 'leaf' | 'hollow' | 'fork';
+
+/** A set branch where a future tree nest can be built (empty in normal games). */
+export interface TreeSiteDef {
+  kind: TreeSiteKind;
+  /** its hex in the trees grid and position (mm) */
+  q: number;
+  x: number;
+  y: number;
+  /** the colony nesting here (−1 none) */
+  nest: number;
+}
+
+/** The Trees map (CHANGE_PLAN §30): the canopy grid is `nests[TREES]`; this is what the grid cannot say. */
+export interface TreesDef {
+  space: number;
+  trunks: TrunkDef[];
+  sites: TreeSiteDef[];
+  /** per hex of the trees grid: 0 sky, 1 wood, 2 leaf, 3 trunk top, 4 flower (food site) (render and validator) */
+  kinds: string;
+  /** the canopy's height above the ground (mm; the fall) */
+  height: number;
+}
+
 export interface SimSettings {
   /** wild creature abundance multiplier (0 = none); undefined = 1 */
   creatures?: number;
@@ -937,6 +996,8 @@ export interface SimState {
   weather?: { rain: number; heat: number };
   /** the set tunnel routes between nests (sim/tunnels.ts; version ≥ 4; older saves get them on load, all closed) */
   routes?: TunnelRoute[];
+  /** the Trees map (sim/trees.ts; version ≥ 5), only in matches with the layer on */
+  trees?: TreesDef;
 }
 
 /**

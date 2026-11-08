@@ -22,6 +22,7 @@ import {
   turnToward,
   wander,
 } from './movement';
+import { trunkHold } from './trees';
 import { dropCarried, hexCoreCells, onAntDied, setTask, tileCellsOfType, tilePoint } from './colony';
 import { jobWork, JobNav } from './jobs';
 import { tileAt } from './tiles';
@@ -324,6 +325,11 @@ export function antSystem(w: World, dt: number): void {
     }
     if (a.state === AS.Flung) {
       flungUpdate(w, a, dt);
+      continue;
+    }
+    // on a tree trunk (sim/trees.ts): held on the bark for the climb, nothing else happens to it
+    if (a.trunkT && trunkHold(a, dt)) {
+      finish(w, a);
       continue;
     }
     // army ants: links of a living bridge / pothole plugs hold still; an ant on a bridge walks across it (eciton.ts)

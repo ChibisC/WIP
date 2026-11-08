@@ -145,6 +145,11 @@ export interface SpeciesDef {
    * now — tiles stay inside the nest (sim/tiles.ts tileAllowedOnRoute, sim/tunnels.ts)
    */
   satelliteNests?: boolean;
+  /**
+   * where the species nests: 'ground' (default, an anthill) or 'trees' (a tree nest on a set branch of the Trees map,
+   * CHANGE_PLAN §30; a match with such a colony turns the trees layer on). No tree species exists yet.
+   */
+  habitat?: 'ground' | 'trees';
 }
 
 const C = (c: CasteDef) => c;

@@ -22,9 +22,10 @@ import type { MapId } from '../maps/types';
  * 2026-11-03. 12: stag beetle males of four sizes in forest and rainforest skirmishes, nests that flood, the weather and
  * visiting colonies of the story's surprise events, claude/story/06-spec — 2026-11-06. 13: the shared underground — rock margins, tunnel routes between nests, the `digRoute` command (wire 26),
  * save version 4, CHANGE_PLAN §27 — 2026-11-07. 14: one tick of lockstep delay on a LAN (MIN_DELAY 1, the host's new
- * margin), CHANGE_PLAN §29 — 2026-11-07)
+ * margin), CHANGE_PLAN §29 — 2026-11-07. 15: the Trees layer — the canopy space, trunks that block, the `sandboxSet trees`
+ * key, the fall, save version 5, CHANGE_PLAN §30 — 2026-11-08)
  */
-export const BUILD_ID = 'ud-mp-14';
+export const BUILD_ID = 'ud-mp-15';
 
 /** A lobby slot (players 0–3; the slot number is the colony id). */
 export interface Slot {
