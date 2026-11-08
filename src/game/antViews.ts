@@ -481,7 +481,7 @@ function blastPose(w: World, a: Ant, out: AntView, len: number): void {
  */
 export function blasterPose(out: Pick<AntView, 'mouthGlow' | 'brace' | 'crouch' | 'headYaw' | 'headPitch' | 'mandible' | 'gaster' | 'antennaPitch' | 'antennaActivity' | 'roll' | 'pitch' | 'pivX' | 'pose'>, p: { t: number; len: number; phase: 'rest' | 'windup' | 'hold' | 'beam'; st: number; beamAge: number; since: number; aim: number; beamNext: boolean }): void {
   const B = BALANCE.blaster;
-  out.mouthGlow = 0.1 + 0.04 * Math.sin(p.t * 2.3);
+  out.mouthGlow = 0.12 + 0.04 * Math.sin(p.t * 2.3);
   if (p.phase === 'beam') {
     // braced: feet wide, body low and steady on the line, the jaws wide open, a fine tremble through the whole body
     const k = Math.min(1, p.beamAge / 0.25);

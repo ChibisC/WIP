@@ -567,10 +567,10 @@ export function antPatch(): ShaderPatch {
            // their colour
            #ifdef MOUTH_GLOW
            // Saiy-Ant Blaster (CHANGE_PLAN §31): the rage channel carries the mouth's glow — white-blue, gold in the
-           // gold form; a faint ember at rest, bright in the wind-up, a flash on the shot
+           // gold form; a dim ember at rest, bright in the wind-up, a flash on the shot
            if (abs(vSurf.w - 9.5) < 0.25) {
              vec3 mc = mix(vec3(0.6, 0.84, 1.0), vec3(1.0, 0.72, 0.24), clamp(vGold.x * 1.5, 0.0, 1.0));
-             totalEmissiveRadiance += mc * (0.05 + 3.2 * vRage * vRage);
+             totalEmissiveRadiance += mc * (3.2 * vRage * vRage);
            }
            #else
            int rpart = int(vPartF + 0.5);
