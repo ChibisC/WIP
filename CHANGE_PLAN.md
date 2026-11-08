@@ -1515,3 +1515,17 @@ LAN two-tab in sync).
 4. **Hash packed** cell by cell before the first query; **hex lookup** from column/row.
 5. **Bench GPU scene** (`dev/bench.ts` 'gpu'); the profiler counts draw calls and triangles over the whole frame (Safari
    showed one call before) and keeps running totals.
+6. **Timing bundled** (`tools/perf/bundle.sh`): vite-node reaches every imported function through a module object;
+   the game's worker is one bundle. All timings since are of bundles (same.sh and ab.sh bundle both checkouts).
+7. **Separation's pair loop on typed arrays** (positions, teams, ids, states, foes filled before the loop);
+   **creature spacing** computes each creature's radius, attack, push-through and team once a pass.
+8. **Surface flow cache**: use counter instead of a map re-insert per look-up (same eviction order).
+9. **Hex lookup fast path** (the common case without the 3 × 3 loop; 7.2 M points checked against it).
+10. **Worker frames**: a generated column writer (named loads) and key discovery testing the value first — the same
+    packets byte for byte (`tests/performance.ts`).
+11. **The ground and scenery in culled chunks** (render only, the same triangles): the terrain heightfield (5 × 5
+    chunks sharing one set of attributes), the grass (5 × 5 instanced chunks, spheres padded for lean and wind), the
+    map-wide pebble sets and merged decor (`render/chunks.ts`); the water draws only the contiguous rows a camera sees
+    (`onBeforeRender`, same index order — it is transparent). On Meadow Pond the grass alone was 1.1 M triangles a
+    frame, the pebbles 310 k (twice: they cast shadows), the water 320 k.
+12. Merged `main` twice (audio v3, the model redo); the reference for same.sh is `main` + the tools.
