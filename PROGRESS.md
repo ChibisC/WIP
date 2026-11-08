@@ -2090,3 +2090,4 @@ User spec `claude/performance/03-spec-performance-v3-big-colonies.md`; branch `f
 - **Found and left for the user:** both devices are limited by the GPU at High even with few ants; ~80 % of the big
   fight's triangles are the ants (mid-distance ants at 3,300 triangles, twice with shadows). Changes that would alter
   the picture (simpler shadow casters, resolution, effect settings) wait for the gpu-scene report and the user's yes.
+- **Merged** into `main` as `ad17880` (Pages deployed; game artifact v51); handoff 23.
