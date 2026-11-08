@@ -271,7 +271,7 @@ export class GameView {
     if (!this.terrain) return;
     if (this.grass) {
       this.worldGroup.remove(this.grass.mesh);
-      this.grass.mesh.geometry.dispose();
+      this.grass.dispose();
     }
     this.grass = new Grass(this.terrain, this.preset.grassDensity, 320, this.decor?.clumps, this.grassClear);
     this.worldGroup.add(this.grass.mesh);

@@ -55,8 +55,17 @@ const WIND_VERTEX = /* glsl */ `
   }
 `;
 
+/**
+ * Performance v3: the blades are drawn in square chunks, each its own instanced mesh with a bounding sphere (padded for
+ * the lean and the wind), so the renderer culls the chunks out of view instead of shading every blade of the map and its
+ * meadow skirt each frame — the same blades with the same data where they are seen (an opaque, depth-tested pass: the
+ * draw order between chunks changes nothing drawn).
+ */
+const CHUNKS_ACROSS = 6;
+
 export class Grass {
-  mesh: THREE.InstancedMesh;
+  /** the chunks ('grass' group; each child one chunk's instanced mesh) */
+  mesh: THREE.Group;
   material: THREE.MeshStandardMaterial;
 
   constructor(terrain: Terrain, density: number, margin = 320, extra: readonly DecorClump[] = [], clear: ReadonlyArray<{ x: number; y: number; r: number }> = []) {
@@ -184,7 +193,9 @@ export class Grass {
     });
     // light through the blades when the sun is behind them
     thinLightPatch(this.material, 0.38);
-    const mesh = new THREE.InstancedMesh(geo, this.material, Math.max(1, blades.length));
+    // every blade's matrix and colour, in the order they were made (the same random draws as before)
+    const mats = new Float32Array(Math.max(1, blades.length) * 16);
+    const cols = new Float32Array(Math.max(1, blades.length) * 3);
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const e = new THREE.Euler();
@@ -203,20 +214,82 @@ export class Grass {
       q.setFromEuler(e);
       s.set(b.w, b.h, b.w);
       m.compose(p, q, s);
-      mesh.setMatrixAt(i, m);
+      m.toArray(mats, i * 16);
       const pal = b.reed ? reeds : b.dry ? dry : greens;
       const gi = Math.floor(b.c * pal.length);
       col.copy(pal[gi]).lerp(pal[(gi + 1) % pal.length], rng.next() * 0.5);
       col.multiplyScalar(0.85 + rng.next() * 0.3);
-      mesh.setColorAt(i, col);
+      col.toArray(cols, i * 3);
     });
-    mesh.count = blades.length;
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    mesh.frustumCulled = false;
-    mesh.castShadow = false;
-    mesh.receiveShadow = true;
-    mesh.name = 'grass';
-    this.mesh = mesh;
+    // the chunks: blades binned by where they stand (each chunk keeps them in their order)
+    const group = new THREE.Group();
+    group.name = 'grass';
+    let x0 = Infinity;
+    let z0 = Infinity;
+    let x1 = -Infinity;
+    let z1 = -Infinity;
+    for (const b of blades) {
+      x0 = Math.min(x0, b.x);
+      z0 = Math.min(z0, b.z);
+      x1 = Math.max(x1, b.x);
+      z1 = Math.max(z1, b.z);
+    }
+    const size = Math.max(1, Math.max(x1 - x0, z1 - z0) / CHUNKS_ACROSS);
+    const nx = Math.max(1, Math.ceil((x1 - x0) / size + 1e-9));
+    const bins = new Map<number, number[]>();
+    blades.forEach((b, i) => {
+      const cx = Math.min(nx - 1, Math.floor((b.x - x0) / size));
+      const cz = Math.floor((b.z - z0) / size);
+      const k = cz * nx + cx;
+      let l = bins.get(k);
+      if (!l) bins.set(k, (l = []));
+      l.push(i);
+    });
+    const keys = [...bins.keys()].sort((a, b) => a - b);
+    for (const k of keys) {
+      const idx = bins.get(k)!;
+      const mesh = new THREE.InstancedMesh(geo, this.material, idx.length);
+      const im = mesh.instanceMatrix.array as Float32Array;
+      const colArr = new Float32Array(idx.length * 3);
+      // the bounding sphere: the blades' bases, out by each blade's height (its lean and the wind's sway stay within it)
+      let cx = 0;
+      let cz = 0;
+      let cy = 0;
+      for (const i of idx) {
+        cx += mats[i * 16 + 12];
+        cy += mats[i * 16 + 13];
+        cz += mats[i * 16 + 14];
+      }
+      cx /= idx.length;
+      cy /= idx.length;
+      cz /= idx.length;
+      let r = 0;
+      idx.forEach((i, j) => {
+        im.set(mats.subarray(i * 16, i * 16 + 16), j * 16);
+        colArr.set(cols.subarray(i * 3, i * 3 + 3), j * 3);
+        const d = Math.hypot(mats[i * 16 + 12] - cx, mats[i * 16 + 13] - cy, mats[i * 16 + 14] - cz);
+        r = Math.max(r, d + blades[i].h * 1.6 + blades[i].w * 2);
+      });
+      mesh.instanceColor = new THREE.InstancedBufferAttribute(colArr, 3);
+      mesh.count = idx.length;
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, cy, cz), r);
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.name = 'grass';
+      group.add(mesh);
+    }
+    this.mesh = group;
+  }
+
+  /** Free the chunks' instance buffers and the shared blade geometry. */
+  dispose(): void {
+    let geo: THREE.BufferGeometry | null = null;
+    for (const c of this.mesh.children) {
+      const im = c as THREE.InstancedMesh;
+      geo = im.geometry;
+      im.dispose();
+    }
+    geo?.dispose();
   }
 }

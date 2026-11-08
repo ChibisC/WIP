@@ -26,6 +26,9 @@ import { createStressWorld } from '../src/dev/stressScene';
 import { ColumnReader, ColumnWriter, columnCodegen } from '../src/sim/columns';
 import { antShape } from '../src/sim/factory';
 import { encodeState, hashState, restoreWorld } from '../src/sim/snapshot';
+import { chunkTriangles } from '../src/render/terrainMesh';
+import { Grass } from '../src/render/grass';
+import { stressSetup } from '../src/dev/stressScene';
 
 const t0 = Date.now();
 let failed = 0;
@@ -354,6 +357,59 @@ if (columnCodegen.on) {
   }
   columnCodegen.on = can;
   check('entity columns: the generated writer gives the plain loop’s packets byte for byte (ants, food, creatures; 120 ticks of a fight)', !bad, bad);
+}
+
+// ---- the ground in culled chunks (performance v3: render/terrainMesh.ts, render/grass.ts) — the same triangles, the same blades
+{
+  // a heightfield index like TerrainMesh's (quads (a, c, b), (b, c, d)), some quads left out as under a bank sculpt
+  const nx = 97;
+  const ny = 61;
+  const full: number[] = [];
+  for (let j = 0; j < ny - 1; j++)
+    for (let i = 0; i < nx - 1; i++) {
+      if ((i * 7 + j * 13) % 11 === 0) continue;
+      const a = j * nx + i;
+      full.push(a, a + nx, a + 1, a + 1, a + nx, a + nx + 1);
+    }
+  const lists = chunkTriangles(full, nx, ny, 6);
+  const tri = (a: ArrayLike<number>) => {
+    const out: string[] = [];
+    for (let i = 0; i < a.length; i += 3) out.push(`${a[i]},${a[i + 1]},${a[i + 2]}`);
+    return out;
+  };
+  const all = lists.flatMap((l) => (l ? tri(l) : []));
+  const ref = tri(full);
+  // each chunk's triangles in the full order, every triangle in exactly one chunk, each within its block of quads
+  let inOrder = true;
+  let inBlock = true;
+  const pos = new Map(ref.map((t, i) => [t, i]));
+  lists.forEach((l, k) => {
+    if (!l) return;
+    const ts = tri(l);
+    for (let i = 1; i < ts.length; i++) if (pos.get(ts[i])! < pos.get(ts[i - 1])!) inOrder = false;
+    for (const t of ts) {
+      const v = t.split(',').map(Number);
+      // (the quad's corner: the first triangle (a, c, b) starts at it, the second (b, c, d) one after it)
+      const a = v[2] === v[0] + 1 ? v[0] : v[0] - 1;
+      const ci = Math.min(5, Math.floor((a % nx) / Math.ceil((nx - 1) / 6)));
+      const cj = Math.min(5, Math.floor(Math.floor(a / nx) / Math.ceil((ny - 1) / 6)));
+      if (cj * 6 + ci !== k) inBlock = false;
+    }
+  });
+  check('terrain chunks: every triangle in exactly one chunk, in the full order, within its block', all.length === ref.length && [...all].sort().join() === [...ref].sort().join() && inOrder && inBlock, `${ref.length} triangles in ${lists.filter(Boolean).length} chunks`);
+  // the grass: the chunks hold exactly the blades the single mesh held (matrices and colours, bit for bit)
+  const w = createWorld(stressSetup(), new EventBus());
+  const g = new Grass(w.terrain, 1);
+  let n = 0;
+  let inSphere = true;
+  for (const c of g.mesh.children) {
+    const m = c as import('three').InstancedMesh;
+    n += m.count;
+    const s = m.boundingSphere!;
+    const a = m.instanceMatrix.array as Float32Array;
+    for (let i = 0; i < m.count; i++) if (Math.hypot(a[i * 16 + 12] - s.center.x, a[i * 16 + 13] - s.center.y, a[i * 16 + 14] - s.center.z) > s.radius) inSphere = false;
+  }
+  check('grass chunks: every blade drawn once, each chunk\'s blades inside its bounding sphere', n > 1000 && inSphere, `${n} blades in ${g.mesh.children.length} chunks`);
 }
 
 // ---- one object shape for every ant (performance v3: sim/factory.ts antShape)

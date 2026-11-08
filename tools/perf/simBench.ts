@@ -258,6 +258,14 @@ for (const scene of SCENES)
         seg.push(`${(part.reduce((x, y) => x + y, 0) / part.length).toFixed(1)}/${Math.max(...part).toFixed(0)}`);
       }
       console.log(`           per 50 ticks (avg/max ms): ${seg.join(' ')}`);
+      // the slowest ticks (tick number, ms) and the once-a-second ticks (every: 20 systems) against the rest
+      const t0 = w.s.tick - times.length + 1;
+      const slow = times.map((ms, k) => [t0 + k, ms] as const).sort((a, b) => b[1] - a[1]).slice(0, 6);
+      const sec = times.filter((_, k) => (t0 + k) % 20 === 0);
+      const odd = times.filter((_, k) => (t0 + k) % 2 === 1);
+      const even = times.filter((_, k) => (t0 + k) % 2 === 0 && (t0 + k) % 20 !== 0);
+      const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0).toFixed(1);
+      console.log(`           slowest ${slow.map(([t, ms]) => `#${t} ${ms.toFixed(0)}`).join(', ')}; once-a-second ticks ${mean(sec)}, other even ${mean(even)}, odd ${mean(odd)} ms`);
     }
     console.log(`${scene.padEnd(8)} ${String(ants0).padStart(5)} ants: tick avg ${r.avg.toFixed(2)} ms, p95 ${r.p95.toFixed(2)}, max ${r.max.toFixed(2)}, over 40 ms ${r.over40}/${TICKS}  hash ${hashes[hashes.length - 1]}` + (r.systems ? `\n           ${Object.entries(r.systems).map(([k, v]) => `${k} ${v}`).join(' · ')}` : ''));
   }

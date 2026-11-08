@@ -32,8 +32,38 @@ const TILE = 70;
  * Nothing here touches the simulation: everything is read from the terrain (heights, cover, water, layers, flood
  * levels) and time.
  */
+/**
+ * Performance v3: the heightfield is drawn in square chunks, each a mesh sharing the one set of vertex attributes with
+ * its own index and a bounding sphere from its own vertices, so the renderer culls the chunks out of view instead of
+ * shading all ~150 000 vertices of the map and its skirt each frame — the same triangles where they are seen (opaque and
+ * depth-tested: the draw order between chunks changes nothing drawn).
+ */
+const TERRAIN_CHUNKS = 6;
+
+/**
+ * A heightfield index's triangles binned into `chunks` × `chunks` blocks of quads (the grid is nx × ny vertices; quad
+ * (i, j) has corner a = j·nx + i and the triangles (a, c, b), (b, c, d) with b = a + 1, c = a + nx, d = c + 1), each
+ * block's triangles in the full index's order. Exported for tests.
+ */
+export function chunkTriangles(full: ArrayLike<number>, nx: number, ny: number, chunks: number): number[][] {
+  const bx = Math.ceil((nx - 1) / chunks);
+  const by = Math.ceil((ny - 1) / chunks);
+  const lists: number[][] = [];
+  for (let t = 0; t < full.length; t += 3) {
+    // (the first triangle ends at its start + 1; the second starts at b: the quad's corner is a either way)
+    const a = full[t + 2] === full[t] + 1 ? full[t] : full[t] - 1;
+    const i = a % nx;
+    const j = Math.floor(a / nx);
+    const k = Math.min(chunks - 1, Math.floor(j / by)) * chunks + Math.min(chunks - 1, Math.floor(i / bx));
+    (lists[k] ??= []).push(full[t], full[t + 1], full[t + 2]);
+  }
+  return lists;
+}
+
 export class TerrainMesh {
-  mesh: THREE.Mesh;
+  /** the heightfield's chunks ('terrain' group; the bank sculpt is a child too) */
+  mesh: THREE.Group;
+  private chunks: THREE.Mesh[] = [];
   material: THREE.MeshStandardMaterial;
   /** sculpted bank faces and ramp sides (render/ground/bankSculpt.ts), sharing this material; null when flat */
   sculpt: THREE.Mesh | null = null;
@@ -119,8 +149,7 @@ export class TerrainMesh {
     this.overlayUniforms.uMapSize.value.set(terrain.width, terrain.depth);
     patchDapple(this.material);
     addPatch(this.material, groundPatch(this.groundUniforms, this.overlayUniforms, tex.noise));
-    this.mesh = new THREE.Mesh(geo, this.material);
-    this.mesh.receiveShadow = true;
+    this.mesh = new THREE.Group();
     this.mesh.name = 'terrain';
     this.rebuild();
   }
@@ -231,6 +260,40 @@ export class TerrainMesh {
       this.geo.computeVertexNormals();
       this.geo.computeBoundingSphere();
       this.geo.computeBoundingBox();
+      this.buildChunks();
+    }
+  }
+
+  /** (Re)make the chunk meshes from the full index: each chunk the full index's triangles of its block of quads. */
+  private buildChunks(): void {
+    for (const c of this.chunks) {
+      c.removeFromParent();
+      // (the vertex attributes are shared: only the chunk's own index leaves the GPU)
+      for (const name of Object.keys(c.geometry.attributes)) c.geometry.deleteAttribute(name);
+      c.geometry.dispose();
+    }
+    this.chunks = [];
+    const lists = chunkTriangles(this.geo.index!.array as Uint32Array, this.nx, this.ny, TERRAIN_CHUNKS);
+    const pos = this.geo.attributes.position.array as Float32Array;
+    for (let k = 0; k < lists.length; k++) {
+      const l = lists[k];
+      if (!l || !l.length) continue;
+      const g = new THREE.BufferGeometry();
+      for (const name of Object.keys(this.geo.attributes)) g.setAttribute(name, this.geo.attributes[name]);
+      g.setIndex(new THREE.BufferAttribute(new Uint32Array(l), 1));
+      // the chunk's own bounds (computeBoundingSphere would take every vertex of the shared attributes)
+      const box = new THREE.Box3();
+      const v = new THREE.Vector3();
+      for (const vi of l) box.expandByPoint(v.set(pos[vi * 3], pos[vi * 3 + 1], pos[vi * 3 + 2]));
+      g.boundingBox = box;
+      const sph = new THREE.Sphere();
+      box.getBoundingSphere(sph);
+      g.boundingSphere = sph;
+      const mesh = new THREE.Mesh(g, this.material);
+      mesh.receiveShadow = true;
+      mesh.name = 'terrain';
+      this.chunks.push(mesh);
+      this.mesh.add(mesh);
     }
   }
 
