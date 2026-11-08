@@ -1995,7 +1995,7 @@ User spec `claude/performance/02-spec-responsiveness-client-visuals.md`; branch 
 - **Client visuals:** ants well out of view skipped and caught up in one step (`render/viewCull.ts`; zoomed in on a
   crowd the ant renderer takes a tenth of the time); id-hashed seeds and seeded sparks (no run-to-run noise); combat
   particles in closed form in the shader (`tests/clientVisuals.ts`).
-- **Messages:** delta entity columns and a generated reader: big fight 716 → 467 KB a frame, columns read 3.1 → 1.8 ms
+- **Messages:** delta entity columns and a generated reader: big fight 716 → 381 KB a frame, columns read 3.1 → 1.8 ms
   on the build machine (`tests/performance.ts` keeps the replica exact; `tools/perf/frameBench.ts`).
 - **UI:** marker counts once a tick, label styles written only when changed.
 - **Fixed on the way:** a story save with a visiting party restored differently (merged early with the meter).

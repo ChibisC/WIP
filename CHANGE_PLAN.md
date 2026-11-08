@@ -1375,7 +1375,7 @@ LAN); only the client changes, plus the multiplayer input delay (when commands a
 6. **Messages** — delta entity columns (`ColumnWriter.write(…, delta)`: when the entities are the same as last frame
    and in the same order, the columns nobody changed are left out — 50–70 % of them in a fight) and a generated reader
    (one loop per schema with named stores; the plain loop where a page forbids compiling code). Big fight (829 ants,
-   96 creatures, build machine, Node): 716 → 467 KB a frame, the columns' read 3.1 → 1.8 ms. `tests/performance.ts`
+   96 creatures, build machine, Node): 716 → 381 KB a frame, the columns' read 3.1 → 1.8 ms. `tests/performance.ts`
    checks the replica's ants stay exactly the simulation's. The simulation's systems were profiled
    (`tools/stress.ts`, a CPU profile): the time is spread over the ant brains, combat and separation with no single
    hot spot; no change to the simulation (its results are untouched: determinism check, replays).
