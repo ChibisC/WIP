@@ -35,7 +35,7 @@ export const columnCodegen = {
   })(),
 };
 type ReadFn = (out: unknown[], n: number, num: Float64Array, str: Uint16Array, table: string[], nb: number[], sb: number[], absent: number) => void;
-const readFns = new Map<string, ReadFn>();
+const readFns = new Map<string, ReadFn>(); // det-ok: compiled readers for the main thread’s replica, keyed by schema; never simulation state
 const sigOf = (keys: readonly string[], kinds: readonly number[]) => keys.map((k, j) => kinds[j] + k).join('\u0001');
 
 function readFn(keys: readonly string[], kinds: readonly number[]): ReadFn | null {
