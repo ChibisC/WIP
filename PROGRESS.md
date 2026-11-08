@@ -2136,3 +2136,4 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
 - **Checks:** `tests/performance.ts` (the caps; a simulated overloaded device at 4×: 90 ms behind with the limit, 2 s
   and growing without), `tests/browser/replay.py` (identical to the recording), `worker.py`, `lan.py` two players
   (hashes match, no desync, the speed vote).
+- **Merged** into `main` as `0a8d9eb` (Pages deployed; game artifact v54); handoff 25.
