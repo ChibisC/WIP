@@ -1606,12 +1606,17 @@ LAN two-tab in sync).
    shader links, texture uploads); `tests/browser/speed_check.py` (the speed steps from a script).
 2. **Cutscenes:** the flight links no shader and uploads no texture (everything it shows is prepared at load).
 3. **Game speed:** a tick costs the same at any speed; at N× the worker runs 20·N a second (this machine holds
-   3.0–4.9× at 2,000 ants, 4.6–8.8× at 1,000). Found: lockstep and replay ticks went to the worker with no limit, so a
-   device whose worker could not keep up fell further behind every second; single-player batches grew to 24 ticks.
+   3.0–4.9× at 2,000 ants, 4.6–8.8× at 1,000). Found: lockstep and replay ticks go to the worker with no limit, so a
+   device whose worker cannot keep up falls further behind every second; single-player batches grew to 24 ticks.
    **Worker lag limit** (`game/simHost.ts` `WORKER_LAG_MS` = 100 ms of the worker's ticks): single-player batches
-   hold at most that much (still at most 24); lockstep and replay ticks wait while that much is queued (a rejoin's
-   catch-up 500 ms). Pacing only: the same ticks with the same commands (no `BUILD_ID` change). `tests/performance.ts`
-   checks the caps and a simulated overloaded 4× match (90 ms behind with the limit; 2 s after 10 s, growing, without).
+   hold at most that much (still at most 24); replay ticks wait while that much is queued. Pacing only: the same ticks
+   with the same commands (no `BUILD_ID` change). `tests/performance.ts` checks the caps and a simulated overloaded
+   device at 4× (90 ms behind with the limit; 2 s after 10 s, growing, without).
+4. **Multiplayer left as it was, for the user:** making the match wait for a slow device's worker was tried and taken
+   out — it sets every player's speed by the slowest device (a gameplay change), and with it `tests/browser/lan.py` lost the guest
+   (dropped by the host after 30 s of waiting) in 2 of 7 runs here, `main` in none of 4.
+   Proposed instead: a device whose worker stays behind votes the speed down itself (the vote lowers at once) with a
+   message; waiting for the user's choice (docs/performance.md "Game speed and cutscenes").
 
 ## 33. A third layer: the Trees (user spec 2026-11-07, claude/trees/01-spec-trees-layer.md)
 

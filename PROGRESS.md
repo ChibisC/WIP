@@ -2119,9 +2119,12 @@ Plan and record: `CHANGE_PLAN.md` §30. Design: `DESIGN.md` §3.13. Player notes
   worker's tick time) and **cine** (The Antlered King's opening flight: frames, hitches, shader links, texture uploads);
   `?bench=1&bonly=speed,cine` runs only these; `tests/browser/speed_check.py`.
 - **Cutscene:** no shader links or texture uploads during the flight (everything it shows is prepared at load).
-- **Game speed:** found that lockstep and replay ticks went to the worker with no limit (an overloaded device fell
-  further behind every second) and single-player batches grew to 24 ticks. Now at most ~100 ms of the worker's ticks
-  are queued (`game/simHost.ts` `WORKER_LAG_MS`); pacing only, the same results.
-- **Checks:** `tests/performance.ts` (the caps; a simulated overloaded 4× match: 90 ms behind with the limit, 2 s and
-  growing without), `tests/browser/replay.py` (identical to the recording), `worker.py`, `lan.py` two players (hashes
-  match, no desync, the speed vote).
+- **Game speed:** found that lockstep and replay ticks go to the worker with no limit (an overloaded device falls
+  further behind every second) and single-player batches grew to 24 ticks. Now single-player and replays keep at most
+  ~100 ms of the worker's ticks queued (`game/simHost.ts` `WORKER_LAG_MS`); pacing only, the same results.
+  Multiplayer is unchanged: making the match wait for the slowest device was tried and taken out (a gameplay change;
+  with it the LAN test lost the guest to the 30-second drop in 2 of 7 runs here); the proposal (an automatic speed-down vote) waits
+  for the user.
+- **Checks:** `tests/performance.ts` (the caps; a simulated overloaded device at 4×: 90 ms behind with the limit, 2 s
+  and growing without), `tests/browser/replay.py` (identical to the recording), `worker.py`, `lan.py` two players
+  (hashes match, no desync, the speed vote).

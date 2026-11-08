@@ -27,20 +27,19 @@ const TICK_DT = 0.05;
  * How far a device's worker may fall behind the game's clock (ms of its own tick time) — performance v3, game speed
  * (CHANGE_PLAN §32.4). At 4× or 8× a big colony can need more ticks a second than a slow device's worker can run.
  * Past this much queued work the device waits for its worker instead of queueing more: single-player then runs at the
- * speed the device can do, in smaller and more frequent updates; multiplayer and replays wait as they do for a
- * player's packets (the slowest device paces the match), instead of the picture and the player's orders falling
- * further and further behind. A device that keeps up never gets near it. Nothing the simulation computes changes.
+ * speed the device can do, in smaller and more frequent updates; a replay plays at the speed the device can do instead
+ * of its picture falling further and further behind. A device that keeps up never gets near it. Nothing the
+ * simulation computes changes. (Multiplayer does not wait: holding the lockstep back would slow every player's match
+ * to the slowest device — the user's decision, docs/performance.md "Game speed and cutscenes".)
  */
 export const WORKER_LAG_MS = 100;
-/** (a rejoining player's catch-up keeps more queued: its worker should never wait for the next frame's top-up) */
-export const WORKER_CATCHUP_LAG_MS = 500;
 
 /** Single-player: how many ticks one batch may hold (24, fewer when the worker's ticks are slow). */
 export function workerBatchCap(tickMs: number): number {
   return tickMs > 0 ? Math.max(2, Math.min(24, Math.floor(WORKER_LAG_MS / tickMs))) : 24;
 }
 
-/** Lockstep and replays: may another tick go to the worker with `inFlight` ticks not answered yet? */
+/** Replays (one tick a step): may another tick go to the worker with `inFlight` ticks not answered yet? */
 export function workerHasRoom(inFlight: number, tickMs: number, lagMs = WORKER_LAG_MS): boolean {
   return inFlight * Math.max(tickMs, 0.5) < lagMs;
 }
@@ -63,7 +62,7 @@ export interface SimHost extends NetSim {
   readonly kind: 'local' | 'worker';
   /** n ticks are due (the loop's clock, or the lockstep scheduler, decided) */
   tick(n: number): void;
-  /** lockstep and replays: can the next tick be sent (the worker is not too far behind; `WORKER_LAG_MS`)? */
+  /** replays: can the next tick be sent (the worker is not too far behind; `WORKER_LAG_MS`)? */
   canStep(lagMs?: number): boolean;
   /** interpolation alpha for this frame */
   alpha(loopAlpha: number, now: number, paused: boolean): number;

@@ -358,13 +358,17 @@ runs the simulation about three times faster than this machine (5 ms a tick for 
   segments). Multiplayer and replays had no limit: each tick went to the worker as it came due, so an overloaded
   device's picture, and its player's orders, fell further behind every second (a simulated 4× match on a device at
   15 ms a tick: 2 s behind after 10 s, and growing).
-- **Now** (`game/simHost.ts` `WORKER_LAG_MS`): a device keeps at most about 100 ms of its worker's work queued.
-  Single-player batches are smaller when the ticks are slow (24 ticks at up to 4 ms a tick, 6 at 15 ms, 3 at 30 ms):
-  about four times as many updates for a few per cent less speed (one frame packet a batch). Multiplayer and replays
-  wait for the worker: a replay then plays at the speed the device can do; a match waits as it does for a player's
-  packets, so the slowest device paces it (as it already did when its frames were slow), behind by at most 100 ms
-  (500 for a rejoin's catch-up, whose worker must stay busy). A device
-  that keeps up never reaches the limit, and the simulation computes the same ticks with the same commands.
+- **Now** (`game/simHost.ts` `WORKER_LAG_MS`): single-player and replays keep at most about 100 ms of the worker's
+  work queued. Single-player batches are smaller when the ticks are slow (24 ticks at up to 4 ms a tick, 6 at 15 ms,
+  3 at 30 ms): about four times as many updates for a few per cent less speed (one frame packet a batch). A replay
+  plays at the speed the device can do. A device that keeps up never reaches the limit, and the simulation computes
+  the same ticks with the same commands.
+- **Multiplayer is unchanged, for the user to decide.** In lockstep every device runs every tick, so a device that
+  cannot keep up has only three ways to go: (1) as now, it falls behind (its picture and its orders later every
+  second, the others unaffected); (2) the match waits for it, as it waits for a player's packets — the slowest device
+  sets everyone's speed (tried and taken out: with it, `tests/browser/lan.py` lost the guest — dropped by the host after
+  30 s of waiting — in 2 of 7 runs here, `main` in none of 4); (3) the slow device votes the speed down by itself (the
+  vote already lowers the speed at once) with a message saying whose device could not keep up. (3) is the proposal.
 - **The main thread at speed:** single-player gets one worker update a batch at any speed, so its message cost does
   not grow; the events of all the batch's ticks (hits, deaths, sounds, effects) do. Multiplayer sends every tick as its
   own update (lockstep). The **speed** scene measures both per frame on the devices.
