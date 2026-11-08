@@ -15,8 +15,8 @@
  * Sickle-jaw termites (Rhynchotermes perarmatus; model redo, claude/realism/10-spec-saiy-ant-sickle-jaw-models.md,
  * shapes in docs/creatures/rhynchotermes-perarmatus.md §10) use the same builder: the soldier's globe head drawn into a
  * long, down-curved snout (`head.nasus` + `head.sickle`) with long, thin crossing sickle mandibles traced from the
- * user's photos; the worker's rounded head with its pale fontanelle and Y-shaped suture (`head.fontanelle`,
- * `head.suture`); the presoldier and the larva. (Their king and queen stay on the termite kit, as the conehead royals do:
+ * user's photos; the worker's round glossy head and its dark banded abdomen (`head.fontanelle`); the presoldier and
+ * the larva. (Their king and queen stay on the termite kit, as the conehead royals do:
  * the user preferred the kit's queen, review round 1, 2026-11-07.)
  *
  * Returns the standard { geometry, rig } plus `nasusTip` (soldiers: the glue or the secretion comes from it) and `soft`.
@@ -102,8 +102,9 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
   const NT = 10;
   const terg = (s) => { const f = s * NT; const q = Math.min(NT - 1, Math.floor(f)); return [q, f - q]; };
   const aProf = (s) => {
-    // a rounded rear, fullest at `ab.full`, narrowing a little to the thorax joint
-    const front = 0.62 + 0.38 * ss(0, ab.full, s);
+    // a rounded rear, fullest at `ab.full`, narrowing a little to the thorax joint (`ab.front`, its width there: the
+    // sickle-jaw termites' egg-shaped abdomens round down into a narrow joint, rising in a rounded curve, not a cone)
+    const front = ab.front == null ? 0.62 + 0.38 * ss(0, ab.full, s) : ab.front + (1 - ab.front) * Math.sqrt(1 - (1 - Math.min(1, s / ab.full)) ** 2);
     const rear = Math.pow(Math.max(0, 1 - Math.pow(Math.max(0, (s - ab.full) / (1 - ab.full)), 2.4)), 0.5);
     let r = front * (s < ab.full ? 1 : rear);
     r = Math.max(r, 0.04);
@@ -135,7 +136,8 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       const [q, fr] = terg(s);
       // each tergite a little darker toward its rear margin; the membrane between them pale
       let c = d > 0 ? mix(C.abd, C.abdTop, d * 0.7) : mix(C.abd, C.abdUnder, -d * 0.8);
-      c = mix(c, C.tergRear, 0.35 * ss(0.4, 0.95, fr) * Math.max(0, d * 0.8 + 0.3));
+      // (`abdomen.band`: how strongly — the sickle-jaw soldier's bands are bold)
+      c = mix(c, C.tergRear, (ab.band ?? 0.35) * ss(0.4, 0.95, fr) * Math.max(0, d * 0.8 + 0.3));
       const mem = Math.exp(-((fr - 0.0) ** 2) / 0.006) + Math.exp(-((fr - 1) ** 2) / 0.006);
       if (q > 0 || fr > 0.15) c = mix(c, C.membrane, ab.membrane * Math.min(1, mem));
       c = mix(c, C.gut, ab.gut * gutAt(s, d, lat));
@@ -236,10 +238,11 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       const s = k / (R - 1);
       const back = s < 0.38 ? Math.sqrt(Math.max(0.0025, 1 - ((0.38 - s) / 0.38) ** 2)) : 1;
       const front = s > 0.84 ? Math.sqrt(Math.max(0.0025, 1 - ((s - 0.84) / 0.16) ** 2)) : 1;
-      // (`head.narrow`: how much the face narrows forward — the sickle-jaw worker's broad head hardly does)
+      // (`head.narrow`: how much the face narrows forward — the sickle-jaw worker's broad head hardly does;
+      // `head.round`: the cross-section's squareness, 2 a true ellipse — the sickle-jaw worker's head is a round dome)
       const narrow = 1 - (hd.narrow ?? 0.38) * ss(0.42, 1, s);
       const env = back * front;
-      secs.push({ x: x0 + s * hL, y: 0.2 * hH - 0.16 * hH * s * s, ry: hH * 0.5 * env * (1 - 0.18 * ss(0.55, 1, s)), rz: hW * 0.5 * env * narrow, n: 2.4 });
+      secs.push({ x: x0 + s * hL, y: 0.2 * hH - 0.16 * hH * s * s, ry: hH * 0.5 * env * (1 - 0.18 * ss(0.55, 1, s)), rz: hW * 0.5 * env * narrow, n: hd.round ?? 2.4 });
     }
     // (`head.flat`: the top flattened this much — the sickle-jaw worker's head is flattened top to bottom)
     const flat = hd.flat ?? 0.88;
@@ -251,15 +254,6 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
       c = mix(c, C.headBand, (hd.band ?? 1) * 0.75 * Math.min(1, band) * top);
       // the fontanelle: a whitish spot in the middle of the frons (the frontal gland's pore)
       if (hd.fontanelle) c = mix(c, C.fontanelle, top * Math.exp(-(((s - 0.55) / hd.fontanelle) ** 2 + (lat / (hd.fontanelle * 1.3)) ** 2) * 3));
-      // (`head.suture`, its half-width: the sickle-jaw worker's pale Y-shaped epicranial suture, "proportionately
-      // larger and more contrasting" than its relatives' — the stem along the midline from the back to the
-      // fontanelle, the arms forking forward and out toward the antennal sockets)
-      if (hd.suture) {
-        const w2 = hd.suture * hd.suture;
-        const stem = ss(0.08, 0.2, s) * (1 - ss(0.5, 0.56, s)) * Math.exp(-(lat * lat) / w2);
-        const arms = ss(0.55, 0.6, s) * (1 - ss(0.82, 0.9, s)) * Math.exp(-((Math.abs(lat) - Math.max(0, s - 0.55) * 1.6) ** 2) / w2);
-        c = mix(c, C.fontanelle, top * 0.8 * Math.min(1, stem + arms));
-      }
       return c;
     }, lk.head, (x, y, z) => [x, y > 0.22 * hH ? 0.22 * hH + (y - 0.22 * hH) * flat : y, z], REGION.HEAD);
     // (user notes 17:48 / 17:59: "redo the head geometry and mandibles", "fix the mandibles especially and the head")
@@ -375,7 +369,7 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
      * §10): long, thin, flattened blades hinged low on the front sides of the globe, where it narrows into the snout.
      * Seen from above each sweeps out sideways, turns forward and then in (about 150° in all), the tips crossing in
      * front of and below the snout when closed; seen from the side it hangs, curving ever more steeply down, the last
-     * sixth hooked down and back. A small conical tooth on the inner margin at 0.42; dark red, near black at the tip.
+     * sixth hooked down and back. A small conical tooth on the inner margin at 0.42; crimson, black from `sk.tip` on.
      */
     const sickles = (sk, sc0) => {
       const mL = sk.len * L;
@@ -435,7 +429,7 @@ export function buildNasute(i: any, lod: number, seed = 1): BuiltAnt {
         });
         const part = sd < 0 ? PART.MAND_L : PART.MAND_R;
         // flattened in the blade's plane: the tube's `flat` squashes its section across the curve
-        ttube(n, pts, rad, S(10, 6, 4), part, (t) => mix(C.mand, C.mandTip, ss(0.45, 0.95, t)), lk.mandible, true, true, sk.flat ?? 0.55, REGION.MANDIBLE);
+        ttube(n, pts, rad, S(10, 6, 4), part, (t) => mix(C.mand, C.mandTip, ss(sk.tip ?? 0.45, 0.97, t)), lk.mandible, true, true, sk.flat ?? 0.55, REGION.MANDIBLE);
         if (lod < 2) {
           // the marginal tooth on the inner edge
           const k = Math.round((sk.tooth ?? 0.42) * (pts.length - 1)), tn = pts[k + 1].clone().sub(pts[k - 1]).normalize();

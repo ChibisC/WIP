@@ -19,31 +19,33 @@ const SURF = {
 // the soldier's head: hard, smooth and glassy red
 const GLASSY = { rough: 0.1, coat: 1, sheen: 0.04 };
 
-// ---------- the worker (review round 1: "is that truly how the worker looks?" — redone from the descriptions) ----------
-// Constantini et al. 2019 (R. armatus, ZooKeys) and Scheffrahn 2010 (R. bulbinasus, Zootaxa): the worker's head
-// capsule is concolorous with the soldier's — reddish in R. perarmatus, ferruginous orange to chestnut in its
-// relatives — rounded, wider than long (1.17 mm wide, 0.79 long to the condyles), with a strongly inflated
-// postclypeus; R. perarmatus' fontanelle and cranial suture are "proportionately larger and more contrasting"; 14
-// antennal articles; a pointed rise on the fore coxa; slightly larger than the soldier; the abdomen a termite
-// worker's, pale and soft with the dark gut showing. Eyeless.
+// ---------- the worker (review round 1: "is that truly how the worker looks?"; round 3: "redo rhyncotermes workers
+// based on real life images cos they look off" — rebuilt from the user's three field photos, study only) ----------
+// What the photos show: a strongly two-toned animal. The head a small, round, glossy orange dome (the photos read
+// #c95b07), about as wide as long, the face the same colour; a narrow thorax of a lighter orange (#d2863e); long,
+// slender pale-amber legs and beaded antennae; and a big, plump egg-shaped abdomen that is dark — a glossy chocolate
+// (#623525) to grey-brown (#785d47), the gut contents showing through a wet-looking cuticle — its tergites divided by
+// dark creases, not pale stripes (the pale bits in the photos are highlights). No visible fontanelle or suture at
+// this scale. The descriptions (Constantini et al. 2019; Scheffrahn 2010: the head concolorous with the soldier's,
+// reddish-orange, eyeless, 14 antennal articles) agree.
 const WORKER_COLORS = {
-  head: 0xa4461c, headTop: 0xb04e20, headUnder: 0x8c3c18, headBand: 0x7a3216, clypeus: 0xc0784a, labrum: 0xcc9a6a, palp: 0xe6d6b8, suture: 0x7a3216, fontanelle: 0xf2e6cc,
-  mand: 0x7a3a1a, mandTip: 0x261006,
-  thorax: 0xe0caa0, thoraxTop: 0xd6bc8e, pronotum: 0xdcc498,
-  abd: 0xdcc292, abdTop: 0xd2b682, abdUnder: 0xe8d6b0, tergRear: 0xb8955e, membrane: 0xf0e2c2, gut: 0x2e2414,
-  leg: 0xe2cca2, legLight: 0xeadab6, legBase: 0xd6be90, claw: 0x8a6a40, antenna: 0xd8c6a0, antennaTip: 0xe6d8b8,
-  hair: 0xf2ead6, seta: 0xf2ead6,
+  head: 0xc85818, headTop: 0xd06020, headUnder: 0xa84414, headBand: 0xa04418, clypeus: 0xd06a2a, labrum: 0xc0743c, palp: 0xd8b07a, fontanelle: 0xdc8a52,
+  mand: 0x6a2a10, mandTip: 0x200a04,
+  thorax: 0xd2843c, thoraxTop: 0xc87a34, pronotum: 0xcc7e36,
+  abd: 0x6c381e, abdTop: 0x5a2e18, abdUnder: 0x86583c, tergRear: 0x381a0c, membrane: 0x8a644a, gut: 0x26160c,
+  leg: 0xd8a862, legLight: 0xe2b874, legBase: 0xcc9a54, claw: 0x7a5a30, antenna: 0xd09c58, antennaTip: 0xdcb070,
+  hair: 0xe8d8b0, seta: 0xe8d8b0,
 };
 const worker = {
   key: 'termite_rhy_worker', builder: 'nasute', real: true, L: 5.8, stance: 0.06, soft: 1.1,
-  look: { colors: WORKER_COLORS, ...SURF, head: { rough: 0.36, coat: 0.42, sheen: 0.12 } },
-  // a termite worker's soft abdomen (0.52 L), plump, the dark leaf-litter gut showing through
-  abdomen: { x0: 0.5, len: 0.52, w: 0.27, h: 0.21, cy: 0.11, full: 0.45, sag: 0.015, groove: 0.05, membrane: 0.55, gut: 1.0, gutLobes: [[0.33, 0.03, 1], [0.52, 0.035, 1], [0.7, 0.02, 0.85]] },
-  // the pronotum a saddle with its front lobe turned up (R. armatus: the lobes at about 130°)
-  thorax: { meta: 0.05, meso: 0.05, pro: 0.055, w: 0.15, h: 0.1, cy: 0.095, proW: 0.19, proLift: 0.014, saddle: 0.02 },
-  // the head rounded, wider than long (1.5 : 1), a rounded dome — not flattened — narrowing a little to the swollen
-  // postclypeus; the fontanelle and the Y suture pale and contrasting
-  head: { len: 0.2, w: 0.255, h: 0.16, tilt: -0.24, neck: 0.018, neckY: 0.012, flat: 0.92, narrow: 0.3, band: 0.25, fontanelle: 0.085, suture: 0.035 },
+  // the head and the abdomen both glossy and wet-looking in the photos
+  look: { colors: WORKER_COLORS, ...SURF, head: { rough: 0.16, coat: 0.85, sheen: 0.06 }, abdomen: { rough: 0.14, coat: 0.9, sheen: 0.08 } },
+  // a big plump egg-shaped abdomen, dark, the tergites divided by dark creases
+  abdomen: { x0: 0.5, len: 0.5, w: 0.32, h: 0.26, cy: 0.155, full: 0.55, front: 0.3, sag: 0.015, groove: 0.09, membrane: 0.3, gut: 0.35, gutLobes: [[0.35, 0.04, 1], [0.55, 0.045, 1], [0.74, 0.03, 0.85]] },
+  // a narrow thorax, the pronotum a small saddle
+  thorax: { meta: 0.05, meso: 0.05, pro: 0.05, w: 0.12, h: 0.09, cy: 0.1, proW: 0.15, proLift: 0.012, saddle: 0.016 },
+  // a small round glossy dome, about as wide as long
+  head: { len: 0.19, w: 0.2, h: 0.18, tilt: -0.2, neck: 0.02, neckY: 0.014, flat: 1.0, narrow: 0.22, round: 2.0, band: 0, fontanelle: 0.04 },
   mandible: { len: 0.11, curve: 1.1, r: 0.02, open: 0.65 },
   antenna: { beads: 14, len: 0.46, r: 0.0105, sx: 0.42, sy: -0.02, sz: 0.46, ang: 0.38, splay: 0.55, droop: 0.4 },
   // long, slender legs (hind tibia 1.26 mm = 0.22 L)
@@ -61,27 +63,35 @@ const worker = {
 // ---------- the soldier: a glossy red globe drawn into a long down-curved snout, long crossing sickles; eyeless ----------
 const SOLDIER_COLORS = {
   ...WORKER_COLORS,
+  // the palps, claws and pale hairs as before the worker's round-3 redo
+  palp: 0xe6d6b8, claw: 0x8a6a40, hair: 0xf2ead6, seta: 0xf2ead6, clypeus: 0xc0784a, labrum: 0xcc9a6a, fontanelle: 0xf2e6cc, headBand: 0x7a3216,
   head: 0xa23a16, headTop: 0xb0421a, headUnder: 0x8a3012, nasusTip: 0x5a1610, pore: 0x2a0806,
-  mand: 0x5a140c, mandTip: 0x160604,
+  // (round 3, the user's photos: "more colored like irl counterparts") the sickles a glossy wine-crimson (the photos
+  // read #7c2018 in the light, #4a0604 in shadow), going black only at the hook
+  mand: 0x8a2218, mandTip: 0x140404,
   // the photos' amber-cream body with bold brown tergite bands (species doc §6: #D49E5C, bands #6E3E1E)
-  // (round-1 photo comparison: still too pale) a warmer amber, the bands darker
+  // (round-1 photo comparison: still too pale) a warmer amber
   thorax: 0xc08440, thoraxTop: 0xb47838, pronotum: 0xb87c3a,
-  abd: 0xb87434, abdTop: 0xa8682c, abdUnder: 0xcc945a, tergRear: 0x5a2c12, membrane: 0xe8c08a, gut: 0x4a3018,
+  // (round 3, "as well as their abdomens") browner than before: a warm tan-brown (the photos read #8c674a), each
+  // tergite darkening to a bold brown rear band (#533115), thin pale cream membranes between, the gut a dull shadow
+  abd: 0xa07044, abdTop: 0x8c5e36, abdUnder: 0xc0966a, tergRear: 0x40200a, membrane: 0xdac4a0, gut: 0x4a3a2a,
   leg: 0xd4a258, legLight: 0xdeb26a, legBase: 0xc49048, antenna: 0xc89a54, antennaTip: 0xd8ae68,
 };
 const soldier = {
   ...worker,
   key: 'termite_rhy_soldier', L: 4.5, stance: 0.09, soft: 1,
   look: { colors: SOLDIER_COLORS, ...SURF, head: GLASSY, mandible: GLASSY },
-  abdomen: { x0: 0.37, len: 0.33, w: 0.18, h: 0.16, cy: 0.1, full: 0.5, sag: 0.01, groove: 0.05, membrane: 0.5, gut: 0.45, gutLobes: [[0.4, 0.016, 0.9], [0.6, 0.012, 0.7]] },
+  // (round 3, the photos) a plump oval abdomen about 1.8 × the capsule's length and a little wider than it
+  abdomen: { x0: 0.38, len: 0.4, w: 0.25, h: 0.2, cy: 0.115, full: 0.52, front: 0.35, sag: 0.012, groove: 0.06, membrane: 0.4, band: 0.85, gut: 0.45, gutLobes: [[0.38, 0.02, 0.9], [0.6, 0.016, 0.75]] },
   thorax: { meta: 0.05, meso: 0.05, pro: 0.06, w: 0.12, h: 0.1, cy: 0.1, proW: 0.14, proLift: 0.01, saddle: 0.018 },
   // the capsule 1.05 mm (0.233 L) by 1.0 wide; the snout 1.45 mm (0.322 L), down-curved toward its blunt tip
   head: {
     len: 0.233, w: 0.222, h: 0.2, tilt: 0.08, neck: 0.012, neckY: 0.03,
     nasus: { len: 0.3, r0: 0.04, r1: 0.017, up: -0.32, rise: 0.0, curve: 0.22, dark: 0.55, flank: 2.6 },
     // (round-1 photo comparison) a C-hook in one plane: forward and down from the hinge, round the bottom, the tip
-    // curling back and up; thicker at the base, dark red to near-black
-    sickle: { len: 0.34, w: 0.04, flat: 0.6, plane: true, yaw0: 0.32, yawPow: 1, dip0: 0.4, dip1: 2.0, hook: 0.5, at: 0.02, ang: 0.9, cross: 0.012, tooth: 0.42, toothLen: 0.1 },
+    // curling back and up; thicker at the base. (round 3: "slightly less thick") a quarter slimmer; crimson, black
+    // from `tip` along the blade
+    sickle: { len: 0.34, w: 0.03, tip: 0.74, flat: 0.6, plane: true, yaw0: 0.32, yawPow: 1, dip0: 0.4, dip1: 2.0, hook: 0.5, at: 0.02, ang: 0.9, cross: 0.012, tooth: 0.42, toothLen: 0.1 },
   },
   mandible: { len: 0.25, curve: 1, r: 0.02, open: 0.55 },
   antenna: { beads: 14, len: 0.55, r: 0.0105, ss: 0.3, sa: 0.3, ang: 0.42, splay: 0.6, droop: 0.6 },
@@ -103,7 +113,7 @@ const presoldier = {
     colors: {
       ...SOLDIER_COLORS, head: 0xe2c8a2, headTop: 0xe8d0aa, headUnder: 0xd8bc94, nasusTip: 0xcaa67c, pore: 0x8a6a48, mand: 0xd4b48a, mandTip: 0xa88458,
       // soft and untanned all over
-      thorax: 0xe6d4b0, thoraxTop: 0xdecaa4, pronotum: 0xe2d0aa, abd: 0xe4d0a8, abdTop: 0xdac49a, abdUnder: 0xeadcbc, tergRear: 0xc8aa7c, membrane: 0xf0e4ca,
+      thorax: 0xe6d4b0, thoraxTop: 0xdecaa4, pronotum: 0xe2d0aa, abd: 0xe4d0a8, abdTop: 0xdac49a, abdUnder: 0xeadcbc, tergRear: 0xc8aa7c, membrane: 0xf0e4ca, gut: 0x4a3018,
       leg: 0xe8d8b4, legLight: 0xeee2c4, legBase: 0xdecca6, antenna: 0xe2d2ae, antennaTip: 0xeadcbc,
     },
     ...SURF,
@@ -118,6 +128,7 @@ const LARVA_COLORS = {
   head: 0xdccaa6, headTop: 0xe2d0ae, headUnder: 0xd2bf9a, clypeus: 0xe0cfae, labrum: 0xe6d8bc, mand: 0xc8ad80, mandTip: 0xa4865a, fontanelle: 0xece2cc,
   thorax: 0xe0d0b0, thoraxTop: 0xd8c6a2, pronotum: 0xdccaa8, abd: 0xe0cfae, abdTop: 0xd6c29c, abdUnder: 0xe8dcc2, tergRear: 0xccb68e, membrane: 0xeee4ce, gut: 0x8a7656,
   leg: 0xe2d4b8, legLight: 0xeae0ca, legBase: 0xd8c8a8, antenna: 0xdccdb0, antennaTip: 0xe6dac4,
+  palp: 0xe6d6b8, claw: 0x8a6a40, hair: 0xf2ead6, seta: 0xf2ead6, headBand: 0x7a3216,
 };
 const larva = {
   ...worker,
