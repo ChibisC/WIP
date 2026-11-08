@@ -351,7 +351,7 @@ export const CASTES: Record<string, CasteDef> = {
     length: 5.8, // larger than the soldier
     speed: 12.8, // × 0.8
     hp: 21, // (balance pass 2026-11-02: was × 0.75)
-    bite: 2.4, attackInterval: 1.0, // (was 0.87: they still only bite back)
+    bite: 2.5, attackInterval: 1.0, // (was 0.87: they still only bite back)
     armor: 0, carry: 3, grip: 1, mass: 1, forage: true, dig: true, nurse: true,
     cost: 6, devTime: 1, pop: 1, cocoon: false,
     fact: 'Sickle-jaw workers are stout, blind and soft, with a transparent abdomen full of dark leaf litter and a whitish spot (the fontanelle) on the head.',
@@ -359,7 +359,7 @@ export const CASTES: Record<string, CasteDef> = {
   rhy_soldier: C({
     id: 'rhy_soldier', species: 'rhynchotermes', name: 'Sickle-jaw', role: 'soldier', morph: 'termite_rhy_soldier', termite: 'sickle',
     length: 4.5, speed: 14.4, // × 0.9
-    hp: 22, // (balance pass 2026-11-02: was 12.8; wins one on one, loses in groups: it holds one enemy at a time)
+    hp: 20, // (balance pass 2026-11-02: was 12.8; wins one on one, loses in groups: it holds one enemy at a time)
     bite: SICKLE.grab.biteDamage, attackInterval: SICKLE.acid.freeTargetBiteInterval, armor: 0, carry: 2, grip: 3, mass: 0.8,
     forage: true, dig: false, nurse: false, threat: 0.6, // gathers like an ant soldier (user note 2026-10-25)
     cost: 10, devTime: 1.4, pop: 1, cocoon: false,

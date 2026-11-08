@@ -8,6 +8,8 @@
 // (round 3 review of the first renders against the photos: the live workers are golden amber, not cream; the gut
 // shows dark brown through the abdomen; the head a deeper glossy amber)
 // (the lab's daylight brightens vertex colours a lot: these are set about a quarter darker than the photos read)
+import { RHY_MORPHS } from './rhyMorphs';
+
 const WORKER_COLORS = {
   head: 0xb47830, headTop: 0xc48a3e, headUnder: 0x9a6628, headBand: 0x6e3e16, clypeus: 0xc0904c, labrum: 0xc89a58, palp: 0xd8b880, suture: 0x7a4c1e,
   mand: 0x5a2e12, mandTip: 0x1e0e04,
@@ -103,5 +105,8 @@ const major = {
 };
 
 export const NASUTE_MORPHS = { termite_worker: worker, termite_nasute: soldier, termite_major: major };
-/** Termite castes drawn by the ant renderer (the rest stay on the termite kit). */
-export const NASUTE_ANT_PATH = new Set(Object.keys(NASUTE_MORPHS));
+/**
+ * Termite castes drawn by the ant renderer: the conehead workers, sprayers and soldiers, and every sickle-jaw caste
+ * (rhyMorphs.ts; model redo). The conehead royals and larvae stay on the termite kit.
+ */
+export const NASUTE_ANT_PATH = new Set([...Object.keys(NASUTE_MORPHS), ...Object.keys(RHY_MORPHS)]);

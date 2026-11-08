@@ -9,7 +9,3 @@ export const TERMITE_ROYALS = {
   rhy_queen: { length: 26.11, front: 3.01, back: 23.1, halfWidth: 2.83, abdFront: -0.58, abdHalfWidth: 2.6, eggLay: [-22.83, 1.24, 0] },
   rhy_king: { length: 8.88, front: 3.03, back: 5.85, halfWidth: 2.09, abdFront: -0.97, abdHalfWidth: 0.9, eggLay: [-5.85, 0.9, 0] },
 } as const;
-
-// The Sickle-Jaw soldier (kit v2): its crossed mandible tips in the HOLD pose (x ahead, y up) and its front. The sim
-// pins a held victim with its front in this socket (sim/sickleJaws.ts).
-export const SICKLE_SOCKET = { x: 1.27, y: 0.21, front: 2.28 } as const;

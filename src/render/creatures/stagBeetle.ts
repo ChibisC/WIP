@@ -115,6 +115,43 @@ function elytraGeo(): THREE.BufferGeometry {
   }, paint);
 }
 
+/**
+ * One elytron (wing case): the elytra split down the suture, for the flare (review 2026-11-07: the beetle's
+ * `cr.beetle_elytra` sound had no animation). Triangles whose centre lies on the other side are dropped.
+ */
+function elytronGeo(side: 1 | -1): THREE.BufferGeometry {
+  const g0 = elytraGeo();
+  const g = g0.index ? g0.toNonIndexed() : g0;
+  const pos = g.getAttribute('position');
+  const keep: number[] = [];
+  for (let t = 0; t < pos.count; t += 3) {
+    const z = pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2);
+    if (z * side >= 0) keep.push(t, t + 1, t + 2);
+  }
+  const out = new THREE.BufferGeometry();
+  for (const name of Object.keys(g.attributes)) {
+    const a = g.getAttribute(name) as THREE.BufferAttribute;
+    const arr = new (a.array.constructor as new (n: number) => typeof a.array)(keep.length * a.itemSize);
+    for (let i = 0; i < keep.length; i++) for (let c = 0; c < a.itemSize; c++) arr[i * a.itemSize + c] = a.array[keep[i] * a.itemSize + c];
+    out.setAttribute(name, new THREE.BufferAttribute(arr, a.itemSize, a.normalized));
+  }
+  return out;
+}
+
+/** A hind wing (membranous, folded under the elytra; shown only in the flare): a thin, long, rounded blade. */
+function hindWingGeo(): THREE.BufferGeometry {
+  return build((acc) => {
+    const rings: Ring[] = [];
+    const N = 14;
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1); // 0 root (at the shoulder) … 1 tip
+      const w = F(0.08) * Math.sin(Math.PI * Math.pow(t, 0.75)) + F(0.004);
+      rings.push({ x: -F(0.5) * t, y: 0, rz: w, ry: F(0.0012), n: 2 });
+    }
+    put(acc, loft(rings, 24, (x, y, z) => [x, y, z]), REGION.ELYTRA);
+  }, () => new THREE.Color(0.78, 0.7, 0.58), F(0.01));
+}
+
 /** Pronotum: transverse, rounded sides with a sharp margin, narrower in front, blunt hind angles. */
 function pronotumGeo(): THREE.BufferGeometry {
   return build((acc) => {
@@ -404,6 +441,9 @@ export function registerStagParts(): void {
   registered = true;
   const fam = 'stag';
   registerPart('stag_elytra', { family: fam, make: elytraGeo });
+  registerPart('stag_elytronL', { family: fam, make: () => elytronGeo(1) });
+  registerPart('stag_elytronR', { family: fam, make: () => elytronGeo(-1) });
+  registerPart('stag_hindwing', { family: fam, make: hindWingGeo });
   registerPart('stag_pronotum', { family: fam, make: pronotumGeo });
   for (let q = 0; q <= 4; q++) registerPart(`stag_head${q}`, { family: fam, make: () => headGeo(q / 4) });
   registerPart('stag_under', { family: fam, make: underGeo });
@@ -423,6 +463,7 @@ const C = (hex: number) => new THREE.Color(hex);
 export const SG2 = { gold: C(0x4a3a26), elytra: C(0x4e2420), black: C(0x2a2623), leg: C(0x1e1a18), under: C(0x1a1612), eye: C(0x080605), mand: C(0xffffff), brush: C(0x8a5e2a) };
 const S = (rough: number, gloss: number) => ({ rough, gloss, pattern: 0, scale: 1 });
 // realism v2: satin, not lacquer (the clearcoat roughness per region is in render/bake/recipes.ts)
+const WING = S(0.25, 0.55);
 const SURF = { elytra: S(0.38, 0.42), shield: S(0.58, 0.25), head: S(0.62, 0.2), mand: S(0.34, 0.52), leg: S(0.42, 0.42), under: S(0.6, 0.15), eye: S(0.1, 1.0) };
 const HAIR = { rough: 0.9, gloss: 0, pattern: 2, scale: 3 };
 const jit = new THREE.Color();
@@ -768,7 +809,38 @@ export function stagBeetle2(rig: Rig, p: CrPose, male?: { msize: number; off: nu
   }
   // body shell
   rig.part('stag_under', 0, 0, 0, k, SG2.under, SURF.under);
-  rig.part('stag_elytra', 0, 0, 0, k, jitter(SG2.elytra, p.v2), SURF.elytra);
+  // the wing-case flare (review 2026-11-07): entering a rear or a display, the elytra snap open and lift, the hind
+  // wings unfold and buzz for most of a second, fold, and the cases close — the game's audio plays cr.beetle_elytra
+  // on the same state entry, so the sound lands on the snap
+  const flareT = p.state === ST.Rear || p.state === ST.Display ? st : -1;
+  const flare = flareT >= 0 && flareT < 1.6 ? (flareT < 0.1 ? strikeE(flareT / 0.1) : flareT < 1.2 ? 1 : 1 - sm01((flareT - 1.2) / 0.4)) : 0;
+  if (flare > 0.001 && !p.dead) {
+    const E = SB.elytra;
+    const hingeY = (E.top - 0.015) * L;
+    const hingeX = E.x1 * L;
+    // the hind wings: out from under the shoulders, swept back and out, beating fast while the cases are open
+    const buzz = flareT > 0.08 && flareT < 1.25 ? Math.min(1, (flareT - 0.08) / 0.08) * (1 - sm01((flareT - 1.05) / 0.2)) : 0;
+    for (const sd of [1, -1] as const) {
+      // each case rolls outward about the suture and pitches up at the shoulder hinge
+      const m = new THREE.Matrix4();
+      const t1 = new THREE.Matrix4().makeTranslation(hingeX, hingeY, 0);
+      const r = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(-sd * 0.42 * flare, sd * 0.1 * flare, -0.1 * flare, 'ZYX'));
+      const t2 = new THREE.Matrix4().makeTranslation(-hingeX, -hingeY, 0);
+      m.copy(t1).multiply(r).multiply(t2).multiply(new THREE.Matrix4().makeScale(k, k, k));
+      rig.partM(sd > 0 ? 'stag_elytronL' : 'stag_elytronR', m, jitter(SG2.elytra, p.v2), SURF.elytra);
+      if (buzz > 0.001) {
+        const beat = Math.sin(p.t * 2 * Math.PI * 22 + sd * 0.4) * 0.35 * buzz;
+        const wm = new THREE.Matrix4();
+        const wt = new THREE.Matrix4().makeTranslation(hingeX - 0.02 * L, hingeY - 0.03 * L, sd * 0.06 * L);
+        // unfolds: sweeps out to the side and back, flapping about the root
+        const wr = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(-sd * (0.18 + beat * 0.6), sd * 0.8 * buzz, 0.1 + beat * 0.4, 'YXZ'));
+        wm.copy(wt).multiply(wr).multiply(new THREE.Matrix4().makeScale(k * (0.2 + 0.8 * buzz), k, k * (0.3 + 0.7 * buzz)));
+        rig.partM('stag_hindwing', wm, 0xcbb894, WING);
+      }
+    }
+    // the abdomen bared under the raised cases
+    rig.ell((E.x0 + E.x1) / 2 * L, (SB.belly + 0.05) * L, 0, (E.x1 - E.x0) / 2 * 0.92 * L, 0.055 * L, E.half * 0.85 * L, SG2.black, SURF.under);
+  } else rig.part('stag_elytra', 0, 0, 0, k, jitter(SG2.elytra, p.v2), SURF.elytra);
   rig.part('stag_pronotum', 0, 0, 0, k, SG2.black, SURF.shield);
   // scutellum
   rig.ell(-0.08 * L, 0.174 * L, 0, 0.012 * L, 0.003 * L, 0.011 * L, SG2.black, SURF.shield);

@@ -230,7 +230,6 @@ npx vite-node tools/duels.ts -- ant:lasius_worker 60 ant:fire_soldier 60 20   # 
 npx vite-node tools/spin-check.ts                                   # 50 v 50 spinning, 30 ants on a beetle, tunnel flow
 npx vite-node tools/climb-stress.ts -- 40 400                       # 4 titans with full riders + a 400 v 400 clash: tick time with and without mounting
 npx vite-node tools/chain-check.ts                                  # centipede / caterpillar bodies: neck and joint bends, body vs hitbox
-npx vite-node tools/sickle-guard.ts -- 24 12 5                       # the sickle-jaw guard line along the workers' route
 npx vite-node tools/eciton-raid.ts -- 40 8 5 8 120 5 1               # army-ant raid numbers: front, pulses, lanes, porters, posts, bridge, plugs [puddle=1]
 npx vite-node tools/morph-hash.ts -- check tests/data/morph-hashes.json   # ant model geometry unchanged (save <file> for a new baseline)
 npx vite-node tools/climb-data.ts                                   # re-author climbing points, rails, weak points and mount slots from the creature models
@@ -265,6 +264,6 @@ npx vite-node tools/battle.ts -- formica_soldier:2,formica_rapid:2 fire_minor:16
 npx vite-node tools/equal.ts -- fire_major fire_soldier 150         # how many of each the same food buys
 python3 tools/crsheet.py out.jpg "wolfSpider|wolf spider;mantis|mantis|state=11"   # creature model sheet (?scene=crlab)
 ```
-Sound: `?scene=sounds` is the sound board (every sound with its takes, file or stand-in, and a soundscape mixer). `docs/audio/` has the sound list for gathering recordings, the attributions and how the audio works. `npm run audio:process` turns recordings in `audio-src/recordings/` into game files.
+Sound: every effect is a file made for this game, rendered offline from the physics of real insect sounds (`npm run audio:build`, Python with numpy, scipy, soundfile and pyloudnorm, plus ffmpeg; recordings in `audio-src/recordings/` replace a sound's takes). `?scene=sounds` is the sound board (every sound with its takes and a soundscape mixer). `docs/audio/` has the research notes, the sound list, the attributions and how the audio works.
 
 Dev URLs: `?scene=crlab&kinds=stagBeetle,tarantula` (creature viewer: `state`, `st`, `walk`, `dead`, `eaten`, `cam`), `?play=1&spawn=wolfSpider:2,mantis` (creatures beside your entrance; add `&rival=formica&battle=lasius_soldier:14&climbdebug=1` to watch them climbed; `&hitboxes=1` draws every hitbox, as F3 does; `&combatdebug=1` the combat debug view: anchored, blocked, backing off, going round, slots), `?play=1&allies=lasius&rival=formica&developed=70` (an AI ally and a rival, everyone well grown; `&ailevel=0..3` the AI level), `?stress=1`, `?scene=determinism`, `?netsim=lat,jit,loss`, `?delay=N`, `?worker=0`.

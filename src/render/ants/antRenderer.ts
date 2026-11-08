@@ -10,7 +10,7 @@ import { ANIM_SFX, animV2, AtkPlan, attackPlan, Motion2, newMotion, newMotionOut
 import { addPatch, patchDapple } from '../shaderPatch';
 import { TermiteLayer } from '../termite/termiteLayer';
 import { NASUTE_ANT_PATH } from './nasuteMorphs';
-import { GlueStreams, NASUTE_GLUE } from '../termite/glue';
+import { ACID_STREAM, AcidFizz, GlueStreams, NASUTE_GLUE } from '../termite/glue';
 import { termiteTime } from '../termite/material';
 import { BALANCE } from '../../sim/balance';
 
@@ -593,6 +593,11 @@ export class AntRenderer {
   /** the nasute soldiers on the ant pipeline: their glue streams from the nasus tip (realism round 3) */
   private nasGlue: GlueStreams | null = null;
   private nasGlueN = 0;
+  /** sickle-jaw soldiers on the ant pipeline: the acid jet from the snout's tip and the fizz where it lands */
+  private rhyAcid: GlueStreams | null = null;
+  private rhyAcidN = 0;
+  private rhyFizz: AcidFizz | null = null;
+  private rhyFizzN = 0;
   /** climbing ants: placed on the creature's animated leg or body (set by the session) */
   mount: MountFn | null = null;
   /** the space these ants are in (for the sound hooks; set by the session) */
@@ -790,8 +795,9 @@ export class AntRenderer {
     this.termites?.begin(frameDt);
     if (this.termites) this.termites.mount = this.mount;
     this.nasGlueN = 0;
+    this.rhyAcidN = this.rhyFizzN = 0;
     // (the glue's pulses run on the termite clock: the kit layer advances it when there is one)
-    if (this.nasGlue && !this.termites) termiteTime.value += frameDt;
+    if ((this.nasGlue || this.rhyAcid) && !this.termites) termiteTime.value += frameDt;
 
     const turnTo = antHeadingHook.fn && antHeadingHook.active() ? antHeadingHook.fn : null;
     const nowMs = turnTo ? performance.now() : 0;
@@ -1128,7 +1134,10 @@ export class AntRenderer {
         bodyBuf[5] = qB.y * k;
         bodyBuf[6] = qB.z * k;
         // (crushed: the feet pushed out a little as it is pressed down)
-        bodyBuf[7] = atkP.spread * w + M.squash * 0.35;
+        // (user, review 2026-11-07, the attack clips: "plant legs on ground better" — an attack's brace moved the planted
+        // feet outward along the ground and back with every strike; now the feet stay where they stand and the body
+        // moves over them)
+        bodyBuf[7] = M.squash * 0.35;
         bodyBuf[8] = atkP.gYaw * w;
         bodyBuf[9] = stingW;
         bodyBuf[10] = Math.max(atkP.front * w, v.front ?? 0);
@@ -1198,7 +1207,25 @@ export class AntRenderer {
       if (v.special === 4 && !v.dead && sock) this.recordHold(v.id, rig, hp, hy, sock);
       // a nasute soldier squirting (the ant pipeline): the glue from its nasus tip to the target
       const nt = (rig as { nasusTip?: THREE.Vector3 }).nasusTip;
-      if (nt && v.firing && !v.dead && v.aimX !== undefined && v.aimY !== undefined) {
+      if (nt && v.firing && !v.dead && v.aimX !== undefined && v.aimY !== undefined && v.morph === 'termite_rhy_soldier') {
+        // a sickle-jaw soldier: the clear-to-amber acid jet point-blank from the snout's tip, the fizz on the target
+        if (!this.rhyAcid) {
+          this.rhyAcid = new GlueStreams(64, { ...ACID_STREAM, diameter: 0.16 });
+          this.rhyFizz = new AcidFizz(64);
+          this.group.add(this.rhyAcid.mesh, this.rhyFizz.mesh);
+        }
+        if (this.rhyAcidN < this.rhyAcid.capacity) {
+          this.recordHold(-v.id, rig, hp, hy, nt);
+          const tip = this.holds.get(-v.id)!;
+          _gt.set(tip.x, tip.y, tip.z);
+          adapter.toWorld(v.aimX, v.aimY, _ga);
+          adapter.normal(v.aimX, v.aimY, _gn);
+          _ga.addScaledVector(_gn, v.aimZ ?? 1);
+          const seed = (v.id * 0.618) % 1;
+          this.rhyAcid.set(this.rhyAcidN++, _gt, _ga, v.ramp ?? 0, true, seed);
+          if (this.rhyFizzN < this.rhyFizz!.capacity) this.rhyFizz!.set(this.rhyFizzN++, _ga, Math.max(0.25, ((v.aimZ ?? 1) / 0.22) * 0.125), v.ramp ?? 0, seed);
+        }
+      } else if (nt && v.firing && !v.dead && v.aimX !== undefined && v.aimY !== undefined) {
         if (!this.nasGlue) {
           this.nasGlue = new GlueStreams(64, NASUTE_GLUE);
           this.group.add(this.nasGlue.mesh);
@@ -1305,8 +1332,9 @@ export class AntRenderer {
         // termite glue clinging to the ant (render only), on one of the two while they cross-fade
         if (pass === 0) {
           // eases in, wears off slowly; a sickle-jaw's acid uses the same wet shell (the kit's acid and glue colours
-          // are nearly the same pale amber)
-          const gw = Math.max(v.glue ?? 0, v.acid ?? 0);
+          // are nearly the same pale amber) — thinner: a wet sheen where it was squirted, not a coat of glue (round-1
+          // clips: at full strength it read as white fuzz over the victim)
+          const gw = Math.max(v.glue ?? 0, (v.acid ?? 0) * 0.35);
           s.gl = damp(s.gl ?? 0, gw, gw > (s.gl ?? 0) ? 4 : 0.6, dt);
         }
         if (l === glueAt && s.gl! > 0.02) b.addShell(l, n, s.gl!);
@@ -1339,6 +1367,12 @@ export class AntRenderer {
     if (this.nasGlue) {
       this.nasGlue.count = this.nasGlueN;
       this.nasGlue.commit();
+    }
+    if (this.rhyAcid && this.rhyFizz) {
+      this.rhyAcid.count = this.rhyAcidN;
+      this.rhyAcid.commit();
+      this.rhyFizz.count = this.rhyFizzN;
+      this.rhyFizz.commit();
     }
     // Forget animation state of ants not seen for a while.
     if (this.frame % 120 === 0) for (const [id, s] of this.anim) if (this.frame - s.seen > 240) this.anim.delete(id);

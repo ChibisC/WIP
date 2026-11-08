@@ -24,7 +24,7 @@ import { ATK } from './attackPoses';
  */
 
 /** Which morphs use the pass (the pilot: the tropical fire ant; the rollout widens this). */
-export const ANIM_V2_PREFIXES = ['fire_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_', 'hell_', 'termite_worker', 'termite_nasute', 'termite_major'];
+export const ANIM_V2_PREFIXES = ['fire_', 'saiy_', 'lasius_', 'formica_', 'plagiaria_', 'atta_', 'eciton_', 'hell_', 'termite_worker', 'termite_nasute', 'termite_major', 'termite_rhy_', 'termant_'];
 /** Lab switch: false shows the old motion (before/after clips). */
 export const animSettings = { v2: true };
 export const animV2 = (morph: string): boolean => animSettings.v2 && ANIM_V2_PREFIXES.some((p) => morph.startsWith(p));
@@ -95,6 +95,27 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
     }
     return out;
   }
+  // sickle-jaw termites on the ant pipeline (model redo, claude/realism/10-spec §3): the soldier's grab, hold-and-squirt
+  // and free squirt (game/antViews.ts sets them as specials 7–9 from the sim's lunge and hold) and the alarm drum; the
+  // other castes bite as ant workers do (user, review round 2: the termite tug, rip and lunge "feel jittery, make them
+  // similar to ant worker attacks"): the lunge, the clamp-and-tug, the chomp, never the same twice running
+  if (morph.startsWith('termite_rhy_')) {
+    if (v.special === 5) out.variant = ATK.DRUM;
+    else if (v.special === 7) out.variant = ATK.S_GRAB;
+    else if (v.special === 8) out.variant = ATK.S_HOLD;
+    else if (v.special === 9) out.variant = ATK.S_SQUIRT;
+    else if (morph === 'termite_rhy_soldier' || morph === 'termite_rhy_presoldier') out.variant = [ATK.S_GRAB, ATK.S_SQUIRT, ATK.S_HOLD][av];
+    else {
+      const set = [ATK.LUNGE, ATK.CLAMP, ATK.CHOMP];
+      if (!v.atkSeq) out.variant = set[av];
+      else {
+        const pick = (k: number) => Math.floor(hs(k, 8) * 3) % 3;
+        const i = pick(n);
+        out.variant = set[n > 0 && i === pick(n - 1) ? (i + 1) % 3 : i];
+      }
+    }
+    return out;
+  }
   // hell ants (user rating 2026-11-02): three attacks — the vertical snap, the chomp, the slam — never the same twice
   // running; a foe at a quarter of its health gets the finisher (the soldier's with its paddle)
   if (morph.startsWith('hell_')) {
@@ -112,6 +133,32 @@ export function attackPlan(morph: string, v: AntView, q: number, seed: number, o
     if (!v.atkSeq) out.variant = set[av];
     else {
       const pick = (k: number) => Math.floor(hs(k, 6) * 3) % 3;
+      const i = pick(n);
+      out.variant = set[n > 0 && i === pick(n - 1) ? (i + 1) % 3 : i];
+    }
+    return out;
+  }
+  // Saiy-Ants (model redo, claude/realism/10-spec): carpenter ant bites — the worker's lunge, clamp-and-tug and chomp;
+  // the soldier's (a Camponotus major's) crushing bite, head swing and chomp; no acid (the user's 2026-10-25 rule);
+  // never the same twice running. Gold-form bites come faster with the sim's surge; the sparks are the renderer's.
+  if (morph.startsWith('saiy_')) {
+    const set = morph === 'saiy_soldier' ? [ATK.CRUSH, ATK.HEAD_SWING, ATK.CHOMP] : morph === 'saiy_queen' ? [ATK.LUNGE, ATK.CLAMP, ATK.CRUSH] : [ATK.LUNGE, ATK.CLAMP, ATK.CHOMP];
+    if (!v.atkSeq) out.variant = set[av];
+    else {
+      const pick = (k: number) => Math.floor(hs(k, 9) * 3) % 3;
+      const i = pick(n);
+      out.variant = set[n > 0 && i === pick(n - 1) ? (i + 1) % 3 : i];
+    }
+    return out;
+  }
+  // Termants (spec 09 §3.3): workers bite like formicines and spray formic acid with the abdomen curled forward;
+  // the soldier's heavy Macrotermes bites — a crushing bite, a chomp — and the glue dab, the forehead's pore pressed
+  // at the foe (T_JAB); the royals bite; never the same twice running
+  if (morph.startsWith('termant_')) {
+    const set = morph === 'termant_soldier' ? [ATK.CRUSH, ATK.CHOMP, ATK.T_JAB] : morph === 'termant_worker' ? [ATK.LUNGE, ATK.CLAMP, ATK.ACID] : [ATK.LUNGE, ATK.CLAMP, ATK.CRUSH];
+    if (!v.atkSeq) out.variant = set[av];
+    else {
+      const pick = (k: number) => Math.floor(hs(k, 10) * 3) % 3;
       const i = pick(n);
       out.variant = set[n > 0 && i === pick(n - 1) ? (i + 1) % 3 : i];
     }
