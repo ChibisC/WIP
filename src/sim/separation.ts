@@ -335,23 +335,39 @@ function creatureSpacing(w: World, dt: number): void {
   const crs = w.s.creatures;
   const S = BALANCE.separation;
   const cap = S.creatureMaxPush * dt * BALANCE.tickHz;
-  for (let i = 0; i < crs.length; i++) {
+  const n = crs.length;
+  // (performance v3) each creature's radius, attack, push-through and team once, not once per pair: none of them
+  // changes while creatures are pushed apart (only positions do) — the same values in the same sums
+  if (csRad.length < n) {
+    csRad = new Float64Array(n * 2);
+    csTeam = new Float64Array(n * 2);
+    csFlag = new Uint8Array(n * 2);
+  }
+  for (let i = 0; i < n; i++) {
+    const c = crs[i];
+    csFlag[i] = (c.dead ? 1 : 0) | (pushesThrough(c) ? 2 : 0) | (creatureHooks.attacking(c) ? 4 : 0);
+    if (!c.dead) csRad[i] = creatureHooks.radius(c);
+    csTeam[i] = c.faction >= 0 ? w.teamOf(c.faction) : 0;
+  }
+  for (let i = 0; i < n; i++) {
     const a = crs[i];
+    const fa = csFlag[i];
     // (a story titan on its way into the nest is never held back by another creature: it pushes through —
     // claude/story/05-spec §2; 2026-11-03 a ground beetle on guard at a ramp's top stopped the tarantula for good)
-    if (a.dead || pushesThrough(a)) continue;
+    if (fa & 3) continue;
     // (in an attack it stands its ground: the other one gives way — combat v2.1; not against a titan pushing through)
-    const stand = creatureHooks.attacking(a);
-    const ra = creatureHooks.radius(a);
+    const stand = (fa & 4) !== 0;
+    const ra = csRad[i];
     let px = 0;
     let py = 0;
-    for (let j = 0; j < crs.length; j++) {
+    for (let j = 0; j < n; j++) {
       const o = crs[j];
-      if (j === i || o.dead || o.space !== a.space) continue;
-      const through = pushesThrough(o);
+      const fo = csFlag[j];
+      if (j === i || fo & 1 || o.space !== a.space) continue;
+      const through = (fo & 2) !== 0;
       if (stand && !through) continue;
-      const ally = a.faction >= 0 && o.faction >= 0 && w.teamOf(a.faction) === w.teamOf(o.faction);
-      const min = (ra + creatureHooks.radius(o)) * (ally ? S.creatureAllyRoom : 1);
+      const ally = a.faction >= 0 && o.faction >= 0 && csTeam[i] === csTeam[j];
+      const min = (ra + csRad[j]) * (ally ? S.creatureAllyRoom : 1);
       const dx = a.x - o.x;
       const dy = a.y - o.y;
       const d2 = dx * dx + dy * dy;
@@ -368,7 +384,7 @@ function creatureSpacing(w: World, dt: number): void {
         ny = i < j ? dsin(ang) : -dsin(ang);
       }
       // the smaller one gives way more (all of it to one in an attack)
-      const share = through || creatureHooks.attacking(o) ? 1 : o.scale / (a.scale + o.scale);
+      const share = through || fo & 4 ? 1 : o.scale / (a.scale + o.scale);
       px += nx * (min - d) * 0.5 * share;
       py += ny * (min - d) * 0.5 * share;
     }
@@ -384,6 +400,9 @@ function creatureSpacing(w: World, dt: number): void {
     }
   }
 }
+let csRad = new Float64Array(0); // det-ok: scratch, rebuilt every pass
+let csTeam = new Float64Array(0); // det-ok: scratch, rebuilt every pass
+let csFlag = new Uint8Array(0); // det-ok: scratch, rebuilt every pass
 
 /** A story titan walking to (or digging) the hole of its dig-in (titanDig.ts `rstory`, phases Approach and Dig). */
 function pushesThrough(cr: Creature): boolean {

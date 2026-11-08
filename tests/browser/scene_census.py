@@ -30,6 +30,16 @@ JS = """() => {
     }
   });
   scene.traverse((o) => { if (o.isMesh) { out.meshes++; if (o.castShadow) out.casters++; } });
+  // the biggest meshes by triangles (instances included), and whether they cast shadows
+  const big = [];
+  scene.traverse((o) => {
+    if (!o.isMesh || !o.geometry) return;
+    const g = o.geometry; const per = (g.index ? g.index.count : (g.attributes.position ? g.attributes.position.count : 0)) / 3;
+    const n = o.isInstancedMesh ? o.count : 1;
+    big.push([o.name || o.type, Math.round(per * n), o.castShadow ? 1 : 0, o.frustumCulled ? 1 : 0, n, o.visible ? 1 : 0]);
+  });
+  big.sort((a, b) => b[1] - a[1]);
+  out.big = big.slice(0, 25);
   out.materials = out.materials.size;
   return out;
 }"""
@@ -44,6 +54,9 @@ with sync_playwright() as p:
     res = pg.evaluate(JS)
     calls = pg.evaluate("() => { const i = window.__session.view.renderer.info; return { calls: i.render.calls, tris: i.render.triangles, programs: i.programs.length, geometries: i.memory.geometries, textures: i.memory.textures }; }")
     top = sorted(res.pop("byName").items(), key=lambda kv: -kv[1])[:25]
+    big = res.pop("big")
     print(json.dumps(res), json.dumps(calls))
     print("visible meshes by name:", ", ".join(f"{k} {n}" for k, n in top))
+    print("biggest meshes (name, triangles, casts shadow, culled, instances, visible):")
+    for b in big: print("  ", b)
     b.close()
