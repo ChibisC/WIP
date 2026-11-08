@@ -1394,6 +1394,8 @@ const living = (w: World, ids: number[]) => ids.filter((id) => w.antById.get(id)
   // boss telegraphs: a circle and a cone appear, fill up and are cleaned away; a slam ring fades
   const fx = new CombatFx();
   const flatH = () => 0;
+  // (the standing layers: the particles and the Saiy-Ant Blaster's orbs and beams)
+  const base = fx.group.children.length;
   fx.emit({ t: 'telegraph', x: 10, y: 10, space: SURFACE, radius: 20, duration: 1.2, creature: 1 }, flatH);
   fx.emit({ t: 'telegraph', x: 10, y: 10, space: SURFACE, radius: 30, duration: 0.8, creature: 1, dir: 0.5, half: 0.6 }, flatH);
   fx.emit({ t: 'slam', x: 10, y: 10, space: SURFACE, radius: 25, power: 1 }, flatH);
@@ -1402,7 +1404,7 @@ const living = (w: World, ids: number[]) => ids.filter((id) => w.antById.get(id)
   for (let i = 0; i < 15; i++) fx.update(0.05, flatH, 900);
   const mid = fx.group.children.length;
   for (let i = 0; i < 20; i++) fx.update(0.05, flatH, 900);
-  check('creatures: boss telegraphs (circle, cone) and slam rings show, then clear away', shown === 4 && mid === 3 && fx.group.children.length === 1 && fx.liveCount > 0, `${shown} → ${mid} → ${fx.group.children.length} (the particle layer stays)`);
+  check('creatures: boss telegraphs (circle, cone) and slam rings show, then clear away', shown === base + 3 && mid === base + 2 && fx.group.children.length === base && fx.liveCount > 0, `${shown} → ${mid} → ${fx.group.children.length} (the particle and blast layers stay)`);
   check('creatures: a caterpillar body follows its path round a bend', Math.abs(dCentre - R) < R * 0.08, `tail ${dCentre.toFixed(1)} mm from the bend centre (path radius ${R})`);
 }
 

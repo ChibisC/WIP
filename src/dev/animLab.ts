@@ -11,7 +11,7 @@ import { createSurfaceEnvironment } from '../render/environment';
 import { textures } from '../render/textures';
 import { globalUniforms } from '../render/shaderPatch';
 import { applyLabLight } from './labLight';
-import { blankView, sprayPose } from '../game/antViews';
+import { blankView, blasterPose, sprayPose } from '../game/antViews';
 import { CREATURES } from '../sim/creatures/kinds';
 import { BALANCE, STAG } from '../sim/balance';
 import { CASTE_FX } from '../sim/casteAbilities';
@@ -171,6 +171,73 @@ function attacker(x: number, y: number, h: number, variant: number, gap: number,
     v.atkSide = cq & 1 ? 1 : -1;
     v.atkGap = gap;
     v.atkN = Math.max(0, cq);
+  };
+}
+
+/** The Blaster clip's timeline: shots (wind-up start, kind), the gold form's start, the beam. */
+function blastClip(): Clip {
+  const B = BALANCE.blaster;
+  const L = MORPHS.saiy_blaster?.L ?? 6.6;
+  const bx = -22;
+  const mouthX = bx + L * 0.5;
+  const foes = [8, 15, 22.5, 29, 36].map((x, k) => ({ x, y: (k % 2 ? 1.2 : -1.2) * (k > 2 ? 1 : 0.5), hp: 100 }));
+  const goldAt = 3.4;
+  // wind-up starts; the last is the beam (its charge harder)
+  const shots: Array<{ t: number; beam?: boolean }> = [{ t: 0.6 }, { t: 2.1 }, { t: 4.0 }, { t: 5.2 }, { t: 6.4, beam: true }];
+  const beamOn = 6.4 + B.windup;
+  const beamOff = beamOn + B.beamTime;
+  const events: NonNullable<Clip['events']> = [];
+  let pid = 1;
+  for (const sh of shots) {
+    const fire = sh.t + B.windup;
+    const gold = fire > goldAt;
+    events.push({ t: sh.t, e: { t: 'blastCharge', x: bx, y: 0, space: -1, id: 1, beam: sh.beam } as SimEvent });
+    if (sh.beam) {
+      events.push({ t: fire, e: { t: 'beam', x: mouthX, y: 0, h: 0, len: L * B.beamReach, space: -1, id: 1 } as SimEvent });
+      events.push({ t: beamOff, e: { t: 'beamEnd', x: bx, y: 0, space: -1, id: 1 } as SimEvent });
+    } else {
+      const f = foes[0];
+      const hitAt = fire + (f.x - 1.6 - mouthX) / B.orbSpeed;
+      events.push({ t: fire, e: { t: 'orb', x: mouthX, y: 0, tx: f.x, ty: f.y, space: -1, id: 1, pid, gold } as SimEvent });
+      events.push({ t: hitAt, e: { t: 'orbHit', x: f.x - 1.6, y: f.y * 0.8, space: -1, pid, gold } as SimEvent });
+      pid++;
+    }
+  }
+  const fires = shots.map((sh) => sh.t + B.windup);
+  return {
+    dur: 10.5,
+    noScale: true,
+    events,
+    ants: [
+      {
+        morph: 'saiy_blaster',
+        script: (t, v) => {
+          Object.assign(v, { x: bx, y: 0, heading: 0, antennaActivity: 0.5, gold: 0, goldDir: 1, exhausted: 0, headPitch: 0, headYaw: 0, gaster: 0, antennaPitch: 0, roll: 0, pitch: 0, pivX: 0, mandible: 0.3, crouch: 0, brace: 0, atk: undefined, special: 0 });
+          // the gold form: in over 0.8 s with its stretch, on to the end
+          if (t > goldAt) {
+            const k = Math.min(1, (t - goldAt) / 0.8);
+            v.gold = Math.min(1, k * 1.08);
+            const st = k < 1 ? Math.sin(Math.PI * k) : 0;
+            v.headPitch += 0.25 * st;
+            v.gaster += 0.3 * st;
+          }
+          const last = [...fires].reverse().find((f) => f <= t);
+          const sh = shots.find((x) => t >= x.t && t < x.t + B.windup);
+          const phase = t >= beamOn && t < beamOff ? 'beam' : sh ? 'windup' : t > 0.4 ? 'hold' : 'rest';
+          blasterPose(v, { t, len: L, phase, st: sh ? t - sh.t : 0, beamAge: t - beamOn, since: last !== undefined ? t - last : 9, aim: 0, beamNext: !!sh?.beam });
+        },
+      },
+      ...foes.map((f, k) => ({
+        morph: 'lasius_worker',
+        script: ((t: number, v: AntView) => {
+          // a hit: the first worker at each orb; every worker the beam crosses at each pulse
+          let hits = fires.filter((x, i) => !shots[i].beam && k === 0 && t > x + 0.17).length;
+          if (t > beamOn) hits += Math.floor((Math.min(t, beamOff) - beamOn) / B.beamTick) + 1;
+          Object.assign(v, { x: f.x, y: f.y, heading: Math.PI + (k - 2) * 0.12, antennaActivity: 1, mandible: 0.6, hp: 100 - hits * 1.5 });
+        }) as AntScript,
+      })),
+    ],
+    cam: { tx: 6, ty: 1, tz: 0, dir: [0.25, 0.42, 1], dist: 62, fov: 30 },
   };
 }
 
@@ -492,6 +559,10 @@ function clips(): Record<string, Clip> {
       ],
       cam: { tx: 1, ty: 0.5, tz: 0.2, dir: [0.3, 0.5, 1], dist: 11, fov: 30 },
     },
+    // the Saiy-Ant Blaster (claude/saiy-ants/09-spec): two white-blue orbs, the gold form, two gold orbs and the beam
+    // down the line of black garden ant workers (the game's pose `blasterPose` and effects `blastFx`, from the same
+    // events the sim sends; the targets flinch at each hit)
+    blast: blastClip(),
     // realism rework: one attacker, seen from the side — the hell ants' vertical snap (variant 0: the snap; the soldier's
     // impale), slowed by a long attack gap so the cocked jaws, the trap firing, the hit-stop and the lift read
     snap: {

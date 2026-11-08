@@ -453,40 +453,57 @@ function blastPose(w: World, a: Ant, out: AntView, len: number): void {
     blastPrune = 0;
     for (const [id, x] of blastRecs) if (w.s.tick - x.seen > 200) blastRecs.delete(id);
   }
-  const t = w.time + a.id * 0.37;
-  out.mouthGlow = 0.1 + 0.04 * Math.sin(t * 2.3);
-  const aim = (): number => {
-    const o = a.tk === 3 ? w.antById.get(a.tgt) : a.tk === 4 ? w.creatureById.get(a.tgt) : undefined;
-    if (!o) return 0;
-    let d = Math.atan2(o.y - a.y, o.x - a.x) - a.h;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    return Math.max(-0.55, Math.min(0.55, d));
-  };
-  if ((a.beamT ?? 0) > 0) {
+  const o = a.tk === 3 ? w.antById.get(a.tgt) : a.tk === 4 ? w.creatureById.get(a.tgt) : undefined;
+  let aim = 0;
+  if (o) {
+    const d = Math.atan2(o.y - a.y, o.x - a.x) - a.h;
+    aim = Math.max(-0.55, Math.min(0.55, Math.atan2(Math.sin(d), Math.cos(d))));
+  }
+  const beamOn = (a.beamT ?? 0) > 0;
+  const spray = a.state === AS.Spray && !beamOn;
+  const holding = a.state === AS.Attack && a.v < casteOf(a.caste).speed * 0.25 && a.tk >= 3 && a.tk <= 4;
+  blasterPose(out, {
+    t: w.time + a.id * 0.37,
+    len,
+    phase: beamOn ? 'beam' : spray ? 'windup' : holding ? 'hold' : 'rest',
+    st: a.st,
+    beamAge: beamOn ? B.beamTime - a.beamT! : 0,
+    since: w.time - r.at,
+    aim,
+    // the fifth gold shot is the beam: it charges harder
+    beamNext: spray && (a.surgeT ?? 0) > 0 && (a.shotN ?? 0) + 1 >= B.beamEvery && a.st < B.windup,
+  });
+}
+
+/**
+ * The Blaster's pose from its phase (shared with the animation lab's `blast` clip): `st` the wind-up's time, `beamAge`
+ * the beam's, `since` the time since the last shot (the recoil), `aim` the head's turn to the target (rad).
+ */
+export function blasterPose(out: Pick<AntView, 'mouthGlow' | 'brace' | 'crouch' | 'headYaw' | 'headPitch' | 'mandible' | 'gaster' | 'antennaPitch' | 'antennaActivity' | 'roll' | 'pitch' | 'pivX' | 'pose'>, p: { t: number; len: number; phase: 'rest' | 'windup' | 'hold' | 'beam'; st: number; beamAge: number; since: number; aim: number; beamNext: boolean }): void {
+  const B = BALANCE.blaster;
+  out.mouthGlow = 0.1 + 0.04 * Math.sin(p.t * 2.3);
+  if (p.phase === 'beam') {
     // braced: feet wide, body low and steady on the line, the jaws wide open, a fine tremble through the whole body
-    const k = Math.min(1, (B.beamTime - a.beamT!) / 0.25);
+    const k = Math.min(1, p.beamAge / 0.25);
     out.brace = 0.75 * k;
-    out.crouch = Math.max(out.crouch ?? 0, len * 0.07 * k);
+    out.crouch = Math.max(out.crouch ?? 0, p.len * 0.07 * k);
     out.headYaw = 0;
     out.headPitch = 0.04;
     out.mandible = 1;
     out.gaster = 0.15;
     out.antennaPitch = -0.35;
     out.antennaActivity = 0.2;
-    out.roll = Math.sin(t * 53) * 0.022 * k;
-    out.pitch = Math.sin(t * 41 + 1.3) * 0.012 * k;
-    out.mouthGlow = 0.92 + 0.08 * Math.sin(t * 31);
+    out.roll = Math.sin(p.t * 53) * 0.022 * k;
+    out.pitch = Math.sin(p.t * 41 + 1.3) * 0.012 * k;
+    out.mouthGlow = 0.92 + 0.08 * Math.sin(p.t * 31);
     out.pose = POSE.NONE;
     return;
   }
-  const since = w.time - r.at;
-  const kick = since >= 0 && since < 0.6 ? Math.exp(-since * 13) * Math.min(1, since * 60 + 0.2) : 0;
-  if (a.state === AS.Spray) {
-    const c = Math.min(1, a.st / B.windup);
+  const kick = p.since >= 0 && p.since < 0.6 ? Math.exp(-p.since * 13) * Math.min(1, p.since * 60 + 0.2) : 0;
+  if (p.phase === 'windup') {
+    const c = Math.min(1, p.st / B.windup);
     const e = c * c * (3 - 2 * c);
-    // the fifth gold shot is the beam: it charges harder
-    const beamNext = (a.surgeT ?? 0) > 0 && (a.shotN ?? 0) + 1 >= B.beamEvery && a.st < B.windup;
-    out.headYaw = aim() * (1 - 0.3 * kick);
+    out.headYaw = p.aim * (1 - 0.3 * kick);
     out.headPitch = 0.06 * e + 0.22 * kick;
     out.mandible = 0.3 + 0.7 * e;
     out.antennaPitch = 0.1 - 0.5 * e;
@@ -494,13 +511,13 @@ function blastPose(w: World, a: Ant, out: AntView, len: number): void {
     out.gaster = 0.1 + 0.1 * e;
     out.pitch = 0.06 * kick;
     out.pivX = -0.3;
-    out.mouthGlow = Math.max(0.1, beamNext ? 0.25 + 0.75 * e : 0.15 + 0.6 * e, kick);
+    out.mouthGlow = Math.max(0.1, p.beamNext ? 0.25 + 0.75 * e : 0.15 + 0.6 * e, kick);
     out.pose = POSE.NONE;
     return;
   }
-  if (a.state === AS.Attack && a.v < casteOf(a.caste).speed * 0.25 && a.tk >= 3 && a.tk <= 4) {
+  if (p.phase === 'hold') {
     // holding its range between shots: the head stays on the target, the jaws a little open, the glow simmering
-    out.headYaw = aim() * (1 - 0.3 * kick);
+    out.headYaw = p.aim * (1 - 0.3 * kick);
     out.headPitch = 0.22 * kick;
     out.mandible = Math.max(0.35, kick);
     out.antennaPitch = -0.1;

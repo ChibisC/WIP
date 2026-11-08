@@ -31,7 +31,7 @@ type HeightFn = (x: number, y: number) => number;
 // the two looks: white-blue normally, gold in the gold form (core, shell)
 const GLSL_COLOURS = `
   vec3 coreOf(float g) { return mix(vec3(0.82, 0.93, 1.0), vec3(1.0, 0.93, 0.72), g); }
-  vec3 shellOf(float g) { return mix(vec3(0.36, 0.66, 1.0), vec3(1.0, 0.64, 0.16), g); }
+  vec3 shellOf(float g) { return mix(vec3(0.3, 0.62, 1.0), vec3(1.0, 0.55, 0.08), g); }
 `;
 
 export class BlastFx {
@@ -109,22 +109,22 @@ export class BlastFx {
           vA = clamp((iT.y - tau) / 0.04, 0.0, 1.0) * clamp(tau / 0.03 + 0.35, 0.0, 1.0);
           if (part > 0.5) {
             // the light on the ground: a soft disc under the orb
-            float R = 2.6;
+            float R = 3.2;
             vL = corner;
             vec4 mv = modelViewMatrix * vec4(p.x + corner.x * R, g + 0.12, p.z + corner.y * R, 1.0);
             gl_Position = projectionMatrix * mv;
             return;
           }
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
-          // the trail: back along the screen-space motion, as long as it has flown (up to 40 ms of flight)
-          float back = min(tau, 0.04);
+          // the trail: back along the screen-space motion, as long as it has flown (up to 60 ms of flight)
+          float back = min(tau, 0.06);
           vec4 mt = modelViewMatrix * vec4(p - vec3(iV.x, 0.0, iV.y) * back, 1.0);
           vec2 d = mv.xy - mt.xy;
           float dl = length(d);
           vec2 dir = dl > 1e-5 ? d / dl : vec2(1.0, 0.0);
           vec2 nrm = vec2(-dir.y, dir.x);
-          // at least ~4 px across, so it reads when zoomed out
-          float R = max(0.55, 4.0 * -mv.z / uPx);
+          // at least ~6 px in radius, so it reads at the gameplay zoom (the orb is ~1.6 mm across, an ant's head)
+          float R = max(0.8, 6.0 * -mv.z / uPx);
           float tail = dl / R;
           vTail = tail;
           vL = vec2(corner.x > 0.0 ? corner.x : corner.x * (1.0 + tail), corner.y);
@@ -138,14 +138,14 @@ export class BlastFx {
           vec3 sh = shellOf(vGold);
           if (vPart > 0.5) {
             float r = length(vL);
-            float a = (1.0 - smoothstep(0.0, 1.0, r)) * 0.22 * vA;
+            float a = (1.0 - smoothstep(0.0, 1.0, r)) * 0.3 * vA;
             if (a < 0.003) discard;
             gl_FragColor = vec4(sh * a, 1.0);
             return;
           }
           float r = length(vL);
           // head: core + shell with swirling crackle
-          float core = 1.0 - smoothstep(0.18, 0.42, r);
+          float core = 1.0 - smoothstep(0.22, 0.48, r);
           float shell = (1.0 - smoothstep(0.35, 1.0, r));
           float ang = atan(vL.y, vL.x);
           float swirl = 0.5 + 0.5 * sin(ang * 5.0 + r * 9.0 - uClock * 34.0 + vSeed * 6.283);
@@ -158,7 +158,7 @@ export class BlastFx {
             float wdt = mix(0.62, 0.08, u);
             tr = (1.0 - smoothstep(wdt * 0.4, wdt, abs(vL.y))) * (1.0 - u) * (1.0 - u);
           }
-          vec3 col = coreOf(vGold) * core * 3.4 + sh * (shell * (0.5 + 0.35 * swirl) + band * crack * 0.9) * 0.75 + sh * tr * 0.55 + coreOf(vGold) * tr * tr * 0.35;
+          vec3 col = coreOf(vGold) * core * 5.0 + sh * (shell * (0.55 + 0.4 * swirl) + band * crack * 1.1) * 0.9 + sh * tr * 0.7 + coreOf(vGold) * tr * tr * 0.5;
           float a = max(max(core, shell), tr) * vA;
           if (a < 0.004) discard;
           gl_FragColor = vec4(col * vA, 1.0);
@@ -232,14 +232,14 @@ export class BlastFx {
             gl_Position = projectionMatrix * mv;
             return;
           }
-          // the beam strip: across its screen-space axis, at least ~5 px wide
+          // the beam strip: across its screen-space axis, at least ~14 px wide (the glow; the core a third of it)
           vec2 d = mb.xy - ma.xy;
           float dl = length(d);
           vec2 dir = dl > 1e-5 ? d / dl : vec2(1.0, 0.0);
           vec2 nrm = vec2(-dir.y, dir.x);
           float s = corner.x * 0.5 + 0.5;
           vec4 mv = mix(ma, mb, s);
-          float W = max(1.05, 2.5 * -mv.z / uPx);
+          float W = max(1.3, 7.0 * -mv.z / uPx);
           mv.xy += nrm * corner.y * W;
           gl_Position = projectionMatrix * mv;
         }`,
@@ -277,7 +277,7 @@ export class BlastFx {
             float core = 1.0 - smoothstep(wcore * 0.5, wcore, y);
             float glow = exp(-y * y / (0.18 + 0.1 * rip)) * (0.55 + 0.25 * rip);
             float ends = smoothstep(0.0, 0.03, s) * (1.0 - smoothstep(0.97, 1.0, s));
-            col = (c * core * 3.0 + sh * glow * 0.85) * flick * ends;
+            col = (c * core * 4.5 + sh * glow * 1.0) * flick * ends;
             a = max(core, glow) * ends;
           }
           col *= vOn;
