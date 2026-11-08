@@ -151,7 +151,7 @@ export function treesGrid(w: World): NestGrid {
  * The canopy grid and its hexes from the match's trees: a pure function of the terrain and the trees' definitions, so
  * the worker's replica builds the same grid when the layer appears (game/replica.ts) and a save needs only the def.
  */
-export function buildCanopy(w: World): { g: NestGrid; kinds: Uint8Array; trunks: TrunkDef[]; siteCands: Array<{ kind: TreeSiteKind; x: number; y: number; tree: number }>; defs: TreeDef[] } | null {
+export function buildCanopy(w: World): { g: NestGrid; kinds: Uint8Array; comps: Uint8Array; trunks: TrunkDef[]; siteCands: Array<{ kind: TreeSiteKind; x: number; y: number; tree: number }>; defs: TreeDef[] } | null {
   const defs = treesOf(w);
   if (!defs.length) return null;
   const g = treesGrid(w);
@@ -176,7 +176,7 @@ export function buildCanopy(w: World): { g: NestGrid; kinds: Uint8Array; trunks:
     for (const f of crown.flowers) flowers.push(f);
     for (const s of crown.sites) siteCands.push({ kind: s.kind, x: s.at[0], y: s.at[1], tree: ti });
     const top = g.hexAt(def.trunk[0], def.trunk[1]);
-    trunks.push({ x: def.trunk[0], y: def.trunk[1], r: def.r, top, climbs: [], tree: ti });
+    trunks.push({ x: def.trunk[0], y: def.trunk[1], r: def.r, top, climbs: [], tree: ti, comp: 0 });
   });
   // paint the hexes: wood first, then leaves over it, the trunk tops last
   for (const kind of [TK_WOOD, TK_LEAF, TK_TOP]) {
@@ -202,23 +202,29 @@ export function buildCanopy(w: World): { g: NestGrid; kinds: Uint8Array; trunks:
     const q = g.hexAt(f[0], f[1]);
     if (q >= 0 && kinds[q]) kinds[q] = TK_FLOWER;
   }
-  // each crown must hang together with its trunk top: hexes no trunk top can reach are pruned (sky)
-  const reach = new Uint8Array(nh);
-  const stack: number[] = [];
-  for (const tr of trunks)
-    if (tr.top >= 0 && kinds[tr.top]) {
-      reach[tr.top] = 1;
-      stack.push(tr.top);
+  // each crown must hang together with its trunk top: hexes no trunk top can reach are pruned (sky); crowns that touch
+  // are one component (ants walk between them), others are reached by the ground
+  const comps = new Uint8Array(nh);
+  let nComp = 0;
+  for (const tr of trunks) {
+    if (tr.top < 0 || !kinds[tr.top]) continue;
+    if (comps[tr.top]) {
+      tr.comp = comps[tr.top];
+      continue;
     }
-  while (stack.length) {
-    const q = stack.pop()!;
-    for (const n of g.neighbors(q))
-      if (n >= 0 && kinds[n] && !reach[n]) {
-        reach[n] = 1;
-        stack.push(n);
-      }
+    tr.comp = ++nComp;
+    comps[tr.top] = nComp;
+    const stack = [tr.top];
+    while (stack.length) {
+      const q = stack.pop()!;
+      for (const n of g.neighbors(q))
+        if (n >= 0 && kinds[n] && !comps[n]) {
+          comps[n] = nComp;
+          stack.push(n);
+        }
+    }
   }
-  for (let q = 0; q < nh; q++) if (kinds[q] && !reach[q]) kinds[q] = TK_SKY;
+  for (let q = 0; q < nh; q++) if (kinds[q] && !comps[q]) kinds[q] = TK_SKY;
   // dig the walkable hexes
   for (let q = 0; q < nh; q++) {
     if (!kinds[q]) continue;
@@ -231,7 +237,7 @@ export function buildCanopy(w: World): { g: NestGrid; kinds: Uint8Array; trunks:
   g.version++;
   g.stateVersion++;
   g.dirtyAll();
-  return { g, kinds, trunks, siteCands, defs };
+  return { g, kinds, comps, trunks, siteCands, defs };
 }
 
 /**
@@ -242,7 +248,7 @@ export function createTrees(w: World): TreesDef | null {
   if (w.s.trees) return w.s.trees;
   const built = buildCanopy(w);
   if (!built) return null;
-  const { g, kinds, trunks, siteCands, defs } = built;
+  const { g, kinds, comps, trunks, siteCands, defs } = built;
   const nh = g.cols * g.rows;
   const p = { x: 0, y: 0 };
   // the trunk tops are the grid's entrances; the climb points at the foot are the space's entrances
@@ -255,7 +261,7 @@ export function createTrees(w: World): TreesDef | null {
       const a0 = rng.range(0, Math.PI * 2);
       for (let k = 0; k < T.climbPoints; k++) {
         const ang = a0 + (k / T.climbPoints) * Math.PI * 2;
-        pts.push([tr.x + dcos(ang) * (tr.r + 5), tr.y + dsin(ang) * (tr.r + 5)]);
+        pts.push([tr.x + dcos(ang) * (tr.r + 10), tr.y + dsin(ang) * (tr.r + 10)]);
       }
     }
     for (const pt of pts) {
@@ -286,7 +292,7 @@ export function createTrees(w: World): TreesDef | null {
     g.hexCenter(q, p);
     sites.push({ kind, q, x: p.x, y: p.y, nest: -1 });
   }
-  const def: TreesDef = { space: TREES, trunks, sites, kinds: kindsToString(kinds), height: T.height };
+  const def: TreesDef = { space: TREES, trunks, sites, kinds: kindsToString(kinds), comps: kindsToString(comps), height: T.height };
   w.addGrid(TREES, g);
   w.s.trees = def;
   applyTreesToTerrain(w);
@@ -312,8 +318,11 @@ export function createTrees(w: World): TreesDef | null {
 function groundNear(w: World, x: number, y: number, tr: { x: number; y: number; r: number }): { x: number; y: number } | null {
   const t = w.terrain;
   const ok = (px: number, py: number) => t.inBounds(px, py, 4) && t.passable(px, py) && dhypot(px - tr.x, py - tr.y) > tr.r + 2;
+  // (on the surface fields' lattice, so the climb point's cell is open to them)
+  const r = w.surfFlow.cell;
+  x = Math.round(x / r) * r;
+  y = Math.round(y / r) * r;
   if (ok(x, y)) return { x, y };
-  const r = t.res;
   const ci = Math.round(x / r);
   const cj = Math.round(y / r);
   for (let k = 1; k <= Math.ceil(80 / r); k++) {
@@ -480,6 +489,25 @@ export function moveNestToTree(w: World, c: Colony, siteIdx: number): void {
   e.space = TREES;
   c.entrances = [e];
   c.spoil = [0];
+}
+
+/** The crown a point of the trees map is in (0: sky or off the layer). */
+export function crownAt(w: World, x: number, y: number): number {
+  const d = w.s.trees;
+  const g = w.nestOf(TREES);
+  if (!d || !g) return 0;
+  const q = g.hexAt(x, y);
+  return q < 0 ? 0 : d.comps.charCodeAt(q) - 48;
+}
+
+/** The climb points that lead into the crown over a goal (every climb point when the goal is in no crown). */
+export function climbsToward(w: World, gx: number, gy: number): Entrance[] {
+  const d = w.s.trees;
+  const comp = crownAt(w, gx, gy);
+  if (!d || !comp) return treeEntrances(w);
+  const out: Entrance[] = [];
+  for (const t of d.trunks) if (t.comp === comp) for (const e of t.climbs) out.push(e);
+  return out.length ? out : treeEntrances(w);
 }
 
 /** The trunk a climb point belongs to (null: not a climb point). */

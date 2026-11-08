@@ -2,7 +2,7 @@ import { antClear, antMostClear, antNeed } from './underpass';
 import { World } from './world';
 import { Ant, AS, Carry, Colony, Entrance, SURFACE, TREES, nestSpace, colonyOfSpace } from './types';
 import { arrivalHash, canEnter, canLeave, entranceTop, exitHole, exitTops, holeIn, passEntrance, usableMask } from './entrances';
-import { holeSpace, startClimb, trunkOf } from './trees';
+import { climbsToward, crownAt, holeSpace, startClimb, trunkOf } from './trees';
 import { casteOf } from './species';
 import { hexCoreCells } from './colony';
 import { hexSpeedOf } from './tiles';
@@ -371,6 +371,19 @@ export function areaField(w: World, space: number): Float32Array {
   return w.surfFlow.field('area:' + space, stamp, ents.filter(canEnter).map((e) => ({ x: e.sx, y: e.sy })));
 }
 
+/** Surface field toward one crown's climb points. */
+function crownField(w: World, ents: readonly Entrance[]): Float32Array {
+  const stamp = ents.reduce((s, e) => s + e.sx * 7 + e.sy * 13, 0) + usableMask(ents, false) * 0.001;
+  return w.surfFlow.field('crown:' + (ents[0]?.q ?? 0), stamp, ents.filter(canEnter).map((e) => ({ x: e.sx, y: e.sy })));
+}
+
+/** In the trees: is the point in the crown the ant stands in (reachable along the branches)? */
+export function sameCrown(w: World, a: Ant, x: number, y: number): boolean {
+  if (a.space !== TREES) return false;
+  const c = crownAt(w, a.x, a.y);
+  return c !== 0 && c === crownAt(w, x, y);
+}
+
 /** The trees grid's field toward an area whose holes lie on the branches (a tree nest). */
 function treesAreaField(w: World, space: number): Float32Array | null {
   const flow = w.flowOf(TREES);
@@ -386,6 +399,11 @@ function goToHoleInTrees(w: World, a: Ant, space: number, dt: number, speedMul: 
   const bi = holeIn(w, ents, a.x, a.y);
   if (bi < 0) return false;
   const e = ents[bi];
+  // the hole is in another crown: down this one, over the ground, up the right trunk
+  if (!sameCrown(w, a, e.sx, e.sy)) {
+    goOut(w, a, dt);
+    return false;
+  }
   const de = dhypot(e.sx - a.x, e.sy - a.y);
   if (de < 3) {
     if (!passEntrance(w, e, false)) return waitAtHole(w, a, e, dt);
@@ -537,7 +555,7 @@ export function goHome(w: World, a: Ant, dt: number, speedMul = 1): boolean {
   // a tree colony's holes lie on the branches: up the nearest trunk first, then along the branches to a hole
   if (c.entrances.length && holeSpace(c.entrances[0]) === TREES) {
     if (a.space === TREES) return goToHoleInTrees(w, a, nestSpace(a.colony), dt, speedMul);
-    goToArea(w, a, TREES, dt, speedMul);
+    goToArea(w, a, TREES, dt, speedMul, { x: c.entrances[0].sx, y: c.entrances[0].sy });
     return false;
   }
   // the nearest hole; while it is busy, another of the anthill's with room that is not much farther
@@ -743,15 +761,16 @@ export function goOut(w: World, a: Ant, dt: number): boolean {
  * Walk on the surface to an underground area's nearest entrance and go down
  * it (markers placed on entrances, raids, cave visits). Returns true once inside.
  */
-export function goToArea(w: World, a: Ant, space: number, dt: number, speedMul = 1): boolean {
+export function goToArea(w: World, a: Ant, space: number, dt: number, speedMul = 1, goal?: { x: number; y: number }): boolean {
   if (a.space === space) return true;
   if (space === nestSpace(a.colony)) return goHome(w, a, dt, speedMul);
-  const ents0 = w.entrancesOf(space);
+  // (the trees: the climb points of the crown over the goal — crowns that do not touch are reached by the ground)
+  const ents0 = space === TREES && goal ? climbsToward(w, goal.x, goal.y) : w.entrancesOf(space);
   // an area whose holes lie on the branches (a tree nest): up a trunk, then along the branches to a hole
   if (ents0.length && holeSpace(ents0[0]) === TREES) {
     if (a.space === TREES) return goToHoleInTrees(w, a, space, dt, speedMul);
     if (a.space === SURFACE) {
-      goToArea(w, a, TREES, dt, speedMul);
+      goToArea(w, a, TREES, dt, speedMul, { x: ents0[0].sx, y: ents0[0].sy });
       return false;
     }
   }
@@ -770,7 +789,8 @@ export function goToArea(w: World, a: Ant, space: number, dt: number, speedMul =
   const de = dhypot(e.sx - a.x, e.sy - a.y);
   if (de < 3) {
     if (!passEntrance(w, e, false)) return waitAtHole(w, a, e, dt);
-    enterArea(w, a, space, bi);
+    // (the index in the area's whole list: `ents` may be one crown's climb points)
+    enterArea(w, a, space, ents === ents0 && space !== TREES ? bi : w.entrancesOf(space).indexOf(e));
     return true;
   }
   if (de < 30) {
@@ -778,7 +798,7 @@ export function goToArea(w: World, a: Ant, space: number, dt: number, speedMul =
     return false;
   }
   // Far away: follow the surface field to the area's entrances (paths round obstacles).
-  const f = areaField(w, space);
+  const f = space === TREES && goal ? crownField(w, ents) : areaField(w, space);
   if (w.surfFlow.dir(f, a.x, a.y, tmp)) {
     turnToward(a, datan2(tmp.y, tmp.x) + dsin(w.time * 2 + a.id) * 0.12, dt, 6);
     moveForward(w, a, antSpeed(w, a) * speedMul, dt);

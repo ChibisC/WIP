@@ -910,6 +910,8 @@ export interface TrunkDef {
   climbs: Entrance[];
   /** the trees of this map, index */
   tree: number;
+  /** the crown (connected set of hexes) this trunk climbs into */
+  comp: number;
 }
 
 export type TreeSiteKind = 'leaf' | 'hollow' | 'fork';
@@ -932,6 +934,8 @@ export interface TreesDef {
   sites: TreeSiteDef[];
   /** per hex of the trees grid: 0 sky, 1 wood, 2 leaf, 3 trunk top, 4 flower (food site) (render and validator) */
   kinds: string;
+  /** per hex: which crown it belongs to (crowns that touch are one; 0 sky) — ants reach another crown by the ground */
+  comps: string;
   /** the canopy's height above the ground (mm; the fall) */
   height: number;
 }
