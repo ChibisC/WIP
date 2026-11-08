@@ -188,6 +188,12 @@ class AntRecord {
     this.beamD = undefined;
     this.beamP = undefined;
     this.beamCd = undefined;
+    // the Trees layer (sim/trees.ts): on a trunk, and the fall off a branch
+    this.trunkT = undefined;
+    this.trunkUp = undefined;
+    this.trunkX = undefined;
+    this.trunkY = undefined;
+    this.fell = undefined;
   }
 }
 

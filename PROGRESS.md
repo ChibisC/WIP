@@ -2091,6 +2091,27 @@ User spec `claude/performance/03-spec-performance-v3-big-colonies.md`; branch `f
   fight's triangles are the ants (mid-distance ants at 3,300 triangles, twice with shadows). Changes that would alter
   the picture (simpler shadow casters, resolution, effect settings) wait for the gpu-scene report and the user's yes.
 - **Merged** into `main` as `ad17880` (Pages deployed; game artifact v51); handoff 23.
+## 2026-11-07 — The Trees: a third layer over the ground (branch `feature/trees-layer`; claude/trees/01-spec-trees-layer.md)
+Plan and record: `CHANGE_PLAN.md` §30. Design: `DESIGN.md` §3.13. Player notes: `README.md` "The trees". Stills:
+`docs/trees/shots/` (`tests/browser/trees.py`); the map tool `tools/trees-check.ts`; `tests/trees.ts` in `npm test`.
+- **One canopy map per match** (space `TREES` 63): a hex grid like a cave's in the ground's frame, all rock but the
+  branches, twigs and leaves (walkable). The trees come from `MapDef.trees` (3–4 on each of the five maps; procedural
+  maps grow a few from the seed); crowns are grown deterministically; **every tree is joined to the others by boughs**
+  (user, mid-session) so the canopy is one walkable network.
+- **Climbing:** trunks block the ground; their climb points are the space's entrances, so the entrance code walks ants
+  up (a timed hold on the bark, `TREES.climbSec`, drawn rising at the climb point) and down, with `TREES.climbPerS`
+  throughput. Markers on branches, markers across crowns (down and up the right trunk), the fall (a fling drops the ant
+  to the ground below, dazed), food and sites on the branches, a tree-nest framework (`treeSite`, `Entrance.space`).
+- **View:** the "TREES" bar beside the ground map rises into the canopy (a fade with a pull-in and pull-back); the
+  canopy is a heightfield from the grid's signed distance (bark ridges, lichen, moss, flush leaves, sway) under daylight,
+  the ground far below as a blurred darkened render; the ground map draws the canopy; tree nests are tabs.
+- **On/off:** a `habitat: 'trees'` species (none yet), the sandbox "Trees on" (built at runtime, also on the worker's
+  replica), or `?trees=1` with a placeholder colony; otherwise nothing is built.
+- **Lairs** removed from skirmish, sandbox and LAN setups and the five maps' zones; wild creatures arrive from the edges.
+- Saves version 5, protocol `ud-mp-16`.
+- Numbers: the canopy grid is 100–120 × 80–105 hexes (530–630 cells a side), built in 0.6–1.1 s at match start on this
+  machine (only with the layer on); 740–2,100 walkable hexes a map; the canopy mesh has one vertex a cell in the chunks
+  that hold branches.
 
 ## 2026-11-08 — Game speed and cutscenes checked; a device's worker never far behind (CHANGE_PLAN §32.4)
 - The user asked whether changing the game speed or cutscenes cause lag: neither had been checked. **Bench scenes**

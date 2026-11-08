@@ -15,7 +15,7 @@
  */
 import type { SimEvent } from '../core/events';
 import type { ColumnPacket } from '../sim/columns';
-import type { AphidCluster, CaveDef, Colony, LeafPlant, SimState } from '../sim/types';
+import type { AphidCluster, CaveDef, Colony, LeafPlant, SimState, TreesDef } from '../sim/types';
 
 export interface GridDelta {
   space: number;
@@ -48,6 +48,8 @@ export interface SlowState {
   colonies: Array<Partial<Colony> & { id: number }>;
   /** absent: unchanged since the last frame */
   caves?: CaveDef[];
+  /** the Trees map (null while the layer is off) */
+  trees?: TreesDef | null;
   aphids?: AphidCluster[];
   plants?: LeafPlant[];
   /** storms on authored maps (the replica raises its own water to match) */

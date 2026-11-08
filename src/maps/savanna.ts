@@ -142,8 +142,6 @@ export const SAVANNA: MapDef = {
     { kind: 'aphid', shape: { circle: [1385, 1180], r: 45 }, name: 'acacia shoots' },
     { kind: 'plant', shape: { circle: [752.4, 62.9], r: 50 } },
     { kind: 'plant', shape: { circle: [1047.6, 1737.1], r: 50 } },
-    { kind: 'lair', shape: { circle: [470, 155.2], r: 35 }, name: 'scorpion burrow' },
-    { kind: 'lair', shape: { circle: [1330, 1644.8], r: 35 }, name: 'scorpion burrow' },
     { kind: 'litter', shape: { circle: [740, 190], r: 100 } },
     { kind: 'litter', shape: { circle: [1060, 1610], r: 100 } },
     { kind: 'litter', shape: { circle: [1275, 460], r: 100 } },
@@ -165,5 +163,11 @@ export const SAVANNA: MapDef = {
   floods: [
     // a storm swells the waterhole over its flat margin
     { shape: { circle: [900, 900], r: 260 }, level: -1.5, first: [600, 900], every: [900, 1200], hold: [60, 120] },
+  ],
+  // the Trees: a few scattered acacias, flat and wide
+  trees: [
+    { trunk: [1500, 420], r: 30, style: 'acacia', reach: 300, seed: 51 },
+    { trunk: [300, 1500], r: 30, style: 'acacia', reach: 300, seed: 52 },
+    { trunk: [1620, 1600], r: 28, style: 'acacia', reach: 260, seed: 53 },
   ],
 };

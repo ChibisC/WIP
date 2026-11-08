@@ -608,7 +608,7 @@ export class NestTerrain {
 }
 
 /** One cell of the signed distance's 3×3 blur, with the grid's edge taken into account (the original loop's body). */
-function borderBlur(sd: Float32Array, W: number, H: number, x: number, y: number): number {
+export function borderBlur(sd: Float32Array, W: number, H: number, x: number, y: number): number {
   let sum = 0;
   let n = 0;
   for (let dy = -1; dy <= 1; dy++)
@@ -624,7 +624,7 @@ function borderBlur(sd: Float32Array, W: number, H: number, x: number, y: number
 }
 
 /** Two-pass chamfer distance transform (in cells). */
-function chamfer(d: Float32Array, W: number, H: number): void {
+export function chamfer(d: Float32Array, W: number, H: number): void {
   const D1 = 1;
   const D2 = Math.SQRT2;
   for (let y = 0; y < H; y++)
@@ -656,7 +656,7 @@ function chamfer(d: Float32Array, W: number, H: number): void {
 }
 
 /** Separable box blur repeated `passes` times (≈ gaussian). */
-function boxBlur(src: Float32Array, W: number, H: number, r: number, passes: number): Float32Array {
+export function boxBlur(src: Float32Array, W: number, H: number, r: number, passes: number): Float32Array {
   let a = Float32Array.from(src);
   let b = new Float32Array(W * H);
   const inv = 1 / (2 * r + 1);

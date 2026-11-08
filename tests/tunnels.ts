@@ -277,7 +277,7 @@ function crew(w: World, cid: number, n: number): void {
   console.info = info;
   const g2 = w2.nest(0)!;
   const c2 = w2.colony(0)!;
-  check('a version-3 save loads with the margin: the grid grown, version 4', g2.margin === TUNNELS.margin && w2.s.version === 4 && g2.cols === NEST_COLS + 2 * TUNNELS.margin);
+  check('a version-3 save loads with the margin: the grid grown, version 5 (the current)', g2.margin === TUNNELS.margin && w2.s.version === 5 && g2.cols === NEST_COLS + 2 * TUNNELS.margin);
   check('… tiles, entrances and ants shifted with it (the queen on her tile, on dug floor)', c2.tiles.find((t) => t.type === 'queen')!.q === queenQ && w2.antById.get(c2.queen)!.tile === w.antById.get(c.queen)!.tile && g2.isHexDug(queenQ) && w2.walkable(nestSpace(0), w2.antById.get(c2.queen)!.x, w2.antById.get(c2.queen)!.y) && g2.flowers[0].every((q) => g2.isHexDug(q) && g2.isInterior(q)));
   check('… and routes generated, all closed', routes(w2).length === 1 && !routes(w2)[0].open);
   const h = hashState(w2);

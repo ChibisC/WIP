@@ -19,6 +19,7 @@ import { aphidClaims, registerSpeciesAI } from './speciesAI';
 import { SURFACE, SimState, TileType } from './types';
 import { CaveOptions, createCave, lostRouteSystem } from './areas';
 import { SpeciesId, SPECIES } from './species';
+import { createTrees, moveNestToTree } from './trees';
 import { BALANCE, NASUTE, SICKLE } from './balance';
 import { edible } from './diet';
 import { datan2, dcos, dhypot, dsin } from './dmath';
@@ -50,6 +51,8 @@ export interface ColonySpec {
   at?: { x: number; y: number };
   /** team: give an AI colony the player's team (0) to make it an ally */
   team?: number;
+  /** a tree nest (sim/trees.ts): on the Trees map's site of that index (dev placeholder colony until a tree species exists) */
+  treeSite?: number;
 }
 
 /** A neutral underground area (cave or lair); placed automatically when `at` is left out. */
@@ -89,6 +92,8 @@ export interface GameSetup {
    * colonies, else nearest neighbours), 'none', or authored pairs of colony indices; story levels default to none
    */
   tunnels?: RoutePlan;
+  /** the Trees layer (sim/trees.ts, CHANGE_PLAN §33): on (also on when a colony's species has `habitat: 'trees'` or a `treeSite`) */
+  trees?: boolean;
 }
 
 /** Register all simulation systems in update order. */
@@ -197,6 +202,14 @@ export function createWorld(setup: GameSetup, events: EventBus): World {
   if (setup.sandbox) w.s.mode.sandbox = true;
   if (setup.arena) setupArena(w);
 
+  // The Trees (sim/trees.ts): only with a tree-dwelling colony, a tree nest, or asked for (sandbox, dev)
+  if (setup.trees || setup.colonies.some((c) => c.treeSite !== undefined || SPECIES[c.species]?.habitat === 'trees')) {
+    createTrees(w);
+    setup.colonies.forEach((spec, i) => {
+      const c = w.s.colonies[i];
+      if (c && spec.treeSite !== undefined) moveNestToTree(w, c, spec.treeSite);
+    });
+  }
   // Neutral caves and lairs, away from the nests.
   const lairs = L ? L.def.zones.filter((z) => z.kind === 'lair') : [];
   (setup.caves ?? []).forEach((cv, i) => createCave(w, { ...cv, at: cv.at ?? (i < lairs.length ? zonePoint(w, rng, HF_LAIR, 40) : caveSpot(w, rng)) }));

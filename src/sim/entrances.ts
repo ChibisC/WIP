@@ -261,6 +261,12 @@ export function entranceTop(g: NestGrid): readonly number[] {
   return g.flowerEdges(0).top;
 }
 
+/** Every hex an ant may leave an area from: a nest's flower top; a cave's tunnel top; the trees' every trunk top. */
+export function exitTops(g: NestGrid): readonly number[] {
+  if (g.flowers[0]?.length) return g.flowerEdges(0).top;
+  return g.entrances;
+}
+
 /** The hexes at the inner edge of a nest's flower (where defenders hold the choke); a cave: its tunnel's bottom. */
 export function entranceInner(g: NestGrid): readonly number[] {
   return g.flowerEdges(0).inner;

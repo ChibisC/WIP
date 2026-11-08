@@ -106,6 +106,7 @@ export function hasRouteHome(w: World, a: { colony: number; space: number; x: nu
   if (a.space !== SURFACE && usableRoute(w, a.space, home, a.colony)) return true;
   if (!c.entrances.length) return false;
   if (a.space === SURFACE) return true;
+  // in the trees: a tree colony's own hole is on a branch; anyone else needs a way down a trunk
   const flow = w.flowOf(a.space);
   const f = exitFieldIn(w, a.space);
   if (!flow || !f) return false;

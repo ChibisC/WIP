@@ -1,7 +1,7 @@
 import { climbTick, climbUpdate } from './climbing';
 import { World } from './world';
 import { canLeave, entranceInner, entranceTop, refuseSpot, usableMask } from './entrances';
-import { Ant, AS, Brood, Carry, Colony, Food, POSE, SURFACE, TileType, colonyOfSpace, nestSpace, snapping } from './types';
+import { Ant, AS, Brood, Carry, Colony, Food, POSE, SURFACE, TREES, TileType, colonyOfSpace, nestSpace, snapping } from './types';
 import { casteOf, CASTES } from './species';
 import { NestGrid } from '../world/nestGrid';
 import {
@@ -22,6 +22,8 @@ import {
   turnToward,
   wander,
 } from './movement';
+import { trunkHold } from './trees';
+import { sameCrown } from './movement';
 import { dropCarried, hexCoreCells, onAntDied, setTask, tileCellsOfType, tilePoint } from './colony';
 import { jobWork, JobNav } from './jobs';
 import { tileAt } from './tiles';
@@ -337,6 +339,11 @@ export function antSystem(w: World, dt: number): void {
         finish(w, a);
         continue;
       }
+    }
+    // on a tree trunk (sim/trees.ts): held on the bark for the climb, nothing else happens to it
+    if (a.trunkT && trunkHold(a, dt)) {
+      finish(w, a);
+      continue;
     }
     // army ants: links of a living bridge / pothole plugs hold still; an ant on a bridge walks across it (eciton.ts)
     if (a.state === AS.Bridge || a.state === AS.Plug || (a.xing ?? 0) !== 0) {
@@ -1344,7 +1351,12 @@ function marker(w: World, a: Ant, c: Colony, dt: number): void {
       a.carryAmt = 0;
     }
     if (m.space === SURFACE) goOut(w, a, dt);
-    else goToArea(w, a, m.space, dt);
+    else goToArea(w, a, m.space, dt, 1, m);
+    return;
+  }
+  // in the trees but in another crown than the marker: down this trunk, over the ground, up the right one
+  if (a.space === TREES && !sameCrown(w, a, m.x, m.y)) {
+    goOut(w, a, dt);
     return;
   }
   // battle arena: every unit only fights — it goes to its team's marker and takes on what comes near (sim/arena.ts)

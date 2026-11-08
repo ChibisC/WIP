@@ -1,9 +1,10 @@
 import { GameSession } from '../game/session';
-import { AS, SURFACE, colonyOfSpace } from '../sim/types';
+import { AS, SURFACE, TREES, colonyOfSpace } from '../sim/types';
 import { SOIL_AIR, SOIL_GATE, SOIL_ROCK, SOIL_ROUTE, SOIL_STONE } from '../world/nestGrid';
 import { halfIn, routesOf } from '../sim/tunnels';
 import { edible } from '../sim/diet';
 import { MARKER_COLORS, MARKER_NAMES } from '../sim/markers';
+import { kindsOf } from '../sim/trees';
 import { groupById } from '../sim/tiles';
 import { el, esc, shield } from './dom';
 import { AreaTabs } from './areaTabs';
@@ -30,7 +31,12 @@ export class Minimaps {
   private nestCv = el('canvas');
   private nestLbl = el('div', 'mm-lbl', 'Area 1');
   private surfCv = el('canvas');
+  private surfLbl = el('div', 'mm-lbl', 'Surface');
   private surfBase: HTMLCanvasElement | null = null;
+  /** the "TREES" bar (claude/trees/01-spec-trees-layer.md §3): tall and narrow, right of the ground map; only with the layer on */
+  private treesBar = el('button', 'pnl mm-trees');
+  private treesLbl = el('span', 'mm-trees-lbl', 'TREES');
+  private canopyBase: HTMLCanvasElement | null = null;
   private nestImg: ImageData | null = null;
   private nestVer = -1;
   private nestFogKey = -1;
@@ -40,12 +46,19 @@ export class Minimaps {
 
   constructor(private s: GameSession) {
     this.nestBox.append(this.nestCv, this.nestLbl);
-    this.surfBox.append(this.surfCv, el('div', 'mm-lbl', 'Surface'));
+    this.surfBox.append(this.surfCv, this.surfLbl);
+    this.treesBar.append(this.treesLbl);
+    this.treesBar.dataset.tip = '<b>The trees</b>Up into the canopy: the branches, twigs and leaves over the ground, where ants climb the trunks to forage and fight. Click again (or the ground map) to come back down.';
+    this.treesBar.addEventListener('click', (e) => {
+      e.stopPropagation();
+      s.toggleTrees();
+    });
+    this.treesBar.hidden = true;
     this.nestBox.dataset.tip = '<b>Area map</b>The underground area you are watching. Tile groups are coloured hexes; arrows mark the ramps up to the surface; dots: food (amber), your ants (pale), allies (blue), enemies (red). Click to look there.';
     this.surfBox.dataset.tip = '<b>Surface map</b>Your ants are bright dots; food is amber. Each underground area’s entrance shows its number and colour (a crown for a nest with its queen). Click to look there.';
     this.tabs = new AreaTabs(s);
     const row = el('div', 'mm-row');
-    row.append(this.nestBox, this.surfBox);
+    row.append(this.nestBox, this.surfBox, this.treesBar);
     this.root.append(this.tabs.root, row);
     if (TOUCH) {
       // compact layout (GameUI): the maps fold away behind this button
@@ -68,7 +81,11 @@ export class Minimaps {
     this.surfCv.addEventListener('click', (e) => {
       const t = s.world.terrain;
       const r = this.surfCv.getBoundingClientRect();
-      s.jumpTo('surface', ((e.clientX - r.left) / r.width) * t.width, ((e.clientY - r.top) / r.height) * t.depth);
+      const x = ((e.clientX - r.left) / r.width) * t.width;
+      const y = ((e.clientY - r.top) / r.height) * t.depth;
+      // in the trees the ground map shows the canopy: a click looks there
+      if (s.view.inTrees) s.jumpTo('nest', x, y, TREES);
+      else s.jumpTo('surface', x, y);
     });
   }
 
@@ -95,16 +112,105 @@ export class Minimaps {
     if (!force && this.tick % 6 !== 0) return;
     const S = this.fit();
     if (!S) return;
-    this.nestBox.classList.toggle('active', this.s.view.space === 'nest');
-    this.surfBox.classList.toggle('active', this.s.view.space === 'surface');
+    const inTrees = this.s.view.inTrees;
+    this.nestBox.classList.toggle('active', this.s.view.space === 'nest' && !inTrees);
+    this.surfBox.classList.toggle('active', this.s.view.space === 'surface' || inTrees);
+    this.treesBar.hidden = !this.s.treesOn;
+    this.treesBar.classList.toggle('up', inTrees);
+    this.treesLbl.textContent = inTrees ? 'GROUND' : 'TREES';
+    this.surfLbl.textContent = inTrees ? 'The trees' : 'Surface';
     this.drawNest(S);
-    this.drawSurface(S);
+    if (inTrees) this.drawCanopy(S);
+    else this.drawSurface(S);
   }
 
-  /** The area the area map shows: the one watched, while it is open; else home. */
+  /** The area the area map shows: the one watched, while it is open; else home (the trees are not an area: home). */
   private areaSpace(): number {
+    if (this.s.viewedArea === TREES) return this.s.areaTabs()[0].space;
     const t = this.s.areaTab(this.s.viewedArea);
     return t && t.open ? t.space : this.s.areaTabs()[0].space;
+  }
+
+  /** The canopy map (shown in the ground map's box while in the trees): the ground dimmed under it, the branches and leaves, the units, sites and markers. */
+  private drawCanopy(S: number): void {
+    const s = this.s;
+    const w = s.world;
+    const t = w.terrain;
+    const d = w.s.trees;
+    const g = w.nestOf(TREES);
+    if (!d || !g) return;
+    if (!this.surfBase) this.surfBase = this.bakeSurface(S);
+    if (!this.canopyBase || this.canopyBase.width !== S) this.canopyBase = this.bakeCanopy(S);
+    const ctx = this.surfCv.getContext('2d')!;
+    ctx.drawImage(this.surfBase, 0, 0);
+    ctx.fillStyle = 'rgba(10,14,18,0.62)';
+    ctx.fillRect(0, 0, S, S);
+    ctx.drawImage(this.canopyBase, 0, 0);
+    const kx = S / t.width;
+    const kz = S / t.depth;
+    for (const f of w.s.food) {
+      if (f.space !== TREES || f.kind === 'corpse') continue;
+      const mine = edible(s.player, f);
+      ctx.fillStyle = mine ? (s.foodView ? '#ffd060' : 'rgba(240,190,80,0.85)') : 'rgba(150,140,125,0.45)';
+      const sz = mine && s.foodView ? 3 : 2;
+      ctx.fillRect(f.x * kx - sz / 2, f.y * kz - sz / 2, sz, sz);
+    }
+    const me = s.player;
+    for (const a of w.s.ants) {
+      if (a.space !== TREES || a.state === AS.Dead) continue;
+      ctx.fillStyle = a.colony === me.id ? '#fff2cc' : (a.team ?? a.colony) === me.team ? '#7fb8ff' : '#ff5a44';
+      ctx.fillRect(a.x * kx - 0.7, a.y * kz - 0.7, 1.6, 1.6);
+    }
+    for (const cr of w.s.creatures) {
+      if (cr.space !== TREES || cr.dead) continue;
+      ctx.fillStyle = '#ff5a3c';
+      ctx.beginPath();
+      ctx.arc(cr.x * kx, cr.y * kz, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // the sites (empty branches for tree nests) and the trunk tops
+    for (const st of d.sites) {
+      ctx.strokeStyle = st.kind === 'leaf' ? '#9fe07a' : st.kind === 'hollow' ? '#6b4a2a' : '#f0e4c0';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(st.x * kx, st.y * kz, Math.max(2.5, S / 70), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    for (const tr of d.trunks) {
+      ctx.fillStyle = '#5a4634';
+      ctx.beginPath();
+      ctx.arc(tr.x * kx, tr.y * kz, Math.max(2, tr.r * kx), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    this.drawMarkers(ctx, TREES, kx, kz, S);
+    this.drawFrame(ctx, kx, kz);
+  }
+
+  /** The branches and leaves painted once (the canopy never changes). */
+  private bakeCanopy(S: number): HTMLCanvasElement {
+    const w = this.s.world;
+    const t = w.terrain;
+    const d = w.s.trees!;
+    const g = w.nestOf(TREES)!;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const ctx = cv.getContext('2d')!;
+    const img = ctx.createImageData(S, S);
+    const kinds = kindsOf(d);
+    for (let y = 0; y < S; y++)
+      for (let x = 0; x < S; x++) {
+        const q = g.hexAt((x / S) * t.width, (y / S) * t.depth);
+        const k = q < 0 ? 0 : kinds[q];
+        if (!k) continue;
+        const i = (y * S + x) * 4;
+        const col = k === 2 || k === 4 ? [92, 140, 58] : k === 3 ? [120, 92, 64] : [104, 78, 52];
+        img.data[i] = col[0];
+        img.data[i + 1] = col[1];
+        img.data[i + 2] = col[2];
+        img.data[i + 3] = 235;
+      }
+    ctx.putImageData(img, 0, 0);
+    return cv;
   }
 
   private drawNest(S: number): void {

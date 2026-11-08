@@ -120,8 +120,6 @@ export const RAINFOREST: MapDef = {
     { kind: 'aphid', shape: { circle: [520, 1380], r: 40 }, name: 'seedlings' },
     { kind: 'plant', shape: { circle: [300, 1250], r: 40 } },
     { kind: 'plant', shape: { circle: [1200, 250], r: 40 } },
-    { kind: 'lair', shape: { circle: [560, 380], r: 30 }, name: 'spider roots' },
-    { kind: 'lair', shape: { circle: [940, 1120], r: 30 }, name: 'spider roots' },
     { kind: 'litter', shape: { circle: [470, 520], r: 120 } },
     { kind: 'litter', shape: { circle: [1030, 980], r: 120 } },
     { kind: 'creature', shape: { poly: [
@@ -136,5 +134,11 @@ export const RAINFOREST: MapDef = {
     { shape: { circle: [1170, 1200], r: 60 }, level: -2, first: [240, 420], every: [300, 540], hold: [25, 50] },
     { shape: { circle: [1180, 700], r: 60 }, level: -2, first: [240, 420], every: [300, 540], hold: [25, 50] },
     { shape: { circle: [320, 800], r: 60 }, level: -2, first: [240, 420], every: [300, 540], hold: [25, 50] },
+  ],
+  // the Trees: the two giant trunks carry broad tropical crowns; a smaller tree between the pools
+  trees: [
+    { trunk: [480, 516], r: 81, style: 'tropical', reach: 400, seed: 41 },
+    { trunk: [1020, 984], r: 81, style: 'tropical', reach: 400, seed: 42 },
+    { trunk: [750, 620], r: 30, style: 'tropical', reach: 230, seed: 43 },
   ],
 };

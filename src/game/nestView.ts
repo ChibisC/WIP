@@ -1,3 +1,4 @@
+import { TREES } from '../sim/types';
 import * as THREE from 'three';
 import { GameView, NestStage } from '../render/view';
 import { AntRenderer, AntSpaceAdapter, AntView } from '../render/ants/antRenderer';
@@ -188,7 +189,7 @@ export class NestView {
       if (a.state === AS.Dead && a.deadT > 30) continue;
       if (vis && !vis(a.x, a.y)) continue;
       if (!cull.keeps(a, pos)) continue;
-      antToView(w, a, take(), 0, 0);
+      antToView(w, a, take(), this.space === TREES ? TREES : 0, 0);
     }
     for (const f of w.s.food) if (f.space === this.space && f.kind === 'corpse' && f.from.includes('_') && !(vis && !vis(f.x, f.y)) && cull.keepsPoint(f.x, f.y, pos)) corpseToView(f, take(), 0, f.from);
     // termite larvae and presoldiers on their tiles: the model kit (eggs stay with the brood renderer)
