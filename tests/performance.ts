@@ -28,6 +28,8 @@ import { antShape } from '../src/sim/factory';
 import { encodeState, hashState, restoreWorld } from '../src/sim/snapshot';
 import { chunkTriangles } from '../src/render/terrainMesh';
 import { Grass } from '../src/render/grass';
+import { chunkStatic } from '../src/render/chunks';
+import * as THREE from 'three';
 import { stressSetup } from '../src/dev/stressScene';
 
 const t0 = Date.now();
@@ -410,6 +412,70 @@ if (columnCodegen.on) {
     for (let i = 0; i < m.count; i++) if (Math.hypot(a[i * 16 + 12] - s.center.x, a[i * 16 + 13] - s.center.y, a[i * 16 + 14] - s.center.z) > s.radius) inSphere = false;
   }
   check('grass chunks: every blade drawn once, each chunk\'s blades inside its bounding sphere', n > 1000 && inSphere, `${n} blades in ${g.mesh.children.length} chunks`);
+}
+
+// ---- static scenery in culled chunks (performance v3: render/chunks.ts) — the same triangles, the same instances
+{
+  // a merged mesh of 400 small boxes over 1,000 mm (indexed, with colours) and an instanced mesh of 500 pebbles
+  const geos: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 400; i++) {
+    const g = new THREE.BoxGeometry(3, 2, 4);
+    g.rotateY(i * 0.7);
+    g.translate((i * 37) % 1000, (i % 7) * 0.5, (i * 91) % 1000);
+    const c = new Float32Array(g.attributes.position.count * 3).fill(i / 400);
+    g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    geos.push(g);
+  }
+  const { mergeGeometries } = await import('three/examples/jsm/utils/BufferGeometryUtils.js');
+  const merged = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshStandardMaterial({ vertexColors: true }));
+  merged.castShadow = true;
+  const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial(), 500);
+  const m4 = new THREE.Matrix4();
+  for (let i = 0; i < 500; i++) {
+    im.setMatrixAt(i, m4.makeTranslation((i * 53) % 1000, 0, (i * 29) % 1000));
+    im.setColorAt(i, new THREE.Color(i / 500, 0, 0));
+  }
+  const group = new THREE.Group();
+  group.add(merged, im);
+  // every triangle as its three vertices' values (position + colour), every instance as its matrix + colour
+  const triKeys = (g: THREE.BufferGeometry): string[] => {
+    const out: string[] = [];
+    const p = g.attributes.position;
+    const c = g.attributes.color;
+    const n = g.index ? g.index.count : p.count;
+    for (let t = 0; t < n; t += 3) {
+      const vs: string[] = [];
+      for (let k = 0; k < 3; k++) {
+        const v = g.index ? g.index.getX(t + k) : t + k;
+        vs.push([p.getX(v), p.getY(v), p.getZ(v), c.getX(v)].join(','));
+      }
+      out.push(vs.join('|'));
+    }
+    return out;
+  };
+  const before = triKeys(merged.geometry).sort();
+  const instBefore = Array.from({ length: 500 }, (_, i) => Array.from((im.instanceMatrix.array as Float32Array).subarray(i * 16, i * 16 + 16)).join(',') + '|' + (im.instanceColor!.array as Float32Array)[i * 3]).sort();
+  const made = chunkStatic(group, 1000 / 6, 1000, 64);
+  const after: string[] = [];
+  const instAfter: string[] = [];
+  let shadows = true;
+  let spheres = true;
+  group.traverse((o) => {
+    const mm = o as THREE.InstancedMesh;
+    if (mm.isInstancedMesh) {
+      const a = mm.instanceMatrix.array as Float32Array;
+      for (let i = 0; i < mm.count; i++) {
+        instAfter.push(Array.from(a.subarray(i * 16, i * 16 + 16)).join(',') + '|' + (mm.instanceColor!.array as Float32Array)[i * 3]);
+        if (Math.hypot(a[i * 16 + 12] - mm.boundingSphere!.center.x, a[i * 16 + 14] - mm.boundingSphere!.center.z) > mm.boundingSphere!.radius) spheres = false;
+      }
+    } else if ((o as THREE.Mesh).isMesh) {
+      after.push(...triKeys((o as THREE.Mesh).geometry));
+      if (!(o as THREE.Mesh).castShadow) shadows = false;
+    }
+  });
+  after.sort();
+  instAfter.sort();
+  check('static chunks: a merged mesh keeps every triangle (vertex values), an instanced one every instance, settings kept', made > 10 && before.join() === after.join() && instBefore.join() === instAfter.join() && shadows && spheres, `${made} chunks; ${before.length} triangles, 500 instances`);
 }
 
 // ---- one object shape for every ant (performance v3: sim/factory.ts antShape)
