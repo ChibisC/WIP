@@ -81,8 +81,9 @@ export interface ColumnPacket {
   /** other-typed fields: [entity index, key index, value] */
   other: Array<[number, number, unknown]>;
   /**
-   * Delta frames (performance v2): per key, 1 = the column is the same as in the last packet (the same entities in the
-   * same order) and is not sent — the reader's objects keep their values. Absent: every column is sent.
+   * Delta frames (performance v2): per key, 1 = no entity's value changed since the last packet (every entity was in
+   * it) and the column is not sent — the reader's objects, pooled by id, keep their values. Absent: every column is
+   * sent.
    */
   omit?: Uint8Array;
 }
@@ -139,9 +140,9 @@ export class ColumnWriter {
   /**
    * Encode a list. `alloc` supplies the column arrays (the worker passes
    * shared ring buffers when the page is cross-origin isolated). `delta`:
-   * when the entities are the same as last time and in the same order, the
-   * columns that did not change are left out (`omit`) — about half of them
-   * in a big fight (performance v2).
+   * when every entity was in the last packet too (some may be gone, the
+   * order may differ), the columns in which none changed are left out
+   * (`omit`) — about half of them in a big fight (performance v2).
    */
   write(items: readonly object[], skip?: ReadonlySet<string> | null, alloc?: ColumnAlloc, delta = false): ColumnPacket {
     this.schema(items);
@@ -203,20 +204,27 @@ export class ColumnWriter {
         }
       }
     }
-    // delta: the same entities in the same order as the last packet → leave out the columns that did not change
+    // delta: no entity that was not in the last packet (some may be gone, the order may differ) → leave out the
+    // columns in which no entity's value changed; the reader's objects (pooled by id) keep theirs
     let omit: Uint8Array | undefined;
     const L = this.last;
     const idCol = this.keyIndex.get('id') ?? -1;
-    if (delta && L && idCol >= 0 && L.n === n && L.nNum === nNum && L.nStr === nStr && L.nKeys === keys.length && n > 0) {
+    const prevRow = this.prevRow;
+    if (delta && L && idCol >= 0 && L.nNum === nNum && L.nStr === nStr && L.nKeys === keys.length && n > 0) {
       const P = this.bufs[this.cur ^ 1];
       const ib = numBase[idCol];
-      let same = true;
-      for (let i = 0; i < n; i++)
-        if (num[ib + i] !== P.num[ib + i]) {
-          same = false;
+      const rows = this.rows.length >= n ? this.rows : (this.rows = new Int32Array(Math.ceil(n * 1.5) + 16));
+      let known = true;
+      for (let i = 0; i < n; i++) {
+        const r = prevRow.get(num[ib + i]);
+        if (r === undefined) {
+          known = false;
           break;
         }
-      if (same) {
+        rows[i] = r;
+      }
+      if (known) {
+        const pn = L.n;
         omit = new Uint8Array(keys.length);
         for (let j = 0; j < keys.length; j++) {
           if (j === idCol) continue;
@@ -224,9 +232,10 @@ export class ColumnWriter {
           const sb = strBase[j];
           let eq = nb >= 0 || sb >= 0;
           if (nb >= 0) {
+            const pb = (nb / n) * pn;
             for (let i = 0; i < n; i++) {
               const a = num[nb + i];
-              const b = P.num[nb + i];
+              const b = P.num[pb + rows[i]];
               // (NaN equals NaN here: an unchanged NaN need not be sent again)
               if (a !== b && !(a !== a && b !== b)) {
                 eq = false;
@@ -234,8 +243,9 @@ export class ColumnWriter {
               }
             }
           } else if (sb >= 0) {
+            const pb = (sb / n) * pn;
             for (let i = 0; i < n; i++)
-              if (str[sb + i] !== P.str[sb + i]) {
+              if (str[sb + i] !== P.str[pb + rows[i]]) {
                 eq = false;
                 break;
               }
@@ -243,6 +253,12 @@ export class ColumnWriter {
           if (eq) omit[j] = 1;
         }
       }
+    }
+    // (the rows of this packet, by id, for the next one)
+    prevRow.clear();
+    if (delta && idCol >= 0) {
+      const ib = numBase[idCol];
+      for (let i = 0; i < n; i++) prevRow.set(num[ib + i], i);
     }
     this.last = { n, nNum, nStr, nKeys: keys.length };
     // the columns sent
@@ -268,6 +284,9 @@ export class ColumnWriter {
   }
   private numBase: number[] = [];
   private strBase: number[] = [];
+  /** the last packet's row of each entity id, and this packet's rows' rows in it (delta frames) */
+  private prevRow = new Map<number, number>();
+  private rows = new Int32Array(0);
 }
 
 /**
