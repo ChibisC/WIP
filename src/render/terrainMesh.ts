@@ -38,7 +38,7 @@ const TILE = 70;
  * shading all ~150 000 vertices of the map and its skirt each frame — the same triangles where they are seen (opaque and
  * depth-tested: the draw order between chunks changes nothing drawn).
  */
-const TERRAIN_CHUNKS = 6;
+const TERRAIN_CHUNKS = 5;
 
 /**
  * A heightfield index's triangles binned into `chunks` × `chunks` blocks of quads (the grid is nx × ny vertices; quad

@@ -235,7 +235,7 @@ export class GameView {
     this.worldGroup.add(this.terrainMesh.mesh);
     this.props = new Props(terrain);
     // (performance v3: the map-wide pebble sets and merged scenery in culled chunks — render/chunks.ts)
-    const chunkCell = Math.max(terrain.width, terrain.depth) / 6;
+    const chunkCell = Math.max(terrain.width, terrain.depth) / 5;
     chunkStatic(this.props.group, chunkCell);
     this.worldGroup.add(this.props.group);
     this.water = new Water(terrain);

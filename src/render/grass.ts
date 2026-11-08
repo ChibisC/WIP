@@ -61,7 +61,7 @@ const WIND_VERTEX = /* glsl */ `
  * meadow skirt each frame — the same blades with the same data where they are seen (an opaque, depth-tested pass: the
  * draw order between chunks changes nothing drawn).
  */
-const CHUNKS_ACROSS = 6;
+const CHUNKS_ACROSS = 5;
 
 export class Grass {
   /** the chunks ('grass' group; each child one chunk's instanced mesh) */
