@@ -231,6 +231,14 @@ export class GameView {
     return !this.fullSharpness && this.preset.post && pr >= 1.9 ? 0.75 : 1;
   }
 
+  /**
+   * The ants' level of detail scale: the preset's, times the share of the canvas's resolution the scene is drawn at on
+   * Retina (performance v5) — a model's detail is picked by its size in the pixels it is drawn in.
+   */
+  get antLodScale(): number {
+    return this.preset.lodScale * this.retinaScale;
+  }
+
   setFullSharpness(on: boolean): void {
     if (this.fullSharpness === on) return;
     this.fullSharpness = on;

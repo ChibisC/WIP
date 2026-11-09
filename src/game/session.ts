@@ -1926,6 +1926,10 @@ export class GameSession {
     this.updateTunnelView();
     this.updateHover();
     const cam = v.activeCamera();
+    // (the ants' detail follows the resolution the scene is drawn at: 1.5× on Retina unless Full sharpness — v5)
+    const lodK = v.antLodScale;
+    this.surfAnts.lodScale = lodK;
+    for (const nv of this.nests.values()) nv.ants.lodScale = lodK;
     const vh = window.innerHeight * v.renderer.getPixelRatio();
     const sel = this.tool === 'marker' ? this.markerSel : -1;
     const shown = this.shownMarkers();
