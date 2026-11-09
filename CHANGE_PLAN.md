@@ -1799,8 +1799,8 @@ the same (a "Full sharpness" option keeps 2×); the 30 FPS cap is Low Power Mode
 keeps the golden set and the simulation's results.
 
 ### 35.1 Plan (the work loop: measure, fix the biggest cost, prove nothing else changed, measure again)
-1. **The bench first, so its numbers can be trusted**: the GPU pass by pass on any browser (`gl.finish` after each
-   pass — Safari has no timer queries), the triangles by what is drawn, the longest frames with their causes (not the
+1. **The bench first, so its numbers can be trusted**: the GPU pass by pass on any browser (a wait after each
+   pass — Safari has no timer queries; round 2: a read-back, as `gl.finish()` only flushes in Chromium), the triangles by what is drawn, the longest frames with their causes (not the
    first ones), the UI's pieces, the display's rate measured while idle (Low Power Mode), effect toggles that compile
    nothing, the speed steps robust to one long frame, the stress scenes without the F3 overlay (its hitboxes and climb
    rails were drawn and rebuilt every frame), the renderer's counts after each switching round.
@@ -1858,3 +1858,12 @@ Merged as the interim build (main a7dd6b1, game artifact v56; handoff 27).
    rounds summed ("first 19, later 183" — about 20 a round). Now a round's count, and each round's. The multi-second
    frames on some switches (2.6 s, 4.2 s, "outside this thread") are real: the next report's worst steps and causes
    say which.
+3. **The bench's waits for the GPU**: `gl.finish()` only flushes in Chromium (measured on the build machine: 0 ms with
+   1.4–1.6 s of drawing still queued; a read-back after it waited the 1.4–1.6 s), so round 1's pass times were not
+   waits there, and a browser need not wait. Every wait is now a read-back of a 1 × 1 framebuffer of the bench's own,
+   cleared after everything else (`gpuSync`; the GL state put back). The build machine's own multi-second switch
+   frames turned out to be that: a Chromium trace shows the GPU process drawing the page's commands for all of each gap.
+4. **Switching's last round is diagnostic**: every pass and every draw waited for; a frame much longer than the round's
+   typical frame lists its passes and slowest draws (a pipeline built, a texture or buffer uploaded, a program
+   compiled) — or a long gap with little work in it: something outside the page.
+5. **Loading split** in the report: before the pre-warm, the pre-warm's slowest kinds of step, after it.

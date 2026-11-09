@@ -510,7 +510,7 @@ results.
 
 ### How it is measured (v5's tools)
 - **The benchmark, made trustworthy** (`dev/bench.ts`): each heavy scene (feel, fight, nest, arena, mp4, trees, story)
-  ends with the **GPU pass by pass** (`dev/gpuBreakdown.ts`: `gl.finish` after each pass — the shadow maps, the scene,
+  ends with the **GPU pass by pass** (`dev/gpuBreakdown.ts`: a wait for the GPU after each pass — round 2: a read-back, `gl.finish()` only flushes in Chromium — the shadow maps, the scene,
   ambient occlusion, depth of field and grade, bloom, the last pass — Safari has no GPU timer queries; draws are not
   waited one by one, which would end an Apple GPU's render pass each time, so their **triangles are counted by what is
   drawn** instead); the **longest frames** with their causes (the report listed the first eight, which hid the
@@ -622,3 +622,12 @@ range (as FSR's upscaler does), which leaves edges as sharp; the table above is 
   multi-second frames on a switch (2.6 s, 4.2 s, all "outside this thread") are real and not reproduced here: the next
   report's worst steps and causes say which.
 - **The UI's 44 ms frame** (the full nest's first second): not reproduced here; the bench now lists the UI's pieces.
+
+### Round 2: the benchmark's waits, made real
+`gl.finish()` does not wait for the GPU in Chromium — it flushes (the build machine: 0 ms at the end of a frame with
+1.4–1.6 s of drawing still queued; a read-back right after it waited the 1.4–1.6 s, and a second read-back 0.5 ms), and
+no browser has to wait. So every wait in the bench (`dev/gpuBreakdown.ts gpuSync`, and `tests/browser/gpu_census.py`)
+is now a read-back: a 1 × 1 framebuffer of its own is cleared — a command after all the others — and read, and the
+GL state it touched is put back. Round 1's pass times on the build machine were not waits. Switching's last round is
+now diagnostic (every pass and draw waited for: a long frame names its draw), and the report splits loading into
+before the pre-warm, the pre-warm's slowest kinds of step, and after it.
