@@ -34,9 +34,14 @@ const TICK_DT = 0.05;
  */
 export const WORKER_LAG_MS = 100;
 
-/** Single-player: how many ticks one batch may hold (24, fewer when the worker's ticks are slow). */
+/**
+ * Single-player: how many ticks one batch may hold (24, fewer when the worker's ticks are slow). Before the worker has
+ * reported a tick time, 2 (performance v5): its first ticks run before the JavaScript engine has compiled the
+ * simulation — many times slower on a phone or in Safari — and a first batch of 24 then held the game's picture still
+ * for seconds with no frame coming back.
+ */
 export function workerBatchCap(tickMs: number): number {
-  return tickMs > 0 ? Math.max(2, Math.min(24, Math.floor(WORKER_LAG_MS / tickMs))) : 24;
+  return tickMs > 0 ? Math.max(2, Math.min(24, Math.floor(WORKER_LAG_MS / tickMs))) : 2;
 }
 
 /** Replays (one tick a step): may another tick go to the worker with `inFlight` ticks not answered yet? */

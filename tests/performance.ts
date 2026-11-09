@@ -504,7 +504,7 @@ if (columnCodegen.on) {
 // ---- game speed: a device's worker is never far behind (performance v3 after the merge, game/simHost.ts)
 {
   const caps = [0, 2, 4, 5, 15, 30, 200].map(workerBatchCap);
-  check('worker lag: single-player batches hold 24 ticks, fewer when the ticks are slow (≈ 100 ms of work)', caps.join() === '24,24,24,20,6,3,2', caps.join());
+  check('worker lag: single-player batches hold 24 ticks, fewer when the ticks are slow (≈ 100 ms of work); 2 before the first tick time', caps.join() === '2,24,24,20,6,3,2', caps.join());
   check('worker lag: a replay sends ticks while under 100 ms of queued work',
     workerHasRoom(0, 15) && workerHasRoom(6, 15) && !workerHasRoom(7, 15) && workerHasRoom(60, 1) && !workerHasRoom(1, 300));
   // a replay at 4× (80 ticks a second asked for, 60 frames a second) on a device whose worker needs 15 ms a tick (66 a

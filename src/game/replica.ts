@@ -110,7 +110,8 @@ export class Replica {
     w.reindex();
     w.touch();
     if (f.phero) this.overlay = { colony: f.phero.colony, data: f.phero.data, fresh: true };
-    this.tickMs = f.tickMs;
+    // (a frame that ran no tick — commands applied at a boundary — has no tick time: the last one stands; v5)
+    if (f.ran > 0) this.tickMs = f.tickMs;
     // the columns have been read: the worker may reuse this frame's shared buffers
     if (this.ctrl) Atomics.store(this.ctrl, 0, f.frame);
     for (const e of f.events) w.events.emit(e);
