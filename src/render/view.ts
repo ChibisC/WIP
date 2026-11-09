@@ -892,8 +892,9 @@ export class GameView {
       const fz = Math.round(f.z / texel) * texel;
       sun.target.position.set(fx, f.y, fz);
       sun.position.set(fx, f.y, fz).addScaledVector(this.surfaceLights.sunDir, 1000);
-      this.terrainMesh?.rebuild();
-      this.water?.rebuild();
+      // (a flood step: the ground's wet band this frame, the water mesh the next — performance v4; at once when stepped)
+      const groundWork = this.terrainMesh?.rebuild() ?? false;
+      if (!groundWork || this.stepped) this.water?.rebuild();
     } else {
       // (performance v4: the shown nest's mesh after digging in steps — the signed distance one frame, the light
       // maps the next, then the changed chunks together — instead of all three on the frame a hex is dug)

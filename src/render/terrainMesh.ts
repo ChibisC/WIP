@@ -212,9 +212,10 @@ export class TerrainMesh {
     this.groundUniforms.uStormWet.value = this.stormWet;
   }
 
-  rebuild(): void {
+  /** Bring the mesh up to the terrain (heights, water); true when it did work this call. */
+  rebuild(): boolean {
     this.update();
-    if (this.builtVersion === this.terrain.version && this.builtWater === this.terrain.waterVersion) return;
+    if (this.builtVersion === this.terrain.version && this.builtWater === this.terrain.waterVersion) return false;
     const heightsChanged = this.builtVersion !== this.terrain.version;
     this.builtVersion = this.terrain.version;
     this.builtWater = this.terrain.waterVersion;
@@ -240,7 +241,7 @@ export class TerrainMesh {
       }
       this.geo.attributes.g1.needsUpdate = true;
       this.geo.attributes.g2.needsUpdate = true;
-      return;
+      return true;
     }
     this.everBuilt = true;
     const N0 = this.nx * this.ny;
@@ -292,6 +293,7 @@ export class TerrainMesh {
       this.geo.computeBoundingBox();
       this.buildChunks();
     }
+    return true;
   }
 
   /** (Re)make the chunk meshes from the full index: each chunk the full index's triangles of its block of quads. */
