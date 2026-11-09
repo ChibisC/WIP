@@ -511,7 +511,8 @@ export class CombatFx implements Sparker {
     }
   }
 
-  update(dt: number, heightAt: HeightFn, pxScale: number): void {
+  /** `upload` false: a plane off screen — the clock and the bookkeeping go on, nothing goes to the GPU (performance v4) */
+  update(dt: number, heightAt: HeightFn, pxScale: number, upload = true): void {
     this.mat.uniforms.uPx.value = pxScale;
     this.updateWarnings(dt);
     // acid mist where jets land
@@ -534,7 +535,7 @@ export class CombatFx implements Sparker {
     this.clock += dt;
     this.mat.uniforms.uClock.value = this.clock;
     this.blast.update(this.clock, heightAt, pxScale);
-    if (this.dirtyHi >= this.dirtyLo) {
+    if (upload && this.dirtyHi >= this.dirtyLo) {
       const lo = this.dirtyLo;
       const n = this.dirtyHi - lo + 1;
       for (const name of ['position', 'aV0', 'color', 'aT', 'aK']) {

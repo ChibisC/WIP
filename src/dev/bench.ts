@@ -23,6 +23,7 @@ import { prof } from '../core/profiler';
 import { feel, FeelSummary } from '../core/feel';
 import { BUILD_ID } from '../net/messages';
 import { AS, SURFACE } from '../sim/types';
+import { shapeBox } from '../world/mapShapes';
 
 interface SceneDef {
   id: string;
@@ -42,6 +43,8 @@ export const BENCH_SCENES: SceneDef[] = [
   { id: 'mp4', title: 'Multiplayer-sized world (4 colonies, authored map)', query: 'play=1&seed=3&map=meadowPond&species=lasius&rival=formica,solenopsis,atta&developed=6&nocine=1' },
   { id: 'speed', title: 'Game speed: the big fight at 1×, 2×, 4× and 8×', query: 'stress=1&ants=200&creatures=100&bosses=2' },
   { id: 'cine', title: 'Story cutscene: the opening flight of The Antlered King', query: 'story=antleredKing&diff=normal&seed=7' },
+  { id: 'trees', title: 'Trees layer on: the multiplayer-sized world, the ground, then up into the canopy', query: 'play=1&seed=3&map=meadowPond&species=lasius&rival=formica,solenopsis,atta&developed=6&nocine=1&trees=1' },
+  { id: 'flood', title: 'A flood rising and draining on Meadow Pond (what it costs to draw: five steps up, five down)', query: 'play=1&seed=3&map=meadowPond&species=lasius&rival=formica,solenopsis,atta&developed=6&nocine=1' },
 ];
 
 const KEY = 'ud-bench';
@@ -229,6 +232,25 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
     v.space = 'nest';
     v.onSpaceChanged?.('nest');
   }
+  // the flood scene: over the first flood zone, its water stepped up then down on the page's copy of the world (the
+  // drawing's cost of a flood: the ground's wet band, the water mesh; the simulation is not flooded)
+  const fz = def.id === 'flood' ? w.terrain.map?.floods[0] : undefined;
+  if (fz) {
+    const b = shapeBox(fz.shape, 0);
+    cx = (b.x0 + b.x1) / 2;
+    cz = (b.y0 + b.y1) / 2;
+  }
+  let floodStep = -1;
+  const floodAt = (k: number) => {
+    if (!fz) return;
+    // ten steps over the scene's middle: up in five, down in five
+    const step = Math.floor((k - 0.15) / 0.07);
+    if (step < 0 || step > 10 || step === floodStep) return;
+    floodStep = step;
+    const up = step <= 5 ? step : 10 - step;
+    w.terrain.setZoneFlood(0, up === 0 ? -9999 : fz.level - 3 * (1 - up / 5));
+  };
+  let treesUp = false;
   const tour = (k: number) => {
     // k: 0..1 through the scene
     const rig = v.space === 'nest' ? v.nestRig : surf;
@@ -263,6 +285,12 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
     }
     const k = (el - warm) / (secs * 1000);
     tour(Math.min(1, k));
+    floodAt(k);
+    // the trees scene: half on the ground, then up into the canopy
+    if (def.id === 'trees' && k >= 0.5 && !treesUp) {
+      treesUp = true;
+      s.toggleTrees();
+    }
     if (k < 1) requestAnimationFrame(loop);
     else finish();
   };

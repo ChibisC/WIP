@@ -33,6 +33,11 @@ export interface AreaTerrain {
   setFog(level: ((q: number) => number) | null): void;
   /** chunks waiting for a rebuild */
   readonly dirty: number;
+  /**
+   * Has the mesh caught up with the ground as it was at `version` (its signed distance and maps computed from it or
+   * later, at most a few chunks left)? A dive or a cut into an area waits for this (performance v4).
+   */
+  caughtUp(version: number): boolean;
   update(force?: boolean, budgetMs?: number): void;
   rebuildAll(): void;
   setShadows(on: boolean): void;

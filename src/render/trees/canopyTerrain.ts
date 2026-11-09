@@ -350,6 +350,10 @@ vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, vec4 lv, out float r
   get dirty(): number {
     return this.built ? 0 : 1;
   }
+  caughtUp(version: number): boolean {
+    void version;
+    return this.built;
+  }
   update(force = false, budgetMs = Infinity): void {
     void budgetMs;
     if (this.built && !force) return;

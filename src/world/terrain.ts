@@ -522,20 +522,43 @@ export class Terrain {
     for (const t of this.trunks) this.block(t.x, t.y, t.r);
   }
 
+  /**
+   * Which samples of a shape's box lie inside it (`shapeDist < 0`), worked out once per shape (performance v4): a
+   * flood step rebuilt the water testing every sample of every water body and flood zone against its outline again.
+   * The shapes of a map never change, and the test is a pure function of the shape and the point.
+   */
+  private shapeMasks = new Map<object, { i0: number; i1: number; j0: number; j1: number; inside: Uint8Array }>();
+
+  private shapeMask(shape: Parameters<typeof shapeDist>[0]): { i0: number; i1: number; j0: number; j1: number; inside: Uint8Array } {
+    let m = this.shapeMasks.get(shape);
+    if (m) return m;
+    const { nx, ny, res } = this;
+    const box = shapeBox(shape, 0);
+    const i0 = Math.max(0, Math.floor(box.x0 / res));
+    const i1 = Math.min(nx - 1, Math.ceil(box.x1 / res));
+    const j0 = Math.max(0, Math.floor(box.y0 / res));
+    const j1 = Math.min(ny - 1, Math.ceil(box.y1 / res));
+    const w = Math.max(0, i1 - i0 + 1);
+    const inside = new Uint8Array(w * Math.max(0, j1 - j0 + 1));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) inside[(j - j0) * w + (i - i0)] = shapeDist(shape, i * res, j * res) < 0 ? 1 : 0;
+    m = { i0, i1, j0, j1, inside };
+    this.shapeMasks.set(shape, m);
+    return m;
+  }
+
   rebuildWater(): void {
     const { nx, ny, res } = this;
+    // (the flood zones' masks made with the map, not on a storm's first step: performance v4)
+    if (this.map) for (const fz of this.map.floods) this.shapeMask(fz.shape);
     this.water.fill(-9999);
     if (this.map)
       for (const wb of this.map.water) {
-        const box = shapeBox(wb.shape, 0);
-        const i0 = Math.max(0, Math.floor(box.x0 / res));
-        const i1 = Math.min(nx - 1, Math.ceil(box.x1 / res));
-        const j0 = Math.max(0, Math.floor(box.y0 / res));
-        const j1 = Math.min(ny - 1, Math.ceil(box.y1 / res));
+        const { i0, i1, j0, j1, inside } = this.shapeMask(wb.shape);
+        const w = i1 - i0 + 1;
         for (let j = j0; j <= j1; j++)
           for (let i = i0; i <= i1; i++) {
             const k = j * nx + i;
-            if (this.heights[k] < wb.level && shapeDist(wb.shape, i * res, j * res) < 0 && wb.level > this.water[k]) this.water[k] = wb.level;
+            if (this.heights[k] < wb.level && inside[(j - j0) * w + (i - i0)] && wb.level > this.water[k]) this.water[k] = wb.level;
           }
       }
     // flood zones under water (storms on authored maps)
@@ -545,15 +568,12 @@ export class Terrain {
         const level = zf[z];
         const fz = this.map.floods[z];
         if (!fz || level <= -9000) continue;
-        const box = shapeBox(fz.shape, 0);
-        const i0 = Math.max(0, Math.floor(box.x0 / res));
-        const i1 = Math.min(nx - 1, Math.ceil(box.x1 / res));
-        const j0 = Math.max(0, Math.floor(box.y0 / res));
-        const j1 = Math.min(ny - 1, Math.ceil(box.y1 / res));
+        const { i0, i1, j0, j1, inside } = this.shapeMask(fz.shape);
+        const w = i1 - i0 + 1;
         for (let j = j0; j <= j1; j++)
           for (let i = i0; i <= i1; i++) {
             const k = j * nx + i;
-            if (this.heights[k] < level && level > this.water[k] && shapeDist(fz.shape, i * res, j * res) < 0) this.water[k] = level;
+            if (this.heights[k] < level && level > this.water[k] && inside[(j - j0) * w + (i - i0)]) this.water[k] = level;
           }
       }
     const flood = this.params.floodLevel;

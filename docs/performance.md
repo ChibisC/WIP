@@ -389,3 +389,108 @@ runs the simulation about three times faster than this machine (5 ms a tick for 
 - **WASM or several workers**: not needed for the targets (and shared memory needs headers Pages cannot send).
 - **Fewer garbage collections**: allocations are spread over many call sites (boxed numbers from small helpers,
   closures in a few callbacks); left for a later pass.
+
+## Performance v4: draw only what's on screen, kill the lag spikes, smooth story (claude/performance/04-spec-performance-v4-on-screen-spikes-story.md, CHANGE_PLAN §34)
+
+User decisions: areas nobody looks at are **not drawn or animated** — the simulation runs every ant and creature in
+full, so results never change; the spikes are in normal play; story: camera flights and events. Every change below
+keeps the pictures (golden set) and the simulation's results (`same.sh`, a 30-minute skirmish's hash, the story
+playtest logs) exactly.
+
+### How it is measured
+- **`tools/perf/longRun.ts`** — a 30-minute skirmish as the menu builds it (four colonies on Meadow Pond, grown, wild
+  creatures and titans on), the player's colony played by the AI or left alone (`idle`: its ants rest in the nest),
+  trees on or off; every tick timed, the slow ticks with the systems that took the time and the full flow-field
+  builds of that tick.
+- **`tools/playtest-story.ts` `TICKS=1`** — the same for each chapter 1 level, played by the story bot.
+- **`tests/browser/spike_session.py`** — normal play in the real page, every frame's main-thread parts and each
+  surface renderer (and the view's own rebuilds: the ground, the water, the backdrop) timed on its own; `NORENDER=1`
+  takes the GL draws out (SwiftShader draws on the CPU here) so the main thread's own work runs at full rate.
+- **`tests/browser/story_flights.py`** — every level's opening flight, drawn: shader links, uploads, the main thread's
+  work in its slowest frames.
+- **`tests/browser/offscreen_work.py`** — counts every update of a plane not on screen (must be none).
+- **Benchmark** (`?bench=1`): two new scenes, **trees** (the ground with the layer on, then up into the canopy) and
+  **flood** (a flood's ten steps drawn); the devices' reports are the real numbers.
+
+### What was found (build machine)
+- **The simulation's spikes came from one place: a nest's flow-field cache thrashing.** A big nest (265 × 282 cells)
+  with ~100 ants resting in it needs ~70 fields at once (one per rest hex); the cache held 64 and, least recently used
+  first, threw out exactly the fields the next ants needed: 60–77 full builds a tick, each a Dijkstra over 75,000
+  cells on a binary heap. *Spider Mother* at 22.7 min: 231 ticks over 40 ms in a row (50–91 ms); a 30-minute skirmish:
+  3–14 ticks over 40 ms (the Atta nest). The rest of the simulation is light in natural games (1.3–1.7 ms a tick on
+  average; story levels 0.5–1.3) and garbage collection in the worker is short (major collections 1–5 ms).
+- **The trees layer adds nothing to the simulation** while no ant is up there (stress scenes and a 20-minute skirmish
+  from before the trees merge against after: the same cost), and the trees are only on with a tree colony, the
+  sandbox's toggle or the dev URL. The spikes of normal play were older than the layer.
+- **Main thread, normal play** (Meadow Pond, four colonies, `NORENDER`): the 70–130 ms frames were **anthill rebuilds**
+  — a colony's anthill rebuilt whole on the frame its look changes (it grows a size step, digs, a hole caves in):
+  26–134 ms here (the red wood ants' thatch the most), and the rebuilt mesh could need a shader program the pre-warm
+  never made (the one link caught in play). Next, **off-screen nests kept current**: a nest mesh slice meant to cost
+  3 ms was a whole signed-distance pass or a chunk of 20–30 ms here — 80–130 frames a minute over 8 ms.
+- **Story events: floods.** Each flood step (five up, five down) rebuilt the water mesh (35–175 ms: 25 look-ups a
+  vertex), recomputed every ground field (160–400 ms: the wet band needs the water, the rest did not) and the
+  terrain's water (6–49 ms: every sample of every water shape tested against its outline again) — 200–250 ms frames
+  in High Water and Carton Kingdom. The **camera flights** compile nothing (no shader link in any of the seven) but
+  ran over anthill rebuilds and off-screen nest slices (the slowest frames of four of them).
+- The HUD wrote its DOM every frame (the marker panel's stance button, the ability tip) and read counters back with
+  `innerHTML`; Chrome's `performance.memory` (~0.25 ms a read) was read every frame by the profiler.
+
+### What changed
+| Where | What (the same results, the same pictures) |
+|---|---|
+| Nest fields (`sim/flow.ts`) | Full builds on a bucket queue: steps cost (c₁ + c₂)/32 with whole cell costs, so a ring of 129 buckets of whole units replaces the heap; shortest distances are unique, so the fields are the heap's bit for bit (checked against a plain Dijkstra). The cache keeps every field used on the tick (past 64, up to 32 MB) and shrinks back once idle. |
+| Anthills (`entranceModels.ts`) | The build is a generator (a step every 32 pieces and between big pieces); a changed anthill is built ~3 ms a frame from a copy of the colony, its programs compiled ahead (`compileAsync`), then swapped in whole. The first build and a fire-ant dome change stay at once. Pellets cloned from a plain geometry (cloning an IcosahedronGeometry rebuilt a polyhedron). Byte-identical meshes. |
+| Off screen (`session.ts`, `view.ts`) | No mesh, tile or effect upload for planes not shown (effects keep their clocks). The area a dive or cut leads into is brought up to date while the fade hides the frame; the fade waits (at most 1.5 s) until it has caught up. The shown nest's mesh after digging in three steps (signed distance, maps, chunks). |
+| Minimaps | Every 15th frame (4 a second) and only while on screen. |
+| Trees' backdrop | Forced on entering the trees (under the fade); else every 30 s, a quadrant a frame, 256² (it is blurred). |
+| Floods (`water.ts`, `terrain.ts`, `terrainMesh.ts`) | The water mesh's 5 × 5 maximum taken separably (checked against `waterAt`'s own rounding), ground heights cached; each water shape's inside mask kept; the ground fields split by what they depend on, and a water-only change rewrites and uploads only the two channels that depend on water. Byte-identical attributes. |
+| HUD | Marker panel every third frame; DOM written only when it changes, compared with the last write. |
+| Profiler | `performance.memory` every tenth frame and on slow ones. |
+| Benchmark | Scenes **trees** and **flood**. |
+
+### Measured
+**Simulation** (bundled; the same results throughout):
+
+| | before (`main`) | v4 |
+|---|---|---|
+| *Spider Mother* to 23 min (story bot) | 231 ticks over 40 ms (50–91 ms at 22.7 min), p99 21 ms | **0**, p99 4.0 ms, the slowest 29 ms |
+| 30-minute skirmish, player idle (`longRun`) | 3–14 ticks over 40 ms, the slowest 47–62 ms, p99 11.9 | **0**, the slowest 22.5 ms, p99 8.6 |
+| Stress scenes at 1,000 ants | economy 2 of 300 over 40 ms | economy, nests, ten, titan, tunnel 0; the fight 0–4 (as `main` on this machine: the stress scene's synchronised one-second ticks) |
+
+**Main thread, normal play** (`spike_session.py NORENDER=1`, 60 s, Meadow Pond, four colonies; this machine is slower
+than the laptop):
+
+| | before | v4 |
+|---|---|---|
+| trees off: average, the worst frame, frames over 33 ms | 2.5 ms, 130 ms, 1 | **1.1 ms, 10 ms, 0** |
+| trees on | 3.0 ms, 118 ms, 3 | **1.2 ms, 10 ms, 0** |
+| sandbox, trees on | — | 1.1 ms, 13 ms, 0 |
+| an anthill rebuild (four forced at once) | frames of 26–134 ms | at most 14 ms |
+| flood step: water mesh / ground / terrain water | 35–175 / 160–400 / 6–49 ms, on one frame | 10–25 / 10–45 / 0.4–12 ms, on two frames |
+| High Water at 4×, 120 s: frames over 33 ms | 1 (245 ms: the flood's ground and water) | 0 (the worst 12 ms) |
+| Carton Kingdom at 4×, 120 s | 2 (198 ms, 45 ms) | 0 (the worst 15 ms) |
+| shader programs compiled in 150 s of play / on entering the trees | 1 (an anthill's details) / 5 | **0 / 0** |
+
+**Off screen** (`offscreen_work.py`): 30 s on the ground with the trees on, then 30 s in the home nest — **0** updates of
+any plane not shown (nest views, tiles, meshes, the canopy, the backdrop, effects to the GPU, the ground's ants and
+anthills). **Switching** after 45 s away (`switch_after_away.py`): the swap waits 0–0.6 s here while the area catches
+up; the frames over 33 ms of that work fall while the fade covers the screen.
+
+**Story flights** (`story_flights.py`, each level's opening flight drawn; the main thread's own work, without the
+drawing that SwiftShader does on the CPU here): no shader link in any flight, before or after; the slowest frame, main
+→ v4: The Garden Below 84 → 16 ms, The Long Nights 27 → 13, Fire on the Banks 47 → 13, The Spider Mother 8 → 14, The
+Antlered King 16 → 17, High Water 40 → 11, Carton Kingdom 24 → 11 (what ran during the flights: anthill rebuilds and
+off-screen nest slices).
+
+**Golden set** (`golden/compare-v4after.md`): 17 of 17 match — 16 pixel for pixel; the flood shot differs by at most 1
+level in 20 % of its pixels, as two renders of `main` differ from each other (run-to-run noise).
+
+### Not done, and why
+- **Spreading story events' spawns over ticks**: their ticks are light (0.5–1.3 ms on average, the slowest 15–38 ms,
+  none over 40 ms) and it would change the simulation's results.
+- **The stress scenes' synchronised one-second ticks**: every ant there is made on the same tick; changing when the
+  timers fire changes results. In natural games they are spread (no tick over 40 ms in 30 minutes).
+- **Anything that changes the picture** (v3's list: the devices are limited by the GPU at High) — waits for the user.
+- **Multiplayer at high speed on a slow device** (handoff 25) — the user's choice.
+- **The wet band's recomputation** after a flood step (a distance pass over the whole grid, 10–45 ms here): only its
+  region could be redone, but its distances reach across the map; a step is now on its own frame.

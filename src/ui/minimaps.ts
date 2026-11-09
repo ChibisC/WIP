@@ -106,10 +106,17 @@ export class Minimaps {
     return this.size;
   }
 
+  /** Are the maps on screen (not folded away in the compact layout, not hidden in the arena)? */
+  private get shown(): boolean {
+    if (this.root.style.display === 'none') return false;
+    return this.root.classList.contains('open') || !this.root.closest('.gui.compact');
+  }
+
   update(force = false): void {
     this.tabs.update();
     this.tick++;
-    if (!force && this.tick % 6 !== 0) return;
+    // (performance v4: the units a few times a second — every 15th frame — and only while the maps are on screen)
+    if (!force && (this.tick % 15 !== 0 || !this.shown)) return;
     const S = this.fit();
     if (!S) return;
     const inTrees = this.s.view.inTrees;

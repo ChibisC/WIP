@@ -161,7 +161,7 @@ Play phones in landscape (in portrait the game asks you to turn the phone). On p
 The pause menu has graphics quality, frame rate (match the screen, 60 or 30), interface size, edge scrolling and the sandbox setting **Reveal all underground areas**. Auto quality first lowers the render resolution a little (never below 75 %, with a light sharpen) and only then the preset.
 
 ### Benchmark
-Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`; `&bonly=gpu` runs one scene) runs ten fixed scenes for about five minutes: scripted clicks, orders, digging, building and camera moves (how quickly the game answers), what each effect costs (the big fight at a fixed camera with ambient occlusion, bloom, depth of field, all post effects, shadows, double resolution, the ants and the grass turned off one at a time), switching surface ↔ underground ten times, a big fight, a full nest, a story night, the arena at 600 units, a multiplayer-sized world, the big fight at 1×, 2×, 4× and 8× game speed (the speed each really reached) and a story's opening camera flight. It ends with a report to copy and send (frame times, hitches and their causes, the switch frames, draw calls, memory). See `docs/performance.md`.
+Menu → Graphics → **Run the benchmark** (or open the game with `?bench=1`; `&bonly=gpu` runs one scene) runs twelve fixed scenes for about six minutes: scripted clicks, orders, digging, building and camera moves (how quickly the game answers), what each effect costs (the big fight at a fixed camera with ambient occlusion, bloom, depth of field, all post effects, shadows, double resolution, the ants and the grass turned off one at a time), switching surface ↔ underground ten times, a big fight, a full nest, a story night, the arena at 600 units, a multiplayer-sized world, the big fight at 1×, 2×, 4× and 8× game speed (the speed each really reached), a story's opening camera flight, the trees layer on (the ground, then up into the canopy) and a flood rising and draining. It ends with a report to copy and send (frame times, hitches and their causes, the switch frames, draw calls, memory). See `docs/performance.md`.
 
 ## Species
 | Species | Castes |
@@ -247,6 +247,11 @@ tools/perf/same.sh <main checkout | ref.json> fight,economy,nests,ten,titan,tunn
 tools/perf/ab.sh <main checkout> fight 2000 300 3                    # main against this checkout, alternating runs, medians
 npx esbuild tools/perf/unitsBench.ts --bundle --platform=node --format=esm --outfile=/tmp/u.mjs && node /tmp/u.mjs 200 300 default   # main thread: ant views, ant and creature renderers in a real fight
 tests/browser/with_server.sh python3 tests/browser/scene_census.py  # what a scene holds: meshes, shadow casters, the biggest meshes by triangles (QUERY=…)
+npx esbuild tools/perf/longRun.ts --bundle --platform=node --format=esm --outfile=/tmp/lr.mjs && node /tmp/lr.mjs 30 3 idle   # a 30-minute skirmish tick by tick: slow ticks, their systems, flow builds (--trees)
+TICKS=1 npx vite-node tools/playtest-story.ts -- spiderMother normal 25   # a story level played by the bot, every tick timed
+NORENDER=1 tests/browser/with_server.sh python3 tests/browser/spike_session.py   # normal play: every frame's main-thread parts (TREES=1, SPEED=4, Q=…)
+tests/browser/with_server.sh python3 tests/browser/story_flights.py   # each chapter 1 level's opening flight: shader links, uploads, slowest frames
+tests/browser/with_server.sh python3 tests/browser/offscreen_work.py   # planes off screen do no render work (counts every update)
 tests/browser/with_server.sh python3 tests/browser/ui_areas.py      # browser checks (Playwright); also ui_test.py, ui_test2.py, ui_dig.py, ui_camera.py
 tests/browser/with_server.sh python3 tests/browser/mp_local.py      # 3 tabs + AI over BroadcastChannel: lobby, lockstep, chat, drop
 tests/browser/with_server.sh python3 tests/browser/mp_finish.py     # 2 tabs: a match played to the end (surrender, results)

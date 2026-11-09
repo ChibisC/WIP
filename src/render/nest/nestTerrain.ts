@@ -597,9 +597,13 @@ export class NestTerrain {
     if (!sliced || g.dirty.size === 0) prof.note(`nest mesh: ${sliced ? built : n} chunks rebuilt${sliced ? ' (in the background)' : ''} (${(performance.now() - t0).toFixed(0)} ms)`);
   }
 
-  /** Chunks waiting to be rebuilt (the session keeps areas that are not shown current at a low rate). */
+  /** Chunks waiting to be rebuilt (an area off screen is brought up to date when it is shown). */
   get dirty(): number {
     return this.grid.dirty.size;
+  }
+
+  caughtUp(version: number): boolean {
+    return this.grid.dirty.size === 0 || (this.builtVersion >= version && !this.mapsStale && this.batchOpen && this.grid.dirty.size <= 3);
   }
 
   setShadows(on: boolean): void {

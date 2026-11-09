@@ -49,6 +49,9 @@ export class TopBar {
     shield(this.left);
   }
 
+  /** what was last written into the counters */
+  private last = { food: '', workers: '', soldiers: '' };
+
   update(): void {
     const c = this.s.player;
     for (const t of this.toggles) t.b.classList.toggle('on', t.on());
@@ -57,19 +60,21 @@ export class TopBar {
       for (const e of [this.food, this.wood, this.workers, this.soldiers]) e.style.display = 'none';
       return;
     }
+    // (compared with what was last written, not read back from the DOM: reading innerHTML serialises it — performance v4)
     const fd = `${ICONS.food}<span class="cur">${Math.floor(c.food)}</span><span class="cap">/ ${c.foodCap}</span>`;
-    if (this.food.innerHTML !== fd) this.food.innerHTML = fd;
+    if (this.last.food !== fd) this.food.innerHTML = this.last.food = fd;
     this.food.classList.toggle('full', c.food >= c.foodCap - 0.5);
     this.food.classList.toggle('low', c.food < 10);
     // (Termants keep wood and leaves in the food store: no wood counter since 2026-11-02)
-    this.wood.style.display = 'none';
+    if (this.wood.style.display !== 'none') this.wood.style.display = 'none';
     const wcol = casteFigureColour(basicCaste(c.species));
     const wk = `${antSilhouette('worker', wcol)}<span class="cur">${c.workers}</span><span class="cap">/ ${c.workersMax}</span>`;
-    if (this.workers.innerHTML !== wk) this.workers.innerHTML = wk;
+    if (this.last.workers !== wk) this.workers.innerHTML = this.last.workers = wk;
     const sold = c.castes.find((cs) => CASTES[cs].role === 'soldier' || CASTES[cs].role === 'major');
     const so = `${antSilhouette('soldier', sold ? casteFigureColour(sold) : '#b0503a')}<span class="cur">${c.soldiers}</span><span class="cap">/ ${c.soldiersMax}</span>`;
-    if (this.soldiers.innerHTML !== so) this.soldiers.innerHTML = so;
-    this.soldiers.style.display = c.soldiersMax > 0 || c.soldiers > 0 ? '' : 'none';
+    if (this.last.soldiers !== so) this.soldiers.innerHTML = this.last.soldiers = so;
+    const sd = c.soldiersMax > 0 || c.soldiers > 0 ? '' : 'none';
+    if (this.soldiers.style.display !== sd) this.soldiers.style.display = sd;
     void esc;
   }
 }

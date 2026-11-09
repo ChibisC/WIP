@@ -235,6 +235,7 @@ function startGame(): void {
       // The simulation runs in a Web Worker (the screenshot harness steps it synchronously in this thread; ?worker=0 too).
       if (!q.get('shot') && q.get('worker') !== '0') s.useWorker();
       if (q.get('shot')) {
+        s.setStepped();
         const n = Number(q.get('ticks') || 0);
         s.loop.advance(n);
         if (q.get('view') === 'nest') s.view.space = 'nest';
@@ -306,6 +307,7 @@ function startGame(): void {
     if (q.get('combatdebug')) s.setCombatDebug(true);
     if (!q.get('shot') && q.get('worker') !== '0') s.useWorker();
     if (q.get('shot')) {
+      s.setStepped();
       let vt = performance.now();
       (window as unknown as { __step: (k: number, dt: number) => void }).__step = (k, dt) => {
         for (let i = 0; i < k; i++) s.loop.step((vt += dt * 1000));

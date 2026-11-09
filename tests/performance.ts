@@ -23,6 +23,7 @@ import { packExhaustedFade } from '../src/render/ants/antMaterial';
 import { NestTerrain } from '../src/render/nest/nestTerrain';
 import { SOIL_AIR } from '../src/world/nestGrid';
 import { createStressWorld } from '../src/dev/stressScene';
+import { nestSpace } from '../src/sim/types';
 import { ColumnReader, ColumnWriter, columnCodegen } from '../src/sim/columns';
 import { antShape } from '../src/sim/factory';
 import { encodeState, hashState, restoreWorld } from '../src/sim/snapshot';
@@ -536,6 +537,66 @@ if (columnCodegen.on) {
   const without = run(false);
   const withCheck = run(true);
   check('worker lag: an overloaded device stepping tick by tick at 4× stays within the limit (10 s simulated)', withCheck <= WORKER_LAG_MS + 15 && without > 1000, `behind by ${withCheck} ms with the check, ${without} ms without`);
+}
+
+// ---- nest flow fields (performance v4): the bucket queue gives the heap's distances; the cache keeps its working set
+{
+  const w = createStressWorld(new EventBus(), 60, 5);
+  for (let i = 0; i < 60; i++) {
+    w.step(0.05);
+    w.events.drain();
+  }
+  const c = w.s.colonies[0];
+  const sp = nestSpace(c.id);
+  const g = w.nestOf(sp)!;
+  const flow = w.flowOf(sp)!;
+  const cost = (flow as unknown as { cost16: Uint16Array | null }).cost16;
+  // a plain Dijkstra over the same steps ((c1 + c2) / 32, four neighbours), sorted array as the queue
+  const reference = (targets: number[]): Float32Array => {
+    const d = new Float64Array(g.w * g.h).fill(Infinity);
+    const open: Array<[number, number]> = [];
+    for (const k of targets) if (g.isAirIdx(k)) (d[k] = 0), open.push([0, k]);
+    while (open.length) {
+      let bi = 0;
+      for (let i = 1; i < open.length; i++) if (open[i][0] < open[bi][0]) bi = i;
+      const [d0, k] = open[bi];
+      open[bi] = open[open.length - 1];
+      open.pop();
+      if (d0 > d[k]) continue;
+      const x = k % g.w;
+      const nb = [x > 0 ? k - 1 : -1, x < g.w - 1 ? k + 1 : -1, k >= g.w ? k - g.w : -1, k + g.w < d.length ? k + g.w : -1];
+      for (const m of nb) {
+        if (m < 0 || g.soil[m] !== 0) continue;
+        const nd = d0 + ((cost ? cost[k] : 16) + (cost ? cost[m] : 16)) / 32;
+        if (nd < d[m]) (d[m] = nd), open.push([nd, m]);
+      }
+    }
+    return Float32Array.from(d);
+  };
+  let bad = 0;
+  let cells = 0;
+  const air: number[] = [];
+  for (let k = 0; k < g.w * g.h; k++) if (g.isAirIdx(k)) air.push(k);
+  for (let t = 0; t < 6; t++) {
+    const targets = [air[(t * 7919) % air.length], air[(t * 104729 + 13) % air.length]];
+    const a = flow.field('test:' + t, () => targets);
+    const b = reference(targets);
+    for (let k = 0; k < a.length; k++) if (a[k] !== b[k] && !(a[k] === Infinity && b[k] === Infinity)) bad++;
+    cells += a.length;
+  }
+  check('nest fields: the bucket queue gives exactly the distances of a plain Dijkstra', bad === 0, `${bad} of ${cells} cells differ`);
+  // 80 fields used on one tick: all kept (none rebuilt when asked again that tick); idle, back down to 64
+  const fl = flow as unknown as { stats: { full: number }; size: number };
+  w.step(0.05);
+  for (let i = 0; i < 80; i++) flow.field('many:' + i, () => [air[(i * 31) % air.length]]);
+  const full0 = fl.stats.full;
+  for (let i = 0; i < 80; i++) flow.field('many:' + i, () => [air[(i * 31) % air.length]]);
+  const kept = fl.stats.full === full0 && fl.size >= 80;
+  for (let i = 0; i < 260; i++) {
+    w.step(0.05);
+    w.events.drain();
+  }
+  check('nest fields: a tick\'s working set stays cached past 64, and the cache shrinks back once idle', kept && fl.size <= 64 + 8, `size after idle ${fl.size}`);
 }
 
 console.log(`\n${failed ? `${failed} FAILED` : 'all passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

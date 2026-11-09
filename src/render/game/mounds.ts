@@ -97,6 +97,15 @@ export class SurfaceMounds {
     n.z /= l;
   }
 
+  /**
+   * Build the domes and anthills now, while loading (performance v4: drawn once off screen by the pre-warm, so their
+   * programs are compiled before play), without moving the every-30-frames clock of the updates in play.
+   */
+  prebuild(w: World, ground: (x: number, y: number) => number): void {
+    this.updateDomes(w, ground);
+    this.entrances.prebuild(w, (x, y) => ground(x, y) + this.domeHeight(x, y));
+  }
+
   update(w: World, ground: (x: number, y: number) => number): void {
     // (the domes first: an anthill's holes sit on its dome, so they are rebuilt with it)
     if (this.frame++ % 30 === 0) this.updateDomes(w, ground);

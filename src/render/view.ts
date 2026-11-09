@@ -51,7 +51,12 @@ interface Transition {
   /** entrance ramp in the nest plane (x, z) */
   entranceNest: THREE.Vector2;
   returnDist: number;
+  /** seconds the swap has waited for the incoming area (performance v4) */
+  held?: number;
 }
+
+/** The longest a dive or a cut waits, faded out, for the incoming area to be current (s). */
+const SWAP_HOLD = 1.5;
 
 /** One underground area (a nest or a cave): its own scene, terrain, lights and remembered camera. */
 export interface NestStage {
@@ -407,40 +412,75 @@ export class GameView {
   private backdropAt = -1e9;
   private backdropRT: THREE.WebGLRenderTarget | null = null;
 
-  /** Render the ground into the trees' backdrop: a low-resolution top-down shot of the surface, darkened and desaturated by the material. */
+  /** the backdrop being refreshed a quarter a frame (performance v4): the next quarter, -1 none */
+  private backdropPart = -1;
+
+  /**
+   * Render the ground into the trees' backdrop: a low-resolution top-down shot of the surface, darkened and desaturated
+   * by the material. Forced (entering the trees, under the fade): at once. Otherwise only while the trees are shown,
+   * every 30 s, a quarter of the picture a frame (performance v4: it was the whole surface scene on one frame every
+   * 12 s).
+   */
   refreshBackdrop(force = false): void {
     const bd = this.treesBackdrop;
     const t = this.terrain;
     if (!bd || !t) return;
-    if (!force && this.time - this.backdropAt < 12) return;
+    if (!force && this.backdropPart < 0 && this.time - this.backdropAt < 30) return;
+    if (force) this.backdropPart = -1;
+    else if (this.backdropPart < 0) this.backdropPart = 0;
     this.backdropAt = this.time;
     const W = t.width;
     const D = t.depth;
-    const res = 384;
+    const res = 256;
     if (!this.backdropRT) {
       this.backdropRT = new THREE.WebGLRenderTarget(res, res, { depthBuffer: true });
       this.backdropRT.texture.minFilter = THREE.LinearFilter;
       this.backdropRT.texture.magFilter = THREE.LinearFilter;
       this.backdropRT.texture.colorSpace = THREE.SRGBColorSpace;
     }
-    const cam = new THREE.OrthographicCamera(-W * 0.8, W * 0.8, D * 0.8, -D * 0.8, 1, 4000);
+    const cam = (this.backdropCam ??= new THREE.OrthographicCamera(-W * 0.8, W * 0.8, D * 0.8, -D * 0.8, 1, 4000));
     cam.position.set(W / 2, 1500, D / 2);
     cam.up.set(0, 0, -1);
     cam.lookAt(W / 2, 0, D / 2);
     cam.updateMatrixWorld();
     const prevRT = this.renderer.getRenderTarget();
     const prevShadow = this.renderer.shadowMap.enabled;
+    const prevScissor = this.renderer.getScissorTest();
     this.renderer.shadowMap.enabled = false;
     this.renderer.setRenderTarget(this.backdropRT);
-    this.renderer.render(this.surfaceScene, cam);
+    if (force) {
+      cam.clearViewOffset();
+      this.renderer.render(this.surfaceScene, cam);
+    } else {
+      // one quadrant: the camera's view offset to that quarter, drawn into that quarter of the target
+      const q = this.backdropPart;
+      const qx = q % 2;
+      const qy = Math.floor(q / 2);
+      const h = res / 2;
+      cam.setViewOffset(res, res, qx * h, qy * h, h, h);
+      this.backdropRT.viewport.set(qx * h, res - (qy + 1) * h, h, h);
+      this.backdropRT.scissor.set(qx * h, res - (qy + 1) * h, h, h);
+      this.backdropRT.scissorTest = true;
+      this.renderer.render(this.surfaceScene, cam);
+      this.backdropRT.viewport.set(0, 0, res, res);
+      this.backdropRT.scissor.set(0, 0, res, res);
+      this.backdropRT.scissorTest = false;
+      cam.clearViewOffset();
+      this.backdropPart = q + 1 >= 4 ? -1 : q + 1;
+    }
     this.renderer.setRenderTarget(prevRT);
+    this.renderer.setScissorTest(prevScissor);
     this.renderer.shadowMap.enabled = prevShadow;
     const m = bd.material as THREE.MeshBasicMaterial;
-    m.map = this.backdropRT.texture;
-    // (darker and greyer than the ground seen up close: it is far below, in the trees' shade)
-    m.color.setRGB(0.42, 0.44, 0.4);
-    m.needsUpdate = true;
+    if (m.map !== this.backdropRT.texture) {
+      m.map = this.backdropRT.texture;
+      // (darker and greyer than the ground seen up close: it is far below, in the trees' shade)
+      m.color.setRGB(0.42, 0.44, 0.4);
+      m.needsUpdate = true;
+    }
   }
+
+  private backdropCam: THREE.OrthographicCamera | null = null;
 
   /** Is the trees map the area shown (the view's space is 'nest' then, as for any area)? */
   get inTrees(): boolean {
@@ -609,6 +649,14 @@ export class GameView {
     return this.fadeK >= 0.999;
   }
 
+  /**
+   * Is the area a dive or a cut leads into ready to show (performance v4: areas off screen are not kept current; the
+   * session brings the incoming one up to date under the fade)? The swap waits for it, at most SWAP_HOLD seconds.
+   */
+  swapReady: (() => boolean) | null = null;
+  /** frames stepped by hand (the screenshot harness): mesh work on the frame it is asked for (session.setStepped) */
+  stepped = false;
+
   private updateAreaFade(dt: number): void {
     const f = this.areaFade!;
     f.t += dt;
@@ -616,6 +664,7 @@ export class GameView {
     const IN = 0.32;
     if (!f.swapped) {
       this.setFade(Math.min(1, f.t / OUT));
+      if (f.t >= OUT && f.t < OUT + SWAP_HOLD && !(this.swapReady?.() ?? true)) return;
       if (f.t >= OUT) {
         f.swapped = true;
         f.swap();
@@ -646,6 +695,11 @@ export class GameView {
         this.nestRig.goalDistance = THREE.MathUtils.lerp(this.nestRig.goalDistance, this.nestRig.minDist * 1.2, e * 0.25);
       }
       this.setFade(Math.min(1, e * 1.1));
+      // (into a nest: the swap waits, faded out, until its mesh is current — performance v4)
+      if (t >= 0.5 && tr.to === 'nest' && !(this.swapReady?.() ?? true) && (tr.held = (tr.held ?? 0) + dt) < SWAP_HOLD) {
+        tr.t = 0.5;
+        return;
+      }
       if (t >= 0.5) {
         tr.swapped = true;
         this.space = tr.to;
@@ -838,10 +892,13 @@ export class GameView {
       const fz = Math.round(f.z / texel) * texel;
       sun.target.position.set(fx, f.y, fz);
       sun.position.set(fx, f.y, fz).addScaledVector(this.surfaceLights.sunDir, 1000);
-      this.terrainMesh?.rebuild();
-      this.water?.rebuild();
+      // (a flood step: the ground's wet band this frame, the water mesh the next — performance v4; at once when stepped)
+      const groundWork = this.terrainMesh?.rebuild() ?? false;
+      if (!groundWork || this.stepped) this.water?.rebuild();
     } else {
-      this.nestTerrain?.update();
+      // (performance v4: the shown nest's mesh after digging in steps — the signed distance one frame, the light
+      // maps the next, then the changed chunks together — instead of all three on the frame a hex is dug)
+      this.nestTerrain?.update(false, this.stepped ? Infinity : 40);
       if (this.inTrees) {
         // the trees' sun follows the view like the surface's
         const st = this.nestStage!;

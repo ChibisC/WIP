@@ -256,6 +256,22 @@ export class GameSession {
     this.surfAnts.lodScale = this.view.preset.lodScale;
     this.surfAnts.space = SURFACE;
     this.view.surfaceScene.add(this.teamRings.group, this.digRings.group, this.surfBars.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfTrail.group, this.surfFx.group);
+    // a dive or a cut into an area waits under its fade until the area's mesh is current (performance v4)
+    this.view.swapReady = () => {
+      const nv = this.nests.get(this.viewedArea);
+      if (!nv) return true;
+      // (caught up with the ground as it was when the wait began: ants digging on meanwhile do not keep it waiting)
+      if (this.swapWait?.space !== nv.space) this.swapWait = { space: nv.space, version: nv.stage.terrain.grid.version };
+      if (!nv.stage.terrain.caughtUp(this.swapWait.version)) return false;
+      this.swapWait = null;
+      return true;
+    };
+    // a rebuilt anthill's programs are compiled before it is swapped in (performance v4: the swap never compiles)
+    this.mounds.entrances.compile = (objs) => {
+      const tmp = new THREE.Group();
+      for (const o of objs) tmp.add(o);
+      return this.view.renderer.compileAsync(tmp, this.view.activeCamera(), this.view.surfaceScene);
+    };
     // Pheromone overlay texture.
     const ph = w.phero;
     this.pheroData = new Uint8Array(ph.w * ph.h * 4);
@@ -426,6 +442,11 @@ export class GameSession {
       for (const nv of this.nests.values()) nv.creatures.prepare();
     });
     const vh = window.innerHeight * v.renderer.getPixelRatio();
+    // (the trees: the ground below drawn into the backdrop once now — that render's programs, and the backdrop's own
+    // textured variant, compiled behind the loading screen instead of when the player first climbs: performance v4)
+    // (the anthills built now, so the warm-up draws them: their programs compiled before play)
+    steps.push(() => this.mounds.prebuild(w, this.terrainHeight));
+    if (this.nests.has(TREES)) steps.push(() => v.refreshBackdrop(true));
     for (const [space, nv] of this.nests)
       steps.push(() => {
         const g = w.nestOf(space)!;
@@ -451,38 +472,35 @@ export class GameSession {
   /** time the pre-warm took (ms; the benchmark reports it) */
   prewarmMs = 0;
 
-  private areaRR = 0;
+  /**
+   * The screenshot harness steps frames by hand (?shot=1, the golden set): there the work spread over frames in play
+   * (anthill rebuilds, the shown nest's mesh) is done on the frame it is asked for, as before performance v4, so a
+   * stepped shot shows the same picture as before.
+   */
+  setStepped(): void {
+    this.mounds.entrances.budgetMs = Infinity;
+    this.mounds.entrances.compile = null;
+    this.view.stepped = true;
+  }
+
+  /** the area a dive or cut waits for, and its ground's version when the wait began */
+  private swapWait: { space: number; version: number } | null = null;
 
   /**
-   * Areas not on screen are kept current at a low rate (performance pass): one a few times a second rebuilds its nest
-   * mesh after digging and its tiles, while the frame has room, so showing it later has nothing to catch up on.
+   * Areas not on screen do no render work at all (performance v4, user 2026-11-08: no mesh, tile or chunk updates off
+   * screen). The area a dive or a cut is about to show is brought up to date while its fade hides the frame, a slice
+   * a frame, and the fade holds until it is (`view.swapReady`), so it arrives current.
    */
   private keepAreasCurrent(): void {
     const v = this.view;
-    // the area a dive or a cut is about to show: brought up to date under the fade, a slice every frame
-    if (v.incoming === 'nest') {
-      const nv = this.nests.get(this.viewedArea);
-      if (nv && nv.stage.terrain.dirty) {
-        const t0 = performance.now();
-        nv.stage.terrain.update(false, 6);
-        prof.add('nest', performance.now() - t0);
-        return;
-      }
-    }
-    // the others in turn, a slice every third frame while the frame has room
-    if (this.frameNo % 3 !== 0 || prof.cpuMs.ema > 25) return;
-    const list = [...this.nests.values()];
-    for (let k = 0; k < list.length; k++) {
-      const nv = list[this.areaRR++ % list.length];
-      if (v.space === 'nest' && nv.space === v.activeNest) continue;
-      const t0 = performance.now();
-      if (nv.stage.terrain.dirty) nv.stage.terrain.update(false, 3);
-      // (the hexes: tiles and their looks, cheap; at most every 18 frames per area)
-      else if (this.frameNo % 18 === 0) nv.updateHexes(this.world, this.world.colony(colonyOfSpace(nv.space)) ?? null);
-      else continue;
-      prof.add('nest', performance.now() - t0);
-      return;
-    }
+    if (v.incoming !== 'nest') this.swapWait = null;
+    // (only while the fade hides the frame: a long step — the signed distance of a big nest — is never seen)
+    if (v.incoming !== 'nest' || !v.fadedOut) return;
+    const nv = this.nests.get(this.viewedArea);
+    if (!nv || !nv.stage.terrain.dirty) return;
+    const t0 = performance.now();
+    nv.stage.terrain.update(false, 12);
+    prof.add('nest', performance.now() - t0);
   }
 
   /**
@@ -686,6 +704,8 @@ export class GameSession {
     this.view.worldGroup.add(this.treeDecor.ground);
     stage.scene.add(this.treeDecor.canopy);
     this.warmNew();
+    // (turned on in play — the sandbox's "Trees on": the backdrop's programs compiled now, not on the first climb)
+    if (this.prewarmMs > 0) this.view.refreshBackdrop(true);
   }
 
   /** The "TREES" bar: up into the canopy, or back down to the ground. */
@@ -1884,7 +1904,8 @@ export class GameSession {
     }
     if (v.space === 'nest' && !v.transitioning && v.activeNest !== this.viewedArea) v.setActiveNest(this.viewedArea);
     if (w.s.trees && !this.nests.has(TREES)) this.addTreesView();
-    this.treeDecor?.update(w, v.time);
+    // (the climb rings breathe on the ground only while the ground is shown: performance v4)
+    if (v.space === 'surface') this.treeDecor?.update(w, v.time);
     this.updateTunnelView();
     this.updateHover();
     const cam = v.activeCamera();
@@ -2002,8 +2023,13 @@ export class GameSession {
     // effects run on game time (frozen while paused)
     pt = performance.now();
     const px = (vh * 0.5) / Math.tan(THREE.MathUtils.degToRad((cam as THREE.PerspectiveCamera).fov) * 0.5);
-    this.surfFx.update(simDt, this.surfHeight, px);
-    for (const nv of this.nests.values()) nv.fx.update(simDt, (x, y) => nv.stage.terrain.heightAt(x, y), px);
+    // (performance v4: a plane off screen sends its effects nothing to the GPU; their clocks keep time, so a spark
+    // spawned off screen is as old as it should be, and its slots go up together when the plane is shown)
+    this.surfFx.update(simDt, this.surfHeight, px, v.space === 'surface' || v.incoming === 'surface');
+    for (const nv of this.nests.values()) {
+      const shown = (v.space === 'nest' || v.incoming === 'nest') && (nv.space === v.activeNest || nv.space === this.viewedArea);
+      nv.fx.update(simDt, (x, y) => nv.stage.terrain.heightAt(x, y), px, shown);
+    }
     prof.add('fx', performance.now() - pt);
     // a story shot steers the surface camera (input waits until it is over or skipped)
     let cineOn = false;

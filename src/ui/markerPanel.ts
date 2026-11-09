@@ -155,8 +155,15 @@ export class MarkerPanel {
       .join('|');
   }
 
-  /** Rebuild cards when groups or assignments change; refresh counts every call. */
+  /** frames since the panel was made (it refreshes every third: performance v4) */
+  private tick = 0;
+  private lastAggro: boolean | null = null;
+  /** each column's count as last written (not read back from the DOM) */
+  private lastCounts = new Map<number, string>();
+
+  /** Rebuild cards when groups or assignments change; refresh counts (every third frame: the counts walk every tile). */
   update(): void {
+    if (this.tick++ % 3 !== 0) return;
     const s = this.s;
     const c = s.player;
     const key = this.groupKey();
@@ -175,7 +182,10 @@ export class MarkerPanel {
         const tab = m.placed && m.space !== SURFACE ? s.areaTab(m.space) : undefined;
         const badge = tab && tab.kind !== 'home' ? ` <span class="mp-area" style="color:${tab.color}" title="In area ${tab.number}">⬇${tab.number}</span>` : '';
         const txt = `${n.current}/${n.max}${badge}`;
-        if (o.count.innerHTML !== txt) o.count.innerHTML = txt;
+        if (this.lastCounts.get(i) !== txt) {
+          this.lastCounts.set(i, txt);
+          o.count.innerHTML = txt;
+        }
         for (const [k, b] of o.orders) b.classList.toggle('on', !!m[k]);
         for (const [k, b] of o.summary) b.classList.toggle('on', !!m[k]);
       } else {
@@ -203,11 +213,15 @@ export class MarkerPanel {
       }
     }
     const aggressive = s.shownAggression();
-    this.aggroBtn.innerHTML = aggressive ? ICONS.attack : ICONS.defend;
-    this.aggroBtn.classList.toggle('on', aggressive);
-    this.aggroBtn.dataset.tip = aggressive
-      ? '<b>Stance: attack</b>Ants attack any enemy they find. Click to switch to <i>defend only</i>.'
-      : '<b>Stance: defend only</b>Away from the nest, ants fight only when attacked or alarmed. Click to switch to <i>attack</i>.';
+    // (the DOM only when it changes: writing it every frame made the browser restyle the panel every frame)
+    if (aggressive !== this.lastAggro) {
+      this.lastAggro = aggressive;
+      this.aggroBtn.innerHTML = aggressive ? ICONS.attack : ICONS.defend;
+      this.aggroBtn.classList.toggle('on', aggressive);
+      this.aggroBtn.dataset.tip = aggressive
+        ? '<b>Stance: attack</b>Ants attack any enemy they find. Click to switch to <i>defend only</i>.'
+        : '<b>Stance: defend only</b>Away from the nest, ants fight only when attacked or alarmed. Click to switch to <i>attack</i>.';
+    }
     // call allies for help (CHANGE_PLAN §23): only with allies; lit while the call lasts
     const allies = s.world.s.colonies.some((o) => o.id !== c.id && o.alive && o.team === c.team);
     this.helpBtn.hidden = !allies;
@@ -219,7 +233,8 @@ export class MarkerPanel {
     const ready = c.abilityCd <= 0;
     this.abilityBtn.classList.toggle('dim', !ready);
     this.abilityBtn.classList.toggle('on', c.abilityT > 0);
-    this.abilityBtn.dataset.tip = `<b>${esc(ab.name)}</b>${esc(ab.desc)}<br>${ready ? 'Ready.' : `Ready in ${Math.ceil(c.abilityCd)} s.`}`;
+    const abTip = `<b>${esc(ab.name)}</b>${esc(ab.desc)}<br>${ready ? 'Ready.' : `Ready in ${Math.ceil(c.abilityCd)} s.`}`;
+    if (this.abilityBtn.dataset.tip !== abTip) this.abilityBtn.dataset.tip = abTip;
     void ABILITIES;
   }
 

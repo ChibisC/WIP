@@ -2137,3 +2137,22 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   and growing without), `tests/browser/replay.py` (identical to the recording), `worker.py`, `lan.py` two players
   (hashes match, no desync, the speed vote).
 - **Merged** into `main` as `0a8d9eb` (Pages deployed; game artifact v54); handoff 25.
+
+## 2026-11-08 — Performance v4: draw only what's on screen, the lag spikes found and gone, smoother story (CHANGE_PLAN §34)
+- **Found (measured):** the simulation's spikes were a nest's flow-field cache thrashing (a big nest with ~100 resting
+  ants: 60–77 full builds a tick; Spider Mother 231 ticks over 40 ms); normal play's 70–130 ms frames were anthill
+  rebuilds (and an uncompiled program with them) and off-screen nest mesh slices; story events' were flood steps
+  (water mesh, every ground field, the terrain's water: 200–250 ms frames). The trees layer adds nothing to the
+  simulation; the spikes were older than it.
+- **Fixed, the same results and pictures:** bucket-queue field builds and a working-set cache; anthills built a few ms a
+  frame and swapped in whole, compiled ahead, built while loading; planes off screen do no render work (the incoming
+  area caught up under its fade); flood steps rebuild only what depends on water, on two frames; the trees' backdrop
+  a quadrant a frame every 30 s and warmed at loading; minimaps 4× a second when shown; the HUD writes its DOM only on
+  change; the profiler reads the heap every tenth frame. Bench scenes **trees** and **flood**.
+- **Numbers (this machine):** Spider Mother 231 → 0 ticks over 40 ms; a 30-minute skirmish 3–14 → 0; normal play's
+  main thread 2.5–3.0 → 1.1–1.2 ms a frame, the worst 118–130 → 10 ms; High Water / Carton Kingdom at 4×: no frame
+  over 33 ms (was 245 / 198 ms); no shader compiled in play or on entering the trees; story flights' slowest frames
+  84 → 16 ms at most; planes off screen: 0 updates.
+- **Checks:** same.sh 18 runs ALL SAME; the skirmish's hash and the story logs unchanged; golden set 17 of 17 (16 pixel
+  for pixel, the flood shot within main's own noise); `npm test`, determinism, build; LAN two players.
+
