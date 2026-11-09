@@ -1799,8 +1799,8 @@ the same (a "Full sharpness" option keeps 2×); the 30 FPS cap is Low Power Mode
 keeps the golden set and the simulation's results.
 
 ### 35.1 Plan (the work loop: measure, fix the biggest cost, prove nothing else changed, measure again)
-1. **The bench first, so its numbers can be trusted**: the GPU pass by pass on any browser (`gl.finish` after each
-   pass — Safari has no timer queries), the triangles by what is drawn, the longest frames with their causes (not the
+1. **The bench first, so its numbers can be trusted**: the GPU pass by pass on any browser (a wait after each
+   pass — Safari has no timer queries; round 2: a read-back, as `gl.finish()` only flushes in Chromium), the triangles by what is drawn, the longest frames with their causes (not the
    first ones), the UI's pieces, the display's rate measured while idle (Low Power Mode), effect toggles that compile
    nothing, the speed steps robust to one long frame, the stress scenes without the F3 overlay (its hitboxes and climb
    rails were drawn and rebuilt every frame), the renderer's counts after each switching round.
@@ -1840,10 +1840,39 @@ keeps the golden set and the simulation's results.
    **The worker's first batch** 2 ticks until it has a tick time; **its engine warmed up** on a copy before the first
    tick (`worker/warmUp.ts`).
 6. **One shadow map and one environment map** for every underground area and the trees.
-7. **Retina at High: the effects at 1.5×**, a Catmull-Rom upscale in the last pass, the ants' detail by the pixels
-   drawn; Graphics → Sharpness → Full sharpness. Dynamic resolution resizes only the effects' targets.
+7. **Retina at High: the effects at 1.5×**, a Catmull-Rom upscale in the last pass, the ants' detail still picked by
+   the canvas's pixels (picking it by the pixels drawn changed models and their effects: dropped); Graphics →
+   Sharpness → Full sharpness. Dynamic resolution resizes only the effects' targets.
 8. **UI**: area tabs, minimaps (box measured after a resize, raster in a canvas, no per-pixel arrays, colour sets
    only on change), tile labels.
 
 Checks: golden set 17 of 17 (16 pixel for pixel, the flood shot within its run-to-run noise); `npm test`;
 `same.sh` (no simulation code changed); LAN two players.
+Merged as the interim build (main a7dd6b1, game artifact v56; handoff 27).
+
+### 35.3 Round 2 (after the interim build; the user's plugged-in Mac and iPhone/iPad reports drive the rest)
+1. **The 1.5× upscale's black rings**: Catmull-Rom's negative lobes next to a very bright HDR pixel (a larva's
+   highlight in the nest) went below zero. Each result is kept within its 2 × 2 nearest texels' range (as FSR's
+   upscaler does); edges stay sharp. The 2×/1.5× sheets shot again.
+2. **The switching "growth" was the report's arithmetic**: the v4 line set the first round against the nine later
+   rounds summed ("first 19, later 183" — about 20 a round). Now a round's count, and each round's. The multi-second
+   frames on some switches (2.6 s, 4.2 s, "outside this thread") are real: the next report's worst steps and causes
+   say which.
+3. **The bench's waits for the GPU**: `gl.finish()` only flushes in Chromium (measured on the build machine: 0 ms with
+   1.4–1.6 s of drawing still queued; a read-back after it waited the 1.4–1.6 s), so round 1's pass times were not
+   waits there, and a browser need not wait. Every wait is now a read-back of a 1 × 1 framebuffer of the bench's own,
+   cleared after everything else (`gpuSync`; the GL state put back). The build machine's own multi-second switch
+   frames turned out to be that: a Chromium trace shows the GPU process drawing the page's commands for all of each gap.
+4. **Switching's last round is diagnostic**: every pass and every draw waited for; a frame much longer than the round's
+   typical frame lists its passes and slowest draws (a pipeline built, a texture or buffer uploaded, a program
+   compiled) — or a long gap with little work in it: something outside the page.
+5. **Loading split** in the report: before the pre-warm, the pre-warm's slowest kinds of step, after it.
+6. **The GPU's queue paid behind the loading screen** (`render/prewarm.ts gpuIdle`): the pre-warm waits for the GPU
+   — a WebGL2 fence polled between tasks, so the loading screen keeps moving; at most 30 s each — before its steps
+   (what making the world queued: ground, detail and texture bakes) and after them (its own draws, and the pipelines
+   a GPU builds as it takes them). Before, the first frames of play, or whichever step first had to wait for the GPU,
+   paid for all of it: on the build machine the pre-warm's "ant models" took 84–97 s of a backlog that was not
+   theirs (3.5–9.5 s their own), and the build panel's caste swatches 130 s.
+7. **The caste swatches on a CPU canvas** (`casteLook.ts`, `willReadFrequently`): `toDataURL` on a GPU-backed canvas
+   waits for everything the GPU has queued. The same pixels (checked: 20 random images with transparent and
+   half-transparent pixels, decoded identical).

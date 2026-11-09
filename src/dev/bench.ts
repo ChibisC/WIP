@@ -25,7 +25,7 @@ import { BUILD_ID } from '../net/messages';
 import { AS, SURFACE } from '../sim/types';
 import { shapeBox } from '../world/mapShapes';
 import { display, probeDisplay } from '../core/display';
-import { GpuBreakdown, measureGpu } from './gpuBreakdown';
+import { DrawWatch, GpuBreakdown, measureGpu, SlowFrame } from './gpuBreakdown';
 
 interface SceneDef {
   id: string;
@@ -58,6 +58,9 @@ interface SceneResult {
   loadMs: number;
   /** of which the pre-warm (ms) */
   prewarmMs: number;
+  /** page start to the pre-warm's start (ms), and the pre-warm's steps by kind, largest first (performance v5 round 2) */
+  beforeMs?: number;
+  prewarmSteps?: Array<{ name: string; ms: number }>;
   secs: number;
   frames: number;
   fps: number;
@@ -117,6 +120,10 @@ interface SwitchStep {
 interface SwitchResult {
   rounds: number;
   steps: SwitchStep[];
+  /** the last, diagnostic round (every pass and draw waited for): its long frames and where their time went */
+  diag?: Array<{ kind: SwitchStep['kind']; slow: SlowFrame[] }>;
+  /** the diagnostic round's typical frame (its median waited-for work, ms): every wait makes its frames slow */
+  diagMedian?: number;
   /** the renderer's counts at the end of each round */
   counts?: Array<{ textures: number; geometries: number; programs: number; gpuMB: number }>;
 }
@@ -323,6 +330,15 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
   requestAnimationFrame(loop);
 }
 
+/** "before the pre-warm 9.0 s, pre-warm 28.1 s (an underground area 12.3, the surface 8.1, …), after 6.0 s" */
+function loadSplit(r: SceneResult): string {
+  const s1 = (ms: number) => (ms / 1000).toFixed(1);
+  const pw = r.prewarmMs ?? 0;
+  const steps = r.prewarmSteps?.length ? ` (${r.prewarmSteps.map((x) => `${x.name} ${s1(x.ms)}`).join(', ')})` : '';
+  if (r.beforeMs === undefined) return `pre-warm ${s1(pw)} s${steps}`;
+  return `before the pre-warm ${s1(r.beforeMs)} s, pre-warm ${s1(pw)} s${steps}, after ${s1(Math.max(0, r.loadMs - r.beforeMs - pw))} s`;
+}
+
 function collect(s: GameSession, def: SceneDef, loadMs: number, secs: number, sw?: SwitchResult): SceneResult {
   const f = prof.frameMs.summary();
   const c = prof.cpuMs.summary();
@@ -338,6 +354,8 @@ function collect(s: GameSession, def: SceneDef, loadMs: number, secs: number, sw
     title: def.title,
     loadMs: Math.round(loadMs),
     prewarmMs: Math.round(s.prewarmMs),
+    beforeMs: s.prewarmAt ? Math.round(s.prewarmAt) : undefined,
+    prewarmSteps: s.prewarmSteps.slice(0, 5),
     secs,
     frames: arr.count,
     fps: +(1000 / Math.max(1, f.avg)).toFixed(1),
@@ -764,13 +782,17 @@ function runSwitching(s: GameSession, _fail: () => void, done: (sw: SwitchResult
     .filter((sp) => sp !== home);
   type Step = { kind: SwitchStep['kind']; round: number; act: () => void };
   const plan: Step[] = [];
-  for (let r = 0; r < rounds; r++) {
+  // (performance v5 round 2: one more round at the end, every pass and draw waited for — not counted with the others)
+  for (let r = 0; r <= rounds; r++) {
     plan.push({ kind: 'dive in', round: r, act: () => void (v.space === 'surface' && s.showArea(home)) });
     for (const a of areas) plan.push({ kind: 'area', round: r, act: () => void s.showArea(a) });
     plan.push({ kind: 'dive out', round: r, act: () => void (v.space === 'nest' && s.toggleView()) });
   }
   const steps: SwitchStep[] = [];
   const counts: NonNullable<SwitchResult['counts']> = [];
+  const diag: NonNullable<SwitchResult['diag']> = [];
+  let watch: DrawWatch | null = null;
+  let slowMark = 0;
   let k = -1;
   let stepStart = 0;
   let endAt = 0;
@@ -805,13 +827,18 @@ function runSwitching(s: GameSession, _fail: () => void, done: (sw: SwitchResult
       // this step's hitches and their causes
       // (the longest first — performance v5: the first three hid the multi-second ones)
       for (const h of prof.hitches.slice(hitchMark).sort((a, b) => b.ms - a.ms)) cur!.causes.push(`${h.ms.toFixed(0)} ms (main thread ${h.cpu.toFixed(0)}): ${h.causes.join('; ')}`);
-      steps.push(cur!);
-      if (plan[k].kind === 'dive out') {
+      if (plan[k].round === rounds) diag.push({ kind: plan[k].kind, slow: watch ? watch.slow.slice(slowMark) : [] });
+      else steps.push(cur!);
+      if (plan[k].kind === 'dive out' && plan[k].round < rounds) {
         const c = prof.counts();
         counts.push({ textures: c.textures, geometries: c.geometries, programs: c.programs, gpuMB: Math.round(prof.gpuMB()) });
       }
       k++;
-      if (k >= plan.length) return done({ rounds, steps, counts });
+      if (k >= plan.length) {
+        watch?.dispose();
+        const ws = watch ? [...watch.works].sort((a, b) => a - b) : [];
+        return done({ rounds, steps, counts, diag, diagMedian: ws.length ? Math.round(ws[ws.length >> 1]) : undefined });
+      }
       startStep(t);
     }
     requestAnimationFrame(loop);
@@ -822,6 +849,12 @@ function runSwitching(s: GameSession, _fail: () => void, done: (sw: SwitchResult
     hitchMark = prof.hitches.length;
     stepStart = t;
     endAt = 0;
+    if (p.round === rounds) {
+      watch ??= new DrawWatch(s, 150, prof);
+      watch.hookNew();
+      watch.on = true;
+      slowMark = watch.slow.length;
+    }
     p.act();
   };
   requestAnimationFrame(loop);
@@ -836,7 +869,7 @@ function fmtScene(r: SceneResult): string[] {
     .join(', ');
   const out = [
     `## ${r.title}`,
-    `load ${(r.loadMs / 1000).toFixed(1)} s (pre-warm ${((r.prewarmMs ?? 0) / 1000).toFixed(1)} s) · ${r.frames} frames · ${r.fps} FPS · frame avg ${r.frameAvg} ms, p95 ${r.p95}, worst ${r.worst} · over 33 ms: ${r.over33}, over 50 ms: ${r.over50}`,
+    `load ${(r.loadMs / 1000).toFixed(1)} s (${loadSplit(r)}) · ${r.frames} frames · ${r.fps} FPS · frame avg ${r.frameAvg} ms, p95 ${r.p95}, worst ${r.worst} · over 33 ms: ${r.over33}, over 50 ms: ${r.over50}`,
     `main thread ${r.cpuAvg} ms (${parts}) · GPU ${r.gpuAvg ?? 'n/a'} ms · sim tick ${r.tickMs} ms, msg ${r.msgKB} KB`,
     `draw calls ${r.calls} · tris ${(r.tris / 1000).toFixed(0)}k · programs ${r.programs} · textures ${r.textures} · geometries ${r.geometries} · heap ${r.heapMB} MB · GPU memory ≈ ${r.gpuMB} MB${r.gpuParts ? ` (textures ${r.gpuParts.tex}, render buffers ${r.gpuParts.rb}, buffers ${r.gpuParts.buf})` : ''} · ${r.ants} ants, ${r.creatures} creatures · quality ${r.quality}`,
     `GL during the run: ${r.glLinks} shader links, ${r.glUploads} texture uploads`,
@@ -851,7 +884,11 @@ function fmtScene(r: SceneResult): string[] {
       const later = all.filter((x) => x.round > 0);
       const worst = (a: SwitchStep[]) => (a.length ? Math.max(...a.map((x) => x.worst)).toFixed(0) : '—');
       const over = (a: SwitchStep[]) => a.reduce((n, x) => n + x.over33, 0);
-      out.push(`switch ${kind}: ${all.length}× · worst frame first round ${worst(first)} ms, later rounds ${worst(later)} ms · frames over 33 ms: first ${over(first)}, later ${over(later)}`);
+      // (performance v5: per round — the v4 line summed the nine later rounds against the first one, which read as
+      // growth: the Mac's "first 19, later 183" was about 20 a round)
+      const nr = new Set(all.map((x) => x.round)).size;
+      const perRound = [...new Set(all.map((x) => x.round))].sort((a, b) => a - b).map((k) => over(all.filter((x) => x.round === k)));
+      out.push(`switch ${kind}: ${all.length}× · worst frame first round ${worst(first)} ms, later rounds ${worst(later)} ms · frames over 33 ms a round: first ${over(first)}, later ${nr > 1 ? (over(later) / (nr - 1)).toFixed(1) : '—'} (each round: ${perRound.join(', ')})`);
     }
     // the steps with the longest frames, and what was in them
     const causes = sw.steps
@@ -861,6 +898,19 @@ function fmtScene(r: SceneResult): string[] {
     for (const x of causes) out.push(`  round ${x.round + 1} ${x.kind}: ${x.causes.slice(0, 2).join(' | ')}`);
     // the renderer's counts after each round (performance v5: does anything pile up?)
     if (sw.counts?.length) out.push(`  after each round (textures, geometries, programs, GPU MB): ${sw.counts.map((c) => `${c.textures}/${c.geometries}/${c.programs}/${c.gpuMB}`).join(' · ')}`);
+    // the diagnostic round: a long frame's passes and draws (waited for one by one), or a long gap with little work in it
+    if (sw.diag) {
+      // (long: over 150 ms and over 2.5 times the round's typical frame — every wait ends a render pass)
+      const lim = Math.max(150, 2.5 * (sw.diagMedian ?? 0));
+      const longs = sw.diag.flatMap((d) => d.slow.filter((f) => Math.max(f.workMs, f.intervalMs) > lim).map((f) => ({ kind: d.kind, f })));
+      out.push(`  diagnostic round (every pass and draw waited for; not counted above; a frame's work typically ${sw.diagMedian ?? '—'} ms): ${longs.length ? `${longs.length} frames over ${Math.round(lim)} ms` : `no frame over ${Math.round(lim)} ms`}`);
+      for (const { kind, f } of longs.sort((a, b) => Math.max(b.f.intervalMs, b.f.workMs) - Math.max(a.f.intervalMs, a.f.workMs)).slice(0, 8))
+        out.push(
+          `    ${kind}: gap ${f.intervalMs} ms, work ${f.workMs} ms` +
+            (f.passes.length ? ` — ${f.passes.map((p) => `${p.name} ${p.ms}`).join(', ')}` : '') +
+            (f.draws.length ? ` — slowest draws: ${f.draws.map((d) => `${d.name} ${d.ms}`).join(', ')}` : ''),
+        );
+    }
   }
   if (r.feel) {
     const F = r.feel;

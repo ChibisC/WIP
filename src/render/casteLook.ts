@@ -354,7 +354,9 @@ export function casteSwatchUrl(caste: string): string {
   let url: string;
   const doc = (globalThis as { document?: Document }).document;
   const cv = doc?.createElement('canvas');
-  const g = cv?.getContext?.('2d');
+  // (performance v5 round 2: a CPU canvas — toDataURL on a GPU-backed one waits for everything the GPU has queued,
+  //  and the build panel makes these while loading: here, 130 s of the full nest's 158 s load behind the bakes)
+  const g = cv?.getContext?.('2d', { willReadFrequently: true });
   if (!cv || !g) {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><polygon points="${hexPoints(20, 19)}" fill="${lk.css}"/></svg>`;
     url = `url('data:image/svg+xml,${encodeURIComponent(svg)}')`;
