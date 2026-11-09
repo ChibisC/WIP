@@ -1788,3 +1788,34 @@ take the GL draws out and see the main thread's own work at full rate, each surf
 7. **Benchmark**: scenes `trees` and `flood`.
 8. **The stepped screenshot harness** (`?shot=1`, the golden set) does the spread-out work on the frame it is asked
    for, so its pictures compare with main's.
+
+## 35. Performance v5 — nonstop until smooth, underground first, driven by the user's Mac report (user spec 2026-11-09, claude/performance/05-spec-performance-v5-nonstop.md) — branch `feature/performance-v5`
+
+The user's `?bench=1` on a Mac (Apple GPU, Safari 26.5, 1470×956 at 2×, High, Low Power Mode) after v4: the full
+nest at 2.6 FPS, switching worse in later rounds, GPU memory rising across scenes, the big fight falling behind real
+time (0.05× at 1×), GPU-bound everywhere, 8 million triangles in the arena, 28 s pre-warms and 8–12 s first frames,
+and a benchmark whose effect toggles recompiled everything. User decisions: Retina at 1.5× with sharpening if it looks
+the same (a "Full sharpness" option keeps 2×); the 30 FPS cap is Low Power Mode (detect it, show it); everything else
+keeps the golden set and the simulation's results.
+
+### 35.1 Plan (the work loop: measure, fix the biggest cost, prove nothing else changed, measure again)
+1. **The bench first, so its numbers can be trusted**: the GPU pass by pass on any browser (`gl.finish` after each
+   pass — Safari has no timer queries), the triangles by what is drawn, the longest frames with their causes (not the
+   first ones), the UI's pieces, the display's rate measured while idle (Low Power Mode), effect toggles that compile
+   nothing, the speed steps robust to one long frame, the stress scenes without the F3 overlay (its hitboxes and climb
+   rails were drawn and rebuilt every frame), the renderer's counts after each switching round.
+2. **Underground**: what uploads textures every frame (the ants' body-offset textures, one per model and LOD, and a
+   nest's maps after a dig) — on Apple's Metal (through ANGLE) a texture written while the GPU still reads it waits for
+   the GPU or ends the render pass: rings of three, uploaded before the frame's first pass. The nest's shadow map
+   covered the whole nest with every chunk drawn into it each frame (5× the view's triangles): casters culled to what
+   can shadow the screen (exact). The shown nest's chunk rebuilds a few ms a frame (they took 33–41 ms frames).
+3. **Loads and first frames**: the pre-warm compiled two variants of every program (for the screen and for a target)
+   and drew into a one-sample target while play draws into a four-sample one — the GPU's pipelines were built again on
+   the first frame: warm exactly what play draws.
+4. **The speed stall**: hit-stops added up in a big fight (each slam near the camera took 33–80 ms off the clock).
+5. **Resolution**: the effects at 1.5× on Retina at High, the canvas at 2×, a Catmull-Rom upscale in the last pass; the
+   golden shots at 2× against 1.5× for the user; Graphics → Sharpness → Full sharpness.
+6. **Then, from the next report**: switching growth and GPU memory (counts per round), the GPU's passes, the arena's
+   triangles, the UI's pieces — each fixed with the same pictures where possible, the rest as options with pictures.
+
+### 35.2 Done (in order; each measured, each proven the same)
