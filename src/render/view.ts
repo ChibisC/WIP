@@ -654,6 +654,8 @@ export class GameView {
    * session brings the incoming one up to date under the fade)? The swap waits for it, at most SWAP_HOLD seconds.
    */
   swapReady: (() => boolean) | null = null;
+  /** frames stepped by hand (the screenshot harness): mesh work on the frame it is asked for (session.setStepped) */
+  stepped = false;
 
   private updateAreaFade(dt: number): void {
     const f = this.areaFade!;
@@ -895,7 +897,7 @@ export class GameView {
     } else {
       // (performance v4: the shown nest's mesh after digging in steps — the signed distance one frame, the light
       // maps the next, then the changed chunks together — instead of all three on the frame a hex is dug)
-      this.nestTerrain?.update(false, 40);
+      this.nestTerrain?.update(false, this.stepped ? Infinity : 40);
       if (this.inTrees) {
         // the trees' sun follows the view like the surface's
         const st = this.nestStage!;

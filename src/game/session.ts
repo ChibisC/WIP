@@ -467,11 +467,19 @@ export class GameSession {
   /** time the pre-warm took (ms; the benchmark reports it) */
   prewarmMs = 0;
 
+  /**
+   * The screenshot harness steps frames by hand (?shot=1, the golden set): there the work spread over frames in play
+   * (anthill rebuilds, the shown nest's mesh) is done on the frame it is asked for, as before performance v4, so a
+   * stepped shot shows the same picture as before.
+   */
+  setStepped(): void {
+    this.mounds.entrances.budgetMs = Infinity;
+    this.mounds.entrances.compile = null;
+    this.view.stepped = true;
+  }
+
   /** the area a dive or cut waits for, and its ground's version when the wait began */
   private swapWait: { space: number; version: number } | null = null;
-
-  /** effect time a plane skipped while off screen (per space; handed over when it is shown) */
-  private fxLag = new Map<number, number>();
 
   /**
    * Areas not on screen do no render work at all (performance v4, user 2026-11-08: no mesh, tile or chunk updates off
@@ -2007,20 +2015,12 @@ export class GameSession {
     // effects run on game time (frozen while paused)
     pt = performance.now();
     const px = (vh * 0.5) / Math.tan(THREE.MathUtils.degToRad((cam as THREE.PerspectiveCamera).fov) * 0.5);
-    // (performance v4: a plane off screen does no effect work; the time it skipped is handed over in one step when it
-    // is shown — the particles play themselves on a clock, so they are where they would have been)
-    const surfShown = v.space === 'surface' || v.incoming === 'surface';
-    this.fxLag.set(SURFACE, (this.fxLag.get(SURFACE) ?? 0) + simDt);
-    if (surfShown) {
-      this.surfFx.update(this.fxLag.get(SURFACE)!, this.surfHeight, px);
-      this.fxLag.set(SURFACE, 0);
-    }
+    // (performance v4: a plane off screen sends its effects nothing to the GPU; their clocks keep time, so a spark
+    // spawned off screen is as old as it should be, and its slots go up together when the plane is shown)
+    this.surfFx.update(simDt, this.surfHeight, px, v.space === 'surface' || v.incoming === 'surface');
     for (const nv of this.nests.values()) {
-      this.fxLag.set(nv.space, (this.fxLag.get(nv.space) ?? 0) + simDt);
       const shown = (v.space === 'nest' || v.incoming === 'nest') && (nv.space === v.activeNest || nv.space === this.viewedArea);
-      if (!shown) continue;
-      nv.fx.update(this.fxLag.get(nv.space)!, (x, y) => nv.stage.terrain.heightAt(x, y), px);
-      this.fxLag.set(nv.space, 0);
+      nv.fx.update(simDt, (x, y) => nv.stage.terrain.heightAt(x, y), px, shown);
     }
     prof.add('fx', performance.now() - pt);
     // a story shot steers the surface camera (input waits until it is over or skipped)
