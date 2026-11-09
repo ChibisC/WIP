@@ -2174,5 +2174,9 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
 - **The benchmark** now gives the GPU's time pass by pass (Safari too), triangles by group, the longest frames with
   causes, the UI's pieces, GPU memory split, the display's rate (Low Power Mode), toggles without recompiles,
   per-step simulation frames for the speed scene, per-round counts for switching.
+- **The simulation's start:** the first batch is 2 ticks until the worker reports a tick time (was 24 — seconds on a
+  cold engine with nothing back, the speed scene's stall); the worker warms up on a throwaway copy (results identical).
 - **Checks:** golden set 17 of 17 (16 pixel for pixel; the flood shot within its run-to-run noise); `npm test`;
   `same.sh` ALL SAME (no simulation code changed); LAN.
+- **Merged** into `main` as `a7dd6b1` (Pages deployed; game artifact v56); handoff 27. Interim: round 2 waits for the
+  user's plugged-in Mac and iPhone/iPad reports.
