@@ -448,9 +448,16 @@ export class GameSession {
     const w = this.world;
     const morphs = this.matchMorphs();
     const tick = () => new Promise<void>((r) => setTimeout(r, 0));
+    this.prewarmAt = t0;
     const steps: Array<() => void> = [];
-    for (const r of this.antRenderers()) steps.push(() => void r.prepare(morphs));
-    steps.push(() => {
+    // (each step's name, for the benchmark's report of where the pre-warm's time goes — performance v5 round 2)
+    const names: string[] = [];
+    const add = (name: string, f: () => void) => {
+      names.push(name);
+      steps.push(f);
+    };
+    for (const r of this.antRenderers()) add('ant models', () => void r.prepare(morphs));
+    add('creatures', () => {
       this.surfCreatures.prepare();
       for (const nv of this.nests.values()) nv.creatures.prepare();
     });
@@ -458,10 +465,10 @@ export class GameSession {
     // (the trees: the ground below drawn into the backdrop once now — that render's programs, and the backdrop's own
     // textured variant, compiled behind the loading screen instead of when the player first climbs: performance v4)
     // (the anthills built now, so the warm-up draws them: their programs compiled before play)
-    steps.push(() => this.mounds.prebuild(w, this.terrainHeight));
-    if (this.nests.has(TREES)) steps.push(() => v.refreshBackdrop(true));
+    add('anthills', () => this.mounds.prebuild(w, this.terrainHeight));
+    if (this.nests.has(TREES)) add('trees backdrop', () => v.refreshBackdrop(true));
     for (const [space, nv] of this.nests)
-      steps.push(() => {
+      add(space === TREES ? 'trees' : 'an underground area', () => {
         const g = w.nestOf(space)!;
         const cam = overviewCamera(g.widthMm, g.depthMm);
         const owner = w.colony(colonyOfSpace(space)) ?? null;
@@ -470,24 +477,32 @@ export class GameSession {
         // (the areas share one shadow map: the one just made is handed to the next — performance v5)
         v.shareAreaShadows();
       });
-    steps.push(() => {
+    add('the surface', () => {
       const t = w.terrain;
       warmScene(v.renderer, v.surfaceScene, overviewCamera(t.width, t.depth), !v.post.enabled);
     });
     // (performance v5: the post effects' own passes, every one, drawn once — they were built on the first frame)
-    steps.push(() => v.post.warm(v.surfaceScene, v.surfaceCam));
+    add('post effects', () => v.post.warm(v.surfaceScene, v.surfaceCam));
     for (const m of morphs) this.warmed.add(m);
+    const took = new Map<string, number>();
     for (let i = 0; i < steps.length; i++) {
+      const ts = performance.now();
       steps[i]();
+      // (a draw's GPU work and the browser's compile finish after the step: the wait for the next task counts too)
       progress?.(i + 1, steps.length);
       await tick();
+      took.set(names[i], (took.get(names[i]) ?? 0) + performance.now() - ts);
     }
+    this.prewarmSteps = [...took].map(([name, ms]) => ({ name, ms: Math.round(ms) })).sort((a, b) => b.ms - a.ms);
     prof.note(`pre-warm ${(performance.now() - t0).toFixed(0)} ms (${steps.length} steps, ${morphs.size} models)`);
     this.prewarmMs = performance.now() - t0;
   }
 
   /** time the pre-warm took (ms; the benchmark reports it) */
   prewarmMs = 0;
+  /** when it started (performance.now()) and each kind of step's time, largest first (the benchmark) */
+  prewarmAt = 0;
+  prewarmSteps: Array<{ name: string; ms: number }> = [];
 
   /**
    * The screenshot harness steps frames by hand (?shot=1, the golden set): there the work spread over frames in play

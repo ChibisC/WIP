@@ -58,6 +58,9 @@ interface SceneResult {
   loadMs: number;
   /** of which the pre-warm (ms) */
   prewarmMs: number;
+  /** page start to the pre-warm's start (ms), and the pre-warm's steps by kind, largest first (performance v5 round 2) */
+  beforeMs?: number;
+  prewarmSteps?: Array<{ name: string; ms: number }>;
   secs: number;
   frames: number;
   fps: number;
@@ -325,6 +328,15 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
   requestAnimationFrame(loop);
 }
 
+/** "before the pre-warm 9.0 s, pre-warm 28.1 s (an underground area 12.3, the surface 8.1, …), after 6.0 s" */
+function loadSplit(r: SceneResult): string {
+  const s1 = (ms: number) => (ms / 1000).toFixed(1);
+  const pw = r.prewarmMs ?? 0;
+  const steps = r.prewarmSteps?.length ? ` (${r.prewarmSteps.map((x) => `${x.name} ${s1(x.ms)}`).join(', ')})` : '';
+  if (r.beforeMs === undefined) return `pre-warm ${s1(pw)} s${steps}`;
+  return `before the pre-warm ${s1(r.beforeMs)} s, pre-warm ${s1(pw)} s${steps}, after ${s1(Math.max(0, r.loadMs - r.beforeMs - pw))} s`;
+}
+
 function collect(s: GameSession, def: SceneDef, loadMs: number, secs: number, sw?: SwitchResult): SceneResult {
   const f = prof.frameMs.summary();
   const c = prof.cpuMs.summary();
@@ -340,6 +352,8 @@ function collect(s: GameSession, def: SceneDef, loadMs: number, secs: number, sw
     title: def.title,
     loadMs: Math.round(loadMs),
     prewarmMs: Math.round(s.prewarmMs),
+    beforeMs: s.prewarmAt ? Math.round(s.prewarmAt) : undefined,
+    prewarmSteps: s.prewarmSteps.slice(0, 5),
     secs,
     frames: arr.count,
     fps: +(1000 / Math.max(1, f.avg)).toFixed(1),
@@ -852,7 +866,7 @@ function fmtScene(r: SceneResult): string[] {
     .join(', ');
   const out = [
     `## ${r.title}`,
-    `load ${(r.loadMs / 1000).toFixed(1)} s (pre-warm ${((r.prewarmMs ?? 0) / 1000).toFixed(1)} s) · ${r.frames} frames · ${r.fps} FPS · frame avg ${r.frameAvg} ms, p95 ${r.p95}, worst ${r.worst} · over 33 ms: ${r.over33}, over 50 ms: ${r.over50}`,
+    `load ${(r.loadMs / 1000).toFixed(1)} s (${loadSplit(r)}) · ${r.frames} frames · ${r.fps} FPS · frame avg ${r.frameAvg} ms, p95 ${r.p95}, worst ${r.worst} · over 33 ms: ${r.over33}, over 50 ms: ${r.over50}`,
     `main thread ${r.cpuAvg} ms (${parts}) · GPU ${r.gpuAvg ?? 'n/a'} ms · sim tick ${r.tickMs} ms, msg ${r.msgKB} KB`,
     `draw calls ${r.calls} · tris ${(r.tris / 1000).toFixed(0)}k · programs ${r.programs} · textures ${r.textures} · geometries ${r.geometries} · heap ${r.heapMB} MB · GPU memory ≈ ${r.gpuMB} MB${r.gpuParts ? ` (textures ${r.gpuParts.tex}, render buffers ${r.gpuParts.rb}, buffers ${r.gpuParts.buf})` : ''} · ${r.ants} ants, ${r.creatures} creatures · quality ${r.quality}`,
     `GL during the run: ${r.glLinks} shader links, ${r.glUploads} texture uploads`,
