@@ -2192,3 +2192,4 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
 - **Loading**: the pre-warm waits for the GPU's queue before and after its steps (a fence, the loading screen still
   moving), so the first frames of play do not; the caste swatches drawn on a CPU canvas (they waited for that queue:
   130 s of a 158 s load on the build machine). Same pixels.
+- **Merged** into `main` as `f3473f2` (Pages deployed; game artifact v57); handoff 27 (updated).
