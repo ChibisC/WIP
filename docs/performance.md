@@ -654,4 +654,7 @@ march at close zoom, five noise lookups and the dappled light's two fbm noises, 
 filter), the water 1.8 s, the grass 1.0 s (256k triangles), the stag beetle's parts ~2 s together; the shadow map
 0.29 s; the effects at 2205 × 1215 1.1 s, the last pass at 2940 × 1620 0.71 s. 1.39 M triangles, 244 draws. If the
 Mac's pass split agrees, the ground shader is the next cost: what would make it cheaper changes its look (fewer taps
-or layers), so it is an option for the user with pictures.
+or layers), so it is an option for the user with pictures. The bench's GPU breakdown now ends with six frames of every
+draw waited for (each kind of draw's time a frame, each carrying its wait's cost), so the Mac's report splits its
+scene pass the same way; the build machine's big fight there: ground 1353 ms, grass 524, water 377, ants 321, the
+shadow map's ants 204.

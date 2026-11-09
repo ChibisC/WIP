@@ -1876,3 +1876,7 @@ Merged as the interim build (main a7dd6b1, game artifact v56; handoff 27).
 7. **The caste swatches on a CPU canvas** (`casteLook.ts`, `willReadFrequently`): `toDataURL` on a GPU-backed canvas
    waits for everything the GPU has queued. The same pixels (checked: 20 random images with transparent and
    half-transparent pixels, decoded identical).
+8. **The GPU breakdown ends with every draw waited for** (six frames): each kind of draw's time, so the scene pass
+   splits into the ground, the grass, the water, the ants. The build machine's big fight: the ground first (1353 ms a
+   frame against the grass 524, the water 377, the ants 321) — if the Mac agrees, the ground shader's options (fewer
+   taps or layers; a change of look) go to the user with pictures.
