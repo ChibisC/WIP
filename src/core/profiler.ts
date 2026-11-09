@@ -136,6 +136,9 @@ export class Profiler {
   msgBytesAvg = 0;
   /** worker frames applied since the page started */
   msgs = 0;
+  /** when the last worker frame was applied, and the longest wait between two since `msgGapMax` was cleared (ms) */
+  lastMsgAt = 0;
+  msgGapMax = 0;
   private renderer: THREE.WebGLRenderer | null = null;
   private heapLast = 0;
   /** loading is over: from here on a shader compile or a texture upload is worth a line in the log */
@@ -319,6 +322,9 @@ export class Profiler {
 
   /** A frame message from the simulation worker was applied (between animation frames). */
   addMsg(ms: number, bytes: number): void {
+    const now = performance.now();
+    if (this.lastMsgAt) this.msgGapMax = Math.max(this.msgGapMax, now - this.lastMsgAt);
+    this.lastMsgAt = now;
     this.msgs++;
     this.pendingMsg += ms;
     this.msgBytes = bytes;

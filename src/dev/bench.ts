@@ -397,6 +397,8 @@ interface SpeedStep {
   msgs?: number;
   backlog?: number;
   secs?: number;
+  /** the longest time without a frame from the simulation in the step (ms) */
+  gap?: number;
 }
 
 /**
@@ -455,6 +457,7 @@ function runSpeedSteps(s: GameSession, cx: number, cz: number, done: (steps: Spe
         tick0 = s.world.s.tick;
         tm0 = t;
         msgs0 = prof.msgs;
+        prof.msgGapMax = 0;
         p0 = snap();
         times = [];
         last = t;
@@ -478,6 +481,7 @@ function runSpeedSteps(s: GameSession, cx: number, cz: number, done: (steps: Spe
           msgs: prof.msgs - msgs0,
           backlog: (s.sim as unknown as { backlog?: number }).backlog ?? 0,
           secs: +((t - tm0) / 1000).toFixed(1),
+          gap: Math.round(Math.max(prof.msgGapMax, prof.lastMsgAt ? performance.now() - prof.lastMsgAt : 0)),
         });
         if (!next(t)) return;
       }
@@ -871,7 +875,7 @@ function fmtScene(r: SceneResult): string[] {
   if (r.speedSteps) {
     out.push('  speed  reached   frame avg / p95, over 50 ms   main thread (msg, events)   sim tick   sim frames (in s), waiting');
     for (const g of r.speedSteps)
-      out.push(`  ${String(g.speed).padStart(3)}×   ${g.reached.toFixed(2)}×     ${g.avg.toFixed(1)} / ${g.p95.toFixed(1)} ms, ${g.over50}`.padEnd(48) + `${g.cpu} ms (${g.msg}, ${g.events})`.padEnd(28) + `${g.tickMs} ms`.padEnd(11) + (g.msgs !== undefined ? `${g.msgs} (${g.secs} s), ${g.backlog} ticks` : ''));
+      out.push(`  ${String(g.speed).padStart(3)}×   ${g.reached.toFixed(2)}×     ${g.avg.toFixed(1)} / ${g.p95.toFixed(1)} ms, ${g.over50}`.padEnd(48) + `${g.cpu} ms (${g.msg}, ${g.events})`.padEnd(28) + `${g.tickMs} ms`.padEnd(11) + (g.msgs !== undefined ? `${g.msgs} (${g.secs} s), ${g.backlog} ticks, longest gap ${g.gap} ms` : ''));
   }
   if (r.cine) out.push(r.cine.secs ? `  the shot ran ${r.cine.secs} s${r.cine.ended ? '' : ' (not seen to end)'}` : '  the flight did not start within 30 s');
   if (r.gpuSteps) {
