@@ -51,7 +51,12 @@ interface Transition {
   /** entrance ramp in the nest plane (x, z) */
   entranceNest: THREE.Vector2;
   returnDist: number;
+  /** seconds the swap has waited for the incoming area (performance v4) */
+  held?: number;
 }
+
+/** The longest a dive or a cut waits, faded out, for the incoming area to be current (s). */
+const SWAP_HOLD = 1.5;
 
 /** One underground area (a nest or a cave): its own scene, terrain, lights and remembered camera. */
 export interface NestStage {
@@ -609,6 +614,12 @@ export class GameView {
     return this.fadeK >= 0.999;
   }
 
+  /**
+   * Is the area a dive or a cut leads into ready to show (performance v4: areas off screen are not kept current; the
+   * session brings the incoming one up to date under the fade)? The swap waits for it, at most SWAP_HOLD seconds.
+   */
+  swapReady: (() => boolean) | null = null;
+
   private updateAreaFade(dt: number): void {
     const f = this.areaFade!;
     f.t += dt;
@@ -616,6 +627,7 @@ export class GameView {
     const IN = 0.32;
     if (!f.swapped) {
       this.setFade(Math.min(1, f.t / OUT));
+      if (f.t >= OUT && f.t < OUT + SWAP_HOLD && !(this.swapReady?.() ?? true)) return;
       if (f.t >= OUT) {
         f.swapped = true;
         f.swap();
@@ -646,6 +658,11 @@ export class GameView {
         this.nestRig.goalDistance = THREE.MathUtils.lerp(this.nestRig.goalDistance, this.nestRig.minDist * 1.2, e * 0.25);
       }
       this.setFade(Math.min(1, e * 1.1));
+      // (into a nest: the swap waits, faded out, until its mesh is current — performance v4)
+      if (t >= 0.5 && tr.to === 'nest' && !(this.swapReady?.() ?? true) && (tr.held = (tr.held ?? 0) + dt) < SWAP_HOLD) {
+        tr.t = 0.5;
+        return;
+      }
       if (t >= 0.5) {
         tr.swapped = true;
         this.space = tr.to;
@@ -841,7 +858,9 @@ export class GameView {
       this.terrainMesh?.rebuild();
       this.water?.rebuild();
     } else {
-      this.nestTerrain?.update();
+      // (performance v4: the shown nest's mesh after digging in steps — the signed distance one frame, the light
+      // maps the next, then the changed chunks together — instead of all three on the frame a hex is dug)
+      this.nestTerrain?.update(false, 40);
       if (this.inTrees) {
         // the trees' sun follows the view like the surface's
         const st = this.nestStage!;

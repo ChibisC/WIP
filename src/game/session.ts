@@ -256,6 +256,16 @@ export class GameSession {
     this.surfAnts.lodScale = this.view.preset.lodScale;
     this.surfAnts.space = SURFACE;
     this.view.surfaceScene.add(this.teamRings.group, this.digRings.group, this.surfBars.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfTrail.group, this.surfFx.group);
+    // a dive or a cut into an area waits under its fade until the area's mesh is current (performance v4)
+    this.view.swapReady = () => {
+      const nv = this.nests.get(this.viewedArea);
+      if (!nv) return true;
+      // (caught up with the ground as it was when the wait began: ants digging on meanwhile do not keep it waiting)
+      if (this.swapWait?.space !== nv.space) this.swapWait = { space: nv.space, version: nv.stage.terrain.grid.version };
+      if (!nv.stage.terrain.caughtUp(this.swapWait.version)) return false;
+      this.swapWait = null;
+      return true;
+    };
     // a rebuilt anthill's programs are compiled before it is swapped in (performance v4: the swap never compiles)
     this.mounds.entrances.compile = (objs) => {
       const tmp = new THREE.Group();
@@ -457,38 +467,27 @@ export class GameSession {
   /** time the pre-warm took (ms; the benchmark reports it) */
   prewarmMs = 0;
 
-  private areaRR = 0;
+  /** the area a dive or cut waits for, and its ground's version when the wait began */
+  private swapWait: { space: number; version: number } | null = null;
+
+  /** effect time a plane skipped while off screen (per space; handed over when it is shown) */
+  private fxLag = new Map<number, number>();
 
   /**
-   * Areas not on screen are kept current at a low rate (performance pass): one a few times a second rebuilds its nest
-   * mesh after digging and its tiles, while the frame has room, so showing it later has nothing to catch up on.
+   * Areas not on screen do no render work at all (performance v4, user 2026-11-08: no mesh, tile or chunk updates off
+   * screen). The area a dive or a cut is about to show is brought up to date while its fade hides the frame, a slice
+   * a frame, and the fade holds until it is (`view.swapReady`), so it arrives current.
    */
   private keepAreasCurrent(): void {
     const v = this.view;
-    // the area a dive or a cut is about to show: brought up to date under the fade, a slice every frame
-    if (v.incoming === 'nest') {
-      const nv = this.nests.get(this.viewedArea);
-      if (nv && nv.stage.terrain.dirty) {
-        const t0 = performance.now();
-        nv.stage.terrain.update(false, 6);
-        prof.add('nest', performance.now() - t0);
-        return;
-      }
-    }
-    // the others in turn, a slice every third frame while the frame has room
-    if (this.frameNo % 3 !== 0 || prof.cpuMs.ema > 25) return;
-    const list = [...this.nests.values()];
-    for (let k = 0; k < list.length; k++) {
-      const nv = list[this.areaRR++ % list.length];
-      if (v.space === 'nest' && nv.space === v.activeNest) continue;
-      const t0 = performance.now();
-      if (nv.stage.terrain.dirty) nv.stage.terrain.update(false, 3);
-      // (the hexes: tiles and their looks, cheap; at most every 18 frames per area)
-      else if (this.frameNo % 18 === 0) nv.updateHexes(this.world, this.world.colony(colonyOfSpace(nv.space)) ?? null);
-      else continue;
-      prof.add('nest', performance.now() - t0);
-      return;
-    }
+    if (v.incoming !== 'nest') this.swapWait = null;
+    // (only while the fade hides the frame: a long step — the signed distance of a big nest — is never seen)
+    if (v.incoming !== 'nest' || !v.fadedOut) return;
+    const nv = this.nests.get(this.viewedArea);
+    if (!nv || !nv.stage.terrain.dirty) return;
+    const t0 = performance.now();
+    nv.stage.terrain.update(false, 12);
+    prof.add('nest', performance.now() - t0);
   }
 
   /**
@@ -2008,8 +2007,21 @@ export class GameSession {
     // effects run on game time (frozen while paused)
     pt = performance.now();
     const px = (vh * 0.5) / Math.tan(THREE.MathUtils.degToRad((cam as THREE.PerspectiveCamera).fov) * 0.5);
-    this.surfFx.update(simDt, this.surfHeight, px);
-    for (const nv of this.nests.values()) nv.fx.update(simDt, (x, y) => nv.stage.terrain.heightAt(x, y), px);
+    // (performance v4: a plane off screen does no effect work; the time it skipped is handed over in one step when it
+    // is shown — the particles play themselves on a clock, so they are where they would have been)
+    const surfShown = v.space === 'surface' || v.incoming === 'surface';
+    this.fxLag.set(SURFACE, (this.fxLag.get(SURFACE) ?? 0) + simDt);
+    if (surfShown) {
+      this.surfFx.update(this.fxLag.get(SURFACE)!, this.surfHeight, px);
+      this.fxLag.set(SURFACE, 0);
+    }
+    for (const nv of this.nests.values()) {
+      this.fxLag.set(nv.space, (this.fxLag.get(nv.space) ?? 0) + simDt);
+      const shown = (v.space === 'nest' || v.incoming === 'nest') && (nv.space === v.activeNest || nv.space === this.viewedArea);
+      if (!shown) continue;
+      nv.fx.update(this.fxLag.get(nv.space)!, (x, y) => nv.stage.terrain.heightAt(x, y), px);
+      this.fxLag.set(nv.space, 0);
+    }
     prof.add('fx', performance.now() - pt);
     // a story shot steers the surface camera (input waits until it is over or skipped)
     let cineOn = false;
