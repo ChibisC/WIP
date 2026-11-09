@@ -247,6 +247,11 @@ tools/perf/same.sh <main checkout | ref.json> fight,economy,nests,ten,titan,tunn
 tools/perf/ab.sh <main checkout> fight 2000 300 3                    # main against this checkout, alternating runs, medians
 npx esbuild tools/perf/unitsBench.ts --bundle --platform=node --format=esm --outfile=/tmp/u.mjs && node /tmp/u.mjs 200 300 default   # main thread: ant views, ant and creature renderers in a real fight
 tests/browser/with_server.sh python3 tests/browser/scene_census.py  # what a scene holds: meshes, shadow casters, the biggest meshes by triangles (QUERY=…)
+npx esbuild tools/perf/longRun.ts --bundle --platform=node --format=esm --outfile=/tmp/lr.mjs && node /tmp/lr.mjs 30 3 idle   # a 30-minute skirmish tick by tick: slow ticks, their systems, flow builds (--trees)
+TICKS=1 npx vite-node tools/playtest-story.ts -- spiderMother normal 25   # a story level played by the bot, every tick timed
+NORENDER=1 tests/browser/with_server.sh python3 tests/browser/spike_session.py   # normal play: every frame's main-thread parts (TREES=1, SPEED=4, Q=…)
+tests/browser/with_server.sh python3 tests/browser/story_flights.py   # each chapter 1 level's opening flight: shader links, uploads, slowest frames
+tests/browser/with_server.sh python3 tests/browser/offscreen_work.py   # planes off screen do no render work (counts every update)
 tests/browser/with_server.sh python3 tests/browser/ui_areas.py      # browser checks (Playwright); also ui_test.py, ui_test2.py, ui_dig.py, ui_camera.py
 tests/browser/with_server.sh python3 tests/browser/mp_local.py      # 3 tabs + AI over BroadcastChannel: lobby, lockstep, chat, drop
 tests/browser/with_server.sh python3 tests/browser/mp_finish.py     # 2 tabs: a match played to the end (surrender, results)
