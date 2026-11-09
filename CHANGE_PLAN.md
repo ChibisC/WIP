@@ -1812,10 +1812,13 @@ keeps the golden set and the simulation's results.
 3. **Loads and first frames**: the pre-warm compiled two variants of every program (for the screen and for a target)
    and drew into a one-sample target while play draws into a four-sample one — the GPU's pipelines were built again on
    the first frame: warm exactly what play draws.
-4. **The speed stall** (0.05× at 1×, then no frames from the simulation at all for ~12 s): not reproduced here — the
-   same scene in Node has no tick over 0.2 s, and no hit-stop event in its first minute. Guarded where it could come
-   from the game's own clock (hit-stops could add up without limit); the bench now counts the simulation's frames,
-   its unanswered ticks and the time of every speed step, so the next report says where the time goes.
+4. **The speed stall** (0.05× at 1×, then no frames from the simulation at all for ~12 s): the same scene in Node has
+   no tick over 0.2 s once warm, but its first 60 ticks run 60–160 ms each while the engine compiles — and before the
+   worker had reported a tick time, its first batch was 24 ticks: on a cold engine in Safari that is seconds with no
+   frame back. Now the first batch is 2 ticks, and the worker warms the engine up on a throwaway copy of the world
+   before its first real tick (the real world's results identical — tests/performance.ts). Hit-stops guarded too
+   (they could add up without limit). The bench counts the simulation's frames, its unanswered ticks, the longest gap
+   between its frames and the time of every speed step, so the next report confirms it.
 5. **Resolution**: the effects at 1.5× on Retina at High, the canvas at 2×, a Catmull-Rom upscale in the last pass; the
    golden shots at 2× against 1.5× for the user; Graphics → Sharpness → Full sharpness.
 6. **Then, from the next report**: switching growth and GPU memory (counts per round), the GPU's passes, the arena's
@@ -1833,8 +1836,9 @@ keeps the golden set and the simulation's results.
    full nest. The shown nest's chunks 5 ms a frame.
 4. **Pre-warm**: the variants and pipelines play uses (a four-sample HDR target set before compiling; every post pass
    drawn): 167 → 99 programs, 13.8 → 8.8 s on the build machine.
-5. **Hit-stops** can no longer add up (at most a tenth of the time held; a guard — the big fight has almost none, so
-   this is not what stalled the Mac).
+5. **Hit-stops** can no longer add up (at most a tenth of the time held; a guard — the big fight has almost none).
+   **The worker's first batch** 2 ticks until it has a tick time; **its engine warmed up** on a copy before the first
+   tick (`worker/warmUp.ts`).
 6. **One shadow map and one environment map** for every underground area and the trees.
 7. **Retina at High: the effects at 1.5×**, a Catmull-Rom upscale in the last pass, the ants' detail by the pixels
    drawn; Graphics → Sharpness → Full sharpness. Dynamic resolution resizes only the effects' targets.
