@@ -20,6 +20,6 @@ Pass: SSIM ≥ 0.985 and mean absolute difference ≤ 2.0 (0–255 levels).
 | nest_home_meadowPond | 1.0000 | 0.00 | 0 | match |
 | story_day | 1.0000 | 0.00 | 0 | match |
 | story_night | 1.0000 | 0.00 | 0 | match |
-| titan_nest |  |  |  | missing |
+| titan_nest | 1.0000 | 0.00 | 0 | match |
 
-16 of 17 match.
+17 of 17 match.
