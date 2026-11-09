@@ -393,6 +393,7 @@ export class SurfaceEntrances {
       const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: R * 0.42 * (1 - 0.6 * fallC), k: 1.15, seed: c.id * 3 + 1 };
       b.masses.push(m);
       massGeos.push(massMesh(m, ground, (x, y, h, t) => thatchColour(x, y, h, t, m.seed)));
+      yield;
       yield* thatch(details, m, ground, rng, Math.round(700 + R * 30));
       addTrails(R);
     } else if (look === 'lasius' || look === 'plagiaria' || look === 'termant') {
@@ -401,6 +402,7 @@ export class SurfaceEntrances {
       const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: (1.7 + living * 1.5) * (look === 'termant' ? 1.25 : 1) * (1 - 0.6 * fallC), k: 1, seed: c.id * 23 + 9, ring: far / R };
       b.masses.push(m);
       craterGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed, h / m.h), true));
+      yield;
       const at = (x: number, y: number) => ground(x, y) + massHeight(m, x, y);
       yield* pellets(details, ctr.x, ctr.y, R * 0.97, Math.round((260 + living * 260) * (1 - 0.6 * fallC)), rng, at, [pal.pellet, pal.dry, pal.damp, 0x6a5644], 0.3, 0.75);
       if (look === 'termant') yield* pellets(details, ctr.x, ctr.y, R * 0.8, Math.round(40 + living * 40), rng, at, [0x2e2016, 0x3b2a1e, 0x4a3626], 0.45, 0.9, far * 0.5);
@@ -411,10 +413,12 @@ export class SurfaceEntrances {
       const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: (2.5 + living * 4) * (1 - 0.6 * fallC), k: 0.8, seed: c.id * 29 + 4 };
       b.masses.push(m);
       craterGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed, h / m.h), true));
+      yield;
       const rs = refuseSpot(c, { x: 0, y: 0 });
       const d: Mass = { x: rs.x, y: rs.y, r: 6 + living * 6, h: 1.4 + living * 1.6, k: 0.8, seed: c.id * 19 + 7 };
       b.masses.push(d);
       massGeos.push(massMesh(d, ground, (x, y, h, t) => refuseColour(x, y, t)));
+      yield;
       yield* pellets(details, d.x, d.y, d.r * 0.95, Math.round(160 + d.r * 12), rng, (x, y) => ground(x, y) + massHeight(d, x, y), [0x9a8c74, 0x7a6e5a, 0xb0a288, 0x5a5040, 0x6a6a4a], 0.4, 1.0);
       addTrails(R);
     } else if (look === 'nasute') {
@@ -423,6 +427,7 @@ export class SurfaceEntrances {
       const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: R * 0.85 * (1 - 0.5 * fallC), k: 1.4, seed: c.id * 5 + 3 };
       b.masses.push(m);
       cartonGeos.push(lobedMass(m, ground, rng));
+      yield;
       for (let k = 0; k < outs.length; k++) {
         // (between hole k and the next)
         const a0 = outs[k];
@@ -440,6 +445,7 @@ export class SurfaceEntrances {
           y += Math.sin(h) * (L / 6);
         }
         cartonGeos.push(buildGalleryTubeGeometry(pts, { radius: 1.3, flatten: 0.7, lumpiness: 0.25, seed: c.id * 17 + k }));
+        yield;
       }
     } else if (look === 'aurimyrmex') {
       // a rotting stump in the middle, a root running out to each hole (the holes open among the roots), frass below
@@ -447,6 +453,7 @@ export class SurfaceEntrances {
       const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: R * 1.25, k: 3.2, seed: c.id * 11 + 2 };
       b.masses.push(m);
       massGeos.push(stumpMesh(m, ground, rng));
+      yield;
       for (let k = 0; k < outs.length; k++) massGeos.push(rootMesh(m, outs[k] + 0.35, far + 3, ground, c.id * 13 + k));
     } else if (look === 'eciton') {
       // the bivouac: a hanging mass of linked workers, the three ways in dark gaps at its skirt
@@ -455,6 +462,7 @@ export class SurfaceEntrances {
       b.masses.push(m);
       // a dark core under the clinging bodies, so no ground shows between them
       massGeos.push(massMesh(m, ground, () => new THREE.Color(0x24120a)));
+      yield;
       if (fallC < 0.9) {
         // the linked workers: one instanced ant body (head, thorax, gaster, legs) many times over
         const ants = bivouac(m, ground, rng, Math.round(500 + living * 700), this.bodyMat, c.entrances);
@@ -466,6 +474,7 @@ export class SurfaceEntrances {
       const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: 0.45 * (1 - 0.6 * fallC), k: 1, seed: c.id * 31 + 6, ring: far / R };
       b.masses.push(m);
       craterGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed, h / m.h), true));
+      yield;
       yield* leafBits(details, ctr.x, ctr.y, R * 1.8, 14, rng, (x, y) => ground(x, y) + massHeight(m, x, y), [0x5a3e22, 0x7a5430, 0x4a321c, 0x6a4a2a, 0x8a6236], [2, 4.2], far * 0.2);
     } else if (look === 'sickle') {
       // three small openings with soil collars in the leaf litter

@@ -1897,7 +1897,8 @@ export class GameSession {
     }
     if (v.space === 'nest' && !v.transitioning && v.activeNest !== this.viewedArea) v.setActiveNest(this.viewedArea);
     if (w.s.trees && !this.nests.has(TREES)) this.addTreesView();
-    this.treeDecor?.update(w, v.time);
+    // (the climb rings breathe on the ground only while the ground is shown: performance v4)
+    if (v.space === 'surface') this.treeDecor?.update(w, v.time);
     this.updateTunnelView();
     this.updateHover();
     const cam = v.activeCamera();

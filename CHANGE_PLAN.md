@@ -1761,3 +1761,30 @@ take the GL draws out and see the main thread's own work at full rate, each surf
 5. **Story:** each level's flight pre-warmed along its path; events' kinds pre-warmed at loading; spawning and big
    meshes ahead of time; a bench scene for an event.
 6. **Benchmark:** a trees-on scene and a story-event scene.
+
+### 34.3 What was done (in order; each measured, each proven the same)
+1. **Tools** (`tools/perf/longRun.ts`, `simBench --trees`, `playtest-story TICKS=1`, `tests/browser/spike_session.py`,
+   `story_flights.py`, `offscreen_work.py`).
+2. **Nest flow fields** (`sim/flow.ts`, `sim/world.ts`): full builds on a bucket queue — a ring of 129 buckets of whole
+   1/32 units; the same distances as the heap's, bit for bit (tests/performance.ts against a plain Dijkstra) — and a
+   cache that keeps the fields in use on the tick (past 64, up to 32 MB, back down once idle). Spider Mother at 22.7
+   min: 231 ticks over 40 ms → 0; the skirmish's Atta nest: 3–14 → 0. same.sh ALL SAME, the skirmish's hash and
+   the story logs unchanged.
+3. **Anthills** (`render/game/entranceModels.ts`): the build a generator, a changed anthill built ~3 ms a frame from a
+   copy of the colony and swapped in whole once its programs are compiled (`compileAsync`); pellets cloned without
+   rebuilding a polyhedron. Every anthill byte-identical (99 builds of eleven looks hashed against main).
+4. **Off screen** (`game/session.ts`, `render/view.ts`, `ui/minimaps.ts`): no nest mesh, tile or effect upload for a
+   plane not shown; the incoming area brought up to date under its fade (the fade waits, at most 1.5 s, until it has
+   caught up with the ground as it was when the wait began); the shown nest's mesh after digging in steps (signed
+   distance, maps, chunks); minimaps every 15th frame and only on screen; the trees' backdrop forced on entering,
+   else every 30 s a quadrant a frame at 256².
+5. **Floods** (`render/water.ts`, `world/terrain.ts`, `render/terrainMesh.ts`): the water mesh's 5 × 5 maximum taken
+   separably (checked against `waterAt`'s rounding), ground heights cached; each water shape's inside mask kept;
+   the ground's fields split (height-only per terrain version; the wet band and gravel per water version) and a
+   water-only change rewrites and uploads two channels. Water and ground attributes byte-identical at five flood
+   levels on two maps; High Water's playthrough identical.
+6. **HUD** (`ui/markerPanel.ts`, `ui/topBar.ts`, `core/profiler.ts`): the marker panel every third frame, DOM written
+   only on change and compared with the last write (not read back); Chrome's heap read every tenth frame.
+7. **Benchmark**: scenes `trees` and `flood`.
+8. **The stepped screenshot harness** (`?shot=1`, the golden set) does the spread-out work on the frame it is asked
+   for, so its pictures compare with main's.
