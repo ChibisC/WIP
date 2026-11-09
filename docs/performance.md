@@ -597,10 +597,28 @@ sharpness and once with the effects at 1.5× and the last pass upscaling (`EXTRA
 pixels (a first try picked it by the pixels drawn: an ant's model then changed with the resolution, and its effects
 with it — not the user's decision).
 
+| Shot (DPR 2) | SSIM, full size | SSIM at viewing size (halved) | mean difference (of 255) |
+|---|---|---|---|
+| fight | 0.976 | 0.990 | 1.8 |
+| fight_termites | 0.992 | 0.995 | 1.2 |
+| map_meadowPond_close | 0.997 | 0.998 | 0.7 |
+| story_day | 0.992 | 0.996 | 0.6 |
+| nest_home_meadowPond | 0.866 | 0.910 | 2.6 |
+
+The surface is the same at viewing size (ants in the same places, edges as sharp); the nest's fine grain and the
+larvae's highlights are a little softer up close. Graphics → Sharpness → Full sharpness keeps 2×.
+
+**Round 2, the upscale's black rings**: Catmull-Rom's negative lobes next to a very bright HDR pixel (a larva's
+highlight) went below zero — a black ring inside the glow. Each result is now kept within its 2 × 2 nearest texels'
+range (as FSR's upscaler does), which leaves edges as sharp; the table above is from the fixed upscale.
+
 ### Not done yet, and why
 - **The arena's triangles** (8 M at 2×: ~300 ants at the closest model) — the same rule as the game; fewer would be a
   different model on screen: an option for the user with pictures.
 - **The nest's ground shader** (every pattern of every layer, every pixel): skipping what a pixel does not show would
   change the bump of every pixel (the bumps of all the layers are summed) — an option with pictures.
-- **The switching growth and the UI's 44 ms frame**: not reproduced here; the bench now lists each switching round's
-  counts and the steps with the longest frames, and the UI's pieces — the next report shows them.
+- **The switching "growth"** was the report's arithmetic (round 2): the v4 line set the first round against the nine
+  later rounds summed — "first 19, later 183" is about 20 a round. The report now counts a round. The few
+  multi-second frames on a switch (2.6 s, 4.2 s, all "outside this thread") are real and not reproduced here: the next
+  report's worst steps and causes say which.
+- **The UI's 44 ms frame** (the full nest's first second): not reproduced here; the bench now lists the UI's pieces.

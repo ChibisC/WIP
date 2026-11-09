@@ -2180,3 +2180,10 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   `same.sh` ALL SAME (no simulation code changed); LAN.
 - **Merged** into `main` as `a7dd6b1` (Pages deployed; game artifact v56); handoff 27. Interim: round 2 waits for the
   user's plugged-in Mac and iPhone/iPad reports.
+
+## 2026-11-09 — Performance v5, round 2 begun (CHANGE_PLAN §35.3)
+- **The 1.5× upscale's black rings**: next to a very bright pixel (a larva's highlight in the nest) Catmull-Rom's
+  negative lobes went below zero. Each result kept within its 2 × 2 nearest texels' range (as FSR); the 2×/1.5×
+  sheets shot again (`docs/performance.md`, the table).
+- **Switching "worse in later rounds"** was the report's arithmetic (the first round against nine later rounds
+  summed: about 20 slow frames a round each). The report counts a round now.
