@@ -24,6 +24,8 @@ import { feel, FeelSummary } from '../core/feel';
 import { BUILD_ID } from '../net/messages';
 import { AS, SURFACE } from '../sim/types';
 import { shapeBox } from '../world/mapShapes';
+import { display, probeDisplay } from '../core/display';
+import { GpuBreakdown, measureGpu } from './gpuBreakdown';
 
 interface SceneDef {
   id: string;
@@ -75,6 +77,8 @@ interface SceneResult {
   heapMB: number;
   /** GPU memory, estimated (MB) */
   gpuMB: number;
+  /** of which textures, render buffers (the multisampled targets), vertex and index buffers (MB; performance v5) */
+  gpuParts?: { tex: number; rb: number; buf: number };
   tickMs: number;
   msgKB: number;
   glLinks: number;
@@ -91,7 +95,14 @@ interface SceneResult {
   cine?: { secs: number; ended: boolean };
   /** latency and pacing (core/feel.ts) */
   feel?: FeelSummary;
+  /** the named pieces of the frame with the most time (performance v5: the UI's panels, the nest mesh's steps) */
+  subs?: Array<{ name: string; avg: number; worst: number }>;
+  /** where the GPU's time goes, pass by pass (performance v5, dev/gpuBreakdown.ts) */
+  gpu?: GpuBreakdown;
 }
+
+/** the scenes that end with the GPU breakdown (a second or two of frames with every pass waited for) */
+const GPU_BREAKDOWN = new Set(['feel', 'fight', 'nest', 'arena', 'mp4', 'trees', 'story']);
 
 interface SwitchStep {
   kind: 'dive in' | 'area' | 'dive out';
@@ -106,6 +117,8 @@ interface SwitchStep {
 interface SwitchResult {
   rounds: number;
   steps: SwitchStep[];
+  /** the renderer's counts at the end of each round */
+  counts?: Array<{ textures: number; geometries: number; programs: number; gpuMB: number }>;
 }
 
 interface BenchState {
@@ -117,6 +130,8 @@ interface BenchState {
   results: SceneResult[];
   /** run only these scenes (`?bonly=feel,fight`), else all */
   only?: string[];
+  /** the display's rate on the start screen (performance v5: Low Power Mode holds Safari to 30 Hz) */
+  display?: { hz: number; capped: boolean };
 }
 
 function load(): BenchState | null {
@@ -152,6 +167,11 @@ export function startBench(ui: HTMLElement, q: URLSearchParams): void {
   const box = panel(ui);
   box.innerHTML = `<h2>Benchmark</h2><p>${BENCH_SCENES.length} scenes, about ${Math.round((BENCH_SCENES.length * (st.secs + 12) + 60) / 60)} minutes at <b>${st.quality}</b> quality. Each one loads, warms up, then flies the camera along a fixed path while every frame is timed. Leave the mouse and keyboard alone until the report appears; keep this tab in front.</p><p>Starting in 3 s…</p>`;
   save(st);
+  // the display's rate while this screen is idle (core/display.ts)
+  void probeDisplay(1500).then((hz) => {
+    st.display = { hz, capped: display.capped };
+    save(st);
+  });
   setTimeout(() => go(sceneUrl(nextScene(st, -1), st)), 3000);
 }
 
@@ -188,6 +208,7 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
   if (!st || !(i >= 0 && i < BENCH_SCENES.length)) return;
   const def = BENCH_SCENES[i];
   const loadMs = performance.now();
+  if (st.display?.hz) Object.assign(display, { hz: st.display.hz, ms: 1000 / st.display.hz, capped: st.display.capped });
   (window as unknown as { __prof: unknown }).__prof = prof;
   const secs = Number(q.get('bsecs') || st.secs);
   const v = s.view;
@@ -198,6 +219,11 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
     const r = collect(s, def, loadMs, secs, sw);
     if (gpuSteps) r.gpuSteps = gpuSteps;
     if (extra) Object.assign(r, extra);
+    // (the scene's numbers are taken first: the breakdown's frames wait for the GPU and are slow on purpose)
+    if (GPU_BREAKDOWN.has(def.id)) measureGpu(s, 20, (g) => save1({ ...r, gpu: g }));
+    else save1(r);
+  };
+  const save1 = (r: SceneResult) => {
     st.results.push(r);
     save(st);
     console.log('[bench]', JSON.stringify(r));
@@ -330,6 +356,7 @@ function collect(s: GameSession, def: SceneDef, loadMs: number, secs: number, sw
     geometries: n.geometries,
     heapMB: +n.heapMB.toFixed(0),
     gpuMB: +prof.gpuMB().toFixed(0),
+    gpuParts: { tex: Math.round(prof.mem.tex / 1048576), rb: Math.round(prof.mem.rb / 1048576), buf: Math.round(prof.mem.buf / 1048576) },
     tickMs: +s.sim.tickMs.toFixed(2),
     msgKB: +(prof.msgBytesAvg / 1024).toFixed(0),
     glLinks: G.links,
@@ -337,9 +364,16 @@ function collect(s: GameSession, def: SceneDef, loadMs: number, secs: number, sw
     quality: s.view.quality,
     ants: s.world.s.ants.length,
     creatures: s.world.s.creatures.length,
-    hitches: prof.hitches.slice(0, 12).map((h) => `${h.t.toFixed(1)} s ${h.ms.toFixed(0)} ms: ${h.causes.join('; ')}`),
+    // the worst frames (in the order they came) with what was in them (v5: the first ones hid the long frames)
+    hitches: prof.hitches
+      .slice()
+      .sort((a, b) => b.ms - a.ms)
+      .slice(0, 10)
+      .sort((a, b) => a.t - b.t)
+      .map((h) => `${h.t.toFixed(1)} s ${h.ms.toFixed(0)} ms (main thread ${h.cpu.toFixed(0)}): ${h.causes.join('; ')}`),
     switch: sw,
     feel: feel.summary(),
+    subs: prof.topSubs(8).map((x) => ({ name: x.name, avg: +x.avg.toFixed(2), worst: +x.worst.toFixed(0) })),
   };
 }
 
@@ -359,6 +393,12 @@ interface SpeedStep {
   events: number;
   /** the simulation's tick (ms) */
   tickMs: number;
+  /** frames from the simulation worker in the measured time, its ticks not answered at the end, the time (s) */
+  msgs?: number;
+  backlog?: number;
+  secs?: number;
+  /** the longest time without a frame from the simulation in the step (ms) */
+  gap?: number;
 }
 
 /**
@@ -373,25 +413,59 @@ function runSpeedSteps(s: GameSession, cx: number, cz: number, done: (steps: Spe
   const speeds = [1, 2, 4, 8];
   const out: SpeedStep[] = [];
   const WARM = 3000;
+  // each step settles for 2 s and is measured for 4 s — and for at least 8 and 15 frames (performance v5: one
+  // 12-second frame after loading took a whole step, which then had no frames and a speed made up of page time)
   const SETTLE = 2000;
   const MEASURE = 4000;
+  const CAP = 15000;
   let k = -1;
   let t0 = 0;
+  let phase: 'settle' | 'measure' = 'settle';
+  let n = 0;
   let last = 0;
   let times: number[] = [];
   let tick0 = 0;
   let tm0 = 0;
+  let msgs0 = 0;
   const snap = () => ({ cpu: [prof.cpuMs.total, prof.cpuMs.pushes], msg: [prof.parts.msg.total, prof.parts.msg.pushes], ev: [prof.parts.events.total, prof.parts.events.pushes] });
   let p0 = snap();
   const per = (a: number[], b: number[]) => (b[1] - a[1] > 0 ? (b[0] - a[0]) / (b[1] - a[1]) : 0);
   const start = performance.now();
+  const next = (t: number) => {
+    k++;
+    if (k >= speeds.length) {
+      s.setSpeed(1);
+      done(out);
+      return false;
+    }
+    s.setSpeed(speeds[k]);
+    t0 = t;
+    phase = 'settle';
+    n = 0;
+    return true;
+  };
   const loop = (t: number) => {
     if (t - start < WARM) {
       requestAnimationFrame(loop);
       return;
     }
-    if (k < 0 || t - t0 > SETTLE + MEASURE) {
-      if (k >= 0) {
+    if (k < 0 && !next(t)) return;
+    n++;
+    if (phase === 'settle') {
+      if ((t - t0 >= SETTLE && n >= 8) || t - t0 > CAP) {
+        phase = 'measure';
+        tick0 = s.world.s.tick;
+        tm0 = t;
+        msgs0 = prof.msgs;
+        prof.msgGapMax = 0;
+        p0 = snap();
+        times = [];
+        last = t;
+      }
+    } else {
+      times.push(t - last);
+      last = t;
+      if ((t - tm0 >= MEASURE && times.length >= 15) || t - tm0 > CAP) {
         const srt = times.slice().sort((a, b) => a - b);
         const p1 = snap();
         out.push({
@@ -404,26 +478,13 @@ function runSpeedSteps(s: GameSession, cx: number, cz: number, done: (steps: Spe
           msg: +per(p0.msg, p1.msg).toFixed(2),
           events: +per(p0.ev, p1.ev).toFixed(2),
           tickMs: +s.sim.tickMs.toFixed(1),
+          msgs: prof.msgs - msgs0,
+          backlog: (s.sim as unknown as { backlog?: number }).backlog ?? 0,
+          secs: +((t - tm0) / 1000).toFixed(1),
+          gap: Math.round(Math.max(prof.msgGapMax, prof.lastMsgAt ? performance.now() - prof.lastMsgAt : 0)),
         });
+        if (!next(t)) return;
       }
-      k++;
-      if (k >= speeds.length) {
-        s.setSpeed(1);
-        return done(out);
-      }
-      s.setSpeed(speeds[k]);
-      t0 = t;
-      times = [];
-      last = 0;
-    }
-    if (t - t0 > SETTLE) {
-      if (last) times.push(t - last);
-      else {
-        tick0 = s.world.s.tick;
-        tm0 = t;
-        p0 = snap();
-      }
-      last = t;
     }
     requestAnimationFrame(loop);
   };
@@ -464,6 +525,9 @@ interface GpuStep {
   cpu: number;
   /** frames measured (a GPU too slow for a few frames in the window cannot be judged) */
   frames: number;
+  /** the step's longest frame, settling included, and what was in it (performance v5) */
+  worst?: number;
+  why?: string;
 }
 
 /**
@@ -481,43 +545,42 @@ function runGpuSteps(s: GameSession, cx: number, cz: number, done: (steps: GpuSt
   surf.goalDistance = 260;
   surf.goal.set(cx + Math.cos(0.6) * 30, surf.goal.y, cz + Math.sin(0.6) * 30);
   const S = s as unknown as { surfAnts?: { group: THREE.Object3D }; surfCreatures?: { group: THREE.Object3D } };
+  // (performance v5: the shadow map kept, not redrawn — turning shadows off recompiled every material twice, 83
+  // shader links and seconds of stalls on Safari; what is measured is the shadow pass's own cost)
   const shadows = (on: boolean) => {
-    R.shadowMap.enabled = on && v.preset.shadows;
-    for (const sc of [v.surfaceScene])
-      sc.traverse((o) => {
-        const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
-        if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => (mm.needsUpdate = true));
-      });
+    R.shadowMap.autoUpdate = on;
+    R.shadowMap.needsUpdate = false;
   };
+  // (performance v5: the effects at one device pixel a screen pixel, upscaled to the canvas as the game does)
   const pixels = (one: boolean) => {
-    if (!one) return v.resize();
-    R.setPixelRatio(1);
-    R.setSize(window.innerWidth, window.innerHeight, false);
-    v.post.setSize(window.innerWidth, window.innerHeight, 1);
+    v.pixelOverride = one ? 1 : null;
+    v.resize();
   };
   const P = v.post.settings;
-  const keep = { ao: P.ao, bloom: P.bloom, dof: P.dof, post: v.post.enabled };
+  const keep = { ao: P.ao, bloom: P.bloom, dof: P.dof, post: v.post.enabled, sharp: v.fullSharpness };
   const steps: Array<{ name: string; on: () => void; off: () => void }> = [
     { name: 'as set', on: () => {}, off: () => {} },
     { name: 'ambient occlusion off', on: () => (P.ao = false), off: () => (P.ao = keep.ao) },
     { name: 'bloom off', on: () => (P.bloom = false), off: () => (P.bloom = keep.bloom) },
     { name: 'depth of field off', on: () => (P.dof = false), off: () => (P.dof = keep.dof) },
-    { name: 'all post effects off', on: () => (v.post.enabled = false), off: () => (v.post.enabled = keep.post) },
-    { name: 'shadows off', on: () => shadows(false), off: () => shadows(true) },
+    { name: 'all post effects off', on: () => (v.post.bare = true), off: () => (v.post.bare = false) },
+    { name: 'shadow maps not redrawn', on: () => shadows(false), off: () => shadows(true) },
     { name: '1 device pixel per screen pixel', on: () => pixels(true), off: () => pixels(false) },
+    // (performance v5: on a Retina screen the effects run at 1.5× unless Full sharpness — what 2× costs)
+    { name: 'full sharpness (2× on Retina)', on: () => v.setFullSharpness(true), off: () => v.setFullSharpness(keep.sharp) },
     { name: 'ants hidden', on: () => S.surfAnts && (S.surfAnts.group.visible = false), off: () => S.surfAnts && (S.surfAnts.group.visible = true) },
     { name: 'grass hidden', on: () => v.grass && (v.grass.mesh.visible = false), off: () => v.grass && (v.grass.mesh.visible = true) },
     {
       name: 'all of these off',
       on: () => {
-        v.post.enabled = false;
+        v.post.bare = true;
         shadows(false);
         pixels(true);
         if (S.surfAnts) S.surfAnts.group.visible = false;
         if (v.grass) v.grass.mesh.visible = false;
       },
       off: () => {
-        v.post.enabled = keep.post;
+        v.post.bare = false;
         shadows(true);
         pixels(false);
         if (S.surfAnts) S.surfAnts.group.visible = true;
@@ -535,6 +598,7 @@ function runGpuSteps(s: GameSession, cx: number, cz: number, done: (steps: GpuSt
   let times: number[] = [];
   let cpu0 = 0;
   let frames0 = 0;
+  let hitch0 = 0;
   const start = performance.now();
   const loop = (t: number) => {
     if (t - start < WARM) {
@@ -546,11 +610,13 @@ function runGpuSteps(s: GameSession, cx: number, cz: number, done: (steps: GpuSt
         const srt = times.slice().sort((a, b) => a - b);
         const avg = times.reduce((a, b) => a + b, 0) / Math.max(1, times.length);
         const cpuN = prof.cpuMs.pushes - frames0;
-        out.push({ name: steps[k].name, avg: +avg.toFixed(1), p95: +(srt[Math.floor(srt.length * 0.95)] ?? 0).toFixed(1), cpu: +(cpuN > 0 ? (prof.cpuMs.total - cpu0) / cpuN : 0).toFixed(1), frames: times.length });
+        const hs = prof.hitches.slice(hitch0).sort((a, b) => b.ms - a.ms)[0];
+        out.push({ name: steps[k].name, avg: +avg.toFixed(1), p95: +(srt[Math.floor(srt.length * 0.95)] ?? 0).toFixed(1), cpu: +(cpuN > 0 ? (prof.cpuMs.total - cpu0) / cpuN : 0).toFixed(1), frames: times.length, worst: hs ? Math.round(hs.ms) : undefined, why: hs?.causes.join('; ') });
         steps[k].off();
       }
       k++;
       if (k >= steps.length) return done(out);
+      hitch0 = prof.hitches.length;
       steps[k].on();
       t0 = t;
       times = [];
@@ -704,6 +770,7 @@ function runSwitching(s: GameSession, _fail: () => void, done: (sw: SwitchResult
     plan.push({ kind: 'dive out', round: r, act: () => void (v.space === 'nest' && s.toggleView()) });
   }
   const steps: SwitchStep[] = [];
+  const counts: NonNullable<SwitchResult['counts']> = [];
   let k = -1;
   let stepStart = 0;
   let endAt = 0;
@@ -736,10 +803,15 @@ function runSwitching(s: GameSession, _fail: () => void, done: (sw: SwitchResult
     if (!v.transitioning && !endAt && t - stepStart > 100) endAt = t + 400;
     if (endAt && t >= endAt) {
       // this step's hitches and their causes
-      for (const h of prof.hitches.slice(hitchMark)) cur!.causes.push(`${h.ms.toFixed(0)} ms: ${h.causes.join('; ')}`);
+      // (the longest first — performance v5: the first three hid the multi-second ones)
+      for (const h of prof.hitches.slice(hitchMark).sort((a, b) => b.ms - a.ms)) cur!.causes.push(`${h.ms.toFixed(0)} ms (main thread ${h.cpu.toFixed(0)}): ${h.causes.join('; ')}`);
       steps.push(cur!);
+      if (plan[k].kind === 'dive out') {
+        const c = prof.counts();
+        counts.push({ textures: c.textures, geometries: c.geometries, programs: c.programs, gpuMB: Math.round(prof.gpuMB()) });
+      }
       k++;
-      if (k >= plan.length) return done({ rounds, steps });
+      if (k >= plan.length) return done({ rounds, steps, counts });
       startStep(t);
     }
     requestAnimationFrame(loop);
@@ -766,7 +838,7 @@ function fmtScene(r: SceneResult): string[] {
     `## ${r.title}`,
     `load ${(r.loadMs / 1000).toFixed(1)} s (pre-warm ${((r.prewarmMs ?? 0) / 1000).toFixed(1)} s) · ${r.frames} frames · ${r.fps} FPS · frame avg ${r.frameAvg} ms, p95 ${r.p95}, worst ${r.worst} · over 33 ms: ${r.over33}, over 50 ms: ${r.over50}`,
     `main thread ${r.cpuAvg} ms (${parts}) · GPU ${r.gpuAvg ?? 'n/a'} ms · sim tick ${r.tickMs} ms, msg ${r.msgKB} KB`,
-    `draw calls ${r.calls} · tris ${(r.tris / 1000).toFixed(0)}k · programs ${r.programs} · textures ${r.textures} · geometries ${r.geometries} · heap ${r.heapMB} MB · GPU memory ≈ ${r.gpuMB} MB · ${r.ants} ants, ${r.creatures} creatures · quality ${r.quality}`,
+    `draw calls ${r.calls} · tris ${(r.tris / 1000).toFixed(0)}k · programs ${r.programs} · textures ${r.textures} · geometries ${r.geometries} · heap ${r.heapMB} MB · GPU memory ≈ ${r.gpuMB} MB${r.gpuParts ? ` (textures ${r.gpuParts.tex}, render buffers ${r.gpuParts.rb}, buffers ${r.gpuParts.buf})` : ''} · ${r.ants} ants, ${r.creatures} creatures · quality ${r.quality}`,
     `GL during the run: ${r.glLinks} shader links, ${r.glUploads} texture uploads`,
   ];
   if (r.switch) {
@@ -781,8 +853,14 @@ function fmtScene(r: SceneResult): string[] {
       const over = (a: SwitchStep[]) => a.reduce((n, x) => n + x.over33, 0);
       out.push(`switch ${kind}: ${all.length}× · worst frame first round ${worst(first)} ms, later rounds ${worst(later)} ms · frames over 33 ms: first ${over(first)}, later ${over(later)}`);
     }
-    const causes = sw.steps.filter((x) => x.causes.length).slice(0, 10);
-    for (const x of causes) out.push(`  round ${x.round + 1} ${x.kind}: ${x.causes.slice(0, 3).join(' | ')}`);
+    // the steps with the longest frames, and what was in them
+    const causes = sw.steps
+      .filter((x) => x.causes.length)
+      .sort((a, b) => b.worst - a.worst)
+      .slice(0, 10);
+    for (const x of causes) out.push(`  round ${x.round + 1} ${x.kind}: ${x.causes.slice(0, 2).join(' | ')}`);
+    // the renderer's counts after each round (performance v5: does anything pile up?)
+    if (sw.counts?.length) out.push(`  after each round (textures, geometries, programs, GPU MB): ${sw.counts.map((c) => `${c.textures}/${c.geometries}/${c.programs}/${c.gpuMB}`).join(' · ')}`);
   }
   if (r.feel) {
     const F = r.feel;
@@ -795,23 +873,30 @@ function fmtScene(r: SceneResult): string[] {
     );
   }
   if (r.speedSteps) {
-    out.push('  speed  reached   frame avg / p95, over 50 ms   main thread (msg, events)   sim tick');
+    out.push('  speed  reached   frame avg / p95, over 50 ms   main thread (msg, events)   sim tick   sim frames (in s), waiting');
     for (const g of r.speedSteps)
-      out.push(`  ${String(g.speed).padStart(3)}×   ${g.reached.toFixed(2)}×     ${g.avg.toFixed(1)} / ${g.p95.toFixed(1)} ms, ${g.over50}`.padEnd(48) + `${g.cpu} ms (${g.msg}, ${g.events})`.padEnd(28) + `${g.tickMs} ms`);
+      out.push(`  ${String(g.speed).padStart(3)}×   ${g.reached.toFixed(2)}×     ${g.avg.toFixed(1)} / ${g.p95.toFixed(1)} ms, ${g.over50}`.padEnd(48) + `${g.cpu} ms (${g.msg}, ${g.events})`.padEnd(28) + `${g.tickMs} ms`.padEnd(11) + (g.msgs !== undefined ? `${g.msgs} (${g.secs} s), ${g.backlog} ticks, longest gap ${g.gap} ms` : ''));
   }
   if (r.cine) out.push(r.cine.secs ? `  the shot ran ${r.cine.secs} s${r.cine.ended ? '' : ' (not seen to end)'}` : '  the flight did not start within 30 s');
   if (r.gpuSteps) {
     const base = r.gpuSteps[0]?.avg ?? 0;
     for (const g of r.gpuSteps)
       out.push(
-        g.frames < 5
+        (g.frames < 5
           ? `  ${g.name.padEnd(32)} too slow to measure (${g.frames} frames in 2.5 s)`
-          : `  ${g.name.padEnd(32)} frame ${g.avg.toFixed(1)} ms (p95 ${g.p95.toFixed(1)}, ${g.frames} frames)${g === r.gpuSteps[0] ? '' : `, saves ${(base - g.avg).toFixed(1)} ms`} · main thread ${g.cpu} ms`,
+          : `  ${g.name.padEnd(32)} frame ${g.avg.toFixed(1)} ms (p95 ${g.p95.toFixed(1)}, ${g.frames} frames)${g === r.gpuSteps[0] ? '' : `, saves ${(base - g.avg).toFixed(1)} ms`} · main thread ${g.cpu} ms`) +
+          (g.worst && g.worst > 100 ? ` · longest ${g.worst} ms: ${g.why}` : ''),
       );
   }
+  if (r.subs?.length) out.push(`pieces (ms a frame, the worst frame): ${r.subs.map((x) => `${x.name} ${x.avg} (${x.worst})`).join(', ')}`);
+  if (r.gpu) {
+    const g = r.gpu;
+    out.push(`GPU, pass by pass (${g.frames} frames, each pass waited for: ${g.frameMs} ms a frame): ${g.passes.map((p) => `${p.name} ${p.ms}`).join(', ')}`);
+    out.push(`  triangles a frame by what is drawn: ${g.draws.map((d) => `${d.name} ${(d.tris / 1000).toFixed(0)}k`).join(', ')}`);
+  }
   if (r.hitches.length) {
-    out.push('hitches:');
-    for (const h of r.hitches.slice(0, 8)) out.push(`  ${h}`);
+    out.push('the longest frames:');
+    for (const h of r.hitches.slice(0, 10)) out.push(`  ${h}`);
   }
   return out;
 }
@@ -826,6 +911,7 @@ function showReport(ui: HTMLElement): void {
   const text = [
     `# Underground Dominion benchmark — ${BUILD_ID} — ${new Date(st.started).toISOString()}`,
     device(),
+    st.display ? `display ${st.display.hz} Hz on the start screen${st.display.capped ? ' — capped at 30 Hz: Low Power Mode or on battery? Frames are measured against it; for the full numbers, plug in and turn Low Power Mode off' : ''}` : 'display rate not measured',
     `quality ${st.quality}, ${st.secs} s a scene`,
     '',
     ...st.results.flatMap((r) => [...fmtScene(r), '']),

@@ -7,6 +7,7 @@ to find the frames over 33 ms and what was in them. Run it with the trees on and
       TREES=1 (adds trees=1)  SECS=90 (recorded)  WARM=20  PAN=1 (the camera pans now and then)  VW=480 VH=300
       OUT=report.json  NORENDER=1 (the GL draw calls stubbed out: the main thread's own work at full frame rate)
       SUBS=1 (time each surface renderer's update on its own: surfAnts, surfFood, surfBars, …)  SPEED=4 (game speed)
+      NEST=1 (look into the home nest, as the benchmark's full nest: Q="stress=1&ants=200&creatures=40" NEST=1 PAN=0)
 
 Prints the count of frames whose main-thread time is over 33 ms and 50 ms, the parts of each (largest first) with the
 GL work and garbage-collection drops in them, and a per-part summary (frames where the part alone was over 8 ms).
@@ -29,6 +30,7 @@ OUT = os.environ.get("OUT", "")
 NORENDER = os.environ.get("NORENDER", "") == "1"
 SUBS = os.environ.get("SUBS", "1") == "1"
 SPEED = float(os.environ.get("SPEED", "1"))
+NEST = os.environ.get("NEST", "") == "1"
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"]
 
 # every frame: the main thread's time, its parts over 0.5 ms, GL work and a heap drop
@@ -111,6 +113,8 @@ with sync_playwright() as pw:
         pg.evaluate("() => { const r = window.__session.view.renderer; r.render = function () {}; }")
     if SPEED != 1:
         pg.evaluate(f"() => window.__session.setSpeed({SPEED})")
+    if NEST:
+        pg.evaluate("() => { const s = window.__session, v = s.view; s.viewedArea = v.activeNest; v.space = 'nest'; v.onSpaceChanged && v.onSpaceChanged('nest'); }")
     time.sleep(WARM)
     pg.evaluate("() => { window.__prof.__rec.length = 0; window.__prof.__on = true; }")
     t0 = time.time()

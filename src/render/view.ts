@@ -1,3 +1,4 @@
+import { uploadPendingTextures } from './dynamicTextures';
 import type { AreaTerrain } from './nest/areaTerrain';
 import * as THREE from 'three';
 import { setBakeRenderer } from './bake/detailBake';
@@ -78,6 +79,9 @@ const MOON = new THREE.Color(0.55, 0.66, 1.0);
 const NIGHT_SKY = new THREE.Color(0.2, 0.27, 0.48);
 const NIGHT_GROUND = new THREE.Color(0.05, 0.05, 0.06);
 const NIGHT_AIR = new THREE.Color(0.05, 0.065, 0.11);
+
+/** milliseconds a frame for the shown nest's chunk rebuilds after a dig (performance v5) */
+export const NEST_MESH_MS = 5;
 
 export class GameView {
   renderer: THREE.WebGLRenderer;
@@ -208,23 +212,64 @@ export class GameView {
    * preset itself steps down — never below about 0.85 device pixels per screen pixel, where ants stop reading clearly.
    */
   get minRenderScale(): number {
-    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio);
-    return Math.min(1, Math.max(0.75, 0.85 / pr));
+    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio) * this.retinaScale;
+    // (performance v5: a Retina screen already at 1.5 may go to 60 % of that in a heavy moment — 0.9 device pixels a
+    // screen pixel; elsewhere 75 % as before; never below 0.85)
+    return Math.min(1, Math.max(this.retinaScale < 1 ? 0.6 : 0.75, 0.85 / pr));
   }
+
+  /**
+   * Performance v5 (the user's decision, 2026-11-09): on a Retina screen at High the effects run at 1.5 device pixels a
+   * screen pixel instead of 2 and the last pass upscales and sharpens (render/post.ts) — about 44 % fewer pixels, which
+   * were most of the GPU's time. "Full sharpness" (Graphics) keeps 2.
+   */
+  fullSharpness = false;
+
+  /** the share of the canvas's resolution the effects run at before dynamic resolution (1, or 0.75 on Retina at High) */
+  get retinaScale(): number {
+    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio);
+    return !this.fullSharpness && this.preset.post && pr >= 1.9 ? 0.75 : 1;
+  }
+
+  /**
+   * The ants' level of detail scale: the preset's. (Performance v5 tried picking the detail by the pixels drawn at 1.5×
+   * on Retina: fewer triangles, but a different model changes more than the resolution — an ant's animation effects
+   * with it — and the user's decision covered the resolution only. Kept at the canvas's pixels.)
+   */
+  get antLodScale(): number {
+    return this.preset.lodScale;
+  }
+
+  setFullSharpness(on: boolean): void {
+    if (this.fullSharpness === on) return;
+    this.fullSharpness = on;
+    this.renderScale = Math.max(this.renderScale, this.minRenderScale);
+    this.resize();
+  }
+
+  /** the benchmark's "1 device pixel per screen pixel" step: the effects' resolution forced (null: as set) */
+  pixelOverride: number | null = null;
 
   setRenderScale(k: number): void {
     const s = Math.max(this.minRenderScale, Math.min(1, k));
     if (Math.abs(s - this.renderScale) < 0.01) return;
     this.renderScale = s;
-    this.post.sharpen = s < 0.999 ? Math.min(0.6, (1 - s) * 2.2) : 0;
     this.resize();
   }
 
   resize(): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio) * this.renderScale;
-    this.renderer.setPixelRatio(pr);
+    const out = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio);
+    // with the effects on, the canvas keeps its resolution and the effects run at the scaled one (the last pass
+    // upscales: a change of dynamic resolution resizes only the effects' targets); without them, the canvas itself
+    const pr = this.pixelOverride ?? out * this.retinaScale * this.renderScale;
+    const canvasPr = this.post.enabled ? out : pr;
+    // a light sharpening when the canvas itself is drawn smaller (no effects); with the effects the last pass upscales
+    // with a Catmull-Rom filter instead (sharpening before the bloom made bright points bloom into big glows — v5)
+    const s = pr / out;
+    this.post.sharpen = !this.post.enabled && s < 0.999 ? Math.min(0.6, (1 - s) * 2.2) : 0;
+    this.renderer.setPixelRatio(canvasPr);
     this.renderer.setSize(w, h, false);
     this.canvas.style.width = w + 'px';
     this.canvas.style.height = h + 'px';
@@ -232,7 +277,7 @@ export class GameView {
       c.aspect = w / h;
       c.updateProjectionMatrix();
     }
-    this.post.setSize(w, h, pr);
+    this.post.setSize(w, h, pr, canvasPr);
   }
 
   /** Build the surface world for a terrain. */
@@ -443,6 +488,7 @@ export class GameView {
     cam.up.set(0, 0, -1);
     cam.lookAt(W / 2, 0, D / 2);
     cam.updateMatrixWorld();
+    uploadPendingTextures(this.renderer);
     const prevRT = this.renderer.getRenderTarget();
     const prevShadow = this.renderer.shadowMap.enabled;
     const prevScissor = this.renderer.getScissorTest();
@@ -856,6 +902,78 @@ export class GameView {
     return rc.ray;
   }
 
+  /**
+   * The ground (x, z, mm) whose shadow casters can matter on screen under a fixed light (performance v5): what the
+   * camera sees of the slab from the floor to `top` (the hull of its corner rays where they cross y = 0 and y = top),
+   * widened toward the light by the height a caster can stand over what it shades (`top`), and by the shadow lookup's
+   * reach (the normal offset, the filter's texels). Null when it cannot be bounded (a corner ray at or above the
+   * horizon): every caster then casts, as before.
+   */
+  private shadowCasterBox(cam: THREE.Camera, light: THREE.DirectionalLight, top: number): { x0: number; x1: number; z0: number; z1: number } | null {
+    cam.updateMatrixWorld();
+    const o = cam.getWorldPosition(this.tmpBoxO);
+    if (o.y <= top) return null;
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    let z0 = Infinity;
+    let z1 = -Infinity;
+    const p = this.tmpBoxP;
+    for (const [nx, ny] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      p.set(nx, ny, 1).unproject(cam).sub(o);
+      if (p.y > -1e-6) return null;
+      for (const y of [0, top]) {
+        const t = (y - o.y) / p.y;
+        const x = o.x + p.x * t;
+        const z = o.z + p.z * t;
+        x0 = Math.min(x0, x);
+        x1 = Math.max(x1, x);
+        z0 = Math.min(z0, z);
+        z1 = Math.max(z1, z);
+      }
+    }
+    const L = p.copy(light.position).sub(light.target.position);
+    if (L.y <= 1e-6) return null;
+    // a caster up to `top` over what it shades stands this far from it toward the light
+    const ox = (top * L.x) / L.y;
+    const oz = (top * L.z) / L.y;
+    if (ox < 0) x0 += ox;
+    else x1 += ox;
+    if (oz < 0) z0 += oz;
+    else z1 += oz;
+    const sc = light.shadow.camera as THREE.OrthographicCamera;
+    const texel = Math.max((sc.right - sc.left) / light.shadow.mapSize.x, (sc.top - sc.bottom) / light.shadow.mapSize.y);
+    const m = Math.abs(light.shadow.normalBias) + texel * (4 + 2 * light.shadow.radius) + 2;
+    return { x0: x0 - m, x1: x1 + m, z0: z0 - m, z1: z1 + m };
+  }
+
+  /**
+   * One shadow map for every underground area and the trees (performance v5): only one of them is drawn in a frame and
+   * its key light's map is redrawn every frame, so they can share it — 16 MB at High per area that was kept for each.
+   */
+  shareAreaShadows(): void {
+    let m: THREE.LightShadow['map'] = null;
+    for (const st of this.nestStages.values()) {
+      const sh = st.lights.key.shadow;
+      if (sh.map && sh.map.width === sh.mapSize.x && sh.map.height === sh.mapSize.y) {
+        m = sh.map;
+        break;
+      }
+    }
+    if (!m) return;
+    for (const st of this.nestStages.values()) {
+      const sh = st.lights.key.shadow;
+      if (sh.map === m || sh.mapSize.x !== m.width || sh.mapSize.y !== m.height) continue;
+      if (sh.map) {
+        sh.map.depthTexture?.dispose();
+        sh.map.dispose();
+      }
+      sh.map = m;
+    }
+  }
+
+  private tmpBoxO = new THREE.Vector3();
+  private tmpBoxP = new THREE.Vector3();
+
   frame(dt: number, inputActive = true): void {
     this.time += dt;
     globalUniforms.uTime.value = this.time;
@@ -897,8 +1015,12 @@ export class GameView {
       if (!groundWork || this.stepped) this.water?.rebuild();
     } else {
       // (performance v4: the shown nest's mesh after digging in steps — the signed distance one frame, the light
-      // maps the next, then the changed chunks together — instead of all three on the frame a hex is dug)
-      this.nestTerrain?.update(false, this.stepped ? Infinity : 40);
+      // maps the next, then the changed chunks; v5: the chunks a few milliseconds a frame — a busy nest dug in many
+      // places at once rebuilt 16–21 chunks, 33–41 ms, on a frame — so a dig's new walls take a few frames to appear)
+      this.nestTerrain?.update(false, this.stepped ? Infinity : NEST_MESH_MS);
+      this.shareAreaShadows();
+      const nt = this.nestTerrain;
+      if (nt?.cullShadowCasters && !this.inTrees) nt.cullShadowCasters(this.preset.shadows ? this.shadowCasterBox(cam, this.nestStage!.lights.key, nt.topHeight ?? nt.wallH * 1.25 + 1) : null);
       if (this.inTrees) {
         // the trees' sun follows the view like the surface's
         const st = this.nestStage!;
@@ -937,6 +1059,9 @@ export class GameView {
     // drawn: the leaving scene costs nothing while the swap's own work runs, and the new scene's first draw moves to
     // the next frame (performance pass, spec §2)
     if (this.fadedOut) return;
+    // (performance v5: the textures changed this frame go to the GPU before its first render pass, not when a draw in
+    // the middle of one binds them — render/dynamicTextures.ts)
+    uploadPendingTextures(this.renderer);
     prof.gpuBegin();
     this.post.render(this.activeScene(), cam);
     prof.gpuEnd();

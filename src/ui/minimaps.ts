@@ -1,4 +1,5 @@
 import { GameSession } from '../game/session';
+import { prof } from '../core/profiler';
 import { AS, SURFACE, TREES, colonyOfSpace } from '../sim/types';
 import { SOIL_AIR, SOIL_GATE, SOIL_ROCK, SOIL_ROUTE, SOIL_STONE } from '../world/nestGrid';
 import { halfIn, routesOf } from '../sim/tunnels';
@@ -22,6 +23,21 @@ const TILE_RGB: Record<string, string> = { queen: '#9fb2c8', food: '#7a9a3a', fu
  * for nests — and markers). The current view is drawn as a frame; clicking
  * either map moves the camera there, switching maps if needed.
  */
+/**
+ * A fill colour setter for one loop of dots (performance v5): sets the context's colour only when it differs from the
+ * last one this loop set — each set parses the colour string, and the dots come in runs of one colour. Made just
+ * before the loop: nothing else in the loop sets the colour.
+ */
+function filler(ctx: CanvasRenderingContext2D): (c: string) => void {
+  let last: string | null = null;
+  return (c) => {
+    if (c !== last) {
+      ctx.fillStyle = c;
+      last = c;
+    }
+  };
+}
+
 export class Minimaps {
   root = el('div', 'mm');
   /** numbered underground-area tabs along the top of the minimaps */
@@ -38,6 +54,7 @@ export class Minimaps {
   private treesLbl = el('span', 'mm-trees-lbl', 'TREES');
   private canopyBase: HTMLCanvasElement | null = null;
   private nestImg: ImageData | null = null;
+  private nestBaseCv: HTMLCanvasElement | null = null;
   private nestVer = -1;
   private nestFogKey = -1;
   private nestFor = -1;
@@ -45,6 +62,7 @@ export class Minimaps {
   private size = 0;
 
   constructor(private s: GameSession) {
+    window.addEventListener('resize', () => (this.remeasure = true));
     this.nestBox.append(this.nestCv, this.nestLbl);
     this.surfBox.append(this.surfCv, this.surfLbl);
     this.treesBar.append(this.treesLbl);
@@ -91,11 +109,21 @@ export class Minimaps {
 
   /** compact layout: maps shown or folded (the full layout always shows them) */
   setOpen(on: boolean): void {
+    this.remeasure = true;
     this.root.classList.toggle('open', on);
     if (on) this.update(true);
   }
 
+  /** the maps' box measured again (a resize, the layout changing): reading the layout forces it to be worked out */
+  private remeasure = true;
+  private measured = 0;
+
   private fit(): number {
+    // (performance v5: the box's size read only after a resize or every 2 s — reading it after the frame's style
+    // writes made the browser lay the page out again then)
+    if (!this.remeasure && this.size && performance.now() - this.measured < 2000) return this.size;
+    this.remeasure = false;
+    this.measured = performance.now();
     const px = Math.round(this.nestCv.getBoundingClientRect().width * Math.min(2, window.devicePixelRatio || 1));
     if (px > 0 && px !== this.size) {
       this.size = px;
@@ -146,7 +174,7 @@ export class Minimaps {
     const d = w.s.trees;
     const g = w.nestOf(TREES);
     if (!d || !g) return;
-    if (!this.surfBase) this.surfBase = this.bakeSurface(S);
+    if (!this.surfBase) this.surfBase = this.timed('ui:minimap surface bake', () => this.bakeSurface(S));
     if (!this.canopyBase || this.canopyBase.width !== S) this.canopyBase = this.bakeCanopy(S);
     const ctx = this.surfCv.getContext('2d')!;
     ctx.drawImage(this.surfBase, 0, 0);
@@ -155,17 +183,19 @@ export class Minimaps {
     ctx.drawImage(this.canopyBase, 0, 0);
     const kx = S / t.width;
     const kz = S / t.depth;
+    const fl0 = filler(ctx);
     for (const f of w.s.food) {
       if (f.space !== TREES || f.kind === 'corpse') continue;
       const mine = edible(s.player, f);
-      ctx.fillStyle = mine ? (s.foodView ? '#ffd060' : 'rgba(240,190,80,0.85)') : 'rgba(150,140,125,0.45)';
+      fl0(mine ? (s.foodView ? '#ffd060' : 'rgba(240,190,80,0.85)') : 'rgba(150,140,125,0.45)');
       const sz = mine && s.foodView ? 3 : 2;
       ctx.fillRect(f.x * kx - sz / 2, f.y * kz - sz / 2, sz, sz);
     }
     const me = s.player;
+    const fl1 = filler(ctx);
     for (const a of w.s.ants) {
       if (a.space !== TREES || a.state === AS.Dead) continue;
-      ctx.fillStyle = a.colony === me.id ? '#fff2cc' : (a.team ?? a.colony) === me.team ? '#7fb8ff' : '#ff5a44';
+      fl1(a.colony === me.id ? '#fff2cc' : (a.team ?? a.colony) === me.team ? '#7fb8ff' : '#ff5a44');
       ctx.fillRect(a.x * kx - 0.7, a.y * kz - 0.7, 1.6, 1.6);
     }
     for (const cr of w.s.creatures) {
@@ -238,6 +268,7 @@ export class Minimaps {
     const sealed = fog.sealedOf(space);
     const lv = fog.levelsOf(space);
     const fogKey = (sealed?.size ?? 0) * 1000003 + (lv ? lv.reduce((a, b) => a + b, 0) : 0);
+    const tRaster = performance.now();
     if (g.version !== this.nestVer || fogKey !== this.nestFogKey) {
       this.nestVer = g.version;
       this.nestFogKey = fogKey;
@@ -250,20 +281,44 @@ export class Minimaps {
           let r = 10;
           let gg = 8;
           let b = 6;
+          // (performance v5: plain assignments — the array destructuring made three arrays a pixel)
           if (cx < g.w && cy < g.h) {
             const cell = cy * g.w + cx;
             const q = g.cellHex[cell];
             let v = g.soil[cell];
             if (sealed && q >= 0 && sealed.has(q)) v = SOIL_ROUTE;
             const f = lv && q >= 0 ? lv[q] : 0;
-            if (f === 2) [r, gg, b] = [12, 10, 8];
-            else {
-              if (v === SOIL_AIR) [r, gg, b] = [176, 132, 74];
-              else if (v === SOIL_STONE) [r, gg, b] = [70, 68, 64];
-              else if (v === SOIL_ROCK || v === SOIL_ROUTE) [r, gg, b] = [44, 46, 56];
-              else if (v === SOIL_GATE) [r, gg, b] = [150, 96, 48];
-              else [r, gg, b] = [30, 24, 17];
-              if (f === 1) [r, gg, b] = [r * 0.45, gg * 0.45, b * 0.45];
+            if (f === 2) {
+              r = 12;
+              gg = 10;
+              b = 8;
+            } else {
+              if (v === SOIL_AIR) {
+                r = 176;
+                gg = 132;
+                b = 74;
+              } else if (v === SOIL_STONE) {
+                r = 70;
+                gg = 68;
+                b = 64;
+              } else if (v === SOIL_ROCK || v === SOIL_ROUTE) {
+                r = 44;
+                gg = 46;
+                b = 56;
+              } else if (v === SOIL_GATE) {
+                r = 150;
+                gg = 96;
+                b = 48;
+              } else {
+                r = 30;
+                gg = 24;
+                b = 17;
+              }
+              if (f === 1) {
+                r *= 0.45;
+                gg *= 0.45;
+                b *= 0.45;
+              }
             }
           }
           img.data[i] = r;
@@ -272,8 +327,18 @@ export class Minimaps {
           img.data[i + 3] = 255;
         }
       this.nestImg = img;
+      // (performance v5: kept in a canvas of its own and drawn from it — putting the pixels in every update was an
+      // upload of the whole map each time)
+      const base = (this.nestBaseCv ??= document.createElement('canvas'));
+      if (base.width !== S || base.height !== S) {
+        base.width = S;
+        base.height = S;
+      }
+      base.getContext('2d')!.putImageData(img, 0, 0);
+      prof.sub('ui:minimap nest raster', performance.now() - tRaster);
     }
-    ctx.putImageData(this.nestImg!, 0, 0);
+    if (this.nestBaseCv && this.nestBaseCv.width === S) ctx.drawImage(this.nestBaseCv, 0, 0);
+    else ctx.putImageData(this.nestImg!, 0, 0);
     // designated hexes and tiles as small hexes
     const hex = (cx: number, cy: number, r: number) => {
       ctx.beginPath();
@@ -295,10 +360,11 @@ export class Minimaps {
       hex(p.x * k, p.y * k, g.R * k * 0.85);
       ctx.stroke();
     }
+    const fl2 = filler(ctx);
     for (const t of c?.tiles ?? []) {
       g.hexCenter(t.q, p);
       const gr = groupById(c!, t.group);
-      ctx.fillStyle = t.type === 'brood' && t.caste ? casteFigureColour(t.caste) : (TILE_RGB[t.type] ?? '#888');
+      fl2(t.type === 'brood' && t.caste ? casteFigureColour(t.caste) : (TILE_RGB[t.type] ?? '#888'));
       hex(p.x * k, p.y * k, g.R * k * 0.92);
       ctx.fill();
       if (gr && gr.marker >= 0 && c!.player) {
@@ -345,16 +411,18 @@ export class Minimaps {
     // food, then ants: yours pale, allies blue, enemies red; creatures as rings
     // (only food your colony can gather is shown in food colours; the rest is a dim grey)
     const shown = (x: number, y: number) => !fog.hasFog(space) || fog.visible(g, space, x, y);
+    const fl3 = filler(ctx);
     for (const f of w.s.food) {
       if (f.space !== space || f.heldBy || f.kind === 'corpse' || !shown(f.x, f.y)) continue;
-      ctx.fillStyle = edible(s.player, f) ? (s.foodView ? '#ffd060' : 'rgba(240,190,80,0.9)') : 'rgba(150,140,125,0.45)';
+      fl3(edible(s.player, f) ? (s.foodView ? '#ffd060' : 'rgba(240,190,80,0.9)') : 'rgba(150,140,125,0.45)');
       ctx.fillRect(f.x * k - 0.8, f.y * k - 0.8, 1.8, 1.8);
     }
     const me = s.player;
+    const fl4 = filler(ctx);
     for (const a of w.s.ants) {
       if (a.space !== space || a.state === AS.Dead || !shown(a.x, a.y)) continue;
       const team = a.team ?? a.colony;
-      ctx.fillStyle = a.colony === me.id ? 'rgba(255,242,212,0.95)' : team === me.team ? '#7fb8ff' : '#ff5a44';
+      fl4(a.colony === me.id ? 'rgba(255,242,212,0.95)' : team === me.team ? '#7fb8ff' : '#ff5a44');
       const r = a.id === w.colony(a.colony)?.queen ? 2.4 : 0.8;
       ctx.fillRect(a.x * k - r, a.y * k - r, r * 2, r * 2);
     }
@@ -408,6 +476,14 @@ export class Minimaps {
     ctx.lineWidth = 1;
     ctx.fill();
     ctx.stroke();
+  }
+
+  /** a piece of the minimaps timed for the profiler (performance v5) */
+  private timed<T>(name: string, f: () => T): T {
+    const t = performance.now();
+    const r = f();
+    prof.sub(name, performance.now() - t);
+    return r;
   }
 
   private bakeSurface(S: number): HTMLCanvasElement {
@@ -493,24 +569,26 @@ export class Minimaps {
     const s = this.s;
     const w = s.world;
     const t = w.terrain;
-    if (!this.surfBase) this.surfBase = this.bakeSurface(S);
+    if (!this.surfBase) this.surfBase = this.timed('ui:minimap surface bake', () => this.bakeSurface(S));
     const ctx = this.surfCv.getContext('2d')!;
     ctx.drawImage(this.surfBase, 0, 0);
     const kx = S / t.width;
     const kz = S / t.depth;
     // food
+    const fl5 = filler(ctx);
     for (const f of w.s.food) {
       if (f.space !== SURFACE || f.kind === 'corpse') continue;
       const mine = edible(s.player, f);
-      ctx.fillStyle = mine ? (s.foodView ? '#ffd060' : 'rgba(240,190,80,0.85)') : 'rgba(150,140,125,0.45)';
+      fl5(mine ? (s.foodView ? '#ffd060' : 'rgba(240,190,80,0.85)') : 'rgba(150,140,125,0.45)');
       const sz = mine && s.foodView ? 3 : 2;
       ctx.fillRect(f.x * kx - sz / 2, f.y * kz - sz / 2, sz, sz);
     }
     // ants: yours bright, allies blue, enemies red
     const me = s.player;
+    const fl6 = filler(ctx);
     for (const a of w.s.ants) {
       if (a.space !== SURFACE || a.state === AS.Dead) continue;
-      ctx.fillStyle = a.colony === me.id ? '#fff2cc' : (a.team ?? a.colony) === me.team ? '#7fb8ff' : '#ff5a44';
+      fl6(a.colony === me.id ? '#fff2cc' : (a.team ?? a.colony) === me.team ? '#7fb8ff' : '#ff5a44');
       ctx.fillRect(a.x * kx - 0.7, a.y * kz - 0.7, 1.6, 1.6);
     }
     for (const cr of w.s.creatures) {

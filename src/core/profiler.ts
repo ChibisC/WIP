@@ -134,6 +134,11 @@ export class Profiler {
   /** worker → main: bytes of the last frame message, and a running average */
   msgBytes = 0;
   msgBytesAvg = 0;
+  /** worker frames applied since the page started */
+  msgs = 0;
+  /** when the last worker frame was applied, and the longest wait between two since `msgGapMax` was cleared (ms) */
+  lastMsgAt = 0;
+  msgGapMax = 0;
   private renderer: THREE.WebGLRenderer | null = null;
   private heapLast = 0;
   /** loading is over: from here on a shader compile or a texture upload is worth a line in the log */
@@ -303,6 +308,7 @@ export class Profiler {
     this.cur.input = this.pendingInput;
     this.pendingInput = 0;
     this.notes.length = 0;
+    this.subCur.clear();
     this.gl = blankGl();
   }
 
@@ -316,6 +322,10 @@ export class Profiler {
 
   /** A frame message from the simulation worker was applied (between animation frames). */
   addMsg(ms: number, bytes: number): void {
+    const now = performance.now();
+    if (this.lastMsgAt) this.msgGapMax = Math.max(this.msgGapMax, now - this.lastMsgAt);
+    this.lastMsgAt = now;
+    this.msgs++;
     this.pendingMsg += ms;
     this.msgBytes = bytes;
     this.msgBytesAvg = this.msgBytesAvg ? this.msgBytesAvg * 0.95 + bytes * 0.05 : bytes;
@@ -324,6 +334,18 @@ export class Profiler {
   /** Time spent in a part this frame. */
   add(part: Part, ms: number): void {
     this.cur[part] += ms;
+  }
+
+  /** named pieces of the parts this frame (performance v5: the UI's panels, the nest mesh's steps) */
+  private subCur = new Map<string, number>();
+  /** each piece since the last reset: total ms, the frames it ran in, its worst frame */
+  readonly subs = new Map<string, { total: number; frames: number; worst: number }>();
+  /** frames since the last reset (the pieces' averages are over these) */
+  subFrames = 0;
+
+  /** Time spent in a named piece of a part this frame ("ui:minimaps"). */
+  sub(name: string, ms: number): void {
+    this.subCur.set(name, (this.subCur.get(name) ?? 0) + ms);
   }
 
   /** Something worth knowing about this frame if it turns out slow ("rebuilt nest 3 mesh", "switch: swap"). */
@@ -377,6 +399,14 @@ export class Profiler {
     this.frameMs.push(dt);
     this.cpuMs.push(cpu);
     for (const p of PARTS) this.parts[p].push(this.cur[p]);
+    this.subFrames++;
+    for (const [k, ms] of this.subCur) {
+      let e = this.subs.get(k);
+      if (!e) this.subs.set(k, (e = { total: 0, frames: 0, worst: 0 }));
+      e.total += ms;
+      e.frames++;
+      if (ms > e.worst) e.worst = ms;
+    }
     const g = this.gl;
     this.lastGl = g;
     const T = this.glTotal;
@@ -413,6 +443,8 @@ export class Profiler {
         .sort((a, b) => b[1] - a[1])
         .map(([p, ms]) => `${p} ${ms.toFixed(0)} ms`);
       if (parts.length) causes.push(parts.join(', '));
+      const subs = [...this.subCur].filter(([, ms]) => ms > 4).sort((a, b) => b[1] - a[1]).map(([k, ms]) => `${k} ${ms.toFixed(0)} ms`);
+      if (subs.length) causes.push(subs.join(', '));
       causes.push(...this.notes);
       if (!causes.length) causes.push(cpu > 12 ? 'main thread busy (unattributed)' : 'outside this thread (browser, GPU or a background tab)');
       this.hitches.push({ frame: this.frame, t: (this.frameStart - this.t0) / 1000, ms: dt, cpu, causes });
@@ -442,7 +474,17 @@ export class Profiler {
     for (const p of PARTS) this.parts[p].reset();
     this.hitches.length = 0;
     this.lastFrameAt = 0;
+    this.subs.clear();
+    this.subFrames = 0;
     Object.assign(this.glTotal, blankGl());
+  }
+
+  /** The pieces with the most time since the last reset: name, average ms a frame (over every frame), worst frame. */
+  topSubs(n = 8): Array<{ name: string; avg: number; worst: number }> {
+    return [...this.subs]
+      .map(([name, e]) => ({ name, avg: e.total / Math.max(1, this.subFrames), worst: e.worst }))
+      .sort((a, b) => b.avg - a.avg)
+      .slice(0, n);
   }
 
   partNames(): readonly Part[] {

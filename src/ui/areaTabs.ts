@@ -45,15 +45,24 @@ export class AreaTabs {
     return `<b>Area ${t.number} · ${esc(t.name)}</b>${who}${t.alive ? '' : 'Fallen. '}${state}`;
   }
 
+  /** each tab's colour as last written */
+  private color: string[] = [];
+
   update(): void {
     const s = this.s;
     const tabs = s.areaTabs();
     this.root.classList.toggle('many', tabs.length > 8);
     this.tabs.forEach((b, i) => {
       const t = tabs[i];
-      b.style.display = t ? '' : 'none';
+      // (performance v5: styles written only when they change — a custom property set every frame restyled the tabs
+      // every frame)
+      const disp = t ? '' : 'none';
+      if (b.style.display !== disp) b.style.display = disp;
       if (!t) return;
-      b.style.setProperty('--ac', t.color);
+      if (this.color[i] !== t.color) {
+        this.color[i] = t.color;
+        b.style.setProperty('--ac', t.color);
+      }
       const k = b.querySelector('.at-k') as HTMLElement;
       if (k.dataset.kind !== t.kind) {
         k.dataset.kind = t.kind;

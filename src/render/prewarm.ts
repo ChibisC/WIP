@@ -12,9 +12,28 @@ import * as THREE from 'three';
  */
 let target: THREE.WebGLRenderTarget | null = null;
 
-export function warmScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): number {
+/**
+ * A small target made like the one the scene is drawn into in play (render/post.ts: HDR, four samples, a depth texture)
+ * — performance v5. A GPU's pipeline for a draw depends on the target's formats and sample count: warming into a
+ * different target (one sample, as before) left every pipeline to be built again on the first real frame (8–12 s
+ * frames after loading on a Mac); and a program compiled with no target set is the variant for drawing straight to
+ * the screen (tone mapped, sRGB), which the game never uses while the post effects are on.
+ */
+export function sceneTarget(): THREE.WebGLRenderTarget {
+  if (!target) {
+    target = new THREE.WebGLRenderTarget(64, 64, { type: THREE.HalfFloatType, samples: 4, depthBuffer: true });
+    target.depthTexture = new THREE.DepthTexture(64, 64);
+    target.depthTexture.type = THREE.UnsignedIntType;
+  }
+  return target;
+}
+
+/**
+ * Warm a scene: `toScreen` when the game draws it straight to the canvas (no post effects: Low quality), else into a
+ * target like the post pipeline's.
+ */
+export function warmScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, toScreen = false): number {
   const t0 = performance.now();
-  target ??= new THREE.WebGLRenderTarget(64, 64, { type: THREE.HalfFloatType, depthBuffer: true });
   const undo: Array<() => void> = [];
   scene.traverse((o) => {
     if (!o.visible) {
@@ -40,16 +59,27 @@ export function warmScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, cam
   });
   const prev = renderer.getRenderTarget();
   const prevAuto = renderer.shadowMap.autoUpdate;
+  const prevScissor = renderer.getScissorTest();
   renderer.shadowMap.autoUpdate = true;
   renderer.shadowMap.needsUpdate = true;
   try {
+    // (the target is set first: the programs compiled are the variants drawn in play)
+    renderer.setRenderTarget(toScreen ? null : sceneTarget());
+    // (to the screen: one pixel of it, under the loading screen — the draw is what counts, not what it shows)
+    if (toScreen) {
+      renderer.setScissor(0, 0, 1, 1);
+      renderer.setScissorTest(true);
+    }
     renderer.compile(scene, camera);
-    renderer.setRenderTarget(target);
     renderer.render(scene, camera);
   } catch (e) {
     // (warming is an optimisation: whatever failed here is built when it is first drawn, as before)
     console.warn('[prewarm]', e);
   } finally {
+    if (toScreen) {
+      renderer.setScissorTest(prevScissor);
+      renderer.setScissor(0, 0, renderer.domElement.width, renderer.domElement.height);
+    }
     renderer.setRenderTarget(prev);
     renderer.shadowMap.autoUpdate = prevAuto;
     for (let i = undo.length - 1; i >= 0; i--) undo[i]();

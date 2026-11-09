@@ -1,4 +1,5 @@
 import { creatureKind } from '../sim/creatures/kinds';
+import { prof } from '../core/profiler';
 import './theme.css';
 import { GameSession } from '../game/session';
 import { SimEvent } from '../core/events';
@@ -423,19 +424,32 @@ export class GameUI {
       this.caption.classList.remove('show');
     }
     const s = this.s;
+    // (performance v5: each piece timed for the profiler's hitch log and the benchmark — "ui:minimaps 12 ms")
+    let t = performance.now();
+    const lap = (name: string) => {
+      const n = performance.now();
+      prof.sub(name, n - t);
+      t = n;
+    };
     this.markers.update();
+    lap('ui:marker panel');
     const first = this.tick < 3;
     this.minimaps.update(first);
+    lap('ui:minimaps');
     if (first || this.tick % 4 === 0) {
       this.top.update();
+      lap('ui:top bar');
       this.build.update();
       this.info.update();
+      lap('ui:build, info');
       this.boss.update();
       this.crBars.update();
       this.sandbox.update();
       this.arena?.update();
+      lap('ui:boss, creatures, sandbox');
       this.updateGoals();
       this.checkEnd();
+      lap('ui:goals');
     }
     // marker count labels under each world marker (performance v2: the counts once a tick — they walk every tile of
     // every group — and only the styles that changed written)
@@ -479,6 +493,7 @@ export class GameUI {
     const q = s.world.antById.get(s.player.queen);
     const danger = !!q && q.hp > 0 && q.hp < q.maxHp * 0.25;
     this.vignette.classList.toggle('show', danger);
+    lap('ui:labels');
     // tile info overlay and upgrade-point hints
     const labels = s.tileLabels();
     while (this.tileEls.length < labels.length) {
@@ -500,8 +515,13 @@ export class GameUI {
       if (e.style.top !== top) e.style.top = top;
       const cls = 'tlabel ' + l.kind;
       if (e.className !== cls) e.className = cls;
-      if (e.innerHTML !== l.html) e.innerHTML = l.html;
+      // (compared with what was last written: reading innerHTML back serialises the element every frame — v5)
+      if (this.tileHtml[i] !== l.html) {
+        this.tileHtml[i] = l.html;
+        e.innerHTML = l.html;
+      }
     });
+    lap('ui:tile labels');
     const follow = s.followId ? s.world.antById.get(s.followId) : undefined;
     this.obsBar.classList.toggle('show', !!follow);
     if (follow && this.tick % 10 === 0) this.obsBar.innerHTML = `<span class="sc">Observing</span><span style="color:var(--ink-dim)">${TOUCH ? 'Pinch zooms · drag orbits' : 'Wheel zooms · drag orbits · Esc stops'}</span>`;
@@ -512,5 +532,9 @@ export class GameUI {
       const html = `<span class="x">✕</span>${label}`;
       if (label && this.cancelChip.innerHTML !== html) this.cancelChip.innerHTML = html;
     }
+    lap('ui:rest');
   }
+
+  /** what each tile label last had written into it */
+  private tileHtml: string[] = [];
 }

@@ -2157,3 +2157,22 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   for pixel, the flood shot within main's own noise); `npm test`, determinism, build; LAN two players.
 - **Merged** into `main` as `32f32b6` (Pages deployed; game artifact v55); handoff 26.
 
+
+## 2026-11-09 — Performance v5, round 1: underground, loading, the benchmark, Retina at 1.5× (CHANGE_PLAN §35)
+- **From the user's Mac report** (`docs/performance/bench-mac-2026-11-09.md`, Low Power Mode: 30 Hz): the full nest
+  at 2.6 FPS, GPU-bound everywhere, 28 s pre-warms and 8–12 s first frames, the big fight's clock stalling.
+- **Found and fixed (the same pictures, the same results):** the ants' body-offset textures and a nest's maps were
+  rewritten while the GPU could still read them and uploaded in the middle of a render pass (on Metal: a wait for the
+  GPU or a render pass ended) — now rings of three, uploaded before the frame's first pass; the nest's shadow map drew
+  every chunk of the nest each frame (598k of 1.29M triangles) — casters culled to what can shadow the screen (131k);
+  the shown nest's chunks 5 ms a frame (33–41 ms frames); the pre-warm compiled every program twice and drew into a
+  one-sample target (play draws into four samples) — 167 → 99 programs, 13.8 → 8.8 s here, the first frame's
+  pipelines built at loading; one shadow map and one environment map for all underground areas; the area tabs and
+  minimaps stopped restyling and re-laying out the page; hit-stops cannot add up (a guard).
+- **Retina at High** (the user's decision): the effects at 1.5×, upscaled (Catmull-Rom) to the 2× canvas; Graphics →
+  Sharpness → Full sharpness keeps 2×.
+- **The benchmark** now gives the GPU's time pass by pass (Safari too), triangles by group, the longest frames with
+  causes, the UI's pieces, GPU memory split, the display's rate (Low Power Mode), toggles without recompiles,
+  per-step simulation frames for the speed scene, per-round counts for switching.
+- **Checks:** golden set 17 of 17 (16 pixel for pixel; the flood shot within its run-to-run noise); `npm test`;
+  `same.sh` ALL SAME (no simulation code changed); LAN.

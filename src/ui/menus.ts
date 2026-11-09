@@ -282,6 +282,24 @@ export class Menus {
       rf.appendChild(b);
     }
     m.appendChild(rf);
+    // sharpness (performance v5): on a Retina screen the effects run at 1.5× and the last pass upscales and sharpens
+    if ((window.devicePixelRatio || 1) >= 1.9) {
+      m.appendChild(el('h3', '', 'Sharpness'));
+      const rs = el('div', 'row');
+      for (const [full, label, tip] of [
+        [false, 'Faster', 'At High on this Retina screen the 3D view is drawn at 1.5 pixels a point and sharpened up to the screen: about 40 % less work for the graphics chip, and it looks the same at a normal viewing distance'],
+        [true, 'Full sharpness', 'Draw the 3D view at the screen’s full 2 pixels a point (slower)'],
+      ] as Array<[boolean, string, string]>) {
+        const b = button(!!settings().fullSharpness === full ? 'on' : '', label, tip, () => {
+          updateSettings({ fullSharpness: full || undefined });
+          this.s.view.setFullSharpness(full);
+          for (const x of Array.from(rs.children)) x.classList.remove('on');
+          b.classList.add('on');
+        });
+        rs.appendChild(b);
+      }
+      m.appendChild(rs);
+    }
     // the benchmark (performance pass): six fixed scenes, then a report to copy (dev/bench.ts)
     const rb = el('div', 'row');
     rb.appendChild(

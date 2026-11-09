@@ -94,14 +94,22 @@ export interface NestLights {
   points: THREE.PointLight[];
 }
 
+/** every nest's environment map is the same picture: made once per renderer (performance v5: one per nest before) */
+const nestEnv = new WeakMap<THREE.WebGLRenderer, THREE.Texture>();
+
 export function createNestEnvironment(renderer: THREE.WebGLRenderer, scene: THREE.Scene): NestLights {
   scene.background = new THREE.Color(0x060403);
   // Warm, dim env for subtle chitin highlights.
-  const envScene = new THREE.Scene();
-  envScene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 16, 8), skyMaterial(new THREE.Color(0.5, 0.36, 0.22), new THREE.Color(0.25, 0.16, 0.09), new THREE.Color(0.05, 0.03, 0.02), new THREE.Vector3(0.3, 0.6, 1), new THREE.Color(1, 0.7, 0.4))));
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(envScene, 0.04).texture;
-  pmrem.dispose();
+  let env = nestEnv.get(renderer);
+  if (!env) {
+    const envScene = new THREE.Scene();
+    envScene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 16, 8), skyMaterial(new THREE.Color(0.5, 0.36, 0.22), new THREE.Color(0.25, 0.16, 0.09), new THREE.Color(0.05, 0.03, 0.02), new THREE.Vector3(0.3, 0.6, 1), new THREE.Color(1, 0.7, 0.4))));
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    env = pmrem.fromScene(envScene, 0.04).texture;
+    pmrem.dispose();
+    nestEnv.set(renderer, env);
+  }
+  scene.environment = env;
   // Underground: very little ambient so undug soil sinks into darkness; a warm raking key (realism pass 2026-11-02:
   // a warm white rather than orange, which tinted every soil the same orange-gold)
   const ambient = new THREE.AmbientLight(0x45382c, 0.16);
@@ -121,13 +129,9 @@ export function createNestEnvironment(renderer: THREE.WebGLRenderer, scene: THRE
   const fill = new THREE.DirectionalLight(0x6a7890, 0.18);
   fill.position.set(300, 200, 400);
   scene.add(ambient, key, key.target, fill);
+  // (performance v5: the four point lights that stood here at intensity 0 were never lit by anything — every pixel of
+  // every material in a nest still worked out all four; a nest's pixels add up to the same without them)
   const points: THREE.PointLight[] = [];
-  for (let i = 0; i < 4; i++) {
-    const p = new THREE.PointLight(0xffd8a0, 0, 60, 1.6);
-    p.castShadow = false;
-    scene.add(p);
-    points.push(p);
-  }
   scene.fog = new THREE.FogExp2(0x070504, 0.002);
   return { key, fill, ambient, points };
 }

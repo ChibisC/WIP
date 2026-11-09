@@ -494,3 +494,113 @@ level in 20 % of its pixels, as two renders of `main` differ from each other (ru
 - **Multiplayer at high speed on a slow device** (handoff 25) — the user's choice.
 - **The wet band's recomputation** after a flood step (a distance pass over the whole grid, 10–45 ms here): only its
   region could be redone, but its distances reach across the map; a step is now on its own frame.
+## Performance v5: nonstop until smooth, underground first (claude/performance/05-spec-performance-v5-nonstop.md, CHANGE_PLAN §35)
+
+The user's `?bench=1` on a Mac after v4 (`docs/performance/bench-mac-2026-11-09.md`; Safari 26.5, Apple GPU, Retina at
+2×, High, Low Power Mode): the full nest at 2.6 FPS, switching worse in later rounds, the big fight falling behind
+real time, GPU-bound everywhere, 8 million triangles in the arena, 28 s pre-warms and 8–12 s first frames, and effect
+toggles that recompiled everything. User decisions: Retina at 1.5× with sharpening if it looks the same ("Full
+sharpness" keeps 2×); the 30 FPS cap is Low Power Mode; everything else keeps the golden set and the simulation's
+results.
+
+### On the user's devices
+- **2026-11-09, Mac (before v5)** — the whole report: `docs/performance/bench-mac-2026-11-09.md`. Every scene's
+  display interval was 33.3 ms: Low Power Mode holds Safari to 30 frames a second, so no scene could show more than
+  30 and the savings of the effect steps are understated.
+
+### How it is measured (v5's tools)
+- **The benchmark, made trustworthy** (`dev/bench.ts`): each heavy scene (feel, fight, nest, arena, mp4, trees, story)
+  ends with the **GPU pass by pass** (`dev/gpuBreakdown.ts`: `gl.finish` after each pass — the shadow maps, the scene,
+  ambient occlusion, depth of field and grade, bloom, the last pass — Safari has no GPU timer queries; draws are not
+  waited one by one, which would end an Apple GPU's render pass each time, so their **triangles are counted by what is
+  drawn** instead); the **longest frames** with their causes (the report listed the first eight, which hid the
+  multi-second ones); **the UI's pieces** (`prof.sub`: marker panel, minimaps, top bar, labels…); **GPU memory split**
+  into textures, render buffers and buffers; **the display's rate** measured on the start screen while it is idle
+  (`core/display.ts`: "display 30 Hz — Low Power Mode?", also in F3, and frames are counted against it); the effect
+  steps compile nothing ("shadow maps not redrawn" instead of shadows off, which recompiled every material twice — the
+  83 links; "post effects off" draws the scene into its own target and tone maps, the same programs; the longest frame
+  of each step and its cause); the speed steps settle for at least 8 frames and measure at least 15 (one 12-second
+  frame took a whole step before), with the simulation's frames counted; the switching scene lists the steps with the
+  longest frames and the renderer's counts after every round; the stress scenes run without the F3 overlay (its
+  hitboxes and climb rails of every ant were rebuilt and drawn each frame).
+- **Build machine** (SwiftShader, two cores; the GPU's times do not carry over, the counts do):
+  `scratchpad` probes kept in the repo as `tests/browser/spike_session.py NEST=1` (the full nest's main thread).
+
+### What was found
+- **Underground, every frame**: the ants' body-offset textures (one 512 × 2 float texture per model and level of
+  detail: three a frame in the full nest, four to eight in the arena) were rewritten and uploaded when the shadow pass
+  first drew them. Safari draws WebGL through ANGLE's Metal backend, where a texture written while the GPU may still be
+  reading it either waits for the GPU (`replaceRegion` on a texture in use: the command buffer is flushed and the CPU
+  waits) or copies through a staging buffer and a blit, which ends the render pass being recorded (its attachments
+  stored and loaded back). The report's frames were slower the more of them there were (87–97 ms with three, 120–138
+  ms with six or seven). A nest's soil, light and hex maps did the same after every dig (0.6 MB).
+- **The nest's shadow map covered the whole nest** (its key light is fixed): every chunk of ground was drawn into it
+  every frame — 598,000 of the full nest's 1.29 million triangles (the view itself: 115,000).
+- **The shown nest's mesh after digging** had a 40 ms budget a frame: a nest dug in many places rebuilt 16–21 chunks,
+  33–41 ms, on one frame (build machine).
+- **The nest's ground shader** computes the floor, the walls and the soil top, every pattern of each, for every pixel
+  (it sums the bumps of all of them, so skipping the ones a pixel does not show would change the picture): at 2× on a
+  Retina screen, 4.8 million pixels of it. The effects (ambient occlusion, depth of field, bloom) are full-screen
+  passes at the same resolution.
+- **The pre-warm compiled two variants of every program** — `renderer.compile` with no target set compiles the
+  variant for drawing straight to the screen (tone mapped, sRGB), never used while the effects are on, and then the
+  draw into a target compiled the other — and drew into a one-sample target while play draws into a four-sample one,
+  so the GPU's pipelines for every draw were made again on the first real frame (the 8–12 s frames after loading).
+  On the build machine: 167 programs after the pre-warm → 99, the pre-warm 13.8 → 8.8 s (a two-colony game, High).
+- **The speed stall** (0.05× at 1×, then no frame from the simulation for ~12 s at 2× and 4×, then 0.19× at 8×):
+  warm, the same scene has no tick over 0.2 s (Node), but its first 60 ticks run 60–160 ms each while the engine
+  compiles the simulation, and the worker's first batch — before it had reported a tick time — was 24 ticks. On a
+  cold engine in Safari (many times slower than V8 warm) that is seconds with nothing coming back, the game's
+  picture standing still (msg 0, the clock not moving). Hit-stops (each 33–80 ms off the clock with no limit) are
+  not it — the big fight has none in its first minute — but they could have added up, so they are guarded too.
+- **The benchmark's toggles**: "shadows off" set `needsUpdate` on every material (twice: 83 shader links and seconds
+  of stalls in Safari); "post effects off" drew to the screen, which needs every material's screen variant; the stress
+  scenes had the F3 overlay open, which rebuilt and drew every ant's hitbox and climb rails each frame.
+- **GPU memory "rising across scenes"** is each scene's own content (every scene is its own page load). What the
+  scenes hold: four-sample HDR targets at 2× (≈ 230 MB of render buffers and 130 MB of resolve and effect targets at
+  2940 × 1620), a 16 MB shadow map and a 6 MB environment map for every underground area, textures and buffers.
+- **The arena's 8 million triangles** are ~300 ants at their closest model (25,000 triangles; the next is 3,300):
+  at 2× a body 70 device pixels long gets the closest model, and the arena's camera is close.
+- **The UI**: the area tabs set a CSS custom property on every tab every frame (a restyle a frame); the minimaps read
+  their box's size each update after the frame's style writes (a layout), uploaded the whole nest raster with
+  `putImageData` each update and built it with three arrays a pixel; tile labels read `innerHTML` back each frame.
+
+### What changed (round 1; the same pictures and the same results unless said)
+| Where | What |
+|---|---|
+| Changing textures (`render/dynamicTextures.ts`, `antRenderer.ts`, `nestTerrain.ts`) | A **ring of three** textures over one data array: each change goes to the next one, which the GPU finished with frames ago, and every changed texture is uploaded **before the frame's first render pass** (`uploadPendingTextures`). The ants' body offsets and glue shells, a nest's soil, light, hex and tint maps; the canopy's and the pheromone overlay's textures uploaded early too. |
+| The nest's shadow map (`view.ts shadowCasterBox`, `nestTerrain.cullShadowCasters`) | Only the chunks that can shadow a pixel on screen cast: the ground the camera sees from the floor to the walls' top, widened toward the light by that height and by the shadow lookup's reach (normal offset, filter). Exact: 598k → 131k shadow triangles in the full nest; the golden nest shots pixel for pixel. |
+| The shown nest's mesh after a dig (`view.ts NEST_MESH_MS`) | 5 ms of chunks a frame (was 40). |
+| One shadow map and one environment map for every underground area and the trees (`view.shareAreaShadows`, `environment.ts`) | Only one is drawn in a frame and its map is redrawn every frame: 16 MB (High) and ~6 MB kept per area before. |
+| Loading (`render/prewarm.ts`, `session.prewarm`, `post.warm`) | The pre-warm sets a target made like the scene's (HDR, four samples, a depth texture) before it compiles, so it compiles and draws exactly the variants play draws; every post pass drawn once; a rebuilt anthill's programs compiled for that target too. |
+| The simulation's start (`game/simHost.ts`, `worker/warmUp.ts`) | The worker's first batch is 2 ticks until it has reported a tick time (was 24); before its first real tick it runs a few ticks on a throwaway copy of the world so the engine has compiled the simulation (at most 40 ticks or 1.2 s, stopping once a tick runs at half the first one's time). The real world's results are the same (`tests/performance.ts`; the fight and a skirmish, every hash equal over 600 ticks). |
+| The nests' lights (`environment.ts`) | Four point lights at intensity 0, never lit by anything, removed: every pixel of every material in a nest computed all four. |
+| Hit-stops (`core/loop.ts`) | A guard: one holding is lengthened to at most its own length, and after one the next waits nine times its length (at most a tenth of the time held). |
+| Retina at High (`view.ts retinaScale`, `post.ts upscalePass`, Graphics → Sharpness) | **The user's decision**: the effects at 1.5 device pixels a screen pixel, the canvas at 2, the last pass upscaling with a Catmull-Rom filter (dynamic resolution then resizes only the effects' targets, not the canvas). The bloom's mips stay sized from the canvas (its kernels are in pixels: at 1.5× its glows came out a third larger) and nothing is sharpened before the bloom (a sharpened bright point bloomed into a big glow). The ants' detail is picked by the canvas's pixels, as at 2×. "Full sharpness" keeps 2×. The golden shots at 2× and at 1.5× are below. |
+| UI (`ui/areaTabs.ts`, `ui/minimaps.ts`, `ui/gameUI.ts`) | Styles written only on change; the minimaps' box measured after a resize (or every 2 s); the nest raster kept in a canvas, built without allocating; a dot's colour set only when it changes; tile labels compared with what was written. |
+
+### Measured (build machine; the Mac's report is the real test)
+| | before (`main`) | v5 round 1 |
+|---|---|---|
+| Full nest: triangles a frame (shadow pass's ground) | 1.29 M (598 k) | 0.84 M (131 k) |
+| Full nest: draw calls | 132 | 69 |
+| Full nest: textures written each frame while possibly in use | 3 (more after digs) | 0 (rings, uploaded before the passes) |
+| Programs after the pre-warm (two colonies, High) | 167 | 99 |
+| Pre-warm (the same game) | 13.8 s | 8.8 s |
+| Golden set | — | 17 of 17 (16 pixel for pixel; the flood shot within its noise) |
+| `same.sh` (18 runs) | — | ALL SAME (no simulation code changed) |
+
+### Resolution: 2× against 1.5× (the user's decision, made with pictures)
+The golden shots rendered at two device pixels a screen pixel (`tests/browser/golden.py DPR=2`), once at full
+sharpness and once with the effects at 1.5× and the last pass upscaling (`EXTRA=&res15=1`); `res_sheet` crops
+(2× | 1.5× | difference ×4) of each shot's busiest regions. The ants' level of detail stays picked by the canvas's
+pixels (a first try picked it by the pixels drawn: an ant's model then changed with the resolution, and its effects
+with it — not the user's decision).
+
+### Not done yet, and why
+- **The arena's triangles** (8 M at 2×: ~300 ants at the closest model) — the same rule as the game; fewer would be a
+  different model on screen: an option for the user with pictures.
+- **The nest's ground shader** (every pattern of every layer, every pixel): skipping what a pixel does not show would
+  change the bump of every pixel (the bumps of all the layers are summed) — an option with pictures.
+- **The switching growth and the UI's 44 ms frame**: not reproduced here; the bench now lists each switching round's
+  counts and the steps with the longest frames, and the UI's pieces — the next report shows them.

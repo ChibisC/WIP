@@ -41,4 +41,8 @@ export interface AreaTerrain {
   update(force?: boolean, budgetMs?: number): void;
   rebuildAll(): void;
   setShadows(on: boolean): void;
+  /** performance v5: only the parts that can shadow what is on screen cast into a fixed light's shadow map */
+  cullShadowCasters?(box: { x0: number; x1: number; z0: number; z1: number } | null): void;
+  /** the highest the mesh rises over the floor (mm) */
+  readonly topHeight?: number;
 }

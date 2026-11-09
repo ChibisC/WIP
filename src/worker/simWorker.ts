@@ -12,6 +12,7 @@ import { restoreWorld, encodeState, hashState } from '../sim/snapshot';
 import { CommandSchedule, applyCommandsNow, decodeCommandLog, encodeCommandLog, stepWithCommands } from '../sim/commands';
 import { World } from '../sim/world';
 import { FrameBuilder } from './frames';
+import { warmUp } from './warmUp';
 import type { FromWorker, ToWorker } from './protocol';
 
 const TICK_DT = 0.05;
@@ -37,9 +38,11 @@ self.onmessage = (ev: MessageEvent<ToWorker>) => {
     switch (m.t) {
       case 'init': {
         const bus = new EventBus();
+        const copy = m.snapshot.slice();
         world = restoreWorld(m.snapshot, bus);
         bus.onAny((e) => events.push(e));
         frames = new FrameBuilder(world, true, m.ctrl);
+        warmUp(copy);
         post({ t: 'ready' });
         break;
       }

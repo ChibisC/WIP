@@ -57,10 +57,20 @@ export class GameLoop {
     cancelAnimationFrame(this.rafId);
   }
 
-  /** Presentation hit-stop: hold the simulation back for a moment (single player only; the sim itself is unchanged). */
-  hitStop(sec: number): void {
-    this.acc -= sec;
+  /**
+   * Presentation hit-stop: hold the simulation back for a moment (single player only; the sim itself is unchanged).
+   * Performance v5: hit-stops do not add up — one already holding is at most lengthened to `sec`, and after one the
+   * next waits nine times its length (at most a tenth of the time held). Each slam or impale near the camera took its
+   * 33–80 ms off the clock with no limit: a fight throwing more of them than time passes would never catch up.
+   */
+  hitStop(sec: number, now = performance.now()): void {
+    if (now < this.hitStopFree) return;
+    this.hitStopFree = now + sec * 1000 * 10;
+    this.acc = Math.min(this.acc, Math.max(this.acc - sec, -sec));
   }
+
+  /** when the next hit-stop may hold the clock (ms) */
+  private hitStopFree = -Infinity;
 
   /** Advance manually (used by tests and by the headless screenshot harness). */
   step(now: number): void {

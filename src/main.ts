@@ -1,3 +1,4 @@
+import { probeDisplay } from './core/display';
 import { PLAYABLE_MAPS } from './maps';
 import './ui/style.css';
 
@@ -54,6 +55,9 @@ const q = new URLSearchParams(location.search);
 const AUTO_START = TOUCH ? 'medium' : 'high';
 const canvas = document.getElementById('view') as HTMLCanvasElement;
 const scene = q.get('scene');
+// the display's rate while the page is still idle (the menu; performance v5: Low Power Mode holds Safari to 30 Hz) —
+// not on the benchmark's scene pages (they load at once; the start screen measured it) nor the screenshot harness
+if (!q.get('shot') && !q.get('bscene')) void probeDisplay();
 if (scene === 'antlab') runAntLab(canvas, q);
 else if (scene === 'swarm') runSwarmTest(canvas, q);
 else if (scene === 'crlab') runCreatureLab(canvas, q);

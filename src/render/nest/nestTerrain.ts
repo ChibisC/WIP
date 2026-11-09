@@ -1,3 +1,4 @@
+import { TextureRing } from '../dynamicTextures';
 import * as THREE from 'three';
 import { prof } from '../../core/profiler';
 import { NEST_CHUNK, NestGrid, SOIL_AIR, SOIL_GATE, SOIL_ROCK, SOIL_ROUTE, SOIL_STONE } from '../../world/nestGrid';
@@ -40,13 +41,14 @@ export class NestTerrain {
   readonly wallH: number;
   private chunks = new Map<number, THREE.Mesh>();
   private sd: Float32Array;
-  private soilTex: THREE.DataTexture;
+  // (performance v5: rings — a change after a dig goes to a texture the GPU is not drawing with; render/dynamicTextures.ts)
+  private soilTex: TextureRing;
   private soilData: Uint8Array;
-  private lightTex: THREE.DataTexture;
+  private lightTex: TextureRing;
   private lightData: Uint8Array;
-  private hexTex: THREE.DataTexture;
+  private hexTex: TextureRing;
   private hexData: Uint8Array;
-  private tintTex: THREE.DataTexture;
+  private tintTex: TextureRing;
   private tintData: Uint8Array;
   private builtVersion = -1;
   private skirt: THREE.Mesh;
@@ -128,7 +130,7 @@ export class NestTerrain {
         changed = true;
       }
     }
-    if (changed) this.hexTex.needsUpdate = true;
+    if (changed) this.hexTex.commit();
   }
   /** scratch for the signed distance (chamfer from air, from soil, the blur's other buffer) */
   private sdA: Float32Array | null = null;
@@ -142,24 +144,26 @@ export class NestTerrain {
     const g = grid;
     this.wallH = g.R * 1.25;
     this.sd = new Float32Array(g.w * g.h);
-    this.soilData = new Uint8Array(g.w * g.h * 4);
-    this.soilTex = new THREE.DataTexture(this.soilData, g.w, g.h, THREE.RGBAFormat);
-    this.soilTex.magFilter = this.soilTex.minFilter = THREE.NearestFilter;
-    this.lightData = new Uint8Array(g.w * g.h * 4);
-    this.lightTex = new THREE.DataTexture(this.lightData, g.w, g.h, THREE.RGBAFormat);
-    this.lightTex.magFilter = this.lightTex.minFilter = THREE.LinearFilter;
-    this.hexData = new Uint8Array(g.cols * g.rows * 4);
-    this.hexTex = new THREE.DataTexture(this.hexData, g.cols, g.rows, THREE.RGBAFormat);
-    this.hexTex.magFilter = this.hexTex.minFilter = THREE.NearestFilter;
-    this.tintData = new Uint8Array(g.cols * g.rows * 4);
-    this.tintTex = new THREE.DataTexture(this.tintData, g.cols, g.rows, THREE.RGBAFormat);
-    this.tintTex.magFilter = this.tintTex.minFilter = THREE.NearestFilter;
-    for (const t of [this.soilTex, this.lightTex, this.hexTex, this.tintTex]) t.flipY = false;
+    const ring = (data: Uint8Array, w: number, h: number, filter: THREE.MagnificationTextureFilter, uni: { value: THREE.DataTexture }) => {
+      const r = new TextureRing(() => {
+        const t = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
+        t.magFilter = t.minFilter = filter;
+        t.flipY = false;
+        return t;
+      });
+      uni.value = r.current;
+      r.onSwap = (t) => (uni.value = t);
+      return r;
+    };
     const u = this.uniforms;
-    u.tSoil.value = this.soilTex;
-    u.tLight.value = this.lightTex;
-    u.tHex.value = this.hexTex;
-    u.tTint.value = this.tintTex;
+    this.soilData = new Uint8Array(g.w * g.h * 4);
+    this.soilTex = ring(this.soilData, g.w, g.h, THREE.NearestFilter, u.tSoil);
+    this.lightData = new Uint8Array(g.w * g.h * 4);
+    this.lightTex = ring(this.lightData, g.w, g.h, THREE.LinearFilter, u.tLight);
+    this.hexData = new Uint8Array(g.cols * g.rows * 4);
+    this.hexTex = ring(this.hexData, g.cols, g.rows, THREE.NearestFilter, u.tHex);
+    this.tintData = new Uint8Array(g.cols * g.rows * 4);
+    this.tintTex = ring(this.tintData, g.cols, g.rows, THREE.NearestFilter, u.tTint);
     u.uRaster.value.set(g.w, g.h);
     u.uCell.value = g.cell;
     u.uHexDim.value.set(g.cols, g.rows);
@@ -306,8 +310,8 @@ export class NestTerrain {
       this.lightData[i + 2] = Math.round((Math.max(-4, Math.min(4, this.sd[k])) / 8 + 0.5) * 255);
       this.lightData[i + 3] = Math.round(st[k] * 255);
     }
-    this.soilTex.needsUpdate = true;
-    this.lightTex.needsUpdate = true;
+    this.soilTex.commit();
+    this.lightTex.commit();
     this.updateDesignation();
   }
 
@@ -319,7 +323,7 @@ export class NestTerrain {
       const v = g.hexDesig[q] && !g.isHexDug(q) ? 1 : 0;
       this.hexData[i] = (this.hexData[i] & ~1) | v;
     }
-    this.hexTex.needsUpdate = true;
+    this.hexTex.commit();
   }
 
   /** Per-hex visuals (tile type, level, group outline edges, outline colour, caste tint). */
@@ -344,8 +348,8 @@ export class NestTerrain {
       // alpha: the brood tile's texture number (×16 + 8, read back as floor(a×255 / 16))
       this.tintData[i + 3] = Math.max(0, Math.min(15, v.pattern ?? 0)) * 16 + 8;
     }
-    this.hexTex.needsUpdate = true;
-    this.tintTex.needsUpdate = true;
+    this.hexTex.commit();
+    this.tintTex.commit();
   }
 
   // ------------------------------------------------------------------ heights
@@ -523,8 +527,9 @@ export class NestTerrain {
         }
       geo.setIndex(idx);
       mesh = new THREE.Mesh(geo, this.material);
+      mesh.name = 'nestGround';
       mesh.receiveShadow = true;
-      mesh.castShadow = true;
+      mesh.castShadow = this.shadowsOn;
       this.chunks.set(ci, mesh);
       this.group.add(mesh);
     }
@@ -578,13 +583,19 @@ export class NestTerrain {
       this.computeSignedDistance();
       this.builtVersion = g.version;
       this.mapsStale = true;
-      if (sliced) return;
+      if (sliced) {
+        prof.note(`nest mesh: signed distance (${(performance.now() - t0).toFixed(0)} ms)`);
+        return;
+      }
     }
     if (!sliced || this.mapsStale || !this.batchOpen) {
       this.updateMaps();
       this.mapsStale = false;
       this.batchOpen = true;
-      if (sliced) return;
+      if (sliced) {
+        prof.note(`nest mesh: light maps (${(performance.now() - t0).toFixed(0)} ms)`);
+        return;
+      }
     }
     let built = 0;
     for (const ci of g.dirty) {
@@ -607,7 +618,36 @@ export class NestTerrain {
   }
 
   setShadows(on: boolean): void {
+    this.shadowsOn = on;
     for (const m of this.chunks.values()) m.castShadow = on;
+  }
+
+  private shadowsOn = true;
+
+  /**
+   * Performance v5: the nest's key light is fixed and its shadow map covers the whole nest, so every chunk was drawn
+   * into it every frame (about five times the triangles of the view itself). Only a chunk inside `box` — the ground the
+   * camera sees, widened toward the light by the walls' height and by the shadow filter's reach (the view works it
+   * out) — can shadow a pixel on screen; the others cast nothing that is ever looked up. Null: every chunk casts.
+   */
+  cullShadowCasters(box: { x0: number; x1: number; z0: number; z1: number } | null): void {
+    const g = this.grid;
+    const cw = Math.ceil(g.w / NEST_CHUNK);
+    const size = NEST_CHUNK * g.cell;
+    for (const [ci, m] of this.chunks) {
+      if (!this.shadowsOn || !box) {
+        m.castShadow = this.shadowsOn;
+        continue;
+      }
+      const x0 = (ci % cw) * size;
+      const z0 = Math.floor(ci / cw) * size;
+      m.castShadow = !(x0 + size < box.x0 || x0 > box.x1 || z0 + size < box.z0 || z0 > box.z1);
+    }
+  }
+
+  /** the highest the ground's mesh rises over the floor (mm): walls with their lumps, ramps, fallen-in caps */
+  get topHeight(): number {
+    return this.wallH * 1.25 + 1;
   }
 }
 
