@@ -129,13 +129,9 @@ export function createNestEnvironment(renderer: THREE.WebGLRenderer, scene: THRE
   const fill = new THREE.DirectionalLight(0x6a7890, 0.18);
   fill.position.set(300, 200, 400);
   scene.add(ambient, key, key.target, fill);
+  // (performance v5: the four point lights that stood here at intensity 0 were never lit by anything — every pixel of
+  // every material in a nest still worked out all four; a nest's pixels add up to the same without them)
   const points: THREE.PointLight[] = [];
-  for (let i = 0; i < 4; i++) {
-    const p = new THREE.PointLight(0xffd8a0, 0, 60, 1.6);
-    p.castShadow = false;
-    scene.add(p);
-    points.push(p);
-  }
   scene.fog = new THREE.FogExp2(0x070504, 0.002);
   return { key, fill, ambient, points };
 }
