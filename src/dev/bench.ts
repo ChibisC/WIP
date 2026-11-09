@@ -943,6 +943,7 @@ function fmtScene(r: SceneResult): string[] {
     const g = r.gpu;
     out.push(`GPU, pass by pass (${g.frames} frames, each pass waited for: ${g.frameMs} ms a frame): ${g.passes.map((p) => `${p.name} ${p.ms}`).join(', ')}`);
     out.push(`  triangles a frame by what is drawn: ${g.draws.map((d) => `${d.name} ${(d.tris / 1000).toFixed(0)}k`).join(', ')}`);
+    if (g.drawMs?.length) out.push(`  each draw waited for (${g.drawFrames} frames; ms a frame, each with its wait's cost): ${g.drawMs.map((d) => `${d.name} ${d.ms}`).join(', ')}`);
   }
   if (r.hitches.length) {
     out.push('the longest frames:');
