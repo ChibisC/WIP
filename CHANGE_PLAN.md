@@ -1819,3 +1819,23 @@ keeps the golden set and the simulation's results.
    triangles, the UI's pieces — each fixed with the same pictures where possible, the rest as options with pictures.
 
 ### 35.2 Done (in order; each measured, each proven the same)
+1. **The benchmark** (`dev/bench.ts`, `dev/gpuBreakdown.ts`, `core/display.ts`, `core/profiler.ts`): the GPU pass by
+   pass and triangles by group after the heavy scenes; the longest frames with causes; the UI's pieces; GPU memory
+   split; the display's rate on the idle start screen (Low Power Mode shown, frames measured against it; F3 too);
+   toggles without recompiles; robust speed steps with the simulation's frames counted; switching's worst steps and
+   per-round counts; stress scenes without the F3 overlay.
+2. **Changing textures as rings of three, uploaded before the frame's first pass** (`render/dynamicTextures.ts`): the
+   ants' body offsets and glue shells, a nest's maps; the canopy's and the pheromone overlay's uploaded early.
+3. **The nest's shadow casters culled to what can shadow the screen** (exact): 598k → 131k shadow triangles in the
+   full nest. The shown nest's chunks 5 ms a frame.
+4. **Pre-warm**: the variants and pipelines play uses (a four-sample HDR target set before compiling; every post pass
+   drawn): 167 → 99 programs, 13.8 → 8.8 s on the build machine.
+5. **Hit-stops** do not add up (at most a tenth of the time held): the speed stall.
+6. **One shadow map and one environment map** for every underground area and the trees.
+7. **Retina at High: the effects at 1.5×**, a Catmull-Rom upscale in the last pass, the ants' detail by the pixels
+   drawn; Graphics → Sharpness → Full sharpness. Dynamic resolution resizes only the effects' targets.
+8. **UI**: area tabs, minimaps (box measured after a resize, raster in a canvas, no per-pixel arrays, colour sets
+   only on change), tile labels.
+
+Checks: golden set 17 of 17 (16 pixel for pixel, the flood shot within its run-to-run noise); `npm test`;
+`same.sh` (no simulation code changed); LAN two players.
