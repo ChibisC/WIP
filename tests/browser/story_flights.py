@@ -1,7 +1,8 @@
 """Story camera flights (performance v4, claude/performance/04-spec-performance-v4-on-screen-spikes-story.md §4): each
 chapter 1 level's opening flight in the real page, drawn (shader programs and textures made during the flight are what
-stutters on a real GPU), from its first frame to the camera's return. For each level: frames, the main thread's
-slowest frames and their parts, shader links, texture and buffer uploads and the profiler's notes during the flight.
+stutters on a real GPU), from its first frame to the camera's return. For each level: frames, the main thread's own
+work (the frame without the drawing) and its slowest frames' parts, shader links, texture and buffer uploads and the
+profiler's notes during the flight.
 SwiftShader draws on the CPU here: the frame times are long; links, uploads and the main thread's parts carry over.
 
   tests/browser/with_server.sh python3 tests/browser/story_flights.py      (LEVELS=garden,longNights,... OUT=f.json)
@@ -57,15 +58,20 @@ with sync_playwright() as pw:
         while started and time.time() - t1 < 180 and pg.evaluate("() => !!window.__session.cine"):
             time.sleep(1)
         rec = pg.evaluate("() => window.__prof.__rec")
-        slow = sorted(rec, key=lambda f: -f["cpu"])[:4]
+        # (the main thread's own work: the frame's time without the drawing, which SwiftShader does on the CPU here)
+        for f in rec:
+            f["js"] = round(f["cpu"] - f["parts"].get("render", 0), 1)
+        slow = sorted(rec, key=lambda f: -f["js"])[:4]
         r = {
             "started": started,
             "frames": len(rec),
             "links": sum(f["links"] for f in rec),
             "tex": sum(f["tex"] for f in rec),
             "bufMB": round(sum(f["buf"] for f in rec), 2),
-            "cpuAvg": round(sum(f["cpu"] for f in rec) / max(1, len(rec)), 1),
-            "slowest": [{"cpu": f["cpu"], "parts": f["parts"], "links": f["links"], "tex": f["tex"], "notes": f["notes"]} for f in slow],
+            "jsAvg": round(sum(f["js"] for f in rec) / max(1, len(rec)), 1),
+            "jsMax": max([f["js"] for f in rec] or [0]),
+            "jsOver16": sum(1 for f in rec if f["js"] > 16),
+            "slowest": [{"js": f["js"], "parts": {k: v for k, v in f["parts"].items() if k != "render"}, "links": f["links"], "tex": f["tex"], "notes": f["notes"]} for f in slow],
             "errors": errs[:2],
         }
         res[lv] = r
