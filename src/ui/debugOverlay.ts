@@ -60,7 +60,7 @@ export class DebugOverlay {
       `parts (ms): ${parts || '—'}`,
       `draw calls ${n.calls}  tris ${(n.triangles / 1000).toFixed(0)}k  programs ${n.programs}  textures ${n.textures}  geometries ${n.geometries}${n.heapMB ? `  heap ${n.heapMB.toFixed(0)} MB` : ''}  GPU memory ≈ ${prof.gpuMB().toFixed(0)} MB  sim msg ${(prof.msgBytesAvg / 1024).toFixed(0)} KB`,
       `GL since loading: ${G.links} shader links (${G.compileMs.toFixed(0)} ms), ${G.texUploads} texture uploads (${(G.texBytes / 1048576).toFixed(1)} MB)`,
-      `sim ${s.sim.kind}  tick ${s.sim.tickMs.toFixed(2)} ms  #${w.s.tick}  t=${w.s.time.toFixed(0)} s  speed ${s.loop.speed}×${s.loop.paused ? ' paused' : ''}`,
+      `sim ${s.sim.kind}  tick ${s.sim.tickMs.toFixed(2)} ms  #${w.s.tick}  t=${w.s.time.toFixed(0)} s  speed ${s.loop.speed}×${s.loop.paused ? ' paused' : ''}${s.sim.kind === 'worker' && prof.lastMsgAt ? `  last frame ${(performance.now() - prof.lastMsgAt).toFixed(0)} ms ago, ${(s.sim as unknown as { backlog: number }).backlog} ticks waiting` : ''}`,
       `ants ${w.s.ants.length}  creatures ${w.s.creatures.length}  food ${w.s.food.length}  brood ${w.s.brood.length}`,
       `quality ${s.view.quality}${s.view.renderScale < 1 ? ` at ${Math.round(s.view.renderScale * 100)} % resolution` : ''}${s.autoQuality.enabled ? ` (auto${s.autoQuality.lastChange ? `, last ${s.autoQuality.lastChange}` : ''})` : ''}`,
       `pending commands ${s.commands.pending().length}`,
