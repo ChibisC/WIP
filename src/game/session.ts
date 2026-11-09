@@ -442,6 +442,11 @@ export class GameSession {
       for (const nv of this.nests.values()) nv.creatures.prepare();
     });
     const vh = window.innerHeight * v.renderer.getPixelRatio();
+    // (the trees: the ground below drawn into the backdrop once now — that render's programs, and the backdrop's own
+    // textured variant, compiled behind the loading screen instead of when the player first climbs: performance v4)
+    // (the anthills built now, so the warm-up draws them: their programs compiled before play)
+    steps.push(() => this.mounds.prebuild(w, this.terrainHeight));
+    if (this.nests.has(TREES)) steps.push(() => v.refreshBackdrop(true));
     for (const [space, nv] of this.nests)
       steps.push(() => {
         const g = w.nestOf(space)!;
@@ -699,6 +704,8 @@ export class GameSession {
     this.view.worldGroup.add(this.treeDecor.ground);
     stage.scene.add(this.treeDecor.canopy);
     this.warmNew();
+    // (turned on in play — the sandbox's "Trees on": the backdrop's programs compiled now, not on the first climb)
+    if (this.prewarmMs > 0) this.view.refreshBackdrop(true);
   }
 
   /** The "TREES" bar: up into the canopy, or back down to the ground. */

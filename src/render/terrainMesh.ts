@@ -229,21 +229,8 @@ export class TerrainMesh {
     if (!heightsChanged && this.everBuilt) {
       // (each vertex's sample and edge fade, as the full pass works them out: they depend on its x, z alone)
       const N = this.nx * this.ny;
-      if (!this.vSample) {
-        this.vSample = new Int32Array(N);
-        this.vFade = new Float64Array(N);
-        for (let k = 0; k < N; k++) {
-          const x = pos[k * 3];
-          const z = pos[k * 3 + 2];
-          const inside = x >= 0 && z >= 0 && x <= t.width && z <= t.depth;
-          const ci = Math.round(Math.min(Math.max(x, 0), t.width) / t.res);
-          const cj = Math.round(Math.min(Math.max(z, 0), t.depth) / t.res);
-          this.vSample[k] = cj * t.nx + ci;
-          const d = inside ? 0 : Math.hypot(x - Math.min(Math.max(x, 0), t.width), z - Math.min(Math.max(z, 0), t.depth));
-          this.vFade[k] = 1 - sstep(0, 60, d);
-        }
-      }
-      const vs = this.vSample;
+      // (each vertex's sample and edge fade, as the full pass worked them out and kept them)
+      const vs = this.vSample!;
       const vf = this.vFade!;
       for (let k = 0; k < N; k++) {
         const sI = vs[k];
@@ -256,6 +243,9 @@ export class TerrainMesh {
       return;
     }
     this.everBuilt = true;
+    const N0 = this.nx * this.ny;
+    const vSample = (this.vSample ??= new Int32Array(N0));
+    const vFade = (this.vFade ??= new Float64Array(N0));
     const biome = t.map?.biome;
     const outsideCover: number[] | null =
       biome === 'savanna' ? [0.35, 0.1, 0.55, 0]
@@ -280,6 +270,9 @@ export class TerrainMesh {
         const fo = out ? sstep(0, 140, d) : 0;
         for (let c = 0; c < 4; c++) cover[k * 4 + c] = F.cover[k4 + c] + ((out ? out[c] : 0) - F.cover[k4 + c]) * fo;
         const fade = 1 - sstep(0, 60, d);
+        // (kept for a water-only change: performance v4)
+        vSample[k] = s;
+        vFade[k] = fade;
         g1[k * 4] = F.wet[s] * fade;
         g1[k * 4 + 1] = F.ao[s] + (1 - F.ao[s]) * sstep(0, 40, d);
         g1[k * 4 + 2] = F.trail[s] * fade;

@@ -548,6 +548,8 @@ export class Terrain {
 
   rebuildWater(): void {
     const { nx, ny, res } = this;
+    // (the flood zones' masks made with the map, not on a storm's first step: performance v4)
+    if (this.map) for (const fz of this.map.floods) this.shapeMask(fz.shape);
     this.water.fill(-9999);
     if (this.map)
       for (const wb of this.map.water) {

@@ -239,6 +239,12 @@ export class SurfaceEntrances {
     this.work();
   }
 
+  /** Build every anthill now (loading), without moving the update clock. */
+  prebuild(w: World, ground: (x: number, y: number) => number): void {
+    this.check(w, ground);
+    this.work();
+  }
+
   /** Which anthills changed (every 30 frames): the first build of one at once; a changed one queued. */
   private check(w: World, ground: (x: number, y: number) => number): void {
     const seen = new Set<string>();
