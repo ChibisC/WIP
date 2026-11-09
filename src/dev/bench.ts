@@ -851,7 +851,11 @@ function fmtScene(r: SceneResult): string[] {
       const later = all.filter((x) => x.round > 0);
       const worst = (a: SwitchStep[]) => (a.length ? Math.max(...a.map((x) => x.worst)).toFixed(0) : '—');
       const over = (a: SwitchStep[]) => a.reduce((n, x) => n + x.over33, 0);
-      out.push(`switch ${kind}: ${all.length}× · worst frame first round ${worst(first)} ms, later rounds ${worst(later)} ms · frames over 33 ms: first ${over(first)}, later ${over(later)}`);
+      // (performance v5: per round — the v4 line summed the nine later rounds against the first one, which read as
+      // growth: the Mac's "first 19, later 183" was about 20 a round)
+      const nr = new Set(all.map((x) => x.round)).size;
+      const perRound = [...new Set(all.map((x) => x.round))].sort((a, b) => a - b).map((k) => over(all.filter((x) => x.round === k)));
+      out.push(`switch ${kind}: ${all.length}× · worst frame first round ${worst(first)} ms, later rounds ${worst(later)} ms · frames over 33 ms a round: first ${over(first)}, later ${nr > 1 ? (over(later) / (nr - 1)).toFixed(1) : '—'} (each round: ${perRound.join(', ')})`);
     }
     // the steps with the longest frames, and what was in them
     const causes = sw.steps
