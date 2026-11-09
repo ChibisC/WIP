@@ -77,6 +77,8 @@ interface SceneResult {
   heapMB: number;
   /** GPU memory, estimated (MB) */
   gpuMB: number;
+  /** of which textures, render buffers (the multisampled targets), vertex and index buffers (MB; performance v5) */
+  gpuParts?: { tex: number; rb: number; buf: number };
   tickMs: number;
   msgKB: number;
   glLinks: number;
@@ -354,6 +356,7 @@ function collect(s: GameSession, def: SceneDef, loadMs: number, secs: number, sw
     geometries: n.geometries,
     heapMB: +n.heapMB.toFixed(0),
     gpuMB: +prof.gpuMB().toFixed(0),
+    gpuParts: { tex: Math.round(prof.mem.tex / 1048576), rb: Math.round(prof.mem.rb / 1048576), buf: Math.round(prof.mem.buf / 1048576) },
     tickMs: +s.sim.tickMs.toFixed(2),
     msgKB: +(prof.msgBytesAvg / 1024).toFixed(0),
     glLinks: G.links,
@@ -829,7 +832,7 @@ function fmtScene(r: SceneResult): string[] {
     `## ${r.title}`,
     `load ${(r.loadMs / 1000).toFixed(1)} s (pre-warm ${((r.prewarmMs ?? 0) / 1000).toFixed(1)} s) · ${r.frames} frames · ${r.fps} FPS · frame avg ${r.frameAvg} ms, p95 ${r.p95}, worst ${r.worst} · over 33 ms: ${r.over33}, over 50 ms: ${r.over50}`,
     `main thread ${r.cpuAvg} ms (${parts}) · GPU ${r.gpuAvg ?? 'n/a'} ms · sim tick ${r.tickMs} ms, msg ${r.msgKB} KB`,
-    `draw calls ${r.calls} · tris ${(r.tris / 1000).toFixed(0)}k · programs ${r.programs} · textures ${r.textures} · geometries ${r.geometries} · heap ${r.heapMB} MB · GPU memory ≈ ${r.gpuMB} MB · ${r.ants} ants, ${r.creatures} creatures · quality ${r.quality}`,
+    `draw calls ${r.calls} · tris ${(r.tris / 1000).toFixed(0)}k · programs ${r.programs} · textures ${r.textures} · geometries ${r.geometries} · heap ${r.heapMB} MB · GPU memory ≈ ${r.gpuMB} MB${r.gpuParts ? ` (textures ${r.gpuParts.tex}, render buffers ${r.gpuParts.rb}, buffers ${r.gpuParts.buf})` : ''} · ${r.ants} ants, ${r.creatures} creatures · quality ${r.quality}`,
     `GL during the run: ${r.glLinks} shader links, ${r.glUploads} texture uploads`,
   ];
   if (r.switch) {

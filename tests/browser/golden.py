@@ -11,6 +11,8 @@ that only the optimization differs. On the build machine (SwiftShader) a screens
 up with the shader compiles, minutes after loading: the timeouts are long on purpose.
 
 Run: tests/browser/with_server.sh python3 tests/browser/golden.py   (TAG=before|after  ONLY=name,parts  RESUME=1)
+Performance v5: DPR=2 renders at two device pixels a screen pixel (a Retina screen); EXTRA="&res15=1" is appended to
+every page (the effects at 1.5× with the upscale, for the resolution before/after pictures).
 """
 import os
 import time
@@ -19,6 +21,8 @@ from playwright.sync_api import sync_playwright
 BASE = os.environ.get("BASE", "http://127.0.0.1:5173/")
 TAG = os.environ.get("TAG", "before")
 ONLY = os.environ.get("ONLY", "")
+DPR = float(os.environ.get("DPR", "1"))
+EXTRA = os.environ.get("EXTRA", "")
 OUT = os.path.join(os.path.dirname(__file__), "..", "..", "docs", "performance", "golden", TAG)
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"]
 os.makedirs(OUT, exist_ok=True)
@@ -62,7 +66,7 @@ GAME = "?play=1&shot=1&noui=1&nocine=1&q={q}&seed={seed}&creatures=1&ticks=40"
 def load(pg, url, errs):
     errs.clear()
     t0 = time.time()
-    pg.goto(BASE + url, wait_until="load")
+    pg.goto(BASE + url + EXTRA, wait_until="load")
     while time.time() - t0 < 900 and not pg.evaluate("window.__ready===true"):
         time.sleep(0.5)
     return time.time() - t0
@@ -81,7 +85,7 @@ NEST_CAM = """([space, x, z, k, pitch]) => { const s = window.__session; const v
 
 with sync_playwright() as p:
     b = p.chromium.launch(args=ARGS)
-    ctx = b.new_context(viewport={"width": 1280, "height": 760})
+    ctx = b.new_context(viewport={"width": 1280, "height": 760}, device_scale_factor=DPR)
     pg = ctx.new_page()
     pg.set_default_timeout(900000)
     errs = []

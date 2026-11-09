@@ -235,7 +235,9 @@ export class GameSession {
     this.view = new GameView(canvas, this.input);
     // (performance v5: Retina screens draw the effects at 1.5× unless the player chose full sharpness; the screenshot
     // harness and the golden set draw at full resolution)
-    this.view.fullSharpness = !!st.fullSharpness || new URLSearchParams(location.search).has('shot');
+    // (`res15=1`: the 1.5× path in a screenshot too — the before/after pictures for the user)
+    const sq = new URLSearchParams(location.search);
+    this.view.fullSharpness = !!st.fullSharpness || (sq.has('shot') && !sq.has('res15'));
     this.view.setQuality(quality);
     const w = this.world;
     // (no grass through the anthills: each one's holes and the ground round them)
