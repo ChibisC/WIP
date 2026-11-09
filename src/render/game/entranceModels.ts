@@ -215,16 +215,34 @@ export class SurfaceEntrances {
     return !this.holes.length && !this.masses.length;
   }
 
-  /** Rebuild a colony's anthill on the next update (the ground under it changed: a fire-ant dome grew). */
+  /** Rebuild a colony's anthill on the next update (the ground under it changed: a fire-ant dome grew): at once, not spread. */
   rebuild(colony: number): void {
     const b = this.built.get('c' + colony);
     if (b) b.sig = '';
+    this.now.add('c' + colony);
     this.frame = 0;
   }
 
+  /** anthills to rebuild at once on the next check (the dome under them changed) */
+  private now = new Set<string>();
+  /** changed anthills waiting to be rebuilt, and the one being built a slice a frame (performance v4) */
+  private pending = new Map<string, { sig: string; start: () => Generator<void, Built> }>();
+  private job: { key: string; sig: string; gen: Generator<void, Built> | null; done: Built | null; ready: boolean } | null = null;
+  /** ms a frame for rebuilding anthills */
+  budgetMs = 3;
+  /** compile a finished anthill's programs before it is shown (the session gives the renderer's compileAsync), so
+   *  the swap never compiles a shader on the frame */
+  compile: ((objs: THREE.Object3D[]) => Promise<unknown>) | null = null;
+
   update(w: World, ground: (x: number, y: number) => number): void {
-    if (this.frame++ % 30 !== 0) return;
+    if (this.frame++ % 30 === 0) this.check(w, ground);
+    this.work();
+  }
+
+  /** Which anthills changed (every 30 frames): the first build of one at once; a changed one queued. */
+  private check(w: World, ground: (x: number, y: number) => number): void {
     const seen = new Set<string>();
+    let changed = false;
     for (const c of w.s.colonies) {
       if (!c.entrances.length) continue;
       const key = 'c' + c.id;
@@ -236,15 +254,84 @@ export class SurfaceEntrances {
       const living = Math.round(Math.min(1, Math.sqrt(Math.max(0, c.living)) / 18) * 5) / 5;
       const sig = `${look}|${size}|${living}|${c.entrances.map((e) => `${e.sx.toFixed(1)},${e.sy.toFixed(1)},${Math.round((e.fall ?? 0) * 4)},${(e.breach ?? 0) ? Math.round((1 - (e.repair ?? 0)) * 6) + ':' + (e.breachMm ?? 0).toFixed(1) : 'n' + digStage(e)}`).join(';')}`;
       const old = this.built.get(key);
-      if (old && old.sig === sig) continue;
-      if (old) this.dispose(old);
-      this.built.set(key, this.build(w, c, look, 1 + size, living, sig, ground));
+      if (old && old.sig === sig) {
+        // (back to the look it has: nothing to build)
+        this.pending.delete(key);
+        if (this.job?.key === key) this.job = null;
+        continue;
+      }
+      if (this.job?.key === key && this.job.sig === sig) continue;
+      // (the colony as it is now: the build reads its holes over several frames while the replica moves on)
+      const snap = { ...c, entrances: c.entrances.map((e) => ({ ...e })) } as Colony;
+      if (!old || this.now.has(key)) {
+        if (this.job?.key === key) this.job = null;
+        this.pending.delete(key);
+        this.swap(key, this.build(w, snap, look, 1 + size, living, sig, ground));
+        changed = true;
+        continue;
+      }
+      if (this.job?.key === key) this.job = null;
+      this.pending.set(key, { sig, start: () => this.buildSteps(w, snap, look, 1 + size, living, sig, ground) });
     }
+    this.now.clear();
     for (const [key, b] of this.built)
       if (!seen.has(key)) {
         this.dispose(b);
         this.built.delete(key);
+        this.pending.delete(key);
+        if (this.job?.key === key) this.job = null;
+        changed = true;
       }
+    if (changed) this.lists();
+  }
+
+  /** A few milliseconds of rebuilding a frame; a finished anthill replaces the old one whole once its programs are ready. */
+  private work(): void {
+    const t0 = performance.now();
+    for (;;) {
+      if (!this.job) {
+        const next = this.pending.entries().next();
+        if (next.done) return;
+        const [key, p] = next.value;
+        this.pending.delete(key);
+        this.job = { key, sig: p.sig, gen: p.start(), done: null, ready: false };
+      }
+      const job = this.job;
+      if (job.gen) {
+        const r = job.gen.next();
+        if (r.done) {
+          job.gen = null;
+          job.done = r.value;
+          if (this.compile) {
+            this.compile(r.value.objs).then(
+              () => (job.ready = true),
+              () => (job.ready = true),
+            );
+          } else job.ready = true;
+        }
+      }
+      if (job.done && job.ready) {
+        if (this.job === job) {
+          this.swap(job.key, job.done);
+          this.lists();
+          this.job = null;
+        }
+        continue;
+      }
+      if (job.done || performance.now() - t0 >= this.budgetMs) return;
+    }
+  }
+
+  /** Show a built anthill in place of the old one. */
+  private swap(key: string, b: Built): void {
+    const old = this.built.get(key);
+    if (old) this.dispose(old);
+    for (const o of b.objs) this.group.add(o);
+    this.built.set(key, b);
+  }
+
+  /** The flat lists `height()` reads. */
+  private lists(): void {
     this.holes = [];
     this.masses = [];
     for (const b of this.built.values()) {
@@ -263,7 +350,21 @@ export class SurfaceEntrances {
 
   // ------------------------------------------------------------------ building
 
-  private build(w: World, c: Colony, look: Look, s: number, living: number, sig: string, ground: (x: number, y: number) => number): Built {
+  /** Build an anthill at once (the first time a colony is seen; tools). Its objects are not added to the group. */
+  build(w: World, c: Colony, look: Look, s: number, living: number, sig: string, ground: (x: number, y: number) => number): Built {
+    const it = this.buildSteps(w, c, look, s, living, sig, ground);
+    for (;;) {
+      const r = it.next();
+      if (r.done) return r.value;
+    }
+  }
+
+  /**
+   * An anthill's meshes, a few pieces at a time (performance v4): a generator that yields every 32 pellets or needles,
+   * after each hole and before each merge, so a rebuild in play is spread over frames (`update`). The same pieces in
+   * the same order as one go.
+   */
+  private *buildSteps(w: World, c: Colony, look: Look, s: number, living: number, sig: string, ground: (x: number, y: number) => number): Generator<void, Built> {
     const b: Built = { sig, objs: [], holes: [], masses: [] };
     const fallC = Math.max(...c.entrances.map((e) => e.fall ?? 0));
     // the anthill: its three holes round its centre (sim/entrances.ts), one structure over them all
@@ -284,7 +385,6 @@ export class SurfaceEntrances {
         tm.receiveShadow = true;
         tm.renderOrder = 1;
         b.objs.push(tm);
-        this.group.add(tm);
       }
     };
     if (look === 'formica') {
@@ -293,7 +393,7 @@ export class SurfaceEntrances {
       const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: R * 0.42 * (1 - 0.6 * fallC), k: 1.15, seed: c.id * 3 + 1 };
       b.masses.push(m);
       massGeos.push(massMesh(m, ground, (x, y, h, t) => thatchColour(x, y, h, t, m.seed)));
-      details.push(...thatch(m, ground, rng, Math.round(700 + R * 30)));
+      yield* thatch(details, m, ground, rng, Math.round(700 + R * 30));
       addTrails(R);
     } else if (look === 'lasius' || look === 'plagiaria' || look === 'termant') {
       // a low crater of crumbly worked soil, the three holes in its rampart (Termants: carton-reinforced)
@@ -302,8 +402,8 @@ export class SurfaceEntrances {
       b.masses.push(m);
       craterGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed, h / m.h), true));
       const at = (x: number, y: number) => ground(x, y) + massHeight(m, x, y);
-      details.push(...pellets(ctr.x, ctr.y, R * 0.97, Math.round((260 + living * 260) * (1 - 0.6 * fallC)), rng, at, [pal.pellet, pal.dry, pal.damp, 0x6a5644], 0.3, 0.75));
-      if (look === 'termant') details.push(...pellets(ctr.x, ctr.y, R * 0.8, Math.round(40 + living * 40), rng, at, [0x2e2016, 0x3b2a1e, 0x4a3626], 0.45, 0.9, far * 0.5));
+      yield* pellets(details, ctr.x, ctr.y, R * 0.97, Math.round((260 + living * 260) * (1 - 0.6 * fallC)), rng, at, [pal.pellet, pal.dry, pal.damp, 0x6a5644], 0.3, 0.75);
+      if (look === 'termant') yield* pellets(details, ctr.x, ctr.y, R * 0.8, Math.round(40 + living * 40), rng, at, [0x2e2016, 0x3b2a1e, 0x4a3626], 0.45, 0.9, far * 0.5);
     } else if (look === 'atta') {
       // a wide bare-soil mound, its three big craters on the flanks; a pale refuse dump beside it (where the dead and the
       // waste are dropped: entrances.ts refuseSpot)
@@ -315,7 +415,7 @@ export class SurfaceEntrances {
       const d: Mass = { x: rs.x, y: rs.y, r: 6 + living * 6, h: 1.4 + living * 1.6, k: 0.8, seed: c.id * 19 + 7 };
       b.masses.push(d);
       massGeos.push(massMesh(d, ground, (x, y, h, t) => refuseColour(x, y, t)));
-      details.push(...pellets(d.x, d.y, d.r * 0.95, Math.round(160 + d.r * 12), rng, (x, y) => ground(x, y) + massHeight(d, x, y), [0x9a8c74, 0x7a6e5a, 0xb0a288, 0x5a5040, 0x6a6a4a], 0.4, 1.0));
+      yield* pellets(details, d.x, d.y, d.r * 0.95, Math.round(160 + d.r * 12), rng, (x, y) => ground(x, y) + massHeight(d, x, y), [0x9a8c74, 0x7a6e5a, 0xb0a288, 0x5a5040, 0x6a6a4a], 0.4, 1.0);
       addTrails(R);
     } else if (look === 'nasute') {
       // a dark carton nest, its three openings at its base, covered galleries running off along the ground between them
@@ -359,7 +459,6 @@ export class SurfaceEntrances {
         // the linked workers: one instanced ant body (head, thorax, gaster, legs) many times over
         const ants = bivouac(m, ground, rng, Math.round(500 + living * 700), this.bodyMat, c.entrances);
         b.objs.push(ants);
-        this.group.add(ants);
       }
     } else if (look === 'hell') {
       // (a reconstruction) a minimal ring of soil, three small neat holes on it, leaf litter round about
@@ -367,10 +466,10 @@ export class SurfaceEntrances {
       const m: Mass = { x: ctr.x, y: ctr.y, r: R, h: 0.45 * (1 - 0.6 * fallC), k: 1, seed: c.id * 31 + 6, ring: far / R };
       b.masses.push(m);
       craterGeos.push(massMesh(m, ground, (x, y, h, t) => soilColour(x, y, t, pal, m.seed, h / m.h), true));
-      details.push(...leafBits(ctr.x, ctr.y, R * 1.8, 14, rng, (x, y) => ground(x, y) + massHeight(m, x, y), [0x5a3e22, 0x7a5430, 0x4a321c, 0x6a4a2a, 0x8a6236], [2, 4.2], far * 0.2));
+      yield* leafBits(details, ctr.x, ctr.y, R * 1.8, 14, rng, (x, y) => ground(x, y) + massHeight(m, x, y), [0x5a3e22, 0x7a5430, 0x4a321c, 0x6a4a2a, 0x8a6236], [2, 4.2], far * 0.2);
     } else if (look === 'sickle') {
       // three small openings with soil collars in the leaf litter
-      details.push(...leafBits(ctr.x, ctr.y, far * 1.9, 12, rng, ground, [0x7a5a30, 0x5e4426, 0x9a7038], [1.4, 2.8], 0));
+      yield* leafBits(details, ctr.x, ctr.y, far * 1.9, 12, rng, ground, [0x7a5a30, 0x5e4426, 0x9a7038], [1.4, 2.8], 0);
     }
     const under = (x: number, y: number) => {
       let h = ground(x, y);
@@ -378,7 +477,8 @@ export class SurfaceEntrances {
       return h;
     };
     // ---- each hole: its rim, opening and loose details (the three alike: one anthill)
-    c.entrances.forEach((e, i) => {
+    for (let i = 0; i < c.entrances.length; i++) {
+      const e = c.entrances[i];
       const k = Math.min(1.35, s);
       // a titan's breach (sim/creatures/titanDig.ts): a wide, raw crater (sized to the titan), shrinking back as the colony
       // repairs it; before it, the hole opening in stages as the titan digs (claude/creatures/02-spec §3): the rim
@@ -397,29 +497,35 @@ export class SurfaceEntrances {
       mesh.castShadow = true;
       mesh.renderOrder = 1;
       b.objs.push(mesh);
-      this.group.add(mesh);
       const at = (x: number, y: number) => under(x, y) + rimHeight(rim, Math.hypot(x - e.sx, y - e.sy), Math.atan2(y - e.sy, x - e.sx), hole.plug, hole.fall);
-      details.push(...entranceDetails(look, e, i, rim, rng, at, ctr, k));
+      yield* entranceDetails(details, look, e, i, rim, rng, at, ctr, k);
       if (look === 'lasius' && i === 1) details.push(flatStone(e.sx, e.sy, rim, rng, under));
       // Termants: dark papery carton plastered round each crater's throat
       if (look === 'termant' && !hole.fall) cartonGeos.push(cartonCollar(e.sx, e.sy, rim, at, seed));
-    });
+      yield;
+    }
+    yield;
     if (details.length) {
-      const g = mergeGeometries(details.map(prep));
+      const prepped: THREE.BufferGeometry[] = [];
+      for (let i = 0; i < details.length; i++) {
+        prepped.push(prep(details[i]));
+        if ((i & 127) === 127) yield;
+      }
+      yield;
+      const g = mergeGeometries(prepped);
       if (g) {
         const m = new THREE.Mesh(g, this.detailMat);
         m.castShadow = m.receiveShadow = true;
         b.objs.push(m);
-        this.group.add(m);
       }
     }
+    yield;
     if (massGeos.length) {
       const g = mergeGeometries(massGeos.map(prep));
       if (g) {
         const m = new THREE.Mesh(g, this.massMat);
         m.castShadow = m.receiveShadow = true;
         b.objs.push(m);
-        this.group.add(m);
       }
     }
     if (craterGeos.length) {
@@ -430,7 +536,6 @@ export class SurfaceEntrances {
         m.castShadow = true;
         m.renderOrder = 0;
         b.objs.push(m);
-        this.group.add(m);
       }
     }
     if (cartonGeos.length) {
@@ -439,7 +544,6 @@ export class SurfaceEntrances {
         const m = new THREE.Mesh(g, this.cartonMat);
         m.castShadow = m.receiveShadow = true;
         b.objs.push(m);
-        this.group.add(m);
       }
     }
     return b;
@@ -774,7 +878,15 @@ function coloured(g: THREE.BufferGeometry, hex: number, k = 1): THREE.BufferGeom
   for (const n of Object.keys(ng.attributes)) if (n !== 'position' && n !== 'normal') ng.deleteAttribute(n);
   const c = new THREE.Color(hex).multiplyScalar(k);
   const a = new Float32Array(ng.attributes.position.count * 3);
-  for (let i = 0; i < a.length; i += 3) a.set([c.r, c.g, c.b], i);
+  // (no array per vertex: performance v4)
+  const r = c.r;
+  const g2 = c.g;
+  const b = c.b;
+  for (let i = 0; i < a.length; i += 3) {
+    a[i] = r;
+    a[i + 1] = g2;
+    a[i + 2] = b;
+  }
   ng.setAttribute('color', new THREE.BufferAttribute(a, 3));
   return ng;
 }
@@ -792,7 +904,11 @@ function prep(g: THREE.BufferGeometry): THREE.BufferGeometry {
   const c = ng.attributes.color as THREE.BufferAttribute;
   if (c.itemSize === 4) {
     const a = new Float32Array(c.count * 3);
-    for (let i = 0; i < c.count; i++) a.set([c.getX(i), c.getY(i), c.getZ(i)], i * 3);
+    for (let i = 0; i < c.count; i++) {
+      a[i * 3] = c.getX(i);
+      a[i * 3 + 1] = c.getY(i);
+      a[i * 3 + 2] = c.getZ(i);
+    }
     ng.setAttribute('color', new THREE.BufferAttribute(a, 3));
   }
   return ng;
@@ -805,14 +921,12 @@ function strip(g: THREE.BufferGeometry): THREE.BufferGeometry {
   return ng;
 }
 
-const PELLET = (() => {
-  const g = new THREE.IcosahedronGeometry(0.5, 0);
-  return g;
-})();
+// (a plain geometry holding the icosahedron: `clone()` of an IcosahedronGeometry builds a fresh polyhedron before
+// copying over it — a fifth of an anthill's build time; the same vertices either way. Performance v4)
+const PELLET = new THREE.BufferGeometry().copy(new THREE.IcosahedronGeometry(0.5, 0));
 
 /** Soil pellets (or frass, refuse) scattered in a disc, denser inward. */
-function pellets(cx: number, cy: number, R: number, n: number, rng: Rng, at: (x: number, y: number) => number, cols: number[], s0: number, s1: number, inner = 0): THREE.BufferGeometry[] {
-  const out: THREE.BufferGeometry[] = [];
+function* pellets(out: THREE.BufferGeometry[], cx: number, cy: number, R: number, n: number, rng: Rng, at: (x: number, y: number) => number, cols: number[], s0: number, s1: number, inner = 0): Generator<void, void> {
   for (let i = 0; i < n; i++) {
     const a = rng.range(0, Math.PI * 2);
     const d = inner + Math.pow(rng.next(), 0.8) * (R - inner);
@@ -824,13 +938,12 @@ function pellets(cx: number, cy: number, R: number, n: number, rng: Rng, at: (x:
     g.rotateY(rng.range(0, 6.28));
     g.translate(x, at(x, y) + sz * 0.18, y);
     out.push(g);
+    if ((i & 31) === 31) yield;
   }
-  return out;
 }
 
 /** Thin slivers lying on a surface (pine needles, twigs, frass flakes). */
-function slivers(cx: number, cy: number, R: number, n: number, rng: Rng, at: (x: number, y: number) => number, cols: number[], len: [number, number], wid: number, inner = 0): THREE.BufferGeometry[] {
-  const out: THREE.BufferGeometry[] = [];
+function* slivers(out: THREE.BufferGeometry[], cx: number, cy: number, R: number, n: number, rng: Rng, at: (x: number, y: number) => number, cols: number[], len: [number, number], wid: number, inner = 0): Generator<void, void> {
   for (let i = 0; i < n; i++) {
     const a = rng.range(0, Math.PI * 2);
     const d = inner + Math.sqrt(rng.next()) * (R - inner);
@@ -849,13 +962,12 @@ function slivers(cx: number, cy: number, R: number, n: number, rng: Rng, at: (x:
     g.applyMatrix4(new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize(), slope));
     g.translate(x, at(x, y) + wid * 0.4, y);
     out.push(g);
+    if ((i & 31) === 31) yield;
   }
-  return out;
 }
 
 /** Small flat leaf pieces (leafcutter fragments, litter). */
-function leafBits(cx: number, cy: number, R: number, n: number, rng: Rng, at: (x: number, y: number) => number, cols: number[], size: [number, number], inner = 0, dir?: number): THREE.BufferGeometry[] {
-  const out: THREE.BufferGeometry[] = [];
+function* leafBits(out: THREE.BufferGeometry[], cx: number, cy: number, R: number, n: number, rng: Rng, at: (x: number, y: number) => number, cols: number[], size: [number, number], inner = 0, dir?: number): Generator<void, void> {
   for (let i = 0; i < n; i++) {
     const a = dir !== undefined ? dir + rng.range(-0.25, 0.25) : rng.range(0, Math.PI * 2);
     const d = inner + Math.sqrt(rng.next()) * (R - inner);
@@ -880,14 +992,15 @@ function leafBits(cx: number, cy: number, R: number, n: number, rng: Rng, at: (x
     g.rotateY(rng.range(0, 6.28));
     g.translate(x, at(x, y) + 0.15, y);
     out.push(g);
+    if ((i & 31) === 31) yield;
   }
-  return out;
 }
 
 /** Thatch over a Formica dome: needles and twig pieces lying on it. */
-function thatch(m: Mass, ground: (x: number, y: number) => number, rng: Rng, n: number): THREE.BufferGeometry[] {
+function* thatch(out: THREE.BufferGeometry[], m: Mass, ground: (x: number, y: number) => number, rng: Rng, n: number): Generator<void, void> {
   const at = (x: number, y: number) => ground(x, y) + massHeight(m, x, y);
-  return [...slivers(m.x, m.y, m.r * 0.98, n, rng, at, [0x5a3a20, 0x7a4e2a, 0x3e2814, 0x8a6036, 0x4a3018, 0x6a4024], [1.6, 3.8], 0.17), ...slivers(m.x, m.y, m.r * 0.9, Math.round(n / 40), rng, at, [0x3e2e20, 0x4e3a28], [4, 8], 0.45)];
+  yield* slivers(out, m.x, m.y, m.r * 0.98, n, rng, at, [0x5a3a20, 0x7a4e2a, 0x3e2814, 0x8a6036, 0x4a3018, 0x6a4024], [1.6, 3.8], 0.17);
+  yield* slivers(out, m.x, m.y, m.r * 0.9, Math.round(n / 40), rng, at, [0x3e2e20, 0x4e3a28], [4, 8], 0.45);
 }
 
 /**
@@ -1049,44 +1162,52 @@ function flatStone(x0: number, y0: number, rim: Rim, rng: Rng, under: (x: number
 }
 
 /** Loose bits round one entrance, by species. */
-function entranceDetails(look: Look, e: Entrance, i: number, rim: Rim, rng: Rng, at: (x: number, y: number) => number, ctr: { x: number; y: number }, k: number): THREE.BufferGeometry[] {
+function* entranceDetails(out: THREE.BufferGeometry[], look: Look, e: Entrance, i: number, rim: Rim, rng: Rng, at: (x: number, y: number) => number, ctr: { x: number; y: number }, k: number): Generator<void, void> {
   const pal = PAL[look];
-  const out = Math.atan2(e.sy - ctr.y, e.sx - ctr.x);
+  const outA = Math.atan2(e.sy - ctr.y, e.sx - ctr.x);
   const fill = e.fall ?? 0;
   const n = (base: number) => Math.round(base * k * (1 - 0.6 * fill));
   switch (look) {
     case 'lasius':
     case 'plagiaria':
     case 'solenopsis':
-      return [
-        ...pellets(e.sx, e.sy, rim.outR * 0.9, n(look === 'solenopsis' ? 120 : 190), rng, at, [pal.pellet, pal.dry, pal.damp, 0x6a5644], 0.35, 0.8, rim.holeR * 1.1),
-        ...(look === 'plagiaria' ? slivers(e.sx, e.sy, rim.outR * 0.8, n(30), rng, at, [0x7a5a34, 0x5a3e24], [1.8, 4], 0.28, rim.holeR * 1.3) : []),
-      ];
+      yield* pellets(out, e.sx, e.sy, rim.outR * 0.9, n(look === 'solenopsis' ? 120 : 190), rng, at, [pal.pellet, pal.dry, pal.damp, 0x6a5644], 0.35, 0.8, rim.holeR * 1.1);
+      if (look === 'plagiaria') yield* slivers(out, e.sx, e.sy, rim.outR * 0.8, n(30), rng, at, [0x7a5a34, 0x5a3e24], [1.8, 4], 0.28, rim.holeR * 1.3);
+      return;
     case 'atta':
       // loose excavated soil, leaf fragments carried in, a cleared trail leading away
-      return [
-        ...pellets(e.sx, e.sy, rim.outR, n(260), rng, at, [pal.pellet, pal.dry, 0xa8703e, pal.damp], 0.45, 1.2, rim.holeR * 1.1),
-        ...leafBits(e.sx, e.sy, rim.outR * 1.6, n(16), rng, at, [0x5a8a30, 0x6a9a3a, 0x4a7a28, 0x8aa040], [0.9, 1.8], rim.holeR * 1.5, out),
-      ];
+      yield* pellets(out, e.sx, e.sy, rim.outR, n(260), rng, at, [pal.pellet, pal.dry, 0xa8703e, pal.damp], 0.45, 1.2, rim.holeR * 1.1);
+      yield* leafBits(out, e.sx, e.sy, rim.outR * 1.6, n(16), rng, at, [0x5a8a30, 0x6a9a3a, 0x4a7a28, 0x8aa040], [0.9, 1.8], rim.holeR * 1.5, outA);
+      return;
     case 'formica':
-      return slivers(e.sx, e.sy, rim.outR, n(26), rng, at, [0x6a4426, 0x8a5a30], [2, 4.5], 0.3, rim.holeR * 1.1);
+      yield* slivers(out, e.sx, e.sy, rim.outR, n(26), rng, at, [0x6a4426, 0x8a5a30], [2, 4.5], 0.3, rim.holeR * 1.1);
+      return;
     case 'hell':
       // a neat hole in the leaf litter (reconstruction)
-      return [...leafBits(e.sx, e.sy, rim.outR * 3.4, 16, rng, at, [0x5a3e22, 0x7a5430, 0x4a321c, 0x6a4a2a, 0x8a6236], [2, 4.2], rim.holeR * 2.2), ...pellets(e.sx, e.sy, rim.outR, n(26), rng, at, [pal.pellet, pal.dry], 0.25, 0.5, rim.holeR * 1.1)];
+      yield* leafBits(out, e.sx, e.sy, rim.outR * 3.4, 16, rng, at, [0x5a3e22, 0x7a5430, 0x4a321c, 0x6a4a2a, 0x8a6236], [2, 4.2], rim.holeR * 2.2);
+      yield* pellets(out, e.sx, e.sy, rim.outR, n(26), rng, at, [pal.pellet, pal.dry], 0.25, 0.5, rim.holeR * 1.1);
+      return;
     case 'aurimyrmex':
       // pale sawdust-like frass spilling from the hole
-      return [...pellets(e.sx, e.sy, rim.outR * 1.2, n(140), rng, at, [0xd8c49a, 0xc8b086, 0xe6d6b0, 0xa88e62], 0.18, 0.42, rim.holeR * 0.9), ...slivers(e.sx, e.sy, rim.outR, n(40), rng, at, [0xd2bc90, 0xbca478], [0.6, 1.4], 0.18, rim.holeR)];
+      yield* pellets(out, e.sx, e.sy, rim.outR * 1.2, n(140), rng, at, [0xd8c49a, 0xc8b086, 0xe6d6b0, 0xa88e62], 0.18, 0.42, rim.holeR * 0.9);
+      yield* slivers(out, e.sx, e.sy, rim.outR, n(40), rng, at, [0xd2bc90, 0xbca478], [0.6, 1.4], 0.18, rim.holeR);
+      return;
     case 'termant':
       // soil pellets and dark carton flakes plastered round the crest
-      return [...pellets(e.sx, e.sy, rim.outR * 0.85, n(80), rng, at, [pal.pellet, pal.dry], 0.3, 0.55, rim.rimR * 0.9), ...pellets(e.sx, e.sy, rim.rimR * 1.15, n(46), rng, at, [0x2e2016, 0x3b2a1e, 0x4a3626], 0.45, 0.9, rim.holeR * 1.05)];
+      yield* pellets(out, e.sx, e.sy, rim.outR * 0.85, n(80), rng, at, [pal.pellet, pal.dry], 0.3, 0.55, rim.rimR * 0.9);
+      yield* pellets(out, e.sx, e.sy, rim.rimR * 1.15, n(46), rng, at, [0x2e2016, 0x3b2a1e, 0x4a3626], 0.45, 0.9, rim.holeR * 1.05);
+      return;
     case 'nasute':
-      return pellets(e.sx, e.sy, rim.outR, n(24), rng, at, [0x3b2a1e, 0x2e2016], 0.3, 0.6, rim.holeR);
+      yield* pellets(out, e.sx, e.sy, rim.outR, n(24), rng, at, [0x3b2a1e, 0x2e2016], 0.3, 0.6, rim.holeR);
+      return;
     case 'sickle': {
       // the litter round the collar, and crumbs of the soil it is built of
-      return [...leafBits(e.sx, e.sy, 9, 6, rng, at, [0x7a5a30, 0x5e4426, 0x9a7038], [1.4, 2.8], rim.outR), ...pellets(e.sx, e.sy, rim.outR * 1.3, n(20), rng, at, [pal.pellet, pal.dry], 0.2, 0.45, rim.outR * 0.8)];
+      yield* leafBits(out, e.sx, e.sy, 9, 6, rng, at, [0x7a5a30, 0x5e4426, 0x9a7038], [1.4, 2.8], rim.outR);
+      yield* pellets(out, e.sx, e.sy, rim.outR * 1.3, n(20), rng, at, [pal.pellet, pal.dry], 0.2, 0.45, rim.outR * 0.8);
+      return;
     }
     case 'eciton':
-      return [];
+      return;
   }
   void i;
 }

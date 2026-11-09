@@ -256,6 +256,12 @@ export class GameSession {
     this.surfAnts.lodScale = this.view.preset.lodScale;
     this.surfAnts.space = SURFACE;
     this.view.surfaceScene.add(this.teamRings.group, this.digRings.group, this.surfBars.group, this.surfHit.group, this.surfCombat.group, this.surfAnts.group, this.surfCreatures.group, this.mounds.group, this.surfFood.group, this.surfDecor.group, this.surfMarkers.group, this.surfTrail.group, this.surfFx.group);
+    // a rebuilt anthill's programs are compiled before it is swapped in (performance v4: the swap never compiles)
+    this.mounds.entrances.compile = (objs) => {
+      const tmp = new THREE.Group();
+      for (const o of objs) tmp.add(o);
+      return this.view.renderer.compileAsync(tmp, this.view.activeCamera(), this.view.surfaceScene);
+    };
     // Pheromone overlay texture.
     const ph = w.phero;
     this.pheroData = new Uint8Array(ph.w * ph.h * 4);
