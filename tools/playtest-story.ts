@@ -99,9 +99,54 @@ ev.on('death', (e) => {
 });
 const t0 = performance.now();
 let end = minutes;
+// TICKS=1 (performance v4): every tick timed; the ticks over 40 ms listed at the end with the story events of that tick
+const TIMED = process.env.TICKS === '1';
+const slowTicks: Array<{ tick: number; ms: number; what: string }> = [];
+// (each system timed on its own: a slow tick names the systems that took the time)
+const sysNow: Record<string, number> = {};
+const fullSeen = new Map<number, number>();
+if (TIMED)
+  for (const sy of w.systems) {
+    const fn = sy.fn;
+    const name = sy.name;
+    sy.fn = (ww, dt) => {
+      const a = performance.now();
+      fn(ww, dt);
+      sysNow[name] = (sysNow[name] ?? 0) + performance.now() - a;
+    };
+  }
+const tickMs: number[] = [];
+let tickWhat: string[] = [];
+if (TIMED)
+  w.events.onAny((e) => {
+    const x = e as { t: string; what?: string; label?: string };
+    if (x.t === 'story' || x.t === 'surprise' || x.t === 'flood' || x.t === 'wave' || x.t === 'spawn' || x.t === 'bossArrive') tickWhat.push(`${x.t}${x.what ? ':' + x.what : ''}${x.label ? ':' + x.label : ''}`);
+  });
 for (let t = 0; t < minutes * 1200; t++) {
+  const s0 = TIMED ? performance.now() : 0;
   w.step(0.05);
+  const ms = TIMED ? performance.now() - s0 : 0;
   w.events.drain();
+  if (TIMED) {
+    tickMs.push(ms);
+    // (full flow-field builds this tick, every area: a field cache that thrashes shows here)
+    let builds = 0;
+    const gf = (w as unknown as { gridFlows: Map<number, { stats: { full: number }; size: number; grid: { w: number; h: number } }> }).gridFlows;
+    const sizes: string[] = [];
+    for (const [sp, f] of gf) {
+      const d = f.stats.full - (fullSeen.get(sp) ?? 0);
+      fullSeen.set(sp, f.stats.full);
+      builds += d;
+      if (d > 5) sizes.push(`area ${sp} ${f.grid.w}×${f.grid.h}: ${d} builds, ${f.size} cached`);
+    }
+    if (ms > 40) {
+      if (builds) tickWhat.push(`flow builds ${builds}${sizes.length ? ' (' + sizes.join('; ') + ')' : ''}`);
+      const top = Object.entries(sysNow).filter(([, v]) => v > 3).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k} ${v.toFixed(0)}`).join(', ');
+      slowTicks.push({ tick: w.s.tick, ms, what: [top, tickWhat.join(' ')].filter(Boolean).join(' | ') });
+    }
+    tickWhat = [];
+    for (const k in sysNow) sysNow[k] = 0;
+  }
   if (t % LOOK !== 0) continue;
   const m = missionOf(w)!;
   if (m.stage !== stage) {
@@ -341,6 +386,11 @@ for (let t = 0; t < minutes * 1200; t++) {
 }
 const m = missionOf(w)!;
 if (process.env.JSON) console.log(JSON.stringify({ level, diff, seed, pace: HUMAN ? 'human' : 'bot', result: m.result || 'unfinished', min: Number(end.toFixed(1)), stage: m.stage, ants: c.living, died: deaths, events: (st.flags.filter((f) => f.startsWith('ev:')).map((f) => f.slice(3))), titanIn: titanIn ? Number((titanIn / 60).toFixed(1)) : undefined, wall: Math.round((performance.now() - t0) / 1000) }));
+if (TIMED) {
+  const sorted = tickMs.slice().sort((a, b) => a - b);
+  console.log(`\nticks: ${tickMs.length}, avg ${(tickMs.reduce((a, b) => a + b, 0) / Math.max(1, tickMs.length)).toFixed(2)} ms, p99 ${(sorted[Math.floor(sorted.length * 0.99)] ?? 0).toFixed(1)}, max ${(sorted[sorted.length - 1] ?? 0).toFixed(1)}, over 40 ms ${slowTicks.length}`);
+  for (const x of slowTicks.sort((a, b) => b.ms - a.ms).slice(0, 15)) console.log(`  #${x.tick} (${(x.tick / 1200).toFixed(1)} min) ${x.ms.toFixed(0)} ms ${x.what}`);
+}
 console.log(`\n${def.title} (${diff}, seed ${seed}${loadout.length ? ', loadout ' + loadout.join('+') : ''}${STRATEGY ? ', strategy ' + STRATEGY : ''}): ${m.result || 'unfinished'} at ${end.toFixed(1)} min — ${c.living} ants, ${deaths} died (${((performance.now() - t0) / 1000).toFixed(0)} s)`);
 if (titanSeen || titanIn) console.log(`  titan: ${titanSeen ? `came to dig in at ${(titanSeen / 60).toFixed(1)} min, ` : ''}${titanIn ? `inside at ${(titanIn / 60).toFixed(1)} min` : 'NEVER INSIDE'}`);
 for (const l of log) console.log('  ' + l);

@@ -86,6 +86,38 @@ class FlowHeap {
   }
 }
 
+/** Ring size of the bucket queue: one more than the largest step (two cells' costs of at most 64 each). */
+const BUCKETS = 129;
+
+/**
+ * Bucket queue for full field builds (performance v4): entries at whole-unit distances, a ring of `BUCKETS` growable
+ * stacks; every waiting entry is within one step of the one being settled, so the ring never wraps onto itself.
+ */
+class FlowBuckets {
+  items: Int32Array[] = Array.from({ length: BUCKETS }, () => new Int32Array(64));
+  count = new Int32Array(BUCKETS);
+  pending = 0;
+
+  clear(): void {
+    this.count.fill(0);
+    this.pending = 0;
+  }
+
+  push(k: number, u: number): void {
+    const bi = u % BUCKETS;
+    let a = this.items[bi];
+    const c = this.count[bi];
+    if (c === a.length) {
+      const na = new Int32Array(a.length * 2);
+      na.set(a);
+      this.items[bi] = a = na;
+    }
+    a[c] = k;
+    this.count[bi] = c + 1;
+    this.pending++;
+  }
+}
+
 interface NestField {
   dist: Float32Array;
   /** normalized targets (air cells, sorted, unique) the field was built for */
@@ -96,12 +128,23 @@ interface NestField {
   costStamp: number;
   /** last use (for evicting the least-recently-used field) */
   used: number;
+  /** the world tick it was last used in (a field used this tick is in use: not evicted while the cache can grow) */
+  usedTick: number;
   /** the target function last given (for the audit) */
   src: () => number[];
 }
 
 /** Most nest fields kept per underground map (they are recomputed exactly when needed again). */
 const MAX_FIELDS = 64;
+/**
+ * The cache may grow past MAX_FIELDS while every field in it is in use on the same tick (performance v4: a big nest
+ * with a hundred ants resting in it can need ~70 fields at once; at 64 the least-recently-used rule threw out the very
+ * fields the next ants needed, and every tick rebuilt 60–70 of them): up to this many bytes of fields, then
+ * least-recently-used again. Fields idle for SHRINK_TICKS are dropped back down to MAX_FIELDS. Only speed changes: a
+ * field is a pure function of the state.
+ */
+const MAX_FIELD_BYTES = 32 * 1048576;
+const SHRINK_TICKS = 100;
 
 export class NestFlow {
   private fields = new Map<string, NestField>();
@@ -150,6 +193,7 @@ export class NestFlow {
     this.clock++;
     if (f && f.extra === extra && f.costStamp === this.costStamp) {
       f.used = this.clock;
+      f.usedTick = this.tick;
       f.src = targets;
       if (f.airSeen === air) return f.dist;
       const t = this.normTargets(targets());
@@ -164,7 +208,7 @@ export class NestFlow {
     let nf = f;
     if (!nf) {
       if (this.fields.size >= MAX_FIELDS) this.evict();
-      nf = { dist: new Float32Array(g.w * g.h), targets: t, airSeen: 0, extra, costStamp: this.costStamp, used: this.clock, src: targets };
+      nf = { dist: new Float32Array(g.w * g.h), targets: t, airSeen: 0, extra, costStamp: this.costStamp, used: this.clock, usedTick: this.tick, src: targets };
       this.fields.set(key, nf);
     }
     nf.targets = t;
@@ -172,20 +216,49 @@ export class NestFlow {
     nf.extra = extra;
     nf.costStamp = this.costStamp;
     nf.used = this.clock;
+    nf.usedTick = this.tick;
     this.build(nf, air);
     return nf.dist;
   }
 
+  /** The world's tick (World.step sets it): fields used on it are in use. */
+  tick = 0;
+
+  /** Called once a tick (World.step): back down to MAX_FIELDS once the extra fields have been idle a while. */
+  newTick(tick: number): void {
+    this.tick = tick;
+    if (this.fields.size <= MAX_FIELDS || tick % SHRINK_TICKS !== 0) return;
+    for (const [k, f] of this.fields) {
+      if (this.fields.size <= MAX_FIELDS) break;
+      if (tick - f.usedTick > SHRINK_TICKS) this.fields.delete(k);
+    }
+  }
+
+  /** Make room for one more field: the least recently used one not in use this tick, else (over the byte budget) the least recently used. */
   private evict(): void {
     let oldest = '';
     let ou = Infinity;
-    for (const [k, f] of this.fields)
+    let idle = '';
+    let iu = Infinity;
+    for (const [k, f] of this.fields) {
       if (f.used < ou) {
         ou = f.used;
         oldest = k;
       }
+      if (f.usedTick !== this.tick && f.used < iu) {
+        iu = f.used;
+        idle = k;
+      }
+    }
+    if (idle) {
+      this.fields.delete(idle);
+      return;
+    }
+    // every field is in use this tick: grow, up to the byte budget
+    if ((this.fields.size + 1) * this.grid.w * this.grid.h * 4 <= MAX_FIELD_BYTES) return;
     this.fields.delete(oldest);
   }
+
 
   private normTargets(raw: number[]): Int32Array {
     const g = this.grid;
@@ -202,16 +275,94 @@ export class NestFlow {
   private build(f: NestField, air: number): void {
     const dist = f.dist;
     dist.fill(Infinity);
-    const h = this.heap;
-    h.clear();
+    const b = this.buckets;
+    b.clear();
     for (let i = 0; i < f.targets.length; i++) {
       const k = f.targets[i];
       dist[k] = 0;
-      h.push(k, 0);
+      b.push(k, 0);
     }
     f.airSeen = air;
     this.stats.full++;
-    this.settle(dist);
+    this.settleBuckets(dist);
+  }
+
+  /** the bucket queue of full builds (performance v4) */
+  private buckets = new FlowBuckets();
+
+  /**
+   * Dijkstra from targets all at distance 0, on a bucket queue (performance v4, CHANGE_PLAN §34): a step costs
+   * (c₁ + c₂) / 32 with the cell costs whole numbers 1–64, so every distance is a whole number of 1/32 units and the
+   * entries waiting are never more than one step (≤ 128 units) apart — a ring of 129 buckets keeps them in order with
+   * no heap. Shortest distances are unique whatever the order cells are settled in, so the field is identical to the
+   * heap's (`settle`), bit for bit.
+   */
+  private settleBuckets(dist: Float32Array): void {
+    const g = this.grid;
+    const soil = g.soil;
+    const cost = this.cost16;
+    const q = this.buckets;
+    const W = g.w;
+    const n = dist.length;
+    let settled = 0;
+    let u = 0;
+    while (q.pending > 0) {
+      const bi = u % BUCKETS;
+      let cnt = q.count[bi];
+      const items = q.items[bi];
+      while (cnt > 0) {
+        const k = items[--cnt];
+        q.count[bi] = cnt;
+        q.pending--;
+        if (dist[k] * 32 !== u) continue; // stale entry (a shorter way was found)
+        settled++;
+        const x = k % W;
+        const ck = cost ? cost[k] : 16;
+        if (x > 0) {
+          const m = k - 1;
+          if (soil[m] === 0) {
+            const nu = u + ck + (cost ? cost[m] : 16);
+            if (nu < dist[m] * 32) {
+              dist[m] = nu / 32;
+              q.push(m, nu);
+            }
+          }
+        }
+        if (x < W - 1) {
+          const m = k + 1;
+          if (soil[m] === 0) {
+            const nu = u + ck + (cost ? cost[m] : 16);
+            if (nu < dist[m] * 32) {
+              dist[m] = nu / 32;
+              q.push(m, nu);
+            }
+          }
+        }
+        if (k >= W) {
+          const m = k - W;
+          if (soil[m] === 0) {
+            const nu = u + ck + (cost ? cost[m] : 16);
+            if (nu < dist[m] * 32) {
+              dist[m] = nu / 32;
+              q.push(m, nu);
+            }
+          }
+        }
+        if (k + W < n) {
+          const m = k + W;
+          if (soil[m] === 0) {
+            const nu = u + ck + (cost ? cost[m] : 16);
+            if (nu < dist[m] * 32) {
+              dist[m] = nu / 32;
+              q.push(m, nu);
+            }
+          }
+        }
+        cnt = q.count[bi];
+      }
+      u++;
+    }
+    this.stats.settled += settled;
   }
 
   /**

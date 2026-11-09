@@ -4,7 +4,7 @@
  * every 50 ticks (tools/perf/canon.ts) so two builds can be compared (the same hash list = the same results).
  *
  *   npx vite-node tools/perf/simBench.ts -- [scenes=fight,economy,nests,ten,titan,tunnel] [ants=500,1000,1500,2000]
- *       [ticks=200] [--out results.json] [--systems] [--series] [--prof]
+ *       [ticks=200] [--out results.json] [--systems] [--series] [--prof] [--trees]
  *
  * Scenes:
  *  - fight:   four colonies' armies meet at the map's middle (the stress scene), 100 wild creatures;
@@ -95,10 +95,15 @@ function forage(w: World, c: Colony, free: number[], n: number, frac = 1): void 
   group(w, c, free, castes[0], Math.round(n * 0.3 * frac), nestSpace(c.id), p.x, p.y, -1);
 }
 
+/** (--trees: the Trees layer on, as with a tree colony or the sandbox's "Trees on") */
+function mk(s: GameSetup, ev: EventBus): World {
+  return createWorld(flags.has('--trees') ? { ...s, trees: true } : s, ev);
+}
+
 function build(scene: string, total: number): World {
   const ev = new EventBus();
   if (scene === 'fight') {
-    const w = createWorld(stressSetup(), ev);
+    const w = mk(stressSetup(), ev);
     const per = perColony(w, total - 0);
     const cx = w.terrain.width / 2;
     const cy = w.terrain.depth / 2;
@@ -116,7 +121,7 @@ function build(scene: string, total: number): World {
     return w;
   }
   if (scene === 'economy' || scene === 'titan') {
-    const w = createWorld(stressSetup(), ev);
+    const w = mk(stressSetup(), ev);
     const per = perColony(w, total);
     for (const c of w.s.colonies) forage(w, c, freeHexes(w, c), per);
     creatures(w, 40);
@@ -129,7 +134,7 @@ function build(scene: string, total: number): World {
     return w;
   }
   if (scene === 'nests') {
-    const w = createWorld(stressSetup(), ev);
+    const w = mk(stressSetup(), ev);
     const per = perColony(w, total);
     for (const c of w.s.colonies) {
       const free = freeHexes(w, c);
@@ -151,7 +156,7 @@ function build(scene: string, total: number): World {
   if (scene === 'ten') {
     const sp = ['lasius', 'formica', 'solenopsis', 'atta', 'lasius', 'formica', 'solenopsis', 'atta', 'lasius', 'formica'];
     const s: GameSetup = { ...stressSetup(), width: 1500, depth: 1500, colonies: sp.map((x, i) => ({ species: x as never, player: i === 0, ai: true, developed: 6, startWorkers: 10, popLimit: 600 })) };
-    const w = createWorld(s, ev);
+    const w = mk(s, ev);
     const per = perColony(w, total);
     const cx = w.terrain.width / 2;
     const cy = w.terrain.depth / 2;
@@ -168,7 +173,7 @@ function build(scene: string, total: number): World {
   }
   if (scene === 'tunnel') {
     const s: GameSetup = { ...stressSetup(['lasius', 'formica']), width: 700, depth: 700, colonies: ['lasius', 'formica'].map((x, i) => ({ species: x as never, player: i === 0, ai: true, developed: 8, startWorkers: 10, popLimit: 1200 })) };
-    const w = createWorld(s, ev);
+    const w = mk(s, ev);
     const r = routes(w)[0];
     if (r) {
       for (const half of r.halves) for (const st of half.steps) for (const q of st) if (q >= 0) (w.nestOf(half.space)!.softenHex(q), w.nestOf(half.space)!.completeHex(q));

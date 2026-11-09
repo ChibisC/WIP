@@ -425,6 +425,8 @@ export class World {
     const s = this.s;
     s.tick++;
     s.time += dt;
+    // (the nest flow-field caches: which fields are in use this tick — performance v4)
+    for (const f of this.gridFlows.values()) f.newTick(s.tick);
     this.rebuildHashes();
     for (const sys of this.systems) {
       if (sys.every && s.tick % sys.every !== 0) continue;
