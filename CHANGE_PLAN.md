@@ -1840,10 +1840,21 @@ keeps the golden set and the simulation's results.
    **The worker's first batch** 2 ticks until it has a tick time; **its engine warmed up** on a copy before the first
    tick (`worker/warmUp.ts`).
 6. **One shadow map and one environment map** for every underground area and the trees.
-7. **Retina at High: the effects at 1.5×**, a Catmull-Rom upscale in the last pass, the ants' detail by the pixels
-   drawn; Graphics → Sharpness → Full sharpness. Dynamic resolution resizes only the effects' targets.
+7. **Retina at High: the effects at 1.5×**, a Catmull-Rom upscale in the last pass, the ants' detail still picked by
+   the canvas's pixels (picking it by the pixels drawn changed models and their effects: dropped); Graphics →
+   Sharpness → Full sharpness. Dynamic resolution resizes only the effects' targets.
 8. **UI**: area tabs, minimaps (box measured after a resize, raster in a canvas, no per-pixel arrays, colour sets
    only on change), tile labels.
 
 Checks: golden set 17 of 17 (16 pixel for pixel, the flood shot within its run-to-run noise); `npm test`;
 `same.sh` (no simulation code changed); LAN two players.
+Merged as the interim build (main a7dd6b1, game artifact v56; handoff 27).
+
+### 35.3 Round 2 (after the interim build; the user's plugged-in Mac and iPhone/iPad reports drive the rest)
+1. **The 1.5× upscale's black rings**: Catmull-Rom's negative lobes next to a very bright HDR pixel (a larva's
+   highlight in the nest) went below zero. Each result is kept within its 2 × 2 nearest texels' range (as FSR's
+   upscaler does); edges stay sharp. The 2×/1.5× sheets shot again.
+2. **The switching "growth" was the report's arithmetic**: the v4 line set the first round against the nine later
+   rounds summed ("first 19, later 183" — about 20 a round). Now a round's count, and each round's. The multi-second
+   frames on some switches (2.6 s, 4.2 s, "outside this thread") are real: the next report's worst steps and causes
+   say which.
