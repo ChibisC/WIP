@@ -1,3 +1,4 @@
+import { texturePending, uploadPendingTextures } from '../render/dynamicTextures';
 import * as THREE from 'three';
 import { CLICK } from '../core/device';
 import { EventBus, SimEvent } from '../core/events';
@@ -1990,12 +1991,12 @@ export class GameSession {
         const o = this.sim.takeOverlay();
         if (o && this.pheroOn) {
           this.pheroData.set(o);
-          this.pheroTex.needsUpdate = true;
+          texturePending(this.pheroTex);
         }
       } else if (this.pheroOn && w.phero.version !== this.pheroVer) {
         this.pheroVer = w.phero.version;
         w.phero.pack(this.player.id, this.pheroData);
-        this.pheroTex.needsUpdate = true;
+        texturePending(this.pheroTex);
       }
     }
     // Saiy-Ants running in the gold surge leave speed lines (close to the camera only, capped)

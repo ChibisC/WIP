@@ -3,6 +3,7 @@ import { hash2 } from '../../core/rng';
 import { prof } from '../../core/profiler';
 import { camCuts } from '../cameras';
 import { AntRig, buildAnt } from './antGeometry';
+import { TextureRing } from '../dynamicTextures';
 import { BODY_TEX, createAntMaterials, createAntGlueShell, LOD_FADE_GLSL, packExhaustedFade, POSE, TINT_GLSL } from './antMaterial';
 import { ATK, ATTACK_CONTACT, AttackPose, applyAttackBody, attackPose, attackPoseV2, neutralPose } from './attackPoses';
 import { AntMorph, MORPHS } from './morphs';
@@ -269,7 +270,7 @@ class Bucket {
   depths: (THREE.Material | undefined)[] = [];
   /** spec 04: each animated LOD's material uniforms and its per-instance body-offset texture */
   unis: Array<Record<string, THREE.IUniform> | undefined> = [];
-  bodyTex: Array<THREE.DataTexture | undefined> = [];
+  bodyTex: Array<TextureRing | undefined> = [];
 
   constructor(public key: string, private group: THREE.Group, impostor: { geo: THREE.BufferGeometry; mat: THREE.Material }, shadows: boolean) {
     this.morph = MORPHS[key];
@@ -315,9 +316,11 @@ class Bucket {
     const u = this.unis[l];
     if (u) {
       this.bodyTex[l]?.dispose();
-      const tex = bodyTexture(cap);
-      this.bodyTex[l] = tex;
-      u.uBodyTex.value = tex;
+      // (performance v5: a ring — the texture written this frame is not the one the GPU may still be drawing)
+      const ring = new TextureRing(() => bodyTexture(cap));
+      ring.onSwap = (t) => (u.uBodyTex.value = t);
+      this.bodyTex[l] = ring;
+      u.uBodyTex.value = ring.current;
     }
     this.meshes[l] = mesh;
     this.attrs[l] = at;
@@ -334,7 +337,7 @@ class Bucket {
   shellAt: Array<{ a: THREE.InstancedBufferAttribute; b: THREE.InstancedBufferAttribute; c: THREE.InstancedBufferAttribute; d: THREE.InstancedBufferAttribute; e: THREE.InstancedBufferAttribute; g: THREE.InstancedBufferAttribute } | null> = [null, null];
   shellN = [0, 0];
   private shellMats: Array<THREE.MeshPhysicalMaterial | null> = [null, null];
-  private shellTex: Array<THREE.DataTexture | null> = [null, null];
+  private shellTex: Array<TextureRing | null> = [null, null];
 
   /** Copy instance `n` of LOD `l` into the glue shell with glue amount `g`. */
   addShell(l: number, n: number, g: number): void {
@@ -344,12 +347,13 @@ class Bucket {
       const cap = mesh ? mesh.instanceMatrix.count * 2 : 16;
       const shellMat = (this.shellMats[l] ??= createAntGlueShell(this.rig, this.key));
       const oldTex = this.shellTex[l];
-      const tex = bodyTexture(cap);
-      if (oldTex) (tex.image.data as Float32Array).set((oldTex.image.data as Float32Array).subarray(0, k * BODY_F));
+      const tex = new TextureRing(() => bodyTexture(cap));
+      if (oldTex) (tex.data as Float32Array).set((oldTex.data as Float32Array).subarray(0, k * BODY_F));
       oldTex?.dispose();
       this.shellTex[l] = tex;
       const su = shellMat.userData.antUniforms as Record<string, THREE.IUniform>;
-      su.uBodyTex.value = tex;
+      su.uBodyTex.value = tex.current;
+      tex.onSwap = (t) => (su.uBodyTex.value = t);
       const geo = sharedGeometry(this.geos[l]);
       const mk = (size = 4) => new THREE.InstancedBufferAttribute(new Float32Array(cap * size), size).setUsage(THREE.DynamicDrawUsage);
       const at = { a: mk(), b: mk(), c: mk(), d: mk(), e: mk(), g: mk(1) };
@@ -392,7 +396,7 @@ class Bucket {
     for (const key of ['a', 'b', 'c', 'd', 'e'] as const) dst[key].setXYZW(k, src[key].getX(n), src[key].getY(n), src[key].getZ(n), src[key].getW(n));
     dst.g.setX(k, g);
     const bt = this.bodyTex[l];
-    if (bt) (this.shellTex[l]!.image.data as Float32Array).set((bt.image.data as Float32Array).subarray(n * BODY_F, n * BODY_F + BODY_F), k * BODY_F);
+    if (bt) (this.shellTex[l]!.data as Float32Array).set((bt.data as Float32Array).subarray(n * BODY_F, n * BODY_F + BODY_F), k * BODY_F);
     this.shellN[l] = k + 1;
   }
 
@@ -408,7 +412,7 @@ class Bucket {
       for (const attr of [at.a, at.b, at.c, at.d, at.e, at.g]) attr.needsUpdate = true;
       const su = this.shellMats[l]?.userData.antUniforms as Record<string, THREE.IUniform> | undefined;
       if (su) su.uBodyOn.value = this.bodyOn;
-      if (this.shellTex[l]) this.shellTex[l]!.needsUpdate = true;
+      this.shellTex[l]?.commit();
     }
   }
 
@@ -418,7 +422,7 @@ class Bucket {
   /** Write instance n's body offset (LOD l): translation (object units), lateral sweep, rotation vector, spread, gaster yaw, sting out, fore legs raised, decapitation. */
   writeBody(l: number, n: number, b: Float32Array): void {
     const t = this.bodyTex[l];
-    if (t) (t.image.data as Float32Array).set(b, n * BODY_F);
+    if (t) (t.data as Float32Array).set(b, n * BODY_F);
   }
 }
 
@@ -1365,8 +1369,7 @@ export class AntRenderer {
           mesh.instanceMatrix.needsUpdate = true;
           const at = b.attrs[l];
           at.a.needsUpdate = at.b.needsUpdate = at.c.needsUpdate = at.d.needsUpdate = at.e.needsUpdate = true;
-          const bt = b.bodyTex[l];
-          if (bt) bt.needsUpdate = true;
+          b.bodyTex[l]?.commit();
           // Only upload the used range.
           for (const attr of [mesh.instanceMatrix, at.a, at.b, at.c, at.d, at.e]) {
             attr.clearUpdateRanges();

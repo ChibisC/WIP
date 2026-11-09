@@ -1,3 +1,4 @@
+import { texturePending } from '../dynamicTextures';
 import * as THREE from 'three';
 import { prof } from '../../core/profiler';
 import { NEST_CHUNK, NestGrid } from '../../world/nestGrid';
@@ -214,7 +215,7 @@ vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, vec4 lv, out float r
       this.data[i + 2] = Math.round((this.kindCell[k] / 8) * 255);
       this.data[i + 3] = 255;
     }
-    this.dataTex.needsUpdate = true;
+    texturePending(this.dataTex);
     this.bakeLeafUV();
   }
 
@@ -226,7 +227,7 @@ vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, vec4 lv, out float r
     const L = this.leaves;
     this.leafData.fill(0);
     if (!L.length) {
-      this.leafTex.needsUpdate = true;
+      texturePending(this.leafTex);
       return;
     }
     // a coarse bucket grid over the leaves so each cell tests only the blades near it
@@ -273,7 +274,7 @@ vec3 canopyColor(vec3 wp, float leaf, float sd, float kind, vec4 lv, out float r
         this.leafData[i + 2] = 255;
         this.leafData[i + 3] = 255;
       }
-    this.leafTex.needsUpdate = true;
+    texturePending(this.leafTex);
   }
 
   private sdAt(px: number, py: number): number {
