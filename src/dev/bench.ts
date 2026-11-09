@@ -553,7 +553,7 @@ function runGpuSteps(s: GameSession, cx: number, cz: number, done: (steps: GpuSt
     v.resize();
   };
   const P = v.post.settings;
-  const keep = { ao: P.ao, bloom: P.bloom, dof: P.dof, post: v.post.enabled };
+  const keep = { ao: P.ao, bloom: P.bloom, dof: P.dof, post: v.post.enabled, sharp: v.fullSharpness };
   const steps: Array<{ name: string; on: () => void; off: () => void }> = [
     { name: 'as set', on: () => {}, off: () => {} },
     { name: 'ambient occlusion off', on: () => (P.ao = false), off: () => (P.ao = keep.ao) },
@@ -562,6 +562,8 @@ function runGpuSteps(s: GameSession, cx: number, cz: number, done: (steps: GpuSt
     { name: 'all post effects off', on: () => (v.post.bare = true), off: () => (v.post.bare = false) },
     { name: 'shadow maps not redrawn', on: () => shadows(false), off: () => shadows(true) },
     { name: '1 device pixel per screen pixel', on: () => pixels(true), off: () => pixels(false) },
+    // (performance v5: on a Retina screen the effects run at 1.5× unless Full sharpness — what 2× costs)
+    { name: 'full sharpness (2× on Retina)', on: () => v.setFullSharpness(true), off: () => v.setFullSharpness(keep.sharp) },
     { name: 'ants hidden', on: () => S.surfAnts && (S.surfAnts.group.visible = false), off: () => S.surfAnts && (S.surfAnts.group.visible = true) },
     { name: 'grass hidden', on: () => v.grass && (v.grass.mesh.visible = false), off: () => v.grass && (v.grass.mesh.visible = true) },
     {
