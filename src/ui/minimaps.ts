@@ -1,4 +1,5 @@
 import { GameSession } from '../game/session';
+import { prof } from '../core/profiler';
 import { AS, SURFACE, TREES, colonyOfSpace } from '../sim/types';
 import { SOIL_AIR, SOIL_GATE, SOIL_ROCK, SOIL_ROUTE, SOIL_STONE } from '../world/nestGrid';
 import { halfIn, routesOf } from '../sim/tunnels';
@@ -61,6 +62,7 @@ export class Minimaps {
   private size = 0;
 
   constructor(private s: GameSession) {
+    window.addEventListener('resize', () => (this.remeasure = true));
     this.nestBox.append(this.nestCv, this.nestLbl);
     this.surfBox.append(this.surfCv, this.surfLbl);
     this.treesBar.append(this.treesLbl);
@@ -107,11 +109,21 @@ export class Minimaps {
 
   /** compact layout: maps shown or folded (the full layout always shows them) */
   setOpen(on: boolean): void {
+    this.remeasure = true;
     this.root.classList.toggle('open', on);
     if (on) this.update(true);
   }
 
+  /** the maps' box measured again (a resize, the layout changing): reading the layout forces it to be worked out */
+  private remeasure = true;
+  private measured = 0;
+
   private fit(): number {
+    // (performance v5: the box's size read only after a resize or every 2 s — reading it after the frame's style
+    // writes made the browser lay the page out again then)
+    if (!this.remeasure && this.size && performance.now() - this.measured < 2000) return this.size;
+    this.remeasure = false;
+    this.measured = performance.now();
     const px = Math.round(this.nestCv.getBoundingClientRect().width * Math.min(2, window.devicePixelRatio || 1));
     if (px > 0 && px !== this.size) {
       this.size = px;
@@ -162,7 +174,7 @@ export class Minimaps {
     const d = w.s.trees;
     const g = w.nestOf(TREES);
     if (!d || !g) return;
-    if (!this.surfBase) this.surfBase = this.bakeSurface(S);
+    if (!this.surfBase) this.surfBase = this.timed('ui:minimap surface bake', () => this.bakeSurface(S));
     if (!this.canopyBase || this.canopyBase.width !== S) this.canopyBase = this.bakeCanopy(S);
     const ctx = this.surfCv.getContext('2d')!;
     ctx.drawImage(this.surfBase, 0, 0);
@@ -256,6 +268,7 @@ export class Minimaps {
     const sealed = fog.sealedOf(space);
     const lv = fog.levelsOf(space);
     const fogKey = (sealed?.size ?? 0) * 1000003 + (lv ? lv.reduce((a, b) => a + b, 0) : 0);
+    const tRaster = performance.now();
     if (g.version !== this.nestVer || fogKey !== this.nestFogKey) {
       this.nestVer = g.version;
       this.nestFogKey = fogKey;
@@ -322,6 +335,7 @@ export class Minimaps {
         base.height = S;
       }
       base.getContext('2d')!.putImageData(img, 0, 0);
+      prof.sub('ui:minimap nest raster', performance.now() - tRaster);
     }
     if (this.nestBaseCv && this.nestBaseCv.width === S) ctx.drawImage(this.nestBaseCv, 0, 0);
     else ctx.putImageData(this.nestImg!, 0, 0);
@@ -464,6 +478,14 @@ export class Minimaps {
     ctx.stroke();
   }
 
+  /** a piece of the minimaps timed for the profiler (performance v5) */
+  private timed<T>(name: string, f: () => T): T {
+    const t = performance.now();
+    const r = f();
+    prof.sub(name, performance.now() - t);
+    return r;
+  }
+
   private bakeSurface(S: number): HTMLCanvasElement {
     const t = this.s.world.terrain;
     const cv = document.createElement('canvas');
@@ -547,7 +569,7 @@ export class Minimaps {
     const s = this.s;
     const w = s.world;
     const t = w.terrain;
-    if (!this.surfBase) this.surfBase = this.bakeSurface(S);
+    if (!this.surfBase) this.surfBase = this.timed('ui:minimap surface bake', () => this.bakeSurface(S));
     const ctx = this.surfCv.getContext('2d')!;
     ctx.drawImage(this.surfBase, 0, 0);
     const kx = S / t.width;
