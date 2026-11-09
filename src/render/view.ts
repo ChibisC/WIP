@@ -265,9 +265,10 @@ export class GameView {
     // upscales: a change of dynamic resolution resizes only the effects' targets); without them, the canvas itself
     const pr = this.pixelOverride ?? out * this.retinaScale * this.renderScale;
     const canvasPr = this.post.enabled ? out : pr;
-    // a light sharpening when the effects run below the screen's own (none at full resolution)
+    // a light sharpening when the canvas itself is drawn smaller (no effects); with the effects the last pass upscales
+    // with a Catmull-Rom filter instead (sharpening before the bloom made bright points bloom into big glows — v5)
     const s = pr / out;
-    this.post.sharpen = s < 0.999 ? Math.min(0.6, (1 - s) * (this.post.enabled ? 1.2 : 2.2)) : 0;
+    this.post.sharpen = !this.post.enabled && s < 0.999 ? Math.min(0.6, (1 - s) * 2.2) : 0;
     this.renderer.setPixelRatio(canvasPr);
     this.renderer.setSize(w, h, false);
     this.canvas.style.width = w + 'px';

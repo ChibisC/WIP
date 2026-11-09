@@ -398,7 +398,9 @@ export class PostPipeline {
     this.aoRT2.setSize(aw, ah);
     this.compRT.setSize(this.w, this.h);
     this.hdrRT.setSize(this.w, this.h);
-    this.bloomPass.setSize(this.w, this.h);
+    // (performance v5: the bloom's mips sized from the canvas, not the effects' resolution — its blur kernels are in
+    // pixels, so at 1.5× the glows would come out a third larger)
+    this.bloomPass.setSize(this.outW, this.outH);
     (this.ssao.uniforms.resolution.value as THREE.Vector2).set(aw, ah);
     (this.blur.uniforms.resolution.value as THREE.Vector2).set(aw, ah);
     (this.dof.uniforms.resolution.value as THREE.Vector2).set(this.w, this.h);
