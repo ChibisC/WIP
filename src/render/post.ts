@@ -180,6 +180,63 @@ void main(){
   gl_FragColor = vec4(max(col, 0.0), 1.0);
 }`;
 
+/**
+ * The output pass when the effects ran below the canvas's resolution (performance v5: Retina screens at 1.5 device
+ * pixels a screen pixel): the HDR picture upscaled with a Catmull-Rom filter (nine bilinear taps — sharper than the
+ * browser's bilinear stretch of a smaller canvas), then tone mapping and the colour space as three's OutputPass.
+ */
+const UPSCALE_FRAG = /* glsl */ `
+precision highp float;
+uniform sampler2D tDiffuse;
+uniform vec2 uSrcSize;
+#include <tonemapping_pars_fragment>
+#include <colorspace_pars_fragment>
+varying vec2 vUv;
+vec4 catmullRom(vec2 uv) {
+  vec2 p = uv * uSrcSize;
+  vec2 t1 = floor(p - 0.5) + 0.5;
+  vec2 f = p - t1;
+  vec2 w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+  vec2 w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+  vec2 w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+  vec2 w3 = f * f * (-0.5 + 0.5 * f);
+  vec2 w12 = w1 + w2;
+  vec2 t12 = (t1 + w2 / w12) / uSrcSize;
+  vec2 t0 = (t1 - 1.0) / uSrcSize;
+  vec2 t3 = (t1 + 2.0) / uSrcSize;
+  vec4 c = texture2D(tDiffuse, vec2(t0.x, t0.y)) * (w0.x * w0.y)
+    + texture2D(tDiffuse, vec2(t12.x, t0.y)) * (w12.x * w0.y)
+    + texture2D(tDiffuse, vec2(t3.x, t0.y)) * (w3.x * w0.y)
+    + texture2D(tDiffuse, vec2(t0.x, t12.y)) * (w0.x * w12.y)
+    + texture2D(tDiffuse, vec2(t12.x, t12.y)) * (w12.x * w12.y)
+    + texture2D(tDiffuse, vec2(t3.x, t12.y)) * (w3.x * w12.y)
+    + texture2D(tDiffuse, vec2(t0.x, t3.y)) * (w0.x * w3.y)
+    + texture2D(tDiffuse, vec2(t12.x, t3.y)) * (w12.x * w3.y)
+    + texture2D(tDiffuse, vec2(t3.x, t3.y)) * (w3.x * w3.y);
+  return max(c, vec4(0.0));
+}
+void main() {
+  gl_FragColor = catmullRom(vUv);
+  #ifdef LINEAR_TONE_MAPPING
+    gl_FragColor.rgb = LinearToneMapping(gl_FragColor.rgb);
+  #elif defined(REINHARD_TONE_MAPPING)
+    gl_FragColor.rgb = ReinhardToneMapping(gl_FragColor.rgb);
+  #elif defined(CINEON_TONE_MAPPING)
+    gl_FragColor.rgb = CineonToneMapping(gl_FragColor.rgb);
+  #elif defined(ACES_FILMIC_TONE_MAPPING)
+    gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
+  #elif defined(AGX_TONE_MAPPING)
+    gl_FragColor.rgb = AgXToneMapping(gl_FragColor.rgb);
+  #elif defined(NEUTRAL_TONE_MAPPING)
+    gl_FragColor.rgb = NeutralToneMapping(gl_FragColor.rgb);
+  #elif defined(CUSTOM_TONE_MAPPING)
+    gl_FragColor.rgb = CustomToneMapping(gl_FragColor.rgb);
+  #endif
+  #ifdef SRGB_TRANSFER
+    gl_FragColor = sRGBTransferOETF(gl_FragColor);
+  #endif
+}`;
+
 export class PostPipeline {
   settings: PostSettings = {
     ao: true,
@@ -207,8 +264,13 @@ export class PostPipeline {
   private quad = new FullScreenQuad();
   private bloomPass: UnrealBloomPass;
   private outputPass: OutputPass;
+  /** the output pass that upscales (effects below the canvas's resolution) */
+  private upscalePass: OutputPass;
   private w = 1;
   private h = 1;
+  /** the canvas's drawing buffer (the effects run at w × h, at most this) */
+  private outW = 1;
+  private outH = 1;
 
   constructor(private renderer: THREE.WebGLRenderer) {
     const mk = (samples: number, depth: boolean, type: THREE.TextureDataType = THREE.HalfFloatType) => {
@@ -279,11 +341,56 @@ export class PostPipeline {
     });
     this.bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.25, 0.55, 0.92);
     this.outputPass = new OutputPass();
+    this.upscalePass = new OutputPass();
+    this.upscalePass.uniforms.uSrcSize = { value: new THREE.Vector2(1, 1) };
+    this.upscalePass.material.fragmentShader = UPSCALE_FRAG;
   }
 
-  setSize(w: number, h: number, pixelRatio: number): void {
-    this.w = Math.floor(w * pixelRatio);
-    this.h = Math.floor(h * pixelRatio);
+  /**
+   * Draw every pass once (the pre-warm, performance v5): each effect's program and pipeline built behind the loading
+   * screen — ambient occlusion, depth of field, bloom and both last passes (as set, and upscaling) whatever the settings.
+   */
+  warm(scene: THREE.Scene, camera: THREE.PerspectiveCamera): void {
+    if (!this.enabled) return;
+    const keep = { ...this.settings };
+    const s = this.settings;
+    s.ao = s.bloom = s.dof = true;
+    try {
+      this.render(scene, camera);
+      const r = this.renderer;
+      for (const pass of [this.outputPass, this.upscalePass]) {
+        (this.upscalePass.uniforms.uSrcSize.value as THREE.Vector2).set(this.w, this.h);
+        pass.renderToScreen = true;
+        pass.render(r, null as unknown as THREE.WebGLRenderTarget, this.hdrRT, 0, false);
+      }
+    } finally {
+      Object.assign(this.settings, keep);
+    }
+  }
+
+  /** the effects run below the canvas's resolution: the last pass upscales */
+  get upscaling(): boolean {
+    return this.w < this.outW || this.h < this.outH;
+  }
+
+  /** The last pass, to the screen: as three's OutputPass, upscaling when the effects ran smaller. */
+  private toScreen(src: THREE.WebGLRenderTarget): void {
+    const r = this.renderer;
+    const pass = this.upscaling ? this.upscalePass : this.outputPass;
+    if (pass === this.upscalePass) (this.upscalePass.uniforms.uSrcSize.value as THREE.Vector2).set(this.w, this.h);
+    pass.renderToScreen = true;
+    pass.render(r, null as unknown as THREE.WebGLRenderTarget, src, 0, false);
+  }
+
+  /**
+   * The effects' size: `pixelRatio` device pixels a screen pixel; `outRatio` the canvas's own (performance v5: on a
+   * Retina screen the effects at 1.5, the canvas at 2, the last pass upscaling; the same when they are equal).
+   */
+  setSize(w: number, h: number, pixelRatio: number, outRatio = pixelRatio): void {
+    this.outW = Math.floor(w * outRatio);
+    this.outH = Math.floor(h * outRatio);
+    this.w = Math.min(this.outW, Math.floor(w * pixelRatio));
+    this.h = Math.min(this.outH, Math.floor(h * pixelRatio));
     this.sceneRT.setSize(this.w, this.h);
     const aw = Math.max(1, Math.floor(this.w / 2));
     const ah = Math.max(1, Math.floor(this.h / 2));
@@ -325,8 +432,7 @@ export class PostPipeline {
     r.render(scene, camera);
     mark?.('scene');
     if (this.bare) {
-      this.outputPass.renderToScreen = true;
-      this.outputPass.render(r, null as unknown as THREE.WebGLRenderTarget, this.sceneRT, 0, false);
+      this.toScreen(this.sceneRT);
       mark?.('tone mapping to the screen');
       return;
     }
@@ -394,8 +500,7 @@ export class PostPipeline {
       this.bloomPass.render(r, this.hdrRT, this.hdrRT, 0, false);
       mark?.('bloom');
     }
-    this.outputPass.renderToScreen = true;
-    this.outputPass.render(r, null as unknown as THREE.WebGLRenderTarget, this.hdrRT, 0, false);
+    this.toScreen(this.hdrRT);
     mark?.('tone mapping to the screen');
   }
 }

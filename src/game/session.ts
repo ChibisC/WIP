@@ -43,7 +43,7 @@ import { LocalSim, SimHost, WorkerSim } from './simHost';
 import { AutoQuality } from './autoQuality';
 import { prof } from '../core/profiler';
 import { feel, InputKind } from '../core/feel';
-import { overviewCamera, warmScene } from '../render/prewarm';
+import { overviewCamera, sceneTarget, warmScene } from '../render/prewarm';
 import { STOLEN_CASTES } from '../sim/termants';
 import type { NetGame } from '../net/netGame';
 import { matchWinner } from '../net/match';
@@ -233,6 +233,9 @@ export class GameSession {
     this.input.bindings = bindingsOf(st);
     this.input.edgeScroll = st.edgeScroll;
     this.view = new GameView(canvas, this.input);
+    // (performance v5: Retina screens draw the effects at 1.5× unless the player chose full sharpness; the screenshot
+    // harness and the golden set draw at full resolution)
+    this.view.fullSharpness = !!st.fullSharpness || new URLSearchParams(location.search).has('shot');
     this.view.setQuality(quality);
     const w = this.world;
     // (no grass through the anthills: each one's holes and the ground round them)
@@ -271,7 +274,14 @@ export class GameSession {
     this.mounds.entrances.compile = (objs) => {
       const tmp = new THREE.Group();
       for (const o of objs) tmp.add(o);
-      return this.view.renderer.compileAsync(tmp, this.view.activeCamera(), this.view.surfaceScene);
+      // (performance v5: compiled for the target the scene is drawn into — with no target set these were the
+      // variants for drawing straight to the screen, never used while the post effects are on)
+      const r = this.view.renderer;
+      const prev = r.getRenderTarget();
+      r.setRenderTarget(this.view.post.enabled ? sceneTarget() : null);
+      const p = r.compileAsync(tmp, this.view.activeCamera(), this.view.surfaceScene);
+      r.setRenderTarget(prev);
+      return p;
     };
     // Pheromone overlay texture.
     const ph = w.phero;
@@ -454,12 +464,14 @@ export class GameSession {
         const cam = overviewCamera(g.widthMm, g.depthMm);
         const owner = w.colony(colonyOfSpace(space)) ?? null;
         nv.update(w, owner, this.player, cam, 1, 0, vh, g.R * 16, -1, v.time, this.player.markers, []);
-        warmScene(v.renderer, nv.stage.scene, cam);
+        warmScene(v.renderer, nv.stage.scene, cam, !v.post.enabled);
       });
     steps.push(() => {
       const t = w.terrain;
-      warmScene(v.renderer, v.surfaceScene, overviewCamera(t.width, t.depth));
+      warmScene(v.renderer, v.surfaceScene, overviewCamera(t.width, t.depth), !v.post.enabled);
     });
+    // (performance v5: the post effects' own passes, every one, drawn once — they were built on the first frame)
+    steps.push(() => v.post.warm(v.surfaceScene, v.surfaceCam));
     for (const m of morphs) this.warmed.add(m);
     for (let i = 0; i < steps.length; i++) {
       steps[i]();

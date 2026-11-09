@@ -37,6 +37,8 @@ export interface Settings {
   shake?: number;
   /** frame cap (performance pass): 0 follows the display, 30 or 60; absent = 60 on phones and tablets, the display elsewhere */
   frameCap?: number;
+  /** performance v5: draw at the screen's full 2× on Retina screens (off: the effects at 1.5×, upscaled and sharpened) */
+  fullSharpness?: boolean;
 }
 
 export type Medal = 'gold' | 'silver' | 'bronze';
@@ -109,6 +111,7 @@ export function sanitizeSettings(p: Partial<Settings> | null): Settings {
     bindings,
     shake: typeof p?.shake === 'number' && p.shake >= 0 && p.shake <= 1 ? p.shake : undefined,
     frameCap: p?.frameCap === 0 || p?.frameCap === 30 || p?.frameCap === 60 ? p.frameCap : undefined,
+    fullSharpness: p?.fullSharpness === true ? true : undefined,
   };
 }
 

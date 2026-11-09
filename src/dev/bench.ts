@@ -544,11 +544,10 @@ function runGpuSteps(s: GameSession, cx: number, cz: number, done: (steps: GpuSt
     R.shadowMap.autoUpdate = on;
     R.shadowMap.needsUpdate = false;
   };
+  // (performance v5: the effects at one device pixel a screen pixel, upscaled to the canvas as the game does)
   const pixels = (one: boolean) => {
-    if (!one) return v.resize();
-    R.setPixelRatio(1);
-    R.setSize(window.innerWidth, window.innerHeight, false);
-    v.post.setSize(window.innerWidth, window.innerHeight, 1);
+    v.pixelOverride = one ? 1 : null;
+    v.resize();
   };
   const P = v.post.settings;
   const keep = { ao: P.ao, bloom: P.bloom, dof: P.dof, post: v.post.enabled };

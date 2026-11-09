@@ -212,23 +212,54 @@ export class GameView {
    * preset itself steps down — never below about 0.85 device pixels per screen pixel, where ants stop reading clearly.
    */
   get minRenderScale(): number {
-    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio);
-    return Math.min(1, Math.max(0.75, 0.85 / pr));
+    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio) * this.retinaScale;
+    // (performance v5: a Retina screen already at 1.5 may go to 60 % of that in a heavy moment — 0.9 device pixels a
+    // screen pixel; elsewhere 75 % as before; never below 0.85)
+    return Math.min(1, Math.max(this.retinaScale < 1 ? 0.6 : 0.75, 0.85 / pr));
   }
+
+  /**
+   * Performance v5 (the user's decision, 2026-11-09): on a Retina screen at High the effects run at 1.5 device pixels a
+   * screen pixel instead of 2 and the last pass upscales and sharpens (render/post.ts) — about 44 % fewer pixels, which
+   * were most of the GPU's time. "Full sharpness" (Graphics) keeps 2.
+   */
+  fullSharpness = false;
+
+  /** the share of the canvas's resolution the effects run at before dynamic resolution (1, or 0.75 on Retina at High) */
+  get retinaScale(): number {
+    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio);
+    return !this.fullSharpness && this.preset.post && pr >= 1.9 ? 0.75 : 1;
+  }
+
+  setFullSharpness(on: boolean): void {
+    if (this.fullSharpness === on) return;
+    this.fullSharpness = on;
+    this.renderScale = Math.max(this.renderScale, this.minRenderScale);
+    this.resize();
+  }
+
+  /** the benchmark's "1 device pixel per screen pixel" step: the effects' resolution forced (null: as set) */
+  pixelOverride: number | null = null;
 
   setRenderScale(k: number): void {
     const s = Math.max(this.minRenderScale, Math.min(1, k));
     if (Math.abs(s - this.renderScale) < 0.01) return;
     this.renderScale = s;
-    this.post.sharpen = s < 0.999 ? Math.min(0.6, (1 - s) * 2.2) : 0;
     this.resize();
   }
 
   resize(): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const pr = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio) * this.renderScale;
-    this.renderer.setPixelRatio(pr);
+    const out = Math.min(window.devicePixelRatio || 1, this.preset.pixelRatio);
+    // with the effects on, the canvas keeps its resolution and the effects run at the scaled one (the last pass
+    // upscales: a change of dynamic resolution resizes only the effects' targets); without them, the canvas itself
+    const pr = this.pixelOverride ?? out * this.retinaScale * this.renderScale;
+    const canvasPr = this.post.enabled ? out : pr;
+    // a light sharpening when the effects run below the screen's own (none at full resolution)
+    const s = pr / out;
+    this.post.sharpen = s < 0.999 ? Math.min(0.6, (1 - s) * (this.post.enabled ? 1.2 : 2.2)) : 0;
+    this.renderer.setPixelRatio(canvasPr);
     this.renderer.setSize(w, h, false);
     this.canvas.style.width = w + 'px';
     this.canvas.style.height = h + 'px';
@@ -236,7 +267,7 @@ export class GameView {
       c.aspect = w / h;
       c.updateProjectionMatrix();
     }
-    this.post.setSize(w, h, pr);
+    this.post.setSize(w, h, pr, canvasPr);
   }
 
   /** Build the surface world for a terrain. */
