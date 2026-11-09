@@ -631,3 +631,16 @@ is now a read-back: a 1 × 1 framebuffer of its own is cleared — a command aft
 GL state it touched is put back. Round 1's pass times on the build machine were not waits. Switching's last round is
 now diagnostic (every pass and draw waited for: a long frame names its draw), and the report splits loading into
 before the pre-warm, the pre-warm's slowest kinds of step, and after it.
+
+### Round 2: loading — the GPU's queue paid behind the loading screen
+A CPU profile of the full nest's loading on the build machine (158 s to the first frame) had 130 s in the build
+panel's caste swatches — 64 × 64 pictures made with `toDataURL`, which on a GPU-backed canvas waits for everything the
+GPU has queued — and the switching page's pre-warm 84 s in "ant models": in both, the queue of GPU work that making
+the world and the pre-warm leave behind (ground, detail and texture bakes, the warm-up draws) paid by the first thing
+that had to wait for the GPU. Now the pre-warm waits for the GPU itself (`render/prewarm.ts gpuIdle`: a WebGL2
+fence polled between tasks, the loading screen still moving, at most 30 s) before its steps and after them, and the
+swatches are drawn on a CPU canvas (`willReadFrequently`; the same pixels). The report shows the two waits as steps
+("the GPU finishing the world", "the GPU finishing the pre-warm"), so a device's GPU backlog after loading is
+measured instead of landing on the first frames (the Mac's 8–12 s first frames were of that kind). On the build
+machine, SwiftShader's backlog is longer than either 30 s cap; "ant models" alone is then 3.5–9.5 s — the impostor
+bakes' shader compiles (their lights differ from any scene's, so their programs are their own).

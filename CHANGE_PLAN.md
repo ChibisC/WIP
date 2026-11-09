@@ -1867,3 +1867,12 @@ Merged as the interim build (main a7dd6b1, game artifact v56; handoff 27).
    typical frame lists its passes and slowest draws (a pipeline built, a texture or buffer uploaded, a program
    compiled) — or a long gap with little work in it: something outside the page.
 5. **Loading split** in the report: before the pre-warm, the pre-warm's slowest kinds of step, after it.
+6. **The GPU's queue paid behind the loading screen** (`render/prewarm.ts gpuIdle`): the pre-warm waits for the GPU
+   — a WebGL2 fence polled between tasks, so the loading screen keeps moving; at most 30 s each — before its steps
+   (what making the world queued: ground, detail and texture bakes) and after them (its own draws, and the pipelines
+   a GPU builds as it takes them). Before, the first frames of play, or whichever step first had to wait for the GPU,
+   paid for all of it: on the build machine the pre-warm's "ant models" took 84–97 s of a backlog that was not
+   theirs (3.5–9.5 s their own), and the build panel's caste swatches 130 s.
+7. **The caste swatches on a CPU canvas** (`casteLook.ts`, `willReadFrequently`): `toDataURL` on a GPU-backed canvas
+   waits for everything the GPU has queued. The same pixels (checked: 20 random images with transparent and
+   half-transparent pixels, decoded identical).

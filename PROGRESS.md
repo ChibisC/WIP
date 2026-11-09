@@ -2187,3 +2187,8 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   sheets shot again (`docs/performance.md`, the table).
 - **Switching "worse in later rounds"** was the report's arithmetic (the first round against nine later rounds
   summed: about 20 slow frames a round each). The report counts a round now.
+- **The bench's GPU waits are read-backs**: `gl.finish()` only flushes in Chromium (0 ms with 1.5 s of drawing
+  queued). The pass breakdown, a diagnostic last switching round (every draw waited for), the loading split.
+- **Loading**: the pre-warm waits for the GPU's queue before and after its steps (a fence, the loading screen still
+  moving), so the first frames of play do not; the caste swatches drawn on a CPU canvas (they waited for that queue:
+  130 s of a 158 s load on the build machine). Same pixels.
