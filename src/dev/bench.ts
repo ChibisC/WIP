@@ -122,6 +122,8 @@ interface SwitchResult {
   steps: SwitchStep[];
   /** the last, diagnostic round (every pass and draw waited for): its long frames and where their time went */
   diag?: Array<{ kind: SwitchStep['kind']; slow: SlowFrame[] }>;
+  /** the diagnostic round's typical frame (its median waited-for work, ms): every wait makes its frames slow */
+  diagMedian?: number;
   /** the renderer's counts at the end of each round */
   counts?: Array<{ textures: number; geometries: number; programs: number; gpuMB: number }>;
 }
@@ -834,7 +836,8 @@ function runSwitching(s: GameSession, _fail: () => void, done: (sw: SwitchResult
       k++;
       if (k >= plan.length) {
         watch?.dispose();
-        return done({ rounds, steps, counts, diag });
+        const ws = watch ? [...watch.works].sort((a, b) => a - b) : [];
+        return done({ rounds, steps, counts, diag, diagMedian: ws.length ? Math.round(ws[ws.length >> 1]) : undefined });
       }
       startStep(t);
     }
@@ -897,8 +900,10 @@ function fmtScene(r: SceneResult): string[] {
     if (sw.counts?.length) out.push(`  after each round (textures, geometries, programs, GPU MB): ${sw.counts.map((c) => `${c.textures}/${c.geometries}/${c.programs}/${c.gpuMB}`).join(' · ')}`);
     // the diagnostic round: a long frame's passes and draws (waited for one by one), or a long gap with little work in it
     if (sw.diag) {
-      const longs = sw.diag.flatMap((d) => d.slow.map((f) => ({ kind: d.kind, f })));
-      out.push(`  diagnostic round (every pass and draw waited for; not counted above): ${longs.length ? `${longs.length} long frames` : 'no frame over 150 ms'}`);
+      // (long: over 150 ms and over 2.5 times the round's typical frame — every wait ends a render pass)
+      const lim = Math.max(150, 2.5 * (sw.diagMedian ?? 0));
+      const longs = sw.diag.flatMap((d) => d.slow.filter((f) => Math.max(f.workMs, f.intervalMs) > lim).map((f) => ({ kind: d.kind, f })));
+      out.push(`  diagnostic round (every pass and draw waited for; not counted above; a frame's work typically ${sw.diagMedian ?? '—'} ms): ${longs.length ? `${longs.length} frames over ${Math.round(lim)} ms` : `no frame over ${Math.round(lim)} ms`}`);
       for (const { kind, f } of longs.sort((a, b) => Math.max(b.f.intervalMs, b.f.workMs) - Math.max(a.f.intervalMs, a.f.workMs)).slice(0, 8))
         out.push(
           `    ${kind}: gap ${f.intervalMs} ms, work ${f.workMs} ms` +

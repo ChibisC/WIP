@@ -1,7 +1,7 @@
 /**
  * Where the GPU's time goes (performance v5, claude/performance/05-spec-performance-v5-nonstop.md §1.5): for a few
- * frames every pass — the shadow maps, the scene, each post effect — is followed by `gl.finish()`, which waits until
- * the GPU has done all of it, so each pass's time can be read on any browser (Safari has no GPU timer queries).
+ * frames every pass — the shadow maps, the scene, each post effect — is followed by a wait until the GPU has done
+ * all of it (`gpuSync`), so each pass's time can be read on any browser (Safari has no GPU timer queries).
  * Waiting kills the overlap of the CPU and the GPU, so these frames are slower than real ones; what matters is how the
  * time splits. Draws are not waited for one by one (on a tiled GPU — Apple's — each wait would end the render pass
  * and store and reload the whole target): their triangles are counted by group instead. Used by the benchmark.
@@ -19,6 +19,47 @@ export interface GpuBreakdown {
   draws: Array<{ name: string; tris: number }>;
 }
 
+/**
+ * Wait until the GPU has done everything sent to it so far (performance v5 round 2). `gl.finish()` does not: in
+ * Chromium it only flushes (measured: 0 ms with 1.4–1.6 s of drawing still queued — a read-back after it waited the
+ * 1.4–1.6 s), and a browser need not do more. A read-back must: a 1 × 1 framebuffer of its own is cleared (a command
+ * queued after all the others) and read. The GL state it touches is put back, so the renderer's state cache stays true.
+ */
+const syncs = new WeakMap<THREE.WebGLRenderer, () => void>();
+export function gpuSync(r: THREE.WebGLRenderer): () => void {
+  let f = syncs.get(r);
+  if (f) return f;
+  const gl = r.getContext() as WebGL2RenderingContext;
+  const prevTex = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
+  const prevFb = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.bindTexture(gl.TEXTURE_2D, prevTex);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, prevFb);
+  const px = new Uint8Array(4);
+  f = () => {
+    const prev = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+    const read = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+    const sc = gl.isEnabled(gl.SCISSOR_TEST);
+    const m = gl.getParameter(gl.COLOR_WRITEMASK) as boolean[];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    if (sc) gl.disable(gl.SCISSOR_TEST);
+    gl.colorMask(true, true, true, true);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    gl.colorMask(m[0], m[1], m[2], m[3]);
+    if (sc) gl.enable(gl.SCISSOR_TEST);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, prev);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, read);
+  };
+  syncs.set(r, f);
+  return f;
+}
+
 /** A draw's group: its own or its nearest named parent's name (an ant model's LOD kept, its species dropped). */
 function groupOf(o: THREE.Object3D): string {
   let x: THREE.Object3D | null = o;
@@ -31,15 +72,15 @@ function groupOf(o: THREE.Object3D): string {
 export function measureGpu(s: GameSession, frames: number, done: (r: GpuBreakdown) => void): void {
   const v = s.view;
   const r = v.renderer;
-  const gl = r.getContext();
   const passes = new Map<string, number>();
   const draws = new Map<string, number>();
   let on = false;
   let markT = 0;
   let pass = 'scene';
   let tri0 = 0;
+  const sync = gpuSync(r);
   const wait = () => {
-    gl.finish();
+    sync();
     return performance.now();
   };
   const post = v.post;
@@ -161,7 +202,7 @@ export interface SlowFrame {
 /**
  * Every pass and every draw waited for while `on` (performance v5 round 2: the switching test's last, diagnostic
  * round). The Mac's report had 2.6–4.2 s frames on some switches with the main thread idle ("outside this thread"):
- * waiting after each draw pulls the GPU's part of a frame — a pipeline built for a draw, a texture or buffer
+ * waiting after each draw (`gpuSync`) pulls the GPU's part of a frame — a pipeline built for a draw, a texture or buffer
  * uploaded, a program compiled — into that draw, so a long frame names its draw; a long interval with little work in
  * it is something outside the page. These frames are slower than real ones (each wait ends an Apple GPU's render pass),
  * so their times are not counted with the measured rounds.
@@ -178,7 +219,9 @@ export class DrawWatch {
   private markT = 0;
   private drawT = 0;
   private pass = 'scene';
-  private readonly gl: WebGLRenderingContext | WebGL2RenderingContext;
+  private readonly sync: () => void;
+  /** every frame's waited-for work (ms), for the round's typical frame */
+  readonly works: number[] = [];
 
   constructor(
     private readonly s: GameSession,
@@ -187,7 +230,7 @@ export class DrawWatch {
   ) {
     const v = s.view;
     const r = v.renderer;
-    this.gl = r.getContext();
+    this.sync = gpuSync(r);
     const self = this;
     const post = v.post;
     const mark0 = post.mark;
@@ -231,6 +274,7 @@ export class DrawWatch {
         const work = t - self.frameT;
         const interval = self.lastStart ? self.frameT - self.lastStart : 0;
         self.lastStart = self.frameT;
+        self.works.push(work);
         if (work > self.slowMs || interval > self.slowMs * 2)
           self.slow.push({
             intervalMs: Math.round(interval),
@@ -249,7 +293,7 @@ export class DrawWatch {
   }
 
   private wait(): number {
-    this.gl.finish();
+    this.sync();
     return performance.now();
   }
 
