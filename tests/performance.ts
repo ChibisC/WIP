@@ -652,5 +652,30 @@ if (columnCodegen.on) {
   check('nest shadow casters: only the chunks the box touches cast; with no box every chunk does', casting >= 1 && casting < chunks.length && all, `${casting} of ${chunks.length}`);
 }
 
+{
+  // the worker's engine warm-up (worker/warmUp.ts) runs ticks on a throwaway copy: the real world's results are the
+  // same as without it (the stress fight; module caches keyed to the state they came from)
+  const { warmUp } = await import('../src/worker/warmUp');
+  const { CommandSchedule, stepWithCommands } = await import('../src/sim/commands');
+  const { populateStress } = await import('../src/dev/stressScene');
+  const w0 = createWorld(stressSetup(), new EventBus());
+  populateStress(w0, 120, 40, 1);
+  const snap = encodeState(w0);
+  const run = (warm: boolean) => {
+    if (warm) warmUp(snap.slice(), 60000, 30);
+    const r = restoreWorld(snap.slice(), new EventBus());
+    const sc = new CommandSchedule();
+    for (let i = 0; i < 150; i++) {
+      stepWithCommands(r, 0.05, sc);
+      r.events.drain();
+    }
+    return hashState(r);
+  };
+  const plain = run(false);
+  const warmed = run(true);
+  const again = run(false);
+  check('worker warm-up: 30 ticks on a copy first leave the real world\'s 150 ticks exactly the same', plain === warmed && plain === again, `${plain} ${warmed}`);
+}
+
 console.log(`\n${failed ? `${failed} FAILED` : 'all passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 if (failed) (globalThis as unknown as { process: { exit(n: number): void } }).process.exit(1);
