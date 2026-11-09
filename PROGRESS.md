@@ -2155,4 +2155,5 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   84 → 16 ms at most; planes off screen: 0 updates.
 - **Checks:** same.sh 18 runs ALL SAME; the skirmish's hash and the story logs unchanged; golden set 17 of 17 (16 pixel
   for pixel, the flood shot within main's own noise); `npm test`, determinism, build; LAN two players.
+- **Merged** into `main` as `32f32b6` (Pages deployed; game artifact v55); handoff 26.
 
