@@ -2193,3 +2193,6 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   moving), so the first frames of play do not; the caste swatches drawn on a CPU canvas (they waited for that queue:
   130 s of a 158 s load on the build machine). Same pixels.
 - **Merged** into `main` as `f3473f2` (Pages deployed; game artifact v57); handoff 27 (updated).
+- **The bench's GPU breakdown ends with six frames of every draw waited for** (the scene pass split by what it
+  draws). Build machine, the big fight: the ground's shader about half the scene pass. Merged into `main` as
+  `4b7dead` (Pages deployed; game artifact v58); handoff 27 (updated).
