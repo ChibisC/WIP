@@ -936,6 +936,31 @@ export class GameView {
     return { x0: x0 - m, x1: x1 + m, z0: z0 - m, z1: z1 + m };
   }
 
+  /**
+   * One shadow map for every underground area and the trees (performance v5): only one of them is drawn in a frame and
+   * its key light's map is redrawn every frame, so they can share it — 16 MB at High per area that was kept for each.
+   */
+  shareAreaShadows(): void {
+    let m: THREE.LightShadow['map'] = null;
+    for (const st of this.nestStages.values()) {
+      const sh = st.lights.key.shadow;
+      if (sh.map && sh.map.width === sh.mapSize.x && sh.map.height === sh.mapSize.y) {
+        m = sh.map;
+        break;
+      }
+    }
+    if (!m) return;
+    for (const st of this.nestStages.values()) {
+      const sh = st.lights.key.shadow;
+      if (sh.map === m || sh.mapSize.x !== m.width || sh.mapSize.y !== m.height) continue;
+      if (sh.map) {
+        sh.map.depthTexture?.dispose();
+        sh.map.dispose();
+      }
+      sh.map = m;
+    }
+  }
+
   private tmpBoxO = new THREE.Vector3();
   private tmpBoxP = new THREE.Vector3();
 
@@ -983,6 +1008,7 @@ export class GameView {
       // maps the next, then the changed chunks; v5: the chunks a few milliseconds a frame — a busy nest dug in many
       // places at once rebuilt 16–21 chunks, 33–41 ms, on a frame — so a dig's new walls take a few frames to appear)
       this.nestTerrain?.update(false, this.stepped ? Infinity : NEST_MESH_MS);
+      this.shareAreaShadows();
       const nt = this.nestTerrain;
       if (nt?.cullShadowCasters && !this.inTrees) nt.cullShadowCasters(this.preset.shadows ? this.shadowCasterBox(cam, this.nestStage!.lights.key, nt.topHeight ?? nt.wallH * 1.25 + 1) : null);
       if (this.inTrees) {

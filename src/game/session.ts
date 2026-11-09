@@ -467,6 +467,8 @@ export class GameSession {
         const owner = w.colony(colonyOfSpace(space)) ?? null;
         nv.update(w, owner, this.player, cam, 1, 0, vh, g.R * 16, -1, v.time, this.player.markers, []);
         warmScene(v.renderer, nv.stage.scene, cam, !v.post.enabled);
+        // (the areas share one shadow map: the one just made is handed to the next — performance v5)
+        v.shareAreaShadows();
       });
     steps.push(() => {
       const t = w.terrain;
