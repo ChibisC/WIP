@@ -69,6 +69,14 @@ SUBJS = """() => {
     o.__timed = true;
     o.update = (...a) => { const t = performance.now(); const r = f(...a); window.__subs[n] = (window.__subs[n] || 0) + performance.now() - t; return r; };
   }
+  // the view's own rebuilds (the water after a flood step, the ground after a change, the trees' backdrop)
+  const v = s.view;
+  for (const [o, m, name] of [[v.water, 'rebuild', 'waterMesh'], [v.terrainMesh, 'rebuild', 'terrainMesh'], [v, 'refreshBackdrop', 'backdrop'], [s.world.terrain, 'rebuildWater', 'terrainWater']]) {
+    if (!o || typeof o[m] !== 'function' || o['__t' + m]) continue;
+    const f = o[m].bind(o);
+    o['__t' + m] = true;
+    o[m] = (...a) => { const t = performance.now(); const r = f(...a); window.__subs[name] = (window.__subs[name] || 0) + performance.now() - t; return r; };
+  }
   for (const [sp, nv] of s.nests) {
     if (nv.__timed) continue;
     nv.__timed = true;

@@ -73,6 +73,11 @@ export class TerrainMesh {
   private nx: number;
   private ny: number;
   private builtVersion = -1;
+  /** every channel written once (the water-only path writes two of them) */
+  private everBuilt = false;
+  /** each vertex's terrain sample and its fade beyond the map's edge (the water-only path) */
+  private vSample: Int32Array | null = null;
+  private vFade: Float64Array | null = null;
   private builtWater = -1;
   overlayUniforms = {
     uPhero: { value: null as THREE.Texture | null },
@@ -219,6 +224,38 @@ export class TerrainMesh {
     const g1 = this.geo.attributes.g1.array as Float32Array;
     const g2 = this.geo.attributes.g2.array as Float32Array;
     const F = groundFields(t);
+    // (performance v4: only the water changed — a flood step: only the wet band and the gravel depend on it; those two
+    // channels are written, by the same expressions, and only their two attributes go to the GPU)
+    if (!heightsChanged && this.everBuilt) {
+      // (each vertex's sample and edge fade, as the full pass works them out: they depend on its x, z alone)
+      const N = this.nx * this.ny;
+      if (!this.vSample) {
+        this.vSample = new Int32Array(N);
+        this.vFade = new Float64Array(N);
+        for (let k = 0; k < N; k++) {
+          const x = pos[k * 3];
+          const z = pos[k * 3 + 2];
+          const inside = x >= 0 && z >= 0 && x <= t.width && z <= t.depth;
+          const ci = Math.round(Math.min(Math.max(x, 0), t.width) / t.res);
+          const cj = Math.round(Math.min(Math.max(z, 0), t.depth) / t.res);
+          this.vSample[k] = cj * t.nx + ci;
+          const d = inside ? 0 : Math.hypot(x - Math.min(Math.max(x, 0), t.width), z - Math.min(Math.max(z, 0), t.depth));
+          this.vFade[k] = 1 - sstep(0, 60, d);
+        }
+      }
+      const vs = this.vSample;
+      const vf = this.vFade!;
+      for (let k = 0; k < N; k++) {
+        const sI = vs[k];
+        const fade = vf[k];
+        g1[k * 4] = F.wet[sI] * fade;
+        g2[k * 4 + 1] = F.gravel[sI] * fade;
+      }
+      this.geo.attributes.g1.needsUpdate = true;
+      this.geo.attributes.g2.needsUpdate = true;
+      return;
+    }
+    this.everBuilt = true;
     const biome = t.map?.biome;
     const outsideCover: number[] | null =
       biome === 'savanna' ? [0.35, 0.1, 0.55, 0]
@@ -364,53 +401,50 @@ export interface GroundFields {
   cover: Float32Array;
 }
 
-const fieldCache = new WeakMap<Terrain, { key: number; f: GroundFields }>();
+/**
+ * Performance v4: the fields split by what they depend on. Everything but the wet band and the pebbles' dampness comes
+ * from the heights and the map alone — kept per terrain version — so a flood step (a water change) recomputes only
+ * the wet band and the gravel from the kept parts (the gravel's dry part kept in doubles: the same product as before).
+ * The same values as recomputing all of it.
+ */
+interface StaticFields {
+  ao: Float32Array;
+  trail: Float32Array;
+  face: Uint8Array;
+  zone: Uint8Array;
+  rim: Float32Array;
+  spill: Float32Array;
+  sculpt: Uint8Array;
+  cover: Float32Array;
+  /** the pebbly shelves before the wet band takes some of them (riverbanks, savannas), or null */
+  gravelBase: Float64Array | null;
+}
 
-export function groundFields(t: Terrain): GroundFields {
-  const key = t.version * 100003 + t.waterVersion;
-  const hit = fieldCache.get(t);
-  if (hit && hit.key === key) return hit.f;
+const fieldCache = new WeakMap<Terrain, { key: number; f: GroundFields }>();
+const staticCache = new WeakMap<Terrain, { version: number; s: StaticFields }>();
+
+const sm = (a: number, b: number, v: number) => {
+  const u = Math.max(0, Math.min(1, (v - a) / (b - a)));
+  return u * u * (3 - 2 * u);
+};
+
+function staticFields(t: Terrain): StaticFields {
+  const hit = staticCache.get(t);
+  if (hit && hit.version === t.version) return hit.s;
   const n = t.nx * t.ny;
   const { nx, ny, res } = t;
-  const f: GroundFields = {
-    wet: new Float32Array(n),
+  const f = {
     ao: new Float32Array(n).fill(1),
     trail: new Float32Array(n),
     face: new Uint8Array(n),
     zone: new Uint8Array(n),
-    gravel: new Float32Array(n),
     rim: new Float32Array(n),
     spill: new Float32Array(n),
     sculpt: new Uint8Array(n),
     cover: softCover(t),
   };
-  // ---- distance to water (chamfer), in mm
-  const D = new Float32Array(n).fill(1e9);
-  for (let k = 0; k < n; k++) if (t.water[k] > t.heights[k] + t.overlay[k] + 0.2) D[k] = 0;
-  chamfer(D, nx, ny);
-  const sm = (a: number, b: number, v: number) => {
-    const u = Math.max(0, Math.min(1, (v - a) / (b - a)));
-    return u * u * (3 - 2 * u);
-  };
-  for (let k = 0; k < n; k++) {
-    const mm = D[k] * res;
-    if (mm > 60) continue;
-    // a wet band of mud, then damp ground; ground well above the water stays dry
-    let w = (1 - sm(2, 14, mm)) + 0.35 * (1 - sm(14, 34, mm)) * sm(2, 14, mm);
-    const i = k % nx;
-    const j = (k - i) / nx;
-    // (the water level nearby: the lowest water within a few samples; banks above it dry out)
-    let lvl = -9999;
-    for (let r = 1; r <= 10 && lvl < -9000; r += 3)
-      for (const [di, dj] of [[r, 0], [-r, 0], [0, r], [0, -r]]) {
-        const q = (j + dj) * nx + (i + di);
-        if (i + di >= 0 && i + di < nx && j + dj >= 0 && j + dj < ny && t.water[q] > -9000) lvl = Math.max(lvl, t.water[q]);
-      }
-    if (lvl > -9000) w *= 1 - sm(2.5, 9, t.heights[k] - lvl);
-    f.wet[k] = Math.min(1, w);
-  }
-  // ---- flood zones (low ground under each zone's water line)
   const m = t.map;
+  // ---- flood zones (low ground under each zone's water line)
   if (m)
     m.floods.forEach((fz, zi) => {
       for (let k = 0; k < n; k++) {
@@ -422,7 +456,9 @@ export function groundFields(t: Terrain): GroundFields {
     });
   // ---- pebbly shelves: riverbanks and savannas, where sand shows (a riverbank's middle shelf most of all)
   const biome = m?.biome;
+  let gravelBase: Float64Array | null = null;
   if (biome === 'riverbank' || biome === 'savanna') {
+    gravelBase = new Float64Array(n);
     for (let k = 0; k < n; k++) {
       const i = k % nx;
       const j = (k - i) / nx;
@@ -431,7 +467,7 @@ export function groundFields(t: Terrain): GroundFields {
       const sand = t.coverW[k * 4 + 2] / 255;
       const shelf = t.layers && biome === 'riverbank' && t.layers.level[k] === 1 ? 0.12 : 0;
       const nz = fbm2(x / 70 + 11, y / 70 - 4, 3, 77);
-      f.gravel[k] = sm(0.58 - shelf, 0.7 - shelf, nz) * sm(0.1, 0.35, sand + shelf) * (1 - f.wet[k] * 0.5);
+      gravelBase[k] = sm(0.58 - shelf, 0.7 - shelf, nz) * sm(0.1, 0.35, sand + shelf);
     }
   }
   const L = t.layers;
@@ -512,6 +548,54 @@ export function groundFields(t: Terrain): GroundFields {
         }
     }
   }
+  const s: StaticFields = { ...f, gravelBase };
+  staticCache.set(t, { version: t.version, s });
+  return s;
+}
+
+export function groundFields(t: Terrain): GroundFields {
+  const key = t.version * 100003 + t.waterVersion;
+  const hit = fieldCache.get(t);
+  if (hit && hit.key === key) return hit.f;
+  const n = t.nx * t.ny;
+  const { nx, ny, res } = t;
+  const st = staticFields(t);
+  const f: GroundFields = {
+    wet: new Float32Array(n),
+    ao: st.ao,
+    trail: st.trail,
+    face: st.face,
+    zone: st.zone,
+    gravel: new Float32Array(n),
+    rim: st.rim,
+    spill: st.spill,
+    sculpt: st.sculpt,
+    cover: st.cover,
+  };
+  // ---- distance to water (chamfer), in mm
+  const D = new Float32Array(n).fill(1e9);
+  for (let k = 0; k < n; k++) if (t.water[k] > t.heights[k] + t.overlay[k] + 0.2) D[k] = 0;
+  chamfer(D, nx, ny);
+  for (let k = 0; k < n; k++) {
+    const mm = D[k] * res;
+    if (mm > 60) continue;
+    // a wet band of mud, then damp ground; ground well above the water stays dry
+    let w = (1 - sm(2, 14, mm)) + 0.35 * (1 - sm(14, 34, mm)) * sm(2, 14, mm);
+    const i = k % nx;
+    const j = (k - i) / nx;
+    // (the water level nearby: the lowest water within a few samples; banks above it dry out)
+    let lvl = -9999;
+    for (let r = 1; r <= 10 && lvl < -9000; r += 3)
+      for (const [di, dj] of [[r, 0], [-r, 0], [0, r], [0, -r]]) {
+        const q = (j + dj) * nx + (i + di);
+        if (i + di >= 0 && i + di < nx && j + dj >= 0 && j + dj < ny && t.water[q] > -9000) lvl = Math.max(lvl, t.water[q]);
+      }
+    if (lvl > -9000) w *= 1 - sm(2.5, 9, t.heights[k] - lvl);
+    f.wet[k] = Math.min(1, w);
+  }
+  // ---- the pebbles: their dry part times the dampness (riverbanks and savannas)
+  const gb = st.gravelBase;
+  if (gb) for (let k = 0; k < n; k++) f.gravel[k] = gb[k] * (1 - f.wet[k] * 0.5);
   fieldCache.set(t, { key, f });
   return f;
 }
