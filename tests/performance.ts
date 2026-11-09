@@ -9,6 +9,7 @@
  *  - The nest terrain's signed distance (its faster blur) is the same to the bit as the plain loop's, and faster; an
  *    area kept current in slices ends with the mesh a full rebuild gives.
  *  - The frame cap holds 30 and 60 on a 120 Hz clock and never skips at 60 on a 60 Hz one.
+ *  - Performance v5: hit-stops do not add up; texture rings; the nest's shadow casters culled to a box.
  *  - Performance v2: the entity columns as deltas (unchanged columns left out), read by the generated reader or the
  *    plain one, leave the replica's ants exactly as the simulation's.
  *
@@ -597,6 +598,58 @@ if (columnCodegen.on) {
     w.events.drain();
   }
   check('nest fields: a tick\'s working set stays cached past 64, and the cache shrinks back once idle', kept && fl.size <= 64 + 8, `size after idle ${fl.size}`);
+}
+
+// ---- performance v5 (claude/performance/05-spec-performance-v5-nonstop.md)
+{
+  // hit-stops do not add up: a big fight's slams and impales near the camera held the clock longer than time passed
+  let ticks = 0;
+  const loop = new GameLoop({ tick: () => void ticks++, frame: () => {} });
+  let now = 1000;
+  loop.step(now);
+  for (let i = 0; i < 600; i++) {
+    // ten hit-stops a second, as many slams as a big fight throws near the camera
+    if (i % 6 === 0) loop.hitStop(0.08, now);
+    now += 1000 / 60;
+    loop.step(now);
+  }
+  const rate = ticks / 10 / 20;
+  check('hit-stops do not add up: ten a second still leave the game near full speed', rate > 0.8, `ran at ${rate.toFixed(2)}×`);
+  // one alone still holds
+  ticks = 0;
+  const l2 = new GameLoop({ tick: () => void ticks++, frame: () => {} });
+  let n2 = 0;
+  l2.step(n2);
+  l2.hitStop(0.08, n2);
+  for (let i = 0; i < 4; i++) l2.step((n2 += 1000 / 60));
+  check('a single hit-stop still holds the simulation for its moment', ticks === 0, `${ticks} ticks in 67 ms`);
+}
+{
+  // texture rings: a change goes to the next texture of the ring with the same data, two changes before an upload
+  // reuse it, and the material's uniform follows
+  const { TextureRing } = await import('../src/render/dynamicTextures');
+  const uni = { value: null as unknown as THREE.DataTexture };
+  const data = new Float32Array(16);
+  const ring = new TextureRing(() => new THREE.DataTexture(data, 2, 2, THREE.RGBAFormat, THREE.FloatType));
+  ring.onSwap = (t) => (uni.value = t);
+  const t0r = ring.current;
+  const t1 = ring.commit();
+  const t1b = ring.commit();
+  const same = ring.ring.every((t) => t.image.data === data);
+  check('texture ring: a commit moves to the next texture, a second before the upload reuses it; one data array', t1 !== t0r && t1b === t1 && uni.value === t1 && same && ring.ring.length === 3);
+}
+{
+  // the nest's shadow casters: only chunks inside the box cast; none culled without a box
+  const w = createWorld({ seed: 4, style: 'meadow', width: 100, depth: 100, map: 'meadowPond', colonies: [{ species: 'lasius', player: true, ai: true }, { species: 'formica', player: false, ai: true }], food: 1.2, settings: {} } as never, new EventBus());
+  const g = w.nestOf(nestSpace(w.s.colonies[0].id))!;
+  const nt = new NestTerrain(g);
+  nt.rebuildAll();
+  const chunks = [...(nt as unknown as { chunks: Map<number, THREE.Mesh> }).chunks.values()];
+  nt.cullShadowCasters({ x0: 0, x1: 20, z0: 0, z1: 20 });
+  const casting = chunks.filter((m) => m.castShadow).length;
+  nt.cullShadowCasters(null);
+  const all = chunks.every((m) => m.castShadow);
+  check('nest shadow casters: only the chunks the box touches cast; with no box every chunk does', casting >= 1 && casting < chunks.length && all, `${casting} of ${chunks.length}`);
 }
 
 console.log(`\n${failed ? `${failed} FAILED` : 'all passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
