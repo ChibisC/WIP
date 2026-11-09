@@ -389,12 +389,15 @@ export class Profiler {
     T.bufBytes += g.bufBytes;
     T.bufMs += g.bufMs;
     // the JS heap (Chrome): a big drop since the last frame is the garbage collector
-    const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+    // (Chrome's performance.memory costs ~0.25 ms a read: every 10th frame, and on a slow one — performance v4)
     let gc = 0;
-    if (mem) {
-      const h = mem.usedJSHeapSize;
-      if (this.heapLast && h < this.heapLast - 2 * 1048576) gc = (this.heapLast - h) / 1048576;
-      this.heapLast = h;
+    if (this.frame % 10 === 0 || dt > HITCH_MS || cpu > HITCH_MS) {
+      const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+      if (mem) {
+        const h = mem.usedJSHeapSize;
+        if (this.heapLast && h < this.heapLast - 2 * 1048576) gc = (this.heapLast - h) / 1048576;
+        this.heapLast = h;
+      }
     }
     // the frame that ends now was measured from the last frame's start: a slow frame shows in this frame's dt when
     // the work happened in the previous frame, so both this frame's work and the time are logged

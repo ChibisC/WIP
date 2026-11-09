@@ -132,25 +132,98 @@ export class Water {
     void globalUniforms;
   }
 
+  /**
+   * Performance v4: the water cells each vertex's 5 × 5 dilation reads, when they form a regular lattice — vertex k's
+   * cell (ci, cj) and the offsets ±1, ±2 times `s` cells — checked once against `waterAt`'s own rounding for every
+   * vertex and offset. Then the maximum is taken separably (rows of the water grid, then columns): the same values,
+   * and a maximum does not depend on the order it is taken in, so every vertex gets the very level the 25 look-ups
+   * gave. A flood step rebuilt the mesh in 35–175 ms; a fallback keeps the old loop for any other layout.
+   */
+  private lattice: { ci: Int32Array; cj: Int32Array; s: number } | null | undefined;
+  /** the ground under each vertex (`heightAt`), for the terrain version it was read at */
+  private ground: Float64Array | null = null;
+  private groundVersion = -1;
+  private rowMax: Float32Array | null = null;
+
+  private buildLattice(): { ci: Int32Array; cj: Int32Array; s: number } | null {
+    const t = this.terrain;
+    const pos = this.geo.attributes.position.array as Float32Array;
+    const s = this.step / t.res;
+    if (s !== Math.round(s)) return null;
+    const n = this.nx * this.ny;
+    const ci = new Int32Array(n);
+    const cj = new Int32Array(n);
+    for (let k = 0; k < n; k++) {
+      const x = pos[k * 3];
+      const z = pos[k * 3 + 2];
+      ci[k] = Math.round(x / t.res);
+      cj[k] = Math.round(z / t.res);
+      for (let d = -2; d <= 2; d++) {
+        if (Math.round((x + d * this.step) / t.res) !== ci[k] + d * s) return null;
+        if (Math.round((z + d * this.step) / t.res) !== cj[k] + d * s) return null;
+      }
+    }
+    return { ci, cj, s };
+  }
+
   rebuild(): void {
     if (this.builtVersion === this.terrain.waterVersion + this.terrain.version * 1000) return;
     this.builtVersion = this.terrain.waterVersion + this.terrain.version * 1000;
     const t = this.terrain;
     const pos = this.geo.attributes.position.array as Float32Array;
     const dep = this.geo.attributes.wdepth.array as Float32Array;
+    if (this.lattice === undefined) this.lattice = this.buildLattice();
+    const L = this.lattice;
+    const n = this.nx * this.ny;
+    if (!this.ground || this.groundVersion !== t.version) {
+      const gr = (this.ground ??= new Float64Array(n));
+      for (let k = 0; k < n; k++) gr[k] = t.heightAt(pos[k * 3], pos[k * 3 + 2]);
+      this.groundVersion = t.version;
+    }
+    const ground = this.ground;
+    // the water grid's rows, each vertex column's maximum over its five cells (−9999 off the grid, as waterAt)
+    let rm: Float32Array | null = null;
+    const TW = t.nx;
+    const TH = t.ny;
+    if (L) {
+      rm = this.rowMax && this.rowMax.length === TH * this.nx ? this.rowMax : (this.rowMax = new Float32Array(TH * this.nx));
+      const W = t.water;
+      for (let j = 0; j < TH; j++)
+        for (let i = 0; i < this.nx; i++) {
+          const c = L.ci[i];
+          let m = -9999;
+          for (let d = -2; d <= 2; d++) {
+            const cc = c + d * L.s;
+            if (cc < 0 || cc >= TW) continue;
+            const v = W[j * TW + cc];
+            if (v > m) m = v;
+          }
+          rm[j * this.nx + i] = m;
+        }
+    }
     let any = false;
-    for (let k = 0; k < this.nx * this.ny; k++) {
+    for (let k = 0; k < n; k++) {
       const x = pos[k * 3];
       const z = pos[k * 3 + 2];
       // Dilate the water level a little so the flat plane runs under the shore
       // and the terrain depth-clips it along a smooth natural contour.
       let w = -9999;
-      for (let dz = -2; dz <= 2; dz++)
-        for (let dx = -2; dx <= 2; dx++) {
-          const v = t.waterAt(x + dx * this.step, z + dz * this.step);
+      if (L && rm) {
+        const i = k % this.nx;
+        const c = L.cj[k];
+        for (let d = -2; d <= 2; d++) {
+          const rr = c + d * L.s;
+          if (rr < 0 || rr >= TH) continue;
+          const v = rm[rr * this.nx + i];
           if (v > w) w = v;
         }
-      const g = t.heightAt(x, z);
+      } else
+        for (let dz = -2; dz <= 2; dz++)
+          for (let dx = -2; dx <= 2; dx++) {
+            const v = t.waterAt(x + dx * this.step, z + dz * this.step);
+            if (v > w) w = v;
+          }
+      const g = ground[k];
       if (w > -9000 && w > g - 3) {
         pos[k * 3 + 1] = w;
         dep[k] = w - g;
