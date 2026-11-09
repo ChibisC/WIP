@@ -17,6 +17,13 @@ export interface GpuBreakdown {
   passes: Array<{ name: string; ms: number }>;
   /** the scene and shadow passes' draws, grouped by what they draw (triangles a frame), most first */
   draws: Array<{ name: string; tris: number }>;
+  /**
+   * Then a few frames with every draw waited for (round 2): each group's time a frame, most first. Each wait ends an
+   * Apple GPU's render pass (its attachments stored and loaded back), so every draw carries some of that — compare
+   * the draws with each other, not with the passes.
+   */
+  drawMs?: Array<{ name: string; ms: number }>;
+  drawFrames?: number;
 }
 
 /**
@@ -74,6 +81,11 @@ export function measureGpu(s: GameSession, frames: number, done: (r: GpuBreakdow
   const r = v.renderer;
   const passes = new Map<string, number>();
   const draws = new Map<string, number>();
+  const drawMs = new Map<string, number>();
+  const DRAW_FRAMES = 6;
+  // 1: passes waited for, triangles counted; 2: every draw waited for
+  let phase = 1;
+  let drawT = 0;
   let on = false;
   let markT = 0;
   let pass = 'scene';
@@ -85,7 +97,7 @@ export function measureGpu(s: GameSession, frames: number, done: (r: GpuBreakdow
   };
   const post = v.post;
   post.mark = (name) => {
-    if (!on) return;
+    if (!on || phase !== 1) return;
     if (!name) {
       // the post pipeline starts: the frame's own work before it (the main thread's) is not a pass
       markT = wait();
@@ -100,6 +112,12 @@ export function measureGpu(s: GameSession, frames: number, done: (r: GpuBreakdow
   const smRender = sm.render;
   sm.render = function (...a: Parameters<typeof smRender>) {
     if (!on) return smRender.apply(this, a);
+    if (phase !== 1) {
+      pass = 'shadow';
+      smRender.apply(this, a);
+      pass = 'scene';
+      return;
+    }
     const t0 = wait();
     pass = 'shadow';
     smRender.apply(this, a);
@@ -118,12 +136,15 @@ export function measureGpu(s: GameSession, frames: number, done: (r: GpuBreakdow
       const rec = { o, b: o.onBeforeRender, a: o.onAfterRender, bs: o.onBeforeShadow, as: o.onAfterShadow };
       hooked.push(rec);
       const before = () => {
-        if (on) tri0 = r.info.render.triangles;
+        if (!on) return;
+        if (phase === 1) tri0 = r.info.render.triangles;
+        else drawT = wait();
       };
       const after = (shadow: boolean) => {
         if (!on) return;
         const k = (shadow ? 'shadow: ' : '') + g;
-        draws.set(k, (draws.get(k) ?? 0) + r.info.render.triangles - tri0);
+        if (phase === 1) draws.set(k, (draws.get(k) ?? 0) + r.info.render.triangles - tri0);
+        else drawMs.set(k, (drawMs.get(k) ?? 0) + wait() - drawT);
       };
       o.onBeforeRender = function (...x) {
         before();
@@ -145,16 +166,20 @@ export function measureGpu(s: GameSession, frames: number, done: (r: GpuBreakdow
       };
     });
   let n = 0;
+  let n2 = 0;
   let total = 0;
   let frameT = 0;
   const skip = 2;
   const loop = () => {
     if (on) {
       const t = wait();
-      total += t - frameT;
-      n++;
+      if (phase === 1) {
+        total += t - frameT;
+        n++;
+      } else n2++;
     }
-    if (n >= frames) {
+    if (phase === 1 && n >= frames) phase = 2;
+    if (phase === 2 && n2 >= DRAW_FRAMES) {
       on = false;
       post.mark = null;
       sm.render = smRender;
@@ -173,6 +198,11 @@ export function measureGpu(s: GameSession, frames: number, done: (r: GpuBreakdow
           .map(([name, tris]) => ({ name, tris: Math.round(tris / Math.max(1, n)) }))
           .sort((a, b) => b.tris - a.tris)
           .slice(0, 12),
+        drawMs: [...drawMs]
+          .map(([name, ms]) => ({ name, ms: +(ms / Math.max(1, n2)).toFixed(2) }))
+          .sort((a, b) => b.ms - a.ms)
+          .slice(0, 12),
+        drawFrames: n2,
       });
       return;
     }
