@@ -25,7 +25,7 @@ import { BUILD_ID } from '../net/messages';
 import { AS, SURFACE } from '../sim/types';
 import { shapeBox } from '../world/mapShapes';
 import { display, probeDisplay } from '../core/display';
-import { GpuBreakdown, measureGpu } from './gpuBreakdown';
+import { DrawWatch, GpuBreakdown, measureGpu, SlowFrame } from './gpuBreakdown';
 
 interface SceneDef {
   id: string;
@@ -117,6 +117,8 @@ interface SwitchStep {
 interface SwitchResult {
   rounds: number;
   steps: SwitchStep[];
+  /** the last, diagnostic round (every pass and draw waited for): its long frames and where their time went */
+  diag?: Array<{ kind: SwitchStep['kind']; slow: SlowFrame[] }>;
   /** the renderer's counts at the end of each round */
   counts?: Array<{ textures: number; geometries: number; programs: number; gpuMB: number }>;
 }
@@ -764,13 +766,17 @@ function runSwitching(s: GameSession, _fail: () => void, done: (sw: SwitchResult
     .filter((sp) => sp !== home);
   type Step = { kind: SwitchStep['kind']; round: number; act: () => void };
   const plan: Step[] = [];
-  for (let r = 0; r < rounds; r++) {
+  // (performance v5 round 2: one more round at the end, every pass and draw waited for — not counted with the others)
+  for (let r = 0; r <= rounds; r++) {
     plan.push({ kind: 'dive in', round: r, act: () => void (v.space === 'surface' && s.showArea(home)) });
     for (const a of areas) plan.push({ kind: 'area', round: r, act: () => void s.showArea(a) });
     plan.push({ kind: 'dive out', round: r, act: () => void (v.space === 'nest' && s.toggleView()) });
   }
   const steps: SwitchStep[] = [];
   const counts: NonNullable<SwitchResult['counts']> = [];
+  const diag: NonNullable<SwitchResult['diag']> = [];
+  let watch: DrawWatch | null = null;
+  let slowMark = 0;
   let k = -1;
   let stepStart = 0;
   let endAt = 0;
@@ -805,13 +811,17 @@ function runSwitching(s: GameSession, _fail: () => void, done: (sw: SwitchResult
       // this step's hitches and their causes
       // (the longest first — performance v5: the first three hid the multi-second ones)
       for (const h of prof.hitches.slice(hitchMark).sort((a, b) => b.ms - a.ms)) cur!.causes.push(`${h.ms.toFixed(0)} ms (main thread ${h.cpu.toFixed(0)}): ${h.causes.join('; ')}`);
-      steps.push(cur!);
-      if (plan[k].kind === 'dive out') {
+      if (plan[k].round === rounds) diag.push({ kind: plan[k].kind, slow: watch ? watch.slow.slice(slowMark) : [] });
+      else steps.push(cur!);
+      if (plan[k].kind === 'dive out' && plan[k].round < rounds) {
         const c = prof.counts();
         counts.push({ textures: c.textures, geometries: c.geometries, programs: c.programs, gpuMB: Math.round(prof.gpuMB()) });
       }
       k++;
-      if (k >= plan.length) return done({ rounds, steps, counts });
+      if (k >= plan.length) {
+        watch?.dispose();
+        return done({ rounds, steps, counts, diag });
+      }
       startStep(t);
     }
     requestAnimationFrame(loop);
@@ -822,6 +832,12 @@ function runSwitching(s: GameSession, _fail: () => void, done: (sw: SwitchResult
     hitchMark = prof.hitches.length;
     stepStart = t;
     endAt = 0;
+    if (p.round === rounds) {
+      watch ??= new DrawWatch(s, 150, prof);
+      watch.hookNew();
+      watch.on = true;
+      slowMark = watch.slow.length;
+    }
     p.act();
   };
   requestAnimationFrame(loop);
@@ -865,6 +881,17 @@ function fmtScene(r: SceneResult): string[] {
     for (const x of causes) out.push(`  round ${x.round + 1} ${x.kind}: ${x.causes.slice(0, 2).join(' | ')}`);
     // the renderer's counts after each round (performance v5: does anything pile up?)
     if (sw.counts?.length) out.push(`  after each round (textures, geometries, programs, GPU MB): ${sw.counts.map((c) => `${c.textures}/${c.geometries}/${c.programs}/${c.gpuMB}`).join(' · ')}`);
+    // the diagnostic round: a long frame's passes and draws (waited for one by one), or a long gap with little work in it
+    if (sw.diag) {
+      const longs = sw.diag.flatMap((d) => d.slow.map((f) => ({ kind: d.kind, f })));
+      out.push(`  diagnostic round (every pass and draw waited for; not counted above): ${longs.length ? `${longs.length} long frames` : 'no frame over 150 ms'}`);
+      for (const { kind, f } of longs.sort((a, b) => Math.max(b.f.intervalMs, b.f.workMs) - Math.max(a.f.intervalMs, a.f.workMs)).slice(0, 8))
+        out.push(
+          `    ${kind}: gap ${f.intervalMs} ms, work ${f.workMs} ms` +
+            (f.passes.length ? ` — ${f.passes.map((p) => `${p.name} ${p.ms}`).join(', ')}` : '') +
+            (f.draws.length ? ` — slowest draws: ${f.draws.map((d) => `${d.name} ${d.ms}`).join(', ')}` : ''),
+        );
+    }
   }
   if (r.feel) {
     const F = r.feel;

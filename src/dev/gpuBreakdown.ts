@@ -146,3 +146,165 @@ export function measureGpu(s: GameSession, frames: number, done: (r: GpuBreakdow
   let started = 0;
   requestAnimationFrame(loop);
 }
+
+/** A frame of the switching test's diagnostic round that took long: where its time went. */
+export interface SlowFrame {
+  /** the time since the previous frame started (what the player waits) */
+  intervalMs: number;
+  /** the frame's own work with every pass and draw waited for */
+  workMs: number;
+  passes: Array<{ name: string; ms: number }>;
+  /** its slowest draws (a program compiled, a pipeline built, a texture or buffer uploaded show up here) */
+  draws: Array<{ name: string; ms: number }>;
+}
+
+/**
+ * Every pass and every draw waited for while `on` (performance v5 round 2: the switching test's last, diagnostic
+ * round). The Mac's report had 2.6–4.2 s frames on some switches with the main thread idle ("outside this thread"):
+ * waiting after each draw pulls the GPU's part of a frame — a pipeline built for a draw, a texture or buffer
+ * uploaded, a program compiled — into that draw, so a long frame names its draw; a long interval with little work in
+ * it is something outside the page. These frames are slower than real ones (each wait ends an Apple GPU's render pass),
+ * so their times are not counted with the measured rounds.
+ */
+export class DrawWatch {
+  on = false;
+  readonly slow: SlowFrame[] = [];
+  private readonly hooked = new WeakSet<THREE.Object3D>();
+  private readonly undo: Array<() => void> = [];
+  private passes = new Map<string, number>();
+  private draws: Array<{ name: string; ms: number }> = [];
+  private frameT = 0;
+  private lastStart = 0;
+  private markT = 0;
+  private drawT = 0;
+  private pass = 'scene';
+  private readonly gl: WebGLRenderingContext | WebGL2RenderingContext;
+
+  constructor(
+    private readonly s: GameSession,
+    private readonly slowMs = 150,
+    prof: { begin: (now?: number) => void; end: () => void },
+  ) {
+    const v = s.view;
+    const r = v.renderer;
+    this.gl = r.getContext();
+    const self = this;
+    const post = v.post;
+    const mark0 = post.mark;
+    post.mark = (name) => {
+      mark0?.(name);
+      if (!self.on) return;
+      const t = self.wait();
+      if (name) self.passes.set(name, (self.passes.get(name) ?? 0) + t - self.markT);
+      self.markT = t;
+    };
+    this.undo.push(() => (post.mark = mark0));
+    const sm = r.shadowMap;
+    const smRender = sm.render;
+    sm.render = function (...a: Parameters<typeof smRender>) {
+      if (!self.on) return smRender.apply(this, a);
+      const t0 = self.wait();
+      self.pass = 'shadow';
+      smRender.apply(this, a);
+      self.pass = 'scene';
+      const t1 = self.wait();
+      self.passes.set('shadow maps', (self.passes.get('shadow maps') ?? 0) + t1 - t0);
+      self.markT += t1 - t0;
+    };
+    this.undo.push(() => (sm.render = smRender));
+    const begin = prof.begin;
+    const end = prof.end;
+    prof.begin = function (now?: number) {
+      if (self.on) {
+        const t = self.wait();
+        self.frameT = t;
+        self.markT = t;
+        self.passes = new Map();
+        self.draws = [];
+      }
+      return begin.call(this, now);
+    };
+    prof.end = function () {
+      const res = end.call(this);
+      if (self.on) {
+        const t = self.wait();
+        const work = t - self.frameT;
+        const interval = self.lastStart ? self.frameT - self.lastStart : 0;
+        self.lastStart = self.frameT;
+        if (work > self.slowMs || interval > self.slowMs * 2)
+          self.slow.push({
+            intervalMs: Math.round(interval),
+            workMs: Math.round(work),
+            passes: [...self.passes].map(([name, ms]) => ({ name, ms: Math.round(ms) })).filter((p) => p.ms >= 5).sort((a, b) => b.ms - a.ms),
+            draws: self.draws.sort((a, b) => b.ms - a.ms).slice(0, 4).filter((d) => d.ms >= 5),
+          });
+      } else self.lastStart = 0;
+      return res;
+    };
+    this.undo.push(() => {
+      prof.begin = begin;
+      prof.end = end;
+    });
+    this.hookNew();
+  }
+
+  private wait(): number {
+    this.gl.finish();
+    return performance.now();
+  }
+
+  /** Hook what has been added to the scenes since (a nest's new chunks, an ant model's first use). */
+  hookNew(): void {
+    const self = this;
+    const v = this.s.view;
+    const scenes = [v.surfaceScene, ...[...this.s.nests.values()].map((nv) => nv.stage.scene)];
+    for (const sc of scenes)
+      sc.traverse((o) => {
+        if (self.hooked.has(o) || (!(o as THREE.Mesh).isMesh && !(o as THREE.Points).isPoints && !(o as THREE.Line).isLine)) return;
+        self.hooked.add(o);
+        const g = groupOf(o);
+        const b = o.onBeforeRender;
+        const a = o.onAfterRender;
+        const bs = o.onBeforeShadow;
+        const as = o.onAfterShadow;
+        const before = () => {
+          if (self.on) self.drawT = self.wait();
+        };
+        const after = (shadow: boolean) => {
+          if (!self.on) return;
+          const ms = self.wait() - self.drawT;
+          if (ms >= 5) self.draws.push({ name: (shadow ? 'shadow: ' : '') + g, ms: Math.round(ms) });
+        };
+        o.onBeforeRender = function (...x) {
+          before();
+          return b.apply(this, x);
+        };
+        o.onAfterRender = function (...x) {
+          const res = a.apply(this, x);
+          after(self.pass === 'shadow');
+          return res;
+        };
+        o.onBeforeShadow = function (...x) {
+          before();
+          return bs.apply(this, x);
+        };
+        o.onAfterShadow = function (...x) {
+          const res = as.apply(this, x);
+          after(true);
+          return res;
+        };
+        self.undo.push(() => {
+          o.onBeforeRender = b;
+          o.onAfterRender = a;
+          o.onBeforeShadow = bs;
+          o.onAfterShadow = as;
+        });
+      });
+  }
+
+  dispose(): void {
+    this.on = false;
+    for (const u of this.undo.reverse()) u();
+    this.undo.length = 0;
+  }
+}
