@@ -297,17 +297,39 @@ export class PostPipeline {
     (this.dof.uniforms.resolution.value as THREE.Vector2).set(this.w, this.h);
   }
 
+  /**
+   * The benchmark's GPU breakdown (performance v5, dev/gpuBreakdown.ts): called after each pass with its name; it waits
+   * for the GPU (gl.finish) and times the pass. Null in play.
+   */
+  mark: ((pass: string) => void) | null = null;
+  /**
+   * The benchmark's "post effects off" (performance v5): the scene into its target and straight to tone mapping, no
+   * effect between — the same shader programs as with the effects (drawing to the screen instead needs new ones for
+   * every material, seconds of compiling on some devices). Never set in play.
+   */
+  bare = false;
+
   render(scene: THREE.Scene, camera: THREE.PerspectiveCamera): void {
     const r = this.renderer;
+    const mark = this.mark;
+    mark?.('');
     if (!this.enabled) {
       r.setRenderTarget(null);
       r.render(scene, camera);
+      mark?.('scene (no post effects)');
       return;
     }
     const s = this.settings;
     r.setRenderTarget(this.sceneRT);
     r.clear();
     r.render(scene, camera);
+    mark?.('scene');
+    if (this.bare) {
+      this.outputPass.renderToScreen = true;
+      this.outputPass.render(r, null as unknown as THREE.WebGLRenderTarget, this.sceneRT, 0, false);
+      mark?.('tone mapping to the screen');
+      return;
+    }
 
     for (const m of [this.ssao, this.blur, this.dof]) {
       m.uniforms.cameraNear.value = camera.near;
@@ -329,6 +351,7 @@ export class PostPipeline {
       (this.blur.uniforms.dir.value as THREE.Vector2).set(0, 1);
       r.setRenderTarget(this.aoRT);
       this.quad.render(r);
+      mark?.('ambient occlusion (half resolution, blurred)');
     }
     // (without ambient occlusion the composite was a full-screen copy: the grade reads the scene directly — the same
     // pixels, one full-screen pass fewer; performance pass)
@@ -338,6 +361,7 @@ export class PostPipeline {
       this.quad.material = this.comp;
       r.setRenderTarget(this.compRT);
       this.quad.render(r);
+      mark?.('ambient occlusion applied');
       this.dof.uniforms.tColor.value = this.compRT.texture;
     } else this.dof.uniforms.tColor.value = this.sceneRT.texture;
 
@@ -363,12 +387,15 @@ export class PostPipeline {
     this.quad.material = this.dof;
     r.setRenderTarget(this.hdrRT);
     this.quad.render(r);
+    mark?.('depth of field and colour grade');
 
     if (s.bloom) {
       this.bloomPass.strength = s.bloomStrength + (currentMood.mood?.bloom ?? 0);
       this.bloomPass.render(r, this.hdrRT, this.hdrRT, 0, false);
+      mark?.('bloom');
     }
     this.outputPass.renderToScreen = true;
     this.outputPass.render(r, null as unknown as THREE.WebGLRenderTarget, this.hdrRT, 0, false);
+    mark?.('tone mapping to the screen');
   }
 }

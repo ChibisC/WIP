@@ -14,6 +14,7 @@
  *   as the 10th percentile of the intervals), and long tasks (main-thread tasks over 50 ms, where the browser reports
  *   them).
  */
+import { display, displayLine } from './display';
 import { Stat } from './profiler';
 
 export type InputKind = 'select' | 'order' | 'build' | 'dig' | 'camera' | 'key';
@@ -138,7 +139,9 @@ export class Feel {
         this.lastInterval = dt;
         if (dt > 16.7 + 1) this.over16++;
         if (dt > 33.4) this.over33++;
-        if (this.frames % 60 === 0) this.vsync = this.estimateVsync();
+        // (the display's rate as measured while the page was idle when known — a game held at 30 frames by Low Power
+        // Mode then misses nothing, and a slow game on a 60 Hz display is not taken for a 30 Hz one; performance v5)
+        if (this.frames % 60 === 0) this.vsync = display.hz ? display.ms : this.estimateVsync();
         if (dt > this.vsync * 1.5) this.missed++;
       }
     }
@@ -183,6 +186,7 @@ export class Feel {
     return [
       `input → feedback ms (avg/p95): ${fb.join('  ') || '—'}`,
       `input → acting ms: ${ac.join('  ') || '—'}  ·  command ${this.cmdTicks.count ? `${this.cmdTicks.summary().avg.toFixed(1)} ticks, ${this.cmdMs.summary().avg.toFixed(0)} ms` : '—'}`,
+      displayLine(),
       `pacing: interval ${iv.avg.toFixed(1)} ms (p95 ${iv.p95.toFixed(1)}), jitter ${this.jitter.count ? this.jitter.summary().avg.toFixed(1) : '—'} ms, display ${this.vsync.toFixed(1)} ms · over 16.7 ms ${pct(this.over16, this.frames)}, over 33 ms ${pct(this.over33, this.frames)}, missed vsync ${pct(this.missed, this.frames)} · ${lt}`,
     ];
   }

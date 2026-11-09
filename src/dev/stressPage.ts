@@ -43,7 +43,9 @@ export async function runStressPage(canvas: HTMLCanvasElement, ui: HTMLElement, 
   if (q.get('worker') !== '0') s.useWorker();
   new GameUI(s, ui);
   const dbg = new DebugOverlay(s, ui);
-  dbg.toggle(true);
+  // (the benchmark measures the game as it is played: without the overlay, whose climb rails and hitboxes of every
+  // ant are redrawn each frame — performance v5)
+  if (!q.get('bscene')) dbg.toggle(true);
   // look at the battle in the middle of the map
   s.view.surfaceRig.jumpTo(s.world.terrain.width / 2, s.world.terrain.depth / 2, 260);
   const w = window as unknown as { __session: GameSession; __ready: boolean; __stress: unknown };

@@ -527,8 +527,9 @@ export class NestTerrain {
         }
       geo.setIndex(idx);
       mesh = new THREE.Mesh(geo, this.material);
+      mesh.name = 'nestGround';
       mesh.receiveShadow = true;
-      mesh.castShadow = true;
+      mesh.castShadow = this.shadowsOn;
       this.chunks.set(ci, mesh);
       this.group.add(mesh);
     }
