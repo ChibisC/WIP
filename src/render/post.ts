@@ -213,7 +213,13 @@ vec4 catmullRom(vec2 uv) {
     + texture2D(tDiffuse, vec2(t0.x, t3.y)) * (w0.x * w3.y)
     + texture2D(tDiffuse, vec2(t12.x, t3.y)) * (w12.x * w3.y)
     + texture2D(tDiffuse, vec2(t3.x, t3.y)) * (w3.x * w3.y);
-  return max(c, vec4(0.0));
+  // Anti-ringing (as FSR's upscaler): kept within the 2x2 nearest texels' range. Catmull-Rom's negative lobes next to
+  // a very bright HDR pixel (a larva's highlight) otherwise went below zero: a black ring round it.
+  vec2 s = 1.0 / uSrcSize;
+  vec2 q = t1 * s;
+  vec4 a = texture2D(tDiffuse, q), b = texture2D(tDiffuse, q + vec2(s.x, 0.0));
+  vec4 d = texture2D(tDiffuse, q + vec2(0.0, s.y)), e = texture2D(tDiffuse, q + s);
+  return clamp(c, min(min(a, b), min(d, e)), max(max(a, b), max(d, e)));
 }
 void main() {
   gl_FragColor = catmullRom(vUv);
