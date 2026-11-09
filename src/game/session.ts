@@ -43,7 +43,7 @@ import { LocalSim, SimHost, WorkerSim } from './simHost';
 import { AutoQuality } from './autoQuality';
 import { prof } from '../core/profiler';
 import { feel, InputKind } from '../core/feel';
-import { overviewCamera, sceneTarget, warmScene } from '../render/prewarm';
+import { gpuIdle, overviewCamera, sceneTarget, warmScene } from '../render/prewarm';
 import { STOLEN_CASTES } from '../sim/termants';
 import type { NetGame } from '../net/netGame';
 import { matchWinner } from '../net/match';
@@ -485,6 +485,9 @@ export class GameSession {
     add('post effects', () => v.post.warm(v.surfaceScene, v.surfaceCam));
     for (const m of morphs) this.warmed.add(m);
     const took = new Map<string, number>();
+    // (what the world's making queued for the GPU — ground, detail and texture bakes — finished first, so the steps'
+    // times are their own: the first step that has to wait for the GPU otherwise paid for all of it — round 2)
+    took.set('the GPU finishing the world', await gpuIdle(v.renderer));
     for (let i = 0; i < steps.length; i++) {
       const ts = performance.now();
       steps[i]();
@@ -493,6 +496,8 @@ export class GameSession {
       await tick();
       took.set(names[i], (took.get(names[i]) ?? 0) + performance.now() - ts);
     }
+    // (the GPU's queue finished behind the loading screen, not on the first frames of play — round 2)
+    took.set('the GPU finishing the pre-warm', await gpuIdle(v.renderer));
     this.prewarmSteps = [...took].map(([name, ms]) => ({ name, ms: Math.round(ms) })).sort((a, b) => b.ms - a.ms);
     prof.note(`pre-warm ${(performance.now() - t0).toFixed(0)} ms (${steps.length} steps, ${morphs.size} models)`);
     this.prewarmMs = performance.now() - t0;

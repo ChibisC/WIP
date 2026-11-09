@@ -95,3 +95,22 @@ export function overviewCamera(w: number, d: number, y0 = 0): THREE.PerspectiveC
   cam.updateMatrixWorld();
   return cam;
 }
+
+/**
+ * Wait, without blocking the page, until the GPU has done everything queued so far (performance v5 round 2): a WebGL2
+ * fence polled between tasks, so the loading screen keeps moving. The pre-warm's draws and uploads (and the pipelines
+ * a GPU builds as it takes each draw) run after the calls return; ended with the loading screen, the first frames of
+ * play waited for all of it — on the build machine a read-back right after loading waited minutes. Resolves with the
+ * time waited (ms); gives up after `maxMs`. WebGL1 has no fences: nothing to wait for there.
+ */
+export async function gpuIdle(renderer: THREE.WebGLRenderer, maxMs = 30000): Promise<number> {
+  const gl = renderer.getContext() as WebGL2RenderingContext;
+  if (typeof gl.fenceSync !== 'function') return 0;
+  const t0 = performance.now();
+  const s = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  if (!s) return 0;
+  gl.flush();
+  while (gl.getSyncParameter(s, gl.SYNC_STATUS) !== gl.SIGNALED && performance.now() - t0 < maxMs) await new Promise<void>((res) => setTimeout(res, 8));
+  gl.deleteSync(s);
+  return performance.now() - t0;
+}
