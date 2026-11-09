@@ -232,11 +232,12 @@ export class GameView {
   }
 
   /**
-   * The ants' level of detail scale: the preset's, times the share of the canvas's resolution the scene is drawn at on
-   * Retina (performance v5) — a model's detail is picked by its size in the pixels it is drawn in.
+   * The ants' level of detail scale: the preset's. (Performance v5 tried picking the detail by the pixels drawn at 1.5×
+   * on Retina: fewer triangles, but a different model changes more than the resolution — an ant's animation effects
+   * with it — and the user's decision covered the resolution only. Kept at the canvas's pixels.)
    */
   get antLodScale(): number {
-    return this.preset.lodScale * this.retinaScale;
+    return this.preset.lodScale;
   }
 
   setFullSharpness(on: boolean): void {
