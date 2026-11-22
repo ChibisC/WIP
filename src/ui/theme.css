@@ -207,7 +207,6 @@
 .icard .hpbar i { display: block; height: 100%; background: linear-gradient(90deg, #7fbf5a, #c8e07a); }
 .icard .ic-fact { margin-top: calc(8 * var(--u)); font-size: calc(12.5 * var(--u)); line-height: 1.4; color: var(--ink); border-top: 1px solid var(--bronze-lo); padding-top: calc(6 * var(--u)); }
 .icard .ic-x { position: absolute; right: calc(6 * var(--u)); top: calc(6 * var(--u)); }
-.icard .ic-follow { margin-top: calc(8 * var(--u)); }
 .modal-veil { position: absolute; inset: 0; background: rgba(5,3,2,0.55); display: flex; align-items: center; justify-content: center; pointer-events: auto; }
 .modal { position: relative; min-width: calc(380 * var(--u)); max-width: min(92vw, calc(640 * var(--u))); max-height: 86vh; overflow-y: auto; padding: calc(18 * var(--u)) calc(22 * var(--u)); }
 .modal h2 { font-family: var(--head-font); font-weight: 400; font-size: calc(26 * var(--u)); margin: 0 0 calc(10 * var(--u)); letter-spacing: .05em; }
@@ -218,8 +217,6 @@
 .modal .keys { display: grid; grid-template-columns: auto 1fr; gap: calc(4 * var(--u)) calc(14 * var(--u)); font-size: calc(13.5 * var(--u)); }
 .modal .keys .k { font-family: var(--head-font); color: var(--bronze-hi); white-space: nowrap; }
 .modal .x { position: absolute; right: calc(8 * var(--u)); top: calc(8 * var(--u)); }
-.obs-bar { position: absolute; left: 50%; top: calc(54 * var(--u)); transform: translateX(-50%); padding: calc(5 * var(--u)) calc(14 * var(--u)); display: none; align-items: center; gap: calc(10 * var(--u)); }
-.obs-bar.show { display: flex; }
 .paused-badge { position: absolute; left: 50%; top: calc(10 * var(--u)); transform: translateX(-50%); font-family: var(--head-font); font-size: calc(18 * var(--u)); letter-spacing: .2em; color: var(--bronze-hi); text-shadow: 0 1px 3px #000; display: none; }
 .paused-badge.show { display: block; }
 
@@ -388,8 +385,8 @@ input.vol::-moz-range-thumb { width: calc(14 * var(--u)); height: calc(14 * var(
 .ic-team { display: inline-block; width: calc(9 * var(--u)); height: calc(9 * var(--u)); border-radius: 50%; margin-right: calc(5 * var(--u)); vertical-align: middle; }
 
 /* ==========================================================================
-   Touch (phones, tablets: core/device.ts). The interface keeps clear of the notch and the home bar; tools and the
-   observe camera get a cancel button (there is no Esc or right-click); tips show on a long press.
+   Touch (phones, tablets: core/device.ts). The interface keeps clear of the notch and the home bar; tools get a
+   cancel button (there is no Esc or right-click); tips show on a long press.
    ========================================================================== */
 .gui.touch { top: env(safe-area-inset-top, 0px); right: env(safe-area-inset-right, 0px); bottom: env(safe-area-inset-bottom, 0px); left: env(safe-area-inset-left, 0px); }
 .gui.touch .mm-box canvas { cursor: default; }

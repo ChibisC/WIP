@@ -501,7 +501,7 @@ export interface AntSpaceAdapter {
 
 /**
  * Instanced, GPU-animated ant rendering with three LODs:
- *   lod0 full anatomy (close/observe), lod1 medium, imp = top-down impostor.
+ *   lod0 full anatomy (close up), lod1 medium, imp = top-down impostor.
  */
 const _lp = new THREE.Vector3();
 /**

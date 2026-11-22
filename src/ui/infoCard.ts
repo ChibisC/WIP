@@ -143,30 +143,24 @@ function activity(task: string, state: AS, carrying: boolean, jobK = 0, held = f
 export class InfoCard {
   root = el('div', 'pnl icard');
   private body = el('div');
-  private followBtn: HTMLButtonElement;
 
   constructor(private s: GameSession) {
     const x = button('sm ic-x', ICONS.close, 'Close', () => (s.inspect = null));
-    this.followBtn = button('ic-follow', `${ICONS.eye}<span>Follow</span>`, '<b>Observe</b>Follow this ant with a close-up camera. <span class="k">O</span> · <span class="k">Esc</span> to stop.', () => {
-      if (s.inspect?.kind === 'ant') s.follow(s.inspect.id);
-    });
-    this.root.append(x, this.body, this.followBtn);
+    this.root.append(x, this.body);
     shield(this.root);
   }
 
   update(): void {
     const s = this.s;
     const ins = s.inspect;
-    // a creature: its own card (no follow camera)
+    // a creature: its own card
     const cr = ins?.kind === 'creature' ? s.world.creatureById.get(ins.id) : undefined;
     if (cr && !cr.dead && CREATURES[cr.kind]) {
       this.root.classList.add('show');
       const html = creatureCard(s, cr);
       if (this.body.innerHTML !== html) this.body.innerHTML = html;
-      this.followBtn.style.display = 'none';
       return;
     }
-    this.followBtn.style.display = '';
     const a = ins?.kind === 'ant' ? s.world.antById.get(ins.id) : undefined;
     if (!a || a.state === AS.Dead) {
       if (ins) s.inspect = null;
@@ -201,6 +195,5 @@ export class InfoCard {
       <div class="hpbar"><i style="width:${(hp * 100).toFixed(0)}%"></i></div>
       <div class="ic-fact">${esc(cd.fact)}</div>`;
     if (this.body.innerHTML !== html) this.body.innerHTML = html;
-    this.followBtn.classList.toggle('on', s.followId === a.id);
   }
 }

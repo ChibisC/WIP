@@ -553,7 +553,7 @@ function setaeOn(acc: Acc, rng: Rng, pts: number[], radial: number, nRings: numb
 }
 
 /**
- * Build an ant. detail 0 = full (observe camera), 1 = medium.
+ * Build an ant. detail 0 = full (close up), 1 = medium.
  */
 export function buildAnt(m: AntMorph, detail: Detail, seed = 1): BuiltAnt {
   const formicine = /^(lasius|formica|plagiaria|saiy)/.test(m.key);

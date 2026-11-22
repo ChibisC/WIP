@@ -960,7 +960,7 @@ bronze/gold borders, small-caps serif headers). Layout follows the reference:
   - A placed tile appears as a ghost until a worker builds it. Upgrade and Delete are tools you click tiles with.
 * **Other UI**
   - **Info card** on click: common and scientific name, caste, level pip, hp, task and a real fact. Tooltips on every button and card.
-  - Main/pause menus; settings for quality, UI scale, volume, key bindings, edge scrolling and the sandbox "reveal areas" option; the observe camera.
+  - Main/pause menus; settings for quality, UI scale, volume, key bindings, edge scrolling and the sandbox "reveal areas" option. (The observe camera — following one ant close up from its card or with O — was removed at the user's request, 2026-11-21: not needed.)
   - The **queen-danger vignette** flashes the screen edges red while she is below 25%.
   - The layout scales with a UI-scale setting and the viewport size.
 * **Camera** (all maps)

@@ -26,7 +26,6 @@ export type Action =
   | 'speedDown'
   | 'recall'
   | 'overlay'
-  | 'observe'
   | 'cancel'
   | 'quickSave'
   | 'quickLoad'
@@ -70,7 +69,6 @@ export const DEFAULT_BINDINGS: Record<Action, string> = {
   speedDown: 'Minus',
   recall: 'KeyR',
   overlay: 'KeyT',
-  observe: 'KeyO',
   cancel: 'Escape',
   quickSave: 'F7',
   quickLoad: 'F8',
@@ -127,7 +125,6 @@ export const ACTION_LABELS: Record<Action, string> = {
   speedDown: 'Slower',
   recall: 'Recall all ants',
   overlay: 'Pheromone overlay',
-  observe: 'Follow the inspected ant',
   cancel: 'Cancel / menu',
   quickSave: 'Quick save',
   quickLoad: 'Quick load',

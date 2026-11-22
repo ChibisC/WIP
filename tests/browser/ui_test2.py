@@ -103,11 +103,17 @@ with sync_playwright() as p:
     st = best
     check('chamber workers sent to marker II go out to the surface', st[1] >= st[0]*0.5 and st[2] > 0 and all(m == 1 for m in st[3]), str(st))
     pg.screenshot(path=f"{SHOTS}/t2_surface.png")
-    # follow camera
+    # the follow (observe) camera is gone (user 2026-11-21): the ant card has no Follow button, O changes nothing,
+    # Esc closes the card
     aid = ev("window.__session.world.s.ants.find(a=>a.space===0&&a.hp>0&&a.colony===window.__session.player.id).id")
     ev(f"window.__session.inspect={{kind:'ant',id:{aid}}}")
+    step()
+    btn = ev("!!document.querySelector('.icard .ic-follow')")
+    card = ev("!!document.querySelector('.icard.show')")
     pg.keyboard.press('o'); step(4)
-    f = ev("window.__session.followId")
+    cam = ev("window.__session.view.activeCamera() === window.__session.view.surfaceCam")
+    gone = ev("window.__session.followId === undefined && window.__session.view.observing === undefined")
     pg.keyboard.press('Escape'); step()
-    check('O follows the inspected ant, Esc stops', f == aid and not ev("window.__session.followId"), f'{f} vs {aid}')
+    closed = ev("window.__session.inspect === null")
+    check('the ant card shows without a Follow button; O changes nothing; Esc closes the card', card and not btn and cam and gone and closed, f'card {card}, button {btn}, surface camera {cam}, no follow state {gone}, closed {closed}')
     print("\n".join(res)); print("\n".join(logs[-5:]))

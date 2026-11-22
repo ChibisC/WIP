@@ -142,8 +142,7 @@ You start with a queen, her seven-tile chamber and three small **nanitic** worke
 | − / = | Slower / faster |
 | T | Pheromone trail overlay |
 | R | Recall every group home |
-| O | Follow the inspected ant |
-| Esc | Cancel the tool / stop following / menu |
+| Esc | Cancel the tool / close the card / menu |
 | Shift + 1 – 4 (battle arena) | Pick team Red, Blue, Green or Gold |
 
 ### Phones and tablets (iPhone, iPad, Android)

@@ -2196,3 +2196,10 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
 - **The bench's GPU breakdown ends with six frames of every draw waited for** (the scene pass split by what it
   draws). Build machine, the big fight: the ground's shader about half the scene pass. Merged into `main` as
   `4b7dead` (Pages deployed; game artifact v58); handoff 27 (updated).
+
+## 2026-11-21 — The observe (follow) camera removed (CHANGE_PLAN §36)
+- At the user's request ("remove the spectate a single creature feature completely … unneeded"): the ant card's Follow
+  button, the O key, the "Observing" bar and the close-up camera rig are gone; play is otherwise unchanged (every
+  "observing" check took its not-observing branch). Trail following, cutscene cameras, photo mode and multiplayer
+  spectators stay.
+

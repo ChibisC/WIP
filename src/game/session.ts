@@ -140,8 +140,6 @@ export class GameSession {
   /** a replay finished: whether it reproduced the recorded game exactly */
   onReplayEnd: ((identical: boolean) => void) | null = null;
   private overSent = false;
-  /** ant followed by the observe camera (0 = none) */
-  followId = 0;
   hoverHex = -1;
   hoverMsg = '';
   /** hover info for the ghost: cost and group it would join */
@@ -658,14 +656,7 @@ export class GameSession {
     inp.on('speedDown', () => this.setSpeed(this.net ? this.gameSpeed() / 2 : Math.max(0.25, this.loop.speed / 2)));
     inp.on('overlay', () => this.setPhero(!this.pheroOn));
     inp.on('recall', () => this.issue({ type: 'recall' }));
-    inp.on('cancel', () => {
-      if (this.followId) this.unfollow();
-      else this.setTool('none');
-    });
-    inp.on('observe', () => {
-      if (this.followId) this.unfollow();
-      else if (this.inspect?.kind === 'ant') this.follow(this.inspect.id);
-    });
+    inp.on('cancel', () => this.setTool('none'));
     inp.on('dig', () => this.setTool(this.tool === 'dig' ? 'none' : 'dig'));
     inp.on('upgradeTool', () => this.setTool(this.tool === 'upgrade' ? 'none' : 'upgrade'));
     inp.on('deleteTool', () => this.setTool(this.tool === 'remove' ? 'none' : 'remove'));
@@ -1150,57 +1141,6 @@ export class GameSession {
     if (!m.placed) return;
     if (m.space === SURFACE) this.jumpTo('surface', m.x, m.y);
     else this.jumpTo('nest', m.x, m.y, m.space);
-  }
-
-  /** Close-up observe camera following one ant (Esc to stop). */
-  follow(id: number): void {
-    const a = this.world.antById.get(id);
-    if (!a) return;
-    this.followId = id;
-    const p = this.antWorldPos(a, new THREE.Vector3());
-    this.view.observeRig.reset(p, CASTES[a.caste].length, false);
-    this.view.observing = true;
-  }
-
-  unfollow(): void {
-    this.followId = 0;
-    this.view.observing = false;
-  }
-
-  private antWorldPos(a: { x: number; y: number; space: number }, out: THREE.Vector3): THREE.Vector3 {
-    if (a.space === SURFACE) this.surfAdapter.toWorld(a.x, a.y, out);
-    else {
-      const nv = this.nests.get(a.space);
-      if (nv) nv.adapter.toWorld(a.x, a.y, out);
-    }
-    return out;
-  }
-
-  private updateFollow(): void {
-    if (!this.followId) return;
-    const a = this.world.antById.get(this.followId);
-    if (!a || a.state === AS.Dead) {
-      this.unfollow();
-      return;
-    }
-    // Follow across spaces: the camera cuts when the ant goes in or out of a nest.
-    if (a.space === SURFACE) {
-      if (this.view.space !== 'surface') this.view.space = 'surface';
-    } else {
-      if (!this.nests.has(a.space)) {
-        this.unfollow();
-        return;
-      }
-      if (this.viewedArea !== a.space) {
-        this.viewedArea = a.space;
-        this.view.setActiveNest(a.space);
-      }
-      if (this.view.space !== 'nest') this.view.space = 'nest';
-    }
-    this.view.observing = true;
-    this.antWorldPos(a, this.view.observeRig.subject);
-    this.view.observeRig.subject.y += CASTES[a.caste].length * 0.25;
-    this.view.observeRig.heading = -a.h + Math.PI / 2;
   }
 
   /** Free-play goals shown in the Missions panel (scripted missions replace these). */
@@ -1727,7 +1667,7 @@ export class GameSession {
     this.sampleHoles();
     if (this.frameNo % 6 !== 0) return;
     this.entranceTip = '';
-    if (this.view.observing || (this.tool !== 'none' && this.tool !== 'marker')) return;
+    if (this.tool !== 'none' && this.tool !== 'marker') return;
     const w = this.world;
     let space = -1;
     let hole = -1;
@@ -1851,7 +1791,7 @@ export class GameSession {
   private updateTunnelView(): void {
     const v = this.view;
     const w = this.world;
-    if (v.space !== 'nest' || v.transitioning || v.observing || this.frameNo % 6 !== 0) return;
+    if (v.space !== 'nest' || v.transitioning || this.frameNo % 6 !== 0) return;
     const space = v.activeNest;
     const g = w.nestOf(space);
     if (!g) return;
@@ -1932,7 +1872,6 @@ export class GameSession {
     this.netFrame();
     this.events.drain();
     if (this.frameNo % 30 === 0) this.autosave();
-    this.updateFollow();
     // The access rule holds while you watch: when your last ant leaves an area, the view returns home.
     if (v.space === 'nest' && !v.transitioning && this.frameNo % 15 === 0 && !this.areaTab(this.viewedArea)?.open) {
       const tab = this.areaTab(this.viewedArea);
@@ -1967,7 +1906,7 @@ export class GameSession {
         if (this.fog.advance(w.s.tick) || !nv.fog) this.fog.update(w, this.player, v.activeNest, this.revealAreas);
         nv.fog = this.fog;
       }
-      if (nv) nv.update(w, owner, this.player, cam, alpha, realDt, vh, v.observing ? v.observeRig.distance * 3 : v.nestRig.distance, sel, v.time, shown, this.pendingHexes());
+      if (nv) nv.update(w, owner, this.player, cam, alpha, realDt, vh, v.nestRig.distance, sel, v.time, shown, this.pendingHexes());
       if (nv) nv.bars.update(w, v.activeNest, alpha, cam, vh, (x, y, l, o) => nv.map.pos(x, y, l, o), this.player, this.inspect, realDt);
       if (nv) nv.trail.update(sel, this.trailEnds(sel, v.activeNest, shown), (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.distance, v.time);
       if (nv) nv.hit.update(w, v.activeNest, this.hitboxes, (x, y) => nv.stage.terrain.heightAt(x, y), v.nestRig.goal.x, v.nestRig.goal.z, v.nestRig.distance * 2);
@@ -2004,7 +1943,7 @@ export class GameSession {
       // a story level's night (its own day/night clock, sim/story/dayNight.ts): moonlight; wolf spiders' eyeshine
       this.view.nightLevel = w.s.night ?? 0;
       this.surfCreatures.night = w.s.night ?? 0;
-      this.surfMarkers.update(shown, SURFACE, this.surfHeight, v.observing ? v.observeRig.distance * 3 : v.surfaceRig.distance, (i) => markerRadius(w, this.player, i), sel, v.time);
+      this.surfMarkers.update(shown, SURFACE, this.surfHeight, v.surfaceRig.distance, (i) => markerRadius(w, this.player, i), sel, v.time);
       this.surfTrail.update(sel, this.trailEnds(sel, SURFACE, shown), this.surfHeight, v.surfaceRig.distance, v.time);
       // creatures first: climbing ants are placed on their animated legs and backs
       prof.add('units', performance.now() - pt);
@@ -2096,7 +2035,7 @@ export class GameSession {
 
   /** Play a story shot (from the simulation's `story` event); shots never pull a player out of a nest view. */
   playShot(shot: StoryShotData): void {
-    if (this.noShots || this.net || this.view.space !== 'surface' || this.view.observing) return;
+    if (this.noShots || this.net || this.view.space !== 'surface') return;
     if (this.cine) this.cine.finish();
     const c = new Cinematic(shot, this.world, this.view.surfaceRig);
     this.cine = c.done ? null : c;
