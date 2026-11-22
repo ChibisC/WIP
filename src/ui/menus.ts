@@ -392,7 +392,7 @@ export class Menus {
     const inp = this.s.input;
     m.appendChild(el('p', 'dim', 'Click a key to change it, then press the new key (Esc keeps the old one). A key already in use swaps with it.'));
     const groups: Array<[string, Action[]]> = [
-      ['Camera', ['panUp', 'panDown', 'panLeft', 'panRight', 'rotateLeft', 'rotateRight', 'zoomIn', 'zoomOut', 'resetCam', 'observe', 'photo']],
+      ['Camera', ['panUp', 'panDown', 'panLeft', 'panRight', 'rotateLeft', 'rotateRight', 'zoomIn', 'zoomOut', 'resetCam', 'photo']],
       ['Markers and tools', ['marker1', 'marker2', 'marker3', 'marker4', 'marker5', 'jumpMarker', 'dig', 'upgradeTool', 'deleteTool', 'recall']],
       ['Areas', ['toggleView', 'nextArea', 'area1', 'area2', 'area3', 'area4', 'area5', 'area6', 'area7', 'area8']],
       ['Game', ['pause', 'speedUp', 'speedDown', 'overlay', 'quickSave', 'quickLoad', 'debug', 'chat']],
@@ -526,7 +526,7 @@ function mouseList(): HTMLElement {
         ['Three fingers up / down', 'Tilt the camera'],
         ['Tap', 'Place the selected marker or tile; inspect an ant'],
         ['Long press', 'Lift a marker; cancel the tool. On a button: its tooltip'],
-        ['✕ (top centre)', 'Cancel the tool / stop following'],
+        ['✕ (top centre)', 'Cancel the tool'],
         ['Marker panel toggles', 'No attacking · no gathering · no climbing, per marker'],
       ]
     : [
@@ -563,10 +563,9 @@ function controlsList(b: Record<Action, string>): HTMLElement {
     [`${key('speedDown')} / ${key('speedUp')}`, 'Slower / faster'],
     [key('overlay'), 'Pheromone trails'],
     [key('recall'), 'Recall every group home'],
-    [key('observe'), 'Follow the inspected ant'],
     [`${key('quickSave')} · ${key('quickLoad')}`, 'Quick save · quick load'],
     [`${key('photo')} · Shift+${key('photo')}`, 'Photo mode · free camera'],
-    ['Esc', 'Cancel tool / stop following / menu'],
+    ['Esc', 'Cancel tool / menu'],
   ];
   for (const [a, d] of rows) k.append(el('span', 'k', esc(a)), el('span', '', esc(d)));
   return k;

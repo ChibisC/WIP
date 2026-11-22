@@ -80,7 +80,6 @@ export class GameUI {
   private labels: HTMLElement[] = [];
   private cursorTip = el('div', 'cursor-tip');
   private paused = el('div', 'paused-badge sc', 'Paused');
-  private obsBar = el('div', 'pnl obs-bar');
   private status = el('div', 'status-line');
   private vignette = el('div', 'queen-vignette');
   private tileLayer = el('div', 'tile-labels');
@@ -90,7 +89,7 @@ export class GameUI {
   private userScale = settings().uiScale;
   /** touch: the compact layout is on (small screens; see applyScale) */
   private compact = false;
-  /** touch: cancels the active tool, or stops following an ant (there is no Esc key) */
+  /** touch: cancels the active tool (there is no Esc key) */
   private cancelChip = el('button', 'bbtn touch-cancel');
 
   constructor(private s: GameSession, parent: HTMLElement) {
@@ -110,7 +109,7 @@ export class GameUI {
       this.labels.push(l);
       this.root.appendChild(l);
     }
-    this.root.append(this.vignette, this.tileLayer, this.crBars.root, this.top.root, this.status, this.minimaps.root, this.markers.root, this.build.root, this.info.root, this.boss.root, this.sandbox.root, this.goals, this.caption, this.bannerEl, this.toasts.root, this.paused, this.obsBar, this.menus.root, this.letterbox);
+    this.root.append(this.vignette, this.tileLayer, this.crBars.root, this.top.root, this.status, this.minimaps.root, this.markers.root, this.build.root, this.info.root, this.boss.root, this.sandbox.root, this.goals, this.caption, this.bannerEl, this.toasts.root, this.paused, this.menus.root, this.letterbox);
     (this.letterbox.querySelector('.skip') as HTMLElement).addEventListener('click', (e) => {
       e.stopPropagation();
       s.skipShot();
@@ -150,8 +149,7 @@ export class GameUI {
       this.cancelChip.addEventListener('pointerdown', (e) => e.stopPropagation());
       this.cancelChip.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (s.followId) s.unfollow();
-        else if (s.tool !== 'none') s.setTool('none');
+        if (s.tool !== 'none') s.setTool('none');
         else if (s.inspect) s.inspect = null;
       });
     }
@@ -163,7 +161,7 @@ export class GameUI {
     };
     this.applyScale();
     window.addEventListener('resize', () => this.applyScale());
-    // Esc: close dialogs first, then the tool/follow (handled by the session), else open the menu.
+    // Esc: close dialogs first, then the tool (handled by the session), else open the menu.
     window.addEventListener(
       'keydown',
       (e) => {
@@ -176,7 +174,7 @@ export class GameUI {
         if (this.menus.open) {
           this.menus.close();
           e.stopImmediatePropagation();
-        } else if (s.tool === 'none' && !s.followId) {
+        } else if (s.tool === 'none') {
           if (s.inspect) s.inspect = null;
           else this.menus.pause();
           e.stopImmediatePropagation();
@@ -522,12 +520,9 @@ export class GameUI {
       }
     });
     lap('ui:tile labels');
-    const follow = s.followId ? s.world.antById.get(s.followId) : undefined;
-    this.obsBar.classList.toggle('show', !!follow);
-    if (follow && this.tick % 10 === 0) this.obsBar.innerHTML = `<span class="sc">Observing</span><span style="color:var(--ink-dim)">${TOUCH ? 'Pinch zooms · drag orbits' : 'Wheel zooms · drag orbits · Esc stops'}</span>`;
     if (TOUCH) {
-      // the touch stand-in for Esc / right-click: cancel the tool, stop following
-      const label = follow ? 'Stop observing' : s.tool !== 'none' ? `Cancel ${TOOL_NAMES[s.tool] ?? 'tool'}` : '';
+      // the touch stand-in for Esc / right-click: cancel the tool
+      const label = s.tool !== 'none' ? `Cancel ${TOOL_NAMES[s.tool] ?? 'tool'}` : '';
       this.cancelChip.classList.toggle('show', !!label);
       const html = `<span class="x">✕</span>${label}`;
       if (label && this.cancelChip.innerHTML !== html) this.cancelChip.innerHTML = html;

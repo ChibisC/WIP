@@ -18,7 +18,7 @@ import { CanopyTerrain } from './trees/canopyTerrain';
 import { TREES } from '../sim/types';
 import { PostPipeline } from './post';
 import { createNestEnvironment, createSurfaceEnvironment, NestLights, SurfaceLights } from './environment';
-import { ObserveCameraRig, SurfaceCameraRig } from './cameras';
+import { SurfaceCameraRig } from './cameras';
 import { globalUniforms } from './shaderPatch';
 import { presetForBiome, setCreatureEnvTexture, setCreatureLighting } from './lightPresets';
 import { prof } from '../core/profiler';
@@ -93,14 +93,11 @@ export class GameView {
   private emptyNest = new THREE.Scene();
   surfaceCam: THREE.PerspectiveCamera;
   nestCam: THREE.PerspectiveCamera;
-  observeCam: THREE.PerspectiveCamera;
   surfaceRig: SurfaceCameraRig;
   /** the nest is a plane seen from above: same rig type as the surface */
   nestRig: SurfaceCameraRig;
-  observeRig: ObserveCameraRig;
   post: PostPipeline;
   space: ViewSpace = 'surface';
-  observing = false;
   /** photo mode free camera (Shift+F9): flies anywhere; rigs keep their state underneath */
   freeCam = { on: false, yaw: 0, pitch: -0.5, pos: new THREE.Vector3(), speed: 60 };
   quality: Quality = 'high';
@@ -156,10 +153,8 @@ export class GameView {
     const aspect = window.innerWidth / window.innerHeight;
     this.surfaceCam = new THREE.PerspectiveCamera(38, aspect, 1, 6000);
     this.nestCam = new THREE.PerspectiveCamera(34, aspect, 1, 4000);
-    this.observeCam = new THREE.PerspectiveCamera(40, aspect, 0.1, 3000);
     this.surfaceRig = new SurfaceCameraRig(this.surfaceCam);
     this.nestRig = new SurfaceCameraRig(this.nestCam);
-    this.observeRig = new ObserveCameraRig(this.observeCam);
     this.post = new PostPipeline(this.renderer);
     this.surfaceLights = createSurfaceEnvironment(this.renderer, this.surfaceScene);
     this.surfaceScene.add(this.worldGroup);
@@ -273,7 +268,7 @@ export class GameView {
     this.renderer.setSize(w, h, false);
     this.canvas.style.width = w + 'px';
     this.canvas.style.height = h + 'px';
-    for (const c of [this.surfaceCam, this.nestCam, this.observeCam]) {
+    for (const c of [this.surfaceCam, this.nestCam]) {
       c.aspect = w / h;
       c.updateProjectionMatrix();
     }
@@ -541,7 +536,6 @@ export class GameView {
     if (this.transitioning) return;
     const sr = this.surfaceRig;
     const nr = this.nestRig;
-    this.observing = false;
     if (to === 'trees') {
       if (!this.nestStages.has(TREES)) return;
       const gx = sr.goal.x;
@@ -636,7 +630,6 @@ export class GameView {
   }
 
   activeCamera(): THREE.PerspectiveCamera {
-    if (this.observing) return this.observeCam;
     return this.space === 'surface' ? this.surfaceCam : this.nestCam;
   }
 
@@ -647,7 +640,6 @@ export class GameView {
   /** Begin the cinematic dive between spaces through a nest entrance. */
   switchSpace(to: ViewSpace, entranceSurface?: THREE.Vector3, entranceNest?: THREE.Vector2): void {
     if (this.transition || to === this.space) return;
-    this.observing = false;
     this.transition = {
       to,
       t: 0,
@@ -981,20 +973,18 @@ export class GameView {
     if (this.transition) this.updateTransition(dt);
     if (this.areaFade) this.updateAreaFade(dt);
     const canControl = inputActive && !this.transition && !this.freeCam.on;
-    if (this.observing) this.observeRig.update(dt, this.input, d);
-    this.surfaceRig.update(dt, this.input, d, canControl && !this.observing && this.space === 'surface');
-    this.nestRig.update(dt, this.input, d, canControl && !this.observing && this.space === 'nest');
+    this.surfaceRig.update(dt, this.input, d, canControl && this.space === 'surface');
+    this.nestRig.update(dt, this.input, d, canControl && this.space === 'nest');
     const cam = this.activeCamera();
     if (this.freeCam.on) this.flyFreeCam(cam, dt, d);
     globalUniforms.uCamPos.value.copy(cam.position);
-    if (this.observing) globalUniforms.uFocus.value.copy(this.observeRig.smoothSubject);
-    else globalUniforms.uFocus.value.copy(this.surfaceRig.target);
+    globalUniforms.uFocus.value.copy(this.surfaceRig.target);
 
     // Shadow frustum follows the view so resolution stays high where we look.
     if (this.space === 'surface') {
-      const f = this.observing ? this.observeRig.smoothSubject : this.surfaceRig.target;
+      const f = this.surfaceRig.target;
       const sun = this.surfaceLights.sun;
-      const dist = this.observing ? this.observeRig.distance * 3 : this.surfaceRig.distance;
+      const dist = this.surfaceRig.distance;
       const ext = THREE.MathUtils.clamp(dist * 0.9, 40, 600);
       const sc = sun.shadow.camera as THREE.OrthographicCamera;
       if (Math.abs(sc.right - ext) > ext * 0.05) {
@@ -1046,13 +1036,12 @@ export class GameView {
     for (const f of this.beforeRender) f(dt);
 
     // Depth of field focus = distance to what we look at.
-    const focus = this.observing ? this.observeRig.distance : this.space === 'surface' ? this.surfaceRig.distance : this.nestRig.distance;
+    const focus = this.space === 'surface' ? this.surfaceRig.distance : this.nestRig.distance;
     this.post.focusDistance = focus;
-    this.post.tilt = this.observing ? 0.15 : this.space === 'surface' || this.inTrees ? 0.55 : 0.45;
-    this.post.settings.dofStrength = this.observing ? 1.2 : 1;
+    this.post.tilt = this.space === 'surface' || this.inTrees ? 0.55 : 0.45;
+    this.post.settings.dofStrength = 1;
     this.applyStorm(dt);
-    const rig = this.observing ? null : this.surfaceRig;
-    this.rain.update(this.space === 'surface' ? this.stormShown : 0, rig ? rig.target : this.observeRig.smoothSubject, rig ? rig.distance : this.observeRig.distance * 3, this.time);
+    this.rain.update(this.space === 'surface' ? this.stormShown : 0, this.surfaceRig.target, this.surfaceRig.distance, this.time);
     this.applyGrade();
     this.applyCreatureLight();
     // Behind a fully opaque fade (the dive's and the area cut's black frames, the swap's frame among them) nothing is

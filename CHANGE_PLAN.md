@@ -1880,3 +1880,15 @@ Merged as the interim build (main a7dd6b1, game artifact v56; handoff 27).
    splits into the ground, the grass, the water, the ants. The build machine's big fight: the ground first (1353 ms a
    frame against the grass 524, the water 377, the ants 321) — if the Mac agrees, the ground shader's options (fewer
    taps or layers; a change of look) go to the user with pictures.
+
+## 36. Remove the observe (follow) camera (user 2026-11-21: "remove the spectate a single creature feature completely from the game cos that is unneeded (like spectating queen ant, a single ant, etc)") — branch `feature/remove-observe-camera`
+The close-up camera that followed one ant (the ant card's **Follow** button, the **O** key, the "Observing" bar, the
+touch cancel chip's "Stop observing"): gone, with its camera rig (`ObserveCameraRig`), the view's `observing` /
+`observeCam` / `observeRig`, the session's `follow` / `unfollow` / `updateFollow` / `followId`, the key binding and its
+help rows, and the styles. Everything that read "observing" now takes the branch it took when not observing (the
+surface or nest camera, their focus and depth of field, the shadow frustum, rain, markers, tunnel view, entrance tips,
+story shots), so play without it is unchanged. A key binding saved for O is dropped on loading (profile.ts keeps only
+known actions). Kept, as different things: the ants' trail following (`AS.FollowTrail`), the story cutscenes' `follow`
+cues and cameras, the photo mode's free camera, multiplayer spectators. `tests/browser/ui_test2.py`: the card has no
+Follow button, O changes nothing, Esc closes the card.
+
