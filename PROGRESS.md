@@ -2202,4 +2202,8 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   button, the O key, the "Observing" bar and the close-up camera rig are gone; play is otherwise unchanged (every
   "observing" check took its not-observing branch). Trail following, cutscene cameras, photo mode and multiplayer
   spectators stay.
+- Checks: `npm test`; `ui_test2.py` 13/13 (its card-drag step is flaky under SwiftShader: one failure in three runs,
+  each passing on a rerun); golden meadowPond and fight shots pixel-identical. Merged into `main` as `4de8642`
+  (Pages deployed; game artifact v59); handoff 28 (also: why digging, a new ant and the tree view lag — explained,
+  not changed).
 
