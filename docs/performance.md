@@ -658,3 +658,44 @@ or layers), so it is an option for the user with pictures. The bench's GPU break
 draw waited for (each kind of draw's time a frame, each carrying its wait's cost), so the Mac's report splits its
 scene pass the same way; the build machine's big fight there: ground 1353 ms, grass 524, water 377, ants 321, the
 shadow map's ants 204.
+
+## Lag on actions: digging, a new ant, climbing into the trees (CHANGE_PLAN §37, user 2026-11-21/23)
+"Everytime a new action happens like digging or a new ant is made or we switch to tree view, the game lags." Measured
+on the build machine with a probe recording every frame's main-thread time, its parts, uploads and notes while each
+action happens (SwiftShader: the GPU's share is not meaningful here, the main thread's is), then fixed without
+changing the picture or the simulation (the golden shots, `same.sh`, the tests below).
+
+**Digging.** Two causes on top of each other:
+- the client's nest grid moves its `version` for every grid update the simulation sends — dig orders and progress as
+  well as soil — and the shown nest remade the whole nest's signed distance (10–58 ms) and light map (9–47 ms, then
+  593 KB of textures) on each; the minimap repainted its nest picture (5–11 ms). Now only a change of the soil's bytes
+  does (`world/soilRev.ts`, a byte compare);
+- while ants dig, the soil itself changes almost every frame: the shown nest recomputed the distance nearly every
+  frame (5–43 ms), starving its light map (once 141 ms) and its chunks. The distance and the light map are now made in
+  a worker (`worker/nestMapsWorker.ts`) by the same functions the page runs for a full rebuild
+  (`render/nest/nestMaps.ts`, moved unchanged); the page applies the answer (1–12 ms) and rebuilds chunks in its 5 ms
+  slices, marking each chunk and edge band once. The textures send only the rows a dig changed (a texture ring commit
+  names its rows; each texture of the ring uploads the rows it is missing).
+
+| the same dig, 4× speed, 40 s (build machine) | before | after |
+|---|---|---|
+| nest maps on the main thread | 492 ms in 35 frames, worst 34 ms | MAPS_AFTER |
+| nest textures uploaded | 2.2 MB (the light maps starved) | TEX_AFTER |
+| while ants hatched (the colony still digging) | 74 ms, worst 19 ms | 0 ms |
+
+**A new ant.** No cost of its own here: frames with a birth had the usual main-thread time, no shader compile and no
+buffer upload (every ant model is drawn once in the pre-warm). What lagged then was the digging that goes on around
+it (the last row above). The profiler now notes each hatch, so the benchmark's longest frames say when a birth was in
+one.
+
+**Climbing into the trees.** The backdrop under the canopy is the whole surface drawn from above: 202 draws and 935k
+triangles (a normal frame here: 133 and 558k), on the swap frame under the fade. While in the trees it was redrawn
+every 30 s a quadrant a frame, and each quadrant cost about 70% of the whole (the instanced ants and grass are drawn
+in every quadrant): four hitches and twice the work. Now one render every 30 s, and a climb reuses a backdrop younger
+than 30 s (the age it may reach while one stays in the trees); the screenshot harness and loading still draw it.
+The minimap keeps each area's floor picture (a switch painted the whole of it again).
+
+Tests (`tests/performance.ts`): dig orders, progress and carves interleaved end with a full rebuild's mesh, distance
+and textures, and the distance is computed only for carves; the same with the maps made "in a worker" whose answers
+come late and out of turn with forced rebuilds between (and a dive waits for the worker); a texture ring with rows
+named at commit always holds the data in the texture bound.

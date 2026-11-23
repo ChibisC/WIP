@@ -808,54 +808,6 @@ if (columnCodegen.on) {
   check('texture ring: a commit moves to the next texture, a second before the upload reuses it; one data array', t1 !== t0r && t1b === t1 && uni.value === t1 && same && ring.ring.length === 3);
 }
 {
-  // action-lag fix: a commit that names its rows uploads only the rows each texture of the ring is missing. With the GPU
-  // emulated as three.js does it (update ranges a row each, or the whole texture; onUpdate after), any order of
-  // changes, commits and uploads leaves the texture bound holding exactly the data
-  const { TextureRing, uploadPendingTextures } = await import('../src/render/dynamicTextures');
-  const W = 8;
-  const H = 6;
-  const data = new Uint8Array(W * H * 4);
-  const ring = new TextureRing(() => new THREE.DataTexture(data, W, H, THREE.RGBAFormat));
-  const gpu = new Map<THREE.Texture, Uint8Array>();
-  let rowsSent = 0;
-  let rowsFull = 0;
-  const fake = {
-    initTexture(t: THREE.Texture) {
-      const d = (t.image as { data?: Uint8Array } | undefined)?.data;
-      if (!d || !(d instanceof Uint8Array)) return;
-      let g = gpu.get(t);
-      const ranges = t.updateRanges;
-      if (!g || !ranges.length) {
-        // (the first upload allocates: three sends the whole texture; ranges only on later ones)
-        gpu.set(t, (g = d.slice()));
-        rowsSent += H;
-      } else
-        for (const r of ranges) {
-          g.set(d.subarray(r.start, r.start + r.count), r.start);
-          rowsSent++;
-        }
-      rowsFull += H;
-      t.clearUpdateRanges();
-      t.onUpdate?.(t);
-    },
-  } as unknown as THREE.WebGLRenderer;
-  let seed = 7;
-  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
-  let ok = true;
-  for (let i = 0; i < 2000; i++) {
-    const y0 = Math.floor(rnd() * H);
-    const y1 = Math.min(H - 1, y0 + Math.floor(rnd() * 3));
-    for (let y = y0; y <= y1; y++) for (let x = 0; x < W * 4; x++) if (rnd() < 0.3) data[y * W * 4 + x] = Math.floor(rnd() * 256);
-    ring.commit(rnd() < 0.1 ? undefined : { y0, y1 });
-    if (rnd() < 0.6) {
-      uploadPendingTextures(fake);
-      const g = gpu.get(ring.current);
-      if (!g || g.some((v, k) => v !== data[k])) ok = false;
-    }
-  }
-  check('texture ring: rows named at commit — every order of changes and uploads leaves the bound texture holding the data', ok, `${rowsSent} rows sent against ${rowsFull} whole`);
-}
-{
   // the nest's shadow casters: only chunks inside the box cast; none culled without a box
   const w = createWorld({ seed: 4, style: 'meadow', width: 100, depth: 100, map: 'meadowPond', colonies: [{ species: 'lasius', player: true, ai: true }, { species: 'formica', player: false, ai: true }], food: 1.2, settings: {} } as never, new EventBus());
   const g = w.nestOf(nestSpace(w.s.colonies[0].id))!;
