@@ -1,4 +1,5 @@
 import { TextureRing } from '../dynamicTextures';
+import { soilRev } from '../../world/soilRev';
 import * as THREE from 'three';
 import { prof } from '../../core/profiler';
 import { NEST_CHUNK, NestGrid, SOIL_AIR, SOIL_GATE, SOIL_ROCK, SOIL_ROUTE, SOIL_STONE } from '../../world/nestGrid';
@@ -279,11 +280,35 @@ export class NestTerrain {
   /** the signed distance of the last computation (which cells changed → which chunks rebuild) */
   private sdPrev: Float32Array | null = null;
 
-  /** Light pools (local + wide openness), wall distance and a smooth stone mask. */
-  private updateMaps(): void {
+  /**
+   * Light pools (local + wide openness), wall distance and a smooth stone mask; the soil texture (type, dig orders).
+   * The light map is made from the soil and the signed distance alone: remade only when the signed distance was
+   * (action-lag fix — dig orders and dig progress opened a batch that blurred the whole nest again, the same result).
+   * A texture is sent again only when one of its bytes changed. Returns whether the light map was remade.
+   */
+  private updateMaps(force = false): boolean {
     const g = this.grid;
     const W = g.w;
     const H = g.h;
+    if (!force && this.lightRev === this.shapeRev) {
+      let changed = false;
+      const sd = this.soilData;
+      for (let k = 0; k < W * H; k++) {
+        const s = this.sealed && this.sealed[k] ? SOIL_ROUTE : g.soil[k];
+        const i = k * 4;
+        const r = s === SOIL_STONE ? 255 : s === SOIL_ROCK || s === SOIL_ROUTE ? 250 : s === SOIL_GATE ? 200 : s * 40;
+        const gg = g.designated[k] ? 255 : 0;
+        if (sd[i] !== r || sd[i + 1] !== gg) {
+          sd[i] = r;
+          sd[i + 1] = gg;
+          changed = true;
+        }
+      }
+      if (changed) this.soilTex.commit();
+      this.updateDesignation();
+      return false;
+    }
+    this.lightRev = this.shapeRev;
     const air = new Float32Array(W * H);
     const stone = new Float32Array(W * H);
     for (let k = 0; k < W * H; k++) {
@@ -312,18 +337,28 @@ export class NestTerrain {
     }
     this.soilTex.commit();
     this.lightTex.commit();
-    this.updateDesignation();
+    this.updateDesignation(true);
+    return true;
   }
 
+  /** the soil revision (world/soilRev.ts) the signed distance, and then the light map, were made from */
+  private shapeRev = -1;
+  private lightRev = -2;
+
   /** Dig designation lives in the per-hex texture (alpha bit 0) so it draws as crisp hexes. */
-  private updateDesignation(): void {
+  private updateDesignation(always = false): void {
     const g = this.grid;
+    let changed = always;
     for (let q = 0; q < g.cols * g.rows; q++) {
       const i = q * 4 + 3;
       const v = g.hexDesig[q] && !g.isHexDug(q) ? 1 : 0;
-      this.hexData[i] = (this.hexData[i] & ~1) | v;
+      const nv = (this.hexData[i] & ~1) | v;
+      if (nv !== this.hexData[i]) {
+        this.hexData[i] = nv;
+        changed = true;
+      }
     }
-    this.hexTex.commit();
+    if (changed) this.hexTex.commit();
   }
 
   /** Per-hex visuals (tile type, level, group outline edges, outline colour, caste tint). */
@@ -580,19 +615,26 @@ export class NestTerrain {
     const n = g.dirty.size;
     const sliced = budgetMs !== Infinity;
     if (g.version !== this.builtVersion || force) {
-      this.computeSignedDistance();
+      // (action-lag fix: the version moves on every grid update — dig progress and dig orders too — but the signed
+      // distance and the light maps are made from the soil alone (and the sealed cells, whose change forces this):
+      // recomputed only when the soil's bytes changed. The same soil gives the same distance, bit for bit.)
+      const rev = soilRev(g);
       this.builtVersion = g.version;
-      this.mapsStale = true;
-      if (sliced) {
-        prof.note(`nest mesh: signed distance (${(performance.now() - t0).toFixed(0)} ms)`);
-        return;
+      if (force || rev !== this.shapeRev) {
+        this.computeSignedDistance();
+        this.shapeRev = rev;
+        this.mapsStale = true;
+        if (sliced) {
+          prof.note(`nest mesh: signed distance (${(performance.now() - t0).toFixed(0)} ms)`);
+          return;
+        }
       }
     }
     if (!sliced || this.mapsStale || !this.batchOpen) {
-      this.updateMaps();
+      const light = this.updateMaps(force);
       this.mapsStale = false;
       this.batchOpen = true;
-      if (sliced) {
+      if (sliced && light) {
         prof.note(`nest mesh: light maps (${(performance.now() - t0).toFixed(0)} ms)`);
         return;
       }

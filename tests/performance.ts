@@ -254,6 +254,87 @@ function check(name: string, ok: boolean, detail = ''): void {
     }
     check('nest terrain: kept current in 3 ms slices, an area ends with the same mesh as a full rebuild', equal, `${calls} slices, the longest ${slicesMax.toFixed(1)} ms`);
   }
+
+  // action-lag fix (2026-11-23): the client's grid version moves on every grid update — dig orders and dig progress,
+  // soil or not (game/replica.ts) — and each one recomputed the whole signed distance and light maps. Now only a change
+  // of the soil's bytes does (world/soilRev.ts); with dig orders, progress and carves interleaved as in play, the shown
+  // nest's 5 ms slices end with the same mesh, signed distance and textures as a full rebuild, and recompute the
+  // distance only for the updates that carved
+  {
+    type NT = {
+      update(f?: boolean, b?: number): void;
+      computeSignedDistance(): void;
+      chunks: Map<number, { geometry: { attributes: Record<string, { array: ArrayLike<number> }> } }>;
+      dirty: number;
+      sd: Float32Array;
+      soilData: Uint8Array;
+      lightData: Uint8Array;
+      hexData: Uint8Array;
+    };
+    const g = w.nestOf(2)!;
+    const shown = new NestTerrain(g) as unknown as NT;
+    shown.update(true);
+    let sdRuns = 0;
+    const sd0 = shown.computeSignedDistance.bind(shown);
+    shown.computeSignedDistance = () => {
+      sdRuns++;
+      sd0();
+    };
+    let carves = 0;
+    let updates = 0;
+    const cells: number[] = [];
+    for (let k = 0; k < g.w * g.h; k++) if (g.soil[k] !== SOIL_AIR && !g.designated[k]) cells.push(k);
+    for (let i = 0; i < 300; i++) {
+      const k = cells[(i * 7919) % cells.length];
+      const x = k % g.w;
+      const y = Math.floor(k / g.w);
+      if (i % 10 === 9) {
+        g.carve(x, y);
+        carves++;
+      } else if (i % 3 === 0) {
+        // a dig order (as the replica applies one: the cell redrawn, the version moved)
+        g.designated[k] = g.designated[k] ? 0 : 1;
+        g.markDirty(x, y);
+      } else {
+        // dig progress on a hex: no cell changes
+        const q = g.cellHex[k];
+        if (q >= 0) g.hexWork[q] = Math.min(255, g.hexWork[q] + 1);
+        if (q >= 0 && i % 4 === 0) g.hexDesig[q] = g.hexDesig[q] ? 0 : 1;
+      }
+      g.version++;
+      updates++;
+      shown.update(false, 5);
+    }
+    while (shown.dirty) shown.update(false, 5);
+    shown.update(false, 5);
+    const full = new NestTerrain(g) as unknown as NT;
+    full.update(true);
+    let equal = shown.chunks.size === full.chunks.size;
+    for (const [ci, m] of full.chunks) {
+      const o = shown.chunks.get(ci);
+      if (!o) {
+        equal = false;
+        continue;
+      }
+      for (const name of Object.keys(m.geometry.attributes)) {
+        const A = m.geometry.attributes[name]?.array;
+        const B = o.geometry.attributes[name]?.array;
+        if (!A || !B || A.length !== B.length) equal = false;
+        else for (let k = 0; k < A.length; k++) if (!Object.is(A[k], B[k])) equal = false;
+      }
+    }
+    const same = (a: ArrayLike<number>, b: ArrayLike<number>) => {
+      if (a.length !== b.length) return false;
+      for (let k = 0; k < a.length; k++) if (!Object.is(a[k], b[k])) return false;
+      return true;
+    };
+    const maps = same(shown.sd, full.sd) && same(shown.soilData, full.soilData) && same(shown.lightData, full.lightData) && same(shown.hexData, full.hexData);
+    check(
+      'nest terrain: dig orders and progress no longer recompute the signed distance; the shown nest ends with the same mesh, distance and textures as a full rebuild',
+      equal && maps && sdRuns <= carves,
+      `${updates} updates, ${carves} carved: the distance computed ${sdRuns} times; mesh ${equal ? 'same' : 'DIFFERS'}, maps ${maps ? 'same' : 'DIFFER'}`,
+    );
+  }
 }
 
 // ---- the frame cap

@@ -1,4 +1,5 @@
 import { GameSession } from '../game/session';
+import { soilRev } from '../world/soilRev';
 import { prof } from '../core/profiler';
 import { AS, SURFACE, TREES, colonyOfSpace } from '../sim/types';
 import { SOIL_AIR, SOIL_GATE, SOIL_ROCK, SOIL_ROUTE, SOIL_STONE } from '../world/nestGrid';
@@ -263,14 +264,21 @@ export class Minimaps {
     }
     const ctx = this.nestCv.getContext('2d')!;
     const k = S / Math.max(g.widthMm, g.depthMm);
-    // floor raster (cached per dig version and the fog's state)
+    // floor raster (cached per soil and the fog's state). (Action-lag fix: keyed on the soil's revision — the grid's
+    // version moves on every dig progress and dig order, and the whole picture was redrawn each time, 5–11 ms — and on
+    // an exact hash of the fog levels and the sealed hexes: the old key, their sum and count, was only safe because
+    // the version moved so often.)
     const fog = s.fog;
     const sealed = fog.sealedOf(space);
     const lv = fog.levelsOf(space);
-    const fogKey = (sealed?.size ?? 0) * 1000003 + (lv ? lv.reduce((a, b) => a + b, 0) : 0);
+    let fogKey = 0x811c9dc5;
+    if (lv) for (let i = 0; i < lv.length; i++) fogKey = Math.imul(fogKey ^ lv[i], 0x01000193);
+    fogKey = Math.imul(fogKey ^ (sealed?.size ?? 0), 0x01000193);
+    if (sealed) for (const q of sealed) fogKey = Math.imul(fogKey ^ q, 0x01000193);
     const tRaster = performance.now();
-    if (g.version !== this.nestVer || fogKey !== this.nestFogKey) {
-      this.nestVer = g.version;
+    const sr = soilRev(g);
+    if (sr !== this.nestVer || fogKey !== this.nestFogKey) {
+      this.nestVer = sr;
       this.nestFogKey = fogKey;
       const img = ctx.createImageData(S, S);
       for (let y = 0; y < S; y++)
