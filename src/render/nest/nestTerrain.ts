@@ -1,6 +1,6 @@
 import { TextureRing } from '../dynamicTextures';
 import { soilRev } from '../../world/soilRev';
-import { borderBlur, boxBlur, chamfer, lightMap, NestMapsInput, sdScratch, SdScratch, signedDistance, soilBytes } from './nestMaps';
+import { borderBlur, boxBlur, chamfer, changedTexels, lightMap, NestMapsInput, sdScratch, SdScratch, signedDistance, soilBytes } from './nestMaps';
 import { nestMapsAsync, requestNestMaps } from './nestMapsClient';
 import * as THREE from 'three';
 import { prof } from '../../core/profiler';
@@ -268,7 +268,8 @@ export class NestTerrain {
     const g = this.grid;
     const n = g.w * g.h;
     if (!force && this.lightRev === this.shapeRev) {
-      if (soilBytes(g.soil, this.sealed, g.designated, n, this.soilData)) this.soilTex.commit();
+      const ch = soilBytes(g.soil, this.sealed, g.designated, n, this.soilData);
+      if (ch) this.soilTex.commit(this.rowsOf(ch));
       this.updateDesignation();
       return false;
     }
@@ -289,6 +290,12 @@ export class NestTerrain {
   /** the worker's job out (its soil revision), and its answer when back */
   private job: { rev: number } | null = null;
   private asyncResult: { rev: number; sd: Float32Array; light: Uint8Array; ms: number } | null = null;
+
+  /** The rows of the nest's cell-sized textures that cells k0..k1 lie in. */
+  private rowsOf(c: { k0: number; k1: number }): { y0: number; y1: number } {
+    const W = this.grid.w;
+    return { y0: Math.floor(c.k0 / W), y1: Math.floor(c.k1 / W) };
+  }
 
   /** Hand the worker a copy of the soil as it is now (one job at a time: newer soil waits for the answer). */
   private startJob(): void {
@@ -313,9 +320,14 @@ export class NestTerrain {
     this.sd.set(res.sd);
     this.markChangedDistance();
     this.shapeRev = this.lightRev = res.rev;
-    this.lightData.set(res.light);
-    this.lightTex.commit();
-    if (soilBytes(g.soil, this.sealed, g.designated, g.w * g.h, this.soilData)) this.soilTex.commit();
+    // (only the rows that changed are sent: a dig changes the light round it, not the whole nest's)
+    const lit = changedTexels(this.lightData, res.light);
+    if (lit) {
+      this.lightData.set(res.light);
+      this.lightTex.commit(this.rowsOf(lit));
+    }
+    const ch = soilBytes(g.soil, this.sealed, g.designated, g.w * g.h, this.soilData);
+    if (ch) this.soilTex.commit(this.rowsOf(ch));
     this.updateDesignation();
     this.mapsStale = false;
     this.batchOpen = true;

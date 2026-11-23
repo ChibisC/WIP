@@ -1892,3 +1892,34 @@ known actions). Kept, as different things: the ants' trail following (`AS.Follow
 cues and cameras, the photo mode's free camera, multiplayer spectators. `tests/browser/ui_test2.py`: the card has no
 Follow button, O changes nothing, Esc closes the card.
 
+## 37. Lag on actions: digging, a new ant, climbing into the trees (user 2026-11-21: "everytime a new action happens like digging or a new ant is made or we switch to tree view, the game lags, why is that?"; 2026-11-23: "can you fix the lag changes now") — branch `feature/action-lag`
+Measured first (scratchpad probe: every frame's main-thread time, parts, uploads and notes while each action
+happens; the build machine, SwiftShader), then fixed without changing the picture or the simulation:
+1. **Digging, the version.** The client's nest grid moves its `version` once for every grid update the simulation
+   sends (`game/replica.ts`) — dig orders and dig progress too, soil or not — and the shown nest recomputed the whole
+   nest's signed distance (10–58 ms) and light map (9–47 ms, then 593 KB of textures) on each. `world/soilRev.ts`: a
+   counter that moves only when the soil's bytes change (a byte compare); the distance and the light map are remade
+   only then, a dig order or progress only rewrites the soil texture's bytes (sent only when one changed). The
+   version keeps its meaning (the nest's decorations seed their randomness from it). Test: dig orders, progress and
+   carves interleaved end with a full rebuild's mesh, distance and textures; the distance computed only for carves.
+2. **Digging, the soil itself.** While ants dig, the soil does change almost every frame: the shown nest recomputed
+   the distance nearly every frame (5–43 ms) and the light maps and the mesh's chunks were starved (once 141 ms).
+   The signed distance and the light map are now made in a worker (`worker/nestMapsWorker.ts`,
+   `render/nest/nestMapsClient.ts`) from the same functions the page uses for a full rebuild (moved, unchanged, into
+   `render/nest/nestMaps.ts`): one job at a time, newer soil waits for the answer, an answer older than the distance
+   in use is dropped, a dive or cut into the area waits for it (`caughtUp`). On the page: a stepped clock (the golden
+   shots), a forced rebuild, the tests. Applying an answer: 1–12 ms, then the chunks in their 5 ms slices; marking the
+   changed cells' chunks once per chunk and edge band (`NestGrid.dirtyKey`: the same chunks). Test: answers late and
+   out of turn, forced rebuilds between, end with the same mesh, distance and textures as a full rebuild.
+3. **Digging, the minimap.** Its nest picture was keyed on the version (painted whole, 5–11 ms, on every dig order and
+   progress); now on the soil's revision and an exact hash of the fog levels and sealed hexes (the old key, their sum
+   and count, was only safe because the version moved so often), painting only the pixels of the cells that changed,
+   and each area keeps its own picture (a switch painted the whole picture again).
+4. **A new ant.** No cost of its own on the build machine: frames with a birth had the usual main-thread time, no
+   shader compile, no buffer upload (every ant model is drawn once in the pre-warm). The profiler now notes each hatch,
+   so the benchmark's longest frames say when one had a birth in it.
+5. **Climbing into the trees.** The backdrop (the ground far below) is the whole surface drawn from above — 202 draws,
+   935k triangles, more than a normal frame — on the swap frame; while in the trees it was redrawn every 30 s a
+   quadrant a frame, each quadrant costing ~70% of the whole (the instanced ants and grass are drawn in every one):
+   four hitches and twice the work. Now drawn whole every 30 s, and a climb reuses a picture younger than 30 s (the
+   age it may reach while one stays); the screenshot harness and loading still draw it.

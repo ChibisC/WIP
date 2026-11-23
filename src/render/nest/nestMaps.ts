@@ -126,9 +126,13 @@ export function nestMapsCompute(m: NestMapsInput, scr: SdScratch): { sd: Float32
   return { sd, light };
 }
 
-/** The soil texture's bytes of cell k (R: type, G: dig order); `out` gets them at k·4. Returns whether they changed. */
-export function soilBytes(soil: Uint8Array, sealed: Uint8Array | null, designated: ArrayLike<number>, n: number, out: Uint8Array): boolean {
-  let changed = false;
+/**
+ * The soil texture's bytes of every cell k (R: type, G: dig order); `out` gets them at k·4. Returns the first and last
+ * cell whose bytes changed, or null.
+ */
+export function soilBytes(soil: Uint8Array, sealed: Uint8Array | null, designated: ArrayLike<number>, n: number, out: Uint8Array): { k0: number; k1: number } | null {
+  let k0 = -1;
+  let k1 = -1;
   for (let k = 0; k < n; k++) {
     const s = sealed && sealed[k] ? SOIL_ROUTE : soil[k];
     const i = k * 4;
@@ -140,10 +144,29 @@ export function soilBytes(soil: Uint8Array, sealed: Uint8Array | null, designate
       out[i + 1] = gg;
       out[i + 2] = 0;
       out[i + 3] = 255;
-      changed = true;
+      if (k0 < 0) k0 = k;
+      k1 = k;
     }
   }
-  return changed;
+  return k0 < 0 ? null : { k0, k1 };
+}
+
+/** The first and last texel (RGBA bytes) where `a` and `b` differ, or null. */
+export function changedTexels(a: Uint8Array, b: Uint8Array): { k0: number; k1: number } | null {
+  let i0 = -1;
+  for (let i = 0; i < a.length; i++)
+    if (a[i] !== b[i]) {
+      i0 = i;
+      break;
+    }
+  if (i0 < 0) return null;
+  let i1 = i0;
+  for (let i = a.length - 1; i > i0; i--)
+    if (a[i] !== b[i]) {
+      i1 = i;
+      break;
+    }
+  return { k0: i0 >> 2, k1: i1 >> 2 };
 }
 
 /** One cell of the signed distance's 3×3 blur, with the grid's edge taken into account (the original loop's body). */

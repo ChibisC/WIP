@@ -44,6 +44,14 @@ export class TextureRing<T extends THREE.DataTexture = THREE.DataTexture> {
   /** called with the texture to bind after each commit (a material's uniform) */
   onSwap: ((t: T) => void) | null = null;
 
+  /**
+   * Per texture of the ring: the rows changed since it was last uploaded — 'all' (the whole texture: never uploaded,
+   * or a change without rows), a span, or null (it holds the data). Action-lag fix: a nest's light and soil textures
+   * changed a few rows a dig and were sent whole each time (600 KB, many times a second while ants dig); a commit that
+   * names its rows sends only those to the texture taking the change — and to the others when their turn comes.
+   */
+  private dirty: Array<{ y0: number; y1: number } | 'all' | null>;
+
   constructor(make: () => T, n = RING) {
     const first = make();
     this.ring = [first];
@@ -53,6 +61,9 @@ export class TextureRing<T extends THREE.DataTexture = THREE.DataTexture> {
       t.image = first.image;
       this.ring.push(t);
     }
+    this.dirty = this.ring.map(() => 'all');
+    // (three.js calls this when a texture's upload is done: it holds the data from then on)
+    this.ring.forEach((t, k) => (t.onUpdate = () => (this.dirty[k] = null)));
   }
 
   get current(): T {
@@ -67,18 +78,38 @@ export class TextureRing<T extends THREE.DataTexture = THREE.DataTexture> {
     return this.ring[0].image;
   }
 
-  /** The data changed: the next texture holds it from now on (a second change before the upload reuses it). */
-  commit(): T {
+  /**
+   * The data changed: the next texture holds it from now on (a second change before the upload reuses it). `rows`:
+   * only these rows changed (every change since the last commit must lie in them) — the texture taking the change
+   * uploads the rows it is missing, not the whole picture.
+   */
+  commit(rows?: { y0: number; y1: number }): T {
+    for (let k = 0; k < this.dirty.length; k++) {
+      const d = this.dirty[k];
+      this.dirty[k] = !rows || d === 'all' ? 'all' : d ? { y0: Math.min(d.y0, rows.y0), y1: Math.max(d.y1, rows.y1) } : { y0: rows.y0, y1: rows.y1 };
+    }
     const cur = this.ring[this.i];
     if (pending.has(cur)) {
       cur.needsUpdate = true;
+      this.setRanges(this.i);
       return cur;
     }
     this.i = (this.i + 1) % this.ring.length;
     const t = this.ring[this.i];
+    this.setRanges(this.i);
     texturePending(t);
     this.onSwap?.(t);
     return t;
+  }
+
+  /** Texture k's upload: its missing rows (three.js uploads a range as one row), or all of it. */
+  private setRanges(k: number): void {
+    const t = this.ring[k];
+    t.clearUpdateRanges();
+    const d = this.dirty[k];
+    if (!d || d === 'all') return;
+    const stride = t.image.width * 4;
+    for (let y = d.y0; y <= d.y1; y++) t.addUpdateRange(y * stride, stride);
   }
 
   dispose(): void {
