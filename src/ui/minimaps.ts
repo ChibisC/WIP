@@ -54,14 +54,12 @@ export class Minimaps {
   private treesBar = el('button', 'pnl mm-trees');
   private treesLbl = el('span', 'mm-trees-lbl', 'TREES');
   private canopyBase: HTMLCanvasElement | null = null;
-  private nestImg: ImageData | null = null;
-  private nestBaseCv: HTMLCanvasElement | null = null;
-  private nestVer = -1;
-  /** the soil the nest picture was painted from, and its area (only changed cells are painted again) */
-  private nestSoil: Uint8Array | null = null;
-  private nestSoilFor = -1;
-  private nestFogKey = -1;
-  private nestFor = -1;
+  /**
+   * Each area's floor picture: the soil revision and fog it was painted for, the pixels, the canvas drawn from, the
+   * soil it was painted from (only changed cells are painted again). Action-lag fix: one picture for all areas was
+   * painted whole again on every switch (5–11 ms); each area keeps its own.
+   */
+  private rasters = new Map<number, { ver: number; fogKey: number; img: ImageData | null; base: HTMLCanvasElement | null; soil: Uint8Array | null }>();
   private tick = 0;
   private size = 0;
 
@@ -133,7 +131,7 @@ export class Minimaps {
       this.size = px;
       for (const cv of [this.nestCv, this.surfCv]) cv.width = cv.height = px;
       this.surfBase = null;
-      this.nestVer = -1;
+      this.rasters.clear();
     }
     return this.size;
   }
@@ -261,10 +259,8 @@ export class Minimaps {
     const tab = s.areaTab(space)!;
     const g = w.nestOf(space)!;
     const c = w.colony(colonyOfSpace(space));
-    if (this.nestFor !== space) {
-      this.nestFor = space;
-      this.nestVer = -1;
-    }
+    let R = this.rasters.get(space);
+    if (!R) this.rasters.set(space, (R = { ver: -1, fogKey: -1, img: null, base: null, soil: null }));
     const ctx = this.nestCv.getContext('2d')!;
     const k = S / Math.max(g.widthMm, g.depthMm);
     // floor raster (cached per soil and the fog's state). (Action-lag fix: keyed on the soil's revision — the grid's
@@ -282,11 +278,11 @@ export class Minimaps {
     const sr = soilRev(g);
     // (action-lag fix: while ants dig, the soil changes nearly every frame — only the pixels of the cells that changed
     // are painted again, with the same code; a change of fog, sealing, size or area paints the whole picture)
-    const full = fogKey !== this.nestFogKey || !this.nestImg || this.nestImg.width !== S || !this.nestSoil || this.nestSoil.length !== g.soil.length || this.nestSoilFor !== space;
-    if (sr !== this.nestVer || full) {
-      this.nestVer = sr;
-      this.nestFogKey = fogKey;
-      const img = full ? ctx.createImageData(S, S) : this.nestImg!;
+    const full = fogKey !== R.fogKey || !R.img || R.img.width !== S || !R.soil || R.soil.length !== g.soil.length;
+    if (sr !== R.ver || full) {
+      R.ver = sr;
+      R.fogKey = fogKey;
+      const img = full ? ctx.createImageData(S, S) : R.img!;
       const paint = (x0: number, x1: number, y0: number, y1: number) => {
         for (let y = y0; y <= y1; y++)
           for (let x = x0; x <= x1; x++) {
@@ -348,11 +344,10 @@ export class Minimaps {
       let dy1 = S - 1;
       if (full) {
         paint(0, S - 1, 0, S - 1);
-        this.nestSoil = g.soil.slice();
-        this.nestSoilFor = space;
+        R.soil = g.soil.slice();
       } else {
         // the changed cells' box, then its pixels (a pixel's cell is floor(x / k / cell): one pixel of margin)
-        const was = this.nestSoil!;
+        const was = R.soil!;
         let cx0 = g.w;
         let cx1 = -1;
         let cy0 = g.h;
@@ -377,10 +372,10 @@ export class Minimaps {
           paint(dx0, dx1, dy0, dy1);
         }
       }
-      this.nestImg = img;
+      R.img = img;
       // (performance v5: kept in a canvas of its own and drawn from it — putting the pixels in every update was an
       // upload of the whole map each time)
-      const base = (this.nestBaseCv ??= document.createElement('canvas'));
+      const base = (R.base ??= document.createElement('canvas'));
       let fresh = false;
       if (base.width !== S || base.height !== S) {
         base.width = S;
@@ -391,8 +386,8 @@ export class Minimaps {
       else if (dx1 >= dx0) base.getContext('2d')!.putImageData(img, 0, 0, dx0, dy0, dx1 - dx0 + 1, dy1 - dy0 + 1);
       prof.sub('ui:minimap nest raster', performance.now() - tRaster);
     }
-    if (this.nestBaseCv && this.nestBaseCv.width === S) ctx.drawImage(this.nestBaseCv, 0, 0);
-    else ctx.putImageData(this.nestImg!, 0, 0);
+    if (R.base && R.base.width === S) ctx.drawImage(R.base, 0, 0);
+    else ctx.putImageData(R.img!, 0, 0);
     // designated hexes and tiles as small hexes
     const hex = (cx: number, cy: number, r: number) => {
       ctx.beginPath();
