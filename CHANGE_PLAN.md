@@ -1897,7 +1897,7 @@ Measured first (scratchpad probe: every frame's main-thread time, parts, uploads
 happens; the build machine, SwiftShader), then fixed without changing the picture or the simulation:
 1. **Digging, the version.** The client's nest grid moves its `version` once for every grid update the simulation
    sends (`game/replica.ts`) — dig orders and dig progress too, soil or not — and the shown nest recomputed the whole
-   nest's signed distance (10–58 ms) and light map (9–47 ms, then 593 KB of textures) on each. `world/soilRev.ts`: a
+   nest's signed distance (10–58 ms) and light map (9–47 ms, then 593 KB of textures) on each. `render/nest/soilRev.ts`: a
    counter that moves only when the soil's bytes change (a byte compare); the distance and the light map are remade
    only then, a dig order or progress only rewrites the soil texture's bytes (sent only when one changed). The
    version keeps its meaning (the nest's decorations seed their randomness from it). Test: dig orders, progress and

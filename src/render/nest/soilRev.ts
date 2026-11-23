@@ -1,4 +1,4 @@
-import type { NestGrid } from './nestGrid';
+import type { NestGrid } from '../../world/nestGrid';
 
 /**
  * A counter that moves only when a nest grid's soil does (action-lag fix, 2026-11-23).

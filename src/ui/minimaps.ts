@@ -1,5 +1,5 @@
 import { GameSession } from '../game/session';
-import { soilRev } from '../world/soilRev';
+import { soilRev } from '../render/nest/soilRev';
 import { prof } from '../core/profiler';
 import { AS, SURFACE, TREES, colonyOfSpace } from '../sim/types';
 import { SOIL_AIR, SOIL_GATE, SOIL_ROCK, SOIL_ROUTE, SOIL_STONE } from '../world/nestGrid';

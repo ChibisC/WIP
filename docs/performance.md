@@ -669,7 +669,7 @@ changing the picture or the simulation (the golden shots, `same.sh`, the tests b
 - the client's nest grid moves its `version` for every grid update the simulation sends — dig orders and progress as
   well as soil — and the shown nest remade the whole nest's signed distance (10–58 ms) and light map (9–47 ms, then
   593 KB of textures) on each; the minimap repainted its nest picture (5–11 ms). Now only a change of the soil's bytes
-  does (`world/soilRev.ts`, a byte compare);
+  does (`render/nest/soilRev.ts`, a byte compare);
 - while ants dig, the soil itself changes almost every frame: the shown nest recomputed the distance nearly every
   frame (5–43 ms), starving its light map (once 141 ms) and its chunks. The distance and the light map are now made in
   a worker (`worker/nestMapsWorker.ts`) by the same functions the page runs for a full rebuild

@@ -2215,7 +2215,7 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   almost every frame, so it remade the distance nearly every frame and starved its light map and chunks. A new ant
   had no cost of its own (its frames were digging's). The trees' backdrop is the whole surface drawn from above (more
   triangles than a frame), redrawn every 30 s a quadrant a frame at ~70% of the whole each.
-- **Fixed, the same picture and results:** the maps remade only when the soil's bytes change (`world/soilRev.ts`);
+- **Fixed, the same picture and results:** the maps remade only when the soil's bytes change (`render/nest/soilRev.ts`);
   made in a worker from the same functions (`render/nest/nestMaps.ts`, `worker/nestMapsWorker.ts`); the minimap
   paints only changed cells and keeps each area's picture; textures sent only when changed; the backdrop drawn whole
   every 30 s and reused on a climb when younger than 30 s. Nest maps on the main thread while digging: 492 → 66 ms

@@ -1,5 +1,5 @@
 import { TextureRing } from '../dynamicTextures';
-import { soilRev } from '../../world/soilRev';
+import { soilRev } from './soilRev';
 import { borderBlur, boxBlur, chamfer, changedTexels, lightMap, NestMapsInput, sdScratch, SdScratch, signedDistance, soilBytes } from './nestMaps';
 import { nestMapsAsync, requestNestMaps } from './nestMapsClient';
 import * as THREE from 'three';
@@ -281,7 +281,7 @@ export class NestTerrain {
     return true;
   }
 
-  /** the soil revision (world/soilRev.ts) the signed distance, and then the light map, were made from */
+  /** the soil revision (render/nest/soilRev.ts) the signed distance, and then the light map, were made from */
   private shapeRev = -1;
   private lightRev = -2;
   /** the soil revision of the grid as last seen (the shape wanted) */

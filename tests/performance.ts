@@ -259,7 +259,7 @@ function check(name: string, ok: boolean, detail = ''): void {
 
   // action-lag fix (2026-11-23): the client's grid version moves on every grid update — dig orders and dig progress,
   // soil or not (game/replica.ts) — and each one recomputed the whole signed distance and light maps. Now only a change
-  // of the soil's bytes does (world/soilRev.ts); with dig orders, progress and carves interleaved as in play, the shown
+  // of the soil's bytes does (render/nest/soilRev.ts); with dig orders, progress and carves interleaved as in play, the shown
   // nest's 5 ms slices end with the same mesh, signed distance and textures as a full rebuild, and recompute the
   // distance only for the updates that carved
   {
