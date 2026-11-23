@@ -44,6 +44,7 @@ import { AutoQuality } from './autoQuality';
 import { prof } from '../core/profiler';
 import { feel, InputKind } from '../core/feel';
 import { gpuIdle, overviewCamera, sceneTarget, warmScene } from '../render/prewarm';
+import { setNestMapsAsync } from '../render/nest/nestMapsClient';
 import { STOLEN_CASTES } from '../sim/termants';
 import type { NetGame } from '../net/netGame';
 import { matchWinner } from '../net/match';
@@ -318,6 +319,8 @@ export class GameSession {
     });
     // the frame profiler (F3, ?bench=1): every frame's parts, GL work and hitches (game/profiler.ts)
     prof.attach(this.view.renderer);
+    // (the nest's signed distance and light map made in a worker while play goes on — off again when stepped)
+    setNestMapsAsync(true);
     (window as unknown as { __prof: unknown }).__prof = prof;
     this.loop.onStepStart = (now) => {
       prof.begin(now);
@@ -513,6 +516,8 @@ export class GameSession {
    * stepped shot shows the same picture as before.
    */
   setStepped(): void {
+    // (the nest's maps made on the page, on the frame asked for: a worker's answer would land on any frame)
+    setNestMapsAsync(false);
     this.mounds.entrances.budgetMs = Infinity;
     this.mounds.entrances.compile = null;
     this.view.stepped = true;
