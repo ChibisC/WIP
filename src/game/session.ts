@@ -346,6 +346,8 @@ export class GameSession {
         this.commands.acknowledge(e.player, e.seq);
         if (e.player === this.player.id) this.hexCmds.delete(e.seq);
       }
+      // (action-lag check: a slow frame with an ant hatching in it says so in the benchmark's longest frames)
+      if (e.t === 'hatch') prof.note('an ant hatched');
       this.routeFx(e);
       this.noteAlert(e);
       // camera shake (the player's setting: off, reduced, full)
