@@ -2220,3 +2220,7 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   paints only changed cells and keeps each area's picture; textures sent only when changed; the backdrop drawn whole
   every 30 s and reused on a climb when younger than 30 s. Nest maps on the main thread while digging: 492 → 66 ms
   in 40 s (worst 34 → 8.6 ms); while ants hatched with digging on: 74 → 0 ms.
+- **Merged** into `main` as `a6574e6` and `65ca8a7` (the second takes out verification screenshots committed by
+  mistake; ignored now) (Pages deployed; game artifact v60); handoff 29. Checks: golden set 34 of 35 pixel-identical
+  to main (the flood shot within its noise); `same.sh` ALL SAME; `npm test`; UI test 13/13; build smoke (the
+  worker answered).
