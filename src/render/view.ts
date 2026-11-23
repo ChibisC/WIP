@@ -452,22 +452,19 @@ export class GameView {
   private backdropAt = -1e9;
   private backdropRT: THREE.WebGLRenderTarget | null = null;
 
-  /** the backdrop being refreshed a quarter a frame (performance v4): the next quarter, -1 none */
-  private backdropPart = -1;
 
   /**
    * Render the ground into the trees' backdrop: a low-resolution top-down shot of the surface, darkened and desaturated
-   * by the material. Forced (entering the trees, under the fade): at once. Otherwise only while the trees are shown,
-   * every 30 s, a quarter of the picture a frame (performance v4: it was the whole surface scene on one frame every
-   * 12 s).
+   * by the material. Forced: at once (loading, the screenshot harness). Otherwise only when it is 30 s old: while the
+   * trees are shown, and on climbing into them (under the fade). (Performance v4 drew it every 30 s instead of 12, a
+   * quarter a frame; the action-lag fix draws it whole again — each quarter cost about 70% of the whole — and lets a
+   * climb reuse a picture younger than 30 s.)
    */
   refreshBackdrop(force = false): void {
     const bd = this.treesBackdrop;
     const t = this.terrain;
     if (!bd || !t) return;
-    if (!force && this.backdropPart < 0 && this.time - this.backdropAt < 30) return;
-    if (force) this.backdropPart = -1;
-    else if (this.backdropPart < 0) this.backdropPart = 0;
+    if (!force && this.time - this.backdropAt < 30) return;
     this.backdropAt = this.time;
     const W = t.width;
     const D = t.depth;
@@ -489,26 +486,11 @@ export class GameView {
     const prevScissor = this.renderer.getScissorTest();
     this.renderer.shadowMap.enabled = false;
     this.renderer.setRenderTarget(this.backdropRT);
-    if (force) {
-      cam.clearViewOffset();
-      this.renderer.render(this.surfaceScene, cam);
-    } else {
-      // one quadrant: the camera's view offset to that quarter, drawn into that quarter of the target
-      const q = this.backdropPart;
-      const qx = q % 2;
-      const qy = Math.floor(q / 2);
-      const h = res / 2;
-      cam.setViewOffset(res, res, qx * h, qy * h, h, h);
-      this.backdropRT.viewport.set(qx * h, res - (qy + 1) * h, h, h);
-      this.backdropRT.scissor.set(qx * h, res - (qy + 1) * h, h, h);
-      this.backdropRT.scissorTest = true;
-      this.renderer.render(this.surfaceScene, cam);
-      this.backdropRT.viewport.set(0, 0, res, res);
-      this.backdropRT.scissor.set(0, 0, res, res);
-      this.backdropRT.scissorTest = false;
-      cam.clearViewOffset();
-      this.backdropPart = q + 1 >= 4 ? -1 : q + 1;
-    }
+    // (action-lag fix, 2026-11-23: the whole map at once, also every 30 s. It was drawn a quadrant a frame, but the
+    // ants, the grass and the other instanced or large objects are drawn whole in every quadrant: each quadrant cost
+    // about 70% of the whole render — four hitches and twice the work. One render: the same picture.)
+    cam.clearViewOffset();
+    this.renderer.render(this.surfaceScene, cam);
     this.renderer.setRenderTarget(prevRT);
     this.renderer.setScissorTest(prevScissor);
     this.renderer.shadowMap.enabled = prevShadow;
@@ -549,7 +531,9 @@ export class GameView {
         nr.yaw = nr.goalYaw = sr.goalYaw;
         nr.goalDistance = dist;
         sr.goalDistance = dist;
-        this.refreshBackdrop(true);
+        // (action-lag fix: the backdrop is drawn again only when it is older than the 30 s it may be while one stays
+        // in the trees — a climb soon after the last one, or after loading, reuses it; a stepped clock draws it)
+        this.refreshBackdrop(this.stepped);
         this.onSpaceChanged?.(this.space);
       });
     } else {

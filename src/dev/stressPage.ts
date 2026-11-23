@@ -7,6 +7,7 @@
  * `window.__stress` for the browser test.
  */
 import { GameSession } from '../game/session';
+import { setNestMapsAsync } from '../render/nest/nestMapsClient';
 import { GameUI } from '../ui/gameUI';
 import { DebugOverlay } from '../ui/debugOverlay';
 import { populateStress, stressSetup } from './stressScene';
@@ -25,6 +26,8 @@ export async function runStressPage(canvas: HTMLCanvasElement, ui: HTMLElement, 
   populateStress(s.world, per, nCr, Number(q.get('bosses') || 0));
   // ?shot=1 (golden set, browser shots): stepped by hand on a virtual clock, like the game's screenshot harness
   if (q.get('shot')) {
+    // (the nest's maps on the page, on the frame asked for — a worker's answer would land on any frame)
+    setNestMapsAsync(false);
     (window as unknown as { __session: GameSession }).__session = s;
     s.loop.advance(Number(q.get('ticks') || 0));
     let vt = performance.now();

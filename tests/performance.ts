@@ -22,6 +22,8 @@ import { GameLoop } from '../src/core/loop';
 import { frameCapOf, sanitizeSettings } from '../src/game/profile';
 import { packExhaustedFade } from '../src/render/ants/antMaterial';
 import { NestTerrain } from '../src/render/nest/nestTerrain';
+import { nestMapsCompute, sdScratch } from '../src/render/nest/nestMaps';
+import { setNestMapsAsync, setNestMapsRunner } from '../src/render/nest/nestMapsClient';
 import { SOIL_AIR } from '../src/world/nestGrid';
 import { createStressWorld } from '../src/dev/stressScene';
 import { nestSpace } from '../src/sim/types';
@@ -253,6 +255,173 @@ function check(name: string, ok: boolean, detail = ''): void {
       }
     }
     check('nest terrain: kept current in 3 ms slices, an area ends with the same mesh as a full rebuild', equal, `${calls} slices, the longest ${slicesMax.toFixed(1)} ms`);
+  }
+
+  // action-lag fix (2026-11-23): the client's grid version moves on every grid update — dig orders and dig progress,
+  // soil or not (game/replica.ts) — and each one recomputed the whole signed distance and light maps. Now only a change
+  // of the soil's bytes does (render/nest/soilRev.ts); with dig orders, progress and carves interleaved as in play, the shown
+  // nest's 5 ms slices end with the same mesh, signed distance and textures as a full rebuild, and recompute the
+  // distance only for the updates that carved
+  {
+    type NT = {
+      update(f?: boolean, b?: number): void;
+      computeSignedDistance(): void;
+      chunks: Map<number, { geometry: { attributes: Record<string, { array: ArrayLike<number> }> } }>;
+      dirty: number;
+      sd: Float32Array;
+      soilData: Uint8Array;
+      lightData: Uint8Array;
+      hexData: Uint8Array;
+    };
+    const g = w.nestOf(2)!;
+    const shown = new NestTerrain(g) as unknown as NT;
+    shown.update(true);
+    let sdRuns = 0;
+    const sd0 = shown.computeSignedDistance.bind(shown);
+    shown.computeSignedDistance = () => {
+      sdRuns++;
+      sd0();
+    };
+    let carves = 0;
+    let updates = 0;
+    const cells: number[] = [];
+    for (let k = 0; k < g.w * g.h; k++) if (g.soil[k] !== SOIL_AIR && !g.designated[k]) cells.push(k);
+    for (let i = 0; i < 300; i++) {
+      const k = cells[(i * 7919) % cells.length];
+      const x = k % g.w;
+      const y = Math.floor(k / g.w);
+      if (i % 10 === 9) {
+        g.carve(x, y);
+        carves++;
+      } else if (i % 3 === 0) {
+        // a dig order (as the replica applies one: the cell redrawn, the version moved)
+        g.designated[k] = g.designated[k] ? 0 : 1;
+        g.markDirty(x, y);
+      } else {
+        // dig progress on a hex: no cell changes
+        const q = g.cellHex[k];
+        if (q >= 0) g.hexWork[q] = Math.min(255, g.hexWork[q] + 1);
+        if (q >= 0 && i % 4 === 0) g.hexDesig[q] = g.hexDesig[q] ? 0 : 1;
+      }
+      g.version++;
+      updates++;
+      shown.update(false, 5);
+    }
+    while (shown.dirty) shown.update(false, 5);
+    shown.update(false, 5);
+    const full = new NestTerrain(g) as unknown as NT;
+    full.update(true);
+    let equal = shown.chunks.size === full.chunks.size;
+    for (const [ci, m] of full.chunks) {
+      const o = shown.chunks.get(ci);
+      if (!o) {
+        equal = false;
+        continue;
+      }
+      for (const name of Object.keys(m.geometry.attributes)) {
+        const A = m.geometry.attributes[name]?.array;
+        const B = o.geometry.attributes[name]?.array;
+        if (!A || !B || A.length !== B.length) equal = false;
+        else for (let k = 0; k < A.length; k++) if (!Object.is(A[k], B[k])) equal = false;
+      }
+    }
+    const same = (a: ArrayLike<number>, b: ArrayLike<number>) => {
+      if (a.length !== b.length) return false;
+      for (let k = 0; k < a.length; k++) if (!Object.is(a[k], b[k])) return false;
+      return true;
+    };
+    const maps = same(shown.sd, full.sd) && same(shown.soilData, full.soilData) && same(shown.lightData, full.lightData) && same(shown.hexData, full.hexData);
+    check(
+      'nest terrain: dig orders and progress no longer recompute the signed distance; the shown nest ends with the same mesh, distance and textures as a full rebuild',
+      equal && maps && sdRuns <= carves,
+      `${updates} updates, ${carves} carved: the distance computed ${sdRuns} times; mesh ${equal ? 'same' : 'DIFFERS'}, maps ${maps ? 'same' : 'DIFFER'}`,
+    );
+  }
+
+  // the same with the maps made in a worker (as in play: nestMapsClient.ts): its answers come late and out of turn —
+  // a queue drained now and then while the soil keeps changing, a forced rebuild in between whose older answers must
+  // be dropped — and the shown nest still ends with the very mesh, distance and textures of a full rebuild
+  {
+    type NT = {
+      update(f?: boolean, b?: number): void;
+      chunks: Map<number, { geometry: { attributes: Record<string, { array: ArrayLike<number> }> } }>;
+      dirty: number;
+      sd: Float32Array;
+      soilData: Uint8Array;
+      lightData: Uint8Array;
+      hexData: Uint8Array;
+      caughtUp(v: number): boolean;
+    };
+    const g = w.nestOf(1)!;
+    const queue: Array<() => void> = [];
+    const scr = sdScratch(g.w * g.h);
+    let jobs = 0;
+    setNestMapsRunner((job, cb) => {
+      jobs++;
+      queue.push(() => {
+        const r = nestMapsCompute(job, scr);
+        cb({ id: job.id, sd: r.sd, light: r.light, ms: 0 });
+      });
+    });
+    setNestMapsAsync(true);
+    const shown = new NestTerrain(g) as unknown as NT;
+    shown.update(true);
+    const cells: number[] = [];
+    for (let k = 0; k < g.w * g.h; k++) if (g.soil[k] !== SOIL_AIR && !g.designated[k]) cells.push(k);
+    let carves = 0;
+    let waitedOk = true;
+    for (let i = 0; i < 400; i++) {
+      const k = cells[(i * 104729) % cells.length];
+      const x = k % g.w;
+      const y = Math.floor(k / g.w);
+      if (i % 4 === 3) {
+        g.carve(x, y);
+        carves++;
+      } else if (i % 3 === 0) {
+        g.designated[k] = g.designated[k] ? 0 : 1;
+        g.markDirty(x, y);
+      }
+      g.version++;
+      shown.update(false, 5);
+      // a dive into this area must wait while a newer shape is still out
+      if (queue.length && shown.caughtUp(g.version)) waitedOk = false;
+      if (i % 7 === 0 && queue.length) queue.shift()!();
+      if (i % 9 === 0) queue.splice(0, 2).forEach((f) => f());
+      if (i === 150 || i === 290) shown.update(true);
+    }
+    for (let n = 0; n < 1000 && (queue.length || shown.dirty || !shown.caughtUp(g.version)); n++) {
+      queue.splice(0).forEach((f) => f());
+      shown.update(false, 5);
+    }
+    setNestMapsAsync(false);
+    setNestMapsRunner(null);
+    const full = new NestTerrain(g) as unknown as NT;
+    full.update(true);
+    let equal = shown.chunks.size === full.chunks.size;
+    for (const [ci, m] of full.chunks) {
+      const o = shown.chunks.get(ci);
+      if (!o) {
+        equal = false;
+        continue;
+      }
+      for (const name of Object.keys(m.geometry.attributes)) {
+        const A = m.geometry.attributes[name]?.array;
+        const B = o.geometry.attributes[name]?.array;
+        if (!A || !B || A.length !== B.length) equal = false;
+        else for (let k = 0; k < A.length; k++) if (!Object.is(A[k], B[k])) equal = false;
+      }
+    }
+    const same = (a: ArrayLike<number>, b: ArrayLike<number>) => {
+      if (a.length !== b.length) return false;
+      for (let k = 0; k < a.length; k++) if (!Object.is(a[k], b[k])) return false;
+      return true;
+    };
+    const maps = same(shown.sd, full.sd) && same(shown.soilData, full.soilData) && same(shown.lightData, full.lightData) && same(shown.hexData, full.hexData);
+    check(
+      'nest terrain: with the maps made in a worker (answers late, out of turn, forced rebuilds between), the shown nest ends with the same mesh, distance and textures as a full rebuild',
+      equal && maps && waitedOk && jobs > 0,
+      `${carves} carves, ${jobs} worker jobs; mesh ${equal ? 'same' : 'DIFFERS'}, maps ${maps ? 'same' : 'DIFFER'}, dives wait for the worker: ${waitedOk}`,
+    );
   }
 }
 

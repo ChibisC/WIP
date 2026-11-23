@@ -2207,3 +2207,16 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   (Pages deployed; game artifact v59); handoff 28 (also: why digging, a new ant and the tree view lag — explained,
   not changed).
 
+
+## 2026-11-23 — Lag on actions: digging, a new ant, climbing into the trees (CHANGE_PLAN §37)
+- **Why** (the user's question of 2026-11-21, measured on the build machine): every grid update the simulation sends
+  moved the client grid's version — dig orders and progress too — and the shown nest remade its whole signed
+  distance and light map on each (10–58 ms and 9–47 ms, then 593 KB of textures); while ants dig the soil changes
+  almost every frame, so it remade the distance nearly every frame and starved its light map and chunks. A new ant
+  had no cost of its own (its frames were digging's). The trees' backdrop is the whole surface drawn from above (more
+  triangles than a frame), redrawn every 30 s a quadrant a frame at ~70% of the whole each.
+- **Fixed, the same picture and results:** the maps remade only when the soil's bytes change (`render/nest/soilRev.ts`);
+  made in a worker from the same functions (`render/nest/nestMaps.ts`, `worker/nestMapsWorker.ts`); the minimap
+  paints only changed cells and keeps each area's picture; textures sent only when changed; the backdrop drawn whole
+  every 30 s and reused on a climb when younger than 30 s. Nest maps on the main thread while digging: 492 → 66 ms
+  in 40 s (worst 34 → 8.6 ms); while ants hatched with digging on: 74 → 0 ms.
