@@ -1910,7 +1910,11 @@ happens; the build machine, SwiftShader), then fixed without changing the pictur
    in use is dropped, a dive or cut into the area waits for it (`caughtUp`). On the page: a stepped clock (the golden
    shots), a forced rebuild, the tests. Applying an answer: 1–12 ms, then the chunks in their 5 ms slices; marking the
    changed cells' chunks once per chunk and edge band (`NestGrid.dirtyKey`: the same chunks). Test: answers late and
-   out of turn, forced rebuilds between, end with the same mesh, distance and textures as a full rebuild.
+   out of turn, forced rebuilds between, end with the same mesh, distance and textures as a full rebuild. Measured
+   (the same dig at 4×, 40 s): nest maps on the main thread 492 ms in 35 frames (worst 34) → 66 ms in 28 (worst 8.6).
+   The textures are sent whole when their bytes changed (~600 KB an answer: 2.2 → 16.6 MB, the light now kept up);
+   sending only the changed rows was dropped — three.js sends a row range as the whole array with skip offsets, and
+   what Safari copies for that is unknown.
 3. **Digging, the minimap.** Its nest picture was keyed on the version (painted whole, 5–11 ms, on every dig order and
    progress); now on the soil's revision and an exact hash of the fog levels and sealed hexes (the old key, their sum
    and count, was only safe because the version moved so often), painting only the pixels of the cells that changed,

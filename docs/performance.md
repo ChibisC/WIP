@@ -674,13 +674,14 @@ changing the picture or the simulation (the golden shots, `same.sh`, the tests b
   frame (5–43 ms), starving its light map (once 141 ms) and its chunks. The distance and the light map are now made in
   a worker (`worker/nestMapsWorker.ts`) by the same functions the page runs for a full rebuild
   (`render/nest/nestMaps.ts`, moved unchanged); the page applies the answer (1–12 ms) and rebuilds chunks in its 5 ms
-  slices, marking each chunk and edge band once. The textures send only the rows a dig changed (a texture ring commit
-  names its rows; each texture of the ring uploads the rows it is missing).
+  slices, marking each chunk and edge band once. A texture is sent again only when its bytes changed. (Sending only
+  the rows a dig changed was tried and dropped: three.js sends a row range as the whole array with skip offsets, and
+  what Safari copies for that call is not known — whole uploads of ~600 KB an answer are the known cost.)
 
 | the same dig, 4× speed, 40 s (build machine) | before | after |
 |---|---|---|
-| nest maps on the main thread | 492 ms in 35 frames, worst 34 ms | MAPS_AFTER |
-| nest textures uploaded | 2.2 MB (the light maps starved) | TEX_AFTER |
+| nest maps on the main thread | 492 ms in 35 frames, worst 34 ms | 66 ms in 28 frames, worst 8.6 ms |
+| nest textures uploaded | 2.2 MB (the light maps starved: the nest's light was not kept up) | 16.6 MB (~600 KB for each worker answer, before the frame's passes) |
 | while ants hatched (the colony still digging) | 74 ms, worst 19 ms | 0 ms |
 
 **A new ant.** No cost of its own here: frames with a birth had the usual main-thread time, no shader compile and no
