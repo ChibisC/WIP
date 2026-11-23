@@ -236,10 +236,24 @@ export class NestTerrain {
     // slices must end with every chunk rebuilt that the final distance touches (tests/performance.ts)
     const prev = this.sdPrev;
     if (prev) {
-      for (let k = 0; k < W * H; k++) if (prev[k] !== src[k]) g.markDirty(k % W, (k - (k % W)) / W);
+      // (one markDirty per chunk and edge band: the same chunks as one for every changed cell — action-lag fix)
+      const seen = this.dirtySeen && this.dirtySeen.length === g.dirtyKeys ? this.dirtySeen.fill(0) : (this.dirtySeen = new Uint8Array(g.dirtyKeys));
+      for (let k = 0; k < W * H; k++)
+        if (prev[k] !== src[k]) {
+          const x = k % W;
+          const y = (k - x) / W;
+          const key = g.dirtyKey(x, y);
+          if (!seen[key]) {
+            seen[key] = 1;
+            g.markDirty(x, y);
+          }
+        }
     } else this.sdPrev = new Float32Array(W * H);
     this.sdPrev!.set(this.sd);
   }
+
+  /** which chunk-and-band keys this marking has done (NestGrid.dirtyKey) */
+  private dirtySeen: Uint8Array | null = null;
 
   /** the signed distance of the last computation (which cells changed → which chunks rebuild) */
   private sdPrev: Float32Array | null = null;

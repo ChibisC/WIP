@@ -57,6 +57,9 @@ export class Minimaps {
   private nestImg: ImageData | null = null;
   private nestBaseCv: HTMLCanvasElement | null = null;
   private nestVer = -1;
+  /** the soil the nest picture was painted from, and its area (only changed cells are painted again) */
+  private nestSoil: Uint8Array | null = null;
+  private nestSoilFor = -1;
   private nestFogKey = -1;
   private nestFor = -1;
   private tick = 0;
@@ -277,72 +280,115 @@ export class Minimaps {
     if (sealed) for (const q of sealed) fogKey = Math.imul(fogKey ^ q, 0x01000193);
     const tRaster = performance.now();
     const sr = soilRev(g);
-    if (sr !== this.nestVer || fogKey !== this.nestFogKey) {
+    // (action-lag fix: while ants dig, the soil changes nearly every frame — only the pixels of the cells that changed
+    // are painted again, with the same code; a change of fog, sealing, size or area paints the whole picture)
+    const full = fogKey !== this.nestFogKey || !this.nestImg || this.nestImg.width !== S || !this.nestSoil || this.nestSoil.length !== g.soil.length || this.nestSoilFor !== space;
+    if (sr !== this.nestVer || full) {
       this.nestVer = sr;
       this.nestFogKey = fogKey;
-      const img = ctx.createImageData(S, S);
-      for (let y = 0; y < S; y++)
-        for (let x = 0; x < S; x++) {
-          const cx = Math.floor((x / k) / g.cell);
-          const cy = Math.floor((y / k) / g.cell);
-          const i = (y * S + x) * 4;
-          let r = 10;
-          let gg = 8;
-          let b = 6;
-          // (performance v5: plain assignments — the array destructuring made three arrays a pixel)
-          if (cx < g.w && cy < g.h) {
-            const cell = cy * g.w + cx;
-            const q = g.cellHex[cell];
-            let v = g.soil[cell];
-            if (sealed && q >= 0 && sealed.has(q)) v = SOIL_ROUTE;
-            const f = lv && q >= 0 ? lv[q] : 0;
-            if (f === 2) {
-              r = 12;
-              gg = 10;
-              b = 8;
-            } else {
-              if (v === SOIL_AIR) {
-                r = 176;
-                gg = 132;
-                b = 74;
-              } else if (v === SOIL_STONE) {
-                r = 70;
-                gg = 68;
-                b = 64;
-              } else if (v === SOIL_ROCK || v === SOIL_ROUTE) {
-                r = 44;
-                gg = 46;
-                b = 56;
-              } else if (v === SOIL_GATE) {
-                r = 150;
-                gg = 96;
-                b = 48;
+      const img = full ? ctx.createImageData(S, S) : this.nestImg!;
+      const paint = (x0: number, x1: number, y0: number, y1: number) => {
+        for (let y = y0; y <= y1; y++)
+          for (let x = x0; x <= x1; x++) {
+            const cx = Math.floor((x / k) / g.cell);
+            const cy = Math.floor((y / k) / g.cell);
+            const i = (y * S + x) * 4;
+            let r = 10;
+            let gg = 8;
+            let b = 6;
+            // (performance v5: plain assignments — the array destructuring made three arrays a pixel)
+            if (cx < g.w && cy < g.h) {
+              const cell = cy * g.w + cx;
+              const q = g.cellHex[cell];
+              let v = g.soil[cell];
+              if (sealed && q >= 0 && sealed.has(q)) v = SOIL_ROUTE;
+              const f = lv && q >= 0 ? lv[q] : 0;
+              if (f === 2) {
+                r = 12;
+                gg = 10;
+                b = 8;
               } else {
-                r = 30;
-                gg = 24;
-                b = 17;
-              }
-              if (f === 1) {
-                r *= 0.45;
-                gg *= 0.45;
-                b *= 0.45;
+                if (v === SOIL_AIR) {
+                  r = 176;
+                  gg = 132;
+                  b = 74;
+                } else if (v === SOIL_STONE) {
+                  r = 70;
+                  gg = 68;
+                  b = 64;
+                } else if (v === SOIL_ROCK || v === SOIL_ROUTE) {
+                  r = 44;
+                  gg = 46;
+                  b = 56;
+                } else if (v === SOIL_GATE) {
+                  r = 150;
+                  gg = 96;
+                  b = 48;
+                } else {
+                  r = 30;
+                  gg = 24;
+                  b = 17;
+                }
+                if (f === 1) {
+                  r *= 0.45;
+                  gg *= 0.45;
+                  b *= 0.45;
+                }
               }
             }
+            img.data[i] = r;
+            img.data[i + 1] = gg;
+            img.data[i + 2] = b;
+            img.data[i + 3] = 255;
           }
-          img.data[i] = r;
-          img.data[i + 1] = gg;
-          img.data[i + 2] = b;
-          img.data[i + 3] = 255;
+      };
+      let dx0 = 0;
+      let dx1 = S - 1;
+      let dy0 = 0;
+      let dy1 = S - 1;
+      if (full) {
+        paint(0, S - 1, 0, S - 1);
+        this.nestSoil = g.soil.slice();
+        this.nestSoilFor = space;
+      } else {
+        // the changed cells' box, then its pixels (a pixel's cell is floor(x / k / cell): one pixel of margin)
+        const was = this.nestSoil!;
+        let cx0 = g.w;
+        let cx1 = -1;
+        let cy0 = g.h;
+        let cy1 = -1;
+        for (let c = 0; c < was.length; c++)
+          if (was[c] !== g.soil[c]) {
+            const cx = c % g.w;
+            const cy = (c - cx) / g.w;
+            if (cx < cx0) cx0 = cx;
+            if (cx > cx1) cx1 = cx;
+            if (cy < cy0) cy0 = cy;
+            if (cy > cy1) cy1 = cy;
+            was[c] = g.soil[c];
+          }
+        if (cx1 < 0) dx1 = -1;
+        else {
+          const kc = k * g.cell;
+          dx0 = Math.max(0, Math.floor(cx0 * kc) - 1);
+          dx1 = Math.min(S - 1, Math.ceil((cx1 + 1) * kc) + 1);
+          dy0 = Math.max(0, Math.floor(cy0 * kc) - 1);
+          dy1 = Math.min(S - 1, Math.ceil((cy1 + 1) * kc) + 1);
+          paint(dx0, dx1, dy0, dy1);
         }
+      }
       this.nestImg = img;
       // (performance v5: kept in a canvas of its own and drawn from it — putting the pixels in every update was an
       // upload of the whole map each time)
       const base = (this.nestBaseCv ??= document.createElement('canvas'));
+      let fresh = false;
       if (base.width !== S || base.height !== S) {
         base.width = S;
         base.height = S;
+        fresh = true;
       }
-      base.getContext('2d')!.putImageData(img, 0, 0);
+      if (full || fresh) base.getContext('2d')!.putImageData(img, 0, 0);
+      else if (dx1 >= dx0) base.getContext('2d')!.putImageData(img, 0, 0, dx0, dy0, dx1 - dx0 + 1, dy1 - dy0 + 1);
       prof.sub('ui:minimap nest raster', performance.now() - tRaster);
     }
     if (this.nestBaseCv && this.nestBaseCv.width === S) ctx.drawImage(this.nestBaseCv, 0, 0);

@@ -4,6 +4,8 @@ import { HexLayout } from './hexLayout';
 
 export { insideHex } from './hexLayout';
 
+/** how far beyond its edge a cell's change moves a chunk's mesh (see markDirty) */
+const DIRTY_REACH = 9;
 export const NEST_CHUNK = 32;
 
 export const SOIL_AIR = 0;
@@ -353,7 +355,7 @@ export class NestGrid extends HexLayout {
     // (the renderer's signed distance is blurred over 7 cells and its normals sample a cell beyond: a change this near a
     // chunk's edge moves the neighbour's mesh too — seen with the bigger grids of the shared underground, where a
     // background area kept current in slices ended with stale normals at one chunk's edge)
-    const r = 9;
+    const r = DIRTY_REACH;
     for (let dy = -1; dy <= 1; dy++)
       for (let dx = -1; dx <= 1; dx++) {
         const lx = x - (cx + dx) * NEST_CHUNK;
@@ -364,6 +366,26 @@ export class NestGrid extends HexLayout {
         if (nx < 0 || ny < 0 || nx >= cw || ny * NEST_CHUNK >= this.h) continue;
         this.dirty.add(ny * cw + nx);
       }
+  }
+
+  /**
+   * Which chunks `markDirty(x, y)` marks depends only on the cell's chunk and on whether it lies within the reach of
+   * each of its chunk's edges: this number says which (action-lag fix — the renderer marks thousands of changed cells
+   * at once, and one `markDirty` for each of these is the same set of chunks). Below `dirtyKeys`.
+   */
+  dirtyKey(x: number, y: number): number {
+    const cw = Math.ceil(this.w / NEST_CHUNK);
+    const cx = Math.floor(x / NEST_CHUNK);
+    const cy = Math.floor(y / NEST_CHUNK);
+    const lx = x - cx * NEST_CHUNK;
+    const ly = y - cy * NEST_CHUNK;
+    const bx = (lx < DIRTY_REACH ? 1 : 0) | (lx >= NEST_CHUNK - DIRTY_REACH ? 2 : 0);
+    const by = (ly < DIRTY_REACH ? 1 : 0) | (ly >= NEST_CHUNK - DIRTY_REACH ? 2 : 0);
+    return ((cy * cw + cx) * 4 + bx) * 4 + by;
+  }
+
+  get dirtyKeys(): number {
+    return Math.ceil(this.w / NEST_CHUNK) * Math.ceil(this.h / NEST_CHUNK) * 16;
   }
 
   // ---------------------------------------------------------------- hex API
