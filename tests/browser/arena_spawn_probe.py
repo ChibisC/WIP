@@ -26,6 +26,10 @@ TEAMS = int(os.environ.get("TEAMS", "2"))
 GAP = float(os.environ.get("GAP", "0"))
 EXTRA = os.environ.get("EXTRA", "")
 PASSIVE = os.environ.get("PASSIVE", "") == "1"
+FIGHT = os.environ.get("FIGHT", "") == "1"
+# (the game's speed: SwiftShader draws a frame in 1-5 s here and a frame moves the game 0.25 s at most at 1x, so a
+# fight needs 8x to happen within a run)
+SPEED = float(os.environ.get("SPEED", "1"))
 PROFILE = os.environ.get("PROFILE", "") == "1"
 TOP = int(os.environ.get("TOP", "25"))
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"]
@@ -150,10 +154,12 @@ def main():
         pg.evaluate(SHPROG)
         time.sleep(6)
         print("shadow programs before the spawn:", pg.evaluate(SHPROG))
+        if SPEED != 1:
+            pg.evaluate(f"() => window.__session.setSpeed({SPEED})")
         tspawn = pg.evaluate("() => performance.now() / 1000")
         for team in range(TEAMS):
-            if PASSIVE:
-                pg.evaluate(f"() => window.__session.issue({{ type: 'arenaStance', team: {team}, stance: 2 }})")
+            if PASSIVE or FIGHT:
+                pg.evaluate(f"() => window.__session.issue({{ type: 'arenaStance', team: {team}, stance: {2 if PASSIVE else 0} }})")
             for unit, n in UNITS:
                 pg.evaluate(f"() => window.__session.issue({{ type: 'arenaSpawn', team: {team}, unit: '{unit}', n: {int(n)}, level: 1, at: false, x: 0, y: 0 }})")
             if GAP:
@@ -198,6 +204,7 @@ def main():
         print(f"programs: {len(progs0)} before the spawn, {len(progs1)} after; new:")
         links = pg.evaluate("() => window.__links || []")
         print("colonies after:", pg.evaluate(COLS))
+        print("arena after:", pg.evaluate("() => { const A = window.__session.world.s.mode.arena; return { tick: window.__session.world.s.tick, winner: A.winner, fought: A.fought, t: A.t, teams: A.teams.map((T) => [T.alive, T.lost, T.stance, T.has]) }; }"))
         hills1 = pg.evaluate(HILLS)
         print("shadow programs after:", pg.evaluate(SHPROG))
         print(f"anthill and dome meshes before the spawn ({len(hills0)}):")

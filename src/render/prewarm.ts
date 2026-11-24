@@ -51,6 +51,12 @@ export function warmScene(renderer: THREE.WebGLRenderer, scene: THREE.Scene, cam
     }
     // (points and lines with nothing in them: draw one element)
     const g = (o as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+    // (instanced geometry with no instances — the glue and acid streams: one, so the draw is made — performance v6)
+    const ig = g as THREE.InstancedBufferGeometry | undefined;
+    if (ig && ig.isInstancedBufferGeometry && ig.instanceCount === 0) {
+      ig.instanceCount = 1;
+      undo.push(() => (ig.instanceCount = 0));
+    }
     if (g && g.drawRange && g.drawRange.count === 0) {
       const c = g.drawRange.count;
       g.drawRange.count = Infinity;

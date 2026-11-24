@@ -8,9 +8,12 @@
 import type { GameSession } from '../game/session';
 import { prof } from '../core/profiler';
 import { feel } from '../core/feel';
+import { copyLagReport } from './lagReport';
 
 export class DebugOverlay {
   private el = document.createElement('pre');
+  /** "Copy lag report" (performance v6): the overlay itself lets clicks through, so the button sits beside it */
+  private copy = document.createElement('button');
   private on = false;
   private lastDraw = 0;
 
@@ -20,6 +23,11 @@ export class DebugOverlay {
   ) {
     this.el.className = 'debug-overlay';
     parent.appendChild(this.el);
+    this.copy.className = 'debug-copy';
+    this.copy.textContent = 'Copy lag report';
+    this.copy.title = 'Every frame over 100 ms since loading, with what was in it, as text to paste into a message';
+    this.copy.addEventListener('click', () => copyLagReport(this.s, (ok) => (this.copy.textContent = ok ? `Copied (${prof.lagCount} freezes)` : 'Copy failed — see the console')));
+    parent.appendChild(this.copy);
     s.input.on('debug', () => this.toggle());
     const loop = (t: number) => {
       // (text at 4 Hz: the overlay must not cost what it measures)
@@ -35,6 +43,8 @@ export class DebugOverlay {
   toggle(force?: boolean): void {
     this.on = force ?? !this.on;
     this.el.classList.toggle('show', this.on);
+    this.copy.classList.toggle('show', this.on);
+    if (this.on) this.copy.textContent = 'Copy lag report';
     // the climb rails and riding slots are drawn with it
     this.s.setClimbDebug(this.on || new URLSearchParams(location.search).has('climbdebug'));
     // and the simulation's hitboxes
@@ -85,6 +95,7 @@ export class DebugOverlay {
         }`,
       );
     }
+    lines.push(`freezes over 100 ms since loading: ${prof.lagCount} (the button above copies them)`);
     const hs = prof.hitches.slice(-6);
     lines.push(`hitches (frames over 33 ms): ${prof.hitches.length}${hs.length ? '' : ' — none'}`);
     for (const h of hs) lines.push(`  ${h.t.toFixed(1)} s  ${h.ms.toFixed(0)} ms (main ${h.cpu.toFixed(0)}): ${h.causes.join('; ')}`);

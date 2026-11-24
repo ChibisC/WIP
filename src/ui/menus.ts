@@ -11,6 +11,8 @@ import { BUILD_ID } from '../net/messages';
 import { Quality } from '../render/view';
 import { button, el, esc, shield } from './dom';
 import { ICONS } from './icons';
+import { copyLagReport } from './lagReport';
+import { prof } from '../core/profiler';
 
 type PauseTab = 'game' | 'graphics' | 'sound' | 'controls';
 
@@ -307,6 +309,11 @@ export class Menus {
         location.href = `${location.pathname}?bench=1&q=${this.s.view.quality}`;
       }),
     );
+    // (performance v6: every frame over 100 ms since loading, with what was in it, as text to send)
+    const lag = button('', 'Copy lag report', 'Copies a list of every freeze over 100 ms since the game loaded — what the game was doing and what took the time — to paste into a message', () => {
+      copyLagReport(this.s, (ok) => (lag.textContent = ok ? `Copied (${prof.lagCount} freezes)` : 'Copy failed — the report is in the console'));
+    });
+    rb.appendChild(lag);
     m.appendChild(rb);
     m.appendChild(el('h3', '', 'Interface size'));
     const r3 = el('div', 'row');

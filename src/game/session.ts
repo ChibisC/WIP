@@ -6,6 +6,7 @@ import { GameLoop } from '../core/loop';
 import { Input, PointerInfo } from '../core/input';
 import { GameView, Quality } from '../render/view';
 import { AntRenderer, AntSpaceAdapter, AntView, animHooks, antHeadingHook } from '../render/ants/antRenderer';
+import { NASUTE_MORPHS } from '../render/ants/nasuteMorphs';
 import { intentAnts, intents } from './intents';
 import { ViewCull } from '../render/viewCull';
 import { edible } from '../sim/diet';
@@ -42,6 +43,8 @@ import { LocalCommands } from './localCommands';
 import { LocalSim, SimHost, WorkerSim } from './simHost';
 import { AutoQuality } from './autoQuality';
 import { prof } from '../core/profiler';
+import { audio } from '../audio/engine';
+import { lagContext } from '../ui/lagReport';
 import { feel, InputKind } from '../core/feel';
 import { gpuIdle, overviewCamera, sceneTarget, shadowStandIns, warmScene } from '../render/prewarm';
 import { setNestMapsAsync } from '../render/nest/nestMapsClient';
@@ -422,6 +425,9 @@ export class GameSession {
   start(): void {
     this.loop.frameCap = frameCapOf(settings());
     this.loop.start();
+    // (loading is over: the lag recorder takes frames over 100 ms from here, with what the game was doing — v6)
+    prof.playing = true;
+    prof.lagContext = () => lagContext(this);
   }
 
   // ---------------------------------------------------------------- pre-warming (performance pass, CHANGE_PLAN §25)
@@ -486,6 +492,11 @@ export class GameSession {
     // warm-up below, so every program its models use is compiled behind the loading screen too)
     const extra = [...this.spawnableMorphs()].filter((m) => !morphs.has(m));
     if (extra.length) add('ant models (the arena roster)', () => void this.surfAnts.prepare(extra));
+    // (performance v6: the glue and acid effects, when a conehead or a sickle-jaw soldier can be in the match — each
+    // was made, and its shaders compiled, on the frame of the first squirt or the first glued ant)
+    const can = new Set([...morphs, ...extra]);
+    const fx = { glue: [...can].some((m) => m in NASUTE_MORPHS), acid: can.has('termite_rhy_soldier') };
+    if (fx.glue || fx.acid) add('effects (glue, acid)', () => this.antRenderers().forEach((r) => r.prepareFx(fx)));
     add('creatures', () => {
       this.surfCreatures.prepare();
       for (const nv of this.nests.values()) nv.creatures.prepare();
@@ -512,6 +523,8 @@ export class GameSession {
     });
     // (performance v5: the post effects' own passes, every one, drawn once — they were built on the first frame)
     add('post effects', () => v.post.warm(v.surfaceScene, v.surfaceCam));
+    // (performance v6: the sounds made in the game — the end-of-match flourishes, the narrator's cue — made now)
+    add('sounds', () => audio.bank.synthesize());
     for (const m of morphs) this.warmed.add(m);
     for (const m of extra) this.warmed.add(m);
     const took = new Map<string, number>();

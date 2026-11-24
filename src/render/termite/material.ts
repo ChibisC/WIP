@@ -241,6 +241,19 @@ export class TermiteInstances {
     this.count = 0;
   }
 
+  /** Take what `old` (a smaller set, being replaced by this one) holds: its matrices and per-instance state
+   *  (performance v6: a set grown in the middle of a frame kept what was written before it, not drawn at the origin). */
+  keepFrom(old: TermiteInstances): void {
+    const cp = (a: { array: ArrayLike<number> }, b: { array: Float32Array | ArrayLike<number> }) => (b.array as Float32Array).set((a.array as Float32Array).subarray(0, Math.min(a.array.length, b.array.length)));
+    cp(old.mesh.instanceMatrix, this.mesh.instanceMatrix);
+    cp(old.aAnim, this.aAnim);
+    cp(old.aAnim2, this.aAnim2);
+    cp(old.aLook, this.aLook);
+    cp(old.aBlend, this.aBlend);
+    cp(old.aTint, this.aTint);
+    cp(old.aFx, this.aFx);
+  }
+
   get count() {
     return this.mesh.count;
   }

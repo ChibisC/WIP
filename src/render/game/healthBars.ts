@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { keepInstances } from './instancedPool';
 import { World } from '../../sim/world';
 import { AS, Colony } from '../../sim/types';
 import { casteOf } from '../../sim/species';
@@ -89,6 +90,8 @@ export class HealthBars {
     const m = new THREE.InstancedMesh(geo, mat, cap);
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     m.setColorAt(0, BACK);
+    // (performance v6: grown in the middle of a frame — the bars already written this frame kept, not drawn at the origin)
+    if (old) keepInstances(old, m);
     m.frustumCulled = false;
     m.renderOrder = order;
     m.name = ['back', 'trail', 'fill', 'chevBack', 'chev'][order - 998];

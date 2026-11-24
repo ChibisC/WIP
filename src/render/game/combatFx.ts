@@ -42,6 +42,17 @@ function warnMat(opacity: number, color = 0xff4a1a): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, toneMapped: false });
 }
 
+/** A slam ring's material (its opacity fades: one each). */
+function ringMat(): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.32, depthWrite: false });
+}
+
+/** Marks a material kept for the game (never disposed with an effect's meshes). */
+function keep<T extends THREE.Material>(m: T): T {
+  m.userData.kept = true;
+  return m;
+}
+
 /** A small seeded generator (mulberry32) for the sparks' spread. */
 function seeded(seed: number): () => number {
   let a = seed >>> 0;
@@ -102,6 +113,14 @@ export class CombatFx implements Sparker {
   private pending: Array<{ t: number; x: number; y: number }> = [];
   private tmpC = new THREE.Color();
   private warnings: Warning[] = [];
+  /**
+   * The wind-ups' still parts, one material each for all of them, kept (performance v6): a material was made and
+   * disposed for every wind-up and slam, and with the last one disposed three releases its program — so each boss's
+   * wind-up compiled its shaders again on the frame it began. Kept, with a hidden keeper for the slam ring's, the
+   * programs live for the game; the keepers are drawn by the loading warm-up, so they are built before play.
+   */
+  private warnBase = keep(warnMat(0.14));
+  private warnFill = keep(warnMat(0.3));
 
   constructor() {
     // (nothing is alive at first: every slot's life is 0)
@@ -153,6 +172,16 @@ export class CombatFx implements Sparker {
     pts.renderOrder = 12;
     this.group.add(pts);
     this.group.add(this.blast.group);
+    // (the keepers: never shown — a wind-up's edge and a slam ring are made like these)
+    const kGeo = new THREE.RingGeometry(0.5, 1, 8, 1).rotateX(-Math.PI / 2);
+    const rGeo = kGeo.clone();
+    rGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(rGeo.attributes.position.count * 4), 4));
+    for (const k of [new THREE.Mesh(kGeo, this.warnBase), new THREE.Mesh(rGeo, keep(ringMat()))]) {
+      k.visible = false;
+      k.renderOrder = 11;
+      k.name = 'combatFx keeper';
+      this.group.add(k);
+    }
   }
 
   /** A particle for the blast effects (blastFx.ts), and their seeded randomness. */
@@ -446,8 +475,8 @@ export class CombatFx implements Sparker {
     const len = cone ? half * 2 : Math.PI * 2;
     const seg = cone ? 24 : 48;
     const edge = new THREE.Mesh(new THREE.RingGeometry(radius * 0.93, radius, seg, 1, start, len).rotateX(-Math.PI / 2), warnMat(0.75));
-    const base = new THREE.Mesh(new THREE.CircleGeometry(radius, seg, start, len).rotateX(-Math.PI / 2), warnMat(0.14));
-    const fill = new THREE.Mesh(new THREE.CircleGeometry(radius, seg, start, len).rotateX(-Math.PI / 2), warnMat(0.3));
+    const base = new THREE.Mesh(new THREE.CircleGeometry(radius, seg, start, len).rotateX(-Math.PI / 2), this.warnBase);
+    const fill = new THREE.Mesh(new THREE.CircleGeometry(radius, seg, start, len).rotateX(-Math.PI / 2), this.warnFill);
     const g = new THREE.Group();
     g.add(base, fill, edge);
     g.position.set(x, heightAt(x, y) + 0.5, y);
@@ -474,8 +503,7 @@ export class CombatFx implements Sparker {
       col.set([0.66, 0.57, 0.44, Math.max(0, 1 - Math.abs(d - rm) / (radius * 0.24))], i * 4);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
-    const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.32, depthWrite: false });
-    const edge = new THREE.Mesh(geo, mat);
+    const edge = new THREE.Mesh(geo, ringMat());
     const g = new THREE.Group();
     g.add(edge);
     g.position.set(x, heightAt(x, y) + 0.5, y);
@@ -503,7 +531,7 @@ export class CombatFx implements Sparker {
           const m = o as THREE.Mesh;
           if (m.isMesh) {
             m.geometry.dispose();
-            (m.material as THREE.Material).dispose();
+            if (!(m.material as THREE.Material).userData.kept) (m.material as THREE.Material).dispose();
           }
         });
         this.warnings.splice(i, 1);
