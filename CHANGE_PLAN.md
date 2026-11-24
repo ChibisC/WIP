@@ -1927,3 +1927,42 @@ happens; the build machine, SwiftShader), then fixed without changing the pictur
    quadrant a frame, each quadrant costing ~70% of the whole (the instanced ants and grass are drawn in every one):
    four hitches and twice the work. Now drawn whole every 30 s, and a climb reuses a picture younger than 30 s (the
    age it may reach while one stays); the screenshot harness and loading still draw it.
+## 38. Performance v6 — no freezes, ever: nothing happens for the first time in play (user spec 2026-11-24, claude/performance/06-spec-performance-v6-no-hitches-ever.md) — branch `feature/performance-v6`
+The user's recording of the arena: a 4.1 s freeze dropping two fire-ant armies in; 1.2/0.35/0.8 s mid-fight and on
+zooming in; 0.55–0.72 s after "Blue wins". Measured on the build machine first (`tests/browser/arena_spawn_probe.py`:
+every frame's main thread, parts, GL work and notes; each program linked in play with the object drawn or shadowed),
+then fixed without changing the picture or the simulation (`docs/performance.md` "Performance v6"):
+1. **The arena roster built while loading.** `sim/arena.ts arenaRosterCastes` (the panel's list, shared), and
+   `session.spawnableMorphs` builds every caste it can drop in during the pre-warm (the surface's renderer; drawn by its
+   warm-up). The spawn frame 4811 ms → 37 ms. A story level's arrivals too: every caste its scenes' `ants` name and every
+   caste of a visiting party's species, in every renderer (a party can go down into a nest).
+2. **One detail-bake material** (`render/bake/detailBake.ts`): the same program and uniforms for every recipe (the same
+   pixels), so a model's build no longer links a program per species: 27 roster builds 69.2 s → 17.6 s here.
+3. **Every caster's shadow program drawn while loading** (`render/prewarm.ts shadowTwins`, called by `warmScene`):
+   three's shared depth material re-picks its program only when the kind of object changes, with the map and side of
+   the caster it changes at, so the variants loading built depended on draw order; the arena anthill's rebuilt mound
+   needed one nothing had been drawn with (2.5–6.4 s frames). Twins with their own depth materials — kept for the game,
+   one set per scene (the scene's light counts are in a program's key, and a depth material keeps the program it first
+   got) — make the warm-up's shadow pass draw every caster's own variant. The anthill rebuild's compile hook also
+   compiles shadow stand-ins (`shadowStandIns`).
+4. **Effects ready before play.** The glue streams, the acid jet and fizz, the glue shell and the termites' glue pass
+   made in the pre-warm when a conehead or sickle-jaw can be in the match (`AntRenderer.prepareFx`,
+   `TermiteLayer.prepareFx`); boss wind-ups' still parts share kept materials and hidden keepers hold the wind-up and
+   slam programs (each wind-up's disposal released the program, so every wind-up compiled again); the warm-up draws
+   instanced geometry with no instances (one).
+5. **Instance buffers keep their frame when they grow** (ant buckets with their body rows, health bars, team rings,
+   termites, creature parts): the instances written before the growth were drawn at the origin for a frame.
+6. **Sounds.** The music stingers and the narrator's cue made in the pre-warm (44 ms, 15 ms a take on the main thread
+   at first play); every non-streamed sound decoded in the background after the first click (creatures', species' and
+   titans' sounds were silent at their first play).
+7. **The lag recorder** (`core/profiler.ts lag`, `ui/lagReport.ts`): every frame over 100 ms in play with its causes and
+   the game's state; Menu → Graphics → "Copy lag report" and a button beside the F3 overlay. `prof.playing` is set when
+   play starts (it never was). UI buttons' work counts toward the frame (`ui/dom.ts`).
+8. **The hitch hunter** (`tests/browser/hitch_hunter.py`): the arena, a four-colony match, the trees and a story
+   night played like a person; fails on a link, an upload over 2 MB or a main-thread frame over 50 ms in play. The
+   benchmark reports each scene's first seconds (`startHitches`: the arena's spawn was erased by the warm-up's reset)
+   and its arena is titled with what it measures (300 units: the arena drops 50 at most).
+9. **After "Blue wins"**: a whole battle at 8× to its end and 10 s after had no main-thread frame over 33 ms and no
+   compile here; likely the system's screen recorder (the user's guess) — the lag report from the Mac will tell.
+Open: the Mac and iPhone reports (`?bench=1` and the lag report) drive the rest, with v5's open work (§35.3); the
+user's recordings themselves were not in this session (frames changed per second: to measure when attached).

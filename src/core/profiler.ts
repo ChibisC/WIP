@@ -153,6 +153,8 @@ export class Profiler {
   lagContext: (() => string) | null = null;
   /** the page was hidden since the last frame (the gap is the tab's, not a freeze: not recorded) */
   private wasHidden = false;
+  /** the newest program seen (the "new program" notes) */
+  private lastProgramId = -1;
   /** worker → main: bytes of the last frame message, and a running average */
   msgBytes = 0;
   msgBytesAvg = 0;
@@ -432,6 +434,13 @@ export class Profiler {
     }
     const g = this.gl;
     this.lastGl = g;
+    // (performance v6: a program linked in play is named in the frame's notes — which material it was for, so a lag
+    // report says what to warm)
+    if (g.links && this.playing && this.renderer) {
+      const ps = this.renderer.info.programs ?? [];
+      for (const p of ps) if (p.id > this.lastProgramId && this.notes.length < 16) this.notes.push(`new program: ${(p as { type?: string }).type ?? '?'}${p.name ? ` '${p.name}'` : ''}`);
+      for (const p of ps) if (p.id > this.lastProgramId) this.lastProgramId = p.id;
+    } else if (g.links && this.renderer) for (const p of this.renderer.info.programs ?? []) if (p.id > this.lastProgramId) this.lastProgramId = p.id;
     const T = this.glTotal;
     T.compiles += g.compiles;
     T.links += g.links;

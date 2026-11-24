@@ -700,3 +700,84 @@ Tests (`tests/performance.ts`): dig orders, progress and carves interleaved end 
 and textures, and the distance is computed only for carves; the same with the maps made "in a worker" whose answers
 come late and out of turn with forced rebuilds between (and a dive waits for the worker); a texture ring with rows
 named at commit always holds the data in the texture bound.
+
+## Performance v6: no freezes, ever (claude/performance/06-spec-performance-v6-no-hitches-ever.md, CHANGE_PLAN §38)
+The user's recording of the battle arena showed three kinds of freeze: 4.1 s when two fire-ant armies of 30–40 were
+dropped in; 1.2 s, 0.35 s and 0.8 s mid-fight and on zooming in, as the close models appeared; 0.55–0.72 s pauses
+after "Blue wins". The rule this round: **nothing happens for the first time during play** — every model, program,
+buffer, effect and sound a mode can show is made, compiled, uploaded and drawn once off screen while loading.
+
+### How it is measured
+- **`tests/browser/arena_spawn_probe.py`**: an empty arena, the armies dropped in through the same command the panel
+  sends, every frame recorded (main-thread time and its parts, links, compiles, uploads, notes), the camera zoomed in
+  on the fight; every program linked while recording printed with the object being drawn or shadowed then (a
+  `gl.linkProgram` hook fed by `onBeforeRender`/`onBeforeShadow`), the program's key against the nearest program
+  built while loading, and the anthills' rebuilds traced. `FIGHT=1 SPEED=8` lets a whole battle happen in a run
+  here (a SwiftShader frame is 1–5 s and moves the game 0.25 s at most at 1×); `PASSIVE=1` keeps the armies apart.
+- **`tests/browser/model_build_probe.py`** and **`model_build_profile.py`**: what building each roster model costs,
+  and a CPU profile of it.
+- **`tests/browser/hitch_hunter.py`**: plays the arena (armies of six kinds, the camera in close, the fight to its
+  end), a four-colony match (pans, zooms, a dive underground and back, 4×), the trees and a story night, and fails on
+  any shader link, any upload over 2 MB in a frame or any main-thread frame over 50 ms in play. About 25 minutes on
+  the build machine, so a documented tool rather than part of `npm test`.
+- **The lag recorder** (`core/profiler.ts lag`, `ui/lagReport.ts`): in the game, every frame over 100 ms since
+  loading, with what was in it (the hitch log's causes: compiles, uploads, the parts of the frame, notes such as a
+  model built) and what the game was doing (area, camera distance, units, speed, tick). **Menu → Graphics → Copy lag
+  report**, or the button beside the F3 overlay: a text to paste into a message. A frame after the page was hidden (a
+  tab switch, a locked screen) is not a freeze and is not kept; a long frame whose main thread was short is flagged as
+  time spent outside the page (the GPU, the browser, the system — a screen recorder).
+- **The benchmark** now reports each scene's first seconds apart (`startHitches`): the arena scene drops its armies in
+  its 3 s warm-up, and the reset before the measured stretch erased the spawn's frames. (Its armies were asked for 100
+  a kind and the arena drops 50 at most: it measured 300 units, as its title now says.)
+
+### What was found (build machine)
+1. **The spawn freeze: the models were built in the frame.** The arena's colonies are black garden ants, and the
+   pre-warm built the match's species only. The fire ants' first frame: 4811 ms of main thread — building the
+   `fire_minor` model 4553 ms, `fire_major` 230 ms. Inside a build, most of it was the detail bake (the model's
+   chitin detail texture): a new shader material for each species' recipe, so a program linked for every model —
+   the 27 roster models took 69.2 s here.
+2. **The fight and zoom freezes: a shadow program linked in play** (2.5–6.4 s frames here). The arena's anthills are
+   rebuilt when their team's ants come (the mound's size follows the colony's living count). three draws a shadow
+   caster that has no depth material of its own with one shared depth material, and picks that material's program
+   again only when the kind of object changes (instanced or not, and so on) — taking the map and side of the caster it
+   changes at. Which depth programs the loading's warm-up built therefore depended on the order things were drawn in;
+   the rebuilt mound, added last, was the first plain caster after instanced ones and needed a variant (no map) that
+   nothing had been drawn with at loading. The rebuild's compile ahead (performance v4) compiled its main programs, not
+   its shadow ones.
+3. **First uses found by reading the code** (not all seen in the arena run, all in play): a boss's wind-up and slam
+   ring made and disposed their materials each time — with the last one disposed three releases the program, so every
+   wind-up compiled its shaders again; the nasutes' glue streams, the sickle-jaws' acid jet and its fizz, the glue
+   shell over glued ants and the termites' own glue pass were made on the frame of the first squirt; the music
+   stingers and the narrator's cue were synthesized on the main thread at their first play (the victory flourish
+   44 ms, the cue 15 ms a take); the creatures', species' and titans' sounds were decoded at their first play (silent
+   the first time); an instance buffer grown in the middle of a frame (ant models, health bars, team rings, termites,
+   creature parts) dropped what the frame had written before it — those instances were drawn at the origin for a
+   frame; a story level's visiting parties and scripted arrivals of a species not in the level were built in play, one
+   model a frame; the arena panel's buttons ran outside the profiler's frame (their time showed as "outside this
+   thread").
+4. **After "Blue wins"** nothing of the game's: a whole battle at 8× to its end and 10 s after (69 deaths, the win,
+   the camera in close) had no frame over 33 ms of main thread (worst 28 ms) and no compile. It fits the user's guess
+   — the system's screen recorder; the lag recorder will say on the Mac (a long frame with a short main thread).
+
+### What changed (the same pictures, the same results)
+| what | how |
+|---|---|
+| The arena roster built while loading (`session.spawnableMorphs`, `sim/arena.ts arenaRosterCastes`) | Every caste the arena panel can drop in is built in the pre-warm and drawn by the surface's warm-up; a story level's arrivals too (every caste its scenes' `ants` name, every caste of a visiting party's species). |
+| One detail-bake material (`render/bake/detailBake.ts`) | The same program and uniforms for every recipe, so the same pixels, with one program instead of one a species: the roster's 27 builds 69.2 s → 17.6 s here. |
+| Every caster's shadow program drawn while loading (`render/prewarm.ts shadowTwins`) | The warm-up adds a twin of each caster — its geometry, instances and material — with a depth material of its own (the caster's, else one kept per scene and settings: a program's key holds the scene's light counts, and a depth material keeps the program it first got), so the warm-up's shadow pass draws every caster's own variant. A rebuilt anthill's compile ahead also compiles its shadow stand-ins. |
+| Effects made while loading (`AntRenderer.prepareFx`, `TermiteLayer.prepareFx`, `CombatFx`) | The glue and acid effects when a conehead or sickle-jaw can be in the match; the wind-ups' still parts share kept materials and hidden keepers hold the programs; the warm-up draws instanced geometry with no instances (one instance). |
+| Instance buffers keep their frame (`instancedPool.keepInstances`, the ant buckets' `alloc`, termites' `keepFrom`, creature pools) | A grown buffer starts with what the old one held. |
+| Sounds (`audio/bank.ts`) | The stingers and the cue made in the pre-warm; every non-streamed sound decoded in the background after the first click (about 30 MB decoded in all). |
+| The lag recorder, the benchmark's first seconds, UI buttons timed (`ui/dom.ts button`) | As above. |
+
+### Measured (build machine, SwiftShader)
+| | before | after |
+|---|---|---|
+| The spawn frame (2 × 45 fire ants) | 4811 ms main thread (two models built in it) | 37 ms |
+| The arena roster's 27 model builds | 69.2 s | 17.6 s (now in loading) |
+| Programs linked in play: the spawn, the zoom in, the anthills rebuilt | 1 (a 2.5–6.4 s frame) | 0 |
+| A whole battle at 8× (69 deaths, the win, 10 s after), frames over 33 ms of main thread | — | 0 (worst 28 ms), no link, no compile |
+
+Checks: `tools/perf/same.sh` ALL SAME (the stress scenes' hashes against `main`); `npm test` with new checks in
+`tests/performance.ts` (the roster has a model for every caste; a grown instanced mesh keeps its instances; shadow
+twins for every caster with kept depth materials per scene; the lag recorder keeps a frame over 100 ms in play only).

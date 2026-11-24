@@ -43,6 +43,8 @@ import { LocalCommands } from './localCommands';
 import { LocalSim, SimHost, WorkerSim } from './simHost';
 import { AutoQuality } from './autoQuality';
 import { prof } from '../core/profiler';
+import { storyOf } from '../sim/story/state';
+import { storyLevel } from '../story/levels';
 import { audio } from '../audio/engine';
 import { lagContext } from '../ui/lagReport';
 import { feel, InputKind } from '../core/feel';
@@ -454,13 +456,34 @@ export class GameSession {
   }
 
   /**
-   * The ant models a panel can drop in during play that the match may not have (performance v6, claude/performance/
-   * 06-spec §3): in the battle arena every caste of its roster. Each was built in the frame its first ant was drawn —
-   * the arena's spawn freeze (4.1 s on the user's Mac, 4.8 s here for the fire ants).
+   * The ant models that can come into play that the match's colonies do not have (performance v6, claude/performance/
+   * 06-spec §3): in the battle arena every caste of its roster; in a story level every caste its scenes and events
+   * bring in. Each was built in the frame its first ant was drawn — the arena's spawn freeze (4.1 s on the user's Mac,
+   * 4.8 s here for the fire ants) — or, for a level's arrivals, in play one model a frame.
    */
   spawnableMorphs(): Set<string> {
     const out = new Set<string>();
     if (arenaOf(this.world)) for (const cs of arenaRosterCastes()) out.add(CASTES[cs].morph);
+    // a story level: every caste its scenes and events bring in (an actor's `ants`), and every caste of a visiting
+    // party's species (a marching column of a species not in the level) — each was built in play, one model a frame
+    const st = storyOf(this.world);
+    if (st) {
+      const L = storyLevel(st.level);
+      const add = (cs: unknown) => {
+        const m = typeof cs === 'string' ? CASTES[cs]?.morph : undefined;
+        if (m) out.add(m);
+      };
+      const walk = (o: unknown): void => {
+        if (!o || typeof o !== 'object') return;
+        if (Array.isArray(o)) return o.forEach(walk);
+        for (const [k, v] of Object.entries(o)) {
+          if (k === 'ants' && Array.isArray(v)) for (const e of v) add(Array.isArray(e) ? e[0] : undefined);
+          else walk(v);
+        }
+      };
+      walk(L);
+      for (const v of Object.values(L.visitors ?? {})) for (const cd of Object.values(CASTES)) if (cd.species === v.species) out.add(cd.morph);
+    }
     return out;
   }
 
@@ -491,7 +514,9 @@ export class GameSession {
     // (what a panel can drop on the surface in play: the arena's whole roster — performance v6; drawn by the surface's
     // warm-up below, so every program its models use is compiled behind the loading screen too)
     const extra = [...this.spawnableMorphs()].filter((m) => !morphs.has(m));
-    if (extra.length) add('ant models (the arena roster)', () => void this.surfAnts.prepare(extra));
+    // (the arena's are dropped on the surface and stay there; a story's actors can go down into a nest)
+    if (extra.length)
+      for (const r of arenaOf(w) ? [this.surfAnts] : this.antRenderers()) add(arenaOf(w) ? 'ant models (the arena roster)' : 'ant models (the level\'s arrivals)', () => void r.prepare(extra));
     // (performance v6: the glue and acid effects, when a conehead or a sickle-jaw soldier can be in the match — each
     // was made, and its shaders compiled, on the frame of the first squirt or the first glued ant)
     const can = new Set([...morphs, ...extra]);

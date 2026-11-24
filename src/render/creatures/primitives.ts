@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { keepInstances } from '../game/instancedPool';
 import { addPatch, patchDapple } from '../shaderPatch';
 import { bakeDetail } from '../bake/detailBake';
 import { detailPatch } from '../bake/detailShading';
@@ -136,12 +137,17 @@ class Pool {
     if (n <= this.cap) return;
     let cap = this.cap;
     while (cap < n) cap *= 2;
-    group.remove(this.mesh);
-    this.mesh.geometry.dispose();
+    const old = this.mesh;
+    const oldMat = this.mat;
+    group.remove(old);
+    old.geometry.dispose();
     this.cap = cap;
     this.mesh = this.make(cap);
     this.mesh.name = this.name;
     this.mat = this.mesh.geometry.getAttribute('aMat') as THREE.InstancedBufferAttribute;
+    // (performance v6: grown in the middle of a frame — the parts already written this frame kept)
+    keepInstances(old, this.mesh);
+    (this.mat.array as Float32Array).set(oldMat.array as Float32Array);
     group.add(this.mesh);
   }
 }
