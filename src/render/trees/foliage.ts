@@ -162,11 +162,14 @@ vec4 leafN = vec4(0.5, 0.5, 0.8, 0.0); vec3 leafAlb = vec3(0.0); float leafRough
           float t = vLeaf.y;
           alb *= vec3(1.0 + 0.18 * t, 1.0 + 0.06 * t, 1.0 - 0.25 * t) * (0.85 + 0.3 * fract(t * 13.7));
           // the underside: paler and matte (the upper side waxy, a soft sheen)
+          // (the oak's paler blue-green; the white willow's nearly white and silky)
+          float sp = floor(vLeaf.x / ${LEAF_VARIANTS}.0 + 0.01);
           if (!gl_FrontFacing) {
             float l = dot(alb, vec3(0.3, 0.6, 0.1));
-            alb = mix(alb, vec3(l) * vec3(1.05, 1.15, 0.95), 0.45) * 1.5;
-            leafRough = 0.85;
-          } else leafRough = mix(0.38, 0.55, leafN.a);
+            vec3 under = sp == 2.0 ? vec3(l * 2.6 + 0.04) * vec3(0.92, 1.0, 0.9) : vec3(l) * (sp == 0.0 ? vec3(0.95, 1.12, 1.08) : vec3(1.05, 1.15, 0.95));
+            alb = mix(alb, under, sp == 2.0 ? 0.8 : 0.45) * 1.5;
+            leafRough = sp == 2.0 ? 0.6 : 0.85;
+          } else leafRough = mix(sp == 2.0 ? 0.5 : 0.36, 0.58, leafN.a);
           leafAlb = alb;
           diffuseColor.rgb = alb;
         }`,
@@ -358,9 +361,10 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
           const a = ns[k - 1];
           const b = ns[k];
           const h = Math.atan2(b.y - a.y, b.x - a.x);
+          // (in pairs: one long, straight and pale, one short, hooked and dark)
           for (const sg of [1, -1]) {
             const ang = h + sg * Math.PI * 0.5;
-            const len = 3 + 3 * R();
+            const len = sg > 0 ? 5 + 3 * R() : 1.6 + 0.8 * R();
             const dir = new THREE.Vector3(Math.cos(ang), -0.35, Math.sin(ang)).normalize();
             const base = new THREE.Vector3(b.x + Math.cos(ang) * b.r * 0.92, b.z - b.r * 0.45, b.y + Math.sin(ang) * b.r * 0.92);
             const m = new THREE.Matrix4();
@@ -437,9 +441,14 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
   }
   if (thorns.length) {
     const tg = new THREE.ConeGeometry(1, 1, 5);
-    const tm = new THREE.MeshStandardMaterial({ color: 0xd8cdb4, roughness: 0.55 });
+    const tm = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55 });
     const im = new THREE.InstancedMesh(tg, tm, thorns.length);
-    thorns.forEach((m, i) => im.setMatrixAt(i, m));
+    const pale = new THREE.Color(0xe2d8c0);
+    const dark = new THREE.Color(0x3a2c22);
+    thorns.forEach((m, i) => {
+      im.setMatrixAt(i, m);
+      im.setColorAt(i, i % 2 === 0 ? pale : dark);
+    });
     im.computeBoundingSphere();
     im.castShadow = true;
     im.name = 'acaciaThorns';

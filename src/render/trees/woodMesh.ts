@@ -19,8 +19,9 @@ import { BARK_COUNT, BARK_LAYER, BARK_TILE, TreeMaps } from './barkBake';
 
 /** traffic on a kind of wood (the worn trails on its top: smoother, lighter) */
 const WEAR: Record<string, number> = { trunk: 0, limb: 0.7, branch: 0.4, twig: 0.15, link: 1 };
-/** the walked section's superellipse exponent (|a|^P + |b|^P = 1 above the axis) */
-const P = 6;
+/** the walked section's superellipse exponent (|a|^P + |b|^P = 1 above the axis: a little fuller than a circle, so the
+ * walked band on top stays within a millimetre of flat) */
+const P = 3;
 
 export interface WoodLod {
   radial: number;
@@ -75,11 +76,11 @@ function section(phi: number, flat: boolean, out: number[]): void {
   const s = Math.sin(phi);
   const c = Math.cos(phi);
   if (flat && c > 0) {
-    const a = Math.sign(s) * Math.cbrt(Math.abs(s));
-    const b = Math.cbrt(c);
-    // (the normal of |a|^6 + |b|^6 = 1: (a^5, b^5))
-    const na = Math.sign(a) * Math.pow(Math.abs(a), 5);
-    const nb = Math.pow(b, 5);
+    const a = Math.sign(s) * Math.pow(Math.abs(s), 2 / P);
+    const b = Math.pow(c, 2 / P);
+    // (the normal of |a|^P + |b|^P = 1: (a^(P−1), b^(P−1)))
+    const na = Math.sign(a) * Math.pow(Math.abs(a), P - 1);
+    const nb = Math.pow(b, P - 1);
     const l = Math.hypot(na, nb) || 1;
     out[0] = a;
     out[1] = b;
@@ -183,8 +184,9 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
     }
     return base;
   };
+  // (counter-clockwise seen from outside: the ring runs round with φ, the tube forward along T)
   const strip = (a: number, b: number) => {
-    for (let j = 0; j < R; j++) g.idx.push(a + j, b + j, a + j + 1, a + j + 1, b + j, b + j + 1);
+    for (let j = 0; j < R; j++) g.idx.push(a + j, a + j + 1, b + j, a + j + 1, b + j + 1, b + j);
   };
   let prev = -1;
   for (const rg of rings) {
@@ -196,8 +198,8 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
   const last = rings[rings.length - 1];
   for (let k = 1; k <= 3; k++) {
     const psi = (k / 4) * (Math.PI / 2);
-    const f = flat ? Math.cbrt(Math.sin(psi)) : Math.sin(psi);
-    const sc = flat ? Math.cbrt(Math.cos(psi)) : Math.cos(psi);
+    const f = flat ? Math.pow(Math.sin(psi), 2 / P) : Math.sin(psi);
+    const sc = flat ? Math.pow(Math.cos(psi), 2 / P) : Math.cos(psi);
     const b0 = ringVerts(last, sc, f, k / 4);
     strip(prev, b0);
     prev = b0;
@@ -206,7 +208,7 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
   vP.copy(last.c).addScaledVector(last.t, last.r * 0.98);
   frame(last.t);
   g.vert(vP, last.t, vL, 0, last.s + last.r, 0.3, last.r, layer, wear);
-  for (let j = 0; j < R; j++) g.idx.push(prev + j, tip, prev + j + 1);
+  for (let j = 0; j < R; j++) g.idx.push(prev + j, prev + j + 1, tip);
 }
 
 /** The trunk: a round column from the ground far below to the crotch, its top flat and rounded off like the floor's. */
@@ -262,8 +264,9 @@ function trunk(g: Geo, sk: CrownSkel, p: WoodPiece, layer: number, lod: WoodLod,
       vn.set(-Math.cos(phi) * dy, 1, -Math.sin(phi) * dy).normalize();
       vP.set(sk.x + Math.cos(phi) * rho, y, sk.y + Math.sin(phi) * rho);
       vt.set(-Math.sin(phi), 0, Math.cos(phi));
-      // (the top's bark: round the trunk and inward, as if the bark ran over it)
-      g.vert(vP, vn, vt, (j / R) * circ + ou, H + (rTop - rho), 1, rTop, layer, 0.5);
+      // (the top's bark laid flat over it, in plan: no seam of bark converging on the middle)
+      vt.set(-1, 0, 0);
+      g.vert(vP, vn, vt, -vP.x + ou, vP.z, 1, rTop, layer, 0.5);
     }
     for (let j = 0; j < R; j++) g.idx.push(prev + j, base + j, prev + j + 1, prev + j + 1, base + j, base + j + 1);
     prev = base;
@@ -388,7 +391,7 @@ export function woodMaterial(maps: TreeMaps): THREE.MeshStandardMaterial {
   addPatch(mat, WORLD_POS_PATCH);
   addPatch(mat, dapplePatch());
   // per species: moss, lichen (amounts)
-  const moss = [0.55, 0.3, 0.75, 0.7, 0.08];
+  const moss = [0.35, 0.15, 0.5, 0.5, 0.03];
   const lichen = [0.5, 0.55, 0.35, 0.25, 0.3];
   addPatch(mat, {
     key: 'bark',
@@ -444,8 +447,8 @@ float barkRough = 0.9; vec4 barkN = vec4(0.5, 0.5, 0.5, 1.0); float barkMoss = 0
           float hole = step(0.9, h21(hc + 11.0 + vWood.z)) * smoothstep(0.9, 0.5, length(hp));
           alb *= 1.0 - hole * 0.85;
           // moss on the upper sides and in the furrows of the thick, damp wood
-          float mn = fbm(vWP.xz * 0.035 + vec2(vWP.y * 0.05, 0.0));
-          barkMoss = uMoss[L] * smoothstep(-0.1, 0.55, up) * smoothstep(0.42, 0.62, mn) * (0.45 + 0.55 * (1.0 - cav)) * smoothstep(6.0, 16.0, vWood.y);
+          float mn = fbm(vWP.xz * 0.03 + vec2(vWP.y * 0.05, 0.0)) * 0.7 + fbm(vWP.xz * 0.21 + 5.0) * 0.3;
+          barkMoss = uMoss[L] * smoothstep(-0.1, 0.55, up) * smoothstep(0.5, 0.66, mn) * (0.35 + 0.65 * (1.0 - cav)) * smoothstep(8.0, 18.0, vWood.y);
           // lichen: pale grey-green crusts on the ridges
           float ln = fbm(vWP.xz * 0.11 + vec2(3.0, vWP.y * 0.09));
           float lich = uLichen[L] * smoothstep(0.66, 0.7, ln) * smoothstep(0.25, 0.65, hgt) * (1.0 - barkMoss);
@@ -453,7 +456,7 @@ float barkRough = 0.9; vec4 barkN = vec4(0.5, 0.5, 0.5, 1.0); float barkMoss = 0
           barkWear = vWood.w * smoothstep(0.88, 0.985, up);
           alb = mix(alb, alb * 1.3 + 0.006, barkWear * 0.65);
           rough = mix(rough, 0.5, barkWear * 0.7);
-          alb = mix(alb, vec3(0.035, 0.065, 0.012) * (0.75 + 0.5 * vnoise(vWP.xz * 0.6)), barkMoss);
+          alb = mix(alb, vec3(0.04, 0.062, 0.014) * (0.7 + 0.6 * vnoise(vWP.xz * 0.9)), barkMoss);
           alb = mix(alb, vec3(0.16, 0.19, 0.14) * (0.85 + 0.3 * vnoise(vWP.xz * 1.3)), lich * 0.85);
           // the furrows' shadow and the undersides
           float ao = mix(0.3, 1.0, cav) * mix(0.5, 1.0, smoothstep(-0.75, 0.25, up));

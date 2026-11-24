@@ -107,6 +107,12 @@ function grow(rng: Rng, x: number, y: number, z: number, h: number, st: Stretch[
   const nodes: WoodNode[] = [{ x, y, z, r: r0 }];
   const h0 = h;
   let s = 0;
+  // the flats meander: a slow sway (its wavelength and phase the piece's own), a slight arc, a little jitter
+  const lam = rng.range(55, 95);
+  const ph = rng.range(0, TAU);
+  const amp = wobble * 1.8;
+  const arc = rng.range(-1, 1) * wobble * 0.004;
+  let jit = 0;
   for (const a of st) {
     const n = Math.max(1, Math.round(a.len / STEP));
     const z0 = z;
@@ -114,8 +120,9 @@ function grow(rng: Rng, x: number, y: number, z: number, h: number, st: Stretch[
     for (let k = 1; k <= n; k++) {
       // (a slope runs straight, like a ramp: on a bend the nearest point of the axis jumps, and so would the floor)
       if (!a.dz) {
-        h += rng.range(-wobble, wobble);
-        h = h0 + Math.max(-0.7, Math.min(0.7, h - h0));
+        jit += rng.range(-wobble, wobble) * 0.35;
+        jit *= 0.8;
+        h = h0 + Math.max(-0.8, Math.min(0.8, amp * dsin(s / lam + ph) - amp * dsin(ph) + arc * s + jit));
       }
       x += dcos(h) * l;
       y += dsin(h) * l;

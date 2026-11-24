@@ -222,8 +222,8 @@ function world(more: Record<string, unknown> = {}, seed = 5): World {
     if (td.h[k] < 0) continue;
     const x = k % g.w;
     const y = (k - x) / g.w;
-    for (let r = 2; r <= 5 && !A; r++)
-      for (const [dx, dy] of [[r, 0], [0, r], [-r, 0], [0, -r]]) {
+    for (let dy = -12; dy <= 12 && !A; dy++)
+      for (let dx = -12; dx <= 12; dx++) {
         const xx = x + dx;
         const yy = y + dy;
         if (xx < 0 || yy < 0 || xx >= g.w || yy >= g.h) continue;

@@ -112,28 +112,45 @@ vec2 warp(vec2 u, vec2 P, float amt, float s) {
   return u + (vec2(pf(u * P, P, 3, s), pf(u * P + 3.1, P, 3, s + 1.0)) - 0.5) * amt;
 }
 
-// English oak: thick grey-brown plates split lengthwise by deep dark furrows, the plates broken across by cracks,
-// their faces rough with fine fissures; the furrows' floors dark red-brown
+// English oak: long grey-brown ridges running down the branch between deep, dark furrows that wander, pinch out and
+// join; the ridges broken across now and then into blocks; rough, finely fissured faces; red-brown furrow floors
+float oakLine(float k, float v, float N) {
+  // the k-th furrow's position across the tile at v (wandering, periodic in both)
+  float kk = mod(k, N);
+  return (k + 0.5 + 0.42 * (pn(vec2(kk * 3.7, v * 3.0), vec2(1e4, 3.0), 13.0) - 0.5) + 0.25 * (pn(vec2(kk * 1.3, v * 7.0), vec2(1e4, 7.0), 14.0) - 0.5)) / N;
+}
 vec4 oak(vec2 u) {
-  vec2 rel;
-  vec2 q = warp(u, vec2(4.0), 0.07, 11.0);
-  vec3 w = pw(vec2(q.x * 9.0, q.y * 3.0), vec2(9.0, 3.0), 1.0, rel);
-  float e = w.y - w.x;
-  float plate = smoothstep(0.02, 0.26, e);
-  float stri = pf(vec2(u.x * 48.0, u.y * 6.0), vec2(48.0, 6.0), 3, 20.0);
-  float grain = pf(u * 32.0, vec2(32.0), 4, 30.0);
-  float h = plate * (2.3 + 1.4 * w.z) + plate * (stri * 0.7 + grain * 0.4);
-  // cracks across the plates (where a plate's face breaks into blocks)
-  float cy = fract(u.y * 7.0 + pf(u * vec2(6.0, 3.0), vec2(6.0, 3.0), 2, 40.0) * 1.4);
-  float crack = smoothstep(0.03, 0.0, abs(cy - 0.5)) * step(0.5, pn(u * vec2(9.0, 7.0), vec2(9.0, 7.0), 41.0));
-  h -= crack * plate * 1.6;
-  vec3 top = mix(vec3(0.115, 0.098, 0.078), vec3(0.19, 0.17, 0.14), grain) * (0.82 + 0.36 * w.z);
-  vec3 side = vec3(0.045, 0.032, 0.022);
-  vec3 deep = vec3(0.012, 0.008, 0.005);
-  vec3 c = mix(deep, side, smoothstep(0.0, 0.35, plate));
-  c = mix(c, top, smoothstep(0.35, 0.95, plate) * (1.0 - crack * 0.7));
-  gRough = mix(0.97, 0.86, plate);
-  return vec4(c, h);
+  float N = 9.0;
+  float x = u.x;
+  float c = floor(x * N);
+  // the nearest furrow and the ridge this point lies on
+  float d = 9.0;
+  float left = -1.0;
+  for (int i = -1; i <= 1; i++) {
+    float k = c + float(i);
+    float lx = oakLine(k, u.y, N);
+    float dd = abs(x - lx) * N;
+    if (dd < d) d = dd;
+    if (lx <= x) left = max(left, k);
+  }
+  float rid = mod(left, N);
+  float grain = pf(u * vec2(40.0, 10.0), vec2(40.0, 10.0), 4, 30.0);
+  float fine = pf(u * vec2(90.0, 18.0), vec2(90.0, 18.0), 2, 31.0);
+  // furrow width varies along it; the ridge's face rounded, rough
+  float wFur = 0.05 + 0.09 * pn(vec2(rid * 2.1, u.y * 6.0), vec2(1e4, 6.0), 15.0);
+  float ridge = smoothstep(wFur, wFur + 0.1, d);
+  // cracks across the ridge: a few a ridge, at its own places
+  float cv = fract(u.y * 5.0 + hash(vec2(rid, 3.0)));
+  float crack = smoothstep(0.035, 0.0, abs(cv - 0.5)) * step(0.4, hash(vec2(rid, floor(u.y * 5.0 + hash(vec2(rid, 3.0))))));
+  ridge *= 1.0 - crack * 0.85;
+  float h = ridge * (2.6 + 0.9 * hash(vec2(rid, 7.0))) + ridge * (grain * 0.9 + fine * 0.3);
+  vec3 top = mix(vec3(0.085, 0.074, 0.06), vec3(0.17, 0.155, 0.13), grain) * (0.85 + 0.3 * hash(vec2(rid, 9.0)));
+  vec3 side = vec3(0.045, 0.034, 0.025);
+  vec3 deep = vec3(0.02, 0.011, 0.007);
+  vec3 col = mix(deep, side, smoothstep(0.0, 0.4, ridge));
+  col = mix(col, top, smoothstep(0.45, 0.95, ridge));
+  gRough = mix(0.97, 0.86, ridge);
+  return vec4(col, h);
 }
 
 // European beech: thin, smooth silver-grey bark, softly mottled; fine dashes of lenticels across the branch, faint
@@ -141,16 +158,16 @@ vec4 oak(vec2 u) {
 vec4 beech(vec2 u) {
   float m = pf(u * vec2(5.0, 3.0), vec2(5.0, 3.0), 4, 50.0);
   float fine = pf(u * 56.0, vec2(56.0), 3, 51.0);
-  vec3 c = mix(vec3(0.15, 0.15, 0.14), vec3(0.29, 0.29, 0.27), m) * (0.95 + 0.1 * fine);
+  vec3 c = mix(vec3(0.095, 0.097, 0.092), vec3(0.19, 0.19, 0.18), m) * (0.95 + 0.1 * fine);
   float h = 0.25 + fine * 0.12 + m * 0.08;
   float ring = smoothstep(0.86, 1.0, pn(vec2(u.x * 3.0, u.y * 26.0), vec2(3.0, 26.0), 52.0));
   h -= ring * 0.1;
   c *= 1.0 - ring * 0.1;
   vec2 rel;
   vec3 w = pw(vec2(u.x * 16.0, u.y * 32.0), vec2(16.0, 32.0), 53.0, rel);
-  float dash = smoothstep(0.32, 0.16, length(rel * vec2(0.42, 1.7))) * step(0.55, w.z);
-  h += dash * 0.12;
-  c = mix(c, vec3(0.075, 0.068, 0.058), dash * 0.75);
+  float dash = smoothstep(0.26, 0.12, length(rel * vec2(0.5, 1.9))) * step(0.72, w.z);
+  h += dash * 0.08;
+  c = mix(c, vec3(0.06, 0.055, 0.048), dash * 0.4);
   // a twig scar: a dark eye with a little moustache of creased bark above it
   vec2 rel2;
   vec3 e = pw(u * vec2(2.0, 1.0), vec2(2.0, 1.0), 54.0, rel2);
@@ -166,14 +183,16 @@ vec4 beech(vec2 u) {
 // White willow: deep furrows between thick ridges that interlace, running together and apart down the branch (a net of
 // diamonds); grey-brown ridges, dark furrows
 vec4 willow(vec2 u) {
-  vec2 q = warp(u, vec2(3.0), 0.16, 60.0);
-  float a = sin(6.2832 * (q.x * 7.0 + q.y * 2.0));
-  float b = sin(6.2832 * (q.x * 7.0 - q.y * 2.0));
-  float r = max(a, b) + 0.25 * min(a, b);
-  float ridge = smoothstep(-0.05, 0.85, r);
+  vec2 q = warp(u, vec2(3.0), 0.22, 60.0);
+  q = warp(q, vec2(8.0), 0.05, 63.0);
+  // (long, narrow diamonds: the ridges cross the branch at a shallow angle)
+  float a = sin(6.2832 * (q.x * 8.0 + q.y * 1.0));
+  float b = sin(6.2832 * (q.x * 8.0 - q.y * 1.0));
+  float r = max(a, b) + 0.25 * min(a, b) + (pf(u * vec2(12.0, 4.0), vec2(12.0, 4.0), 3, 64.0) - 0.5) * 0.9;
+  float ridge = smoothstep(-0.45, 0.25, r);
   float grain = pf(vec2(u.x * 40.0, u.y * 12.0), vec2(40.0, 12.0), 3, 62.0);
   float h = ridge * (3.0 + 1.1 * grain) + grain * 0.3;
-  vec3 c = mix(vec3(0.014, 0.010, 0.007), mix(vec3(0.085, 0.072, 0.055), vec3(0.15, 0.13, 0.10), grain), ridge);
+  vec3 c = mix(vec3(0.022, 0.016, 0.011), mix(vec3(0.08, 0.068, 0.054), vec3(0.14, 0.122, 0.096), grain), ridge);
   gRough = 0.94 - 0.06 * ridge;
   return vec4(c, h);
 }
@@ -183,15 +202,15 @@ vec4 willow(vec2 u) {
 vec4 tropical(vec2 u) {
   float m = pf(u * 4.0, vec2(4.0), 4, 70.0);
   float fine = pf(u * 44.0, vec2(44.0), 3, 71.0);
-  vec3 c = mix(vec3(0.17, 0.145, 0.11), vec3(0.33, 0.30, 0.235), m) * (0.95 + 0.1 * fine);
+  vec3 c = mix(vec3(0.13, 0.115, 0.088), vec3(0.25, 0.225, 0.18), m) * (0.95 + 0.1 * fine);
   float h = 0.3 + fine * 0.2;
   vec2 rel;
-  vec3 w = pw(u * vec2(5.0, 4.0), vec2(5.0, 4.0), 72.0, rel);
-  float flake = step(0.58, w.z);
+  vec3 w = pw(warp(u, vec2(6.0), 0.06, 74.0) * vec2(5.0, 4.0), vec2(5.0, 4.0), 72.0, rel);
+  float flake = step(0.7, w.z);
   float e = w.y - w.x;
   h += flake * (0.45 + 0.6 * smoothstep(0.0, 0.3, e));
   c = mix(c, mix(vec3(0.30, 0.235, 0.13), vec3(0.20, 0.23, 0.12), fract(w.z * 7.0)), flake * 0.6 * smoothstep(0.06, 0.3, e));
-  c = mix(c, vec3(0.025, 0.018, 0.012), flake * (1.0 - smoothstep(0.0, 0.07, e)) * 0.85);
+  c = mix(c, vec3(0.04, 0.03, 0.02), flake * (1.0 - smoothstep(0.0, 0.05, e)) * 0.6);
   vec2 rel2;
   vec3 l = pw(vec2(u.x * 18.0, u.y * 24.0), vec2(18.0, 24.0), 73.0, rel2);
   float len = smoothstep(0.22, 0.1, length(rel2 * vec2(0.6, 1.4))) * step(0.6, l.z);
@@ -205,12 +224,12 @@ vec4 tropical(vec2 u) {
 vec4 acacia(vec2 u) {
   vec2 rel;
   vec2 q = warp(u, vec2(4.0), 0.09, 80.0);
-  vec3 w = pw(vec2(q.x * 11.0, q.y * 5.0), vec2(11.0, 5.0), 81.0, rel);
+  vec3 w = pw(vec2(q.x * 12.0, q.y * 4.0), vec2(12.0, 4.0), 81.0, rel);
   float e = w.y - w.x;
-  float ridge = smoothstep(0.02, 0.17, e);
+  float ridge = smoothstep(0.015, 0.09, e);
   float grain = pf(u * 36.0, vec2(36.0), 4, 82.0);
   float h = ridge * (1.9 + 0.8 * w.z) + grain * 0.5 * ridge;
-  vec3 inner = vec3(0.11, 0.032, 0.010);
+  vec3 inner = vec3(0.055, 0.02, 0.008);
   vec3 c = mix(inner, mix(vec3(0.020, 0.016, 0.013), vec3(0.055, 0.046, 0.038), grain), ridge);
   gRough = 0.95;
   return vec4(c, h);
@@ -284,7 +303,8 @@ float halfWidth(float y, int sp, float v) {
   if (sp == 0) {
     // oak: obovate, widest beyond the middle, five or six rounded lobes a side with deep sinuses, little ears at the base
     float env = 0.92 * pow(sin(3.14159 * min(1.0, y * 1.02)), 0.6) * (0.62 + 0.38 * y);
-    float lob = 0.58 + 0.42 * pow(abs(cos(3.14159 * (y * (5.2 + v * 0.6) + 0.2))), 0.7);
+    // (3–7 pairs of rounded lobes, the sinuses cut about halfway to the midrib)
+    float lob = 0.46 + 0.54 * pow(abs(cos(3.14159 * (y * (5.2 + v * 0.6) + 0.2))), 0.7);
     float ear = smoothstep(0.1, 0.02, y) * 0.25;
     return max(env * lob, ear);
   }
@@ -307,26 +327,27 @@ float halfWidth(float y, int sp, float v) {
   return 0.0;
 }
 
-// acacia: a twice-divided leaf — a stalk with four pairs of side stalks, each set with tiny leaflets in pairs
+// acacia: a twice-divided leaf — a stalk with six pairs of side stalks (pinnae), each set with tiny leaflets in pairs
 float acaciaFrond(vec2 p, out float vein) {
   vein = smoothstep(0.03, 0.0, abs(p.x)) * step(0.02, p.y) * step(p.y, 0.98);
   float a = 0.0;
-  for (int k = 0; k < 4; k++) {
-    float y0 = 0.2 + float(k) * 0.2;
+  for (int k = 0; k < 6; k++) {
+    float y0 = 0.14 + float(k) * 0.14;
     for (int s = -1; s <= 1; s += 2) {
       vec2 d = normalize(vec2(float(s) * 0.86, 0.5));
       vec2 n = vec2(-d.y, d.x);
       vec2 q = p - vec2(0.0, y0);
       float t = dot(q, d);
       float pr = dot(q, n);
-      if (t < 0.0 || t > 0.95) continue;
+      float tl = 0.62 + 0.3 * sin(3.14159 * (y0 - 0.05));
+      if (t < 0.0 || t > tl) continue;
       vein = max(vein, smoothstep(0.018, 0.0, abs(pr)) * 0.8);
-      float st = 0.085;
+      float st = 0.07;
       float j = floor(t / st + 0.5);
       float lt = t - j * st;
       for (int side = -1; side <= 1; side += 2) {
-        vec2 lc = vec2(lt, pr - float(side) * 0.05);
-        a = max(a, step(length(lc / vec2(0.034, 0.052)), 1.0) * step(0.04, t));
+        vec2 lc = vec2(lt, pr - float(side) * 0.04);
+        a = max(a, step(length(lc / vec2(0.028, 0.042)), 1.0) * step(0.04, t));
       }
     }
   }

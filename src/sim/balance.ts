@@ -1639,15 +1639,15 @@ export const TREES = {
   tierStep: 40,
   /** the rise of a sloping branch between two tiers (tan; the ground's ramps allow LAYERS.rampMaxSlope, 0.47) */
   slope: 0.4,
-  /** the walkable band of a branch: this share of its radius either side of its axis (the wood's flat top) */
-  walkShare: 0.8,
+  /** the walkable band of a branch: this share of its radius either side of its axis (the top of the round wood) */
+  walkShare: 0.55,
   /** a floor cell with another within two cells higher by more than this (mm a cell of distance) is a drop: rock */
   stepMax: 2.2,
   /** a foe or creature more than this far above or below (mm) is out of reach (another tier) */
   reachZ: 14,
   /** the thinnest walkable twig (radius, mm) and the boughs that join the crowns (radius, mm) */
-  twigR: 7.5,
-  linkR: 10,
+  twigR: 10,
+  linkR: 13,
   /** a crown reaching this far (mm) or more gets one tier more than its style's */
   bigReach: 340,
   /**
@@ -1665,6 +1665,6 @@ export const TREES = {
     acacia: { tiers: 2, limbs: [4, 5], rise: 0, level: 3, limbR: 0.5, taper: 0.5, wobble: 0.18, forks: 2, twigs: 2, droop: 0.3, leaf: null, flowers: 0.5 },
     sapling: { tiers: 2, limbs: [3, 3], rise: 0, level: 1, limbR: 0.5, taper: 0.55, wobble: 0.18, forks: 1, twigs: 1, droop: 0.3, leaf: [18, 11], flowers: 0 },
   } as Record<string, { tiers: number; limbs: [number, number]; rise: number; level: number; limbR: number; taper: number; wobble: number; forks: number; twigs: number; droop: number; leaf: [number, number] | null; flowers: number }>,
-  limbMin: 11,
-  limbMax: 26,
+  limbMin: 14,
+  limbMax: 30,
 };
