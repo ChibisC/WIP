@@ -777,6 +777,11 @@ buffer, effect and sound a mode can show is made, compiled, uploaded and drawn o
 | The arena roster's 27 model builds | 69.2 s | 17.6 s (now in loading) |
 | Programs linked in play: the spawn, the zoom in, the anthills rebuilt | 1 (a 2.5–6.4 s frame) | 0 |
 | A whole battle at 8× (69 deaths, the win, 10 s after), frames over 33 ms of main thread | — | 0 (worst 28 ms), no link, no compile |
+| The hitch hunter (`hitch_hunter.py`, every scene) | — | passes: no link, no upload over 2 MB, no main-thread frame over 50 ms (the arena 45 frames, worst 37 ms) |
+
+The hitch hunter's match, trees and story scenes are thin on the build machine: SwiftShader draws the four-colony
+world about once every 13 s, so each saw 3–5 frames (each action still lands in one). The Mac's lag recorder is the
+real check there.
 
 Checks: the golden set's shots the change could touch (every species' close-up, the arena fights, a map close-up;
 `golden/compare-v6after.md`): 13 of 13 match `main`, 12 pixel for pixel — the fight differs in 184 pixels where
