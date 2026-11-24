@@ -1,0 +1,22 @@
+# Underground Dominion benchmark — ud-mp-17 — 2026-11-24T10:53:07.628Z
+Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36
+GPU ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver); 2 cores; screen 640×400 at 1× (window 640×400)
+display 60 Hz on the start screen
+quality high, 20 s a scene
+
+## Trees layer on: the multiplayer-sized world, the ground, then up into the canopy
+load 145.9 s (before the pre-warm 16.3 s, pre-warm 129.4 s (the GPU finishing the world 74.8, the GPU finishing the pre-warm 30.0, ant models 11.3, an underground area 4.5, trees 3.3), after 0.1 s) · 3 frames · 0.1 FPS · frame avg 9060.76 ms, p95 16249.3, worst 16249 · over 33 ms: 2, over 50 ms: 2
+main thread 18.92 ms (msg 2.38, events 0.22, units 4.21, fx 0.07, ui 0.4, render 12.59) · GPU n/a ms · sim tick 3.71 ms, msg 113 KB
+draw calls 0 · tris 0k · programs 170 · textures 406 · geometries 1360 · heap 336 MB · GPU memory ≈ 450 MB (textures 303, render buffers 20, buffers 127) · 93 ants, 0 creatures · quality high
+GL during the run: 0 shader links, 0 texture uploads
+input → feedback ms (avg/p95): —
+input → acting ms: — · command —
+pacing: interval — ms, jitter — ms, display 16.7 ms · over 16.7 ms 0/0, over 33 ms 0, missed vsync 0 · long tasks 0 (0 ms)
+pieces (ms a frame, the worst frame): ui:minimaps 0.14 (0), ui:marker panel 0.09 (0), ui:top bar 0.06 (0), ui:build, info 0.03 (0), ui:labels 0.03 (0), ui:boss, creatures, sandbox 0.01 (0), ui:goals 0.01 (0), ui:tile labels 0 (0)
+GPU, pass by pass (20 frames, each pass waited for: 466.47 ms a frame): depth of field and colour grade 144.84, shadow maps 96.74, scene 66.39, bloom 57.29, ambient occlusion (half resolution, blurred) 34.73, ambient occlusion applied 13.68, tone mapping to the screen 9.63
+  triangles a frame by what is drawn: shadow: treeLeaves 19k, shadow: woodChunk 15k, shadow: MeshPhysicalMaterial 9k, MeshPhysicalMaterial 9k, ShaderMaterial 3k, shadow: bigLeaves 2k, bigLeaves 2k, MeshBasicMaterial 0k, shadow: MeshStandardMaterial 0k, MeshStandardMaterial 0k, back 0k, trail 0k
+  each draw waited for (6 frames; ms a frame, each with its wait's cost): shadow: treeLeaves 75.4, ShaderMaterial 26.93, shadow: woodChunk 24.73, MeshBasicMaterial 21.45, bigLeaves 16.32, MeshPhysicalMaterial 15.59, shadow: MeshPhysicalMaterial 13.82, MeshStandardMaterial 2.12, shadow: MeshStandardMaterial 1.84, shadow: bigLeaves 1.57, back 0.54, trail 0.48
+the longest frames:
+  164.8 s 10916 ms (main thread 24): buffer upload 0.0 MB (7 ms); render 23 ms
+  181.1 s 16249 ms (main thread 12): units 10 ms
+

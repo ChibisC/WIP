@@ -1,0 +1,22 @@
+# Underground Dominion benchmark — ud-mp-16 — 2026-11-24T09:09:11.165Z
+Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36
+GPU ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver); 2 cores; screen 640×400 at 1× (window 640×400)
+display 60 Hz on the start screen
+quality high, 20 s a scene
+
+## Trees layer on: the multiplayer-sized world, the ground, then up into the canopy
+load 131.7 s (before the pre-warm 13.8 s, pre-warm 117.8 s (the GPU finishing the world 65.8, the GPU finishing the pre-warm 30.0, ant models 10.2, an underground area 3.9, trees 3.0), after 0.2 s) · 3 frames · 0.1 FPS · frame avg 7721.92 ms, p95 12982.8, worst 12983 · over 33 ms: 2, over 50 ms: 2
+main thread 14.11 ms (msg 2.24, events 0.28, units 1.44, fx 0.05, ui 1.73, render 10.28) · GPU n/a ms · sim tick 4.56 ms, msg 113 KB
+draw calls 0 · tris 0k · programs 169 · textures 403 · geometries 1417 · heap 323 MB · GPU memory ≈ 451 MB (textures 305, render buffers 20, buffers 127) · 93 ants, 0 creatures · quality high
+GL during the run: 0 shader links, 0 texture uploads
+input → feedback ms (avg/p95): —
+input → acting ms: — · command —
+pacing: interval — ms, jitter — ms, display 16.7 ms · over 16.7 ms 0/0, over 33 ms 0, missed vsync 0 · long tasks 0 (0 ms)
+pieces (ms a frame, the worst frame): ui:minimaps 1.35 (4), ui:marker panel 0.23 (1), ui:labels 0.05 (0), ui:top bar 0.03 (0), ui:build, info 0.02 (0), ui:tile labels 0.02 (0), ui:boss, creatures, sandbox 0.01 (0), ui:goals 0.01 (0)
+GPU, pass by pass (20 frames, each pass waited for: 496.78 ms a frame): scene 193.28, shadow maps 111.88, depth of field and colour grade 68.04, bloom 52.68, ambient occlusion (half resolution, blurred) 30.69, ambient occlusion applied 11.08, tone mapping to the screen 8.81
+  triangles a frame by what is drawn: shadow: MeshStandardMaterial 143k, MeshStandardMaterial 37k, shadow: MeshPhysicalMaterial 8k, MeshPhysicalMaterial 8k, ShaderMaterial 3k, MeshBasicMaterial 0k, back 0k, trail 0k, fill 0k, chevBack 0k, chev 0k
+  each draw waited for (6 frames; ms a frame, each with its wait's cost): MeshStandardMaterial 160, shadow: MeshStandardMaterial 123.02, ShaderMaterial 22.22, MeshBasicMaterial 12.43, MeshPhysicalMaterial 12.37, shadow: MeshPhysicalMaterial 8.34, back 0.64, fill 0.35, trail 0.33, chevBack 0.31, chev 0.29
+the longest frames:
+  146.2 s 10166 ms (main thread 7): outside this thread (browser, GPU or a background tab)
+  159.2 s 12983 ms (main thread 6): ui 5 ms
+

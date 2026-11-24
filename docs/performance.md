@@ -700,3 +700,31 @@ Tests (`tests/performance.ts`): dig orders, progress and carves interleaved end 
 and textures, and the distance is computed only for carves; the same with the maps made "in a worker" whose answers
 come late and out of turn with forced rebuilds between (and a dive waits for the worker); a texture ring with rows
 named at commit always holds the data in the texture bound.
+
+## Trees v2: real trees in tiers (claude/trees/02-spec-trees-look-and-tiers.md, CHANGE_PLAN §38)
+The canopy went from flat painted branch bands to round wood, baked bark, instanced leaves and 2–4 tiers. The spec
+asks for the trees scene benched before and after, within v5's targets, and nothing drawn when the layer is off or
+off screen. How it is kept cheap:
+- **Wood** (`render/trees/woodMesh.ts`): the crowns' tubes in chunks of 256 mm, each a `THREE.LOD`: 14 sides and a
+  ring every 3.5 mm near, 7 sides and a ring every 9 mm past `WOOD_FAR` (420 mm from the camera); each chunk culled
+  against the view; thin twigs get fewer sides. One material for all species (the bark's layer per vertex).
+- **Bark and leaf textures** baked on the GPU once at load (`barkBake.ts`: 5 bark layers 512² with their normals, 20
+  leaf layers 128 × 256; 256² bark at a lower quality scale), no image files.
+- **Leaves** (`foliage.ts`): one instanced mesh a tree for the small blades with a coarse twin of 60 % of them for
+  trees past 560 mm (`CanopyTerrain.frame`); the big walkable leaves in one instanced mesh whose sag is an instance
+  attribute updated only where ants stand; shadows alpha-tested through a depth material.
+- **Light** without extra passes: the dappled light and the greener shade come from a cover map (4 mm a texel) read
+  by every canopy material; the haze between tiers is a fog term in the same shaders.
+- **Off**: the trees are a scene of their own (`view.addTrees`), drawn only while the trees view is shown (as before).
+
+| trees scene, build machine (SwiftShader, Q=high 640 × 400; GPU times not like a real GPU's, the counts are) | before (main a39bc06) | after |
+|---|---|---|
+| GPU, all passes, a frame | 496.8 ms | 466.5 ms |
+| scene pass | 193.3 ms | 66.4 ms |
+| shadow maps | 111.9 ms | 96.7 ms |
+| canopy triangles in the shadow pass | 143k (the flat bands' mesh) | 36k (leaves 19k, wood 15k, big leaves 2k) |
+| main thread a frame | 14.1 ms | 18.9 ms (3 frames, `units` 4.2 — noise at this frame rate) |
+| GPU memory | ≈ 451 MB | ≈ 450 MB |
+Reports: `docs/performance/bench-trees-v2-before.txt`, `-after.txt`. COST
+
+GOLDEN
