@@ -21,7 +21,7 @@ import { BARK_COUNT, BARK_LAYER, BARK_TILE, TreeMaps } from './barkBake';
 const WEAR: Record<string, number> = { trunk: 0, limb: 0.7, branch: 0.4, twig: 0.15, link: 1 };
 /** the walked section's superellipse exponent (|a|^P + |b|^P = 1 above the axis: a little fuller than a circle, so the
  * walked band on top stays within a millimetre of flat) */
-const P = 3;
+const P = 2.5;
 
 export interface WoodLod {
   radial: number;
@@ -131,6 +131,9 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
   if (nodes.length < 2) return;
   const flat = p.walk;
   const wear = flat ? WEAR[p.kind] ?? 0.2 : 0;
+  // (the fine twigs and lianas, a few millimetres thick: fewer sides, longer rings)
+  const thin = !p.walk && p.nodes[0].r < 4;
+  if (thin) lod = { radial: Math.max(4, Math.round(lod.radial * 0.4)), step: lod.step * 2.2 };
   // the axis: the wood's top is the floor (z), so its centre is a radius below it — and lower where it swells
   const r0 = nodes[0].r;
   const flareLen = 1.6 * r0;
@@ -359,9 +362,39 @@ export function buildWood(data: CanopyData, material: THREE.Material, extra: Rea
  */
 export const canopyHaze = {
   uHazeY: { value: 0 },
-  uHazeCol: { value: new THREE.Color(0.3, 0.38, 0.36) },
-  uHazeK: { value: 0.55 },
+  uHazeCol: { value: new THREE.Color(0.17, 0.21, 0.18) },
+  uHazeK: { value: 0.38 },
 };
+
+/**
+ * The light under the leaves (shared by the wood and the leaves): a plan map of the leaf cover over the map (R its
+ * density, G the height of its top, `canopyTerrain.ts` fills it) tints what lies beneath greener and a little darker —
+ * the sun through and between the leaves (their own shadows are the shadow map's).
+ */
+export const canopyCover = {
+  tCover: { value: null as THREE.Texture | null },
+  uCoverSize: { value: new THREE.Vector2(1, 1) },
+};
+
+export function coverPatch(): import('../shaderPatch').ShaderPatch {
+  return {
+    key: 'canopyCover',
+    uniforms: canopyCover,
+    fragmentHeader: 'uniform sampler2D tCover; uniform vec2 uCoverSize;',
+    fragment: [
+      [
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        {
+          vec4 _cv = texture2D(tCover, vWP.xz / uCoverSize);
+          float _top = _cv.g * 320.0 - 160.0;
+          float _under = _cv.r * smoothstep(_top - 2.0, _top - 14.0, vWP.y);
+          diffuseColor.rgb *= mix(vec3(1.0), vec3(0.8, 0.97, 0.7), _under);
+        }`,
+      ],
+    ],
+  };
+}
 
 export function hazePatch(): import('../shaderPatch').ShaderPatch {
   return {
@@ -479,6 +512,7 @@ float barkRough = 0.9; vec4 barkN = vec4(0.5, 0.5, 0.5, 1.0); float barkMoss = 0
       ['#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = barkRough;'],
     ],
   });
+  addPatch(mat, coverPatch());
   addPatch(mat, hazePatch());
   return mat;
 }

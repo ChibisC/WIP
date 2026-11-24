@@ -4,7 +4,7 @@ import type { WoodPiece } from '../../sim/treeCrowns';
 import type { CrownStyle } from '../../maps/types';
 import { addPatch, dapplePatch, globalUniforms, WORLD_POS_PATCH } from '../shaderPatch';
 import { LEAF_LAYER, LEAF_VARIANTS, TreeMaps } from './barkBake';
-import { hazePatch } from './woodMesh';
+import { coverPatch, hazePatch } from './woodMesh';
 
 /**
  * Trees v2 (CHANGE_PLAN §38.2): the leaves, render only.
@@ -81,6 +81,8 @@ export interface FoliageBuild {
   big: THREE.InstancedMesh | null;
   /** per tree: [near mesh, far mesh, centre] */
   trees: Array<{ near: THREE.InstancedMesh; far: THREE.InstancedMesh; c: THREE.Vector3 }>;
+  /** every small leaf's middle (x, height, z) and half its length: the cover map's splats */
+  cover: number[];
 }
 
 /** A blade: a grid across (−½…½) × along (0…1), flat (the shader bends it). */
@@ -210,6 +212,7 @@ vec4 leafN = vec4(0.5, 0.5, 0.8, 0.0); vec3 leafAlb = vec3(0.0); float leafRough
       ],
     ],
   });
+  addPatch(color, coverPatch());
   addPatch(color, hazePatch());
   const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
   addPatch(depth, {
@@ -265,6 +268,7 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
   const far = bladeGeometry(1, 2);
   const bigLeaves: Leaf[] = [];
   const thorns: THREE.Matrix4[] = [];
+  const cover: number[] = [];
   data.skels.forEach((sk, ti) => {
     const st = SPRAY[sk.style] ?? SPRAY.oak;
     const R = rand(ti * 7919 + 17);
@@ -285,6 +289,7 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
       const mid = p.clone().addScaledVector(dir, len * 0.5);
       const tip = p.clone().addScaledVector(dir, len * 0.95);
       if (covers(mid) || covers(tip) || covers(p)) return;
+      cover.push(mid.x, mid.y, mid.z, len * 0.5);
       leaves.push({ p, dir, side, len, wid, layer: layer0 + Math.floor(R() * LEAF_VARIANTS), tint: R() * 2 - 1, phase: R(), droop: st.droop, fold: st.fold, sway: 0.03 + 0.03 * R() });
     };
     // where sprays grow: the tips of the walked wood and its outer sides
@@ -454,7 +459,7 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
     im.name = 'acaciaThorns';
     group.add(im);
   }
-  return { fineTwigs, group, big, trees };
+  return { fineTwigs, group, big, trees, cover };
 }
 
 export { SPRAY, HAS_BIG };

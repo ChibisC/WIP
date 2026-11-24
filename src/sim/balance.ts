@@ -1640,7 +1640,7 @@ export const TREES = {
   /** the rise of a sloping branch between two tiers (tan; the ground's ramps allow LAYERS.rampMaxSlope, 0.47) */
   slope: 0.4,
   /** the walkable band of a branch: this share of its radius either side of its axis (the top of the round wood) */
-  walkShare: 0.55,
+  walkShare: 0.5,
   /** a floor cell with another within two cells higher by more than this (mm a cell of distance) is a drop: rock */
   stepMax: 2.2,
   /** a foe or creature more than this far above or below (mm) is out of reach (another tier) */

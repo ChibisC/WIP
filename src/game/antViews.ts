@@ -215,7 +215,6 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
   // as ants do — in the ground view at its climb point, and in the trees view coming over the trunk top's rim
   out.trunk = 0;
   if (a.trunkT && a.trunkT > 0 && w.s.trees) {
-    const k = 1 - a.trunkT / climbSeconds(w);
     const tx = a.trunkX ?? a.x;
     const ty = a.trunkY ?? a.y;
     let bi = -1;
@@ -231,6 +230,8 @@ export function antToView(w: World, a: Ant, out: AntView, space: number, selecte
     }
     if (bi >= 0) {
       const t = ts[bi];
+      // (the climb's share done: its time is its trunk's height to the crotch, trees v2)
+      const k = Math.max(0, 1 - a.trunkT / climbSeconds(w, t));
       const ang = Math.atan2(ty - t.y, tx - t.x);
       out.trunk = bi + 1;
       out.trunkK = a.trunkUp ? k : 1 - k;

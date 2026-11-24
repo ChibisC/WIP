@@ -8,7 +8,7 @@ import type { CanopyData } from '../../sim/trees';
 import { TREES as T } from '../../sim/balance';
 import type { World } from '../../sim/world';
 import { AS, TREES } from '../../sim/types';
-import { buildWood, floorDrop, woodMaterial } from './woodMesh';
+import { buildWood, canopyCover, floorDrop, woodMaterial } from './woodMesh';
 import { buildFoliage, FoliageBuild, HAS_BIG, leafMaterials } from './foliage';
 import type { TreeMaps } from './barkBake';
 
@@ -100,6 +100,7 @@ export class CanopyTerrain implements AreaTerrain {
     const mats = leafMaterials(maps);
     this.foliage = buildFoliage(data, maps, (x, y) => this.rawFloor(x, y), mats);
     this.wood = buildWood(data, this.woodMat, this.foliage.fineTwigs);
+    this.coverTex = this.bakeCover(this.foliage.cover);
     this.group.add(this.wood, this.foliage.group, this.sites);
     let tris = 0;
     this.group.traverse((o) => {
@@ -107,6 +108,63 @@ export class CanopyTerrain implements AreaTerrain {
       if (m.isMesh && m.geometry.index) tris += (m.geometry.index.count / 3) * ((m as THREE.InstancedMesh).isInstancedMesh ? (m as THREE.InstancedMesh).count : 1);
     });
     prof.note(`canopy: ${this.wood.children.length} wood chunks, ${this.foliage.trees.reduce((a, t) => a + t.near.count, 0)} leaves, ${(tris / 1000).toFixed(0)}k triangles (${(performance.now() - t0).toFixed(0)} ms)`);
+  }
+
+  private coverTex: THREE.DataTexture;
+
+  /**
+   * The plan map of the leaf cover (4 mm a texel): R how thick the leaves are overhead, G the height of their top
+   * (−160…160 mm); blurred a little. The wood and the leaves under it are lit greener (woodMesh.ts `coverPatch`).
+   */
+  private bakeCover(cover: number[]): THREE.DataTexture {
+    const g = this.grid;
+    const S = 4;
+    const W = Math.ceil(g.widthMm / S);
+    const H = Math.ceil(g.depthMm / S);
+    const dens = new Float32Array(W * H);
+    const top = new Float32Array(W * H).fill(-160);
+    for (let i = 0; i < cover.length; i += 4) {
+      const x = cover[i];
+      const y = cover[i + 1];
+      const z = cover[i + 2];
+      const r = cover[i + 3];
+      const i0 = Math.max(0, Math.floor((x - r) / S));
+      const i1 = Math.min(W - 1, Math.floor((x + r) / S));
+      const j0 = Math.max(0, Math.floor((z - r) / S));
+      const j1 = Math.min(H - 1, Math.floor((z + r) / S));
+      for (let j = j0; j <= j1; j++)
+        for (let ii = i0; ii <= i1; ii++) {
+          const k = j * W + ii;
+          dens[k] = Math.min(1, dens[k] + 0.3);
+          top[k] = Math.max(top[k], y);
+        }
+    }
+    const data = new Uint8Array(W * H * 4);
+    for (let j = 0; j < H; j++)
+      for (let i = 0; i < W; i++) {
+        let s = 0;
+        let n = 0;
+        let t = -160;
+        for (let dj = -1; dj <= 1; dj++)
+          for (let di = -1; di <= 1; di++) {
+            const ii = i + di;
+            const jj = j + dj;
+            if (ii < 0 || jj < 0 || ii >= W || jj >= H) continue;
+            s += dens[jj * W + ii];
+            n++;
+            t = Math.max(t, top[jj * W + ii]);
+          }
+        const k = (j * W + i) * 4;
+        data[k] = Math.round((s / n) * 255);
+        data[k + 1] = Math.round(((Math.min(160, t) + 160) / 320) * 255);
+        data[k + 3] = 255;
+      }
+    const tex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat);
+    tex.magFilter = tex.minFilter = THREE.LinearFilter;
+    tex.needsUpdate = true;
+    canopyCover.tCover.value = tex;
+    canopyCover.uCoverSize.value.set(W * S, H * S);
+    return tex;
   }
 
   /** the floor's height at a cell (−1 none), for the leaves' check */
