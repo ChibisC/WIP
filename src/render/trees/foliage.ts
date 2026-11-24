@@ -5,6 +5,7 @@ import type { CrownStyle } from '../../maps/types';
 import { addPatch, dapplePatch, globalUniforms, WORLD_POS_PATCH } from '../shaderPatch';
 import { LEAF_LAYER, LEAF_VARIANTS, TreeMaps } from './barkBake';
 import { coverPatch, hazePatch } from './woodMesh';
+import { shadowOnly } from '../shadowOnly';
 
 /**
  * Trees v2 (CHANGE_PLAN §38.2): the leaves, render only.
@@ -262,6 +263,10 @@ function instances(leaves: Leaf[], geo: THREE.BufferGeometry, mat: THREE.Materia
 export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: number, y: number) => number, mats = leafMaterials(maps)): FoliageBuild {
   const group = new THREE.Group();
   group.name = 'canopyLeaves';
+  const shadows = new THREE.Group();
+  shadows.name = 'canopyLeafShadow';
+  shadowOnly(shadows);
+  group.add(shadows);
   const fineTwigs: Array<{ piece: WoodPiece; tree: number }> = [];
   const trees: FoliageBuild['trees'] = [];
   const near = bladeGeometry(2, 4);
@@ -425,15 +430,27 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
       [leaves[i], leaves[j]] = [leaves[j], leaves[i]];
     }
     const mn = instances(leaves, near, mats.color, mats.depth);
-    const mf = new THREE.InstancedMesh(far.clone(), mats.color, leaves.length);
-    mf.instanceMatrix = mn.instanceMatrix;
-    mf.geometry.setAttribute('aLeafA', mn.geometry.getAttribute('aLeafA'));
-    mf.geometry.setAttribute('aLeafB', mn.geometry.getAttribute('aLeafB'));
-    mf.boundingSphere = mn.boundingSphere;
-    mf.castShadow = true;
+    const twin = (geo: THREE.BufferGeometry) => {
+      const m = new THREE.InstancedMesh(geo.clone(), mats.color, leaves.length);
+      m.instanceMatrix = mn.instanceMatrix;
+      m.geometry.setAttribute('aLeafA', mn.geometry.getAttribute('aLeafA'));
+      m.geometry.setAttribute('aLeafB', mn.geometry.getAttribute('aLeafB'));
+      m.boundingSphere = mn.boundingSphere;
+      m.customDepthMaterial = mats.depth;
+      return m;
+    };
+    const mf = twin(far);
+    mf.castShadow = false;
     mf.receiveShadow = true;
-    mf.customDepthMaterial = mats.depth;
     mf.visible = false;
+    // (every leaf's shadow from the coarse blade, drawn into the shadow maps only: the drawn blades cast none)
+    const ms = twin(far);
+    ms.castShadow = true;
+    ms.receiveShadow = false;
+    ms.name = 'leafShadow';
+    shadows.add(ms);
+    mn.castShadow = false;
+    mn.userData.noShadow = mf.userData.noShadow = true;
     mn.name = mf.name = 'treeLeaves';
     group.add(mn, mf);
     trees.push({ near: mn, far: mf, c: new THREE.Vector3(sk.x, sk.topZ, sk.y) });

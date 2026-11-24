@@ -4,6 +4,7 @@ import type { CrownSkel, WoodPiece } from '../../sim/treeCrowns';
 import { TREES as T } from '../../sim/balance';
 import { addPatch, dapplePatch, globalUniforms, WORLD_POS_PATCH } from '../shaderPatch';
 import { BARK_COUNT, BARK_LAYER, BARK_TILE, TreeMaps } from './barkBake';
+import { shadowOnly } from '../shadowOnly';
 
 /**
  * Trees v2 (CHANGE_PLAN §38.2): the crowns' skeletons (sim/treeCrowns.ts) as round 3D wood.
@@ -25,12 +26,15 @@ const P = 2.5;
 
 export interface WoodLod {
   radial: number;
+  /** the rings' spacing in a piece's flare (elsewhere a ring at each node: the wood runs straight between them) */
   step: number;
+  /** rings rounding a piece's end */
+  cap: number;
 }
-/** near: 14 sides, a ring every 3.5 mm; far (beyond `WOOD_FAR` mm from the camera): 7 sides, every 9 mm */
+/** near: 14 sides, the end rounded by three rings; far (beyond `WOOD_FAR` mm from the camera): 7 sides, one ring */
 export const WOOD_LODS: WoodLod[] = [
-  { radial: 14, step: 3.5 },
-  { radial: 7, step: 9 },
+  { radial: 14, step: 3.5, cap: 3 },
+  { radial: 7, step: 9, cap: 1 },
 ];
 export const WOOD_FAR = 420;
 
@@ -133,7 +137,7 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
   const wear = flat ? WEAR[p.kind] ?? 0.2 : 0;
   // (the fine twigs and lianas, a few millimetres thick: fewer sides, longer rings)
   const thin = !p.walk && p.nodes[0].r < 4;
-  if (thin) lod = { radial: Math.max(4, Math.round(lod.radial * 0.4)), step: lod.step * 2.2 };
+  if (thin) lod = { radial: Math.max(4, Math.round(lod.radial * 0.4)), step: lod.step * 2.2, cap: 1 };
   // the axis: the wood's top is the floor (z), so its centre is a radius below it — and lower where it swells
   const r0 = nodes[0].r;
   const flareLen = 1.6 * r0;
@@ -144,7 +148,10 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
     const a = nodes[i];
     const b = nodes[i + 1];
     const len = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-    const n = Math.max(1, Math.ceil(len / lod.step));
+    // (between two nodes the wood runs straight and its radius changes evenly: rings there would add nothing but
+    // triangles — only the flare at a piece's start, which swells as a curve, is ringed: a quarter of its length or
+    // `step` apart, whichever is longer — the curve then misses by under a tenth of a millimetre on a limb of 20)
+    const n = startFlare && s - s0 < flareLen ? Math.max(1, Math.ceil(len / Math.max(lod.step, flareLen / 4))) : 1;
     for (let k = 0; k < n; k++) {
       const u = k / n;
       const r = radiusAt(a.r + (b.r - a.r) * u, s + len * u);
@@ -199,7 +206,8 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
   }
   // the end: a rounded cap (flat-topped like the wood, so the floor's capsule end stays covered)
   const last = rings[rings.length - 1];
-  for (let k = 1; k <= 3; k++) {
+  // (three rings near; far away and on the thin twigs one, half way round)
+  for (const k of lod.cap >= 3 ? [1, 2, 3] : [2]) {
     const psi = (k / 4) * (Math.PI / 2);
     const f = flat ? Math.pow(Math.sin(psi), 2 / P) : Math.sin(psi);
     const sc = flat ? Math.pow(Math.cos(psi), 2 / P) : Math.cos(psi);
@@ -326,12 +334,17 @@ export function buildWood(data: CanopyData, material: THREE.Material, extra: Rea
     }
     return best;
   };
+  // (the shadows: every chunk's coarse level, drawn into the shadow maps only — a soft shadow shows no difference
+  // between 7 and 14 sides, and the coarse tube lies inside the fine one, so the wood doesn't shadow its own lit side)
+  const casters = new THREE.Group();
+  casters.name = 'canopyWoodShadow';
   for (const c of chunks.values()) {
     const lod = new THREE.LOD();
     lod.name = 'woodChunk';
     // (a LOD picks its level by its own position's distance from the camera: the chunk sits at its centre, its
     // geometry moved back by as much)
     let centre: THREE.Vector3 | null = null;
+    let coarse: THREE.BufferGeometry | null = null;
     WOOD_LODS.forEach((L, li) => {
       const g = new Geo();
       for (const part of c.parts) {
@@ -345,14 +358,24 @@ export function buildWood(data: CanopyData, material: THREE.Material, extra: Rea
       geo.translate(-centre.x, -centre.y, -centre.z);
       geo.computeBoundingSphere();
       const m = new THREE.Mesh(geo, material);
-      m.castShadow = true;
+      m.castShadow = false;
       m.receiveShadow = true;
+      m.userData.noShadow = true;
       lod.addLevel(m, li === 0 ? 0 : WOOD_FAR);
+      coarse = geo;
     });
-    if (!centre) continue;
+    if (!centre || !coarse) continue;
     lod.position.copy(centre);
     group.add(lod);
+    const sh = new THREE.Mesh(coarse, material);
+    sh.name = 'woodShadow';
+    sh.castShadow = true;
+    sh.receiveShadow = false;
+    sh.position.copy(centre);
+    casters.add(sh);
   }
+  shadowOnly(casters);
+  group.add(casters);
   return group;
 }
 

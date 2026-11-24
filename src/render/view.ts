@@ -1,6 +1,7 @@
 import { uploadPendingTextures } from './dynamicTextures';
 import type { AreaTerrain } from './nest/areaTerrain';
 import * as THREE from 'three';
+import { installShadowOnly } from './shadowOnly';
 import { setBakeRenderer } from './bake/detailBake';
 import { Input } from '../core/input';
 import { Terrain } from '../world/terrain';
@@ -151,6 +152,8 @@ export class GameView {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // (the canopy's coarse shadow casters: drawn into the shadow maps only — render/shadowOnly.ts)
+    installShadowOnly(this.renderer);
     // macro surface detail is baked on this renderer when a species first appears (render/bake)
     setBakeRenderer(this.renderer);
     const aspect = window.innerWidth / window.innerHeight;

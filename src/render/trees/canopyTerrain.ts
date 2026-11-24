@@ -105,9 +105,9 @@ export class CanopyTerrain implements AreaTerrain {
     let tris = 0;
     this.group.traverse((o) => {
       const m = o as THREE.Mesh;
-      if (m.isMesh && m.geometry.index) tris += (m.geometry.index.count / 3) * ((m as THREE.InstancedMesh).isInstancedMesh ? (m as THREE.InstancedMesh).count : 1);
+      if (m.isMesh && m.geometry.index && o.parent?.visible !== false) tris += (m.geometry.index.count / 3) * ((m as THREE.InstancedMesh).isInstancedMesh ? (m as THREE.InstancedMesh).count : 1);
     });
-    prof.note(`canopy: ${this.wood.children.length} wood chunks, ${this.foliage.trees.reduce((a, t) => a + t.near.count, 0)} leaves, ${(tris / 1000).toFixed(0)}k triangles (${(performance.now() - t0).toFixed(0)} ms)`);
+    prof.note(`canopy: ${this.wood.children.filter((o) => (o as THREE.LOD).isLOD).length} wood chunks, ${this.foliage.trees.reduce((a, t) => a + t.near.count, 0)} leaves, ${(tris / 1000).toFixed(0)}k triangles (${(performance.now() - t0).toFixed(0)} ms)`);
   }
 
   private coverTex: THREE.DataTexture;
@@ -314,8 +314,9 @@ export class CanopyTerrain implements AreaTerrain {
   }
   rebuildAll(): void {}
   setShadows(on: boolean): void {
+    // (the wood and the small leaves cast through their coarse shadow-only twins: the meshes drawn stay out)
     this.group.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = on;
+      if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = on && o.userData.noShadow !== true;
     });
   }
 

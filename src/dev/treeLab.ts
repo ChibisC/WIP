@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createSurfaceEnvironment } from '../render/environment';
 import { globalUniforms } from '../render/shaderPatch';
+import { installShadowOnly } from '../render/shadowOnly';
 import { bakeTreeMaps, BARK_LAYER } from '../render/trees/barkBake';
 import { buildWood, woodMaterial } from '../render/trees/woodMesh';
 import { buildFoliage, leafMaterials } from '../render/trees/foliage';
@@ -22,6 +23,7 @@ export function runTreeLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  installShadowOnly(renderer);
   const scene = new THREE.Scene();
   createSurfaceEnvironment(renderer, scene);
   scene.background = new THREE.Color(0x8ea79a);
