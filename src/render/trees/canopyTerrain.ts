@@ -281,6 +281,8 @@ export class CanopyTerrain implements AreaTerrain {
       t.near.visible = !far;
       t.far.visible = far;
       if (far) t.far.count = (t.far.userData.prepass as THREE.InstancedMesh).count = Math.ceil(t.near.count * 0.6);
+      // (the shadow: the leaves drawn — all of them near, the far share far away)
+      t.shadow.count = far ? t.far.count : t.near.count;
     }
   }
 

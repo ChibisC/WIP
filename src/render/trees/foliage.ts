@@ -80,8 +80,8 @@ export interface FoliageBuild {
   group: THREE.Group;
   /** the big leaves' mesh (its sag attribute is set by `setLoad`) */
   big: THREE.InstancedMesh | null;
-  /** per tree: [near mesh, far mesh, centre] */
-  trees: Array<{ near: THREE.InstancedMesh; far: THREE.InstancedMesh; c: THREE.Vector3 }>;
+  /** per tree: [near mesh, far mesh, centre, its shadow twin (all its leaves near, the far share far away)] */
+  trees: Array<{ near: THREE.InstancedMesh; far: THREE.InstancedMesh; c: THREE.Vector3; shadow: THREE.InstancedMesh }>;
   /** every small leaf's middle (x, height, z) and half its length: the cover map's splats */
   cover: number[];
 }
@@ -506,7 +506,7 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
     addLeafPrepass(mn, mats.pre);
     addLeafPrepass(mf, mats.pre);
     group.add(mn, mf);
-    trees.push({ near: mn, far: mf, c: new THREE.Vector3(sk.x, sk.topZ, sk.y) });
+    trees.push({ near: mn, far: mf, c: new THREE.Vector3(sk.x, sk.topZ, sk.y), shadow: ms });
   });
   let big: THREE.InstancedMesh | null = null;
   if (bigLeaves.length) {
