@@ -2224,3 +2224,24 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   mistake; ignored now) (Pages deployed; game artifact v60); handoff 29. Checks: golden set 34 of 35 pixel-identical
   to main (the flood shot within its noise); `same.sh` ALL SAME; `npm test`; UI test 13/13; build smoke (the
   worker answered).
+
+## 2026-11-24 — Trees v2: real trees in tiers, round wood, bark and leaves (CHANGE_PLAN §38; in review)
+- **The user's spec** (claude/trees/02-spec-trees-look-and-tiers.md): the canopy read as one flat level seen straight
+  down; now 2–4 tiers like the ground's terraces, sloping branches as the ramps, the tilted camera, trunks and limbs as
+  3D wood, each species' bark and leaves, big leaves as platforms that bend.
+- **Sim** (`sim/treeCrowns.ts`, `sim/trees.ts`): crowns grown as skeletons — the trunk to a crotch on the trunk top's
+  tier, rising / level / spreading limbs (the high tier toward the middle, the low ones round it), branches drooping a
+  tier outward, twigs with big walkable leaves; the floor painted per fine cell, the highest winning, every drop cut to
+  rock (no walking off a tier; a lower branch stops short under a higher one), what no trunk top reaches pruned; links
+  between crowns on tier 0 from a spreading limb pointed at the other tree. Heights per cell give the slope speed,
+  the reach across tiers (ants and creatures) and the fall's height; the climb arrives at the crotch's tier. Save
+  version 6 (version 5 canopies rebuilt), `ud-mp-17`. `tools/trees-check.ts` (tiers per tree, slopes, steps, sites,
+  food, one network) passes on every map and seeds 3, 5, 9; `tests/trees.ts` adds the tiers, slopes, drops, reach,
+  climb, fall, old-save rebuild and a lockstep run (two copies and a restored one, 2,600 ticks: identical).
+- **Render** (`render/trees/`): `woodMesh.ts` (tubes, superellipse tops that keep the walked band within a millimetre
+  of flat, fork swellings, the trunk from the ground, chunked LODs), `barkBake.ts` (five barks and twenty leaf blades
+  baked on the GPU), `foliage.ts` (sprays per species kept off the walkways, big leaves that bend, acacia thorns,
+  lianas), `canopyTerrain.ts` (the floor, the leaves' load, the cover map), the haze below the tier in view, the
+  camera; the tree lab `?scene=treelab`. References (descriptions, no photos): `docs/trees/references.md`.
+- **Checks so far:** `npm test` (all suites) passes; the determinism check is clean; `tools/perf/same.sh` against main:
+  ALL SAME on the 12 stress scenes (with the save version, which the hash includes, left out).

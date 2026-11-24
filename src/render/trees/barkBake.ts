@@ -185,19 +185,19 @@ vec4 willow(vec2 u) {
 vec4 tropical(vec2 u) {
   float m = pf(u * 4.0, vec2(4.0), 4, 70.0);
   float fine = pf(u * 44.0, vec2(44.0), 3, 71.0);
-  vec3 c = mix(vec3(0.13, 0.115, 0.088), vec3(0.25, 0.225, 0.18), m) * (0.95 + 0.1 * fine);
+  vec3 c = mix(vec3(0.085, 0.074, 0.056), vec3(0.17, 0.152, 0.118), m) * (0.95 + 0.1 * fine);
   float h = 0.3 + fine * 0.2;
   vec2 rel;
   vec3 w = pw(warp(u, vec2(6.0), 0.06, 74.0) * vec2(5.0, 4.0), vec2(5.0, 4.0), 72.0, rel);
   float flake = step(0.7, w.z);
   float e = w.y - w.x;
   h += flake * (0.45 + 0.6 * smoothstep(0.0, 0.3, e));
-  c = mix(c, mix(vec3(0.30, 0.235, 0.13), vec3(0.20, 0.23, 0.12), fract(w.z * 7.0)), flake * 0.6 * smoothstep(0.06, 0.3, e));
+  c = mix(c, mix(vec3(0.22, 0.17, 0.095), vec3(0.14, 0.16, 0.085), fract(w.z * 7.0)), flake * 0.6 * smoothstep(0.06, 0.3, e));
   c = mix(c, vec3(0.04, 0.03, 0.02), flake * (1.0 - smoothstep(0.0, 0.05, e)) * 0.6);
   vec2 rel2;
   vec3 l = pw(vec2(u.x * 18.0, u.y * 24.0), vec2(18.0, 24.0), 73.0, rel2);
   float len = smoothstep(0.22, 0.1, length(rel2 * vec2(0.6, 1.4))) * step(0.6, l.z);
-  c = mix(c, vec3(0.42, 0.37, 0.28), len * 0.6);
+  c = mix(c, vec3(0.3, 0.26, 0.2), len * 0.45);
   h += len * 0.15;
   gRough = 0.72 + 0.12 * fine;
   return vec4(c, h);
