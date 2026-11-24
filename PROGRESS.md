@@ -2247,4 +2247,6 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
 - Checks: the hitch hunter passes every scene (thin here outside the arena: SwiftShader draws the big world once every
   ~13 s); golden 13 of 13 match `main` (12 pixel for pixel, the fight within its run-to-run noise); `same.sh` ALL SAME;
   `npm test` (the action-lag nest test "dig orders … maps" failed twice under heavy load — golden renders running —
-  and passed alone, as it does on `main`: timing-sensitive, not this change); build.
+  and passed alone, as it does on `main`: timing-sensitive, not this change); build smoke (the arena in the built
+  game, the worker running, the lag recorder on).
+- **Merged** into `main` as `106223d` (game artifact v61, an interim build for the user to test); handoff 30.
