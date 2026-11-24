@@ -87,13 +87,28 @@ export interface FoliageBuild {
 }
 
 /** A blade: a grid across (−½…½) × along (0…1), flat (the shader bends it). */
-function bladeGeometry(nx: number, ny: number): THREE.BufferGeometry {
+/**
+ * Each species' blade outline as the share of the quad's half-width kept at each row of the grid (`ny` 4 and 2): the
+ * widest the baked blade (barkBake.ts `halfWidth`, every variant) gets between the neighbouring rows, and 0.04 more —
+ * the transparent corners are left out, so fewer fragments are drawn (the blade drawn is the same). Acacia's fronds
+ * fill the quad.
+ */
+const HULL: Partial<Record<number, Record<number, number[]>>> = {
+  0: { 4: [0.47, 0.79, 0.8, 0.8, 0.69], 2: [0.79, 0.8, 0.8] },
+  1: { 4: [0.83, 0.98, 0.98, 0.95, 0.68], 2: [0.98, 0.98, 0.95] },
+  2: { 4: [0.72, 0.95, 0.95, 0.95, 0.72], 2: [0.95, 0.95, 0.95] },
+  3: { 4: [0.85, 0.97, 0.97, 0.95, 0.6], 2: [0.97, 0.97, 0.95] },
+};
+/** the big leaves (oak, beech and rainforest in one mesh): the widest of the three, 6 rows */
+const BIG_HULL = [0.72, 0.94, 0.98, 0.98, 0.95, 0.81, 0.58];
+
+function bladeGeometry(nx: number, ny: number, hull?: number[]): THREE.BufferGeometry {
   const pos: number[] = [];
   const uv: number[] = [];
   const idx: number[] = [];
   for (let j = 0; j <= ny; j++)
     for (let i = 0; i <= nx; i++) {
-      const u = i / nx;
+      const u = 0.5 + (i / nx - 0.5) * (hull?.[j] ?? 1);
       const v = j / ny;
       pos.push(u - 0.5, v, 0);
       uv.push(u, v);
@@ -299,8 +314,13 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
   group.add(shadows);
   const fineTwigs: Array<{ piece: WoodPiece; tree: number }> = [];
   const trees: FoliageBuild['trees'] = [];
-  const near = bladeGeometry(2, 4);
-  const far = bladeGeometry(1, 2);
+  // (per species: its outline's hull)
+  const blades = new Map<number, [THREE.BufferGeometry, THREE.BufferGeometry]>();
+  const bladesOf = (sp: number) => {
+    let b = blades.get(sp);
+    if (!b) blades.set(sp, (b = [bladeGeometry(2, 4, HULL[sp]?.[4]), bladeGeometry(1, 2, HULL[sp]?.[2])]));
+    return b;
+  };
   const bigLeaves: Leaf[] = [];
   const thorns: THREE.Matrix4[] = [];
   const cover: number[] = [];
@@ -459,6 +479,7 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
       const j = Math.floor(R() * (i + 1));
       [leaves[i], leaves[j]] = [leaves[j], leaves[i]];
     }
+    const [near, far] = bladesOf(LEAF_LAYER[sk.style] ?? 0);
     const mn = instances(leaves, near, mats.color, mats.depth);
     const twin = (geo: THREE.BufferGeometry) => {
       const m = new THREE.InstancedMesh(geo.clone(), mats.color, leaves.length);
@@ -489,7 +510,7 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
   });
   let big: THREE.InstancedMesh | null = null;
   if (bigLeaves.length) {
-    big = instances(bigLeaves, bladeGeometry(3, 6), mats.color, mats.depth);
+    big = instances(bigLeaves, bladeGeometry(3, 6, BIG_HULL), mats.color, mats.depth);
     big.name = 'bigLeaves';
     addLeafPrepass(big, mats.pre);
     group.add(big);
