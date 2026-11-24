@@ -4,7 +4,7 @@ import { globalUniforms } from '../render/shaderPatch';
 import { installShadowOnly } from '../render/shadowOnly';
 import { bakeTreeMaps, BARK_LAYER } from '../render/trees/barkBake';
 import { buildWood, woodMaterial } from '../render/trees/woodMesh';
-import { buildFoliage, leafMaterials } from '../render/trees/foliage';
+import { addLeafPrepass, buildFoliage, leafMaterials } from '../render/trees/foliage';
 import { crownSkeleton, linkHeadings, paintCanopy } from '../sim/treeCrowns';
 import type { CanopyData } from '../sim/trees';
 import type { CrownStyle, TreeDef } from '../maps/types';
@@ -88,6 +88,7 @@ export function runTreeLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
           m.setPosition((v * 2 + flip - 3.5) * 30, 0, (i - (species.length - 1) / 2) * 56 + 24);
           im.setMatrixAt(0, m);
           im.customDepthMaterial = mats.depth;
+          addLeafPrepass(im, mats.pre);
           im.castShadow = im.receiveShadow = true;
           scene.add(im);
         }

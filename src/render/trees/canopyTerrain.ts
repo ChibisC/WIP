@@ -280,7 +280,7 @@ export class CanopyTerrain implements AreaTerrain {
       const far = cp.distanceTo(t.c) > 560;
       t.near.visible = !far;
       t.far.visible = far;
-      if (far) t.far.count = Math.ceil(t.near.count * 0.6);
+      if (far) t.far.count = (t.far.userData.prepass as THREE.InstancedMesh).count = Math.ceil(t.near.count * 0.6);
     }
   }
 

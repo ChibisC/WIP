@@ -135,15 +135,18 @@ vec3 leafBend(vec3 p, out vec3 n) {
 }`;
 
 /** The leaves' material and its shadow twin. */
-export function leafMaterials(maps: TreeMaps): { color: THREE.MeshStandardMaterial; depth: THREE.MeshDepthMaterial } {
-  const color = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.5 });
+export function leafMaterials(maps: TreeMaps): { color: THREE.MeshStandardMaterial; depth: THREE.MeshDepthMaterial; pre: THREE.MeshBasicMaterial } {
+  // (drawn after the leaves' depth pre-pass, `pre`: only the front blade of a pixel passes the depth test, and it is
+  // shaded once — layers of alpha-tested leaves no longer shade every layer; `invariant` keeps the two passes' depths
+  // equal)
+  const color = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.5, depthWrite: false });
   addPatch(color, WORLD_POS_PATCH);
   addPatch(color, dapplePatch());
   const uni = { tLeafA: { value: maps.leafA }, tLeafN: { value: maps.leafN }, uTime: globalUniforms.uTime };
   addPatch(color, {
     key: 'leaf',
     uniforms: uni,
-    vertexHeader: BEND,
+    vertexHeader: 'invariant gl_Position;\n' + BEND,
     vertex: [
       ['#include <beginnormal_vertex>', 'vec3 _ln; vec3 _lp = leafBend(position, _ln);\nvec3 objectNormal = _ln;\n#ifdef USE_TANGENT\nvec3 objectTangent = vec3( tangent.xyz );\n#endif'],
       ['#include <begin_vertex>', 'vec3 transformed = _lp;\nvLeafUv = uv; vLeaf = aLeafA;'],
@@ -226,7 +229,34 @@ uniform sampler2DArray tLeafA;
 varying vec2 vLeafUv; varying vec4 vLeaf;`,
     fragment: [['void main() {', 'void main() {\n  if (texture(tLeafA, vec3(vLeafUv, vLeaf.x)).a < 0.5) discard;']],
   });
-  return { color, depth };
+  // the depth pre-pass: the blades' shapes into the depth buffer, no colour (a hair behind, so the shaded pass's front
+  // blade always passes)
+  const pre = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 0.5, polygonOffsetUnits: 2 });
+  addPatch(pre, {
+    key: 'leafPre',
+    uniforms: uni,
+    vertexHeader: 'invariant gl_Position;\n' + BEND,
+    vertex: [['#include <begin_vertex>', 'vec3 _ln; vec3 transformed = leafBend(position, _ln);\nvLeafUv = uv; vLeaf = aLeafA;']],
+    fragmentHeader: `precision highp sampler2DArray;
+uniform sampler2DArray tLeafA;
+varying vec2 vLeafUv; varying vec4 vLeaf;`,
+    fragment: [['void main() {', 'void main() {\n  if (texture(tLeafA, vec3(vLeafUv, vLeaf.x)).a < 0.5) discard;']],
+  });
+  return { color, depth, pre };
+}
+
+/** A leaf mesh's depth pre-pass: its child, drawn first with the same blades (hidden with it; `count` kept equal). */
+export function addLeafPrepass(m: THREE.InstancedMesh, pre: THREE.Material): THREE.InstancedMesh {
+  const p = new THREE.InstancedMesh(m.geometry, pre, m.count);
+  p.instanceMatrix = m.instanceMatrix;
+  p.boundingSphere = m.boundingSphere;
+  p.renderOrder = -1;
+  p.castShadow = p.receiveShadow = false;
+  p.userData.noShadow = true;
+  p.name = 'leafPrepass';
+  m.add(p);
+  m.userData.prepass = p;
+  return p;
 }
 
 const tmpM = new THREE.Matrix4();
@@ -452,6 +482,8 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
     mn.castShadow = false;
     mn.userData.noShadow = mf.userData.noShadow = true;
     mn.name = mf.name = 'treeLeaves';
+    addLeafPrepass(mn, mats.pre);
+    addLeafPrepass(mf, mats.pre);
     group.add(mn, mf);
     trees.push({ near: mn, far: mf, c: new THREE.Vector3(sk.x, sk.topZ, sk.y) });
   });
@@ -459,6 +491,7 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
   if (bigLeaves.length) {
     big = instances(bigLeaves, bladeGeometry(3, 6), mats.color, mats.depth);
     big.name = 'bigLeaves';
+    addLeafPrepass(big, mats.pre);
     group.add(big);
   }
   if (thorns.length) {
