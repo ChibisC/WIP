@@ -1,7 +1,7 @@
 import type { World } from './world';
 import { AS, Colony, SURFACE } from './types';
 import { ARENA, BALANCE } from './balance';
-import { CASTES, canonCaste } from './species';
+import { CASTES, canonCaste, type SpeciesId } from './species';
 import { CREATURES } from './creatures/kinds';
 import { spawnCreature } from './creatures/creatureAI';
 import { makeAnt } from './factory';
@@ -63,6 +63,16 @@ export function setupArena(w: World): void {
   w.s.ants = w.s.ants.filter((a) => royal.has(a.id));
   w.reindex();
   w.s.mode.arena = A;
+}
+
+/** The arena roster's species, in the menu's order (ui/arenaPanel.ts lists their castes; the pre-warm builds them). */
+export const ARENA_ROSTER_SPECIES: SpeciesId[] = ['lasius', 'formica', 'atta', 'solenopsis', 'eciton', 'nasutitermes', 'rhynchotermes', 'hell', 'aurimyrmex', 'termant', 'plagiaria'];
+
+/** Every ant caste the arena panel can drop in (`ant:<caste>` units that pass `arenaUnitOk`). */
+export function arenaRosterCastes(): string[] {
+  return Object.values(CASTES)
+    .filter((cd) => ARENA_ROSTER_SPECIES.includes(cd.species) && arenaUnitOk('ant:' + cd.id))
+    .map((cd) => cd.id);
 }
 
 /** Can this unit fight in the arena? `ant:<caste>` (no queens, kings or nanitics) or `cr:<kind>` (not the antlion). */

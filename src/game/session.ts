@@ -43,7 +43,7 @@ import { LocalSim, SimHost, WorkerSim } from './simHost';
 import { AutoQuality } from './autoQuality';
 import { prof } from '../core/profiler';
 import { feel, InputKind } from '../core/feel';
-import { gpuIdle, overviewCamera, sceneTarget, warmScene } from '../render/prewarm';
+import { gpuIdle, overviewCamera, sceneTarget, shadowStandIns, warmScene } from '../render/prewarm';
 import { setNestMapsAsync } from '../render/nest/nestMapsClient';
 import { STOLEN_CASTES } from '../sim/termants';
 import type { NetGame } from '../net/netGame';
@@ -59,7 +59,7 @@ import { TeamRings } from '../render/game/teamRings';
 import { DigRings } from '../render/game/digRings';
 import { HealthBars } from '../render/game/healthBars';
 import { arenaOf } from '../sim/arenaState';
-import { TEAM_NAMES } from '../sim/arena';
+import { TEAM_NAMES, arenaRosterCastes } from '../sim/arena';
 import { Cinematic } from './cinematic';
 import type { StoryShotData } from '../core/events';
 
@@ -281,8 +281,19 @@ export class GameSession {
       const prev = r.getRenderTarget();
       r.setRenderTarget(this.view.post.enabled ? sceneTarget() : null);
       const p = r.compileAsync(tmp, this.view.activeCamera(), this.view.surfaceScene);
+      // (performance v6: and the programs the shadow map draws them with, into a target as the shadow map is — a
+      // rebuilt anthill's depth program was linked on the frame it was first shadowed: the arena's 2.6–6.4 s hitch here)
+      // (the shadow pass draws with no fog: the scene's taken off while the programs are chosen)
+      const sc = this.view.surfaceScene;
+      const sh = shadowStandIns(objs, sc);
+      const fog = sc.fog;
+      sc.fog = null;
+      r.setRenderTarget(sceneTarget());
+      const ps = r.compileAsync(sh.group, this.view.activeCamera(), sc);
+      sc.fog = fog;
+      sh.restore();
       r.setRenderTarget(prev);
-      return p;
+      return Promise.all([p, ps]);
     };
     // Pheromone overlay texture.
     const ph = w.phero;
@@ -436,6 +447,17 @@ export class GameSession {
     return out;
   }
 
+  /**
+   * The ant models a panel can drop in during play that the match may not have (performance v6, claude/performance/
+   * 06-spec §3): in the battle arena every caste of its roster. Each was built in the frame its first ant was drawn —
+   * the arena's spawn freeze (4.1 s on the user's Mac, 4.8 s here for the fire ants).
+   */
+  spawnableMorphs(): Set<string> {
+    const out = new Set<string>();
+    if (arenaOf(this.world)) for (const cs of arenaRosterCastes()) out.add(CASTES[cs].morph);
+    return out;
+  }
+
   private antRenderers(): AntRenderer[] {
     return [this.surfAnts, ...[...this.nests.values()].map((nv) => nv.ants)];
   }
@@ -460,6 +482,10 @@ export class GameSession {
       steps.push(f);
     };
     for (const r of this.antRenderers()) add('ant models', () => void r.prepare(morphs));
+    // (what a panel can drop on the surface in play: the arena's whole roster — performance v6; drawn by the surface's
+    // warm-up below, so every program its models use is compiled behind the loading screen too)
+    const extra = [...this.spawnableMorphs()].filter((m) => !morphs.has(m));
+    if (extra.length) add('ant models (the arena roster)', () => void this.surfAnts.prepare(extra));
     add('creatures', () => {
       this.surfCreatures.prepare();
       for (const nv of this.nests.values()) nv.creatures.prepare();
@@ -487,6 +513,7 @@ export class GameSession {
     // (performance v5: the post effects' own passes, every one, drawn once — they were built on the first frame)
     add('post effects', () => v.post.warm(v.surfaceScene, v.surfaceCam));
     for (const m of morphs) this.warmed.add(m);
+    for (const m of extra) this.warmed.add(m);
     const took = new Map<string, number>();
     // (what the world's making queued for the GPU — ground, detail and texture bakes — finished first, so the steps'
     // times are their own: the first step that has to wait for the GPU otherwise paid for all of it — round 2)
