@@ -778,6 +778,9 @@ buffer, effect and sound a mode can show is made, compiled, uploaded and drawn o
 | Programs linked in play: the spawn, the zoom in, the anthills rebuilt | 1 (a 2.5–6.4 s frame) | 0 |
 | A whole battle at 8× (69 deaths, the win, 10 s after), frames over 33 ms of main thread | — | 0 (worst 28 ms), no link, no compile |
 
-Checks: `tools/perf/same.sh` ALL SAME (the stress scenes' hashes against `main`); `npm test` with new checks in
+Checks: the golden set's shots the change could touch (every species' close-up, the arena fights, a map close-up;
+`golden/compare-v6after.md`): 13 of 13 match `main`, 12 pixel for pixel — the fight differs in 184 pixels where
+ants' antennae wave, less than `main` against itself (3598); `tools/perf/same.sh` ALL SAME (the stress scenes' hashes
+against `main`); `npm test` with new checks in
 `tests/performance.ts` (the roster has a model for every caste; a grown instanced mesh keeps its instances; shadow
 twins for every caster with kept depth materials per scene; the lag recorder keeps a frame over 100 ms in play only).
