@@ -65,6 +65,18 @@ export class InstancedPool {
   }
 }
 
+/** Copy the instances `old` holds into `next` (a grown copy): matrices, and colours where both have them. */
+export function keepInstances(old: THREE.InstancedMesh, next: THREE.InstancedMesh): void {
+  const a = old.instanceMatrix.array;
+  const b = next.instanceMatrix.array;
+  b.set(a.subarray(0, Math.min(a.length, b.length)));
+  if (old.instanceColor && next.instanceColor) {
+    const c = old.instanceColor.array;
+    const d = next.instanceColor.array;
+    d.set(c.subarray(0, Math.min(c.length, d.length)));
+  }
+}
+
 const tmpM = new THREE.Matrix4();
 const tmpC = new THREE.Color();
 const white = new THREE.Color(1, 1, 1);

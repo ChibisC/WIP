@@ -1,5 +1,6 @@
 /** Small DOM helpers shared by the UI components. */
 import { TOUCH } from '../core/device';
+import { prof } from '../core/profiler';
 
 export function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', html = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -14,7 +15,14 @@ export function button(cls: string, html: string, tip: string, onClick: (e: Mous
   b.dataset.tip = tip;
   b.addEventListener('click', (e) => {
     e.stopPropagation();
-    onClick(e);
+    // (performance v6: a button's work counts toward the next frame's main thread, as the game's own clicks do —
+    // the arena panel's drop of an army was "outside this thread" in the hitch log)
+    const t0 = performance.now();
+    try {
+      onClick(e);
+    } finally {
+      prof.addInput(performance.now() - t0);
+    }
   });
   b.addEventListener('pointerdown', (e) => e.stopPropagation());
   return b;

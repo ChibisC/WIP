@@ -376,6 +376,25 @@ function pack(recipe: DetailRecipe, scale: number): { w: number; h: number; cell
 }
 
 /** Bake (once per key) the atlas for a recipe; null when there is no renderer to bake with. */
+/** The bake's one material, triangle and camera (made on the first bake; the uniforms' values set for each recipe). */
+let kit: { mat: THREE.RawShaderMaterial; scene: THREE.Scene; cam: THREE.OrthographicCamera } | null = null;
+
+function bakeKit(uniforms: Record<string, THREE.IUniform>): { mat: THREE.RawShaderMaterial; scene: THREE.Scene; cam: THREE.OrthographicCamera } {
+  if (!kit) {
+    const mat = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: BAKE_VS, fragmentShader: BAKE_FS, uniforms, depthTest: false, depthWrite: false });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0, 0, 0, 0], 3));
+    const tri = new THREE.Mesh(geo, mat);
+    tri.frustumCulled = false;
+    const scene = new THREE.Scene();
+    scene.add(tri);
+    kit = { mat, scene, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1) };
+    return kit;
+  }
+  for (const k in uniforms) kit.mat.uniforms[k].value = uniforms[k].value;
+  return kit;
+}
+
 export function bakeDetail(recipe: DetailRecipe): DetailMaps | null {
   const hit = cache.get(recipe.key);
   if (hit) return hit;
@@ -431,14 +450,10 @@ export function bakeDetail(recipe: DetailRecipe): DetailMaps | null {
     band[i].set(...(sh.band ?? [0.012, 0.6, 0.5, 0.05]));
     tiles[i] = [s.tile[0], s.tile[1]];
   }
-  const mat = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: BAKE_VS, fragmentShader: BAKE_FS, uniforms, depthTest: false, depthWrite: false });
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0, 0, 0, 0], 3));
-  const tri = new THREE.Mesh(geo, mat);
-  tri.frustumCulled = false;
-  const scene = new THREE.Scene();
-  scene.add(tri);
-  const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  // (one bake material for every recipe, kept: the recipe is all in its uniforms, so each species' bake used to dispose
+  // and relink the same program — 4 s of a link wait on the build machine, the most of the battle arena's spawn freeze
+  // when a species not in the match was first dropped in: performance v6. The same program, the same pixels.)
+  const { mat, scene, cam } = bakeKit(uniforms);
   const target = () =>
     new THREE.WebGLRenderTarget(w, h, {
       type: THREE.UnsignedByteType,
@@ -458,17 +473,15 @@ export function bakeDetail(recipe: DetailRecipe): DetailMaps | null {
   const prevXr = r.xr.enabled;
   r.xr.enabled = false;
   r.autoClear = true;
-  uniforms.uOut.value = 0;
+  mat.uniforms.uOut.value = 0;
   r.setRenderTarget(ta);
   r.render(scene, cam);
-  uniforms.uOut.value = 1;
+  mat.uniforms.uOut.value = 1;
   r.setRenderTarget(tb);
   r.render(scene, cam);
   r.setRenderTarget(prev);
   r.autoClear = prevAuto;
   r.xr.enabled = prevXr;
-  mat.dispose();
-  geo.dispose();
   ta.texture.anisotropy = tb.texture.anisotropy = Math.min(8, r.capabilities.getMaxAnisotropy());
   const maps: DetailMaps = { key: recipe.key, a: ta.texture, b: tb.texture, rects, shade, shade2, shade3, bands, band, tiles };
   cache.set(recipe.key, maps);

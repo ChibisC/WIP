@@ -7,7 +7,7 @@
  *  2. a big fight — four colonies of 200 at the middle of the map, 100 creatures and two titans;
  *  3. a full nest — the same world, looking round a crowded home nest;
  *  4. a story night — The Long Nights at dusk before its last, longest night (lairs, hunters, the tarantula);
- *  5. the battle arena with 600 units;
+ *  5. the battle arena with 300 units (dropped in at its start: their first frames are reported apart);
  *  6. a multiplayer-sized world — four colonies on an authored map, the camera touring the surface.
  *  0. first, *feel* (claude/performance/02-spec §1): real pointer and key events dispatched on the page every 0.4 s —
  *     camera drags and wheel turns, clicks on ants, orders (a marker placed, a group sent), then in the home nest digs
@@ -41,7 +41,7 @@ export const BENCH_SCENES: SceneDef[] = [
   { id: 'fight', title: 'Big fight (4 × 200 ants, 100 creatures, 2 titans)', query: 'stress=1&ants=200&creatures=100&bosses=2' },
   { id: 'nest', title: 'Full nest', query: 'stress=1&ants=200&creatures=40&view=nest' },
   { id: 'story', title: 'Story: The Long Nights, last night', query: 'story=longNights&diff=normal&night=3&nocine=1&seed=7' },
-  { id: 'arena', title: 'Battle arena, 600 units', query: 'play=1&mode=arena&teams=2&seed=4' },
+  { id: 'arena', title: 'Battle arena, 300 units', query: 'play=1&mode=arena&teams=2&seed=4' },
   { id: 'mp4', title: 'Multiplayer-sized world (4 colonies, authored map)', query: 'play=1&seed=3&map=meadowPond&species=lasius&rival=formica,solenopsis,atta&developed=6&nocine=1' },
   { id: 'speed', title: 'Game speed: the big fight at 1×, 2×, 4× and 8×', query: 'stress=1&ants=200&creatures=100&bosses=2' },
   { id: 'cine', title: 'Story cutscene: the opening flight of The Antlered King', query: 'story=antleredKing&diff=normal&seed=7' },
@@ -91,6 +91,9 @@ interface SceneResult {
   creatures: number;
   hitches: string[];
   switch?: SwitchResult;
+  /** the frames over 33 ms in the scene's first seconds, before the measured stretch (performance v6: the arena's
+   *  armies are dropped in then — its spawn's freeze was erased with the warm-up's numbers) */
+  startHitches?: string[];
   /** the GPU breakdown scene's steps (performance v3) */
   gpuSteps?: GpuStep[];
   speedSteps?: SpeedStep[];
@@ -248,8 +251,12 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
     cx = e.sx;
     cz = e.sy;
   }
+  // (performance v6: the scene's own first frames — the arena's spawn — kept for the report)
+  const frame0 = prof.frame;
+  let startHitches: string[] = [];
   if (def.id === 'arena') {
-    // two armies of 300, both sides' strongest castes mixed in
+    // two armies of 150, both sides' strongest castes mixed in (the arena drops at most 50 a time — ARENA.maxPerSpawn:
+    // the n of 100 these asked for gave 50 each, 300 in all, as every report so far measured)
     for (const [team, unit] of [
       [0, 'ant:formica_soldier'],
       [0, 'ant:formica_worker'],
@@ -258,7 +265,7 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
       [1, 'ant:eciton_minor'],
       [1, 'ant:lasius_soldier'],
     ] as Array<[number, string]>)
-      s.issue({ type: 'arenaSpawn', team, unit, n: 100, level: 1, at: false, x: 0, y: 0 } as never);
+      s.issue({ type: 'arenaSpawn', team, unit, n: 50, level: 1, at: false, x: 0, y: 0 } as never);
   }
   if (def.id === 'nest') {
     s.viewedArea = v.activeNest;
@@ -313,6 +320,7 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
     }
     if (!reset) {
       reset = true;
+      startHitches = prof.hitches.filter((h) => h.frame >= frame0).map((h) => `${h.t.toFixed(1)} s ${h.ms.toFixed(0)} ms (main thread ${h.cpu.toFixed(0)}): ${h.causes.join('; ')}`);
       prof.reset();
       feel.reset();
     }
@@ -325,7 +333,7 @@ export function runBenchScene(s: GameSession, q: URLSearchParams): void {
       s.toggleTrees();
     }
     if (k < 1) requestAnimationFrame(loop);
-    else finish();
+    else finish(undefined, undefined, startHitches.length ? { startHitches } : undefined);
   };
   requestAnimationFrame(loop);
 }
@@ -948,6 +956,10 @@ function fmtScene(r: SceneResult): string[] {
   if (r.hitches.length) {
     out.push('the longest frames:');
     for (const h of r.hitches.slice(0, 10)) out.push(`  ${h}`);
+  }
+  if (r.startHitches?.length) {
+    out.push(`the scene's first ${r.id === 'arena' ? 'seconds (the armies dropped in)' : 'seconds'}, before the measured stretch:`);
+    for (const h of r.startHitches.slice(0, 10)) out.push(`  ${h}`);
   }
   return out;
 }

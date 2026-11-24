@@ -846,5 +846,104 @@ if (columnCodegen.on) {
   check('worker warm-up: 30 ticks on a copy first leave the real world\'s 150 ticks exactly the same', plain === warmed && plain === again, `${plain} ${warmed}`);
 }
 
+// ---- performance v6 (claude/performance/06-spec-performance-v6-no-hitches-ever.md): nothing happens for the first time in play
+{
+  // the arena's roster: every caste its panel offers is in the pre-warm's list, and each has a model to build
+  const { arenaRosterCastes } = await import('../src/sim/arena');
+  const { CASTES } = await import('../src/sim/species');
+  const { MORPHS } = await import('../src/render/ants/morphs');
+  const roster = arenaRosterCastes();
+  const models = roster.filter((cs) => MORPHS[CASTES[cs].morph] || CASTES[cs].morph.startsWith('termite_'));
+  check('arena roster: every caste the panel can drop in has a model the pre-warm builds', roster.length >= 20 && models.length === roster.length, `${models.length} of ${roster.length}`);
+}
+{
+  // an instanced mesh grown in the middle of a frame keeps what was written before it (it was drawn at the origin)
+  const { keepInstances } = await import('../src/render/game/instancedPool');
+  const geo = new THREE.PlaneGeometry(1, 1);
+  const mat = new THREE.MeshBasicMaterial();
+  const a = new THREE.InstancedMesh(geo, mat, 4);
+  const m4 = new THREE.Matrix4();
+  for (let i = 0; i < 4; i++) {
+    a.setMatrixAt(i, m4.makeTranslation(i + 1, 2 * i, -i));
+    a.setColorAt(i, new THREE.Color(i / 4, 0.5, 1 - i / 4));
+  }
+  const b = new THREE.InstancedMesh(geo, mat, 8);
+  b.setColorAt(0, new THREE.Color(0, 0, 0));
+  keepInstances(a, b);
+  let same = true;
+  const p = new THREE.Matrix4();
+  const c = new THREE.Color();
+  const c2 = new THREE.Color();
+  for (let i = 0; i < 4; i++) {
+    a.getMatrixAt(i, m4);
+    b.getMatrixAt(i, p);
+    a.getColorAt(i, c);
+    b.getColorAt(i, c2);
+    if (!m4.equals(p) || !c.equals(c2)) same = false;
+  }
+  check('a grown instanced mesh keeps the instances written before it grew (matrices and colours)', same);
+}
+{
+  // the warm-up's shadow twins: one for every caster (its geometry, its instances), each with a depth material of its
+  // own — the caster's, else one kept per scene and settings (a program's key holds the scene's light counts)
+  const { shadowTwins } = await import('../src/render/prewarm');
+  const make = () => {
+    const sc = new THREE.Scene();
+    const mat = new THREE.MeshStandardMaterial();
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(), mat);
+    mesh.castShadow = true;
+    const inst = new THREE.InstancedMesh(new THREE.BoxGeometry(), mat, 3);
+    inst.castShadow = true;
+    inst.setColorAt(0, new THREE.Color(1, 0, 0));
+    const own = new THREE.Mesh(new THREE.BoxGeometry(), mat);
+    own.castShadow = true;
+    own.customDepthMaterial = new THREE.MeshDepthMaterial();
+    const off = new THREE.Mesh(new THREE.BoxGeometry(), mat);
+    sc.add(mesh, inst, own, off);
+    return { sc, mesh, inst, own };
+  };
+  const A = make();
+  const B = make();
+  const ta = shadowTwins(A.sc)!.children as THREE.Mesh[];
+  const tb = shadowTwins(B.sc)!.children as THREE.Mesh[];
+  const ok =
+    ta.length === 3 &&
+    ta[0].geometry === A.mesh.geometry &&
+    (ta[1] as THREE.InstancedMesh).instanceMatrix === A.inst.instanceMatrix &&
+    (ta[1] as THREE.InstancedMesh).instanceColor === A.inst.instanceColor &&
+    ta[2].customDepthMaterial === A.own.customDepthMaterial &&
+    ta[0].customDepthMaterial !== ta[1].customDepthMaterial &&
+    ta[0].customDepthMaterial !== tb[0].customDepthMaterial &&
+    ta[0].material === A.mesh.material;
+  check('shadow twins: every caster has one (its geometry, instances and material) with its own depth material, kept per scene', ok, `${ta.length} twins`);
+  // and again for the same scene: the same depth materials (kept, not made anew)
+  const ta2 = shadowTwins(A.sc)!.children as THREE.Mesh[];
+  check('shadow twins: warming the same scene again uses the same kept depth materials', ta2[0].customDepthMaterial === ta[0].customDepthMaterial && ta2[1].customDepthMaterial === ta[1].customDepthMaterial);
+}
+{
+  // the lag recorder: a frame over 100 ms in play is kept with what the game was doing; before play, or after the
+  // page was hidden (a tab switch), it is not
+  const { Profiler, LAG_MS } = await import('../src/core/profiler');
+  const P = new Profiler();
+  const slow = () => {
+    P.begin();
+    const t = performance.now();
+    while (performance.now() - t < LAG_MS + 15) {
+      /* the frame's work */
+    }
+    P.end();
+  };
+  slow();
+  const before = P.lag.length;
+  P.playing = true;
+  P.lagContext = () => 'surface, camera 60 mm';
+  slow();
+  const kept = P.lag.length === 1 && P.lag[0].ctx === 'surface, camera 60 mm' && P.lagCount === 1;
+  P.pageHidden();
+  slow();
+  const afterHidden = P.lag.length;
+  check('lag recorder: a frame over 100 ms in play is kept with the game\'s state; not while loading, not after the page was hidden', before === 0 && kept && afterHidden === 1, `${before} ${P.lag.length} ${afterHidden}`);
+}
+
 console.log(`\n${failed ? `${failed} FAILED` : 'all passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 if (failed) (globalThis as unknown as { process: { exit(n: number): void } }).process.exit(1);

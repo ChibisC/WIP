@@ -108,6 +108,16 @@ function bppOf(gl: WebGL2RenderingContext, f: number): number {
 const blankGl = (): GlWork => ({ compiles: 0, links: 0, compileMs: 0, texUploads: 0, texBytes: 0, texMs: 0, bufBytes: 0, bufMs: 0 });
 
 export const HITCH_MS = 33;
+/** a frame this long in play goes into the lag recorder (performance v6: "Copy lag report") */
+export const LAG_MS = 100;
+
+/** A frame over `LAG_MS` in play, with the clock time and what the game was doing. */
+export interface LagFrame extends Hitch {
+  /** the wall clock (hh:mm:ss) */
+  at: string;
+  /** the game's state then (mode, area, camera, units: `Profiler.lagContext`) */
+  ctx: string;
+}
 const PARTS = ['sim', 'msg', 'input', 'events', 'units', 'creatures', 'nest', 'fx', 'ui', 'render', 'prewarm'] as const;
 export type Part = (typeof PARTS)[number];
 
@@ -131,6 +141,20 @@ export class Profiler {
   /** the last frame's GL work */
   lastGl: GlWork = blankGl();
   readonly hitches: Hitch[] = [];
+  /**
+   * The lag recorder (performance v6, claude/performance/06-spec §4): every frame over `LAG_MS` once loading is
+   * over, the last 100 kept with what the game was doing — the "Copy lag report" text (menu → Graphics, F3). Never
+   * cleared by `reset` (the benchmark's), so a freeze in play is still there to send.
+   */
+  readonly lag: LagFrame[] = [];
+  /** frames over `LAG_MS` in play since loading (the list keeps the last 100) */
+  lagCount = 0;
+  /** the game's state for a lag record (set by the session) */
+  lagContext: (() => string) | null = null;
+  /** the page was hidden since the last frame (the gap is the tab's, not a freeze: not recorded) */
+  private wasHidden = false;
+  /** the newest program seen (the "new program" notes) */
+  private lastProgramId = -1;
   /** worker → main: bytes of the last frame message, and a running average */
   msgBytes = 0;
   msgBytesAvg = 0;
@@ -160,6 +184,7 @@ export class Profiler {
   attach(renderer: THREE.WebGLRenderer): void {
     if (this.renderer === renderer) return;
     this.renderer = renderer;
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => this.pageHidden());
     // (the draw counts cover the whole frame — every pass, the post effects too — not just its last render call)
     renderer.info.autoReset = false;
     const gl = renderer.getContext() as WebGL2RenderingContext;
@@ -409,6 +434,13 @@ export class Profiler {
     }
     const g = this.gl;
     this.lastGl = g;
+    // (performance v6: a program linked in play is named in the frame's notes — which material it was for, so a lag
+    // report says what to warm)
+    if (g.links && this.playing && this.renderer) {
+      const ps = this.renderer.info.programs ?? [];
+      for (const p of ps) if (p.id > this.lastProgramId && this.notes.length < 16) this.notes.push(`new program: ${(p as { type?: string }).type ?? '?'}${p.name ? ` '${p.name}'` : ''}`);
+      for (const p of ps) if (p.id > this.lastProgramId) this.lastProgramId = p.id;
+    } else if (g.links && this.renderer) for (const p of this.renderer.info.programs ?? []) if (p.id > this.lastProgramId) this.lastProgramId = p.id;
     const T = this.glTotal;
     T.compiles += g.compiles;
     T.links += g.links;
@@ -447,9 +479,27 @@ export class Profiler {
       if (subs.length) causes.push(subs.join(', '));
       causes.push(...this.notes);
       if (!causes.length) causes.push(cpu > 12 ? 'main thread busy (unattributed)' : 'outside this thread (browser, GPU or a background tab)');
-      this.hitches.push({ frame: this.frame, t: (this.frameStart - this.t0) / 1000, ms: dt, cpu, causes });
+      const h = { frame: this.frame, t: (this.frameStart - this.t0) / 1000, ms: dt, cpu, causes };
+      this.hitches.push(h);
       if (this.hitches.length > 200) this.hitches.shift();
+      if (this.playing && !this.wasHidden && (dt > LAG_MS || cpu > LAG_MS)) {
+        let ctx = '';
+        try {
+          ctx = this.lagContext?.() ?? '';
+        } catch {
+          // (the recorder never breaks a frame)
+        }
+        this.lag.push({ ...h, at: new Date().toTimeString().slice(0, 8), ctx });
+        this.lagCount++;
+        if (this.lag.length > 100) this.lag.shift();
+      }
     }
+    this.wasHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+  }
+
+  /** The page was hidden (a tab switch, the screen locked): the next frame's gap is not a freeze. */
+  pageHidden(): void {
+    this.wasHidden = true;
   }
 
   /** The renderer's counts now. */

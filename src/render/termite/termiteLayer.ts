@@ -125,6 +125,14 @@ export class TermiteLayer {
     return 1;
   }
 
+  /** One caste's glue and acid sets made now, empty (performance v6: the pass's program built while loading — the
+   *  shell material is one for every caste — rather than on the frame the first termite is glued or squirted). */
+  prepareFx(): void {
+    const first = [...this.sets.keys()].find((k) => !k.endsWith(':fx'));
+    if (!first || this.sets.has(first + ':fx')) return;
+    for (let l = 0; l < 2; l++) this.inst(first as CasteId, l, true);
+  }
+
   has(morph: string): boolean {
     const caste = casteOf(morph);
     return !!caste && this.sets.has(caste);
@@ -145,6 +153,7 @@ export class TermiteLayer {
       const cap = t ? t.capacity * 2 : fx ? 16 : lod === 0 ? 32 : 128;
       const next = new TermiteInstances(baseGeometry(caste, lod), cap, { castShadow: lod < 2, fxShell: fx });
       if (t) {
+        next.keepFrom(t);
         this.group.remove(t.group);
         t.dispose();
       }

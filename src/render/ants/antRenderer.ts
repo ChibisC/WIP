@@ -288,6 +288,9 @@ class Bucket {
 
   alloc(l: number, cap: number, shadows: boolean): void {
     const old = this.meshes[l];
+    // (performance v6: what this frame already wrote kept — the new buffers started empty, and the ants written
+    // before the growth were drawn at the origin for that frame)
+    const keep = old ? { m: old.instanceMatrix.array, at: this.attrs[l], body: this.bodyTex[l]?.data as Float32Array | undefined } : null;
     if (old) {
       this.group.remove(old);
       // (the vertices are the model's, shared: only the old instance attributes leave the GPU)
@@ -322,6 +325,13 @@ class Bucket {
       this.bodyTex[l] = ring;
       u.uBodyTex.value = ring.current;
     }
+    if (keep) {
+      mesh.instanceMatrix.array.set(keep.m.subarray(0, Math.min(keep.m.length, mesh.instanceMatrix.array.length)));
+      for (const k of ['a', 'b', 'c', 'd', 'e'] as const) at[k].array.set((keep.at[k].array as Float32Array).subarray(0, Math.min(keep.at[k].array.length, at[k].array.length)));
+      const nb = this.bodyTex[l]?.data as Float32Array | undefined;
+      // (the body rows are a fixed width: the old rows are the new texture's first rows)
+      if (keep.body && nb) nb.set(keep.body.subarray(0, Math.min(keep.body.length, nb.length)));
+    }
     this.meshes[l] = mesh;
     this.attrs[l] = at;
     this.capacity[l] = cap;
@@ -339,11 +349,36 @@ class Bucket {
   private shellMats: Array<THREE.MeshPhysicalMaterial | null> = [null, null];
   private shellTex: Array<TextureRing | null> = [null, null];
 
+  /** Make LOD `l`'s glue shell now, empty and hidden (performance v6: built while loading, its program with it,
+   *  rather than on the frame the first ant is glued). */
+  warmShell(l: number): void {
+    if (this.shell[l]) return;
+    const m = this.growShell(l, 0);
+    m.count = 0;
+    m.visible = false;
+  }
+
   /** Copy instance `n` of LOD `l` into the glue shell with glue amount `g`. */
   addShell(l: number, n: number, g: number): void {
-    let mesh = this.shell[l];
     const k = this.shellN[l];
-    if (!mesh || k >= mesh.instanceMatrix.count) {
+    let mesh = this.shell[l];
+    if (!mesh || k >= mesh.instanceMatrix.count) mesh = this.growShell(l, k);
+    const src = this.attrs[l];
+    const dst = this.shellAt[l]!;
+    const m4 = tmpShellM;
+    this.meshes[l].getMatrixAt(n, m4);
+    mesh.setMatrixAt(k, m4);
+    for (const key of ['a', 'b', 'c', 'd', 'e'] as const) dst[key].setXYZW(k, src[key].getX(n), src[key].getY(n), src[key].getZ(n), src[key].getW(n));
+    dst.g.setX(k, g);
+    const bt = this.bodyTex[l];
+    if (bt) (this.shellTex[l]!.data as Float32Array).set((bt.data as Float32Array).subarray(n * BODY_F, n * BODY_F + BODY_F), k * BODY_F);
+    this.shellN[l] = k + 1;
+  }
+
+  /** A glue shell for LOD `l` with room for more than `k` (the first `k`, written this frame, kept). */
+  private growShell(l: number, k: number): THREE.InstancedMesh {
+    let mesh = this.shell[l];
+    {
       const cap = mesh ? mesh.instanceMatrix.count * 2 : 16;
       const shellMat = (this.shellMats[l] ??= createAntGlueShell(this.rig, this.key));
       const oldTex = this.shellTex[l];
@@ -388,16 +423,7 @@ class Bucket {
       this.shell[l] = mesh = next;
       this.shellAt[l] = at;
     }
-    const src = this.attrs[l];
-    const dst = this.shellAt[l]!;
-    const m4 = tmpShellM;
-    this.meshes[l].getMatrixAt(n, m4);
-    mesh.setMatrixAt(k, m4);
-    for (const key of ['a', 'b', 'c', 'd', 'e'] as const) dst[key].setXYZW(k, src[key].getX(n), src[key].getY(n), src[key].getZ(n), src[key].getW(n));
-    dst.g.setX(k, g);
-    const bt = this.bodyTex[l];
-    if (bt) (this.shellTex[l]!.data as Float32Array).set((bt.data as Float32Array).subarray(n * BODY_F, n * BODY_F + BODY_F), k * BODY_F);
-    this.shellN[l] = k + 1;
+    return mesh;
   }
 
   commitShell(): void {
@@ -652,6 +678,31 @@ export class AntRenderer {
       }
     }
     return n;
+  }
+
+  /**
+   * The effects a match can show, made now and hidden (performance v6): the nasutes' glue streams, the sickle-jaws'
+   * acid jet and fizz, the glue shell over glued ants (one model's: the shell's program is the same for every
+   * species) and the termites' own glue and acid pass. Each was made on the frame it was first needed, its shaders
+   * compiled on it; made while loading, the warm-up draws them.
+   */
+  prepareFx(o: { glue: boolean; acid: boolean }): void {
+    if (o.glue && !this.nasGlue) {
+      this.nasGlue = new GlueStreams(64, NASUTE_GLUE);
+      this.group.add(this.nasGlue.mesh);
+    }
+    if (o.acid && !this.rhyAcid) {
+      this.rhyAcid = new GlueStreams(64, { ...ACID_STREAM, diameter: 0.16 });
+      this.rhyFizz = new AcidFizz(64);
+      this.group.add(this.rhyAcid.mesh, this.rhyFizz.mesh);
+    }
+    if (!o.glue && !o.acid) return;
+    for (const b of this.buckets.values()) {
+      b.warmShell(0);
+      b.warmShell(1);
+      break;
+    }
+    this.termites?.prepareFx();
   }
 
   /** Has this renderer built `morph` yet? */

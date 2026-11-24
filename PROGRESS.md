@@ -2224,3 +2224,27 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   mistake; ignored now) (Pages deployed; game artifact v60); handoff 29. Checks: golden set 34 of 35 pixel-identical
   to main (the flood shot within its noise); `same.sh` ALL SAME; `npm test`; UI test 13/13; build smoke (the
   worker answered).
+
+## 2026-11-24 — Performance v6: no freezes, ever (CHANGE_PLAN §38)
+- **The user's recording** (the arena: a 4.1 s freeze dropping two fire-ant armies in; 1.2/0.35/0.8 s mid-fight and on
+  zooming in; 0.55–0.72 s after "Blue wins"), reproduced on the build machine (`tests/browser/arena_spawn_probe.py`):
+  - the spawn: the fire-ant models built in the frame (4811 ms of main thread; the arena's colonies are garden ants, so
+    the pre-warm built none of its roster), most of a build a program linked per species for the detail bake;
+  - the fight and zoom: one shadow program linked in play (2.5–6.4 s frames) for the arena anthill's mound, rebuilt
+    when its team's ants came — three's shared depth material picks its variant by draw order, and loading had never
+    drawn this one;
+  - after "Blue wins": nothing of the game's (a whole battle at 8× to its end and after: no frame over 33 ms, no
+    compile) — likely the screen recorder, as the user guessed; the lag report will say.
+- **Fixed, the same pictures and results:** the arena roster and a story level's arrivals built while loading; one
+  detail-bake material; every shadow caster's own depth program drawn by the warm-up (`shadowTwins`, kept per scene);
+  the glue/acid effects, boss wind-ups and slam rings ready before play; grown instance buffers keep their frame; the
+  stingers and the narrator's cue made while loading, every sound decoded in the background. Spawn frame 4811 → 37 ms;
+  the roster's builds 69.2 → 17.6 s (in loading); no program linked in play through a spawn, a zoom and a battle.
+- **New:** the lag recorder — Menu → Graphics → **Copy lag report** (and beside F3): every frame over 100 ms in play
+  with what was in it (a program linked is named) and what the game was doing; `tests/browser/hitch_hunter.py` (the
+  arena, a match, the trees, a story night; fails on a link, a big upload or a main-thread frame over 50 ms); the
+  benchmark reports each scene's first seconds (the arena's spawn).
+- Checks: the hitch hunter passes every scene (thin here outside the arena: SwiftShader draws the big world once every
+  ~13 s); golden 13 of 13 match `main` (12 pixel for pixel, the fight within its run-to-run noise); `same.sh` ALL SAME;
+  `npm test` (the action-lag nest test "dig orders … maps" failed twice under heavy load — golden renders running —
+  and passed alone, as it does on `main`: timing-sensitive, not this change); build.

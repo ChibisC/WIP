@@ -3,7 +3,7 @@ import { GameSession } from '../game/session';
 import { CASTES, SPECIES, SpeciesId } from '../sim/species';
 import { CREATURES } from '../sim/creatures/kinds';
 import { ARENA } from '../sim/balance';
-import { TEAM_NAMES, arenaUnitOk } from '../sim/arena';
+import { ARENA_ROSTER_SPECIES, TEAM_NAMES, arenaUnitOk } from '../sim/arena';
 import { STANCE, arenaOf } from '../sim/arenaState';
 import { TEAM_COLORS } from '../render/game/teamRings';
 import { ICONS, antSilhouette } from './icons';
@@ -11,7 +11,7 @@ import { casteFigureColour } from '../render/casteLook';
 import { button, el, esc, shield } from './dom';
 
 /** Species in the roster, in the menu's order. */
-const ROSTER_SPECIES: SpeciesId[] = ['lasius', 'formica', 'atta', 'solenopsis', 'eciton', 'nasutitermes', 'rhynchotermes', 'hell', 'aurimyrmex', 'termant', 'plagiaria'];
+const ROSTER_SPECIES: SpeciesId[] = ARENA_ROSTER_SPECIES;
 const COUNTS = [1, 5, 10, 25, 50];
 const SPEEDS: Array<[number, string]> = [
   [0.25, '¼×'],

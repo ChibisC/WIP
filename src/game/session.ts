@@ -6,6 +6,7 @@ import { GameLoop } from '../core/loop';
 import { Input, PointerInfo } from '../core/input';
 import { GameView, Quality } from '../render/view';
 import { AntRenderer, AntSpaceAdapter, AntView, animHooks, antHeadingHook } from '../render/ants/antRenderer';
+import { NASUTE_MORPHS } from '../render/ants/nasuteMorphs';
 import { intentAnts, intents } from './intents';
 import { ViewCull } from '../render/viewCull';
 import { edible } from '../sim/diet';
@@ -42,8 +43,12 @@ import { LocalCommands } from './localCommands';
 import { LocalSim, SimHost, WorkerSim } from './simHost';
 import { AutoQuality } from './autoQuality';
 import { prof } from '../core/profiler';
+import { storyOf } from '../sim/story/state';
+import { storyLevel } from '../story/levels';
+import { audio } from '../audio/engine';
+import { lagContext } from '../ui/lagReport';
 import { feel, InputKind } from '../core/feel';
-import { gpuIdle, overviewCamera, sceneTarget, warmScene } from '../render/prewarm';
+import { gpuIdle, overviewCamera, sceneTarget, shadowStandIns, warmScene } from '../render/prewarm';
 import { setNestMapsAsync } from '../render/nest/nestMapsClient';
 import { STOLEN_CASTES } from '../sim/termants';
 import type { NetGame } from '../net/netGame';
@@ -59,7 +64,7 @@ import { TeamRings } from '../render/game/teamRings';
 import { DigRings } from '../render/game/digRings';
 import { HealthBars } from '../render/game/healthBars';
 import { arenaOf } from '../sim/arenaState';
-import { TEAM_NAMES } from '../sim/arena';
+import { TEAM_NAMES, arenaRosterCastes } from '../sim/arena';
 import { Cinematic } from './cinematic';
 import type { StoryShotData } from '../core/events';
 
@@ -281,8 +286,19 @@ export class GameSession {
       const prev = r.getRenderTarget();
       r.setRenderTarget(this.view.post.enabled ? sceneTarget() : null);
       const p = r.compileAsync(tmp, this.view.activeCamera(), this.view.surfaceScene);
+      // (performance v6: and the programs the shadow map draws them with, into a target as the shadow map is — a
+      // rebuilt anthill's depth program was linked on the frame it was first shadowed: the arena's 2.6–6.4 s hitch here)
+      // (the shadow pass draws with no fog: the scene's taken off while the programs are chosen)
+      const sc = this.view.surfaceScene;
+      const sh = shadowStandIns(objs, sc);
+      const fog = sc.fog;
+      sc.fog = null;
+      r.setRenderTarget(sceneTarget());
+      const ps = r.compileAsync(sh.group, this.view.activeCamera(), sc);
+      sc.fog = fog;
+      sh.restore();
       r.setRenderTarget(prev);
-      return p;
+      return Promise.all([p, ps]);
     };
     // Pheromone overlay texture.
     const ph = w.phero;
@@ -411,6 +427,9 @@ export class GameSession {
   start(): void {
     this.loop.frameCap = frameCapOf(settings());
     this.loop.start();
+    // (loading is over: the lag recorder takes frames over 100 ms from here, with what the game was doing — v6)
+    prof.playing = true;
+    prof.lagContext = () => lagContext(this);
   }
 
   // ---------------------------------------------------------------- pre-warming (performance pass, CHANGE_PLAN §25)
@@ -432,6 +451,38 @@ export class GameSession {
       for (const cs of c.castes) add(cs);
       if (c.species === 'termant') for (const e of STOLEN_CASTES) add(e.caste);
       if (isTermiteSpecies(c.species)) out.add(c.species === 'rhynchotermes' ? 'termite_rhy_larva' : 'termite_larva');
+    }
+    return out;
+  }
+
+  /**
+   * The ant models that can come into play that the match's colonies do not have (performance v6, claude/performance/
+   * 06-spec §3): in the battle arena every caste of its roster; in a story level every caste its scenes and events
+   * bring in. Each was built in the frame its first ant was drawn — the arena's spawn freeze (4.1 s on the user's Mac,
+   * 4.8 s here for the fire ants) — or, for a level's arrivals, in play one model a frame.
+   */
+  spawnableMorphs(): Set<string> {
+    const out = new Set<string>();
+    if (arenaOf(this.world)) for (const cs of arenaRosterCastes()) out.add(CASTES[cs].morph);
+    // a story level: every caste its scenes and events bring in (an actor's `ants`), and every caste of a visiting
+    // party's species (a marching column of a species not in the level) — each was built in play, one model a frame
+    const st = storyOf(this.world);
+    if (st) {
+      const L = storyLevel(st.level);
+      const add = (cs: unknown) => {
+        const m = typeof cs === 'string' ? CASTES[cs]?.morph : undefined;
+        if (m) out.add(m);
+      };
+      const walk = (o: unknown): void => {
+        if (!o || typeof o !== 'object') return;
+        if (Array.isArray(o)) return o.forEach(walk);
+        for (const [k, v] of Object.entries(o)) {
+          if (k === 'ants' && Array.isArray(v)) for (const e of v) add(Array.isArray(e) ? e[0] : undefined);
+          else walk(v);
+        }
+      };
+      walk(L);
+      for (const v of Object.values(L.visitors ?? {})) for (const cd of Object.values(CASTES)) if (cd.species === v.species) out.add(cd.morph);
     }
     return out;
   }
@@ -460,6 +511,17 @@ export class GameSession {
       steps.push(f);
     };
     for (const r of this.antRenderers()) add('ant models', () => void r.prepare(morphs));
+    // (what a panel can drop on the surface in play: the arena's whole roster — performance v6; drawn by the surface's
+    // warm-up below, so every program its models use is compiled behind the loading screen too)
+    const extra = [...this.spawnableMorphs()].filter((m) => !morphs.has(m));
+    // (the arena's are dropped on the surface and stay there; a story's actors can go down into a nest)
+    if (extra.length)
+      for (const r of arenaOf(w) ? [this.surfAnts] : this.antRenderers()) add(arenaOf(w) ? 'ant models (the arena roster)' : 'ant models (the level\'s arrivals)', () => void r.prepare(extra));
+    // (performance v6: the glue and acid effects, when a conehead or a sickle-jaw soldier can be in the match — each
+    // was made, and its shaders compiled, on the frame of the first squirt or the first glued ant)
+    const can = new Set([...morphs, ...extra]);
+    const fx = { glue: [...can].some((m) => m in NASUTE_MORPHS), acid: can.has('termite_rhy_soldier') };
+    if (fx.glue || fx.acid) add('effects (glue, acid)', () => this.antRenderers().forEach((r) => r.prepareFx(fx)));
     add('creatures', () => {
       this.surfCreatures.prepare();
       for (const nv of this.nests.values()) nv.creatures.prepare();
@@ -486,7 +548,10 @@ export class GameSession {
     });
     // (performance v5: the post effects' own passes, every one, drawn once — they were built on the first frame)
     add('post effects', () => v.post.warm(v.surfaceScene, v.surfaceCam));
+    // (performance v6: the sounds made in the game — the end-of-match flourishes, the narrator's cue — made now)
+    add('sounds', () => audio.bank.synthesize());
     for (const m of morphs) this.warmed.add(m);
+    for (const m of extra) this.warmed.add(m);
     const took = new Map<string, number>();
     // (what the world's making queued for the GPU — ground, detail and texture bakes — finished first, so the steps'
     // times are their own: the first step that has to wait for the GPU otherwise paid for all of it — round 2)

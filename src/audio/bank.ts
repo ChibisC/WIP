@@ -98,13 +98,33 @@ export class Bank {
     return this.render(def);
   }
 
+  /** the made-in-game sounds' samples, made while loading (`synthesize`) and turned into buffers when first played */
+  private made = new Map<string, Float32Array[]>();
+
+  /**
+   * Make the in-game sounds' samples now (performance v6): the music stingers and the narration cue were made on the
+   * main thread the moment each first played — the victory flourish 44 ms, the narrator's cue 15 ms a take — at the
+   * end of a match and at a level's first caption. Called by the pre-warm, behind the loading screen; no audio
+   * context is needed for this part.
+   */
+  synthesize(): void {
+    for (const d of SOUNDS) {
+      if (!d.recipe || !MUSIC_RECIPES[d.recipe] || this.made.has(d.id) || this.loaded.has(d.id) || this.file(d)) continue;
+      const takes: Float32Array[] = [];
+      for (let k = 1; k <= Math.max(1, d.takes); k++) takes.push(MUSIC_RECIPES[d.recipe](rng(k * 7919 + d.id.length * 31 + Math.floor(Math.random() * 1e6))));
+      this.made.set(d.id, takes);
+    }
+  }
+
   /** Make an in-game sound's takes now (the music stingers, the narration cue). */
   private render(def: SoundDef): AudioBuffer[] | null {
     const ctx = this.engine.ctx;
     if (!ctx || !def.recipe || !MUSIC_RECIPES[def.recipe]) return null;
     const out: AudioBuffer[] = [];
+    const made = this.made.get(def.id);
+    this.made.delete(def.id);
     for (let k = 1; k <= Math.max(1, def.takes); k++) {
-      const x = MUSIC_RECIPES[def.recipe](rng(k * 7919 + def.id.length * 31 + Math.floor(Math.random() * 1e6)));
+      const x = made?.[k - 1] ?? MUSIC_RECIPES[def.recipe](rng(k * 7919 + def.id.length * 31 + Math.floor(Math.random() * 1e6)));
       const b = ctx.createBuffer(1, x.length, SR);
       b.copyToChannel(x as Float32Array<ArrayBuffer>, 0);
       out.push(b);
@@ -203,13 +223,15 @@ export class Bank {
   }
 
   /**
-   * After the first click, decode the sounds a game uses most in the background, a few at a time, so nothing waits
-   * on its first play: combat, the orders and alerts, work. Ambience one-shots, creatures and bosses load when first
-   * wanted (a game uses only some of them).
+   * After the first click, decode the sounds in the background, a few at a time, so nothing waits on its first play
+   * (it was silent): combat, the orders and alerts and work first, then the species' and creatures' sounds, the
+   * titans', and the ambience's one-shots last (performance v6: those loaded when first wanted — a creature's first
+   * bite or a titan's first slam had no sound; all of them decoded are about 30 MB). Loops stream and are not here.
    */
   warm(): void {
-    const first = (d: SoundDef) => (d.bus === 'combat' || d.bus === 'ui' ? 0 : d.id.startsWith('ant.') ? 1 : 2);
-    const queue = SOUNDS.filter((d) => this.file(d) && !d.stream && !d.reserved && first(d) < 2).sort((a, b) => first(a) - first(b));
+    const first = (d: SoundDef) =>
+      d.bus === 'combat' || d.bus === 'ui' ? 0 : d.id.startsWith('ant.') ? 1 : d.id.startsWith('species.') || d.id.startsWith('cr.') ? 2 : d.id.startsWith('boss.') ? 3 : 4;
+    const queue = SOUNDS.filter((d) => this.file(d) && !d.stream && !d.reserved).sort((a, b) => first(a) - first(b));
     const step = async () => {
       await this.manifestLoad;
       while (queue.length) {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { keepInstances } from './instancedPool';
 import { World } from '../../sim/world';
 import { AS, SURFACE } from '../../sim/types';
 import { casteOf } from '../../sim/species';
@@ -45,6 +46,8 @@ export class TeamRings {
     const m = new THREE.InstancedMesh(geo, this.mat, cap);
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     m.setColorAt(0, this.cols[0]);
+    // (performance v6: grown in the middle of a frame — the rings already written this frame kept)
+    if (old) keepInstances(old, m);
     m.frustumCulled = false;
     m.renderOrder = 1;
     m.count = 0;
