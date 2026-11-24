@@ -107,7 +107,7 @@ export class CanopyTerrain implements AreaTerrain {
       const m = o as THREE.Mesh;
       if (m.isMesh && m.geometry.index && o.parent?.visible !== false) tris += (m.geometry.index.count / 3) * ((m as THREE.InstancedMesh).isInstancedMesh ? (m as THREE.InstancedMesh).count : 1);
     });
-    prof.note(`canopy: ${this.wood.children.filter((o) => (o as THREE.LOD).isLOD).length} wood chunks, ${this.foliage.trees.reduce((a, t) => a + t.n, 0)} leaves, ${(tris / 1000).toFixed(0)}k triangles (${(performance.now() - t0).toFixed(0)} ms)`);
+    prof.note(`canopy: ${this.wood.children.filter((o) => (o as THREE.LOD).isLOD).length} wood chunks, ${this.foliage.trees.reduce((a, t) => a + t.near.count, 0)} leaves, ${(tris / 1000).toFixed(0)}k triangles (${(performance.now() - t0).toFixed(0)} ms)`);
   }
 
   private coverTex: THREE.DataTexture;
@@ -280,6 +280,7 @@ export class CanopyTerrain implements AreaTerrain {
       const far = cp.distanceTo(t.c) > 560;
       t.near.visible = !far;
       t.far.visible = far;
+      if (far) t.far.count = (t.far.userData.prepass as THREE.InstancedMesh).count = Math.ceil(t.near.count * 0.6);
     }
   }
 
