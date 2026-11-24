@@ -2245,3 +2245,11 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   camera; the tree lab `?scene=treelab`. References (descriptions, no photos): `docs/trees/references.md`.
 - **Checks so far:** `npm test` (all suites) passes; the determinism check is clean; `tools/perf/same.sh` against main:
   ALL SAME on the 12 stress scenes (with the save version, which the hash includes, left out).
+- **Cost** (`docs/performance.md` "Trees v2"): a fixed-camera probe showed the first cut at 2.5 times the flat canopy's
+  frame close up on the build machine. Then: shadows from coarse twins drawn into the shadow maps only
+  (`render/shadowOnly.ts`), the wood ringed at its nodes and flares, a depth pre-pass for the leaves, blades trimmed
+  to each species' outline, a tree's leaf shadows following its near/far share (leaf chunks tried and dropped). Bench
+  trees scene: GPU 496.8 → 399.5 ms a frame, shadow-pass canopy triangles 143k → 29k; close up the leaves' pixels
+  still make it about 2.5 times the flat canopy on a CPU rasterizer — the Mac's `?bench=1` decides v5's 60 FPS.
+  Golden subset outside the trees: identical. `npm test`, `tools/trees-check.ts` and the build pass again.
+- **Review:** the user's rating page (crowns, tiers, light, five barks, five leaves, the decision); merge after approval.

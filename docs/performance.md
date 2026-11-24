@@ -753,7 +753,14 @@ thirds of them), the coarse share nearer, a plainer leaf shader at Medium and Lo
 
 | trees scene (`?bench=1`, ONLY=trees), build machine, Q=high 640 × 400 | before (main a39bc06) | after |
 |---|---|---|
-BENCHROWS
-Reports: `docs/performance/bench-trees-v2-before.txt`, `-after.txt`.
+| GPU, all passes, a frame (the bench's camera: the canopy from its default height) | 496.8 ms | 399.5 ms |
+| scene pass | 193.3 ms | 57.8 ms |
+| shadow maps | 111.9 ms | 85.0 ms |
+| canopy triangles in the shadow pass | 143k (the flat bands' mesh) | 29k (leaf twins 19k, wood twins 8k, big leaves 2k) |
+| main thread a frame | 14.1 ms | 17.3 ms (2–3 frames at this frame rate: noise) |
+| GPU memory | ≈ 451 MB | ≈ 449 MB |
+Reports: `docs/performance/bench-trees-v2-before.txt`, `-after.txt` (the first cut's was 466.5 ms, its shadow pass
+36k canopy triangles; then a tree's leaf shadows were made to follow its near/far share, as the drawn leaves do).
 
-GOLDEN
+The golden subset outside the trees (Meadow Pond close, play and far; the home nest; the fight; the termite fight)
+against main: identical, before and after the cost pass.
