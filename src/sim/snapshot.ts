@@ -16,6 +16,7 @@
  */
 import { upgradeWorldEntrances } from './entrances';
 import { upgradeWorldTunnels } from './tunnels';
+import { upgradeWorldTrees } from './trees';
 import { EventBus } from '../core/events';
 import { NestGrid, NestGridSnap } from '../world/nestGrid';
 import { World } from './world';
@@ -406,6 +407,8 @@ export function restoreWorld(bytes: Uint8Array, events: EventBus): World {
   // (saves from before the one-entrance rework: the World constructor had no grids to upgrade them with)
   upgradeWorldEntrances(w);
   if (w.loadedVersion < 4) upgradeWorldTunnels(w);
+  // trees v2: the floor's derived data (a save from before it rebuilds its canopy)
+  upgradeWorldTrees(w);
   w.phero.ensureColonies(root.trail.length);
   for (let i = 0; i < root.trail.length; i++) w.phero.trail[i].set(root.trail[i]);
   w.phero.alarm.set(root.alarm);

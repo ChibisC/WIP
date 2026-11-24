@@ -24,9 +24,10 @@ import type { MapId } from '../maps/types';
  * save version 4, CHANGE_PLAN §27 — 2026-11-07. 14: one tick of lockstep delay on a LAN (MIN_DELAY 1, the host's new
  * margin), CHANGE_PLAN §29 — 2026-11-07. 15: performance v3 — every ant one field order, so the state hash (which
  * follows the order of the fields) differs from 14's for the same state, CHANGE_PLAN §32 — 2026-11-07. 16: the Trees layer — the canopy space, trunks that block, the `sandboxSet trees`
- * key, the fall, save version 5, CHANGE_PLAN §33 — 2026-11-08)
+ * key, the fall, save version 5, CHANGE_PLAN §33 — 2026-11-08. 17: trees v2 — branch tiers, sloping branches, a floor per
+ * fine cell, the climb to the crotch's tier, save version 6, CHANGE_PLAN §38 — 2026-11-24)
  */
-export const BUILD_ID = 'ud-mp-16';
+export const BUILD_ID = 'ud-mp-17';
 
 /** A lobby slot (players 0–3; the slot number is the colony id). */
 export interface Slot {

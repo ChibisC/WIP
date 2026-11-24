@@ -11,7 +11,8 @@ import { applyCommand } from '../src/sim/commands';
 import { AS, SURFACE, TREES, nestSpace } from '../src/sim/types';
 import { encodeState, hashState, restoreWorld } from '../src/sim/snapshot';
 import { flingAnt } from '../src/sim/combat';
-import { kindsOf, nearestBranch, TK_LEAF, TK_WOOD } from '../src/sim/trees';
+import { climbSeconds, kindsOf, nearestBranch, TK_LEAF, TK_WOOD, treesApart, treesFloorZ, treesSlopeSpeed, upgradeWorldTrees } from '../src/sim/trees';
+import { LAYERS, TREES as TB } from '../src/sim/balance';
 import { hasRouteHome } from '../src/sim/areas';
 import { BUILD_ID } from '../src/net/messages';
 import { goHome } from '../src/sim/movement';
@@ -158,6 +159,121 @@ function world(more: Record<string, unknown> = {}, seed = 5): World {
   check('… and the same future', hashState(w2) === hashState(w));
 }
 
+// ---------------------------------------------------------------- trees v2: tiers, slopes, drops, reach, the climb's height, falls
+{
+  const w = world({ trees: true, map: 'meadowPond' });
+  const d = w.s.trees!;
+  const g = w.nestOf(TREES)!;
+  const td = w.treesData!;
+  check('the floor has a height per fine cell', !!td && td.h.length === g.w * g.h);
+  const tiers = new Map<number, number>();
+  let slopes = 0;
+  let jumps = 0;
+  let mismatch = 0;
+  const lv = (z: number) => {
+    const l = z / TB.tierStep;
+    return Math.abs(l - Math.round(l)) < 1e-3 ? Math.round(l) : -1;
+  };
+  for (let y = 0; y < g.h; y++)
+    for (let x = 0; x < g.w; x++) {
+      const k = y * g.w + x;
+      if ((td.h[k] >= 0) !== g.isAir(x, y)) mismatch++;
+      if (td.h[k] < 0) continue;
+      const l = lv(td.h[k]);
+      if (l >= 0) tiers.set(l, (tiers.get(l) ?? 0) + 1);
+      else slopes++;
+      if (x + 1 < g.w && td.h[k + 1] >= 0 && Math.abs(td.h[k + 1] - td.h[k]) > TB.stepMax) jumps++;
+      if (y + 1 < g.h && td.h[k + g.w] >= 0 && Math.abs(td.h[k + g.w] - td.h[k]) > TB.stepMax) jumps++;
+    }
+  check('the walkable cells are the floor cells', mismatch === 0, `${mismatch} differ`);
+  check('the canopy has 2–4 tiers', tiers.size >= 2 && tiers.size <= 4, [...tiers.entries()].map(([l, c]) => `tier ${l}: ${c}`).join(', '));
+  check('… and sloping floor between them', slopes > 500, `${slopes} slope cells`);
+  check('drops between tiers block (no walkable step over stepMax)', jumps === 0, `${jumps} steps`);
+  check('every trunk knows its crotch’s tier and its crown’s tiers', d.trunks.every((t) => t.tiers >= 2 && t.tiers <= 4 && t.z === Math.floor(t.tiers / 2) * TB.tierStep), d.trunks.map((t) => `${t.tiers}/${t.z}`).join(' '));
+  check('… and the crotch is floor at that height', d.trunks.every((t) => Math.abs(treesFloorZ(w, t.x, t.y) - t.z) < 1e-6));
+  const t0 = d.trunks[0];
+  check('a climb takes the time of its height, up to the crotch', Math.abs(climbSeconds(w, t0) - (TB.climbSec * (d.height + t0.z)) / TB.height) < 1e-9 && climbSeconds(w, t0) > TB.climbSec, `${climbSeconds(w, t0).toFixed(2)} s`);
+  // a slope cell: walking up it is slower (as on the ground's ramps), down it is not
+  let sx = -1;
+  let sy = -1;
+  let ux = 0;
+  let uy = 0;
+  for (let k = 0; k < td.h.length && sx < 0; k++) {
+    if (td.h[k] < 0 || lv(td.h[k]) >= 0) continue;
+    const x = k % g.w;
+    const y = (k - x) / g.w;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const k2 = (y + dy * 2) * g.w + x + dx * 2;
+      const k3 = (y - dy * 2) * g.w + x - dx * 2;
+      if (td.h[k2] > td.h[k] + 1 && td.h[k3] >= 0 && td.h[k3] < td.h[k] - 1) {
+        sx = (x + 0.5) * g.cell;
+        sy = (y + 0.5) * g.cell;
+        ux = dx;
+        uy = dy;
+        break;
+      }
+    }
+  }
+  check('up a sloping branch at the ramps’ speed, down at full speed', sx >= 0 && treesSlopeSpeed(w, sx, sy, ux, uy) === LAYERS.upSpeed && treesSlopeSpeed(w, sx, sy, -ux, -uy) === 1);
+  // two floor points close in plan but on different tiers (a drop between them)
+  let A: [number, number] | null = null;
+  let B: [number, number] | null = null;
+  for (let k = 0; k < td.h.length && !A; k++) {
+    if (td.h[k] < 0) continue;
+    const x = k % g.w;
+    const y = (k - x) / g.w;
+    for (let r = 2; r <= 5 && !A; r++)
+      for (const [dx, dy] of [[r, 0], [0, r], [-r, 0], [0, -r]]) {
+        const xx = x + dx;
+        const yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= g.w || yy >= g.h) continue;
+        const k2 = yy * g.w + xx;
+        if (td.h[k2] >= 0 && td.h[k2] - td.h[k] >= TB.tierStep - 0.01) {
+          A = [(x + 0.5) * g.cell, (y + 0.5) * g.cell];
+          B = [(xx + 0.5) * g.cell, (yy + 0.5) * g.cell];
+          break;
+        }
+      }
+  }
+  check('floor on two tiers side by side exists (a branch passing over another)', !!A && !!B);
+  if (A && B) {
+    check('… they are out of each other’s reach', treesApart(w, A[0], A[1], B[0], B[1]) && !treesApart(w, A[0], A[1], A[0], A[1]));
+    // an enemy right across the drop is not fought
+    const me = w.s.colonies[0];
+    const foe = w.s.colonies[1];
+    const a = makeAnt(w, me.id, 'formica_worker', TREES, A[0], A[1]);
+    const b = makeAnt(w, foe.id, 'lasius_worker', TREES, B[0], B[1]);
+    a.state = AS.Idle;
+    b.state = AS.Idle;
+    const ha = a.hp;
+    const hb = b.hp;
+    let fought = 0;
+    for (let i = 0; i < 40; i++) {
+      w.step(0.05);
+      w.events.drain();
+      if ((a.state as AS) === AS.Attack || (b.state as AS) === AS.Attack) fought++;
+    }
+    check('… an enemy right across a drop is not fought', fought === 0 && a.hp === ha && b.hp === hb, `${fought} ticks attacking, hp ${a.hp}/${ha} ${b.hp}/${hb}`);
+    // a fling from the higher tier falls from there
+    const zB = treesFloorZ(w, b.x, b.y);
+    flingAnt(w, b, b.x - 5, b.y, 1);
+    check('a fling falls from the height the ant stood at', b.space === SURFACE && b.fz >= d.height + zB, `fz ${b.fz.toFixed(0)} from ${(d.height + zB).toFixed(0)}`);
+  }
+  // an old save (version 5, before the tiers): its canopy is rebuilt, what stood in the trees ends on the floor
+  const fresh = world({ trees: true, map: 'meadowPond' });
+  const c = makeAnt(w, w.s.colonies[0].id, 'formica_worker', TREES, 2, 2);
+  c.state = AS.Idle;
+  w.s.version = 5;
+  const w5 = restoreWorld(encodeState(w), new EventBus());
+  const g5 = w5.nestOf(TREES)!;
+  const c5 = w5.s.ants.find((q) => q.id === c.id)!;
+  let same = g5.soil.length === fresh.nestOf(TREES)!.soil.length;
+  for (let k = 0; same && k < g5.soil.length; k++) if (g5.soil[k] !== fresh.nestOf(TREES)!.soil[k]) same = false;
+  check('a version-5 save rebuilds its canopy (the same floor as a new match)', same && w5.s.version === 6 && !!w5.treesData);
+  check('… and moves what stood off the floor onto a branch', g5.isAirAt(c5.x, c5.y), `${c5.x.toFixed(0)},${c5.y.toFixed(0)}`);
+  void upgradeWorldTrees;
+}
+
 // ---------------------------------------------------------------- the sandbox toggle builds it at runtime (any map)
 {
   const w = world({ sandbox: true });
@@ -192,6 +308,6 @@ function world(more: Record<string, unknown> = {}, seed = 5): World {
   check('an ant walks home into the tree nest (up the trunk, along the branch, in)', home && a.space === nestSpace(c.id), `space ${a.space} after ${w.time.toFixed(0)} s`);
 }
 
-check('protocol bumped for the layer', BUILD_ID === 'ud-mp-16', BUILD_ID);
+check('protocol bumped for trees v2', BUILD_ID === 'ud-mp-17', BUILD_ID);
 console.log(`${failed ? failed + ' failed' : 'all trees tests passed'} in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 if (failed) (globalThis as unknown as { process: { exitCode: number } }).process.exitCode = 1;

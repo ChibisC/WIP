@@ -7,6 +7,7 @@ import { halfIn, routesOf } from '../sim/tunnels';
 import { edible } from '../sim/diet';
 import { MARKER_COLORS, MARKER_NAMES } from '../sim/markers';
 import { kindsOf } from '../sim/trees';
+import { TREES as T } from '../sim/balance';
 import { groupById } from '../sim/tiles';
 import { el, esc, shield } from './dom';
 import { AreaTabs } from './areaTabs';
@@ -236,16 +237,31 @@ export class Minimaps {
     const ctx = cv.getContext('2d')!;
     const img = ctx.createImageData(S, S);
     const kinds = kindsOf(d);
+    const td = w.treesData;
     for (let y = 0; y < S; y++)
       for (let x = 0; x < S; x++) {
-        const q = g.hexAt((x / S) * t.width, (y / S) * t.depth);
-        const k = q < 0 ? 0 : kinds[q];
+        const mx = (x / S) * t.width;
+        const my = (y / S) * t.depth;
+        let k: number;
+        let z = 0;
+        if (td) {
+          // (trees v2: the floor per fine cell, each tier a shade lighter than the one below it)
+          const ci = Math.floor(mx / g.cell);
+          const cj = Math.floor(my / g.cell);
+          const c = ci < 0 || cj < 0 || ci >= g.w || cj >= g.h ? -1 : cj * g.w + ci;
+          k = c < 0 || td.h[c] < 0 ? 0 : td.kind[c];
+          z = c < 0 ? 0 : Math.max(0, td.h[c]);
+        } else {
+          const q = g.hexAt(mx, my);
+          k = q < 0 ? 0 : kinds[q];
+        }
         if (!k) continue;
         const i = (y * S + x) * 4;
         const col = k === 2 || k === 4 ? [92, 140, 58] : k === 3 ? [120, 92, 64] : [104, 78, 52];
-        img.data[i] = col[0];
-        img.data[i + 1] = col[1];
-        img.data[i + 2] = col[2];
+        const lift = 0.78 + 0.16 * (z / T.tierStep);
+        img.data[i] = Math.min(255, col[0] * lift);
+        img.data[i + 1] = Math.min(255, col[1] * lift);
+        img.data[i + 2] = Math.min(255, col[2] * lift);
         img.data[i + 3] = 235;
       }
     ctx.putImageData(img, 0, 0);

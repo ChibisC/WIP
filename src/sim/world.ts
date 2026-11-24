@@ -10,7 +10,7 @@ import { SpatialHash } from './spatial';
 import { normalizeAnt } from './factory';
 import type { FloodCache } from './nestFlood';
 import { Ant, AphidCluster, Brood, CaveDef, Colony, Creature, Entrance, Food, LeafPlant, SimState, SURFACE, TREES, colonyOfSpace, nestSpace, isCaveSpace, Projectile } from './types';
-import { applyTreesToTerrain, treeEntrances } from './trees';
+import { applyTreesToTerrain, CanopyData, treeEntrances, upgradeWorldTrees } from './trees';
 
 /**
  * The live simulation: serializable SimState plus runtime acceleration
@@ -112,13 +112,22 @@ export class World {
     // version 4 (2026-11-06): the shared underground — rock margins round every nest and tunnel routes between them
     // (sim/tunnels.ts; a binary snapshot attaches its grids after this, and restoreWorld upgrades it then)
     // version 5 (2026-11-08): the Trees layer (`trees`; older saves load without it)
+    // version 6 (2026-11-24): trees v2 — branch tiers, a floor per fine cell (sim/trees.ts upgradeWorldTrees rebuilds an
+    // older canopy once the grids are attached)
     this.loadedVersion = state.version ?? 1;
-    state.version = Math.max(5, state.version ?? 1);
+    state.version = Math.max(6, state.version ?? 1);
     this.reindex();
     if (this.grids.size) upgradeWorldTunnels(this);
     // the Trees layer (sim/trees.ts): the trunks block the ground again on a terrain rebuilt from the state
     if (state.trees) applyTreesToTerrain(this);
+    if (state.trees && this.grids.has(TREES)) upgradeWorldTrees(this);
   }
+
+  /**
+   * The trees' crowns and floor heights (sim/trees.ts `CanopyData`): derived from the trees' definitions by every
+   * copy of the world when the layer is built or restored, never saved. Null without the layer.
+   */
+  treesData: CanopyData | null = null;
 
   /** the SimState version this world was constructed from (save upgrades that must run once the grids are attached) */
   loadedVersion = 4;
@@ -448,7 +457,7 @@ export class World {
 
 export function emptyState(seed: number, terrainParams: SimState['terrain']): SimState {
   return {
-    version: 5,
+    version: 6,
     tick: 0,
     time: 0,
     seed,

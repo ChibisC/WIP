@@ -927,6 +927,9 @@ export interface TrunkDef {
   tree: number;
   /** the crown (connected set of hexes) this trunk climbs into */
   comp: number;
+  /** trees v2: the crotch's height over the canopy plane (mm; the trunk top's tier × TREES.tierStep) and the crown's tiers */
+  z: number;
+  tiers: number;
 }
 
 export type TreeSiteKind = 'leaf' | 'hollow' | 'fork';
@@ -947,7 +950,10 @@ export interface TreesDef {
   space: number;
   trunks: TrunkDef[];
   sites: TreeSiteDef[];
-  /** per hex of the trees grid: 0 sky, 1 wood, 2 leaf, 3 trunk top, 4 flower (food site) (render and validator) */
+  /**
+   * per hex of the trees grid: 0 sky, 1 wood, 2 leaf, 3 trunk top, 4 flower (food site) (render and validator); a hex is
+   * walkable when its centre cell is floor (the floor itself is per fine cell: `World.treesData`)
+   */
   kinds: string;
   /** per hex: which crown it belongs to (crowns that touch are one; 0 sky) — ants reach another crown by the ground */
   comps: string;

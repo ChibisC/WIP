@@ -116,9 +116,9 @@ export interface Ramp {
 
 /**
  * The Trees (claude/trees/01-spec-trees-layer.md; sim/trees.ts): a tree is a trunk on the ground (a wall ants walk
- * round, with climb points at its foot) and a crown in the canopy map above it. The crown's branches, twigs and leaves
- * are grown deterministically from the tree's style and seed (`sim/trees.ts crownShapes`); `branches` and `leaves` may
- * be authored outright instead (then nothing is grown).
+ * round, with climb points at its foot) and a crown in the canopy map above it. The crown — its tiers, limbs, branches,
+ * twigs, big leaves, food and nest sites — is grown deterministically from the tree's style, reach and seed (trees v2,
+ * `sim/treeCrowns.ts crownSkeleton`; the authored branches and leaves of v1 went with the flat crowns).
  */
 export type CrownStyle = 'oak' | 'beech' | 'tropical' | 'willow' | 'acacia' | 'sapling';
 
@@ -132,12 +132,6 @@ export interface TreeDef {
   seed: number;
   /** climb points at the foot (mm); grown round the trunk when left out */
   climbs?: readonly Pt[];
-  branches?: ReadonlyArray<{ path: readonly Pt[]; width: number }>;
-  leaves?: ReadonlyArray<{ at: Pt; rx: number; ry: number; rot?: number }>;
-  /** food sites (berries, fruit) on the crown (mm); a few are grown when left out */
-  flowers?: readonly Pt[];
-  /** set branches for future tree nests (mm): leaf clusters, hollows, sheltered forks (grown when left out) */
-  sites?: ReadonlyArray<{ kind: 'leaf' | 'hollow' | 'fork'; at: Pt }>;
 }
 
 /** A camera key of a story map's opening flight: look at `at` from `dist` mm, `yaw` rad, arriving `t` s in. */

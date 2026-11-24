@@ -2,7 +2,8 @@ import { titanRaidTick } from './titanDig';
 import { World } from '../world';
 import { tauntOf } from '../casteAbilities';
 import { HF_CREATURE } from '../../world/surfaceLayout';
-import { Ant, AS, Creature, SURFACE } from '../types';
+import { Ant, AS, Creature, SURFACE, TREES } from '../types';
+import { treesApart } from '../trees';
 import { casteOf } from '../species';
 import { ARENA, BALANCE, ECITON, STAG, STAG_MALE, TERMANT, LAYERS } from '../balance';
 import { enforceMountRatio, riding, throwRiders } from '../climbing';
@@ -227,6 +228,8 @@ export function pickAnt(w: World, cr: Creature, x: number, y: number, r: number,
   w.antsNear(cr.space, x, y, r, (a, d2) => {
     if (a.state === AS.Dead || a.state === AS.Flung || riding(a) || casteOf(a.caste).role === 'king') return false;
     if (team >= 0 && (a.team ?? a.colony) === team) return false; // battle arena: its own team
+    // (the trees: an ant on another tier is out of reach, TREES.reachZ)
+    if (cr.space === TREES && treesApart(w, cr.x, cr.y, a.x, a.y)) return false;
     // (one clinging to its body out of its reach cannot be chased round: 2026-10-31, reach from the outline)
     if (kind && onBody(cr, a) && !inReach(cr, kind, a)) return false;
     // ants ahead count as nearer than ants behind (one straight behind as √2 × as far): with a ring of

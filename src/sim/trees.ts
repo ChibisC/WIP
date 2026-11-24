@@ -14,155 +14,26 @@
  */
 import { Rng } from '../core/rng';
 import { NestGrid, SOIL_AIR, SOIL_LOAM, SOIL_ROCK } from '../world/nestGrid';
-import { shapeDist } from '../world/mapShapes';
-import type { CrownStyle, Pt, Shape, TreeDef } from '../maps/types';
-import { TREES as T } from './balance';
-import { dcos, dhypot, dsin, datan2 } from './dmath';
+import type { Pt, TreeDef } from '../maps/types';
+import { LAYERS, TREES as T } from './balance';
+import { dcos, dhypot, dsin } from './dmath';
+import { CanopyFloor, crownSkeleton, CrownSkel, linkHeadings, linkPieces, paintCanopy, TK_FLOWER, TK_LEAF, TK_WOOD, WoodPiece } from './treeCrowns';
 import { makeEntrance } from './entrances';
 import { makeFood } from './factory';
 import { Colony, Entrance, SURFACE, TREES, TreeSiteDef, TreeSiteKind, TreesDef, TrunkDef } from './types';
 import { World } from './world';
 
-/** per-hex kinds of the trees grid (`TreesDef.kinds`) */
-export const TK_SKY = 0;
-export const TK_WOOD = 1;
-export const TK_LEAF = 2;
-export const TK_TOP = 3;
-export const TK_FLOWER = 4;
-
-export interface CrownShapes {
-  branches: Array<{ path: Pt[]; width: number; main: boolean }>;
-  leaves: Array<{ at: Pt; rx: number; ry: number; rot: number }>;
-  flowers: Pt[];
-  sites: Array<{ kind: TreeSiteKind; at: Pt }>;
-}
-
-const STYLE: Record<CrownStyle, { branches: [number, number]; width: number; droop: number; twigs: number; leaf: number; flowers: number; wobble: number }> = {
-  oak: { branches: [5, 6], width: 2.1, droop: 0.3, twigs: 2, leaf: 0.9, flowers: 1, wobble: 0.35 },
-  beech: { branches: [4, 5], width: 1.8, droop: 0.2, twigs: 2, leaf: 1.0, flowers: 0, wobble: 0.25 },
-  tropical: { branches: [5, 7], width: 2.3, droop: 0.15, twigs: 3, leaf: 1.2, flowers: 2, wobble: 0.3 },
-  willow: { branches: [6, 8], width: 1.5, droop: 0.6, twigs: 1, leaf: 0.65, flowers: 0, wobble: 0.5 },
-  acacia: { branches: [4, 5], width: 1.7, droop: 0.05, twigs: 2, leaf: 0.55, flowers: 1, wobble: 0.2 },
-  sapling: { branches: [3, 3], width: 1.4, droop: 0.1, twigs: 1, leaf: 0.75, flowers: 0, wobble: 0.3 },
-};
+export { TK_SKY, TK_WOOD, TK_LEAF, TK_TOP, TK_FLOWER, crownSkeleton, crownTiers, topTier } from './treeCrowns';
+export type { BigLeaf, CrownSkel, WoodKind, WoodNode, WoodPiece } from './treeCrowns';
 
 /**
- * Grow a crown: main branches radiating from the trunk top, each a wobbling polyline that narrows outward and
- * splits into twigs, with leaf platforms at the twigs' ends and a few along the way; flowers (food sites) on some
- * leaves; nest-site candidates (a leaf cluster at a branch end, a hollow on a thick branch near the trunk, a sheltered
- * fork at a twig split). Deterministic in the tree's seed. Widths are in hexes (× the grid's hex width).
+ * What every copy of a match derives from its trees (never saved; `World.treesData`): the crowns' skeletons and the
+ * links between them (the render draws them as wood), and the floor per fine cell — its height over the canopy plane,
+ * kind, the rounding across its wood and the crown it belongs to (`paintCanopy`).
  */
-export function crownShapes(def: TreeDef, hexW: number): CrownShapes {
-  const st = STYLE[def.style];
-  const rng = new Rng(def.seed * 131 + 17);
-  const out: CrownShapes = { branches: [], leaves: [], flowers: [], sites: [] };
-  if (def.branches) {
-    for (const b of def.branches) out.branches.push({ path: [...b.path], width: b.width, main: true });
-    for (const l of def.leaves ?? []) out.leaves.push({ at: l.at, rx: l.rx, ry: l.ry, rot: l.rot ?? 0 });
-    out.flowers = [...(def.flowers ?? [])];
-    out.sites = (def.sites ?? []).map((s) => ({ kind: s.kind, at: s.at }));
-    return out;
-  }
-  const [tx, ty] = def.trunk;
-  const n = rng.int(st.branches[0], st.branches[1]);
-  const a0 = rng.range(0, Math.PI * 2);
-  const leafR = hexW * 1.6 * st.leaf;
-  for (let i = 0; i < n; i++) {
-    const ang = a0 + (i / n) * Math.PI * 2 + rng.range(-0.25, 0.25);
-    const reach = def.reach * rng.range(0.75, 1.05);
-    const segs = 4;
-    const path: Pt[] = [[tx + dcos(ang) * def.r * 0.5, ty + dsin(ang) * def.r * 0.5]];
-    let x = tx + dcos(ang) * def.r;
-    let y = ty + dsin(ang) * def.r;
-    let h = ang;
-    for (let k = 1; k <= segs; k++) {
-      h += rng.range(-st.wobble, st.wobble) + (k === 1 ? 0 : st.droop * 0.3 * rng.sign());
-      const len = (reach - def.r) / segs;
-      x += dcos(h) * len;
-      y += dsin(h) * len;
-      path.push([x, y]);
-    }
-    // a main branch: wide at the trunk, narrowing to a twig at its end (three pieces of falling width)
-    const w0 = hexW * st.width;
-    for (let k = 0; k < segs; k++) {
-      const u = k / segs;
-      const width = w0 * (1 - 0.62 * u);
-      out.branches.push({ path: [path[k], path[k + 1]], width, main: k < 2 });
-    }
-    // leaves at the end and a cluster near it
-    const end = path[segs];
-    out.leaves.push({ at: end, rx: leafR * 1.5, ry: leafR, rot: h });
-    out.leaves.push({ at: [end[0] + dcos(h + 1.2) * leafR * 1.2, end[1] + dsin(h + 1.2) * leafR * 1.2], rx: leafR, ry: leafR * 0.7, rot: h + 0.6 });
-    if (i % 2 === 0) out.sites.push({ kind: 'leaf', at: end });
-    if (st.flowers && rng.chance(0.6)) out.flowers.push([end[0] + dcos(h - 1.1) * leafR * 0.6, end[1] + dsin(h - 1.1) * leafR * 0.6]);
-    // hollow: on the thick part near the trunk
-    if (i === 1) out.sites.push({ kind: 'hollow', at: [path[1][0], path[1][1]] });
-    // twigs off the middle of the branch, with a leaf at each end; the split is a sheltered fork
-    for (let t = 0; t < st.twigs; t++) {
-      const k = 1 + rng.int(0, segs - 3);
-      const from = path[k];
-      const side = rng.sign();
-      const th = datan2(path[k + 1][1] - path[k][1], path[k + 1][0] - path[k][0]) + side * rng.range(0.7, 1.2);
-      const tl = def.reach * rng.range(0.25, 0.42);
-      const mid: Pt = [from[0] + dcos(th) * tl * 0.5, from[1] + dsin(th) * tl * 0.5];
-      const th2 = th + rng.range(-st.wobble, st.wobble);
-      const tip: Pt = [mid[0] + dcos(th2) * tl * 0.5, mid[1] + dsin(th2) * tl * 0.5];
-      out.branches.push({ path: [from, mid, tip], width: hexW * 1.05, main: false });
-      out.leaves.push({ at: tip, rx: leafR * 1.1, ry: leafR * 0.8, rot: th2 });
-      if (t === 0 && i % 3 === 2) out.sites.push({ kind: 'fork', at: from });
-      if (st.flowers > 1 && rng.chance(0.4)) out.flowers.push(tip);
-    }
-  }
-  return out;
-}
-
-/**
- * The boughs that join the trees: the shortest spanning tree over the trunks (deterministic), each link a path from one
- * trunk top toward the other with a gentle wobble, leaves along it; where the crowns overlap it simply runs through them.
- */
-export function linkBranches(defs: TreeDef[], hexW: number): Array<{ path: Pt[]; width: number; leaves: Pt[]; rot: number }> {
-  const out: Array<{ path: Pt[]; width: number; leaves: Pt[]; rot: number }> = [];
-  if (defs.length < 2) return out;
-  const inTree = new Set<number>([0]);
-  const edges: Array<[number, number]> = [];
-  while (inTree.size < defs.length) {
-    let best: [number, number] | null = null;
-    let bd = Infinity;
-    for (const a of inTree)
-      defs.forEach((d, b) => {
-        if (inTree.has(b)) return;
-        const dd = dhypot(d.trunk[0] - defs[a].trunk[0], d.trunk[1] - defs[a].trunk[1]);
-        if (dd < bd) {
-          bd = dd;
-          best = [a, b];
-        }
-      });
-    if (!best) break;
-    inTree.add(best[1]);
-    edges.push(best);
-  }
-  edges.forEach(([a, b], i) => {
-    const A = defs[a].trunk;
-    const B = defs[b].trunk;
-    const rng = new Rng(defs[a].seed * 7 + defs[b].seed * 13 + i);
-    const len = dhypot(B[0] - A[0], B[1] - A[1]);
-    const n = Math.max(3, Math.round(len / 90));
-    const h0 = datan2(B[1] - A[1], B[0] - A[0]);
-    const path: Pt[] = [A];
-    const leaves: Pt[] = [];
-    for (let k = 1; k < n; k++) {
-      const u = k / n;
-      // a sine wobble across the straight line, fading at both ends
-      const off = dsin(u * Math.PI * 2 + rng.range(0, 1)) * len * 0.07 * dsin(u * Math.PI);
-      const x = A[0] + (B[0] - A[0]) * u + dcos(h0 + Math.PI / 2) * off;
-      const y = A[1] + (B[1] - A[1]) * u + dsin(h0 + Math.PI / 2) * off;
-      path.push([x, y]);
-      if (k % 2 === 0) leaves.push([x + dcos(h0 + Math.PI / 2) * hexW * 1.4 * rng.sign(), y + dsin(h0 + Math.PI / 2) * hexW * 1.4]);
-    }
-    path.push(B);
-    out.push({ path, width: hexW * 1.15, leaves, rot: h0 });
-  });
-  return out;
+export interface CanopyData extends CanopyFloor {
+  skels: CrownSkel[];
+  links: WoodPiece[];
 }
 
 /** The trees of a match: the map's authored trees, or on a procedural map a few grown from the seed away from the nests. */
@@ -186,16 +57,6 @@ export function treesOf(w: World): TreeDef[] {
   return out;
 }
 
-/** Every leaf blade of the match's canopy (the render bakes leaf-local coordinates for the veins): ellipses in mm. */
-export function canopyLeaves(w: World): Array<{ at: Pt; rx: number; ry: number; rot: number }> {
-  const defs = treesOf(w);
-  const hexW = T.hexR * Math.sqrt(3);
-  const out: Array<{ at: Pt; rx: number; ry: number; rot: number }> = [];
-  for (const def of defs) for (const l of crownShapes(def, hexW).leaves) out.push(l);
-  for (const b of linkBranches(defs, hexW)) for (const l of b.leaves) out.push({ at: l, rx: hexW * 1.3, ry: hexW * 0.9, rot: b.rot });
-  return out;
-}
-
 /** The trees grid covering the ground map (its hexes in the ground's mm frame). */
 export function treesGrid(w: World): NestGrid {
   const R = T.hexR;
@@ -206,103 +67,75 @@ export function treesGrid(w: World): NestGrid {
   return new NestGrid({ cols, rows, R, seed: 1 });
 }
 
+/** The crowns of the match's trees and the floor painted from them, on a grid of the trees' size (pure). */
+export function canopyFloorOf(w: World, g: { w: number; h: number; cell: number }): CanopyData | null {
+  const defs = treesOf(w);
+  if (!defs.length) return null;
+  const toward = linkHeadings(defs);
+  const skels = defs.map((d, i) => crownSkeleton(d, i, toward[i]));
+  return { ...paintCanopy(g, skels, (above, reached) => linkPieces(defs, skels, above, reached)), skels };
+}
+
 /**
  * The canopy grid and its hexes from the match's trees: a pure function of the terrain and the trees' definitions, so
  * the worker's replica builds the same grid when the layer appears (game/replica.ts) and a save needs only the def.
+ * The floor is per fine cell (`paintCanopy`); a hex is dug — markers, sites, food, the trunk top's entrance — when its
+ * centre cell is floor.
  */
-export function buildCanopy(w: World): { g: NestGrid; kinds: Uint8Array; comps: Uint8Array; trunks: TrunkDef[]; siteCands: Array<{ kind: TreeSiteKind; x: number; y: number; tree: number }>; defs: TreeDef[] } | null {
+export function buildCanopy(w: World): { g: NestGrid; kinds: Uint8Array; comps: Uint8Array; trunks: TrunkDef[]; siteCands: Array<{ kind: TreeSiteKind; x: number; y: number; tree: number }>; defs: TreeDef[]; data: CanopyData } | null {
   const defs = treesOf(w);
   if (!defs.length) return null;
   const g = treesGrid(w);
-  const hexW = g.R * Math.sqrt(3);
+  const data = canopyFloorOf(w, g)!;
   const nh = g.cols * g.rows;
   const kinds = new Uint8Array(nh);
-  // all rock, nothing diggable
+  const comps = new Uint8Array(nh);
+  // all rock, nothing diggable; the floor cells dug (logged like any dig, so the flow fields know them)
   g.hexSoil.fill(SOIL_ROCK);
   g.soil.fill(SOIL_ROCK);
   g.hexTotal.fill(0);
   g.hexWork.fill(0);
+  for (let k = 0; k < g.w * g.h; k++)
+    if (data.h[k] >= 0) {
+      g.soil[k] = SOIL_LOAM;
+      const x = k % g.w;
+      g.carve(x, (k - x) / g.w);
+    }
+  const p = { x: 0, y: 0 };
+  for (let q = 0; q < nh; q++) {
+    g.hexCenter(q, p);
+    const k = cellIndex(g, p.x, p.y);
+    if (k < 0 || data.h[k] < 0) continue;
+    kinds[q] = data.kind[k];
+    comps[q] = data.comp[k];
+    g.hexSoil[q] = SOIL_AIR;
+  }
+  for (const sk of data.skels)
+    for (const f of sk.flowers) {
+      const q = g.hexAt(f[0], f[1]);
+      if (q >= 0 && kinds[q]) kinds[q] = TK_FLOWER;
+    }
   const trunks: TrunkDef[] = [];
   const siteCands: Array<{ kind: TreeSiteKind; x: number; y: number; tree: number }> = [];
-  const flowers: Pt[] = [];
-  const shapesOf: Array<{ shape: Shape; kind: number }> = [];
-  const p = { x: 0, y: 0 };
   defs.forEach((def, ti) => {
-    const crown = crownShapes(def, hexW);
-    for (const b of crown.branches) shapesOf.push({ shape: { path: b.path, width: b.width }, kind: TK_WOOD });
-    for (const l of crown.leaves) shapesOf.push({ shape: { ellipse: l.at, rx: l.rx, ry: l.ry, rot: l.rot }, kind: TK_LEAF });
-    shapesOf.push({ shape: { circle: def.trunk, r: Math.max(def.r, hexW * 1.2) }, kind: TK_TOP });
-    for (const f of crown.flowers) flowers.push(f);
-    for (const s of crown.sites) siteCands.push({ kind: s.kind, x: s.at[0], y: s.at[1], tree: ti });
+    const sk = data.skels[ti];
     const top = g.hexAt(def.trunk[0], def.trunk[1]);
-    trunks.push({ x: def.trunk[0], y: def.trunk[1], r: def.r, top, climbs: [], tree: ti, comp: 0 });
+    trunks.push({ x: def.trunk[0], y: def.trunk[1], r: def.r, top, climbs: [], tree: ti, comp: top >= 0 ? comps[top] : 0, z: sk.topZ, tiers: sk.tiers });
+    for (const s of sk.sites) siteCands.push({ kind: s.kind, x: s.at[0], y: s.at[1], tree: ti });
   });
-  // every tree is joined to the others by branches reaching out (user 2026-11-07): a spanning tree over the trunks, each
-  // link a long wobbling bough from crown to crown, twig-wide, with a leaf or two along it
-  for (const b of linkBranches(defs, hexW)) {
-    shapesOf.push({ shape: { path: b.path, width: b.width }, kind: TK_WOOD });
-    for (const l of b.leaves) shapesOf.push({ shape: { ellipse: l, rx: hexW * 1.3, ry: hexW * 0.9, rot: b.rot }, kind: TK_LEAF });
-  }
-  // paint the hexes: wood first, then leaves over it, the trunk tops last
-  for (const kind of [TK_WOOD, TK_LEAF, TK_TOP]) {
-    for (const s of shapesOf) {
-      if (s.kind !== kind) continue;
-      // (only the hexes near the shape are tested)
-      const bb = boundsOf(s.shape);
-      const q0 = g.hexAt(Math.max(0, bb.x0), Math.max(0, bb.y0));
-      const q1 = g.hexAt(Math.min(g.widthMm - 1, bb.x1), Math.min(g.depthMm - 1, bb.y1));
-      const c0 = Math.max(0, (q0 >= 0 ? g.hexCol(q0) : 0) - 1);
-      const r0 = Math.max(0, (q0 >= 0 ? g.hexRow(q0) : 0) - 1);
-      const c1 = Math.min(g.cols - 1, (q1 >= 0 ? g.hexCol(q1) : g.cols - 1) + 1);
-      const r1 = Math.min(g.rows - 1, (q1 >= 0 ? g.hexRow(q1) : g.rows - 1) + 1);
-      for (let r = r0; r <= r1; r++)
-        for (let c = c0; c <= c1; c++) {
-          const q = g.hexIndex(c, r);
-          g.hexCenter(q, p);
-          if (shapeDist(s.shape, p.x, p.y) < g.R * 0.35) kinds[q] = kind;
-        }
-    }
-  }
-  for (const f of flowers) {
-    const q = g.hexAt(f[0], f[1]);
-    if (q >= 0 && kinds[q]) kinds[q] = TK_FLOWER;
-  }
-  // each crown must hang together with its trunk top: hexes no trunk top can reach are pruned (sky); crowns that touch
-  // are one component (ants walk between them), others are reached by the ground
-  const comps = new Uint8Array(nh);
-  let nComp = 0;
-  for (const tr of trunks) {
-    if (tr.top < 0 || !kinds[tr.top]) continue;
-    if (comps[tr.top]) {
-      tr.comp = comps[tr.top];
-      continue;
-    }
-    tr.comp = ++nComp;
-    comps[tr.top] = nComp;
-    const stack = [tr.top];
-    while (stack.length) {
-      const q = stack.pop()!;
-      for (const n of g.neighbors(q))
-        if (n >= 0 && kinds[n] && !comps[n]) {
-          comps[n] = nComp;
-          stack.push(n);
-        }
-    }
-  }
-  for (let q = 0; q < nh; q++) if (kinds[q] && !comps[q]) kinds[q] = TK_SKY;
-  // dig the walkable hexes
-  for (let q = 0; q < nh; q++) {
-    if (!kinds[q]) continue;
-    g.hexSoil[q] = SOIL_LOAM;
-    for (const c of g.hexCells[q]) g.soil[c] = SOIL_LOAM;
-    g.completeHex(q);
-  }
   // the trunk tops are the grid's entrances
   for (const tr of trunks) if (tr.top >= 0 && kinds[tr.top]) g.addEntrance([tr.top]);
   g.version++;
   g.stateVersion++;
   g.dirtyAll();
-  return { g, kinds, comps, trunks, siteCands, defs };
+  return { g, kinds, comps, trunks, siteCands, defs, data };
+}
+
+/** The fine cell of a point of the trees grid (−1 outside). */
+function cellIndex(g: { w: number; h: number; cell: number }, x: number, y: number): number {
+  const i = Math.floor(x / g.cell);
+  const j = Math.floor(y / g.cell);
+  return i < 0 || j < 0 || i >= g.w || j >= g.h ? -1 : j * g.w + i;
 }
 
 /**
@@ -313,11 +146,38 @@ export function createTrees(w: World): TreesDef | null {
   if (w.s.trees) return w.s.trees;
   const built = buildCanopy(w);
   if (!built) return null;
-  const { g, kinds, comps, trunks, siteCands, defs } = built;
+  const rng = new Rng(w.s.seed * 29 + 3);
+  const def = treesDefOf(w, built, rng);
+  const { g, kinds } = built;
   const nh = g.cols * g.rows;
   const p = { x: 0, y: 0 };
+  w.addGrid(TREES, g);
+  w.s.trees = def;
+  w.treesData = built.data;
+  applyTreesToTerrain(w);
+  // food on the branches (scaled like the ground's food setting) and the first wild climbers come with the ecology
+  const foodN = Math.round(T.food * ((w.s.settings as { food?: number }).food ?? 1));
+  const walk: number[] = [];
+  for (let q = 0; q < nh; q++) if (kinds[q] === TK_WOOD || kinds[q] === TK_LEAF) walk.push(q);
+  for (let i = 0; i < foodN && walk.length; i++) {
+    const q = walk[rng.int(0, walk.length - 1)];
+    g.hexCenter(q, p);
+    if (kinds[q] === TK_LEAF && rng.chance(0.5)) makeFood(w, 'berry', TREES, p.x, p.y, rng.range(0.8, 1.2), rng.chance(0.5) ? 'berry' : 'apple');
+    else makeFood(w, 'insect', TREES, p.x, p.y, rng.range(0.8, 1.3), rng.pick(['fly', 'moth', 'beetle']));
+  }
+  for (let q = 0; q < nh; q++)
+    if (kinds[q] === TK_FLOWER) {
+      g.hexCenter(q, p);
+      makeFood(w, 'berry', TREES, p.x, p.y, 1.1, 'berry');
+    }
+  return def;
+}
+
+/** The trees' definition from a built canopy: the climb points at each trunk's foot and the nest sites. */
+function treesDefOf(w: World, built: NonNullable<ReturnType<typeof buildCanopy>>, rng: Rng): TreesDef {
+  const { g, kinds, comps, trunks, siteCands, defs } = built;
+  const p = { x: 0, y: 0 };
   // the trunk tops are the grid's entrances; the climb points at the foot are the space's entrances
-  const rng = new Rng(w.s.seed * 29 + 3);
   trunks.forEach((tr, ti) => {
     if (tr.top < 0 || !kinds[tr.top]) return;
     const def = defs[ti];
@@ -357,26 +217,44 @@ export function createTrees(w: World): TreesDef | null {
     g.hexCenter(q, p);
     sites.push({ kind, q, x: p.x, y: p.y, nest: -1 });
   }
-  const def: TreesDef = { space: TREES, trunks, sites, kinds: kindsToString(kinds), comps: kindsToString(comps), height: T.height };
-  w.addGrid(TREES, g);
-  w.s.trees = def;
-  applyTreesToTerrain(w);
-  // food on the branches (scaled like the ground's food setting) and the first wild climbers come with the ecology
-  const foodN = Math.round(T.food * ((w.s.settings as { food?: number }).food ?? 1));
-  const walk: number[] = [];
-  for (let q = 0; q < nh; q++) if (kinds[q] === TK_WOOD || kinds[q] === TK_LEAF) walk.push(q);
-  for (let i = 0; i < foodN && walk.length; i++) {
-    const q = walk[rng.int(0, walk.length - 1)];
-    g.hexCenter(q, p);
-    if (kinds[q] === TK_LEAF && rng.chance(0.5)) makeFood(w, 'berry', TREES, p.x, p.y, rng.range(0.8, 1.2), rng.chance(0.5) ? 'berry' : 'apple');
-    else makeFood(w, 'insect', TREES, p.x, p.y, rng.range(0.8, 1.3), rng.pick(['fly', 'moth', 'beetle']));
+  return { space: TREES, trunks, sites, kinds: kindsToString(kinds), comps: kindsToString(comps), height: T.height };
+}
+
+/**
+ * A restored match's trees (after its grids are attached): the derived floor data; a save from before trees v2
+ * (version ≤ 5: one flat level of hexes) rebuilds its canopy — grid, trunks, sites — and moves what stood in the trees
+ * to the nearest branch (a tree nest's hole to its site's new place).
+ */
+export function upgradeWorldTrees(w: World): void {
+  const d = w.s.trees;
+  if (!d) return;
+  const g = w.nestOf(TREES);
+  if (w.loadedVersion >= 6 && g) {
+    w.treesData = canopyFloorOf(w, g);
+    return;
   }
-  for (let q = 0; q < nh; q++)
-    if (kinds[q] === TK_FLOWER) {
-      g.hexCenter(q, p);
-      makeFood(w, 'berry', TREES, p.x, p.y, 1.1, 'berry');
+  const built = buildCanopy(w);
+  if (!built) return;
+  const def = treesDefOf(w, built, new Rng(w.s.seed * 29 + 3));
+  def.sites.forEach((s, i) => (s.nest = d.sites[i]?.nest ?? -1));
+  if (g) w.replaceGrid(TREES, built.g);
+  else w.addGrid(TREES, built.g);
+  w.s.trees = def;
+  w.treesData = built.data;
+  applyTreesToTerrain(w);
+  for (const c of w.s.colonies) if (c.treeSite !== undefined && c.treeSite >= 0 && def.sites[c.treeSite]) moveNestToTree(w, c, c.treeSite);
+  const onBranch = (o: { space: number; x: number; y: number }) => {
+    if (o.space !== TREES || w.walkable(TREES, o.x, o.y)) return;
+    const p = nearestBranch(w, o.x, o.y, 60);
+    if (p) {
+      o.x = p.x;
+      o.y = p.y;
     }
-  return def;
+  };
+  for (const a of w.s.ants) onBranch(a);
+  for (const f of w.s.food) onBranch(f);
+  for (const cr of w.s.creatures) onBranch(cr);
+  for (const c of w.s.colonies) for (const m of c.markers) if (m.placed) onBranch(m);
 }
 
 /** The nearest walkable ground to a point, outside the trunk's foot (rings of the terrain grid, fixed order). */
@@ -444,27 +322,6 @@ function nearestWalkHex(g: NestGrid, kinds: Uint8Array, x: number, y: number): n
   return -1;
 }
 
-function boundsOf(s: Shape): { x0: number; y0: number; x1: number; y1: number } {
-  if ('circle' in s) return { x0: s.circle[0] - s.r, y0: s.circle[1] - s.r, x1: s.circle[0] + s.r, y1: s.circle[1] + s.r };
-  if ('ellipse' in s) {
-    const m = Math.max(s.rx, s.ry);
-    return { x0: s.ellipse[0] - m, y0: s.ellipse[1] - m, x1: s.ellipse[0] + m, y1: s.ellipse[1] + m };
-  }
-  const pts = 'path' in s ? s.path : s.poly;
-  const m = 'path' in s ? s.width : 0;
-  let x0 = Infinity;
-  let y0 = Infinity;
-  let x1 = -Infinity;
-  let y1 = -Infinity;
-  for (const [x, y] of pts) {
-    x0 = Math.min(x0, x - m);
-    y0 = Math.min(y0, y - m);
-    x1 = Math.max(x1, x + m);
-    y1 = Math.max(y1, y + m);
-  }
-  return { x0, y0, x1, y1 };
-}
-
 export function kindsToString(k: Uint8Array): string {
   let s = '';
   for (let i = 0; i < k.length; i++) s += String.fromCharCode(48 + k[i]);
@@ -483,6 +340,7 @@ export function attachTreesGrid(w: World): void {
   const built = buildCanopy(w);
   if (!built) return;
   w.addGrid(TREES, built.g);
+  w.treesData = built.data;
   applyTreesToTerrain(w);
 }
 
@@ -504,9 +362,14 @@ export function treeEntrances(w: World): Entrance[] {
 }
 const NO: Entrance[] = [];
 
-/** The seconds a climb takes (the canopy's height at the climb's speed). */
-export function climbSeconds(w: World): number {
-  return T.climbSec * ((w.s.trees?.height ?? T.height) / T.height);
+/** How far a climb goes up a trunk (mm): the canopy's height and on up to the crotch's tier. */
+export function climbHeight(w: World, t: TrunkDef | null | undefined): number {
+  return (w.s.trees?.height ?? T.height) + (t?.z ?? 0);
+}
+
+/** The seconds a climb of that trunk takes (its height at the climb's speed: `climbSec` for the canopy's height). */
+export function climbSeconds(w: World, t?: TrunkDef | null): number {
+  return (T.climbSec * climbHeight(w, t)) / T.height;
 }
 
 /** Is the layer on in this match? */
@@ -529,7 +392,7 @@ export function trunkHold(a: { trunkT?: number; v: number }, dt: number): boolea
 
 /** Start a climb: up (`up` true, the ant has just entered the trees at a climb point) or down (it has just come out). */
 export function startClimb(w: World, a: { trunkT?: number; trunkUp?: number; trunkX?: number; trunkY?: number; v: number }, e: Entrance, up: boolean): void {
-  a.trunkT = climbSeconds(w);
+  a.trunkT = climbSeconds(w, trunkOf(w, e));
   a.trunkUp = up ? 1 : 0;
   a.trunkX = e.sx;
   a.trunkY = e.sy;
@@ -556,11 +419,20 @@ export function moveNestToTree(w: World, c: Colony, siteIdx: number): void {
   c.spoil = [0];
 }
 
-/** The crown a point of the trees map is in (0: sky or off the layer). */
+/**
+ * The crown a point of the trees map is in (0: sky or off the layer). Per fine cell (the floor's own crowns): a hex
+ * whose centre is not floor may still carry floor at its edge, and an ant standing there is in a crown.
+ */
 export function crownAt(w: World, x: number, y: number): number {
   const d = w.s.trees;
   const g = w.nestOf(TREES);
   if (!d || !g) return 0;
+  const td = w.treesData;
+  if (td) {
+    const k = cellIndex(g, x, y);
+    if (k < 0) return 0;
+    if (td.comp[k]) return td.comp[k];
+  }
   const q = g.hexAt(x, y);
   return q < 0 ? 0 : d.comps.charCodeAt(q) - 48;
 }
@@ -589,42 +461,67 @@ export function holeSpace(e: Entrance): number {
 }
 
 /**
- * The nearest walkable point of the trees grid to (x, y) (markers dropped in the sky move to the nearest branch);
- * null when none within `maxHex` hexes.
+ * The nearest floor of the trees grid to (x, y) (markers dropped in the sky move to the nearest branch): rings of fine
+ * cells outward, the nearest floor cell's centre; null when none within `maxHex` hexes.
  */
 export function nearestBranch(w: World, x: number, y: number, maxHex = 12): { x: number; y: number } | null {
   const g = w.nestOf(TREES);
   if (!g) return null;
-  const q0 = g.hexAt(x, y);
-  if (q0 < 0) return null;
-  if (g.isHexDug(q0) && g.isAirAt(x, y)) return { x, y };
-  const seen = new Set<number>([q0]);
-  let ring = [q0];
-  const p = { x: 0, y: 0 };
-  for (let k = 0; k < maxHex; k++) {
-    const next: number[] = [];
+  if (g.isAirAt(x, y)) return { x, y };
+  const ci = Math.floor(x / g.cell);
+  const cj = Math.floor(y / g.cell);
+  const K = Math.ceil((maxHex * g.R * 1.5) / g.cell);
+  for (let k = 1; k <= K; k++) {
     let best = -1;
     let bd = Infinity;
-    for (const q of ring)
-      for (const n of g.neighbors(q)) {
-        if (n < 0 || seen.has(n)) continue;
-        seen.add(n);
-        if (g.isHexDug(n)) {
-          g.hexCenter(n, p);
-          const d = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
-          if (d < bd) {
-            bd = d;
-            best = n;
-          }
-        } else next.push(n);
+    for (let dj = -k; dj <= k; dj++) {
+      const j = cj + dj;
+      if (j < 0 || j >= g.h) continue;
+      const edge = dj === -k || dj === k;
+      for (let di = -k; di <= k; di += edge ? 1 : 2 * k) {
+        const i = ci + di;
+        if (i < 0 || i >= g.w || !g.isAir(i, j)) continue;
+        const d = di * di + dj * dj;
+        if (d < bd) {
+          bd = d;
+          best = j * g.w + i;
+        }
       }
-    if (best >= 0) {
-      g.hexCenter(best, p);
-      return { x: p.x, y: p.y };
     }
-    ring = next;
+    if (best >= 0) return { x: ((best % g.w) + 0.5) * g.cell, y: (Math.floor(best / g.w) + 0.5) * g.cell };
   }
   return null;
+}
+
+/** The floor's height in the trees at a point (mm over the canopy plane; 0 off the floor or without the layer). */
+export function treesFloorZ(w: World, x: number, y: number): number {
+  const d = w.treesData;
+  const g = w.nestOf(TREES);
+  if (!d || !g) return 0;
+  const k = cellIndex(g, x, y);
+  return k < 0 ? 0 : Math.max(0, d.h[k]);
+}
+
+/** In the trees: the share of its speed an ant keeps walking from (x, y) along (ux, uy) — `LAYERS.upSpeed` up a slope, as on the ground's ramps. */
+export function treesSlopeSpeed(w: World, x: number, y: number, ux: number, uy: number): number {
+  const d = w.treesData;
+  const g = w.nestOf(TREES);
+  if (!d || !g) return 1;
+  const k0 = cellIndex(g, x, y);
+  const k1 = cellIndex(g, x + ux * 3, y + uy * 3);
+  if (k0 < 0 || k1 < 0 || d.h[k0] < 0 || d.h[k1] < 0) return 1;
+  return d.h[k1] - d.h[k0] > 0.5 ? LAYERS.upSpeed : 1;
+}
+
+/** In the trees: are two points on different tiers — one more than `TREES.reachZ` above the other (out of reach)? */
+export function treesApart(w: World, ax: number, ay: number, bx: number, by: number): boolean {
+  const d = w.treesData;
+  const g = w.nestOf(TREES);
+  if (!d || !g) return false;
+  const ka = cellIndex(g, ax, ay);
+  const kb = cellIndex(g, bx, by);
+  if (ka < 0 || kb < 0) return false;
+  return Math.abs(Math.max(0, d.h[ka]) - Math.max(0, d.h[kb])) > T.reachZ;
 }
 
 export { SOIL_AIR };

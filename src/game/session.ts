@@ -28,7 +28,7 @@ import { halfIn, otherHalf, ownHalf, routeById, routeDone, routeUsable, stepInde
 const ROUTE_EDGE_ANG = [-Math.PI / 6, Math.PI / 6, Math.PI / 2, (5 * Math.PI) / 6, (7 * Math.PI) / 6, -Math.PI / 2];
 import { createWorld, GameSetup } from '../sim/mapGen';
 import { AS, Ant, Colony, FloodState, SURFACE, TREES, TileType, colonyOfSpace, nestSpace } from '../sim/types';
-import { canopyLeaves, kindsOf } from '../sim/trees';
+import { CanopyTerrain } from '../render/trees/canopyTerrain';
 import { TreeDecor } from '../render/trees/treeDecor';
 import { AreaInfo, areaOpen, areasFor, teamPresence } from '../sim/areas';
 import { CASTES, SPECIES, canonCaste, isTermiteSpecies } from '../sim/species';
@@ -718,6 +718,8 @@ export class GameSession {
 
   /** the trunks on the ground and the climb points (render only; with the layer on) */
   treeDecor: TreeDecor | null = null;
+  /** the trees' canopy (trees v2: its big leaves bend under the load, its far leaves coarsen — `frame` while in the trees) */
+  canopy: CanopyTerrain | null = null;
 
   /** Is the layer on (the trees map exists)? */
   get treesOn(): boolean {
@@ -730,8 +732,10 @@ export class GameSession {
     const d = w.s.trees;
     const g = w.nestOf(TREES);
     if (!d || !g || this.nests.has(TREES)) return;
-    const kinds = kindsOf(d);
-    const stage = this.view.addTrees(g, kinds, d.height, canopyLeaves(w));
+    const data = w.treesData;
+    if (!data) return;
+    const stage = this.view.addTrees(g, data, d.height);
+    this.canopy = stage.terrain as CanopyTerrain;
     const nv = new NestView(this.view, TREES, stage);
     nv.fog = null;
     this.nests.set(TREES, nv);
@@ -1889,6 +1893,7 @@ export class GameSession {
     if (w.s.trees && !this.nests.has(TREES)) this.addTreesView();
     // (the climb rings breathe on the ground only while the ground is shown: performance v4)
     if (v.space === 'surface') this.treeDecor?.update(w, v.time);
+    else if (v.inTrees) this.canopy?.frame(w, v.activeCamera(), realDt);
     this.updateTunnelView();
     this.updateHover();
     const cam = v.activeCamera();

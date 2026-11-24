@@ -2,7 +2,7 @@ import { antClear, antMostClear, antNeed } from './underpass';
 import { World } from './world';
 import { Ant, AS, Carry, Colony, Entrance, SURFACE, TREES, nestSpace, colonyOfSpace } from './types';
 import { arrivalHash, canEnter, canLeave, entranceTop, exitHole, exitTops, holeIn, passEntrance, usableMask } from './entrances';
-import { climbsToward, crownAt, holeSpace, startClimb, trunkOf } from './trees';
+import { climbsToward, crownAt, holeSpace, startClimb, treesSlopeSpeed, trunkOf } from './trees';
 import { casteOf } from './species';
 import { hexCoreCells } from './colony';
 import { hexSpeedOf } from './tiles';
@@ -59,8 +59,9 @@ export function antSpeed(w: World, a: Ant): number {
   v *= 1 - w.s.night * 0.15;
   // a story level's hot spell: ants out on the surface walk slower (sim/story/surprises.ts)
   if (w.s.weather && a.space === SURFACE && w.s.weather.heat > w.s.time) v *= STORY.heatSpeed;
-  // layered ground: a little slower walking up a ramp (LAYERS.upSpeed)
+  // layered ground: a little slower walking up a ramp (LAYERS.upSpeed); the trees' sloping branches likewise
   if (a.space === SURFACE && w.terrain.layers) v *= w.terrain.slopeSpeed(a.x, a.y, dcos(a.h), dsin(a.h));
+  else if (a.space === TREES) v *= treesSlopeSpeed(w, a.x, a.y, dcos(a.h), dsin(a.h));
   return v;
 }
 

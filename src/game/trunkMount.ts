@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { World } from '../sim/world';
-import { TREES, TreesDef } from '../sim/types';
-import { TREES as T } from '../sim/balance';
-import { climbSeconds } from '../sim/trees';
+import { TREES, TreesDef, TrunkDef } from '../sim/types';
+import { climbHeight, climbSeconds } from '../sim/trees';
 import { AntView, MountOut } from '../render/ants/antRenderer';
 
 /**
@@ -14,9 +13,9 @@ import { AntView, MountOut } from '../render/ants/antRenderer';
  * outside of the trunk top and tips over the rim onto the wood.
  */
 
-/** the height of the trunk drawn on the ground (`TreeDecor`): a little past the canopy, so a climb ends on bark */
-export function trunkDrawHeight(d: TreesDef): number {
-  return d.height + 8;
+/** the height of the trunk drawn on the ground (`TreeDecor`): a little past its crotch, so a climb ends on bark */
+export function trunkDrawHeight(d: TreesDef, t?: TrunkDef): number {
+  return d.height + (t?.z ?? 0) + 8;
 }
 
 /** the drawn trunk's radius `e` mm above its foot (`trunkGeometry`: the foot flares, higher up it narrows to 80 %) */
@@ -58,9 +57,9 @@ export function trunkMountGround(w: World, v: AntView, groundAt: (x: number, y: 
   if (!d || !v.trunk) return false;
   const t = d.trunks[v.trunk - 1];
   if (!t) return false;
-  const H = trunkDrawHeight(d);
+  const H = trunkDrawHeight(d, t);
   const K = v.trunkK ?? 0;
-  const e = K * d.height;
+  const e = K * climbHeight(w, t);
   const a = v.trunkA ?? 0;
   rad.set(Math.cos(a), 0, Math.sin(a));
   const g0 = groundAt(t.x, t.y);
@@ -78,13 +77,13 @@ export function trunkMountGround(w: World, v: AntView, groundAt: (x: number, y: 
   // the tip-up / tip-down over the first 6 % of the height (about a third of a second)
   const s = smooth(K / 0.06);
   blend(out, fH, Y, fV, uR, s);
-  out.speed = d.height / climbSeconds(w);
+  out.speed = climbHeight(w, t) / climbSeconds(w, t);
   return true;
 }
 
 /**
- * The trees view: the ant coming up the outside of the trunk top (the canopy's wood disc) and over its rim. Below the
- * canopy it is a speck rising at the rim; the last part of the climb tips it onto the wood.
+ * The trees view (trees v2): the ant walking up the drawn trunk (render/trees/woodMesh.ts: a column from the ground far
+ * below to the crotch) at its real height, and over the crotch's rim onto its top in the last part of the climb.
  */
 export function trunkMountCanopy(w: World, v: AntView, out: MountOut): boolean {
   const d = w.s.trees;
@@ -95,23 +94,24 @@ export function trunkMountCanopy(w: World, v: AntView, out: MountOut): boolean {
   const K = v.trunkK ?? 0;
   const a = v.trunkA ?? 0;
   rad.set(Math.cos(a), 0, Math.sin(a));
-  const c = g.hexCenter(t.top);
-  const top = T.hexR * 1.3 + 0.3;
-  const Rd = Math.max(t.r, g.R * 1.1);
-  // on the trunk's side under the rim: the real height below the canopy's top
-  const e = (K - 1) * d.height;
-  pB.set(c.x + rad.x * Rd, top + Math.min(0, e), c.y + rad.z * Rd);
+  const top = t.z;
+  // the trunk's radius at a height: the crown's trunk tapers from its foot to 0.86 of it at the crotch (treeCrowns.ts)
+  const climbH = climbHeight(w, t);
+  const y = top - (1 - K) * climbH;
+  const k = Math.max(0, Math.min(1, (y + d.height) / Math.max(1, climbH)));
+  const Rd = t.r * (1 - 0.14 * k) * 1.02;
+  pB.set(t.x + rad.x * Rd, Math.min(top - 2, y), t.y + rad.z * Rd);
   fV.set(0, 1, 0);
   uR.copy(rad);
-  // over the rim: on the wood, a body length in from the edge, nose to the trunk's centre
-  pA.set(c.x + rad.x * (Rd - 6), top, c.y + rad.z * (Rd - 6));
+  // over the rim: on the crotch's top, a body length in from the edge, nose to the trunk's centre
+  pA.set(t.x + rad.x * (Rd - 6), top, t.y + rad.z * (Rd - 6));
   fH.copy(rad).multiplyScalar(-1);
   const s = smooth((K - 0.94) / 0.06);
-  // (blend goes A → B; here the wood is the end, so from the bark pose to the wood pose)
+  // (blend goes A → B; here the top is the end, so from the bark pose to the top's)
   out.p.lerpVectors(pB, pA, s);
   out.f.lerpVectors(fV, fH, s).normalize();
   out.u.lerpVectors(uR, Y, s);
   out.u.addScaledVector(out.f, -out.f.dot(out.u)).normalize();
-  out.speed = d.height / climbSeconds(w);
+  out.speed = climbH / climbSeconds(w, t);
   return true;
 }

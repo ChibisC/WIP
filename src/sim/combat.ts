@@ -1,6 +1,7 @@
 import { antFitsUnderAnt as antFitsUnderAntAt } from './underpass';
 import { World } from './world';
 import { sealedAt } from './tunnels';
+import { treesApart, treesFloorZ } from './trees';
 import { casteOnBite, casteOnKill, rageMul, tauntOf } from './casteAbilities';
 import { Ant, AS, Carry, Colony, Creature, HIT, POSE, SURFACE, TREES, nestSpace } from './types';
 import { nearestWalkable } from './markers';
@@ -282,8 +283,9 @@ export function flingAnt(w: World, a: Ant, fromX: number, fromY: number, power: 
   // knocked off a branch (the only way down but the trunk, sim/trees.ts): it falls to the ground below, seen dropping
   // from the canopy's height in the ground view, and lands dazed
   if (a.space === TREES && w.s.trees) {
+    // (from the tier it stood on: the canopy's height and the floor's height over it)
+    a.fz += w.s.trees.height + treesFloorZ(w, a.x, a.y);
     a.space = SURFACE;
-    a.fz += w.s.trees.height;
     a.fvz *= 0.3;
     a.fell = 1;
     if (!w.walkable(SURFACE, a.x, a.y)) {
@@ -476,10 +478,13 @@ function findTarget(w: World, a: Ant, c: Colony, r: number): Target | null {
   const sickle = casteOf(a.caste).termite === 'sickle';
   const L = casteOf(a.caste).length;
   const layered = a.space === SURFACE && !!w.terrain.layers;
+  // (the trees: a foe on another tier — more than TREES.reachZ above or below — is out of reach)
+  const tiers = a.space === TREES && !!w.treesData;
   cand.length = 0;
   candD2.length = 0;
   w.enemiesNear(a.space, team, a.x, a.y, r, (o, d2) => {
     if (!isEnemyAnt(a, o)) return false;
+    if (tiers && treesApart(w, a.x, a.y, o.x, o.y)) return false;
     // a sickle-jaw cannot grab what another already holds: it looks past it (sickleJaws.ts drops such a target)
     if (sickle && o.heldBy) return false;
     cand.push(o);
@@ -521,6 +526,7 @@ function findTarget(w: World, a: Ant, c: Colony, r: number): Target | null {
     const fighter = cd.role === 'soldier' || cd.role === 'major' || a.task === 'marker' || a.alarm > 0.3;
     const scan = (cr: Creature, d2: number) => {
       if (cr.space !== a.space || cr.dead || friendlyCreature(w, team, cr)) return false;
+      if (tiers && treesApart(w, a.x, a.y, cr.x, cr.y)) return false;
       const rel = creatureHooks.relation(cr);
       if (rel === 'ignore') return false;
       if (rel === 'prey' && !(a.task === 'forage' || a.task === 'marker' || fighter)) return false;

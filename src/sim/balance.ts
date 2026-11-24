@@ -1634,4 +1634,37 @@ export const TREES = {
   procCrown: 260,
   /** ants walk a little slower on bark than on flat ground */
   speed: 0.9,
+  // ---- trees v2 (claude/trees/02-spec-trees-look-and-tiers.md; CHANGE_PLAN §38): tiers, sloping branches, round wood
+  /** height between branch tiers (mm): tier l is the top of the wood l × tierStep over the canopy plane */
+  tierStep: 40,
+  /** the rise of a sloping branch between two tiers (tan; the ground's ramps allow LAYERS.rampMaxSlope, 0.47) */
+  slope: 0.4,
+  /** the walkable band of a branch: this share of its radius either side of its axis (the wood's flat top) */
+  walkShare: 0.8,
+  /** a floor cell with another within two cells higher by more than this (mm a cell of distance) is a drop: rock */
+  stepMax: 2.2,
+  /** a foe or creature more than this far above or below (mm) is out of reach (another tier) */
+  reachZ: 14,
+  /** the thinnest walkable twig (radius, mm) and the boughs that join the crowns (radius, mm) */
+  twigR: 7.5,
+  linkR: 10,
+  /** a crown reaching this far (mm) or more gets one tier more than its style's */
+  bigReach: 340,
+  /**
+   * Crown styles (`sim/trees.ts crownSkeleton`): tiers (2–4); limbs round the crotch, how many rise to the tier above
+   * (`rise`) and stay level (`level`) — the rest spread out and drop a tier per slope; the limbs' radius × the trunk's
+   * (clamped to `limbMin`–`limbMax` mm) and what is left at the tip (`taper`); the heading's wander a step (rad); forks
+   * a limb and twigs a fork; `droop`: the chance a branch on a spreading limb drops a tier; big walkable leaves
+   * (rx, ry mm; null — this species' leaves are all small decoration); flowers (food sites) a limb.
+   */
+  crowns: {
+    oak: { tiers: 3, limbs: [5, 6], rise: 2, level: 1, limbR: 0.55, taper: 0.55, wobble: 0.2, forks: 2, twigs: 2, droop: 0.5, leaf: [24, 15], flowers: 0.5 },
+    beech: { tiers: 3, limbs: [4, 5], rise: 2, level: 0, limbR: 0.5, taper: 0.5, wobble: 0.09, forks: 2, twigs: 3, droop: 0.4, leaf: [22, 13], flowers: 0 },
+    willow: { tiers: 3, limbs: [6, 7], rise: 3, level: 0, limbR: 0.45, taper: 0.5, wobble: 0.24, forks: 1, twigs: 2, droop: 0.9, leaf: null, flowers: 0 },
+    tropical: { tiers: 3, limbs: [5, 6], rise: 2, level: 1, limbR: 0.33, taper: 0.55, wobble: 0.13, forks: 2, twigs: 2, droop: 0.3, leaf: [40, 21], flowers: 0.8 },
+    acacia: { tiers: 2, limbs: [4, 5], rise: 0, level: 3, limbR: 0.5, taper: 0.5, wobble: 0.18, forks: 2, twigs: 2, droop: 0.3, leaf: null, flowers: 0.5 },
+    sapling: { tiers: 2, limbs: [3, 3], rise: 0, level: 1, limbR: 0.5, taper: 0.55, wobble: 0.18, forks: 1, twigs: 1, droop: 0.3, leaf: [18, 11], flowers: 0 },
+  } as Record<string, { tiers: number; limbs: [number, number]; rise: number; level: number; limbR: number; taper: number; wobble: number; forks: number; twigs: number; droop: number; leaf: [number, number] | null; flowers: number }>,
+  limbMin: 11,
+  limbMax: 26,
 };

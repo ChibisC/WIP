@@ -15,6 +15,9 @@ import { Props } from './props';
 import { Water } from './water';
 import { NestTerrain } from './nest/nestTerrain';
 import { CanopyTerrain } from './trees/canopyTerrain';
+import { bakeTreeMaps } from './trees/barkBake';
+import { canopyHaze } from './trees/woodMesh';
+import type { CanopyData } from '../sim/trees';
 import { TREES } from '../sim/types';
 import { PostPipeline } from './post';
 import { createNestEnvironment, createSurfaceEnvironment, NestLights, SurfaceLights } from './environment';
@@ -402,9 +405,11 @@ export class GameView {
    * below is a backdrop plane carrying a blurred, darkened render of the surface (`refreshBackdrop`). Shown as the area
    * `TREES` through the nest machinery (camera, picking, the per-space view); `riseTo` moves between it and the ground.
    */
-  addTrees(grid: NestGrid, kinds: Uint8Array, height: number, leaves: Array<{ at: readonly [number, number]; rx: number; ry: number; rot: number }> = []): NestStage {
+  addTrees(grid: NestGrid, data: CanopyData, height: number): NestStage {
     const scene = new THREE.Scene();
-    const terrain = new CanopyTerrain(grid, kinds, height, leaves);
+    // (trees v2: each species' bark and leaves baked once on the GPU, like the ground; half size on low quality)
+    const maps = bakeTreeMaps(this.renderer, this.preset.lodScale >= 0.8 ? 512 : 256);
+    const terrain = new CanopyTerrain(grid, data, height, maps);
     terrain.setShadows(this.preset.shadows);
     scene.add(terrain.group);
     const W = grid.widthMm;
@@ -433,8 +438,9 @@ export class GameView {
     fill.position.set(-300, 200, 400);
     const ambient = new THREE.AmbientLight(0x9fb0c0, 0.03);
     scene.add(sun, sun.target, hemi, fill, ambient);
-    // the air between the camera and the ground far below: a thin haze
-    scene.fog = new THREE.FogExp2(0xb9c9d6, 0.35 / Math.max(W, D));
+    // the air between the camera and the ground far below: a thin haze (and deeper below the tier in view: the wood's
+    // and leaves' own haze, woodMesh.ts)
+    scene.fog = new THREE.FogExp2(0xb9c9d6, 0.5 / Math.max(W, D));
     // the backdrop: the ground `height` below, drawn from a render of the surface scene (refreshed now and then)
     const bd = new THREE.Mesh(new THREE.PlaneGeometry(W * 1.6, D * 1.6), new THREE.MeshBasicMaterial({ color: 0x5c6a58, fog: true }));
     bd.rotation.x = -Math.PI / 2;
@@ -569,6 +575,13 @@ export class GameView {
     r.bounds.max.set(W, D);
     r.minDist = g.R * 2.2;
     r.maxDist = Math.max(W, D) * 1.1;
+    if (space === TREES) {
+      // trees v2: the ground's tilted RTS camera — its target follows the floor up and down the tiers, it keeps above
+      // the wood under it, and it zooms between a close look and a crown's width (ants stay readable)
+      r.heightAt = (x, z) => nt.heightAt(Math.min(Math.max(x, 0), W), Math.min(Math.max(z, 0), D));
+      r.minDist = 24;
+      r.maxDist = Math.min(this.surfaceRig.maxDist, 760);
+    }
     if (focus) r.jumpTo(focus.x, focus.z, next.cam?.dist ?? Math.min(g.R * 18, r.maxDist));
     else if (next.cam) {
       r.jumpTo(next.cam.x, next.cam.z, next.cam.dist);
@@ -1015,6 +1028,8 @@ export class GameView {
         sun.target.position.set(fx, 0, fz);
         sun.position.set(fx, 0, fz).addScaledVector(this.surfaceLights.sunDir, 900);
         this.refreshBackdrop();
+        // (trees v2: the haze deepens below the tier in view)
+        canopyHaze.uHazeY.value = this.nestRig.target.y + 6;
       }
     }
     for (const f of this.beforeRender) f(dt);
