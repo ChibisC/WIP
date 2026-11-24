@@ -80,8 +80,8 @@ export interface FoliageBuild {
   group: THREE.Group;
   /** the big leaves' mesh (its sag attribute is set by `setLoad`) */
   big: THREE.InstancedMesh | null;
-  /** per tree: [near mesh, far mesh, centre] */
-  trees: Array<{ near: THREE.InstancedMesh; far: THREE.InstancedMesh; c: THREE.Vector3 }>;
+  /** per tree: its leaves near (in chunks, each culled on its own), the coarse share far away, its centre, its count */
+  trees: Array<{ near: THREE.Group; far: THREE.InstancedMesh; c: THREE.Vector3; n: number }>;
   /** every small leaf's middle (x, height, z) and half its length: the cover map's splats */
   cover: number[];
 }
@@ -101,6 +101,10 @@ const HULL: Partial<Record<number, Record<number, number[]>>> = {
 };
 /** the big leaves (oak, beech and rainforest in one mesh): the widest of the three, 6 rows */
 const BIG_HULL = [0.72, 0.94, 0.98, 0.98, 0.95, 0.81, 0.58];
+/** the near leaves' chunks (mm) */
+const LEAF_CHUNK = 192;
+/** the share of a tree's leaves drawn far away */
+const FAR_SHARE = 0.6;
 
 function bladeGeometry(nx: number, ny: number, hull?: number[]): THREE.BufferGeometry {
   const pos: number[] = [];
@@ -480,33 +484,45 @@ export function buildFoliage(data: CanopyData, maps: TreeMaps, floorZ: (x: numbe
       [leaves[i], leaves[j]] = [leaves[j], leaves[i]];
     }
     const [near, far] = bladesOf(LEAF_LAYER[sk.style] ?? 0);
-    const mn = instances(leaves, near, mats.color, mats.depth);
-    const twin = (geo: THREE.BufferGeometry) => {
-      const m = new THREE.InstancedMesh(geo.clone(), mats.color, leaves.length);
-      m.instanceMatrix = mn.instanceMatrix;
-      m.geometry.setAttribute('aLeafA', mn.geometry.getAttribute('aLeafA'));
-      m.geometry.setAttribute('aLeafB', mn.geometry.getAttribute('aLeafB'));
-      m.boundingSphere = mn.boundingSphere;
-      m.customDepthMaterial = mats.depth;
-      return m;
-    };
-    const mf = twin(far);
+    // near: the leaves in chunks of LEAF_CHUNK mm, each culled on its own (close up most of a crown is off screen);
+    // each chunk's shadow from the coarse blade, drawn into the shadow maps only (the drawn blades cast none)
+    const chunks = new Map<string, Leaf[]>();
+    for (const l of leaves) {
+      const k = `${Math.floor(l.p.x / LEAF_CHUNK)}:${Math.floor(l.p.z / LEAF_CHUNK)}`;
+      let c = chunks.get(k);
+      if (!c) chunks.set(k, (c = []));
+      c.push(l);
+    }
+    const ng = new THREE.Group();
+    ng.name = 'treeLeavesNear';
+    for (const c of chunks.values()) {
+      const mn = instances(c, near, mats.color, mats.depth);
+      mn.castShadow = false;
+      mn.userData.noShadow = true;
+      mn.name = 'treeLeaves';
+      addLeafPrepass(mn, mats.pre);
+      ng.add(mn);
+      const ms = new THREE.InstancedMesh(far.clone(), mats.color, c.length);
+      ms.instanceMatrix = mn.instanceMatrix;
+      ms.geometry.setAttribute('aLeafA', mn.geometry.getAttribute('aLeafA'));
+      ms.geometry.setAttribute('aLeafB', mn.geometry.getAttribute('aLeafB'));
+      ms.boundingSphere = mn.boundingSphere;
+      ms.customDepthMaterial = mats.depth;
+      ms.castShadow = true;
+      ms.receiveShadow = false;
+      ms.name = 'leafShadow';
+      shadows.add(ms);
+    }
+    // far: a random share of the tree's leaves (they are shuffled), coarse blades, one mesh
+    const mf = instances(leaves, far, mats.color, mats.depth);
+    mf.count = Math.ceil(leaves.length * FAR_SHARE);
     mf.castShadow = false;
-    mf.receiveShadow = true;
+    mf.userData.noShadow = true;
     mf.visible = false;
-    // (every leaf's shadow from the coarse blade, drawn into the shadow maps only: the drawn blades cast none)
-    const ms = twin(far);
-    ms.castShadow = true;
-    ms.receiveShadow = false;
-    ms.name = 'leafShadow';
-    shadows.add(ms);
-    mn.castShadow = false;
-    mn.userData.noShadow = mf.userData.noShadow = true;
-    mn.name = mf.name = 'treeLeaves';
-    addLeafPrepass(mn, mats.pre);
+    mf.name = 'treeLeaves';
     addLeafPrepass(mf, mats.pre);
-    group.add(mn, mf);
-    trees.push({ near: mn, far: mf, c: new THREE.Vector3(sk.x, sk.topZ, sk.y) });
+    group.add(ng, mf);
+    trees.push({ near: ng, far: mf, c: new THREE.Vector3(sk.x, sk.topZ, sk.y), n: leaves.length });
   });
   let big: THREE.InstancedMesh | null = null;
   if (bigLeaves.length) {
