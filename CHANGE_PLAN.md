@@ -1927,3 +1927,67 @@ happens; the build machine, SwiftShader), then fixed without changing the pictur
    quadrant a frame, each quadrant costing ~70% of the whole (the instanced ants and grass are drawn in every one):
    four hitches and twice the work. Now drawn whole every 30 s, and a climb reuses a picture younger than 30 s (the
    age it may reach while one stays); the screenshot harness and loading still draw it.
+
+## 38. Trees v2 — real trees: branch tiers like the ground's levels, real trunks and limbs, bark and leaves (user spec 2026-11-21, claude/trees/02-spec-trees-look-and-tiers.md) — branch `feature/trees-v2`
+Off `main` `a39bc06`. User decisions: 2–4 tiers joined by sloping branches that work like the ground's ramps; the
+tilted RTS camera; trunks, limbs, branches and twigs as round 3D wood with each species' bark; leaf clusters with each
+species' leaf shapes; big leaves are walkable platforms (they bend a little under weight), small leaves decoration.
+
+### 38.1 Shape (sim, `sim/trees.ts`; every number in `balance.ts TREES`)
+- **A crown is a skeleton of round wood** (`crownSkeleton(def)`, deterministic, per species `TREES.crowns`): the trunk
+  rising to a crotch at the trunk top's tier (`floor(tiers / 2)`: 2 tiers → 1, 3 → 1, 4 → 2); **limbs** leave the
+  crotch round the compass — *rising* limbs (short) climb to the tier above, *level* limbs stay, *spreading* limbs
+  (long) drop a tier per slope toward the outside — so from above the high tier lies toward the middle and the low
+  ones round it; limbs fork into **branches** (same tier, or one lower outward, as crowns droop) and those into
+  **twigs** ending in **big leaves** (walkable ellipses at the twig's height; per species: oak, beech, tropical) and in
+  fine twigs carrying small leaves (render only). A piece is a polyline of (x, y, z, r): z is the top of the wood
+  over the canopy plane (tier l at `l × TREES.tierStep`), r its radius. **Slopes** are runs between two tiers no steeper
+  than `TREES.slope` (≤ `LAYERS.rampMaxSlope`); everything else is flat at a tier.
+- **The walkable raster** is painted per fine cell (`paintCanopy`): a cell within a piece's walk half-width
+  (`r × TREES.walkShare`) of its axis is floor at that piece's top height; overlapping pieces: the highest wins (what is
+  seen from above). Then the **drops block like the ground's cliffs**: an air cell with an air cell within two cells
+  that is higher by more than `TREES.stepMax` mm a cell turns to rock — a lower branch stops short under a higher one
+  (the 3D wood still passes beneath), and no one walks off a tier; only flung ants fall. Cells no trunk top reaches
+  are pruned. A hex is dug (markers, sites, food, the trunk top's entrance) when its centre cell is floor; the flow
+  fields and walking are per cell, as in a nest.
+- **Heights**: per cell (`w.treesH`, derived — every copy builds it from the trees' definitions). In the trees: up a
+  slope at `LAYERS.upSpeed`; a foe or creature more than `TREES.reachZ` mm above or below is out of reach (target
+  choice); the climb arrives at the trunk top's tier (climb height `height + top z`, time scaled; `TrunkDef.z`,
+  `tiers`); a fling falls from the height it stood at.
+- **Links between crowns** stay a spanning tree, now at tier 0: from the low bough tip of one crown nearest the other
+  to the other's.
+- **Saves** version 6: a save of version ≤ 5 with the layer rebuilds its canopy (grid, kinds, crowns, trunks, sites;
+  ants, food and creatures in the trees moved to the nearest branch). Net `ud-mp-17`.
+- **Validator** (`tools/trees-check.ts`, `tests/trees.ts`): every tree has 2–4 tiers on reachable floor, slopes within
+  `LAYERS.rampMaxSlope` and no step over `stepMax` between neighbouring floor cells, every site and food reachable, one
+  network; and the walkable area each tier keeps after the cliff seams.
+
+### 38.2 Looks (render, `render/trees/`)
+- `woodMesh.ts`: the skeleton as tubes — tapering, bending, swollen at forks, flat-topped where walkable (the top at
+  the walk height, so feet never sink), round elsewhere; the trunk from the ground far below up to the crotch; bark UVs
+  in mm; chunked by tree with frustum culling and two LODs.
+- `barkBake.ts`: per species, baked once on the GPU like the ground (`groundBake.ts`): albedo + roughness, normal +
+  height + cavity — oak's deep ridges and furrows, beech's smooth grey with fine lenticels, willow's interlacing
+  ridges, tropical smooth-to-flaky, acacia rough and dark; cracks, knots, small holes, loose flakes. The shader adds
+  moss (damp furrows, upper sides), lichen crusts, worn trails on the walked tops (smoother, lighter, polished), AO.
+- `leafBake.ts`: per species leaf atlas (shape, midrib and veins, waxy top / matte paler underside, translucency with
+  the veins darker, colour variation, chewed holes, brown edges). `foliage.ts`: instanced leaves in clusters on the
+  fine twigs, kept off the walkable floor seen from above, swaying; near full leaves, far fewer and larger.
+  `leafPlatforms.ts`: the big walkable leaves, bending a little under the units on them (render only; the floor
+  follows the bend).
+- Light: leaves cast alpha-tested shadows (dappled light on wood and ants), greener light under the leaves, a haze
+  that deepens below the tier in view; the ground backdrop kept (v4/action-lag refresh rules), darker and softer.
+- Camera: the trees view uses the ground's RTS rig angles, its target height following the floor, zoom limits so
+  ants stay readable.
+- `TreeDecor`: the ground's trunks as tall as the climb; no trunk-top discs (the crotch is wood now); sites at their
+  heights. `trunkMount`: in the trees view a climbing ant is drawn on the trunk at its real height. Minimap: tiers
+  shaded.
+
+### 38.3 Performance
+Bench trees scene before/after (`?bench=1`, build machine): draws, triangles, GPU time per draw; nothing built with the
+layer off, nothing drawn off screen.
+
+### 38.4 Verify
+Validator + `tests/trees.ts`; `npm test`, determinism check, build; golden set identical outside the trees; LAN
+two-tab in sync with the layer on; render-only sheets in `docs/trees/shots/`; a review page for the user's rating
+(bark, leaves, crowns, tiers); merge after approval.
