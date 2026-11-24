@@ -94,6 +94,7 @@ export function runTreeLab(canvas: HTMLCanvasElement, q: URLSearchParams): void 
     floor.position.y = -20;
     floor.receiveShadow = true;
     scene.add(floor);
+    target.set(0, 0, 24);
   } else {
     const sp = species[0];
     const reach = num('reach', sp === 'tropical' ? 400 : sp === 'acacia' ? 300 : 260);

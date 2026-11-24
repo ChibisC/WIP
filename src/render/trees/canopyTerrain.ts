@@ -111,6 +111,8 @@ export class CanopyTerrain implements AreaTerrain {
   }
 
   private coverTex: THREE.DataTexture;
+  /** per big leaf: the load on it this frame (scratch) */
+  private load: Float32Array | null = null;
 
   /**
    * The plan map of the leaf cover (4 mm a texel): R how thick the leaves are overhead, G the height of their top
@@ -247,7 +249,8 @@ export class CanopyTerrain implements AreaTerrain {
   frame(w: World, cam: THREE.Camera, dt: number): void {
     const big = this.foliage.big;
     if (big && this.sag.length) {
-      const load = new Float32Array(this.sag.length);
+      const load = (this.load ??= new Float32Array(this.sag.length));
+      load.fill(0);
       const g = this.grid;
       const add = (x: number, y: number, m: number) => {
         const i = Math.floor(x / g.cell);

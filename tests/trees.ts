@@ -274,6 +274,47 @@ function world(more: Record<string, unknown> = {}, seed = 5): World {
   void upgradeWorldTrees;
 }
 
+// ---------------------------------------------------------------- lockstep with the tiers (what two tabs of a match run)
+{
+  // two copies of the same match, the same orders at the same ticks — a group up into the tiers, a fight with a spider
+  // on a branch, then everyone down — and a third restored from a save half way: the same state every 100 ticks
+  const mk = () => world({ trees: true, map: 'meadowPond', developed: 4 }, 7);
+  const A = mk();
+  const B = mk();
+  let C: World | null = null;
+  const order = (w: World, t: number) => {
+    const me = w.s.colonies[0];
+    const d = w.s.trees!;
+    const cmd = (c: Record<string, unknown>, seq: number) => applyCommand(w, { ...c, tick: w.s.tick, player: 0, seq } as never);
+    if (t === 5) {
+      cmd({ type: 'placeMarker', i: 0, space: TREES, x: d.sites[1].x, y: d.sites[1].y }, 1);
+      for (const gr of me.groups) cmd({ type: 'assignGroup', group: gr.id, marker: 0 }, 2);
+    }
+    if (t === 900) cmd({ type: 'sandboxSpawn', kind: 'wolfSpider', space: TREES, x: d.sites[1].x, y: d.sites[1].y }, 3);
+    if (t === 1800) cmd({ type: 'placeMarker', i: 0, space: SURFACE, x: me.nx + 40, y: me.ny }, 4);
+  };
+  let diff = -1;
+  let upMax = 0;
+  for (let t = 0; t < 2600 && diff < 0; t++) {
+    order(A, t);
+    order(B, t);
+    if (C) order(C, t);
+    A.step(0.05);
+    B.step(0.05);
+    C?.step(0.05);
+    A.events.drain();
+    B.events.drain();
+    C?.events.drain();
+    upMax = Math.max(upMax, A.s.ants.filter((a) => a.space === TREES).length);
+    if (t === 1200) C = restoreWorld(encodeState(A), new EventBus());
+    if (t % 100 === 99) {
+      const h = hashState(A);
+      if (h !== hashState(B) || (C && h !== hashState(C))) diff = t;
+    }
+  }
+  check("lockstep in the tiers: two copies and a restored one stay identical (2,600 ticks)", diff < 0 && upMax >= 3, diff >= 0 ? `first difference by tick ${diff}` : `${upMax} ants in the trees at most`);
+}
+
 // ---------------------------------------------------------------- the sandbox toggle builds it at runtime (any map)
 {
   const w = world({ sandbox: true });
