@@ -1986,6 +1986,10 @@ species' leaf shapes; big leaves are walkable platforms (they bend a little unde
 ### 38.3 Performance
 Bench trees scene before/after (`?bench=1`, build machine): draws, triangles, GPU time per draw; nothing built with the
 layer off, nothing drawn off screen.
+Done (2026-11-24, `docs/performance.md` "Trees v2"): a fixed-camera probe over a tree showed the first cut 2.5 times
+the flat canopy's frame close up on the build machine; then shadows from coarse shadow-only twins
+(`render/shadowOnly.ts`), the wood ringed at its nodes and flares, a depth pre-pass for the leaves, the blades trimmed
+to their outlines (leaf chunks tried and dropped). The rest is the leaves' pixels; the Mac's `?bench=1` decides.
 
 ### 38.4 Verify
 Validator + `tests/trees.ts`; `npm test`, determinism check, build; golden set identical outside the trees; LAN

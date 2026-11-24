@@ -705,26 +705,55 @@ named at commit always holds the data in the texture bound.
 The canopy went from flat painted branch bands to round wood, baked bark, instanced leaves and 2–4 tiers. The spec
 asks for the trees scene benched before and after, within v5's targets, and nothing drawn when the layer is off or
 off screen. How it is kept cheap:
-- **Wood** (`render/trees/woodMesh.ts`): the crowns' tubes in chunks of 256 mm, each a `THREE.LOD`: 14 sides and a
-  ring every 3.5 mm near, 7 sides and a ring every 9 mm past `WOOD_FAR` (420 mm from the camera); each chunk culled
-  against the view; thin twigs get fewer sides. One material for all species (the bark's layer per vertex).
+- **Wood** (`render/trees/woodMesh.ts`): the crowns' tubes in chunks of 256 mm, each a `THREE.LOD`: 14 sides near,
+  7 past `WOOD_FAR` (420 mm from the camera); each chunk culled against the view. A ring at each node (the wood runs
+  straight between them) and in the flare at a piece's start (a quarter of its length apart); the ends rounded by three
+  rings near, one far and on the fine twigs (4–6 sides). One material for all species (the bark's layer per vertex).
+  The whole canopy's wood near: 136k triangles before this, 116k with the fine twigs (61k without), far 19k.
+- **Shadows from coarse twins** (`render/shadowOnly.ts`): the wood casts through every chunk's far level and the small
+  leaves through their 4-triangle blades, drawn into the shadow maps only (a group hidden from the cameras, shown
+  while the renderer draws its shadow maps — three.js lists a frame's drawables before its shadows; layers can't do
+  it, the shadow pass tests the view camera's layers). The drawn meshes cast none. A soft shadow shows no difference;
+  the coarse tube lies inside the fine one, so the wood doesn't shadow its own lit side.
 - **Bark and leaf textures** baked on the GPU once at load (`barkBake.ts`: 5 bark layers 512² with their normals, 20
   leaf layers 128 × 256; 256² bark at a lower quality scale), no image files.
 - **Leaves** (`foliage.ts`): one instanced mesh a tree for the small blades with a coarse twin of 60 % of them for
   trees past 560 mm (`CanopyTerrain.frame`); the big walkable leaves in one instanced mesh whose sag is an instance
-  attribute updated only where ants stand; shadows alpha-tested through a depth material.
+  attribute updated only where ants stand. **A depth pre-pass**: each leaf mesh has a child drawn first
+  (`renderOrder` −1) that writes only the blades' depth (alpha-tested, a hair behind: polygon offset 0.5/2); the shaded
+  pass then tests against it without writing depth, so on a GPU only each pixel's front blade is shaded instead of
+  every layer of the crown (`invariant gl_Position` in both). **Blades trimmed** to each species' outline (the widest
+  the baked blade gets between neighbouring grid rows, +0.04): oak's transparent corners were a quarter of its quads.
 - **Light** without extra passes: the dappled light and the greener shade come from a cover map (4 mm a texel) read
   by every canopy material; the haze between tiers is a fog term in the same shaders.
 - **Off**: the trees are a scene of their own (`view.addTrees`), drawn only while the trees view is shown (as before).
 
-| trees scene, build machine (SwiftShader, Q=high 640 × 400; GPU times not like a real GPU's, the counts are) | before (main a39bc06) | after |
+**What it costs, close up** — the frame at a fixed camera over Meadow Pond's oak (tree 2), median of three, on the
+build machine (SwiftShader: a CPU rasterizer, every pixel of every layer shaded; times not like a GPU's, the shares
+and counts are):
+
+| camera distance | main (flat canopy) | v2, first cut | v2, as it stands |
+|---|---|---|---|
+| 150 mm | 699 ms · 72 draws · 87k triangles | 1770 ms · 64 · 312k | 1789 ms · 67 · 256k |
+| 300 mm | 843 ms · 88 · 114k | 1817 ms · 72 · 308k | 1800 ms · 75 · 258k |
+| 600 mm | 817 ms · 118 · 168k | 1012 ms · 81 · 132k | 1119 ms · 84 · 127k |
+
+Where it goes at 150 mm (each part hidden in turn): the leaves ≈ 1,100 ms — their shading about 600 (the same blades
+with a flat shader: 1,182 against 1,801), drawing the blades and their alpha test about 450, their shadows about 300 of
+it shared with the wood's; the wood ≈ 340. What did not move it here: the pre-pass (+5 %: a CPU rasterizer shades
+every layer whatever the depth test, even an "equal" test with no discard), the trimmed blades, the leaves in culled
+chunks of 192 mm (tried and dropped: 40 more draws, no gain — the leaves' cost is their pixels on screen, not
+off-screen vertices), the dappled light on the leaves (−4 %), shadows received on the leaves (−3 %). What did: the
+shadow twins and the wood's rings (triangles 312k → 256k close up; shadow-pass canopy triangles 143k → ~25k).
+
+So on the build machine the canopy close up costs about 2.5 times the flat one, from the leaves' layers of pixels.
+On a GPU the pre-pass leaves one shaded blade a pixel; whether the Mac keeps v5's 60 FPS in the trees is for its
+`?bench=1` (trees scene) to say. If it falls short, the cuts left change the look a little: fewer small leaves (two
+thirds of them), the coarse share nearer, a plainer leaf shader at Medium and Low.
+
+| trees scene (`?bench=1`, ONLY=trees), build machine, Q=high 640 × 400 | before (main a39bc06) | after |
 |---|---|---|
-| GPU, all passes, a frame | 496.8 ms | 466.5 ms |
-| scene pass | 193.3 ms | 66.4 ms |
-| shadow maps | 111.9 ms | 96.7 ms |
-| canopy triangles in the shadow pass | 143k (the flat bands' mesh) | 36k (leaves 19k, wood 15k, big leaves 2k) |
-| main thread a frame | 14.1 ms | 18.9 ms (3 frames, `units` 4.2 — noise at this frame rate) |
-| GPU memory | ≈ 451 MB | ≈ 450 MB |
-Reports: `docs/performance/bench-trees-v2-before.txt`, `-after.txt`. COST
+BENCHROWS
+Reports: `docs/performance/bench-trees-v2-before.txt`, `-after.txt`.
 
 GOLDEN
