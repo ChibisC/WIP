@@ -29,4 +29,6 @@ Stills in `shots/v2/` (render only; `scratchpad` probe `look.py` per map with an
 - `oak_close.jpg`, `acacia_close.jpg` — the bark and leaves near (acacia's paired thorns).
 - `lab/bark.jpg`, `lab/bark_close.jpg` — the five barks on walked limbs (oak, beech, willow, rainforest, acacia).
 - `lab/leaves.jpg` — each species' four blades, upper side and underside.
+- `lab/crotch_*.jpg` — round 2 (the user's notes, 2026-11-24): the trunk swelling into thicker limbs, each with its
+  collar — oak from the side near and far and from above, beech, rainforest, acacia from above.
 References (descriptions and numbers, no photos): `references.md`.

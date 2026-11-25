@@ -1991,6 +1991,15 @@ the flat canopy's frame close up on the build machine; then shadows from coarse 
 (`render/shadowOnly.ts`), the wood ringed at its nodes and flares, a depth pre-pass for the leaves, the blades trimmed
 to their outlines (leaf chunks tried and dropped). The rest is the leaves' pixels; the Mac's `?bench=1` decides.
 
+### 38.3b Round 2 (the user's rating, 2026-11-24: "changes")
+"Make the tree stump and the branches blend better with each other, also branches can be thicker or thinner
+(preferably thicker) in game too": limbs about a quarter thicker (`TREES.crowns.*.limbR`, `limbMin/limbMax` 16/38,
+`twigR` 11) and each limb, branch and twig its own thickness (`limbVary`, `branchShare`, `twigVary`); the boughs between
+crowns may meet a crown on tier 1 too (a slope down), at any reached node of its wood, with bowed shapes and the next
+clear pair if the spanning tree's has none (thicker wood above left the oak's tier-0 tips under its higher wood); the
+render's crotch bulb (`crotchShape`) and the limbs' collars; the climb follows the bulb. Stills re-shot, the review page
+round 2 (before/after pairs, items R1 trunk into limbs, R2 thickness, decision D2).
+
 ### 38.4 Verify
 Validator + `tests/trees.ts`; `npm test`, determinism check, build; golden set identical outside the trees; LAN
 two-tab in sync with the layer on; render-only sheets in `docs/trees/shots/`; a review page for the user's rating
