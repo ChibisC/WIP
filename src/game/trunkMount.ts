@@ -3,6 +3,7 @@ import { World } from '../sim/world';
 import { TREES, TreesDef, TrunkDef } from '../sim/types';
 import { climbHeight, climbSeconds } from '../sim/trees';
 import { AntView, MountOut } from '../render/ants/antRenderer';
+import { crotchDomeY, crotchRadiusAt, crotchShape, CrotchShape } from '../render/trees/woodMesh';
 
 /**
  * Ants on a tree trunk (render only; user 2026-11-08 "use walking animation parallel to the tree"): a climbing ant is
@@ -83,30 +84,39 @@ export function trunkMountGround(w: World, v: AntView, groundAt: (x: number, y: 
 
 /**
  * The trees view (trees v2): the ant walking up the drawn trunk (render/trees/woodMesh.ts: a column from the ground far
- * below to the crotch) at its real height, and over the crotch's rim onto its top in the last part of the climb.
+ * below, swelling at the top into the crotch's bulb) at its real height, out over the bulb and onto its walked top in
+ * the last part of the climb.
  */
+const crotches = new WeakMap<object, CrotchShape[]>(); // det-ok: render cache, keyed by the canopy's derived data
 export function trunkMountCanopy(w: World, v: AntView, out: MountOut): boolean {
   const d = w.s.trees;
   const g = w.nestOf(TREES);
   if (!d || !g || !v.trunk) return false;
   const t = d.trunks[v.trunk - 1];
   if (!t || t.top < 0) return false;
+  const data = w.treesData;
+  let cs = data ? crotches.get(data) : undefined;
+  if (data && !cs) crotches.set(data, (cs = data.skels.map((sk) => crotchShape(sk))));
+  const c = cs?.[t.tree];
   const K = v.trunkK ?? 0;
   const a = v.trunkA ?? 0;
   rad.set(Math.cos(a), 0, Math.sin(a));
   const top = t.z;
-  // the trunk's radius at a height: the crown's trunk tapers from its foot to 0.86 of it at the crotch (treeCrowns.ts)
+  // the trunk's radius at a height: the crown's trunk tapers from its foot to 0.86 of it under the crotch's bulb, then
+  // swells out to the bulb's rim (treeCrowns.ts, woodMesh.ts crotchShape)
   const climbH = climbHeight(w, t);
   const y = top - (1 - K) * climbH;
   const k = Math.max(0, Math.min(1, (y + d.height) / Math.max(1, climbH)));
-  const Rd = t.r * (1 - 0.14 * k) * 1.02;
-  pB.set(t.x + rad.x * Rd, Math.min(top - 2, y), t.y + rad.z * Rd);
+  const yb = c ? c.yB : top;
+  const Rd = (c && y > yb ? crotchRadiusAt(c, Math.min(y, c.yR)) : t.r * (1 - 0.14 * k)) * 1.02;
+  pB.set(t.x + rad.x * Rd, Math.min(c ? c.yR : top - 2, y), t.y + rad.z * Rd);
   fV.set(0, 1, 0);
   uR.copy(rad);
-  // over the rim: on the crotch's top, a body length in from the edge, nose to the trunk's centre
-  pA.set(t.x + rad.x * (Rd - 6), top, t.y + rad.z * (Rd - 6));
+  // over the rim: on the crotch's walked top, a body length in from its edge, nose to the trunk's centre
+  const rIn = c ? Math.min(c.rhoR, c.Rc * 0.5) - 6 : Rd - 6;
+  pA.set(t.x + rad.x * rIn, c ? crotchDomeY(c, rIn) : top, t.y + rad.z * rIn);
   fH.copy(rad).multiplyScalar(-1);
-  const s = smooth((K - 0.94) / 0.06);
+  const s = smooth((K - 0.92) / 0.08);
   // (blend goes A → B; here the top is the end, so from the bark pose to the top's)
   out.p.lerpVectors(pB, pA, s);
   out.f.lerpVectors(fV, fH, s).normalize();

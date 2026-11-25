@@ -1645,9 +1645,15 @@ export const TREES = {
   stepMax: 2.2,
   /** a foe or creature more than this far above or below (mm) is out of reach (another tier) */
   reachZ: 14,
-  /** the thinnest walkable twig (radius, mm) and the boughs that join the crowns (radius, mm) */
-  twigR: 10,
+  /** the thinnest walkable twig (radius, mm) and the boughs that join the crowns (radius, mm) — user 2026-11-24:
+   * thicker branches, some thicker and some thinner */
+  twigR: 11,
   linkR: 13,
+  /** each limb's radius × a random share of these (its own thickness), each branch's × its limb's there, each twig's
+   * × `twigR` */
+  limbVary: [0.85, 1.2] as [number, number],
+  branchShare: [0.66, 0.88] as [number, number],
+  twigVary: [0.9, 1.2] as [number, number],
   /** a crown reaching this far (mm) or more gets one tier more than its style's */
   bigReach: 340,
   /**
@@ -1658,13 +1664,13 @@ export const TREES = {
    * (rx, ry mm; null — this species' leaves are all small decoration); flowers (food sites) a limb.
    */
   crowns: {
-    oak: { tiers: 3, limbs: [5, 6], rise: 2, level: 1, limbR: 0.55, taper: 0.55, wobble: 0.2, forks: 2, twigs: 2, droop: 0.5, leaf: [24, 15], flowers: 0.5 },
-    beech: { tiers: 3, limbs: [4, 5], rise: 2, level: 0, limbR: 0.5, taper: 0.5, wobble: 0.09, forks: 2, twigs: 3, droop: 0.4, leaf: [22, 13], flowers: 0 },
-    willow: { tiers: 3, limbs: [6, 7], rise: 3, level: 0, limbR: 0.45, taper: 0.5, wobble: 0.24, forks: 1, twigs: 2, droop: 0.9, leaf: null, flowers: 0 },
-    tropical: { tiers: 3, limbs: [5, 6], rise: 2, level: 1, limbR: 0.33, taper: 0.55, wobble: 0.13, forks: 2, twigs: 2, droop: 0.3, leaf: [40, 21], flowers: 0.8 },
-    acacia: { tiers: 2, limbs: [4, 5], rise: 0, level: 3, limbR: 0.5, taper: 0.5, wobble: 0.18, forks: 2, twigs: 2, droop: 0.3, leaf: null, flowers: 0.5 },
-    sapling: { tiers: 2, limbs: [3, 3], rise: 0, level: 1, limbR: 0.5, taper: 0.55, wobble: 0.18, forks: 1, twigs: 1, droop: 0.3, leaf: [18, 11], flowers: 0 },
+    oak: { tiers: 3, limbs: [5, 6], rise: 2, level: 1, limbR: 0.68, taper: 0.55, wobble: 0.2, forks: 2, twigs: 2, droop: 0.5, leaf: [24, 15], flowers: 0.5 },
+    beech: { tiers: 3, limbs: [4, 5], rise: 2, level: 0, limbR: 0.62, taper: 0.5, wobble: 0.09, forks: 2, twigs: 3, droop: 0.4, leaf: [22, 13], flowers: 0 },
+    willow: { tiers: 3, limbs: [6, 7], rise: 3, level: 0, limbR: 0.56, taper: 0.5, wobble: 0.24, forks: 1, twigs: 2, droop: 0.9, leaf: null, flowers: 0 },
+    tropical: { tiers: 3, limbs: [5, 6], rise: 2, level: 1, limbR: 0.41, taper: 0.55, wobble: 0.13, forks: 2, twigs: 2, droop: 0.3, leaf: [40, 21], flowers: 0.8 },
+    acacia: { tiers: 2, limbs: [4, 5], rise: 0, level: 3, limbR: 0.62, taper: 0.5, wobble: 0.18, forks: 2, twigs: 2, droop: 0.3, leaf: null, flowers: 0.5 },
+    sapling: { tiers: 2, limbs: [3, 3], rise: 0, level: 1, limbR: 0.62, taper: 0.55, wobble: 0.18, forks: 1, twigs: 1, droop: 0.3, leaf: [18, 11], flowers: 0 },
   } as Record<string, { tiers: number; limbs: [number, number]; rise: number; level: number; limbR: number; taper: number; wobble: number; forks: number; twigs: number; droop: number; leaf: [number, number] | null; flowers: number }>,
-  limbMin: 14,
-  limbMax: 30,
+  limbMin: 16,
+  limbMax: 38,
 };

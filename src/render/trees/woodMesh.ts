@@ -122,15 +122,22 @@ function hash01(a: number, b: number): number {
   return ((h >>> 0) % 10007) / 10007;
 }
 
+/** a limb's swelling where it comes out of the crotch's bulb: how far along it starts */
+interface Collar {
+  at: number;
+}
+
 interface Ring {
   c: THREE.Vector3;
   t: THREE.Vector3;
   r: number;
   s: number;
+  /** a collar's swelling: the section this much wider, and deeper below its middle (its top stays the floor's) */
+  f?: number;
 }
 
 /** A walked (or round) piece of wood: rings along its axis, a rounded cap at its end (and at its start for a link). */
-function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, startFlare: boolean, s0 = 0): void {
+function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, startFlare: boolean, s0 = 0, collar?: Collar): void {
   const nodes = p.nodes;
   if (nodes.length < 2) return;
   const flat = p.walk;
@@ -140,10 +147,22 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
   if (thin) lod = { radial: Math.max(4, Math.round(lod.radial * 0.4)), step: lod.step * 2.2, cap: 1 };
   // the axis: the wood's top is the floor (z), so its centre is a radius below it — and lower where it swells
   const r0 = nodes[0].r;
-  const flareLen = 1.6 * r0;
+  // (the swelling where it leaves its parent: from its start; a limb's where it comes out of the crotch's bulb)
+  const fAt = s0 + (collar?.at ?? 0);
+  const flareLen = (collar ? 1.8 : 1.6) * r0;
+  const amp = collar ? 0.3 : 0.3;
   const rings: Ring[] = [];
   let s = s0;
-  const radiusAt = (r: number, sAlong: number) => (startFlare && sAlong - s0 < flareLen ? r * (1 + 0.3 * Math.pow(1 - (sAlong - s0) / flareLen, 2)) : r);
+  // (a collar swells in over most of a radius before its full width, so it has no step)
+  const ramp = collar ? 0.8 * r0 : 0;
+  const radiusAt = (r: number, sAlong: number) => {
+    if (!startFlare || sAlong < fAt - ramp || sAlong - fAt >= flareLen) return r;
+    if (sAlong < fAt) {
+      const q = (sAlong - (fAt - ramp)) / ramp;
+      return r * (1 + amp * q * q * (3 - 2 * q));
+    }
+    return r * (1 + amp * Math.pow(1 - (sAlong - fAt) / flareLen, 2));
+  };
   for (let i = 0; i < nodes.length - 1; i++) {
     const a = nodes[i];
     const b = nodes[i + 1];
@@ -151,10 +170,15 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
     // (between two nodes the wood runs straight and its radius changes evenly: rings there would add nothing but
     // triangles — only the flare at a piece's start, which swells as a curve, is ringed: a quarter of its length or
     // `step` apart, whichever is longer — the curve then misses by under a tenth of a millimetre on a limb of 20)
-    const n = startFlare && s - s0 < flareLen ? Math.max(1, Math.ceil(len / Math.max(lod.step, flareLen / 4))) : 1;
+    const n = startFlare && s + len > fAt - ramp && s - fAt < flareLen ? Math.max(1, Math.ceil(len / Math.max(lod.step, flareLen / 4))) : 1;
     for (let k = 0; k < n; k++) {
       const u = k / n;
-      const r = radiusAt(a.r + (b.r - a.r) * u, s + len * u);
+      const rb = a.r + (b.r - a.r) * u;
+      const rf = radiusAt(rb, s + len * u);
+      // (a collar keeps the wood's middle and top and swells its sides and underside; elsewhere the whole section
+      // swells, its top kept at the floor)
+      const r = collar ? rb : rf;
+      const f = collar ? rf / rb : 1;
       const x = a.x + (b.x - a.x) * u;
       const y = a.y + (b.y - a.y) * u;
       const z = a.z + (b.z - a.z) * u;
@@ -163,7 +187,7 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
         const pa = nodes[i - 1];
         t.add(new THREE.Vector3(a.x - pa.x, a.z - pa.z, a.y - pa.y).normalize()).normalize();
       }
-      rings.push({ c: new THREE.Vector3(x, flat ? z - r : z, y), t, r, s: s + len * u });
+      rings.push({ c: new THREE.Vector3(x, flat ? z - r : z, y), t, r, s: s + len * u, f });
     }
     s += len;
   }
@@ -185,8 +209,10 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
     for (let j = 0; j <= R; j++) {
       const phi = Math.PI + (2 * Math.PI * j) / R;
       section(phi, flat, sec);
-      vP.copy(rg.c).addScaledVector(rg.t, fwd * rg.r).addScaledVector(vL, sec[0] * rg.r * scale).addScaledVector(vN, sec[1] * rg.r * scale);
-      vn.copy(vL).multiplyScalar(sec[2] * (1 - capN)).addScaledVector(vN, sec[3] * (1 - capN)).addScaledVector(rg.t, capN).normalize();
+      const fl = rg.f ?? 1;
+      const fv = sec[1] < 0 ? fl : 1;
+      vP.copy(rg.c).addScaledVector(rg.t, fwd * rg.r).addScaledVector(vL, sec[0] * rg.r * scale * fl).addScaledVector(vN, sec[1] * rg.r * scale * fv);
+      vn.copy(vL).multiplyScalar((sec[2] / fl) * (1 - capN)).addScaledVector(vN, (sec[3] / fv) * (1 - capN)).addScaledVector(rg.t, capN).normalize();
       vt.crossVectors(rg.t, vn);
       if (vt.lengthSq() < 1e-8) vt.copy(vL);
       vt.normalize();
@@ -222,17 +248,79 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
   for (let j = 0; j < R; j++) g.idx.push(prev + j, prev + j + 1, tip);
 }
 
-/** The trunk: a round column from the ground far below to the crotch, its top flat and rounded off like the floor's. */
+/**
+ * The crotch (user 2026-11-24: "make the trunk and the branches blend better"): the trunk's top swells into a rounded
+ * bulb — the walked top's dome (`floorDrop` over the crotch's floor) carried on out past the floor to a rim, then
+ * curving down and in to the column — and the limbs grow out of it, swollen where they leave it (`tube`'s flare).
+ */
+export interface CrotchShape {
+  x: number;
+  y: number;
+  topZ: number;
+  /** the column's radius under the bulb */
+  rCol: number;
+  /** the dome's curve: `floorDrop(Rc, ρ / Rc)` below the top (the floor's own over the crotch) */
+  Rc: number;
+  /** the rim: its radius and height */
+  rhoR: number;
+  yR: number;
+  /** where the bulb leaves the column */
+  yB: number;
+}
+
+export function crotchShape(sk: CrownSkel): CrotchShape {
+  const trunkP = sk.pieces[0];
+  const rCol = trunkP.nodes[trunkP.nodes.length - 1].r;
+  let rl = 0;
+  for (const p of sk.pieces) if (p.kind === 'limb' && p.parent < 0) rl = Math.max(rl, p.nodes[0].r);
+  const Rc = sk.topR / T.walkShare;
+  // (the rim: out by most of the thickest limb's radius, within the dome's steep part)
+  const rhoR = Math.max(rCol * 1.1, Math.min(0.78 * Rc, rCol + 0.6 * rl));
+  const yR = sk.topZ - floorDrop(Rc, rhoR / Rc);
+  // (the swelling starts well below the thickest limb's underside and is most of the way out by it, so it shows under
+  // the limbs as the trunk widening into them)
+  const yB = Math.min(yR - 12, sk.topZ - 2.6 * rl - 0.5 * (rhoR - rCol));
+  return { x: sk.x, y: sk.y, topZ: sk.topZ, rCol, Rc, rhoR, yR, yB };
+}
+
+/** the dome's height at a radius */
+export function crotchDomeY(c: CrotchShape, rho: number): number {
+  return c.topZ - floorDrop(c.Rc, rho / c.Rc);
+}
+
+/** the bulb's widening at q (0 where it leaves the column … 1 the rim): eased in and out (no crease at either end), done
+ * by seven tenths of the way */
+function bulbE(q: number): number {
+  const x = Math.min(1, Math.max(0, q / 0.7));
+  return x * x * x * (10 - 15 * x + 6 * x * x);
+}
+
+/** the bulb's side at t (0 the column … 1 the rim): radius, height and their rates */
+export function crotchSide(c: CrotchShape, t: number, out: number[]): void {
+  const e = 1e-3;
+  const w = c.rhoR - c.rCol;
+  out[0] = c.rCol + w * bulbE(t);
+  out[1] = c.yB + (c.yR - c.yB) * t;
+  out[2] = (w * (bulbE(Math.min(1, t + e)) - bulbE(Math.max(0, t - e)))) / (Math.min(1, t + e) - Math.max(0, t - e));
+  out[3] = c.yR - c.yB;
+}
+
+/** the trunk's drawn radius at a height in the bulb (the column's below it) — the climb follows it (game/trunkMount.ts) */
+export function crotchRadiusAt(c: CrotchShape, y: number): number {
+  if (y <= c.yB) return c.rCol;
+  if (y >= c.yR) return c.rhoR;
+  return c.rCol + (c.rhoR - c.rCol) * bulbE((y - c.yB) / (c.yR - c.yB));
+}
+
+/** The trunk: a round column from the ground far below, swelling at the top into the crotch's bulb (`crotchShape`). */
 function trunk(g: Geo, sk: CrownSkel, p: WoodPiece, layer: number, lod: WoodLod, seed: number): void {
   const nodes = p.nodes;
   const R = lod.radial + 4;
-  const rTop = nodes[nodes.length - 1].r;
-  const Rc = sk.topR / T.walkShare;
-  const yEdge = sk.topZ - floorDrop(Rc, rTop / Rc);
+  const c = crotchShape(sk);
   const y0 = nodes[0].z;
-  const H = yEdge - y0;
+  const H = c.yB - y0;
   const n = Math.max(4, Math.ceil(H / (lod.step * 3)));
-  const circ = 2 * Math.PI * rTop;
+  const circ = 2 * Math.PI * c.rCol;
   const ou = hash01(seed, 3) * 300;
   const rAt = (y: number) => {
     // the nodes' radii along the height (linear between them)
@@ -243,44 +331,58 @@ function trunk(g: Geo, sk: CrownSkel, p: WoodPiece, layer: number, lod: WoodLod,
         const u = Math.min(1, Math.max(0, (y - a.z) / Math.max(1e-6, b.z - a.z)));
         return a.r + (b.r - a.r) * u;
       }
-    return rTop;
+    return c.rCol;
   };
+  // a ring of the surface of revolution: radius, height, the profile's outward normal (in ρ, y), the bark's length
+  // along it, how much it faces up (moss, the worn top) and its wear
   let prev = -1;
-  for (let k = 0; k <= n; k++) {
-    const y = y0 + (H * k) / n;
-    const r = k === n ? rTop : rAt(y);
-    const dr = (rAt(Math.min(yEdge, y + 2)) - rAt(Math.max(y0, y - 2))) / 4;
+  let len = 0;
+  let lastR = -1;
+  let lastY = 0;
+  const ring = (rho: number, y: number, nr: number, ny: number, up: number, wear: number) => {
+    if (lastR >= 0) len += Math.hypot(rho - lastR, y - lastY);
+    lastR = rho;
+    lastY = y;
     const base = g.n;
     for (let j = 0; j <= R; j++) {
       const phi = (2 * Math.PI * j) / R;
-      vn.set(Math.cos(phi), -dr, Math.sin(phi)).normalize();
-      vP.set(sk.x + Math.cos(phi) * r, y, sk.y + Math.sin(phi) * r);
-      vt.set(-Math.sin(phi), 0, Math.cos(phi));
-      g.vert(vP, vn, vt, (j / R) * circ + ou, y - y0, 0, r, layer, 0);
+      const cx = Math.cos(phi);
+      const sz = Math.sin(phi);
+      vn.set(cx * nr, ny, sz * nr).normalize();
+      vP.set(c.x + cx * rho, y, c.y + sz * rho);
+      vt.set(-sz, 0, cx);
+      g.vert(vP, vn, vt, (j / R) * circ + ou, len, up, Math.max(rho, 1), layer, wear);
     }
     if (prev >= 0) for (let j = 0; j < R; j++) g.idx.push(prev + j, base + j, prev + j + 1, prev + j + 1, base + j, base + j + 1);
     prev = base;
+  };
+  // the column
+  for (let k = 0; k <= n; k++) {
+    const y = y0 + (H * k) / n;
+    const r = k === n ? c.rCol : rAt(y);
+    const dr = (rAt(Math.min(c.yB, y + 2)) - rAt(Math.max(y0, y - 2))) / 4;
+    ring(r, y, 1, -dr, 0, 0);
   }
-  // the top: rings in to the middle, at the floor's height (the crotch is walked)
-  const K = 6;
-  for (let k = 1; k <= K; k++) {
-    const rho = rTop * (1 - k / K);
-    const y = sk.topZ - floorDrop(Rc, rho / Rc);
-    const base = g.n;
-    // (the slope of the top there: its normal)
+  // the bulb's side, up to the rim
+  const o = [0, 0, 0, 0];
+  const KS = lod.cap >= 3 ? 14 : 6;
+  for (let k = 1; k <= KS; k++) {
+    crotchSide(c, k / KS, o);
+    const l = Math.hypot(o[2], o[3]) || 1;
+    // (outward: the tangent (dρ, dy) turned a quarter back)
+    ring(o[0], o[1], o[3] / l, -o[2] / l, Math.max(0, -o[2] / l), 0);
+  }
+  // the dome, in to the middle: the floor's own curve over the walked top (worn like a limb's), carried out to the rim
+  const KD = lod.cap >= 3 ? 9 : 4;
+  const wearTop = WEAR.limb;
+  for (let k = 1; k <= KD; k++) {
+    const rho = c.rhoR * (1 - k / KD);
+    const y = crotchDomeY(c, rho);
     const e = 0.5;
-    const dy = (sk.topZ - floorDrop(Rc, (rho + e) / Rc) - (sk.topZ - floorDrop(Rc, Math.max(0, rho - e) / Rc))) / (2 * e);
-    for (let j = 0; j <= R; j++) {
-      const phi = (2 * Math.PI * j) / R;
-      vn.set(-Math.cos(phi) * dy, 1, -Math.sin(phi) * dy).normalize();
-      vP.set(sk.x + Math.cos(phi) * rho, y, sk.y + Math.sin(phi) * rho);
-      vt.set(-Math.sin(phi), 0, Math.cos(phi));
-      // (the top's bark laid flat over it, in plan: no seam of bark converging on the middle)
-      vt.set(-1, 0, 0);
-      g.vert(vP, vn, vt, -vP.x + ou, vP.z, 1, rTop, layer, 0.5);
-    }
-    for (let j = 0; j < R; j++) g.idx.push(prev + j, base + j, prev + j + 1, prev + j + 1, base + j, base + j + 1);
-    prev = base;
+    const dy = (crotchDomeY(c, rho + e) - crotchDomeY(c, Math.max(0, rho - e))) / (2 * e);
+    const l = Math.hypot(dy, 1);
+    const w = wearTop * (1 - Math.min(1, Math.max(0, (rho / (c.Rc * T.walkShare) - 0.75) / 0.35)));
+    ring(rho, y, -dy / l, 1 / l, 1 / l, w);
   }
 }
 
@@ -289,18 +391,38 @@ export function buildWood(data: CanopyData, material: THREE.Material, extra: Rea
   const group = new THREE.Group();
   group.name = 'canopyWood';
   const CELL = 256;
-  type Chunk = { key: string; parts: Array<{ p: WoodPiece; sk: CrownSkel | null; seed: number; flare: boolean; s0: number }> };
+  type Chunk = { key: string; parts: Array<{ p: WoodPiece; sk: CrownSkel | null; seed: number; flare: boolean; s0: number; collar?: Collar }> };
   const chunks = new Map<string, Chunk>();
-  const put = (key: string, p: WoodPiece, sk: CrownSkel | null, seed: number, flare: boolean, s0 = 0) => {
+  const put = (key: string, p: WoodPiece, sk: CrownSkel | null, seed: number, flare: boolean, s0 = 0, collar?: Collar) => {
     let c = chunks.get(key);
     if (!c) chunks.set(key, (c = { key, parts: [] }));
-    c.parts.push({ p, sk, seed, flare, s0 });
+    c.parts.push({ p, sk, seed, flare, s0, collar });
   };
   data.skels.forEach((sk, ti) => {
+    const cr = sk.pieces.length ? crotchShape(sk) : null;
     sk.pieces.forEach((p, pi) => {
       if (p.kind === 'trunk') return put(`t${ti}`, p, sk, ti * 1000 + pi, false);
       const m = p.nodes[Math.floor(p.nodes.length / 2)];
-      put(`${ti}:${Math.floor(m.x / CELL)}:${Math.floor(m.y / CELL)}`, p, sk, ti * 1000 + pi, true);
+      // a limb from the crotch: its collar where it comes out of the bulb (half a radius inside the rim)
+      let collar: Collar | undefined;
+      if (cr && p.kind === 'limb' && p.parent < 0) {
+        const edge = cr.rhoR - 0.5 * p.nodes[0].r;
+        let at = 0;
+        for (let i = 1; i < p.nodes.length; i++) {
+          const a = p.nodes[i - 1];
+          const b = p.nodes[i];
+          const l = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+          const da = Math.hypot(a.x - sk.x, a.y - sk.y);
+          const db = Math.hypot(b.x - sk.x, b.y - sk.y);
+          if (db >= edge) {
+            at += (l * Math.max(0, edge - da)) / Math.max(1e-6, db - da);
+            break;
+          }
+          at += l;
+        }
+        collar = { at };
+      }
+      put(`${ti}:${Math.floor(m.x / CELL)}:${Math.floor(m.y / CELL)}`, p, sk, ti * 1000 + pi, true, 0, collar);
     });
   });
   // the fine twigs and lianas (render only, foliage.ts): with their tree's wood near them
@@ -350,7 +472,7 @@ export function buildWood(data: CanopyData, material: THREE.Material, extra: Rea
       for (const part of c.parts) {
         const layer = layerOf(part.sk, part.p);
         if (part.p.kind === 'trunk' && part.sk) trunk(g, part.sk, part.p, layer, L, part.seed);
-        else tube(g, part.p, layer, L, part.seed, part.flare, part.s0);
+        else tube(g, part.p, layer, L, part.seed, part.flare, part.s0, part.collar);
       }
       const geo = g.build();
       if (!geo) return;

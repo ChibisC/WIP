@@ -268,6 +268,8 @@ export function crownSkeleton(def: TreeDef, tree: number, toward: readonly numbe
   for (let i = 0; i < n; i++) {
     const ang = angs[i];
     const j = rng.range(0.92, 1.06);
+    // (this limb's own thickness)
+    const rl = Math.max(T.limbMin, r0 * rng.range(T.limbVary[0], T.limbVary[1]));
     const sx = tx + dcos(ang) * topR * 0.35;
     const sy = ty + dsin(ang) * topR * 0.35;
     const f0 = topR * 0.65 + Math.max(8, R * 0.06);
@@ -283,8 +285,8 @@ export function crownSkeleton(def: TreeDef, tree: number, toward: readonly numbe
       stretches.push({ len: fa, dz: 0 });
       for (let k = 0; k < topLv; k++) stretches.push({ len: run, dz: -step }, { len: fk, dz: 0 });
     }
-    const r1 = Math.max(T.twigR + 1, r0 * st.taper);
-    const limb = grow(rng, sx, sy, topZ, ang, stretches, r0, r1, st.wobble);
+    const r1 = Math.max(T.twigR + 1, rl * st.taper);
+    const limb = grow(rng, sx, sy, topZ, ang, stretches, rl, r1, st.wobble);
     const li = sk.pieces.length;
     sk.pieces.push({ kind: 'limb', parent: -1, tree, walk: true, nodes: limb.nodes });
     // a hollow in the thick wood near the crotch (the first level or spreading limb)
@@ -301,7 +303,7 @@ export function crownSkeleton(def: TreeDef, tree: number, toward: readonly numbe
       const nd = limb.nodes[k];
       const bh = headingAt(limb.nodes, k) + side * rng.range(0.5, 0.95);
       side = -side;
-      const br = Math.max(T.twigR + 1, nd.r * 0.68);
+      const br = Math.max(T.twigR + 1, nd.r * rng.range(T.branchShare[0], T.branchShare[1]));
       const blen = R * rng.range(0.22, 0.36);
       const drop = role[i] === 'spread' && nd.z > 0.5 && rng.chance(st.droop) && blen >= run + 35;
       const bst: Stretch[] = drop ? [{ len: 14, dz: 0 }, { len: run, dz: -step }, { len: blen - 14 - run, dz: 0 }] : [{ len: blen, dz: 0 }];
@@ -339,7 +341,8 @@ function twig(rng: Rng, sk: CrownSkel, st: (typeof T.crowns)[string], pi: number
   const nd = nodes[at];
   const h = headingAt(nodes, at) + side * rng.range(0.35, 0.9);
   const len = rng.range(28, 50);
-  const t = grow(rng, nd.x, nd.y, nd.z, h, [{ len, dz: 0 }], T.twigR, T.twigR * 0.92, st.wobble);
+  const tr = T.twigR * rng.range(T.twigVary[0], T.twigVary[1]);
+  const t = grow(rng, nd.x, nd.y, nd.z, h, [{ len, dz: 0 }], tr, Math.max(T.twigR * 0.92, tr * 0.92), st.wobble);
   const ti = sk.pieces.length;
   sk.pieces.push({ kind: 'twig', parent: pi, tree: sk.tree, walk: true, nodes: t.nodes });
   const tip = t.nodes[t.nodes.length - 1];
@@ -359,31 +362,51 @@ function twig(rng: Rng, sk: CrownSkel, st: (typeof T.crowns)[string], pi: number
  * out"): the shortest spanning tree over the trunks; each link runs on tier 0 from the low tip of one crown nearest
  * the other to the other's low tip nearest it, with a gentle wobble.
  */
-export function linkPieces(defs: readonly TreeDef[], skels: readonly CrownSkel[], above?: (x: number, y: number) => boolean, reached?: (tree: number, x: number, y: number) => boolean): WoodPiece[] {
+export function linkPieces(defs: readonly TreeDef[], skels: readonly CrownSkel[], above?: (x: number, y: number, z: number) => boolean, reached?: (tree: number, x: number, y: number, z: number) => boolean): WoodPiece[] {
   const out: WoodPiece[] = [];
   if (defs.length < 2) return out;
   const edges = crownLinks(defs);
   // the low tips of each crown nearest the other; of their pairs the bough that passes under no higher floor (it would
   // be cut there), then the shortest
-  const nearest = (tree: number, x: number, y: number, fb: Pt): Pt[] => {
-    // (tips the tree's own trunk top reaches; any tip if none)
+  type P3 = [number, number, number];
+  const onFlat = (z: number) => Math.abs(z) < 1e-6 || Math.abs(z - T.tierStep) < 1e-6;
+  const nearest = (tree: number, x: number, y: number, fb: Pt): P3[] => {
+    // (where a bough may meet the crown: the ends of its wood on tier 0 or 1 its own trunk top reaches, and of each
+    // piece its reached node there nearest the other crown — as thicker wood above leaves fewer clear lines; any tier-0
+    // tip if none is reached)
+    const byDist = (p: P3 | Pt, q: P3 | Pt) => dhypot(p[0] - x, p[1] - y) - dhypot(q[0] - x, q[1] - y) || p[0] - q[0] || p[1] - q[1];
+    const ok = (nd: WoodNode) => onFlat(nd.z) && (!reached || reached(tree, nd.x, nd.y, nd.z));
+    const tips: P3[] = [];
+    const low: P3[] = [];
+    for (const p of skels[tree].pieces) {
+      if (!p.walk) continue;
+      const e = p.nodes[p.nodes.length - 1];
+      if (ok(e)) tips.push([e.x, e.y, e.z]);
+      let bp: P3 | null = null;
+      for (const nd of p.nodes) if (ok(nd) && (!bp || byDist([nd.x, nd.y, nd.z], bp) < 0)) bp = [nd.x, nd.y, nd.z];
+      if (bp) low.push(bp);
+    }
+    const c = [...tips.sort(byDist).slice(0, 8), ...low.sort(byDist).slice(0, 10)];
+    if (c.length) return c;
     const all = skels[tree].lowTips;
-    const ok = reached ? all.filter((p) => reached(tree, p[0], p[1])) : all;
-    const pts = ok.length ? ok : all;
-    const c = pts.length ? [...pts] : [fb];
-    c.sort((p, q) => dhypot(p[0] - x, p[1] - y) - dhypot(q[0] - x, q[1] - y) || p[0] - q[0] || p[1] - q[1]);
-    return c.slice(0, 6);
+    return all.length ? [...all].sort(byDist).slice(0, 6).map((p) => [p[0], p[1], 0] as P3) : [[fb[0], fb[1], 0]];
   };
-  const bough = (A: Pt, B: Pt, ph: number): WoodNode[] => {
+  // (the shapes tried for a bough between two points: a gentle S-wobble either way, or a bow to either side round wood
+  // that stands higher in its way)
+  const SHAPES: Array<[number, number]> = [[0.05, 0], [-0.05, 0], [0.1, 0], [-0.1, 0], [0, 0.12], [0, -0.12], [0, 0.24], [0, -0.24]];
+  // a bough runs on tier 0; from an end on tier 1 it slopes down (and up to one) at the branches' slope
+  const bough = (A: P3, B: P3, ph: number, shape: [number, number] = SHAPES[0]): WoodNode[] | null => {
     const len = dhypot(B[0] - A[0], B[1] - A[1]);
+    if ((A[2] + B[2]) / T.slope > len * 0.9) return null;
     const n = Math.max(2, Math.round(len / STEP));
     const h0 = datan2(B[1] - A[1], B[0] - A[0]);
     const nodes: WoodNode[] = [];
     for (let k = 0; k <= n; k++) {
       const u = k / n;
-      // a sine wobble across the straight line, fading at both ends
-      const off = dsin(u * Math.PI * 2 + ph) * len * 0.05 * dsin(u * Math.PI);
-      nodes.push({ x: A[0] + (B[0] - A[0]) * u + dcos(h0 + Math.PI / 2) * off, y: A[1] + (B[1] - A[1]) * u + dsin(h0 + Math.PI / 2) * off, z: 0, r: T.linkR });
+      // a sine wobble across the straight line, fading at both ends; or a bow
+      const off = dsin(u * Math.PI * 2 + ph) * len * shape[0] * dsin(u * Math.PI) + len * shape[1] * dsin(u * Math.PI);
+      const z = Math.max(0, A[2] - T.slope * u * len, B[2] - T.slope * (1 - u) * len);
+      nodes.push({ x: A[0] + (B[0] - A[0]) * u + dcos(h0 + Math.PI / 2) * off, y: A[1] + (B[1] - A[1]) * u + dsin(h0 + Math.PI / 2) * off, z, r: T.linkR });
     }
     return nodes;
   };
@@ -397,32 +420,75 @@ export function linkPieces(defs: readonly TreeDef[], skels: readonly CrownSkel[]
       for (let t = 0; t < m; t++) {
         const x = a.x + ((b.x - a.x) * t) / m;
         const y = a.y + ((b.y - a.y) * t) / m;
+        const z = a.z + ((b.z - a.z) * t) / m;
         const ox = (-(b.y - a.y) / Math.max(1e-6, dhypot(b.x - a.x, b.y - a.y))) * T.linkR * 0.8;
         const oy = ((b.x - a.x) / Math.max(1e-6, dhypot(b.x - a.x, b.y - a.y))) * T.linkR * 0.8;
-        if (above(x, y) || above(x + ox, y + oy) || above(x - ox, y - oy)) c++;
+        if (above(x, y, z) || above(x + ox, y + oy, z) || above(x - ox, y - oy, z)) c++;
       }
     }
     return c;
   };
-  edges.forEach(([a, b], i) => {
-    const rng = new Rng(defs[a].seed * 7 + defs[b].seed * 13 + i);
+  const bestBough = (a: number, b: number, seed: number): { nodes: WoodNode[]; cost: number } => {
+    const rng = new Rng(defs[a].seed * 7 + defs[b].seed * 13 + seed);
     const ph = rng.range(0, 1);
     let best: WoodNode[] | null = null;
     let bc = Infinity;
     let bl = Infinity;
     for (const A of nearest(a, defs[b].trunk[0], defs[b].trunk[1], defs[a].trunk))
-      for (const B of nearest(b, A[0], A[1], defs[b].trunk)) {
-        const nodes = bough(A, B, ph);
-        const c = cost(nodes);
-        const l = dhypot(B[0] - A[0], B[1] - A[1]);
-        if (c < bc || (c === bc && l < bl)) {
+      for (const B of nearest(b, A[0], A[1], defs[b].trunk))
+        for (let si = 0; si < SHAPES.length; si++) {
+          const nodes = bough(A, B, ph, SHAPES[si]);
+          if (!nodes) break;
+          const c = cost(nodes);
+          // (a bow is a little longer than the straight run, and a slope to tier 1 longer still: the plain wobble on
+          // tier 0 wins a tie)
+          const l = dhypot(B[0] - A[0], B[1] - A[1]) * (1 + Math.abs(SHAPES[si][1])) * (1 + (0.15 * (A[2] + B[2])) / T.tierStep);
+          if (c < bc || (c === bc && l < bl)) {
+            bc = c;
+            bl = l;
+            best = nodes;
+          }
+          if (c === 0) break;
+        }
+    return { nodes: best!, cost: bc };
+  };
+  // the spanning tree's edges first; an edge whose every bough would pass under higher wood (and be cut) gives way to
+  // the next nearest pair of crowns that joins the same two parts, if one has a clear bough (Kruskal, nearest first)
+  const part = defs.map((_, i) => i);
+  const find = (i: number): number => (part[i] === i ? i : (part[i] = find(part[i])));
+  const pairs: Array<[number, number, number]> = [];
+  for (let a = 0; a < defs.length; a++)
+    for (let b = a + 1; b < defs.length; b++) pairs.push([a, b, dhypot(defs[b].trunk[0] - defs[a].trunk[0], defs[b].trunk[1] - defs[a].trunk[1])]);
+  pairs.sort((p, q) => p[2] - q[2] || p[0] - q[0] || p[1] - q[1]);
+  const mst = new Set(edges.map(([a, b]) => `${Math.min(a, b)}:${Math.max(a, b)}`));
+  const tried = new Map<string, { nodes: WoodNode[]; cost: number }>();
+  const tryPair = (a: number, b: number) => {
+    const key = `${a}:${b}`;
+    let r = tried.get(key);
+    if (!r) tried.set(key, (r = bestBough(a, b, tried.size)));
+    return r;
+  };
+  const join = (a: number, b: number, r: { nodes: WoodNode[]; cost: number }) => {
+    part[find(a)] = find(b);
+    out.push({ kind: 'link', parent: -1, tree: -1, walk: true, nodes: r.nodes });
+  };
+  // (the spanning tree's own edges where clear, then any clear pair, then the least cut)
+  for (const [a, b] of pairs) if (mst.has(`${a}:${b}`) && find(a) !== find(b) && tryPair(a, b).cost === 0) join(a, b, tryPair(a, b));
+  for (const [a, b] of pairs) if (find(a) !== find(b) && tryPair(a, b).cost === 0) join(a, b, tryPair(a, b));
+  while (out.length < defs.length - 1) {
+    let bp: [number, number] | null = null;
+    let bc = Infinity;
+    for (const [a, b] of pairs)
+      if (find(a) !== find(b)) {
+        const c = tryPair(a, b).cost;
+        if (c < bc) {
           bc = c;
-          bl = l;
-          best = nodes;
+          bp = [a, b];
         }
       }
-    out.push({ kind: 'link', parent: -1, tree: -1, walk: true, nodes: best! });
-  });
+    if (!bp) break;
+    join(bp[0], bp[1], tryPair(bp[0], bp[1]));
+  }
   return out;
 }
 
@@ -454,7 +520,7 @@ const PRIO = [0, 1, 2, 3, 2];
  * Paint the crowns into the floor, then the links between them (`makeLinks` is told where the crowns' floor stands
  * above tier 0), cut the drops and prune what no trunk top reaches.
  */
-export function paintCanopy(g: FloorGrid, skels: readonly CrownSkel[], makeLinks: (above: (x: number, y: number) => boolean, reached: (tree: number, x: number, y: number) => boolean) => WoodPiece[]): CanopyFloor & { links: WoodPiece[] } {
+export function paintCanopy(g: FloorGrid, skels: readonly CrownSkel[], makeLinks: (above: (x: number, y: number, z: number) => boolean, reached: (tree: number, x: number, y: number, z: number) => boolean) => WoodPiece[]): CanopyFloor & { links: WoodPiece[] } {
   const W = g.w;
   const H = g.h;
   const n = W * H;
@@ -561,15 +627,16 @@ export function paintCanopy(g: FloorGrid, skels: readonly CrownSkel[], makeLinks
   const pre = hh.slice();
   const preComp = cutAndReach(pre, W, H, cs, skels);
   const links = makeLinks(
-    (x, y) => {
+    (x, y, z) => {
       const i = Math.floor(x / cs);
       const j = Math.floor(y / cs);
-      return i < 1 || j < 1 || i >= W - 1 || j >= H - 1 || hh[j * W + i] > 0.5;
+      return i < 1 || j < 1 || i >= W - 1 || j >= H - 1 || hh[j * W + i] > z + 0.5;
     },
-    (tree, x, y) => {
+    (tree, x, y, z) => {
       const i = Math.floor(x / cs);
       const j = Math.floor(y / cs);
-      return i >= 0 && j >= 0 && i < W && j < H && preComp[j * W + i] !== 0 && preComp[j * W + i] === preComp[Math.floor(skels[tree].y / cs) * W + Math.floor(skels[tree].x / cs)];
+      // (reached, and the floor there is at that height — not higher wood painted over it)
+      return i >= 0 && j >= 0 && i < W && j < H && preComp[j * W + i] !== 0 && Math.abs(pre[j * W + i] - z) <= 0.5 && preComp[j * W + i] === preComp[Math.floor(skels[tree].y / cs) * W + Math.floor(skels[tree].x / cs)];
     },
   );
   who = 255;
