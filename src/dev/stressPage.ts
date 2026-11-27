@@ -14,6 +14,7 @@ import { populateStress, stressSetup } from './stressScene';
 import type { Quality } from '../render/view';
 import { animSettings } from '../render/ants/antMotion';
 import { runBenchScene } from './bench';
+import { runLagHuntScene } from './lagHunt';
 
 export async function runStressPage(canvas: HTMLCanvasElement, ui: HTMLElement, q: URLSearchParams): Promise<void> {
   const per = Number(q.get('ants') || 400);
@@ -48,13 +49,14 @@ export async function runStressPage(canvas: HTMLCanvasElement, ui: HTMLElement, 
   const dbg = new DebugOverlay(s, ui);
   // (the benchmark measures the game as it is played: without the overlay, whose climb rails and hitboxes of every
   // ant are redrawn each frame — performance v5)
-  if (!q.get('bscene')) dbg.toggle(true);
+  if (!q.get('bscene') && !q.get('lhscene')) dbg.toggle(true);
   // look at the battle in the middle of the map
   s.view.surfaceRig.jumpTo(s.world.terrain.width / 2, s.world.terrain.depth / 2, 260);
   const w = window as unknown as { __session: GameSession; __ready: boolean; __stress: unknown };
   w.__session = s;
   s.start();
   if (q.get('bscene')) runBenchScene(s, q);
+  if (q.get('lhscene')) runLagHuntScene(s, q);
   w.__ready = true;
   const frames: number[] = [];
   const ticks: number[] = [];

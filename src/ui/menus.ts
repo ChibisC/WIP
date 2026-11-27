@@ -309,6 +309,12 @@ export class Menus {
         location.href = `${location.pathname}?bench=1&q=${this.s.view.quality}`;
       }),
     );
+    // (performance v7: the game plays itself through every mode and records every frame — a report to send)
+    rb.appendChild(
+      button('', 'Run Lag Hunt', 'Leaves this match (it is autosaved) and plays the arena, a match, the trees, a story night and the big fight by itself for about 12 minutes, recording every frame, then shows a report to copy or download', () => {
+        location.href = `${location.pathname}?lagHunt=1&q=${this.s.view.quality}`;
+      }),
+    );
     // (performance v6: every frame over 100 ms since loading, with what was in it, as text to send)
     const lag = button('', 'Copy lag report', 'Copies a list of every freeze over 100 ms since the game loaded — what the game was doing and what took the time — to paste into a message', () => {
       copyLagReport(this.s, (ok) => (lag.textContent = ok ? `Copied (${prof.lagCount} freezes)` : 'Copy failed — the report is in the console'));

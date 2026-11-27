@@ -112,6 +112,9 @@ export class CreatureRenderer {
 
   /** Build every creature part now (performance pass, CHANGE_PLAN §25). */
   prepare(): number {
+    // (performance v7: the night's eyeshine made now, hidden — it was made, and its shader compiled, on the frame night
+    // fell: the Lag Hunt's story scene named it, "new program: PointsMaterial")
+    if (typeof document !== 'undefined') this.makeGlints().visible = false;
     return this.batch.prepare();
   }
 
@@ -276,16 +279,8 @@ export class CreatureRenderer {
     }
   }
 
-  /**
-   * Eyeshine (render only; claude/story/04-spec §2, "wolf spider eyes appearing at the lair mouths"): at night a wolf
-   * spider's big front eyes send light back toward the camera from the tapetum behind the retina — two pale green-white
-   * glints, bright when it faces the camera, gone when it looks away. Drawn as additive points over the bodies.
-   */
-  private eyeshine(creatures: ReadonlyArray<Creature>, space: number, alpha: number, ground: GroundFn, camera: THREE.Camera | null): void {
-    if (this.night < 0.05 || !camera || typeof document === 'undefined') {
-      if (this.glints) this.glints.visible = false;
-      return;
-    }
+  /** The eyeshine's points (made once). */
+  private makeGlints(): THREE.Points {
     if (!this.glints) {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(this.glintPos, 3));
@@ -305,6 +300,20 @@ export class CreatureRenderer {
       this.glints.renderOrder = 5;
       this.group.add(this.glints);
     }
+    return this.glints;
+  }
+
+  /**
+   * Eyeshine (render only; claude/story/04-spec §2, "wolf spider eyes appearing at the lair mouths"): at night a wolf
+   * spider's big front eyes send light back toward the camera from the tapetum behind the retina — two pale green-white
+   * glints, bright when it faces the camera, gone when it looks away. Drawn as additive points over the bodies.
+   */
+  private eyeshine(creatures: ReadonlyArray<Creature>, space: number, alpha: number, ground: GroundFn, camera: THREE.Camera | null): void {
+    if (this.night < 0.05 || !camera || typeof document === 'undefined') {
+      if (this.glints) this.glints.visible = false;
+      return;
+    }
+    const glints = this.makeGlints();
     let n = 0;
     const cp = camera.position;
     for (const cr of creatures) {
@@ -344,11 +353,11 @@ export class CreatureRenderer {
         n++;
       }
     }
-    const g = this.glints.geometry;
+    const g = glints.geometry;
     g.setDrawRange(0, n);
     (g.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
     (g.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
-    this.glints.visible = n > 0;
+    glints.visible = n > 0;
   }
 
   private recOf(id: number): ClimbRec & { full: boolean } {

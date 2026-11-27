@@ -24,6 +24,7 @@ import { creatureDemo } from './dev/creatureDemo';
 import { runDeterminism } from './dev/determinism';
 import { runStressPage } from './dev/stressPage';
 import { runBenchScene, startBench } from './dev/bench';
+import { runLagHuntScene, startLagHunt } from './dev/lagHunt';
 import { decodeReplay } from './game/replay';
 import { SaveSlot, decodeSave, deleteSave, getSave } from './game/saves';
 import { settings, updateSettings } from './game/profile';
@@ -57,7 +58,7 @@ const canvas = document.getElementById('view') as HTMLCanvasElement;
 const scene = q.get('scene');
 // the display's rate while the page is still idle (the menu; performance v5: Low Power Mode holds Safari to 30 Hz) —
 // not on the benchmark's scene pages (they load at once; the start screen measured it) nor the screenshot harness
-if (!q.get('shot') && !q.get('bscene')) void probeDisplay();
+if (!q.get('shot') && !q.get('bscene') && !q.get('lhscene')) void probeDisplay();
 if (scene === 'antlab') runAntLab(canvas, q);
 else if (scene === 'swarm') runSwarmTest(canvas, q);
 else if (scene === 'crlab') runCreatureLab(canvas, q);
@@ -66,6 +67,7 @@ else if (scene === 'sounds' && q.get('render')) void renderScenario(q.get('rende
 else if (scene === 'sounds') runSoundBoard(document.getElementById('ui')!);
 else if (scene === 'determinism') runDeterminismPage(q);
 else if (q.get('bench') && !q.get('bscene')) startBench(document.getElementById('ui')!, q);
+else if (q.get('lagHunt') && !q.get('lhscene')) startLagHunt(document.getElementById('ui')!, q);
 else if (q.get('stress')) void runStressPage(canvas, document.getElementById('ui')!, q);
 else startGame();
 
@@ -273,6 +275,7 @@ function startGame(): void {
       }
       s.start();
       if (q.get('bscene')) runBenchScene(s, q);
+      if (q.get('lhscene')) runLagHuntScene(s, q);
       setTimeout(() => ((window as unknown as { __ready: boolean }).__ready = true), 800);
     }, 30);
   };
@@ -323,6 +326,7 @@ function startGame(): void {
     }
     s.start();
     if (q.get('bscene')) runBenchScene(s, q);
+    if (q.get('lhscene')) runLagHuntScene(s, q);
     setTimeout(() => ((window as unknown as { __ready: boolean }).__ready = true), 800);
   };
   if (q.get('play')) {

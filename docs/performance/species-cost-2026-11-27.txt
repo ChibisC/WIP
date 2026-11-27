@@ -1,0 +1,55 @@
+ready in 83 s
+frames flowing
+  aurimyrmex_soldier     dist   120: frame    1555 ms  main    4.5 ms  tris     727k  calls   55  LOD0/1/imp [0, 54, 0]  drawn 54
+      GPU frame 2546 ms [scene 2048, shadow maps 363, depth of field and colour grade 42, bloom 37, ambient occlusion (half resolution, blurred) 23] ants draws ms {'ants lod1': 1628.67} tris {'ants lod1': 274212}
+  aurimyrmex_soldier     dist    50: frame    4297 ms  main    3.1 ms  tris    1435k  calls   53  LOD0/1/imp [20, 14, 0]  drawn 34
+      GPU frame 4329 ms [scene 3398, shadow maps 795, depth of field and colour grade 58, bloom 34, ambient occlusion (half resolution, blurred) 22] ants draws ms {'ants lod0': 2277.35, 'ants lod1': 348.63} tris {'ants lod0': 557560, 'ants lod1': 71092}
+  fire_major             dist   120: frame    5812 ms  main    5.2 ms  tris     568k  calls   55  LOD0/1/imp [0, 60, 0]  drawn 60
+      GPU frame 2030 ms [scene 1662, shadow maps 249, depth of field and colour grade 39, bloom 34, ambient occlusion (half resolution, blurred) 24] ants draws ms {'ants lod1': 744.42} tris {'ants lod1': 192240}
+  fire_major             dist    50: frame    2856 ms  main    3.2 ms  tris     980k  calls   53  LOD0/1/imp [12, 29, 0]  drawn 41
+      GPU frame 2915 ms [scene 2255, shadow maps 503, depth of field and colour grade 69, bloom 39, ambient occlusion (half resolution, blurred) 23] ants draws ms {'ants lod0': 1136.63, 'ants lod1': 419.7} tris {'ants lod0': 307800, 'ants lod1': 92916}
+  aurimyrmex_worker      dist   120: frame    3292 ms  main    3.9 ms  tris     782k  calls   55  LOD0/1/imp [0, 59, 0]  drawn 59
+      GPU frame 2631 ms [scene 2133, shadow maps 380, depth of field and colour grade 40, bloom 33, ambient occlusion (half resolution, blurred) 22] ants draws ms {'ants lod1': 1190.76} tris {'ants lod1': 299602}
+  aurimyrmex_worker      dist    50: frame    3207 ms  main    3.2 ms  tris    1055k  calls   53  LOD0/1/imp [11, 29, 0]  drawn 40
+      GPU frame 3316 ms [scene 2620, shadow maps 550, depth of field and colour grade 67, bloom 34, ambient occlusion (half resolution, blurred) 23] ants draws ms {'ants lod0': 1184.43, 'ants lod1': 653.71} tris {'ants lod0': 290950, 'ants lod1': 147262}
+  lasius_soldier         dist   120: frame    2017 ms  main    5.4 ms  tris     580k  calls   55  LOD0/1/imp [0, 60, 0]  drawn 60
+      GPU frame 2277 ms [scene 1841, shadow maps 309, depth of field and colour grade 42, bloom 36, ambient occlusion (half resolution, blurred) 23] ants draws ms {'ants lod1': 735.34} tris {'ants lod1': 198240}
+  lasius_soldier         dist    50: frame    2045 ms  main    6.1 ms  tris     651k  calls   53  LOD0/1/imp [4, 41, 0]  drawn 45
+      GPU frame 2040 ms [scene 1590, shadow maps 305, depth of field and colour grade 61, bloom 38, ambient occlusion (half resolution, blurred) 23] ants draws ms {'ants lod1': 604.05, 'ants lod0': 256.9} tris {'ants lod1': 135464, 'ants lod0': 100864}
+  aurimyrmex_blaster     dist   120: frame    4192 ms  main    5.0 ms  tris     790k  calls   55  LOD0/1/imp [0, 59, 0]  drawn 59
+      GPU frame 2680 ms [scene 2179, shadow maps 384, depth of field and colour grade 39, bloom 33, ambient occlusion (half resolution, blurred) 22] ants draws ms {'ants lod1': 1259.21} tris {'ants lod1': 303378}
+  aurimyrmex_blaster     dist    50: frame    3591 ms  main    6.0 ms  tris    1118k  calls   53  LOD0/1/imp [13, 24, 0]  drawn 37
+      GPU frame 3576 ms [scene 2843, shadow maps 591, depth of field and colour grade 59, bloom 37, ambient occlusion (half resolution, blurred) 22] ants draws ms {'ants lod0': 1522.68, 'ants lod1': 619.78} tris {'ants lod0': 346398, 'ants lod1': 123408}
+  atta_media             dist   120: frame    4647 ms  main    5.6 ms  tris     613k  calls   55  LOD0/1/imp [0, 58, 0]  drawn 58
+      GPU frame 2178 ms [scene 1762, shadow maps 292, depth of field and colour grade 41, bloom 36, ambient occlusion (half resolution, blurred) 22] ants draws ms {'ants lod1': 822.08} tris {'ants lod1': 215064}
+  atta_media             dist    50: frame    4915 ms  main    5.0 ms  tris    1768k  calls   53  LOD0/1/imp [16, 18, 0]  drawn 34
+      GPU frame 4744 ms [scene 3618, shadow maps 981, depth of field and colour grade 63, bloom 35, ambient occlusion (half resolution, blurred) 23] ants draws ms {'ants lod0': 2551.09, 'ants lod1': 313.7} tris {'ants lod0': 728224, 'ants lod1': 66744}
+
+by distance (frame ms, relative to fire_major):
+  dist   120 aurimyrmex_soldier        1555 ms 0.27×   tris    727k
+  dist   120 fire_major                5812 ms 1.00×   tris    568k
+  dist   120 aurimyrmex_worker         3292 ms 0.57×   tris    782k
+  dist   120 lasius_soldier            2017 ms 0.35×   tris    580k
+  dist   120 aurimyrmex_blaster        4192 ms 0.72×   tris    790k
+  dist   120 atta_media                4647 ms 0.80×   tris    613k
+  dist    50 aurimyrmex_soldier        4297 ms 1.50×   tris   1435k
+  dist    50 fire_major                2856 ms 1.00×   tris    980k
+  dist    50 aurimyrmex_worker         3207 ms 1.12×   tris   1055k
+  dist    50 lasius_soldier            2045 ms 0.72×   tris    651k
+  dist    50 aurimyrmex_blaster        3591 ms 1.26×   tris   1118k
+  dist    50 atta_media                4915 ms 1.72×   tris   1768k
+
+GPU (every draw waited for): the ants' draws, ms a frame and triangles
+  dist   120 aurimyrmex_soldier     frame    2546 ms  ants    1629 ms     274k tris
+  dist    50 aurimyrmex_soldier     frame    4329 ms  ants    2626 ms     629k tris
+  dist   120 fire_major             frame    2030 ms  ants     744 ms     192k tris
+  dist    50 fire_major             frame    2915 ms  ants    1556 ms     401k tris
+  dist   120 aurimyrmex_worker      frame    2631 ms  ants    1191 ms     300k tris
+  dist    50 aurimyrmex_worker      frame    3316 ms  ants    1838 ms     438k tris
+  dist   120 lasius_soldier         frame    2277 ms  ants     735 ms     198k tris
+  dist    50 lasius_soldier         frame    2040 ms  ants     861 ms     236k tris
+  dist   120 aurimyrmex_blaster     frame    2680 ms  ants    1259 ms     303k tris
+  dist    50 aurimyrmex_blaster     frame    3576 ms  ants    2142 ms     470k tris
+  dist   120 atta_media             frame    2178 ms  ants     822 ms     215k tris
+  dist    50 atta_media             frame    4744 ms  ants    2865 ms     795k tris
+page errors: []
