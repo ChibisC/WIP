@@ -1988,3 +1988,9 @@ Plan, in order:
    draws waited for one by one).
 3. **The issue list** `docs/performance/issues.md`: everything found, its cause, cost and status.
 4. Fixes in order of what the user feels; the golden set, `same.sh`, determinism, `npm test`; a test build each cycle.
+Cycle 1 (2026-11-27): the Lag Hunt built (menu, start menu, `?lagHunt=1`; checks in `tests/performance.ts`;
+`tests/browser/lag_hunt_run.py` runs it here); the Saiy-Ants measured — the simulation within budget at the arena's
+largest (`tools/perf/arenaStress.ts`, issue 5: watch), their drawing ~1.6× an ordinary ant at middle distance (issue 6:
+the hair locks' strands on the middle-distance model; the comparison and its costs went to the user, the game's look
+unchanged until they choose: `?saiyStrands=N`). `same.sh` ALL SAME. Next: the user's Lag Hunt reports from the Mac
+and the iPhone/iPad, then the next cycle from them.
