@@ -164,7 +164,7 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
       <p class="tag">Single-player</p>
       ${modeRow}
       ${body}
-      ${choice.mode === 'story' ? '' : `<h2>Graphics</h2><div class="opt-row">${q}</div>`}
+      ${choice.mode === 'story' ? '' : `<h2>Graphics</h2><div class="opt-row">${q}<button class="chip" data-lh="1" data-tip="<b>Run Lag Hunt</b>The game plays itself for about 12 minutes — the arena with Saiy-Ants and every species, a match, the trees, a story night, the big fight — and records every frame. Then a report to copy or download and send back.">Run Lag Hunt</button></div>`}
       <button class="go" ${choice.mode === 'skirmish' && !choice.ais.length ? 'disabled title="Add at least one AI colony"' : ''}>${go}</button>
     </div>`;
     // map thumbnails, drawn once from the map data
@@ -227,6 +227,11 @@ export function showMenu(parent: HTMLElement, done: (c: MenuChoice) => void): vo
     else if (d.trees) choice.trees = d.trees === '1';
     else if (d.ailevel) choice.aiLevel = Number(d.ailevel);
     else if (d.q) choice.quality = d.q as Quality | 'auto';
+    else if (d.lh) {
+      // (performance v7: the self-running stress test, dev/lagHunt.ts)
+      location.href = `${location.pathname}?lagHunt=1&q=${choice.quality === 'auto' ? 'high' : choice.quality}`;
+      return;
+    }
     else if (t.classList.contains('go')) {
       if (t.disabled) return;
       root.remove();

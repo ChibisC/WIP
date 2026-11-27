@@ -38,6 +38,9 @@ const pos = argv.filter((a, i) => !a.startsWith('--') && !(outI >= 0 && i === ou
 const SCENES = (pos[0] ?? 'fight,economy,nests,ten,titan,tunnel').split(',');
 const ANTS = (pos[1] ?? '500,1000,1500,2000').split(',').map(Number);
 const TICKS = Number(pos[2] ?? 200);
+// (performance v7: --species=aurimyrmex,formica,solenopsis,atta — the colonies' species, e.g. the Saiy-Ants'; the
+// default four otherwise; a run with it hashes differently from same.sh's, which never passes it)
+const SPEC = argv.find((a) => a.startsWith('--species='))?.slice(10).split(',');
 const WARM = 60;
 
 /** A group of `n` ants of `caste` on a new brood tile of colony c, sent to `marker` (−1 home). */
@@ -103,7 +106,7 @@ function mk(s: GameSetup, ev: EventBus): World {
 function build(scene: string, total: number): World {
   const ev = new EventBus();
   if (scene === 'fight') {
-    const w = mk(stressSetup(), ev);
+    const w = mk(stressSetup(SPEC), ev);
     const per = perColony(w, total - 0);
     const cx = w.terrain.width / 2;
     const cy = w.terrain.depth / 2;
@@ -121,7 +124,7 @@ function build(scene: string, total: number): World {
     return w;
   }
   if (scene === 'economy' || scene === 'titan') {
-    const w = mk(stressSetup(), ev);
+    const w = mk(stressSetup(SPEC), ev);
     const per = perColony(w, total);
     for (const c of w.s.colonies) forage(w, c, freeHexes(w, c), per);
     creatures(w, 40);
@@ -134,7 +137,7 @@ function build(scene: string, total: number): World {
     return w;
   }
   if (scene === 'nests') {
-    const w = mk(stressSetup(), ev);
+    const w = mk(stressSetup(SPEC), ev);
     const per = perColony(w, total);
     for (const c of w.s.colonies) {
       const free = freeHexes(w, c);

@@ -20,6 +20,11 @@ import { SURFACE } from '../sim/types';
 import { CASTES } from '../sim/species';
 import { arenaRosterCastes, ARENA_ROSTER_SPECIES } from '../sim/arena';
 import { display, probeDisplay } from '../core/display';
+import { measureGpu, type GpuBreakdown } from './gpuBreakdown';
+
+/** the scenes that end with the GPU breakdown (every pass, then every draw, waited for: where the GPU's time goes —
+ *  Safari has no GPU timers; these frames are slow on purpose and are not counted) */
+const GPU_SCENES = new Set(['arena-saiy', 'match-saiy', 'trees', 'bigfight']);
 
 /** What a script step can do (the session, and the camera like a player's). */
 interface Hands {
@@ -242,6 +247,8 @@ interface HuntSceneResult {
   freezes: Freeze[];
   /** the slowest frames over 33 ms (not freezes), with their causes */
   slow: Freeze[];
+  /** where the GPU's time went at the scene's end (GPU_SCENES) */
+  gpu?: GpuBreakdown;
 }
 
 interface HuntState {
@@ -375,9 +382,10 @@ export function runLagHuntScene(s: GameSession, q: URLSearchParams): void {
       s.issue({ type: 'arenaStance', team, stance } as never, true);
     },
   };
-  const steps = def.steps(H).sort((a, b) => a[0] - b[0]);
+  // (the first seconds after loading are a step of their own: the script starts after them)
+  const LEAD = 3;
+  const steps: Step[] = [[-LEAD, 'the first seconds after loading', () => {}], ...def.steps(H).sort((a, b) => a[0] - b[0])];
   const secs = sceneSecs(def);
-  const warm = 3000;
   const t0 = performance.now();
   // per step, and the scene's freezes and slow frames
   const res: StepResult[] = steps.map((x) => ({ label: x[1], frames: 0, ms: 0, over33: 0, over100: 0, worst: 0, ticks: 0, wanted: 0 }));
@@ -462,24 +470,34 @@ export function runLagHuntScene(s: GameSession, q: URLSearchParams): void {
       freezes,
       slow: slow.sort((a, b) => b.ms - a.ms).slice(0, 12),
     };
-    st.results.push(r);
-    save(st);
-    console.log('[lag hunt]', JSON.stringify(r));
-    (window as unknown as { __lagHuntScene: unknown }).__lagHuntScene = r;
-    const nx = nextScene(st, i);
-    if (nx >= 0) go(sceneUrl(nx, st));
-    else go('lagHunt=1&lhdone=1');
+    const done = () => {
+      st.results.push(r);
+      save(st);
+      console.log('[lag hunt]', JSON.stringify(r));
+      (window as unknown as { __lagHuntScene: unknown }).__lagHuntScene = r;
+      const nx = nextScene(st, i);
+      if (nx >= 0) go(sceneUrl(nx, st));
+      else go('lagHunt=1&lhdone=1');
+    };
+    if (GPU_SCENES.has(def.id)) {
+      // (a stuck breakdown never stops the run)
+      const stop = setTimeout(done, 60000);
+      measureGpu(s, 6, (g) => {
+        clearTimeout(stop);
+        r.gpu = g;
+        done();
+      });
+    } else done();
   };
   let lastT = performance.now();
   const loop = () => {
     const el = performance.now() - t0;
-    if (el >= warm && !measuring) {
-      // (the warm-up: the first frames after loading are counted by the frames-after-loading check below anyway)
+    if (!measuring) {
       measuring = true;
       prof.reset();
     }
-    if (measuring) {
-      const k = (el - warm) / 1000;
+    {
+      const k = el / 1000 - LEAD;
       // the simulation's progress over the last frame against what real time and the speed asked for
       const now = performance.now();
       if (cur >= 0 && !s.loop.paused) {
@@ -540,6 +558,12 @@ export function huntReportText(st: HuntState): string {
     if (r.slow.length) {
       out.push('  the slowest other frames:');
       for (const f of r.slow) out.push(`    ${f.t} s "${f.step}": ${f.ms} ms (main thread ${f.cpu}): ${f.causes.join('; ')} [${f.ctx}]`);
+    }
+    if (r.gpu) {
+      const g = r.gpu;
+      out.push(`  the GPU at the end (every pass waited for, ${g.frames} frames — slower than real ones; the split is what counts): ${g.frameMs.toFixed(0)} ms a frame: ${g.passes.slice(0, 8).map((x) => `${x.name} ${x.ms.toFixed(1)}`).join(', ')}`);
+      out.push(`    what the scene and shadows draw (triangles a frame): ${g.draws.slice(0, 8).map((x) => `${x.name} ${(x.tris / 1000).toFixed(0)}k`).join(', ')}`);
+      if (g.drawMs?.length) out.push(`    each draw waited for (ms a frame; compare them with each other): ${g.drawMs.slice(0, 8).map((x) => `${x.name} ${x.ms.toFixed(1)}`).join(', ')}`);
     }
   }
   return out.join('\n');

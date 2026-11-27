@@ -20,6 +20,9 @@ FRAMES = int(os.environ.get("FRAMES", "5"))
 VW = int(os.environ.get("VW", "640"))
 VH = int(os.environ.get("VH", "400"))
 QUAL = os.environ.get("Q", "high")
+# GPU=1: also the GPU breakdown at each distance (dev/gpuBreakdown.ts: every pass, then every draw, waited for — the
+# ants' draws by detail level, their triangles and milliseconds)
+GPU = os.environ.get("GPU", "") == "1"
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"]
 
 HOOK = """() => {
@@ -71,6 +74,7 @@ def main():
         print("frames flowing", flush=True)
         pg.evaluate("() => { const s = window.__session; for (const t of [0, 1]) s.issue({ type: 'arenaStance', team: t, stance: 2 }); }")
         rows = []
+        gpurows = []
         for cs in CASTES:
             pg.evaluate(f"() => {{ const s = window.__session; s.issue({{ type: 'arenaClear', team: 0 }}); let n = {N}; while (n > 0) {{ const k = Math.min(50, n); s.issue({{ type: 'arenaSpawn', team: 0, unit: 'ant:{cs}', n: k, level: 1, at: false, x: 0, y: 0 }}); n -= k; }} }}")
             wait_frames(pg, 3)
@@ -86,6 +90,13 @@ def main():
                 lod = fr[-1]["lod"]
                 rows.append((cs, d, gap, cpu, tris, calls, lod, fr[-1]["drawn"]))
                 print(f"  {cs:22s} dist {d:5.0f}: frame {gap:7.0f} ms  main {cpu:6.1f} ms  tris {tris / 1000:7.0f}k  calls {calls:4.0f}  LOD0/1/imp {lod}  drawn {fr[-1]['drawn']}", flush=True)
+                if GPU:
+                    g = pg.evaluate("() => import('/src/dev/gpuBreakdown.ts').then((m) => new Promise((res) => m.measureGpu(window.__session, 4, res)))")
+                    ants = {d2['name']: d2['ms'] for d2 in g.get('drawMs', []) if d2['name'].startswith('ants')}
+                    atris = {d2['name']: d2['tris'] for d2 in g.get('draws', []) if d2['name'].startswith('ants')}
+                    passes = ", ".join(f"{x['name']} {x['ms']:.0f}" for x in g['passes'][:5])
+                    print(f"      GPU frame {g['frameMs']:.0f} ms [{passes}] ants draws ms {ants} tris {atris}", flush=True)
+                    gpurows.append((cs, d, g['frameMs'], sum(ants.values()), sum(atris.values())))
         b.close()
     print("\nby distance (frame ms, relative to fire_major):")
     for d in DISTS:
@@ -93,6 +104,10 @@ def main():
         for r in [r for r in rows if r[1] == d]:
             rel = f"{r[2] / ref[2]:.2f}×" if ref and ref[2] else ""
             print(f"  dist {d:5.0f} {r[0]:22s} {r[2]:7.0f} ms {rel:7s} tris {r[4] / 1000:6.0f}k")
+    if GPU:
+        print("\nGPU (every draw waited for): the ants' draws, ms a frame and triangles")
+        for r in gpurows:
+            print(f"  dist {r[1]:5.0f} {r[0]:22s} frame {r[2]:7.0f} ms  ants {r[3]:7.0f} ms  {r[4] / 1000:6.0f}k tris")
     print("page errors:", errs[:3])
 
 

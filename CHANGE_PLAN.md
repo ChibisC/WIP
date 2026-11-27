@@ -1966,3 +1966,25 @@ then fixed without changing the picture or the simulation (`docs/performance.md`
    compile here; likely the system's screen recorder (the user's guess) — the lag report from the Mac will tell.
 Open: the Mac and iPhone reports (`?bench=1` and the lag report) drive the rest, with v5's open work (§35.3); the
 user's recordings themselves were not in this session (frames changed per second: to measure when attached).
+
+## 39. Performance v7 — find every lag and freeze on the user's own devices (user spec 2026-11-25, claude/performance/07-spec-performance-v7-find-and-fix-everything.md; user 2026-11-27: "the game still lags … especially with the species saiyants") — branch `feature/performance-v7`
+The user (2026-11-27) also asked whether the game "runs math simulations behind the scenes before they actually
+happen": it does not. The simulation runs in its worker one 1/20 s tick at a time as real time passes (`core/loop.ts`
+adds real time × speed and asks for whole ticks; `game/simHost.ts` sends them in batches of at most 24, fewer when
+ticks are slow); the picture is drawn a little behind the newest tick (`game/playout.ts`: about one tick plus the
+arrival jitter) so motion is smooth. The only run on a copy is the worker's warm-up at loading (`worker/warmUp.ts`:
+up to 40 ticks on a throw-away copy, to have the JavaScript engine compile the simulation; discarded). When ticks take
+longer than 50 ms the picture comes in bunches and the game falls behind — measured per scene by the Lag Hunt.
+Plan, in order:
+1. **The Lag Hunt** (`dev/lagHunt.ts`; Menu → Graphics → Run Lag Hunt, `?lagHunt=1`): six scenes (the arena with
+   Saiy-Ants in armies of 10–300 a side; every roster species in turn and creatures; a four-colony match as the
+   Saiy-Ants — the nest, the areas, 1×–8×; the trees; a story night; the big fight), the game playing itself, every
+   frame recorded with its step, causes (compiles, uploads, the frame's parts, notes), the simulation's tick time and
+   whether it kept up; a report with the summary first, Copy and Download. Asked of the user on the Mac (plugged in)
+   and the iPhone/iPad.
+2. **Saiy-Ants, measured first** (the user's report): the simulation (`tools/perf/arenaStress.ts`: every tick of the
+   arena's fights, by species, 50–300 a side, with a CPU profile) and the drawing (`tests/browser/species_cost_probe.py`:
+   each caste's army at the same place and camera, the frame, triangles, detail levels, and the GPU breakdown's ant
+   draws waited for one by one).
+3. **The issue list** `docs/performance/issues.md`: everything found, its cause, cost and status.
+4. Fixes in order of what the user feels; the golden set, `same.sh`, determinism, `npm test`; a test build each cycle.
