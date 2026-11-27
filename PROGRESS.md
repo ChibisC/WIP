@@ -2267,4 +2267,6 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   shader compiled in play — now made while loading, hidden (issue 7).
 - Checks: `same.sh` ALL SAME; `npm test` passes; build; the Lag Hunt ran end to end in the build machine's Chromium
   (`docs/performance/lag-hunt-swiftshader-2026-11-27.txt`).
+- **Merged** into `main` as `80eaac8` (game artifact v62, the test build with the Lag Hunt); handoff 31. The golden
+  shots it could touch (the Saiy-Ant close-up, both fights) identical to `main`.
 
