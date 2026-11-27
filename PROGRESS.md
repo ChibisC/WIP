@@ -2263,3 +2263,8 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   the drawing is not: at middle distance a Saiy-Ant costs ~1.6× an ordinary ant of its size (its hair locks: 1.9k of
   the middle-distance model's 5.1k triangles), close up +14 %. Fewer strands there would change the look: before/after
   pictures for the user (`?saiyStrands=N` renders them; the game's look unchanged until the user chooses).
+- **Found by the Lag Hunt here and fixed:** at nightfall in a story level the wolf spiders' eyeshine was made and its
+  shader compiled in play — now made while loading, hidden (issue 7).
+- Checks: `same.sh` ALL SAME; `npm test` passes; build; the Lag Hunt ran end to end in the build machine's Chromium
+  (`docs/performance/lag-hunt-swiftshader-2026-11-27.txt`).
+
