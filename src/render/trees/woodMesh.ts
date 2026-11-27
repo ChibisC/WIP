@@ -149,12 +149,12 @@ function tube(g: Geo, p: WoodPiece, layer: number, lod: WoodLod, seed: number, s
   const r0 = nodes[0].r;
   // (the swelling where it leaves its parent: from its start; a limb's where it comes out of the crotch's bulb)
   const fAt = s0 + (collar?.at ?? 0);
-  const flareLen = (collar ? 1.8 : 1.6) * r0;
-  const amp = collar ? 0.3 : 0.3;
+  const flareLen = (collar ? 2.6 : 1.6) * r0;
+  const amp = collar ? 0.45 : 0.3;
   const rings: Ring[] = [];
   let s = s0;
   // (a collar swells in over most of a radius before its full width, so it has no step)
-  const ramp = collar ? 0.8 * r0 : 0;
+  const ramp = collar ? 1.2 * r0 : 0;
   const radiusAt = (r: number, sAlong: number) => {
     if (!startFlare || sAlong < fAt - ramp || sAlong - fAt >= flareLen) return r;
     if (sAlong < fAt) {
@@ -312,11 +312,61 @@ export function crotchRadiusAt(c: CrotchShape, y: number): number {
   return c.rCol + (c.rhoR - c.rCol) * bulbE((y - c.yB) / (c.yR - c.yB));
 }
 
-/** The trunk: a round column from the ground far below, swelling at the top into the crotch's bulb (`crotchShape`). */
+/**
+ * The crotch's lobes (user 2026-11-27 "blend it a little better between the branches and the trunk"): toward each limb
+ * the bulb's upper part reaches out under it — the trunk's section turning lobed as it divides — so its surface runs
+ * on into the limb's underside instead of meeting it at an edge. Per limb: its heading, the lobe's angular half-width
+ * and its reach past the rim.
+ */
+export function crotchLobes(sk: CrownSkel, c: CrotchShape): Array<{ a: number; w: number; e: number }> {
+  const out: Array<{ a: number; w: number; e: number }> = [];
+  for (const p of sk.pieces) {
+    if (p.kind !== 'limb' || p.parent >= 0) continue;
+    // (its heading where it crosses the rim)
+    let nd = p.nodes[p.nodes.length - 1];
+    for (const q of p.nodes)
+      if (Math.hypot(q.x - sk.x, q.y - sk.y) >= c.rhoR) {
+        nd = q;
+        break;
+      }
+    const rl = p.nodes[0].r;
+    out.push({ a: Math.atan2(nd.y - sk.y, nd.x - sk.x), w: 1.15 * Math.atan2(rl * 1.45, c.rhoR), e: 0.9 * rl });
+  }
+  return out;
+}
+
+/** the trunk's drawn radius at a height and angle, lobes and all (the climb, game/trunkMount.ts) */
+export function crotchRadiusAround(c: CrotchShape, lobes: ReadonlyArray<{ a: number; w: number; e: number }>, y: number, phi: number): number {
+  const r = crotchRadiusAt(c, y);
+  if (y <= c.yB) return r;
+  const x = Math.min(1, Math.max(0, ((y - c.yB) / (c.yR - c.yB) - 0.25) / 0.75));
+  return r + lobeAt(lobes, phi) * x * x * x * (10 - 15 * x + 6 * x * x);
+}
+
+/** how far the lobes carry the bulb out past its round shape at an angle */
+function lobeAt(lobes: ReadonlyArray<{ a: number; w: number; e: number }>, phi: number): number {
+  let m = 0;
+  for (const l of lobes) {
+    let d = Math.abs(phi - l.a) % (2 * Math.PI);
+    if (d > Math.PI) d = 2 * Math.PI - d;
+    if (d < l.w) {
+      const k = Math.cos((Math.PI / 2) * (d / l.w));
+      m = Math.max(m, l.e * k * k);
+    }
+  }
+  return m;
+}
+
+/**
+ * The trunk: a round column from the ground far below, swelling at the top into the crotch's bulb (`crotchShape`),
+ * lobed toward its limbs (`crotchLobes`), its top the walked dome.
+ */
 function trunk(g: Geo, sk: CrownSkel, p: WoodPiece, layer: number, lod: WoodLod, seed: number): void {
   const nodes = p.nodes;
-  const R = lod.radial + 4;
+  // (twice the sides of a limb: the lobes need them)
+  const R = 2 * (lod.radial + 4);
   const c = crotchShape(sk);
+  const lobes = crotchLobes(sk, c);
   const y0 = nodes[0].z;
   const H = c.yB - y0;
   const n = Math.max(4, Math.ceil(H / (lod.step * 3)));
@@ -333,56 +383,66 @@ function trunk(g: Geo, sk: CrownSkel, p: WoodPiece, layer: number, lod: WoodLod,
       }
     return c.rCol;
   };
-  // a ring of the surface of revolution: radius, height, the profile's outward normal (in ρ, y), the bark's length
-  // along it, how much it faces up (moss, the worn top) and its wear
-  let prev = -1;
-  let len = 0;
-  let lastR = -1;
-  let lastY = 0;
-  const ring = (rho: number, y: number, nr: number, ny: number, up: number, wear: number) => {
-    if (lastR >= 0) len += Math.hypot(rho - lastR, y - lastY);
-    lastR = rho;
-    lastY = y;
-    const base = g.n;
-    for (let j = 0; j <= R; j++) {
-      const phi = (2 * Math.PI * j) / R;
-      const cx = Math.cos(phi);
-      const sz = Math.sin(phi);
-      vn.set(cx * nr, ny, sz * nr).normalize();
-      vP.set(c.x + cx * rho, y, c.y + sz * rho);
-      vt.set(-sz, 0, cx);
-      g.vert(vP, vn, vt, (j / R) * circ + ou, len, up, Math.max(rho, 1), layer, wear);
-    }
-    if (prev >= 0) for (let j = 0; j < R; j++) g.idx.push(prev + j, base + j, prev + j + 1, prev + j + 1, base + j, base + j + 1);
-    prev = base;
-  };
-  // the column
+  const ext: number[] = [];
+  for (let j = 0; j <= R; j++) ext.push(lobeAt(lobes, (2 * Math.PI * j) / R));
+  // the profile, ring by ring: a position per side (radius from the axis and height at that side) and the ring's wear
+  const rings: Array<{ rho: (j: number) => number; y: (j: number) => number; wear: number }> = [];
   for (let k = 0; k <= n; k++) {
     const y = y0 + (H * k) / n;
     const r = k === n ? c.rCol : rAt(y);
-    const dr = (rAt(Math.min(c.yB, y + 2)) - rAt(Math.max(y0, y - 2))) / 4;
-    ring(r, y, 1, -dr, 0, 0);
+    rings.push({ rho: () => r, y: () => y, wear: 0 });
   }
-  // the bulb's side, up to the rim
   const o = [0, 0, 0, 0];
   const KS = lod.cap >= 3 ? 14 : 6;
   for (let k = 1; k <= KS; k++) {
-    crotchSide(c, k / KS, o);
-    const l = Math.hypot(o[2], o[3]) || 1;
-    // (outward: the tangent (dρ, dy) turned a quarter back)
-    ring(o[0], o[1], o[3] / l, -o[2] / l, Math.max(0, -o[2] / l), 0);
+    const q = k / KS;
+    crotchSide(c, q, o);
+    const rho0 = o[0];
+    const yy = o[1];
+    // (the lobes grow over the side's upper part, up to the rim's height: inside the limb above them)
+    const x = Math.min(1, Math.max(0, (q - 0.25) / 0.75));
+    const L = x * x * x * (10 - 15 * x + 6 * x * x);
+    rings.push({ rho: (j) => rho0 + ext[j] * L, y: () => yy, wear: 0 });
   }
-  // the dome, in to the middle: the floor's own curve over the walked top (worn like a limb's), carried out to the rim
   const KD = lod.cap >= 3 ? 9 : 4;
-  const wearTop = WEAR.limb;
+  const walkR = c.Rc * T.walkShare;
   for (let k = 1; k <= KD; k++) {
-    const rho = c.rhoR * (1 - k / KD);
-    const y = crotchDomeY(c, rho);
-    const e = 0.5;
-    const dy = (crotchDomeY(c, rho + e) - crotchDomeY(c, Math.max(0, rho - e))) / (2 * e);
-    const l = Math.hypot(dy, 1);
-    const w = wearTop * (1 - Math.min(1, Math.max(0, (rho / (c.Rc * T.walkShare) - 0.75) / 0.35)));
-    ring(rho, y, -dy / l, 1 / l, 1 / l, w);
+    const f = 1 - k / KD;
+    // (worn like a limb's top over the walked part)
+    const w = WEAR.limb * (1 - Math.min(1, Math.max(0, ((c.rhoR * f) / walkR - 0.75) / 0.35)));
+    // (out past the round rim — under a limb, inside it — the dome keeps the rim's height)
+    rings.push({ rho: (j) => (c.rhoR + ext[j]) * f, y: (j) => crotchDomeY(c, Math.min(c.rhoR, (c.rhoR + ext[j]) * f)), wear: w });
+  }
+  // positions, then normals from the neighbours round and along (outward: along × round)
+  const P: THREE.Vector3[][] = rings.map((rg) => {
+    const row: THREE.Vector3[] = [];
+    for (let j = 0; j <= R; j++) {
+      const phi = (2 * Math.PI * j) / R;
+      const rho = rg.rho(j);
+      row.push(new THREE.Vector3(c.x + Math.cos(phi) * rho, rg.y(j), c.y + Math.sin(phi) * rho));
+    }
+    return row;
+  });
+  const dA = new THREE.Vector3();
+  const dR = new THREE.Vector3();
+  let len = 0;
+  let prev = -1;
+  for (let i = 0; i < rings.length; i++) {
+    if (i > 0) len += Math.hypot(rings[i].rho(0) - rings[i - 1].rho(0), rings[i].y(0) - rings[i - 1].y(0));
+    const base = g.n;
+    for (let j = 0; j <= R; j++) {
+      const jj = j % R;
+      const phi = (2 * Math.PI * j) / R;
+      dR.subVectors(P[i][(jj + 1) % R], P[i][(jj + R - 1) % R]);
+      dA.subVectors(P[Math.min(rings.length - 1, i + 1)][jj], P[Math.max(0, i - 1)][jj]);
+      vn.crossVectors(dA, dR);
+      if (vn.lengthSq() < 1e-10) vn.set(0, 1, 0);
+      vn.normalize();
+      vt.set(-Math.sin(phi), 0, Math.cos(phi));
+      g.vert(P[i][j], vn, vt, (j / R) * circ + ou, len, Math.max(0, vn.y), Math.max(rings[i].rho(j), 1), layer, rings[i].wear);
+    }
+    if (prev >= 0) for (let j = 0; j < R; j++) g.idx.push(prev + j, base + j, prev + j + 1, prev + j + 1, base + j, base + j + 1);
+    prev = base;
   }
 }
 

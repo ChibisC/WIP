@@ -1654,6 +1654,10 @@ export const TREES = {
   limbVary: [0.85, 1.2] as [number, number],
   branchShare: [0.66, 0.88] as [number, number],
   twigVary: [0.9, 1.2] as [number, number],
+  /** the trunks thicker than the maps' radii (user 2026-11-27 "make the trunk thicker"): by this share of the radius,
+   * at most `trunkThickMax` mm — on the ground (where it blocks and is climbed) and in the crowns */
+  trunkThick: 0.4,
+  trunkThickMax: 16,
   /** a crown reaching this far (mm) or more gets one tier more than its style's */
   bigReach: 340,
   /**

@@ -17,13 +17,13 @@ import { NestGrid, SOIL_AIR, SOIL_LOAM, SOIL_ROCK } from '../world/nestGrid';
 import type { Pt, TreeDef } from '../maps/types';
 import { LAYERS, TREES as T } from './balance';
 import { dcos, dhypot, dsin } from './dmath';
-import { CanopyFloor, crownSkeleton, CrownSkel, linkHeadings, linkPieces, paintCanopy, TK_FLOWER, TK_LEAF, TK_WOOD, WoodPiece } from './treeCrowns';
+import { CanopyFloor, crownSkeleton, CrownSkel, linkHeadings, linkPieces, paintCanopy, TK_FLOWER, trunkR, TK_LEAF, TK_WOOD, WoodPiece } from './treeCrowns';
 import { makeEntrance } from './entrances';
 import { makeFood } from './factory';
 import { Colony, Entrance, SURFACE, TREES, TreeSiteDef, TreeSiteKind, TreesDef, TrunkDef } from './types';
 import { World } from './world';
 
-export { TK_SKY, TK_WOOD, TK_LEAF, TK_TOP, TK_FLOWER, crownSkeleton, crownTiers, topTier } from './treeCrowns';
+export { TK_SKY, TK_WOOD, TK_LEAF, TK_TOP, TK_FLOWER, crownSkeleton, crownTiers, topTier, trunkR } from './treeCrowns';
 export type { BigLeaf, CrownSkel, WoodKind, WoodNode, WoodPiece } from './treeCrowns';
 
 /**
@@ -120,7 +120,7 @@ export function buildCanopy(w: World): { g: NestGrid; kinds: Uint8Array; comps: 
   defs.forEach((def, ti) => {
     const sk = data.skels[ti];
     const top = g.hexAt(def.trunk[0], def.trunk[1]);
-    trunks.push({ x: def.trunk[0], y: def.trunk[1], r: def.r, top, climbs: [], tree: ti, comp: top >= 0 ? comps[top] : 0, z: sk.topZ, tiers: sk.tiers });
+    trunks.push({ x: def.trunk[0], y: def.trunk[1], r: trunkR(def), top, climbs: [], tree: ti, comp: top >= 0 ? comps[top] : 0, z: sk.topZ, tiers: sk.tiers });
     for (const s of sk.sites) siteCands.push({ kind: s.kind, x: s.at[0], y: s.at[1], tree: ti });
   });
   // the trunk tops are the grid's entrances
@@ -251,10 +251,37 @@ export function upgradeWorldTrees(w: World): void {
       o.y = p.y;
     }
   };
-  for (const a of w.s.ants) onBranch(a);
-  for (const f of w.s.food) onBranch(f);
-  for (const cr of w.s.creatures) onBranch(cr);
-  for (const c of w.s.colonies) for (const m of c.markers) if (m.placed) onBranch(m);
+  // (the trunks are thicker now: what stood on the ground inside one steps out to the nearest open ground)
+  const offTrunk = (o: { space: number; x: number; y: number }) => {
+    if (o.space !== SURFACE) return;
+    for (const t of def.trunks)
+      if (dhypot(o.x - t.x, o.y - t.y) <= t.r + 1) {
+        const p = groundNear(w, o.x, o.y, t);
+        if (p) {
+          o.x = p.x;
+          o.y = p.y;
+        }
+        return;
+      }
+  };
+  for (const a of w.s.ants) {
+    onBranch(a);
+    offTrunk(a);
+  }
+  for (const f of w.s.food) {
+    onBranch(f);
+    offTrunk(f);
+  }
+  for (const cr of w.s.creatures) {
+    onBranch(cr);
+    offTrunk(cr);
+  }
+  for (const c of w.s.colonies)
+    for (const m of c.markers)
+      if (m.placed) {
+        onBranch(m);
+        offTrunk(m);
+      }
 }
 
 /** The nearest walkable ground to a point, outside the trunk's foot (rings of the terrain grid, fixed order). */

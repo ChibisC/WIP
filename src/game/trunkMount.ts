@@ -3,7 +3,7 @@ import { World } from '../sim/world';
 import { TREES, TreesDef, TrunkDef } from '../sim/types';
 import { climbHeight, climbSeconds } from '../sim/trees';
 import { AntView, MountOut } from '../render/ants/antRenderer';
-import { crotchDomeY, crotchRadiusAt, crotchShape, CrotchShape } from '../render/trees/woodMesh';
+import { crotchDomeY, crotchLobes, crotchRadiusAround, crotchShape, CrotchShape } from '../render/trees/woodMesh';
 
 /**
  * Ants on a tree trunk (render only; user 2026-11-08 "use walking animation parallel to the tree"): a climbing ant is
@@ -87,7 +87,7 @@ export function trunkMountGround(w: World, v: AntView, groundAt: (x: number, y: 
  * below, swelling at the top into the crotch's bulb) at its real height, out over the bulb and onto its walked top in
  * the last part of the climb.
  */
-const crotches = new WeakMap<object, CrotchShape[]>(); // det-ok: render cache, keyed by the canopy's derived data
+const crotches = new WeakMap<object, Array<{ c: CrotchShape; lobes: ReturnType<typeof crotchLobes> }>>(); // det-ok: render cache, keyed by the canopy's derived data
 export function trunkMountCanopy(w: World, v: AntView, out: MountOut): boolean {
   const d = w.s.trees;
   const g = w.nestOf(TREES);
@@ -96,8 +96,16 @@ export function trunkMountCanopy(w: World, v: AntView, out: MountOut): boolean {
   if (!t || t.top < 0) return false;
   const data = w.treesData;
   let cs = data ? crotches.get(data) : undefined;
-  if (data && !cs) crotches.set(data, (cs = data.skels.map((sk) => crotchShape(sk))));
-  const c = cs?.[t.tree];
+  if (data && !cs)
+    crotches.set(
+      data,
+      (cs = data.skels.map((sk) => {
+        const c = crotchShape(sk);
+        return { c, lobes: crotchLobes(sk, c) };
+      })),
+    );
+  const c = cs?.[t.tree]?.c;
+  const lobes = cs?.[t.tree]?.lobes ?? [];
   const K = v.trunkK ?? 0;
   const a = v.trunkA ?? 0;
   rad.set(Math.cos(a), 0, Math.sin(a));
@@ -108,7 +116,7 @@ export function trunkMountCanopy(w: World, v: AntView, out: MountOut): boolean {
   const y = top - (1 - K) * climbH;
   const k = Math.max(0, Math.min(1, (y + d.height) / Math.max(1, climbH)));
   const yb = c ? c.yB : top;
-  const Rd = (c && y > yb ? crotchRadiusAt(c, Math.min(y, c.yR)) : t.r * (1 - 0.14 * k)) * 1.02;
+  const Rd = (c && y > yb ? crotchRadiusAround(c, lobes, Math.min(y, c.yR), a) : t.r * (1 - 0.14 * k)) * 1.02;
   pB.set(t.x + rad.x * Rd, Math.min(c ? c.yR : top - 2, y), t.y + rad.z * Rd);
   fV.set(0, 1, 0);
   uR.copy(rad);

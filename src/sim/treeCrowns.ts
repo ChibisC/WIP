@@ -202,6 +202,11 @@ export function linkHeadings(defs: readonly TreeDef[]): number[][] {
  * Grow a tree's crown (deterministic in its seed). `toward`: headings of the crowns its boughs join — the limb nearest
  * each spreads out that way and drops to tier 0, so a bough leaves from its tip.
  */
+/** A trunk's radius: the map's, made thicker (`TREES.trunkThick`, at most `trunkThickMax` more). */
+export function trunkR(def: TreeDef): number {
+  return def.r + Math.min(def.r * T.trunkThick, T.trunkThickMax);
+}
+
 export function crownSkeleton(def: TreeDef, tree: number, toward: readonly number[] = []): CrownSkel {
   const st = T.crowns[def.style] ?? T.crowns.oak;
   const rng = new Rng(def.seed * 131 + 17);
@@ -211,7 +216,8 @@ export function crownSkeleton(def: TreeDef, tree: number, toward: readonly numbe
   const topZ = topLv * step;
   const run = step / T.slope;
   const [tx, ty] = def.trunk;
-  const topR = Math.max(def.r * 0.85, T.hexR * 2);
+  const tr = trunkR(def);
+  const topR = Math.max(tr * 0.85, T.hexR * 2);
   const R = def.reach;
   const sk: CrownSkel = { tree, style: def.style, tiers, topLv, topZ, topR, x: tx, y: ty, pieces: [], leaves: [], flowers: [], sites: [], lowTips: [] };
   // the trunk: its axis from the ground far below up to the crotch (render only — it is climbed, not walked)
@@ -221,9 +227,9 @@ export function crownSkeleton(def: TreeDef, tree: number, toward: readonly numbe
     tree,
     walk: false,
     nodes: [
-      { x: tx, y: ty, z: -T.height, r: def.r },
-      { x: tx, y: ty, z: -T.height * 0.4 + topZ * 0.4, r: def.r * 0.92 },
-      { x: tx, y: ty, z: topZ - def.r * 0.3, r: def.r * 0.86 },
+      { x: tx, y: ty, z: -T.height, r: tr },
+      { x: tx, y: ty, z: -T.height * 0.4 + topZ * 0.4, r: tr * 0.92 },
+      { x: tx, y: ty, z: topZ - tr * 0.3, r: tr * 0.86 },
     ],
   });
   // limbs round the compass: the rising ones spaced out between the others, then the level ones
