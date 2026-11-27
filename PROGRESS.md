@@ -2250,3 +2250,16 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   and passed alone, as it does on `main`: timing-sensitive, not this change); build smoke (the arena in the built
   game, the worker running, the lag recorder on).
 - **Merged** into `main` as `106223d` (game artifact v61, an interim build for the user to test); handoff 30.
+
+## 2026-11-27 — Performance v7, cycle 1: the Lag Hunt; Saiy-Ants measured (CHANGE_PLAN §39)
+- **The user's question** ("does it run math simulations behind the scenes before they happen?"): no — one tick at
+  a time as real time passes, drawn a little behind the newest tick; only the loading warm-up runs on a throw-away
+  copy (`docs/performance.md` "Performance v7").
+- **The Lag Hunt** (Menu → Graphics → Run Lag Hunt, the start menu's Graphics row, `?lagHunt=1`): six self-playing
+  scenes (the arena with Saiy-Ants 10–300 a side and every species, a match as the Saiy-Ants, the trees, a story night,
+  the big fight), every frame recorded with its step and causes, the simulation's keeping-up, the GPU breakdown;
+  a report with the summary first, Copy and Download.
+- **Saiy-Ants:** the simulation is within budget (`tools/perf/arenaStress.ts`: 300 a side 4.4 ms a tick, worst 26);
+  the drawing is not: at middle distance a Saiy-Ant costs ~1.6× an ordinary ant of its size (its hair locks: 1.9k of
+  the middle-distance model's 5.1k triangles), close up +14 %. Fewer strands there would change the look: before/after
+  pictures for the user (`?saiyStrands=N` renders them; the game's look unchanged until the user chooses).

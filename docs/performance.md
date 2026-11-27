@@ -836,3 +836,8 @@ download is blocked).
   likewise (+50 %). Close up the difference is small (+14 %). The middle-distance model's six hair locks are 1.9k of
   its 5.1k triangles (other species' whole models 3.2–3.7k), their three strands a lock 1.1k, mostly thinner than a
   pixel at that size (`docs/performance/species-cost-2026-11-27.txt`).
+- **The choice for the user** (a change to the picture, however small): the middle-distance model's strands — 3 a
+  lock (now), 1, or none, the locks themselves kept; the close-up model is not changed. 44 Saiy-Ants at that distance
+  drew in 1104 / 1005 / 886 ms here (−9 % / −20 %; shadows 492 / 458 / 437 ms), which takes a Saiy-Ant from ~1.6× an
+  ordinary ant to ~1.3×. At the size they are drawn the strands are hard to see (`docs/performance/saiy-hair/lab.jpg`,
+  `in-game.jpg`; `?saiyStrands=N` renders any choice; `tests/browser/saiy_hair_compare.py`).
