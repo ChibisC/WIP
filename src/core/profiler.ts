@@ -151,6 +151,9 @@ export class Profiler {
   lagCount = 0;
   /** the game's state for a lag record (set by the session) */
   lagContext: (() => string) | null = null;
+  /** every frame's interval and main-thread time, its hitch record when it was one, and whether the page was hidden
+   *  since the last (the Lag Hunt, dev/lagHunt.ts — performance v7) */
+  onFrameEnd: ((ms: number, cpu: number, hitch: Hitch | null, hidden: boolean) => void) | null = null;
   /** the page was hidden since the last frame (the gap is the tab's, not a freeze: not recorded) */
   private wasHidden = false;
   /** the newest program seen (the "new program" notes) */
@@ -493,6 +496,10 @@ export class Profiler {
         this.lagCount++;
         if (this.lag.length > 100) this.lag.shift();
       }
+    }
+    if (this.onFrameEnd) {
+      const h = this.hitches[this.hitches.length - 1];
+      this.onFrameEnd(dt, cpu, h && h.frame === this.frame ? h : null, this.wasHidden);
     }
     this.wasHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
   }

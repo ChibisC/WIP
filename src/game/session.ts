@@ -424,6 +424,11 @@ export class GameSession {
     this.view.setActiveNest(this.viewedArea);
   }
 
+  /** the surface ants' drawn counts by detail level (the Lag Hunt's context) */
+  get surfaceAntStats(): { drawn: number; lod: number[] } {
+    return this.surfAnts.stats;
+  }
+
   start(): void {
     this.loop.frameCap = frameCapOf(settings());
     this.loop.start();
