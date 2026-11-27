@@ -2260,3 +2260,7 @@ Plan and record: `CHANGE_PLAN.md` §33. Design: `DESIGN.md` §3.13. Player notes
   boughs between crowns may slope up to a crown's tier 1 and take the next clear pair of crowns (the thicker oak left
   no clear tier-0 tip on Meadow Pond and Forest Floor). `tools/trees-check.ts` and `tests/trees.ts` pass. Stills
   re-shot (`docs/trees/shots/v2`, now in the repo), review page round 2.
+- **Round 3** (2026-11-27, the user in chat: "blend it a little bit better between branches and the trunk? also make
+  the trunk more thicker"): trunks about 40 % thicker (at most 16 mm more) on the ground and in the crowns; the bulb's
+  upper part lobed out under each limb, so the trunk flows into the limbs' undersides; wider, longer collars. Stills
+  re-shot, review page round 3.

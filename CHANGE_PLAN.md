@@ -2000,6 +2000,14 @@ clear pair if the spanning tree's has none (thicker wood above left the oak's ti
 render's crotch bulb (`crotchShape`) and the limbs' collars; the climb follows the bulb. Stills re-shot, the review page
 round 2 (before/after pairs, items R1 trunk into limbs, R2 thickness, decision D2).
 
+### 38.3c Round 3 (the user in chat, 2026-11-27)
+"Can you blend it a little bit better between branches and the trunk? also make the trunk more thicker": trunks
+thicker by `TREES.trunkThick` 0.4 (at most `trunkThickMax` 16 mm) everywhere (`treeCrowns.ts trunkR`: the crown's
+trunk, the crotch's floor, the ground's block and climb points; an old save's ground things inside a thickened trunk
+step out); the bulb lobed toward each limb (`crotchLobes`: reaching 0.9 of the limb's radius past the rim under it, up
+to the rim's height), the trunk drawn with twice a limb's sides; the limbs' collars wider and longer. Review page round
+3 (R3 trunk thickness, R4 flow, D3).
+
 ### 38.4 Verify
 Validator + `tests/trees.ts`; `npm test`, determinism check, build; golden set identical outside the trees; LAN
 two-tab in sync with the layer on; render-only sheets in `docs/trees/shots/`; a review page for the user's rating
