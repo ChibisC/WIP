@@ -841,3 +841,8 @@ download is blocked).
   drew in 1104 / 1005 / 886 ms here (−9 % / −20 %; shadows 492 / 458 / 437 ms), which takes a Saiy-Ant from ~1.6× an
   ordinary ant to ~1.3×. At the size they are drawn the strands are hard to see (`docs/performance/saiy-hair/lab.jpg`,
   `in-game.jpg`; `?saiyStrands=N` renders any choice; `tests/browser/saiy_hair_compare.py`).
+- **The Lag Hunt on the build machine** (`docs/performance/lag-hunt-swiftshader-2026-11-27.txt`; every scene ran to its
+  end; its times are SwiftShader's, a frame every few seconds, so only its causes count): no shader link in play but one
+  — at nightfall in the story scene, the wolf spiders' eyeshine (a `PointsMaterial` made the first time it was dark)
+  — now made in the pre-warm, hidden (issue 7).
+

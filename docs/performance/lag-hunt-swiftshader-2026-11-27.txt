@@ -1,0 +1,144 @@
+Underground Dominion — Lag Hunt — build ud-mp-16 — 2026-11-27 22:58 UTC
+Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36
+GPU ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver); 2 cores; screen 800×500 at 1× (window 800×500)
+quality high; display 60 Hz
+
+== SUMMARY
+freezes over 100 ms after loading: 39
+  69314 ms (main thread 6) in arena-roster, "the first seconds after loading" at 72 s: render 5 ms [surface, camera 330 mm, 2 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+  49948 ms (main thread 29) in bigfight, "the fight" at 54.7 s: render 13 ms, events 11 ms, msg 9 ms [surface, camera 260 mm, 889 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+  42448 ms (main thread 28) in arena-saiy, "zoom out far" at 81.5 s: texture upload ×4 (0.0 MB, 0 ms); units 18 ms, render 9 ms [surface, camera 385 mm, 102 ants (drawn 10: close 0, mid 10, far 0), speed 1×]
+  40148 ms (main thread 21) in match-saiy, "across the map" at 57.5 s: render 16 ms, units 5 ms [surface, camera 319 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+  28199 ms (main thread 19) in arena-saiy, "the first fight, close" at 39.1 s: texture upload ×4 (0.0 MB, 0 ms); units 10 ms, msg 8 ms, render 7 ms [surface, camera 88 mm, 22 ants (drawn 20: close 0, mid 20, far 0), speed 1×]
+  25399 ms (main thread 33) in arena-saiy, "4× speed" at 128.3 s: texture upload ×5 (0.1 MB, 0 ms); units 25 ms, render 5 ms [surface, camera 139 mm, 402 ants (drawn 210: close 37, mid 173, far 0), speed 4×]
+  21266 ms (main thread 25) in arena-roster, "hell close" at 93.2 s: texture upload ×4 (0.0 MB, 0 ms); msg 41 ms, units 15 ms, render 10 ms [surface, camera 80 mm, 62 ants (drawn 57: close 0, mid 57, far 0), speed 1×]
+  21016 ms (main thread 9029) in story, "1×, far" at 85.1 s: shader compile ×1 (0 ms); texture upload ×2 (0.0 MB, 0 ms); render 9026 ms; new program: PointsMaterial [surface, camera 348 mm, 13 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+  20616 ms (main thread 10) in trees, "the canopy, close" at 46.8 s: render 9 ms [nest, camera 70 mm, 93 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+  18783 ms (main thread 14) in story, "the first seconds after loading" at 19.1 s: render 8 ms, creatures 5 ms [surface, camera 230 mm, 13 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+  18133 ms (main thread 13) in match-saiy, "2× speed, a tour" at 75.6 s: render 10 ms [surface, camera 239 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 2×]
+  16783 ms (main thread 14) in trees, "and down" at 81.9 s: buffer upload 0.0 MB (5 ms); render 13 ms [surface, camera 299 mm, 93 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+scenes (frame rate, frames over 33 ms, freezes over 100 ms, the worst frame; the simulation):
+  arena-saiy      0.2 FPS (avg 5570.8 ms, p95 28199) · over 33 ms 8 of 23 · over 100 ms 8 · worst 42448 ms · sim tick avg 7.1 / max 18.1 ms, kept up 1 % · load 121.6 s
+  arena-roster    0.2 FPS (avg 5787.1 ms, p95 21266) · over 33 ms 6 of 21 · over 100 ms 6 · worst 69314 ms · sim tick avg 4.7 / max 15.6 ms, kept up 1 % · load 160.7 s
+  match-saiy      0.1 FPS (avg 7586.4 ms, p95 40148) · over 33 ms 11 of 15 · over 100 ms 8 · worst 40148 ms · sim tick avg 4.7 / max 14.8 ms, kept up 1 % · load 188.7 s
+  trees           0.2 FPS (avg 5114.4 ms, p95 20616) · over 33 ms 9 of 16 · over 100 ms 7 · worst 20616 ms · sim tick avg 3.1 / max 8.5 ms, kept up 2 % · load 105.1 s
+  story           0.2 FPS (avg 4746.7 ms, p95 21016) · over 33 ms 7 of 16 · over 100 ms 6 · worst 21016 ms · sim tick avg 0.7 / max 1.6 ms, kept up 2 % · load 96.9 s
+  bigfight        0.4 FPS (avg 2804.2 ms, p95 10100) · over 33 ms 6 of 23 · over 100 ms 4 · worst 49948 ms · sim tick avg 20.5 / max 28.2 ms, kept up 1 % · load 133.4 s
+
+== DETAILS
+
+## Battle arena: Saiy-Ants against fire ants, armies of 10, 50, 100 and 300 a side
+load 121.6 s (pre-warm 112.1 s) · 23 frames in 112 s · 0.2 FPS · main thread 13.3 ms (render 7.19, units 4.75, msg 1.24, ui 0.73, events 0.25, creatures 0.03)
+draw calls 59 · triangles 4045k · GPU memory ≈ 738 MB · 402 ants · shader links during the run 0 · texture uploads 24 · worker messages 90 KB
+  step                                                frames   avg ms  >33  >100  worst  sim kept up
+  the first seconds after loading                         17    628.4    2     2  10000  1 %
+  the first fight, close                                   1  28198.9    1     1  28199  1 %
+  zoom out far                                             1  42448.3    1     1  42448  1 %
+  zoom in on 600 fighting                                  2   6149.8    2     2   6266  4 %
+  close                                                    1   9099.6    1     1   9100  3 %
+  4× speed                                                 1  25399.0    1     1  25399  0 %
+  freezes over 100 ms:
+    0.6 s "the first seconds after loading": 433 ms (main thread 8): render 8 ms [surface, camera 330 mm, 2 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    10.8 s "the first seconds after loading": 10000 ms (main thread 4): outside this thread (browser, GPU or a background tab) [surface, camera 330 mm, 2 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    39.1 s "the first fight, close": 28199 ms (main thread 19): texture upload ×4 (0.0 MB, 0 ms); units 10 ms, msg 8 ms, render 7 ms [surface, camera 88 mm, 22 ants (drawn 20: close 0, mid 20, far 0), speed 1×]
+    81.5 s "zoom out far": 42448 ms (main thread 28): texture upload ×4 (0.0 MB, 0 ms); units 18 ms, render 9 ms [surface, camera 385 mm, 102 ants (drawn 10: close 0, mid 10, far 0), speed 1×]
+    87.6 s "zoom in on 600 fighting": 6033 ms (main thread 40): texture upload ×5 (0.0 MB, 0 ms); units 32 ms, msg 17 ms, render 7 ms [surface, camera 121 mm, 402 ants (drawn 346: close 0, mid 273, far 73), speed 1×]
+    93.8 s "zoom in on 600 fighting": 6266 ms (main thread 21): texture upload ×4 (0.0 MB, 0 ms); units 11 ms, render 6 ms [surface, camera 93 mm, 402 ants (drawn 81: close 0, mid 81, far 0), speed 1×]
+    102.9 s "close": 9100 ms (main thread 25): texture upload ×2 (0.0 MB, 0 ms); render 13 ms, units 12 ms [surface, camera 50 mm, 402 ants (drawn 27: close 0, mid 27, far 0), speed 1×]
+    128.3 s "4× speed": 25399 ms (main thread 33): texture upload ×5 (0.1 MB, 0 ms); units 25 ms, render 5 ms [surface, camera 139 mm, 402 ants (drawn 210: close 37, mid 173, far 0), speed 4×]
+
+## Battle arena: every species on the roster in turn, 30 a side, the camera in close
+load 160.7 s (pre-warm 136.1 s) · 21 frames in 112 s · 0.2 FPS · main thread 8.3 ms (render 6.76, msg 2.24, units 0.99, creatures 0.21, ui 0.2, events 0.05)
+draw calls 56 · triangles 277k · GPU memory ≈ 737 MB · 32 ants · shader links during the run 0 · texture uploads 6 · worker messages 58 KB
+  step                                                frames   avg ms  >33  >100  worst  sim kept up
+  the first seconds after loading                         17   4228.3    2     2  69314  0 %
+  hell close                                               1  21265.8    1     1  21266  1 %
+  Worker (plagiaria) v lasius                              1  11316.2    1     1  11316  2 %
+  creatures: wolf spiders and ground beetles               1   9016.3    1     1   9016  3 %
+  creatures close                                          1   8049.7    1     1   8050  3 %
+  freezes over 100 ms:
+    2.6 s "the first seconds after loading": 2317 ms (main thread 8): buffer upload 0.0 MB (5 ms); render 7 ms [surface, camera 330 mm, 2 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    72 s "the first seconds after loading": 69314 ms (main thread 6): render 5 ms [surface, camera 330 mm, 2 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    93.2 s "hell close": 21266 ms (main thread 25): texture upload ×4 (0.0 MB, 0 ms); msg 41 ms, units 15 ms, render 10 ms [surface, camera 80 mm, 62 ants (drawn 57: close 0, mid 57, far 0), speed 1×]
+    104.5 s "Worker (plagiaria) v lasius": 11316 ms (main thread 13): texture upload ×2 (0.0 MB, 0 ms); buffer upload 0.0 MB (5 ms); render 11 ms [surface, camera 187 mm, 62 ants (drawn 3: close 0, mid 3, far 0), speed 1×]
+    113.6 s "creatures: wolf spiders and ground beetles": 9016 ms (main thread 12): render 5 ms [surface, camera 154 mm, 32 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    121.6 s "creatures close": 8050 ms (main thread 8): render 6 ms [surface, camera 70 mm, 32 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+
+## A four-colony match as the Saiy-Ants: the surface, the nest and back, the areas, 1×–8×
+load 188.7 s (pre-warm 80.9 s) · 15 frames in 96 s · 0.1 FPS · main thread 16 ms (render 10.73, units 2.89, ui 1.35, msg 1.18, nest 0.54, creatures 0.14)
+draw calls 73 · triangles 360k · GPU memory ≈ 433 MB · 77 ants · shader links during the run 0 · texture uploads 4 · worker messages 78 KB
+  step                                                frames   avg ms  >33  >100  worst  sim kept up
+  the first seconds after loading                          8   2112.4    4     2  16483  1 %
+  across the map                                           3  13493.9    3     2  40148  1 %
+  2× speed, a tour                                         1  18132.6    1     1  18133  1 %
+  8× speed, far                                            1  11516.2    1     1  11516  1 %
+  1×, into the nest again                                  1  10266.3    1     1  10266  3 %
+  and out                                                  1  16499.3    1     1  16499  2 %
+  freezes over 100 ms:
+    0.5 s "the first seconds after loading": 250 ms (main thread 49): render 38 ms, units 8 ms [surface, camera 230 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    17 s "the first seconds after loading": 16483 ms (main thread 25): buffer upload 0.0 MB (5 ms); units 15 ms, render 9 ms [surface, camera 230 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    17.3 s "across the map": 300 ms (main thread 14): buffer upload 0.0 MB (6 ms); render 10 ms [surface, camera 311 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    57.5 s "across the map": 40148 ms (main thread 21): render 16 ms, units 5 ms [surface, camera 319 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    75.6 s "2× speed, a tour": 18133 ms (main thread 13): render 10 ms [surface, camera 239 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 2×]
+    87.2 s "8× speed, far": 11516 ms (main thread 7): render 5 ms [surface, camera 376 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 8×]
+    97.4 s "1×, into the nest again": 10266 ms (main thread 12): msg 9 ms, ui 6 ms; ui:minimaps 6 ms [nest, camera 231 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    113.9 s "and out": 16499 ms (main thread 20): texture upload ×4 (0.0 MB, 0 ms); buffer upload 0.0 MB (6 ms); render 12 ms, nest 8 ms [nest, camera 252 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+  the slowest other frames:
+    0.5 s "the first seconds after loading": 67 ms (main thread 17): render 15 ms [surface, camera 230 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    0.2 s "the first seconds after loading": 33 ms (main thread 8): units 5 ms [surface, camera 230 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    17.4 s "across the map": 33 ms (main thread 4): outside this thread (browser, GPU or a background tab) [surface, camera 313 mm, 77 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+
+## The trees: up into the canopy and down again, twice
+load 105.1 s (pre-warm 94.1 s) · 16 frames in 64 s · 0.2 FPS · main thread 10 ms (render 6.71, units 2.13, ui 0.85, msg 0.31, events 0.07, nest 0.06)
+draw calls 151 · triangles 1810k · GPU memory ≈ 516 MB · 93 ants · shader links during the run 0 · texture uploads 0 · worker messages 88 KB
+  step                                                frames   avg ms  >33  >100  worst  sim kept up
+  the first seconds after loading                         11   1440.9    4     2  13383  2 %
+  climb into the trees                                     1  10199.6    1     1  10200  2 %
+  the canopy, close                                        1  20615.8    1     1  20616  1 %
+  up again                                                 1  10682.9    1     1  10683  2 %
+  and down                                                 2  12241.2    2     2  16783  2 %
+  freezes over 100 ms:
+    2.5 s "the first seconds after loading": 2283 ms (main thread 9): buffer upload 0.0 MB (5 ms); render 8 ms [surface, camera 230 mm, 93 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    15.9 s "the first seconds after loading": 13383 ms (main thread 7): render 5 ms [surface, camera 230 mm, 93 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    26.1 s "climb into the trees": 10200 ms (main thread 4): outside this thread (browser, GPU or a background tab) [nest, camera 157 mm, 93 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    46.8 s "the canopy, close": 20616 ms (main thread 10): render 9 ms [nest, camera 70 mm, 93 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    57.4 s "up again": 10683 ms (main thread 12): ui 9 ms; ui:minimaps 9 ms [nest, camera 276 mm, 93 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    65.1 s "and down": 7700 ms (main thread 1): outside this thread (browser, GPU or a background tab) [surface, camera 294 mm, 93 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    81.9 s "and down": 16783 ms (main thread 14): buffer upload 0.0 MB (5 ms); render 13 ms [surface, camera 299 mm, 93 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+  the slowest other frames:
+    0.1 s "the first seconds after loading": 33 ms (main thread 6): outside this thread (browser, GPU or a background tab) [surface, camera 230 mm, 93 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    0.2 s "the first seconds after loading": 33 ms (main thread 18): render 10 ms, units 8 ms [surface, camera 230 mm, 93 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+
+## Story: The Long Nights, the dusk before the last night
+load 96.9 s (pre-warm 85.3 s) · 16 frames in 60 s · 0.2 FPS · main thread 572.1 ms (render 570.6, units 0.52, creatures 0.46, ui 0.34, msg 0.28, events 0.1)
+draw calls 174 · triangles 754k · GPU memory ≈ 611 MB · 13 ants · shader links during the run 1 · texture uploads 2 · worker messages 28 KB
+  step                                                frames   avg ms  >33  >100  worst  sim kept up
+  the first seconds after loading                         11   1724.2    2     1  18783  1 %
+  4× speed into the night                                  3   8288.6    3     3  12866  2 %
+  close                                                    1  11099.6    1     1  11100  2 %
+  1×, far                                                  1  21015.8    1     1  21016  3 %
+  freezes over 100 ms:
+    19.1 s "the first seconds after loading": 18783 ms (main thread 14): render 8 ms, creatures 5 ms [surface, camera 230 mm, 13 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    19.9 s "4× speed into the night": 833 ms (main thread 5): outside this thread (browser, GPU or a background tab) [surface, camera 221 mm, 13 ants (drawn 0: close 0, mid 0, far 0), speed 4×]
+    32.7 s "4× speed into the night": 12866 ms (main thread 6): render 5 ms [surface, camera 220 mm, 13 ants (drawn 0: close 0, mid 0, far 0), speed 4×]
+    43.9 s "4× speed into the night": 11166 ms (main thread 8): render 6 ms [surface, camera 220 mm, 13 ants (drawn 0: close 0, mid 0, far 0), speed 4×]
+    55 s "close": 11100 ms (main thread 13): render 12 ms [surface, camera 77 mm, 13 ants (drawn 0: close 0, mid 0, far 0), speed 4×]
+    85.1 s "1×, far": 21016 ms (main thread 9029): shader compile ×1 (0 ms); texture upload ×2 (0.0 MB, 0 ms); render 9026 ms; new program: PointsMaterial [surface, camera 348 mm, 13 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+  the slowest other frames:
+    0.1 s "the first seconds after loading": 33 ms (main thread 15): render 14 ms [surface, camera 230 mm, 13 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+
+## The big fight: four colonies of 200, 100 creatures, two titans
+load 133.4 s (pre-warm 90.6 s) · 23 frames in 60 s · 0.4 FPS · main thread 12.8 ms (render 8.01, creatures 2.1, msg 1.3, units 1.21, ui 0.77, events 0.59)
+draw calls 341 · triangles 1625k · GPU memory ≈ 468 MB · 889 ants · shader links during the run 0 · texture uploads 0 · worker messages 638 KB
+  step                                                frames   avg ms  >33  >100  worst  sim kept up
+  the first seconds after loading                         21    211.9    4     2   3850  2 %
+  the fight                                                1  49948.0    1     1  49948  0 %
+  1×, far                                                  1  10099.6    1     1  10100  2 %
+  freezes over 100 ms:
+    0.6 s "the first seconds after loading": 233 ms (main thread 36): render 33 ms [surface, camera 260 mm, 889 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    4.8 s "the first seconds after loading": 3850 ms (main thread 15): render 9 ms, msg 9 ms [surface, camera 260 mm, 889 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    54.7 s "the fight": 49948 ms (main thread 29): render 13 ms, events 11 ms, msg 9 ms [surface, camera 260 mm, 889 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    64.8 s "1×, far": 10100 ms (main thread 36): render 17 ms, msg 12 ms, creatures 12 ms, units 5 ms [surface, camera 475 mm, 889 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+  the slowest other frames:
+    0.6 s "the first seconds after loading": 50 ms (main thread 20): render 12 ms [surface, camera 260 mm, 889 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
+    0.7 s "the first seconds after loading": 33 ms (main thread 13): render 9 ms [surface, camera 260 mm, 889 ants (drawn 0: close 0, mid 0, far 0), speed 1×]
