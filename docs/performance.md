@@ -789,3 +789,50 @@ ants' antennae wave, less than `main` against itself (3598); `tools/perf/same.sh
 against `main`); `npm test` with new checks in
 `tests/performance.ts` (the roster has a model for every caste; a grown instanced mesh keeps its instances; shadow
 twins for every caster with kept depth materials per scene; the lag recorder keeps a frame over 100 ms in play only).
+
+## Performance v7: find every lag on the user's own devices (claude/performance/07-spec-performance-v7-find-and-fix-everything.md, CHANGE_PLAN §39)
+The user (2026-11-27): "the game still lags, does it try to run math simulations behind the scenes before they
+actually happen perhaps? can you make them run in real time … especially with the species saiyants".
+
+**Does the game simulate ahead?** No. The simulation runs in its worker one 1/20 s tick at a time as real time passes:
+the loop adds real time × the game speed and asks for whole ticks (`core/loop.ts`), the host sends them to the worker
+in batches of at most 24 (fewer when ticks are slow, `game/simHost.ts workerBatchCap`), and the picture is drawn a
+little *behind* the newest tick — about one tick plus the arrival jitter — so the units move smoothly between the
+worker's frames (`game/playout.ts`). The only run on a copy is the worker's warm-up while loading (`worker/warmUp.ts`:
+up to 40 ticks on a throw-away copy so the JavaScript engine compiles the simulation before play; discarded). When a
+tick takes longer than 50 ms the game falls behind real time and the picture comes in bunches; the Lag Hunt reports,
+for each scene and step, how much of real time the simulation kept up with.
+
+### The Lag Hunt
+Menu → Graphics → **Run Lag Hunt** (also on the start menu's Graphics row, and `?lagHunt=1`; `&lhonly=arena-saiy,…`
+for some scenes). One page load a scene (`dev/lagHunt.ts HUNT_SCENES`), the game playing itself:
+- `arena-saiy`: Saiy-Ants (soldiers, workers, Blasters) against fire ants, 10, 50, 100 and 300 a side, each fight
+  watched from 220–450 mm and close up (35–90 mm, turning), then 4×;
+- `arena-roster`: every roster species in turn, 30 a side, near and far, then wolf spiders and ground beetles;
+- `match-saiy`: a four-colony match on Meadow Pond as the Saiy-Ants: the entrance, close to the ants, across the map,
+  down into the nest, every area, back up, 2×, 4×, 8×, into the nest and out again;
+- `trees`: up into the canopy and down, twice; `story`: The Long Nights' last dusk at 1× and 4×; `bigfight`: four
+  colonies of 200 with 100 creatures and two titans, near, turning, 4×, far.
+Every frame is recorded with its step (the first seconds after loading are a step of their own), the hitch log's
+causes for frames over 33 ms (compiles and links — a program linked in play is named —, uploads, the frame's parts,
+notes) and what was on screen (the area, the camera, the ants drawn by detail level, the speed); the simulation's
+tick time and the share of real time it kept up with. The report puts the summary first (the worst freezes across the
+run with their scene, step and cause; each scene's frame rate, frames over 33 ms and freezes over 100 ms), then each
+scene's steps, freezes, slowest frames and — for the arena, the match, the trees and the big fight — the GPU
+breakdown at its end (every pass, then every draw, waited for: Safari has no GPU timers). Copy and Download (a text
+file). `tests/browser/lag_hunt_run.py` runs it in the build machine's Chromium (WebKit could not be installed here: its
+download is blocked).
+
+### Saiy-Ants (measured first)
+- **The simulation is not it.** `tools/perf/arenaStress.ts` runs the arena's fights by species (the arena's own world
+  and spawn, every tick timed). At 50 and 100 a side every fight's tick averages under 1 ms (worst 10 ms); at 300 a side
+  Saiy-Ant soldiers against fire majors average 4.4 ms (p95 9.9, worst 26) — the heaviest, against 3.0 ms for fire
+  ants against fire ants — well inside the 50 ms a tick. Most of it is the arena's guard line and approach
+  (`holdGuardLine`, `approachSurface`, `nearestWalkable`), not anything of the Saiy-Ants'.
+- **The drawing is.** `tests/browser/species_cost_probe.py` (`GPU=1`) drops 60 of one caste at the same place, holds
+  them still and waits for every draw: at 120 mm, where every ant is drawn with the middle-distance model, a Saiy-Ant
+  worker costs 20.2 ms to draw here against 12.4 for a fire major of the same length, 12.3 for a garden-ant soldier
+  and 14.2 for a leafcutter media (8 mm, bigger); a Saiy-Ant soldier (9 mm) 30.2; Blasters 21.3; the shadow pass
+  likewise (+50 %). Close up the difference is small (+14 %). The middle-distance model's six hair locks are 1.9k of
+  its 5.1k triangles (other species' whole models 3.2–3.7k), their three strands a lock 1.1k, mostly thinner than a
+  pixel at that size (`docs/performance/species-cost-2026-11-27.txt`).

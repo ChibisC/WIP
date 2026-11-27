@@ -54,7 +54,7 @@ interface HuntScene {
 }
 
 /** One fighting caste of each roster species (its soldier, else its first). */
-function rosterFighters(): string[] {
+export function rosterFighters(): string[] {
   const all = arenaRosterCastes();
   const out: string[] = [];
   for (const sp of ARENA_ROSTER_SPECIES) {
@@ -251,7 +251,7 @@ interface HuntSceneResult {
   gpu?: GpuBreakdown;
 }
 
-interface HuntState {
+export interface HuntState {
   started: number;
   quality: string;
   results: HuntSceneResult[];
@@ -305,6 +305,7 @@ function panel(ui: HTMLElement): HTMLElement {
 
 /** Device facts for the report. */
 function device(): string[] {
+  if (typeof document === 'undefined') return ['(no browser)'];
   const c = document.createElement('canvas');
   const gl = c.getContext('webgl2');
   let gpu = 'unknown GPU';

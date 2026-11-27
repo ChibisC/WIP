@@ -945,5 +945,21 @@ if (columnCodegen.on) {
   check('lag recorder: a frame over 100 ms in play is kept with the game\'s state; not while loading, not after the page was hidden', before === 0 && kept && afterHidden === 1, `${before} ${P.lag.length} ${afterHidden}`);
 }
 
+// ---- performance v7 (claude/performance/07-spec-performance-v7-find-and-fix-everything.md): the Lag Hunt
+{
+  const { rosterFighters, huntReportText, HUNT_SCENES } = await import('../src/dev/lagHunt');
+  const { ARENA_ROSTER_SPECIES } = await import('../src/sim/arena');
+  const { CASTES } = await import('../src/sim/species');
+  const f = rosterFighters();
+  check('lag hunt: one fighting caste of every roster species (the arena scene drops each in turn)', f.length === ARENA_ROSTER_SPECIES.length && new Set(f.map((c) => CASTES[c].species)).size === f.length, f.join(','));
+  check('lag hunt: the scenes include the Saiy-Ants in the arena and a match as them', HUNT_SCENES.some((d) => d.id === 'arena-saiy') && HUNT_SCENES.some((d) => d.id === 'match-saiy' && d.query.includes('species=aurimyrmex')));
+  const freeze = (ms: number, step: string) => ({ scene: 'arena-saiy', step, t: 10, ms, cpu: 20, causes: ['render 12 ms'], ctx: 'surface' });
+  const scene = { id: 'arena-saiy', title: 'Arena', loadMs: 9000, prewarmMs: 4000, frames: 600, secs: 100, fps: 50, avg: 20, p95: 30, worst: 900, over33: 12, over100: 2, cpuAvg: 4, parts: { render: 3 }, tickAvg: 2, tickMax: 9, msgKB: 40, keptUp: 0.98, links: 0, uploads: 3, calls: 60, tris: 800000, gpuMB: 700, ants: 600, steps: [{ label: 'zoom in', frames: 600, ms: 12000, over33: 12, over100: 2, worst: 900, ticks: 1960, wanted: 2000 }], freezes: [freeze(150, 'zoom in'), freeze(900, '300 a side')], slow: [] };
+  const text = huntReportText({ started: Date.UTC(2026, 10, 27), quality: 'high', results: [scene] });
+  const sum = text.indexOf('== SUMMARY');
+  const det = text.indexOf('== DETAILS');
+  check('lag hunt report: the summary (worst freeze first, each scene\'s rate and the simulation kept up) before the details', sum > 0 && det > sum && text.indexOf('900 ms') < text.indexOf('150 ms') && text.includes('kept up 98 %') && text.includes('50 FPS'), text.slice(0, 200));
+}
+
 console.log(`\n${failed ? `${failed} FAILED` : 'all passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 if (failed) (globalThis as unknown as { process: { exit(n: number): void } }).process.exit(1);

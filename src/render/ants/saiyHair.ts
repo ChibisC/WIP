@@ -11,6 +11,20 @@
 import * as THREE from 'three';
 import { ellipsoid, transformPts, tube, tmpC } from './antGeometry';
 
+/**
+ * The middle-distance model's strands a lock (3). Performance v7: at that distance (an ant 9–70 px long) the 18
+ * strands are about a third of a Saiy-Ant's triangles and are drawn mostly thinner than a pixel; `?saiyStrands=N`
+ * renders the comparison for the user's choice (render only; the default is the game's look).
+ */
+const MID_STRANDS = (() => {
+  try {
+    const v = new URLSearchParams(globalThis.location?.search ?? '').get('saiyStrands');
+    return v === null || !(Number(v) >= 0) ? 3 : Math.floor(Number(v));
+  } catch {
+    return 3;
+  }
+})();
+
 export function buildHair6(acc, hair6, look, headM, hL, headCY, hi, rng) {
 if (hair6) {
     const hs = hair6, wflag = (hs.queen ? 6 : 4) + 0.8, hsurf = { rough: hs.rough ?? 0.46, coat: 0.05, sheen: 0.1 };
@@ -18,7 +32,7 @@ if (hair6) {
     const put = (pp, pi) => acc.piece(transformPts(pp, headM), pi, 30, hcol, hsurf, wflag);
     // scalp cap: one continuous mass of hair over the top and back of the head, behind the antenna bases
     if (hs.cap) { const cp = hs.cap, [kp, ki] = ellipsoid(new THREE.Vector3((cp.at[0] + 0.5) * hL, headCY + cp.at[1] * hL, 0), new THREE.Vector3(cp.r[0] * hL, cp.r[1] * hL, cp.r[2] * hL), hi ? 14 : 8); put(kp, ki); }
-    const strandsN = hi ? (hs.strands ?? 6) : !hi ? 3 : 0, segs = hi ? 7 : 5;
+    const strandsN = hi ? (hs.strands ?? 6) : MID_STRANDS, segs = hi ? 7 : 5;
     for (const sp of hs.spikes) {
       const [X, Y, Z] = sp.at, yaw = sp.yaw * Math.PI / 180 * Math.sign(Z || 0), pitch = sp.pitch * Math.PI / 180;
       const len = sp.len * hL * (hs.lenMul ?? 1) * (sp.lenMul ?? 1), wdt = sp.w * hL * (hs.wMul ?? 1);
